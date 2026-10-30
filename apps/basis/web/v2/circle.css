@@ -292,7 +292,7 @@
 .circle-tile.is-removed { opacity: 0.75; }
 .circle-tile__removed {
   flex: 0 0 auto; padding: 2px 8px; border-radius: 10px;
-  border: 1px solid var(--rule, currentColor); color: var(--ink-soft, inherit);
+  border: 1px solid var(--line); color: var(--ink-soft, inherit);
   font-family: var(--font-sans); font-size: 12px; line-height: 1.4;
 }
 .circle-view__close-removed { margin-left: 8px; }

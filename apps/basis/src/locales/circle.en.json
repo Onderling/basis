@@ -5608,7 +5608,15 @@
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     },
     "feedback_contact": "Feedback about the app goes to Onderling — add them as a contact and write to them there: {{link}}. I can't change myself and I don't keep or forward anything.",
-    "feedback_no_contact": "Feedback about the app goes to Onderling, but this bot has no contact of theirs to give. In the app they are under Settings → Feedback. I can't change myself and I don't keep anything."
+    "feedback_no_contact": "Feedback about the app goes to Onderling, but this bot has no contact of theirs to give. In the app they are under Settings → Feedback. I can't change myself and I don't keep anything.",
+    "model_cause_key_or_route": {
+      "text": "the key at the provider may have expired, or the connection to the provider does not work",
+      "doc": "The model trouble's cause when the Privatemode SDK fails as \"502 Connection error\": an expired key and a route that does not reach the enclave look the same there, so both are named (2026-10-30: an expired key showed exactly this)."
+    },
+    "secret_check_key_or_route": {
+      "text": "Note: the language model provider gives no answer (status {{status}}). The key {{secret}} may have expired, or the connection to the provider does not work: check the key first. Free-text questions get no answer until that is sorted; commands and buttons still work.",
+      "doc": "The alert chat's line for the SDK's \"502 Connection error\": names both an expired key and the route, key first (the cheaper check)."
+    }
   },
   "op": {
     "admin_only": {

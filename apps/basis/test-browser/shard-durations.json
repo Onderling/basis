@@ -47,6 +47,7 @@
   "walk-step0-box.spec.js": 600,
   "walk-stories.spec.js": 910,
   "walk-sweep.spec.js": 204,
+  "walk-roster-carriers.spec.js": 2400,
   "walk-two-devices-first-statements.spec.js": 90,
   "walk-withheld-capability.spec.js": 126
  }

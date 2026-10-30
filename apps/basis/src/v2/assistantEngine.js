@@ -31,6 +31,7 @@
  * line on purpose there, and a wait on every bot reply would read as a slow app. Their lane still serialises, and
  * lines that queue up while a turn runs are still one turn.
  */
+import { narrowCatalogueForLine } from './toolFamilies.js';
 import { createCircleDispatch, addressesBot, stripBotTag } from './circleDispatch.js';
 import { createThreadLanes, COLLECT_MS } from './assistantLane.js';
 import { createTokenGate } from './tokenGate.js';
@@ -121,6 +122,8 @@ export function createAssistantEngine({
     const langHints = fixed ? [replyInHint(fixed)] : interpretHintsFor(text);
     return interpretIn(text, {
       ...o,
+      // only the tool families the line's words can concern (the lists always; every tool when no family claims it)
+      ...(o.catalogue ? { catalogue: narrowCatalogueForLine(o.catalogue, text) } : {}),
       ...(fixed || own.length ? { hints: o.hints ?? [...langHints, ...own] } : {}),
       options: o.options ?? { temperature: ASSISTANT_TEMPERATURE },
       toolLang: o.toolLang ?? toolLang,

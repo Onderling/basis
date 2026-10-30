@@ -52,7 +52,7 @@ import {
   prepareJoinIdentity,
   setLinkChoice,
   setJoinReveal,
-  REVEAL_PRESETS, isJoinDirty, personaLabel } from '../../core/wizards/joinGroupState.js';
+  REVEAL_PRESETS, isJoinDirty, personaLabel, secondPersonaWarning } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
 import { mkHandleField } from './_wizardKit.js';   // the one handle field the join and create wizards share
@@ -72,6 +72,8 @@ import { mkHandleField } from './_wizardKit.js';   // the one handle field the j
 export function renderJoinGroupWizard(opts) {
   const { container, doc, args, callSkill, onClose, onDispatched, sendPeerRedeem, sources, setCloseGuard,
     circles, circleAddressFor, signCircleLink,
+    // which persona this device holds a circle as (`agent.profileIdOf`): the join warns before a second persona joins
+    profileIdOf,
     // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
     dialEndpoint, activeEndpointUrl,
     // The host's post-join step (`makeCircleReachable`: register this device's address, bind the roster's,
@@ -106,7 +108,7 @@ export function renderJoinGroupWizard(opts) {
     loadPersonas({ callSkill }).then((personas) => { state.personas = personas; rerender(); }).catch(() => {});
     // #4 — background-load the join-time identity inputs (prior handles + the existing-selves
     // list for the "continue as an existing self" key choice). Failure leaves safe defaults.
-    prepareJoinIdentity({ state, callSkill, circles }).then(rerender).catch(() => {});
+    prepareJoinIdentity({ state, callSkill, circles, profileIdOf }).then(rerender).catch(() => {});
   }
 
   // Dismissing by clicking outside the card used to discard a half-filled join without a word — the same
@@ -431,6 +433,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
       // …and the persona brings its own handle into the field, when the field is still empty. Prefill,
       // never override: going back to this picker must not undo what the person typed.
       applyPersonaHandle({ state, callSkill }).then((r) => { if (r.applied) rerender(); }).catch(() => {});
+      if (state.heldAs) rerender();   // the second-persona warning follows the choice
     });
     pWrap.appendChild(select);
 
@@ -438,6 +441,16 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     pHint.className = 'cc-wizard-field-hint';
     pHint.textContent = t('circle.join.wizard.persona.hint');
     pWrap.appendChild(pHint);
+
+    // ONE MEMBER PER PERSONA — this device is already in the circle as another of the person's personas
+    const second = secondPersonaWarning(state);
+    if (second) {
+      const held = state.personas.find((p) => p.id === second.personaId) ?? { id: second.personaId };
+      const warn = doc.createElement('div');
+      warn.className = 'cc-wizard-error';
+      warn.textContent = t('circle.join.wizard.persona.second_warning', { persona: personaLabel(held, t) });
+      pWrap.appendChild(warn);
+    }
     wrap.appendChild(pWrap);
   }
 

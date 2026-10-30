@@ -19,6 +19,7 @@ import {
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
   personaLabel,
+  secondPersonaWarning,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 
@@ -30,6 +31,8 @@ import {
 export default function JoinGroupWizardModal({
   visible, args, callSkill, onClose, onDispatched, t, sendPeerRedeem,
   circles, circleAddressFor, signCircleLink,
+  // which persona this device holds a circle as (`agent.profileIdOf`): the join warns before a second persona joins
+  profileIdOf,
   // Injected by the shell — see `sheetStyles`. Absent ⇒ the previous light sheet.
   theme,
   // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
@@ -67,7 +70,7 @@ export default function JoinGroupWizardModal({
       // picker. Failure is silent (empty → picker offers only "join minimally").
       next.personas = await loadPersonas({ callSkill });
       // #4 — load the existing-selves list for the "continue as an existing self" key choice.
-      try { await prepareJoinIdentity({ state: next, callSkill, circles }); } catch { /* safe defaults */ }
+      try { await prepareJoinIdentity({ state: next, callSkill, circles, profileIdOf }); } catch { /* safe defaults */ }
       if (active) setState(next);
     })();
     return () => { active = false; };
@@ -245,6 +248,13 @@ export default function JoinGroupWizardModal({
                     ]}
                   />
                 ) : null}
+                {/* ONE MEMBER PER PERSONA — this device is already in the circle as another of the person's personas */}
+                {(() => {
+                  const second = secondPersonaWarning(state);
+                  if (!second) return null;
+                  const held = (state.personas ?? []).find((p) => p.id === second.personaId) ?? { id: second.personaId };
+                  return <ErrorBanner message={t('circle.join.wizard.persona.second_warning', { persona: personaLabel(held, t) })} />;
+                })()}
                 {/* Reveal level (§1.6) — how much of your persona this circle sees. You pick it
                     (default = your resolved usual level, else the fallback); adjustable down to
                     handle. Makes the join release VISIBLE + yours to set, not a silent default. */}

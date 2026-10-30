@@ -337,15 +337,35 @@ describe('rung 4 — the deliberate reach exchange', () => {
     const { a, b } = reachPair();
     const atB = []; b.subscribeToReach((r) => atB.push(r));
     const atA = []; a.subscribeToReach((r) => atA.push(r));
-    const r = await a.shareReach('b');
+    const r = await a.shareReach('b', { press: { trigger: 'chip', event: {} } });
     expect(r.ok).toBe(true);
     expect(atB).toHaveLength(1);
     expect(atB[0]).toMatchObject({ from: 'a', wantBack: true, transports: { relay: { url: 'wss://relay.a' }, nkn: { address: 'nkn-a' } } });
     expect(b.pendingReachFrom('a')).toBeTruthy();
-    const back = await b.shareReach('a', { wantBack: false });
+    const back = await b.shareReach('a', { wantBack: false, press: { trigger: 'reach-back-yes', event: {} } });
     expect(back.ok).toBe(true);
     expect(b.pendingReachFrom('a')).toBeNull();               // answering settles the ask
     expect(atA[0]).toMatchObject({ from: 'b', wantBack: false, transports: { relay: { url: 'wss://relay.b' } } });
+  });
+
+  it('a share happens only from a press on the chip; every attempt is logged with its trigger', async () => {
+    // 2026-10-30, two phones: "how to reach me" left the Samsung twice with nobody pressing Share. Whatever the cause,
+    // the share is the disclosure, so it takes the press it came from — never a call derived from anything else.
+    const sent = []; const logged = [];
+    const a = createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload) => { sent.push(payload); return { delivered: true }; },
+      listPeers: () => [{ pubKey: 'b' }], myAddress: () => 'a', now,
+      myAddresses: () => ({ relay: { url: 'wss://relay.a' } }), onShare: (rec) => logged.push(rec),
+    });
+    expect(await a.shareReach('b')).toMatchObject({ ok: false, reason: 'no-press' });
+    expect(await a.shareReach('b', { press: { trigger: 'somewhere' , event: {} } })).toMatchObject({ ok: false, reason: 'no-press' });
+    expect(await a.shareReach('b', { press: { trigger: 'chip', event: { isTrusted: false } } })).toMatchObject({ ok: false, reason: 'no-press' });
+    expect(sent, 'nothing left without a press').toEqual([]);
+    expect((await a.shareReach('b', { press: { trigger: 'chip', event: {} } })).ok).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(logged.map((r) => [r.kind, r.trigger, r.ok])).toEqual([
+      ['reach-share', 'none', false], ['reach-share', 'none', false], ['reach-share', 'none', false], ['reach-share', 'chip', true],
+    ]);
   });
 
   it('the answer still lands after the sender left the room (the rung is not proximity-gated)', async () => {
@@ -361,7 +381,7 @@ describe('rung 4 — the deliberate reach exchange', () => {
     expect(b.onPeerMessage('a', { subtype: 'nearby-reach', reach: { transports: {} } })).toBe(true);
     expect(b.pendingReachFrom('a')).toBeNull();
     const none = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [{ pubKey: 'x' }], now });
-    expect(await none.shareReach('x')).toMatchObject({ ok: false, reason: 'nothing-to-share' });
+    expect(await none.shareReach('x', { press: { trigger: 'chip', event: {} } })).toMatchObject({ ok: false, reason: 'nothing-to-share' });
   });
 });
 

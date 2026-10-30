@@ -90,8 +90,9 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     if (typeof room?.subscribeToReach !== 'function') return undefined;
     return room.subscribeToReach((r) => { if (r?.from === peerAddr) setPendingReach(r); });
   }, [room, peerAddr]);
-  const shareReach = async (wantBack) => {
-    const r = await room?.shareReach?.(peerAddr, { wantBack });
+  // the press itself goes down with it: sharing how to reach me happens only from a press on these two
+  const shareReach = async (wantBack, trigger, event) => {
+    const r = await room?.shareReach?.(peerAddr, { wantBack, press: { trigger, event } });
     if (r?.ok) {
       room?.settleReach?.(peerAddr);
       setPendingReach(null);
@@ -346,7 +347,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
           <Text style={{ flex: 1, color: theme.color.ink, fontSize: 13 }}>
             {t('circle.nearbyScreen.reach_ask_back', { name })}
           </Text>
-          <Pressable style={styles.send} onPress={() => shareReach(false)} accessibilityRole="button" testID="reach-back-yes">
+          <Pressable style={styles.send} onPress={(e) => shareReach(false, 'reach-back-yes', e?.nativeEvent ?? null)} accessibilityRole="button" testID="reach-back-yes">
             <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_back_yes')}</Text>
           </Pressable>
           <Pressable style={styles.send} onPress={() => { room?.settleReach?.(peerAddr); setPendingReach(null); }} accessibilityRole="button" testID="reach-back-no">
@@ -355,7 +356,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         </View>
       ) : null}
       {contact?.transient && !pendingReach ? (
-        <Pressable onPress={() => shareReach(true)} accessibilityRole="button" testID="reach-share" style={styles.skillChip ?? styles.send}>
+        <Pressable onPress={(e) => shareReach(true, 'chip', e?.nativeEvent ?? null)} accessibilityRole="button" testID="reach-share" style={styles.skillChip ?? styles.send}>
           <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_share')}</Text>
         </Pressable>
       ) : null}

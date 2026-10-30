@@ -31,8 +31,8 @@ importers:
         specifier: ^6
         version: 6.49.0
       privatemode-ai:
-        specifier: ^1.55.0
-        version: 1.55.0(openai@6.49.0)
+        specifier: ^1.61.0
+        version: 1.61.0(openai@6.49.0)
 
 packages:
 
@@ -447,8 +447,8 @@ packages:
     resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
     engines: {node: ^10 || ^12 || >=14}
 
-  privatemode-ai@1.55.0:
-    resolution: {integrity: sha512-aDz+vWyzIZaevzQao3cel3jjXCKL+YMZiQnHhrB9OljziTnhOJuH2le+Bmf3RTl9u0hxOeXl8vNLU7fwok0XpQ==}
+  privatemode-ai@1.61.0:
+    resolution: {integrity: sha512-GEKjKwsav/JWnlQEk6NcFveDkdt1mQ+GZWJO/Xm/Ca//5aOBVYV5/o9chIwVGO3tox733n51P64LOiKTHC1PcQ==}
     peerDependencies:
       openai: <8
 
@@ -828,7 +828,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  privatemode-ai@1.55.0(openai@6.49.0):
+  privatemode-ai@1.61.0(openai@6.49.0):
     dependencies:
       openai: 6.49.0
     optional: true

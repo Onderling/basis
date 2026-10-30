@@ -26,14 +26,21 @@ const TOLD_EVERY_MS = 3600 * 1000;
 
 /** Does this provider error say the account is over its limit (not a wrong key)? */
 export const isOverLimit = (err) => /\b(exceeded|over)\b[^\n]*\blimit\b/i.test(String(err?.message ?? err ?? ''));
+/**
+ * The Privatemode SDK's shape for an answer it could not get: '502 Connection error'. An expired key gives exactly this
+ * (2026-10-30: weeks after a key expired, the smoke failed so, not with a 401), and so does a route that does not reach
+ * the enclave — the shape cannot tell them apart, so neither is blamed alone.
+ */
+const isKeyOrRoute = (err) => (Number(err?.status) || 0) === 502 && /\bconnection error\b/i.test(String(err?.message ?? ''));
 const isSlow = (err) => err?.name === 'AbortError' || /\babort|timed? ?out\b/i.test(String(err?.message ?? ''));
 
 /**
  * What kind of trouble a model failure is: `key` (401/403: the key no longer works), `limit` (402/429, or a refusal that
  * says the account is over its limit — Privatemode sends that as a 401), `refused` (another 4xx), `slow` (it did not
- * answer in time), `unreachable` (no answer, or the provider's own failure).
+ * answer in time), `key_or_route` (the SDK's '502 Connection error': an expired key or a route that does not reach the
+ * provider, which that shape cannot tell apart), `unreachable` (no answer, or the provider's own failure).
  * @param {any} err
- * @returns {'key'|'limit'|'refused'|'slow'|'unreachable'}
+ * @returns {'key'|'limit'|'refused'|'slow'|'key_or_route'|'unreachable'}
  */
 export function troubleCause(err) {
   const status = Number(err?.status) || 0;
@@ -41,13 +48,14 @@ export function troubleCause(err) {
   if (status === 401 || status === 403) return 'key';
   if (status >= 400 && status < 500) return 'refused';
   if (isSlow(err)) return 'slow';
+  if (isKeyOrRoute(err)) return 'key_or_route';
   return 'unreachable';
 }
 
 /** What the person is told, coarser: refused (the admin is told) · slow · unreachable. */
 export const replyClass = (cause) => (cause === 'key' || cause === 'limit' || cause === 'refused' ? 'refused' : cause === 'slow' ? 'slow' : 'unreachable');
 
-const ALERT_KEY = { key: 'circle.bot.secret_check_failed', limit: 'circle.bot.secret_check_limit' };
+const ALERT_KEY = { key: 'circle.bot.secret_check_failed', limit: 'circle.bot.secret_check_limit', key_or_route: 'circle.bot.secret_check_key_or_route' };
 /** The alert chat's words by cause (an alert that blames the key for a quota sends the operator to the wrong screen). */
 const alertKeyFor = (cause) => ALERT_KEY[cause] ?? 'circle.bot.secret_check_refused';
 /** …and by status alone. */

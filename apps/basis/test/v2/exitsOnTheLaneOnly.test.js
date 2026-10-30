@@ -50,6 +50,12 @@ describe('a leave and a removal are statements on the lane, not rows in a pile',
     const mine = async (n) => (await n.agent.callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [];
     expect(await mine(B)).toContain(CIRCLE);
 
+    // C's relay records what comes off it: the security half of a removal runs the moment the evict folds on C
+    const removedAddrs = [];
+    const cAddress = C.agent.circleAddressFor?.(CIRCLE) ?? null;
+    const relaysBefore = C.agent.sa.relays;
+    C.agent.sa.relays = { ...(relaysBefore ?? {}), list: () => [...(relaysBefore?.list?.() ?? []), { url: 'ws://recording.example', port: { removeAddress: (a) => { removedAddrs.push(a); } } }] };
+
     const left = await B.agent.callSkill('pinboard', 'leaveGroup', { groupId: CIRCLE, confirm: true });
     expect(left?.error, JSON.stringify(left)).toBeUndefined();
     const removed = await A.agent.callSkill('pinboard', 'removeMember', { groupId: CIRCLE, memberWebid: C.pubKey });
@@ -61,5 +67,18 @@ describe('a leave and a removal are statements on the lane, not rows in a pile',
     expect(await until(async () => (!(await members(A)).includes(B.pubKey) && !(await members(A)).includes(C.pubKey) ? true : null), { timeout: 12000, step: 150 }),
       'the admin folds both out').toBe(true);
     expect(exitRows, 'no exit row is written into pinboard\'s pile').toEqual([]);
+
+    // C, removed by the admin: out of "my circles" (the security half ran: the address is off the relay), listed only as
+    // removed — what a person's shells show read-only until they close it — and a line from C does not land on A
+    const cMine = await C.agent.callSkill('pinboard', 'listMyCircles', {});
+    expect(cMine?.circles ?? [], 'C\'s circles no longer hold the circle').not.toContain(CIRCLE);
+    expect((cMine?.removed ?? []).map((r) => r.id), 'C sees it as removed').toContain(CIRCLE);
+    expect(cAddress, 'C had a per-circle address').toBeTruthy();
+    expect(await until(async () => (removedAddrs.includes(cAddress) ? true : null), { timeout: 8000, step: 100 }),
+      'C\'s address for the circle came off the relay when the evict folded').toBe(true);
+    await C.agent.callSkill('pinboard', 'postRequest', { groupId: CIRCLE, text: 'ik ben er nog', intent: 'ask' }).catch(() => null);
+    await new Promise((r) => { setTimeout(r, 2000); });
+    const aSees = ((await A.agent.callSkill('pinboard', 'listOpenRequests', {}))?.items ?? []).some((i) => (i.text ?? '').includes('ik ben er nog'));
+    expect(aSees, 'a line from the removed member does not land in the circle').toBe(false);
   }, 120_000);
 });

@@ -2927,6 +2927,10 @@ export function buildSkills({
       // made on a sibling arrives by the lane's catch-up. This is not cosmetic: this list drives `primeCircleSecurity`
       // and the relay's per-circle address registration, so a circle wrongly listed is one re-registered on the relay.
       const left = [];
+      // …and one an admin REMOVED me from: out of "my circles" too (its security half — the address off the relays, the
+      // keys unbound — ran when the evict folded), but a person's shells still show it, marked and read-only, until they
+      // close it (which forgets the circle's rows here). A box lists `circles` only.
+      const removed = [];
       for (const gid of [...ids]) {
         let folded = null;
         let rows = null;
@@ -2938,15 +2942,16 @@ export function buildSkills({
         } catch { rows = null; }
         const exit = folded?.lastExit?.[from];
         const onRoster = Array.isArray(rows) && rows.some((m) => (m?.webid ?? m?.id) === from);
-        if ((exit === 'leave' || exit === 'evict') && !onRoster) { ids.delete(gid); left.push(gid); }
+        if ((exit === 'leave' || exit === 'evict') && !onRoster) { ids.delete(gid); (exit === 'evict' ? removed : left).push(gid); }
       }
       return {
         circles: [...ids],
         // Names alongside the ids, so a shell never has to show an identifier where a name belongs.
         names: Object.fromEntries([...ids].filter((g) => names.has(g)).map((g) => [g, names.get(g)])),
-        // …and the circles this device has LEFT (or been removed from) — what a sibling that slept through the leave
-        // is told on connect, so it leaves too (2026-09-22).
+        // …the circles this device's person LEFT — what a sibling that slept through the leave is told on connect…
         left,
+        // …and the ones an admin removed them from, with their names: shown read-only until the person closes them.
+        removed: removed.map((g) => ({ id: g, name: names.get(g) ?? null })),
         _sync: simulateSync(),
       };
     }, {

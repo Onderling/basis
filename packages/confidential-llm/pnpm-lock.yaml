@@ -447,8 +447,8 @@ packages:
     resolution: {integrity: sha512-DTPx3RWSSnWyzLxQnlH0rJP+EW5ekl16ZU4/psbIhA0e53kJfdgaN5vKM+xP7yJtXVu+nfdVFmlgFDEKAe4Pyw==}
     engines: {node: ^10 || ^12 || >=14}
 
-  privatemode-ai@1.61.0:
-    resolution: {integrity: sha512-GEKjKwsav/JWnlQEk6NcFveDkdt1mQ+GZWJO/Xm/Ca//5aOBVYV5/o9chIwVGO3tox733n51P64LOiKTHC1PcQ==}
+  privatemode-ai@1.55.0:
+    resolution: {integrity: sha512-aDz+vWyzIZaevzQao3cel3jjXCKL+YMZiQnHhrB9OljziTnhOJuH2le+Bmf3RTl9u0hxOeXl8vNLU7fwok0XpQ==}
     peerDependencies:
       openai: <8
 
@@ -635,7 +635,7 @@ snapshots:
       '@onderling/logger': link:../logger
     optionalDependencies:
       openai: 6.49.0
-      privatemode-ai: 1.61.0(openai@6.49.0)
+      privatemode-ai: 1.55.0(openai@6.49.0)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -842,7 +842,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  privatemode-ai@1.61.0(openai@6.49.0):
+  privatemode-ai@1.55.0(openai@6.49.0):
     dependencies:
       openai: 6.49.0
     optional: true

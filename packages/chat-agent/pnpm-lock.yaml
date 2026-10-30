@@ -667,8 +667,8 @@ packages:
     deprecated: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
     hasBin: true
 
-  privatemode-ai@1.61.0:
-    resolution: {integrity: sha512-GEKjKwsav/JWnlQEk6NcFveDkdt1mQ+GZWJO/Xm/Ca//5aOBVYV5/o9chIwVGO3tox733n51P64LOiKTHC1PcQ==}
+  privatemode-ai@1.55.0:
+    resolution: {integrity: sha512-aDz+vWyzIZaevzQao3cel3jjXCKL+YMZiQnHhrB9OljziTnhOJuH2le+Bmf3RTl9u0hxOeXl8vNLU7fwok0XpQ==}
     peerDependencies:
       openai: <8
 
@@ -1001,7 +1001,7 @@ snapshots:
       '@onderling/logger': link:../logger
     optionalDependencies:
       openai: 6.49.0
-      privatemode-ai: 1.61.0(openai@6.49.0)
+      privatemode-ai: 1.55.0(openai@6.49.0)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -1422,7 +1422,7 @@ snapshots:
       tunnel-agent: 0.6.0
     optional: true
 
-  privatemode-ai@1.61.0(openai@6.49.0):
+  privatemode-ai@1.55.0(openai@6.49.0):
     dependencies:
       openai: 6.49.0
     optional: true

@@ -447,7 +447,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     if (second) {
       const held = state.personas.find((p) => p.id === second.personaId) ?? { id: second.personaId };
       const warn = doc.createElement('div');
-      warn.className = 'cc-wizard-error cc-wizard-persona-second';
+      warn.className = 'cc-wizard-error';
       warn.textContent = t('circle.join.wizard.persona.second_warning', { persona: personaLabel(held, t) });
       pWrap.appendChild(warn);
     }

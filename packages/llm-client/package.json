@@ -29,6 +29,6 @@
   },
   "optionalDependencies": {
     "openai": "^6",
-    "privatemode-ai": "^1.55.0"
+    "privatemode-ai": "^1.61.0"
   }
 }

@@ -145,7 +145,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.made', { name: text }) };
     },
 
-    addToList: async (args, ctx) => { try { return await addToListProbe(args, ctx); } catch (e) { console.warn('[circle-probe] addToList threw', e?.stack ?? e); throw e; } },
+    addToList: async (args, ctx) => { try { const cid = circleOf(args); let st = null; try { st = svc.storeFor?.(cid) ?? null; } catch (e) { st = `threw ${e?.message}`; } console.warn('[circle-probe] add', String(cid).slice(0, 14), 'store', st === null ? 'null' : typeof st === 'string' ? st : `ok put=${typeof st.put} hook=${typeof st.setSyncHook}`); return await addToListProbe(args, ctx); } catch (e) { console.warn('[circle-probe] addToList threw', e?.stack ?? e); throw e; } },
     addToListProbe: async (args, ctx) => {
       const circleId = circleOf(args);
       const text = String(args?.text ?? '').trim();

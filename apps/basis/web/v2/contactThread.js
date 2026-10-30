@@ -264,7 +264,7 @@ export function renderContactThread(container, {
         btn.className = 'cc-cthread__btn';
         btn.dataset.buttonId = b.id ?? '';
         btn.textContent = b.label ?? b.id ?? '';
-        btn.addEventListener('click', () => { if (typeof onButtonTap === 'function') onButtonTap(b, m); });
+        btn.addEventListener('click', (ev) => { if (typeof onButtonTap === 'function') onButtonTap(b, m, ev); });
         btnRow.appendChild(btn);
       }
       row.appendChild(btnRow);

@@ -125,10 +125,13 @@ export function receivePresence(payload, fromAddress, now = () => Date.now()) {
  * @param {() => ({label?: string}|null)|Promise<{label?: string}|null>} [deps.myFace]  the face I present
  * @param {() => number} [deps.now]
  * @param {(err: Error, phase: string) => void} [deps.onError]
+ * @param {(record: {kind: 'reach-share', trigger: 'chip'|'reach-back-yes'|'none', ok: boolean, reason?: string, at: number}) => void} [deps.onShare]
+ *   every attempt to share how to reach me, with what pressed it (the shell's diagnostics; default: the console)
  */
 export function createNearbyRoomBinding({
   sendPeerMessage, listPeers = () => [], subscribeToPeers = null, myAddress = () => null, myFace = null,
   now = () => Date.now(), onError = null, deliveryMap: deliveryMapInput = null, myAddresses = null,
+  onShare = (rec) => { try { console.info(`[reach-share] trigger=${rec.trigger} ok=${rec.ok}${rec.reason ? ` reason=${rec.reason}` : ''}`); } catch { /* diagnostics only */ } },
 } = {}) {
   let deliveryMap = deliveryMapInput;
   if (typeof sendPeerMessage !== 'function') throw new TypeError('nearbyRoomBinding: sendPeerMessage required');
@@ -344,17 +347,26 @@ export function createNearbyRoomBinding({
      * Rung 4, outbound: share how to reach me with ONE peer (all-or-nothing; the shell's `myAddresses`
      * decides what "all" is, the publication lock included). `wantBack: true` asks them to share back.
      */
-    async shareReach(toAddress, { wantBack = true } = {}) {
+    async shareReach(toAddress, { wantBack = true, press = null } = {}) {
+      // The share IS the disclosure, so it takes the press it came from: the Share chip, or "share back" on an
+      // ask-back — with the event the shell received (a browser's synthetic click is not one). Anything else — a
+      // call derived from a landing, a stray handler — is refused and said (2026-10-30: two shares nobody pressed).
+      const trigger = press && (press.trigger === 'chip' || press.trigger === 'reach-back-yes') && press.event
+        && press.event.isTrusted !== false ? press.trigger : null;
+      const said = (ok, reason) => { try { onShare?.({ kind: 'reach-share', trigger: trigger ?? 'none', ok, ...(reason ? { reason } : {}), at: now() }); } catch { /* diagnostics only */ } };
+      if (!trigger) { said(false, 'no-press'); return { ok: false, reason: 'no-press' }; }
       let mine = null;
       try { mine = await (typeof myAddresses === 'function' ? myAddresses() : null); } catch { mine = null; }
       const transports = mine && typeof mine === 'object' ? mine : {};
-      if (Object.keys(transports).length === 0) return { ok: false, reason: 'nothing-to-share' };
+      if (Object.keys(transports).length === 0) { said(false, 'nothing-to-share'); return { ok: false, reason: 'nothing-to-share' }; }
       try {
         await sendPeerMessage(toAddress, { subtype: REACH_MESSAGE, msgId: `reach:${now()}`, reach: { transports, wantBack } });
         pendingReach.delete(toAddress);   // answering their ask-back settles it
+        said(true);
         return { ok: true, transports };
       } catch (err) {
         report(err, 'shareReach');
+        said(false, 'send-failed');
         return { ok: false, reason: err?.message ?? 'send-failed' };
       }
     },

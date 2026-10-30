@@ -48,7 +48,8 @@ describe('renderContactThread', () => {
     const btn = el.querySelector('.cc-cthread__btn');
     expect(btn.textContent).toBe('Ja');
     btn.click();
-    expect(onButtonTap).toHaveBeenCalledWith({ id: 'yes', label: 'Ja' }, msg);
+    // …with the click itself (a share of how to reach me takes the press it came from)
+    expect(onButtonTap).toHaveBeenCalledWith({ id: 'yes', label: 'Ja' }, msg, expect.objectContaining({ type: 'click' }));
   });
 
   it('renders the language picker (langValue + onLangChange) + routes a tap', () => {

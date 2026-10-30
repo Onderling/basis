@@ -13,6 +13,7 @@
  *   node scripts/assistant-eval.mjs --model gpt-oss-120b
  *   node scripts/assistant-eval.mjs --model glm-5.3 --thinking on   # the model's reasoning: off (its lowest) · low · on
  *   node scripts/assistant-eval.mjs --only add        # fixtures whose id contains "add"
+ *   node scripts/assistant-eval.mjs --slice 12 --cache   # the first twelve, prompt cache on (a short live check)
  *   node scripts/assistant-eval.mjs --apps lists   # the bot's app list (default: the household template's — lists, tasks)
  *   node scripts/assistant-eval.mjs --from-log ~/.basis-telegram/walk-log-*.jsonl   # print fixture stubs from a walk
  *
@@ -34,6 +35,7 @@ const { values } = parseArgs({ options: {
   model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.95' },
   mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' }, 'door-lang': { type: 'string' },
   apps: { type: 'string' }, thinking: { type: 'string', default: 'off' }, cache: { type: 'boolean', default: false },
+  slice: { type: 'string' },
 } });
 
 if (values['from-log']) {
@@ -78,7 +80,8 @@ if (!values.mock) {
   llm = new LlmClient({ provider: mockProvider({ responses: [{ replyText: 'Welke lijst bedoel je?' }] }) });
 }
 
-const fixtures = FIXTURES.filter((f) => !values.only || f.id.includes(values.only));
+// --slice N: the first N fixtures, for a short live run (a laptop check of a model, not the full baseline)
+const fixtures = FIXTURES.filter((f) => !values.only || f.id.includes(values.only)).slice(0, values.slice ? Number(values.slice) : undefined);
 const results = [];
 for (const f of fixtures) {
   const dispatched = [];

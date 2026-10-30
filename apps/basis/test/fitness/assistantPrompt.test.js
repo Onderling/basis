@@ -5,8 +5,8 @@
  * single word: noise"), while the shared prompt says to reply briefly and naturally. The model got both, and a
  * greeting or an out-of-scope question fell silent ("Kun je ook sokken stoppen" → nothing, 2026-09-28 baseline).
  *
- * One order: stable sections first (the rules, the apps' backgrounds, the phrasing hints), then a marker, then what
- * changes every turn (the language line, the retrieved items, the date), so the provider's prefix cache can hit.
+ * One order: the stable sections (the rules, the apps' backgrounds, the phrasing hints) are the system text; the marker and what
+ * changes every turn (the language line, the retrieved items, the date) follow the person's words, so the cached head never moves.
  *
  * One budget: the retrieved items are cut at `assistant.contextMaxChars`, and the prompt says so when they are.
  */
@@ -22,7 +22,7 @@ const catalogue = mergeManifests([{ manifest: householdManifest }, { manifest: l
 /** Run one private-door turn through the shared engine; return the system prompt the model received. */
 async function promptFor(text, items = []) {
   let system = null;
-  const llm = { invoke: async (req) => { system = req.system; return { toolCall: null, replyText: 'Goedemorgen!' }; } };
+  const llm = { invoke: async (req) => { system = `${req.system}\n\n${req.messages.at(-1).content}`; return { toolCall: null, replyText: 'Goedemorgen!' }; } };
   const engine = createAssistantEngine({ collectMs: 0,
     catalogue, lang: 'nl', llm, interpret: interpretToCommand,
     loadItems: async () => items.map((t, i) => ({ id: `i${i}`, type: 'shopping', text: t })),
@@ -68,7 +68,7 @@ describe('the assistant prompt — stable first, then what changes every turn', 
 
   it('below the marker: the hints for this turn, then the retrieved items, then the date', async () => {
     let system = null;
-    const llm = { invoke: async (req) => { system = req.system; return { toolCall: null, replyText: 'ok' }; } };
+    const llm = { invoke: async (req) => { system = `${req.system}\n\n${req.messages.at(-1).content}`; return { toolCall: null, replyText: 'ok' }; } };
     await interpretToCommand('hoe zit het met de kaas', {
       catalogue, llm, hints: ['The member wrote in: nl.'], context: ['oude kaas'], now: () => Date.UTC(2026, 8, 28),
     });
@@ -86,7 +86,7 @@ describe('the assistant prompt — stable first, then what changes every turn', 
 describe('the assistant prompt — one budget', () => {
   it('forty retrieved items are cut at the budget, and the prompt says some were left out', async () => {
     let system = null;
-    const llm = { invoke: async (req) => { system = req.system; return { toolCall: null, replyText: 'ok' }; } };
+    const llm = { invoke: async (req) => { system = `${req.system}\n\n${req.messages.at(-1).content}`; return { toolCall: null, replyText: 'ok' }; } };
     const context = Array.from({ length: 40 }, (_, i) => `kaas nummer ${i} — een tamelijk lange omschrijving van dit item`);
     await interpretToCommand('hoe zit het met de kaas', { catalogue, llm, context });
     const block = system.slice(system.indexOf('Relevant items already in this circle'));
@@ -98,9 +98,30 @@ describe('the assistant prompt — one budget', () => {
 
   it('a short context is kept whole, with no notice', async () => {
     let system = null;
-    const llm = { invoke: async (req) => { system = req.system; return { toolCall: null, replyText: 'ok' }; } };
+    const llm = { invoke: async (req) => { system = `${req.system}\n\n${req.messages.at(-1).content}`; return { toolCall: null, replyText: 'ok' }; } };
     await interpretToCommand('hoe zit het met de kaas', { catalogue, llm, context: ['oude kaas', 'jonge kaas'] });
     expect(system).toContain('- oude kaas');
     expect(system).not.toMatch(/left out/);
+  });
+});
+
+describe('the assistant prompt — a prefix the provider can cache', () => {
+  // The provider caches a prompt's head per person: it can only hit when the head is the same bytes every turn. The
+  // tools and the system text are that head; anything that changes per turn (the date, the hints, the items) goes
+  // into the person's own turn, after their words, so no chat template can put it in front of the tools.
+  it('two turns a minute apart send the same system text and the same tools; the date rides the user turn', async () => {
+    const seen = [];
+    const llm = { invoke: async (req) => { seen.push(req); return { toolCall: null, replyText: 'ok' }; } };
+    const t0 = Date.UTC(2026, 9, 30, 9, 0);
+    await interpretToCommand('zet kaas op de lijst', { catalogue, llm, hints: ['The member wrote in: nl.'], context: ['oude kaas'], now: () => t0 });
+    await interpretToCommand('en melk', { catalogue, llm, hints: ['The member wrote in: nl.'], now: () => t0 + 60_000 });
+    expect(seen[1].system).toBe(seen[0].system);
+    expect(JSON.stringify(seen[1].tools)).toBe(JSON.stringify(seen[0].tools));
+    expect(seen[0].system).not.toMatch(/It is now/);
+    const last = seen[0].messages.at(-1);
+    expect(last.role).toBe('user');
+    expect(last.content.startsWith('zet kaas op de lijst')).toBe(true);
+    expect(last.content).toMatch(/It is now 2026-10-30 \d{2}:\d{2}/);
+    expect(last.content.indexOf(TURN_MARKER)).toBeGreaterThan(0);
   });
 });

@@ -369,6 +369,12 @@
       "show the shopping list"
     ]
   },
+  "_family": {
+    "doc": "Cue words per tool family: which of the model's tools a line can concern. A family leaves the offered tools only when none of its words is in the line and another family's is; the lists always stay. Words, not phrases: a cue is found anywhere in the line.",
+    "lists": ["list", "shopping", "groceries", "add", "put", "buy", "bought", "need", "chores", "repairs", "on the", "off the"],
+    "calendar": ["appointment", "appointments", "agenda", "calendar", "dentist", "doctor", "birthday", "party", "invite", "invitation", "come", "coming", "move", "reschedule", "cancel", "plan", "planned"],
+    "tasks": ["who does", "who is doing", "does", "doing", "task", "tasks", "chore", "chores", "open", "still open", "i'll take", "i'll do", "my chores", "must", "finished", "claim"]
+  },
   "_trailing": {
     "doc": "Single words that, AFTER an item, mean it is done (\"afwas klaar\"). Dutch speakers code-switch, so English ones may be here too.",
     "complete": [

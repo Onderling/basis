@@ -5240,6 +5240,8 @@ async function showJoinCircle(inviteArg) {
     // the web shell, so it went unseen.
     circleAddressFor: (cid) => circleHouseholdAgent?.circleAddressFor?.(cid) ?? null,
     signCircleLink: (cid, gid, addr) => circleHouseholdAgent?.signCircleLink?.(cid, gid, addr) ?? null,
+    // which persona this device holds a circle as: the join warns before a second persona of the person joins it
+    profileIdOf: (cid) => circleHouseholdAgent?.profileIdOf?.(cid) ?? null,
     // be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
     dialEndpoint: (url) => dialRelayUrl(url),
     activeEndpointUrl: () => connectedRelayUrls(),

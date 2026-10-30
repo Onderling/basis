@@ -545,6 +545,9 @@ describe how a *request* travels; this is what it travels **to**: one sentence, 
 **Circle → store.** The scope axis is also the storage axis: a circle's items live in one
 `CircleItemStore` (`packages/item-store`), rooted per circle. "Which circle" is not a filter applied to a
 shared pile — it is which store you are holding. Two stores for one circle is a defect, not a design.
+The store keeps its items in memory once read — the stored text per item, with its type as the type index, one
+truth whose at-rest form is the sealed medium below — and serves `list` / `listByType` / `get` from there while
+the medium's `revision` is where its own writes left it; any other change beneath it drops what it holds.
 
 One row in that store is not synced like the others, on purpose: the roster's **trail row** (the
 `membership-redemption` item a circle's membership is projected from). Its addresses enter the projection

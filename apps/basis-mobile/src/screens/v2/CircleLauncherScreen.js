@@ -17,6 +17,7 @@ import { pendingEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
 import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2/plusPins.js';
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../../../basis/src/v2/vandaag.js';
+import { createScreenHead } from '../../../../basis/src/v2/screenHead.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
@@ -1290,23 +1291,73 @@ export default function CircleLauncherScreen({
   // a new object with the same content. Keyed on the objects, the run fired three times per landing, ~2.2 s each on a
   // phone (the refreshed page book, the re-read circle list, the seen-marks).
   const vandaagInputs = useRef({});
-  vandaagInputs.current = { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs };
+  vandaagInputs.current = { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs, expandedBlockId };
   const vandaagKey = useMemo(() => vandaagLandingKey({
     book: screensBook, circles: circlesShown, expandedBlockId,
     selves: [...selvesOn, ...heldSelves.map((p) => `held:${p?.id ?? p}`)],
   }), [screensBook, circlesShown, expandedBlockId, selvesOn, heldSelves]);
+  // Vandaag read from the stores as the page stands now — the head's one read (web parity: `materializeVandaag`)
+  const materializeVandaagNow = useCallback(() => {
+    const { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs, expandedBlockId: open } = vandaagInputs.current;
+    const active = getActiveScreen(screensBook);
+    if (!active) return Promise.resolve([]);
+    const screen = open ? (expandedPage(active, open) ?? active) : active;
+    return materializeScreen({
+      screen,
+      // The TARGETED 3-arg waist: materializers call `callSkill('calendar', 'listEvents', …)`.
+      // This site held the 2-arg resolver — the arity trap's third catch (#16 fixed the recipe
+      // path and this sibling kept the wrong one): 'calendar' arg-shifted into the opId and the
+      // agenda materialised empty. Found by the rename that makes the two waists unmistakable.
+      // …and the circles-with-news block counts what the circle tiles count (their 'seen' and 'me')
+      hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs,
+        ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
+        // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
+        selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
+        // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
+        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags) },
+    });
+  }, [bundle, eventLog]);   // eslint-disable-line react-hooks/exhaustive-deps -- onboardingFlags is a stable memo declared further down (read at call time, never during render)
+  // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the
+  // circles' item changes and the event log — a tab landing on a fresh head reads nothing
+  const vandaagHead = useRef(null);
+  const viewNow = useRef(view);
+  viewNow.current = view;
+  useEffect(() => {
+    const agent = bundle?.agent;
+    if (typeof agent?.onCircleChanged !== 'function') return undefined;
+    const head = createScreenHead({
+      materialize: () => materializeVandaagNow(),
+      subscribe: [(fn) => agent.onCircleChanged(fn), ...(typeof eventLog?.subscribe === 'function' ? [(fn) => eventLog.subscribe(fn)] : [])],
+    });
+    const off = head.onUpdate((blocks) => {
+      if (viewNow.current !== 'screens') return;
+      setScreenViewBlocks(blocks);
+      setScreenViewRefreshing(false);
+    });
+    vandaagHead.current = head;
+    return () => { off(); head.dispose(); if (vandaagHead.current === head) vandaagHead.current = null; };
+  }, [bundle, eventLog, materializeVandaagNow]);
+  // the circles-with-news block counts what is not yet seen, and the marks live in AsyncStorage, not in a store
+  useEffect(() => { vandaagHead.current?.invalidate(); }, [seenAt]);
   useEffect(() => {
     if (view !== 'screens') {
+      vandaagHead.current?.hide();   // not shown: a change waits for the next landing
       setScreenViewBlocks(null);
       setScreenViewRefreshing(false);
       return;
     }
-    const { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs } = vandaagInputs.current;
+    const { screensBook } = vandaagInputs.current;
     const active = getActiveScreen(screensBook);
     if (!active) { setScreenViewBlocks([]); setScreenViewRefreshing(false); return; }
-    // the page, or one of its blocks opened whole ("meer"); only the page is cached
-    const screen = expandedBlockId ? (expandedPage(active, expandedBlockId) ?? active) : active;
+    // only the page is cached (not one of its blocks opened whole, "meer")
     const cacheKey = expandedBlockId ? null : active.id;
+    const head = vandaagHead.current;
+    // a fresh head: what it holds, no read and no cache-first paint
+    if (head?.isFresh(vandaagKey)) {
+      let alive = true;
+      head.land(vandaagKey).then((blocks) => { if (alive) { setScreenViewBlocks(blocks); setScreenViewRefreshing(false); } }).catch(() => {});
+      return () => { alive = false; };
+    }
     // δ.1 — cache-first render: paint the last materialized payload
     // immediately so the press feels instant, then materialize fresh
     // in the background.  On a cache miss we keep the existing null →
@@ -1327,20 +1378,7 @@ export default function CircleLauncherScreen({
         setScreenViewRefreshing(false);
       }
       try {
-        const blocks = await materializeScreen({
-          screen,
-          // The TARGETED 3-arg waist: materializers call `callSkill('calendar', 'listEvents', …)`.
-          // This site held the 2-arg resolver — the arity trap's third catch (#16 fixed the recipe
-          // path and this sibling kept the wrong one): 'calendar' arg-shifted into the opId and the
-          // agenda materialised empty. Found by the rename that makes the two waists unmistakable.
-          // …and the circles-with-news block counts what the circle tiles count (their 'seen' and 'me')
-          hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs,
-            ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
-            // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
-            selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
-            // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-            allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags) },
-        });
+        const blocks = head ? await head.land(vandaagKey) : await materializeVandaagNow();
         if (!alive) return;
         setScreenViewBlocks(blocks);
         setScreenViewRefreshing(false);

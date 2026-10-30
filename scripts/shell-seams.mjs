@@ -45,6 +45,10 @@ export const SEAMS = Object.freeze([
   // decides (`secondPersonaWarning`); the shell hands it which persona the device holds each circle as. Only the
   // person's shells run the join wizard.
   { id: 'second-persona-join-warning', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the join cannot see that the person is already in the circle as another persona, and makes a second member silently' },
+  // A SCREEN'S DATA IS A HEAD: Vandaag's blocks kept current by the circles' changes and the event log (`screenHead.js`),
+  // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time
+  // (a phone: calendar.listEvents ×6 + tasks.listOpen ×3 per Vandaag landing). The box paints no screen.
+  { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },
   { id: 'seeded-contact', pattern: /seedContactCard\(/, shells: ['web', 'mobile'], why: 'a card the install is handed is a contact on every person\'s shell, through the one scanned-card path' },
   // A turn to a household bot the person's identity is linked to (`/koppel`) carries a statement from THIS device over
   // exactly that turn: the bot takes it as the person only by that, so a device they revoke stops speaking as them. A

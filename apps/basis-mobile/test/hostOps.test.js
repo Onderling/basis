@@ -68,7 +68,7 @@ describe('Bundle F P1 — buildMobileLocalBuiltins', () => {
 
   it('exposes core host-op handlers (≥ 15 commands)', () => {
     const present = [
-      'help', 'me', 'whoami', 'security-status', 'rotate-identity',
+      'help', 'me', 'whoami', 'security-status',
       'mute', 'unmute', 'muted', 'transports', 'transport-mode',
       'set-relay', 'audit-tail', 'debug-dump',
       'test-peer', 'peer-connect',

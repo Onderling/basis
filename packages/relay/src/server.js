@@ -118,15 +118,10 @@
  *
  * Phase 2 (Pinboard V1 — 2026-05-05):
  *
- *   - `register` may additionally carry a `rotationProof` (built by
- *     `core.KeyRotation.buildProof`) when the connecting `address` is
- *     not the same as `groupProof.memberPubKey`.  The relay accepts
- *     the registration when the rotationProof signature is valid, links
- *     the proof's old pubKey to the connecting key, and is within its
- *     grace period.  Without a rotationProof, mismatched address +
- *     proof now fails with `BINDING_MISMATCH` (closing a legacy
- *     spoofing loophole; only callers that always-passed-anyway are
- *     affected).
+ *   - a `register` whose `address` is not the `groupProof.memberPubKey`
+ *     fails with `BINDING_MISMATCH` (closing a legacy spoofing loophole).
+ *     There is no bridge: the push rotation proof that once linked an old
+ *     member key to a new address is gone (2026-10-29).
  *
  *   - Each accepted-group entry may carry `revokedMembers: ['<pubKey>']`
  *     for static revocation; matching `groupProof.memberPubKey`s are
@@ -215,9 +210,10 @@ const DEFAULT_MSG_RATE_BURST   = param({ key: 'relay.msgRateBurst', scope: PARAM
 // This is what remains of a connection cap after the per-GROUP one was removed (2026-07-31). It is
 // deliberately per-connection rather than per-group or per-identity:
 //   • per-group needs the relay to know circles, which is the thing it must not know (see header);
-//   • per-identity is not yet meaningful — until registration demands proof of address possession
-//     (DESIGN-boundary-authentication Decision 3), an "identity" here is a self-asserted string and a
-//     cap keyed on it is bypassed by asserting another one. It becomes meaningful the day that lands.
+//   • per-identity buys nothing either: registration does prove possession of each address (the
+//     challenge, below), but an address IS a public key, and anyone can mint another keypair and prove
+//     that one too. A cap keyed on the address is bypassed by a fresh key, so the relay still has no
+//     identity it could cap.
 // What it does buy, today: `register` is NOT rate-limited (the token bucket covers only the data plane),
 // so one socket could otherwise grow `clients` without bound. This bounds a connection's footprint.
 // What it does NOT buy: an attacker who opens more sockets. That is an operator concern (fd limits, a
@@ -764,7 +760,7 @@ export async function startRelay(opts = {}) {
       // the structural half of Decision 3, and `test/security/circleBlindDecisions.test.js` asserts
       // it rather than trusting this comment.
       if (msg.type === 'register') {
-        const { address, groupProof, rotationProof } = msg;
+        const { address, groupProof } = msg;
         pendingPrimary.set(address, msg.primary === true);
         pendingServes.set(address, Array.isArray(msg.serves) && msg.serves.includes('feed'));
         if (!address) {
@@ -778,15 +774,12 @@ export async function startRelay(opts = {}) {
         // circle, via the seal and the roster, on every transport.
         // In open mode (no acceptedGroups),
         // both `verify` and `verifyBound` always return ok=true.
-        // `verifyBound` ALSO enforces proof.memberPubKey === address
-        // unless a valid `rotationProof` (from `core.KeyRotation`) links
-        // the proof's old pubKey to the connecting key — closing the
-        // legacy spoofing loophole.  Open-mode deployments and tests
-        // are unaffected (verifyBound short-circuits in open mode).
+        // `verifyBound` ALSO enforces proof.memberPubKey === address — closing the
+        // legacy spoofing loophole.  Open-mode deployments and tests are unaffected
+        // (verifyBound short-circuits in open mode).
         const auth = groupAuth.verifyBound({
           proof: groupProof,
           connectingPubKey: address,
-          rotationProof,
         });
         if (!auth.ok) {
           socket.send(JSON.stringify({ type: 'error', message: auth.reason }));

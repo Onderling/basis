@@ -14,7 +14,6 @@
  *   - Persistent identity (vault-backed) via restoreOrGenerate
  *   - Agent with auto-SecurityLayer (already core default)
  *   - Optional NknTransport, wired with useSecurityLayer + auto-HI
- *   - rotateIdentity wrapper (Agent.rotateIdentity + grace + broadcast)
  *   - securityStatus diagnostic
  *
  * # What lands in S1 + S2 + S3 (also this file)
@@ -196,7 +195,6 @@ function isApplicationError(err) {
  *     status:  string,
  *     address: string|null,
  *   },
- *   rotateIdentity: (opts?: object) => Promise<{ oldPubKey, newPubKey, graceUntilDays }>,
  *   securityStatus: () => object,
  *   shutdown: () => Promise<void>,
  *   mute: {
@@ -704,7 +702,7 @@ export async function createSecureAgent(opts = {}) {
   //
   // The autoLog flag (default true) wires fire-and-forget audit
   // entries for the security-critical actions exposed by the factory:
-  // identity.rotate, mute.add, mute.remove, caps.issue, peer.connect,
+  // mute.add, mute.remove, caps.issue, peer.connect,
   // claim.sign.  Disable with `autoLog: false` if you want full
   // manual control via sa.audit.append.
   let auditAutoLog = false;
@@ -1289,11 +1287,8 @@ export async function createSecureAgent(opts = {}) {
       //
       // Through `learnPeerKey`, not `registerPeer`: this key comes off the wire
       // (`payload.pubKey`), so it may ESTABLISH a binding but never replace
-      // one.  The case that matters is a peer who has ROTATED — after
-      // `migratePeerKey` the map holds `oldPubKey → newPubKey`, and an HI
-      // asserting the retired key would reset it to `old → old`, putting a key
-      // its owner deliberately retired back in service.  `registerPeer` stays
-      // the overwriting setter for what WE establish out of band (roster rows).
+      // one.  `registerPeer` stays the overwriting setter for what WE establish
+      // out of band (roster rows).
       if (env?._p === 'HI' && env?.payload?.pubKey
             && typeof agent.security?.learnPeerKey === 'function') {
         agent.security.learnPeerKey(env.payload.pubKey, env.payload.pubKey);
@@ -2538,25 +2533,6 @@ export async function createSecureAgent(opts = {}) {
   }
 
   /**
-   * Rotate the agent's Ed25519 identity.  Wraps Agent.rotateIdentity
-   * + emits KeyRotation.broadcast to known peers.  Old key valid for
-   * the grace period (default 7 days) so in-flight envelopes decrypt.
-   */
-  async function rotateIdentity(rotateOpts = {}) {
-    const oldPubKey = agent.identity.pubKey;
-    await agent.rotateIdentity(rotateOpts);
-    const result = {
-      oldPubKey,
-      newPubKey: agent.identity.pubKey,
-      graceUntilDays: rotateOpts.gracePeriodSeconds
-        ? rotateOpts.gracePeriodSeconds / 86_400
-        : 7,
-    };
-    if (auditAutoLog) audit('identity.rotate', oldPubKey, { newPubKey: result.newPubKey });
-    return result;
-  }
-
-  /**
    * Diagnostic snapshot.  Initially reports identity + peer transport
    * state; later slices add audit log status / mute count / token
    * count / group memberships.
@@ -2837,7 +2813,6 @@ export async function createSecureAgent(opts = {}) {
     enableSecureRendezvous,
     upgradeToRendezvous,
     isRendezvousActive: (peer) => !!extraTransports.get('rendezvous')?.hasOpenChannelTo?.(peer),
-    rotateIdentity,
     securityStatus,
     shutdown,
 

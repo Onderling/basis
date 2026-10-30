@@ -862,24 +862,6 @@ describe('CC-XA.2 — find across all apps', () => {
   });
 });
 
-describe('CC-XA.5 — identity rotation (factory side)', () => {
-  let ws;
-  beforeEach(async () => { ws = await bootWorkspace({
-    secureAgentOpts: { auditLog: true },
-  }); });
-
-  it('/rotate-identity changes pubKey + autoLog records the event', async () => {
-    const before = ws.agent.identity.chat.pubKey;
-    const r = await ws.userInput('/rotate-identity');
-    expect(r.error).toBeFalsy();
-    const after = ws.agent.sa.securityStatus().identityPub;
-    expect(after).not.toBe(before);
-    await Promise.resolve();
-    const rot = ws.agent.sa.audit.entries().find((e) => e.event === 'identity.rotate');
-    expect(rot).toBeTruthy();
-  });
-});
-
 describe('CC-XA.6 — multi-thread filter routes events', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });

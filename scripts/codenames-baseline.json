@@ -539,7 +539,6 @@
     "packages/data-connectors/src/connectors/sql.js:plan-bucket:Objective S",
     "packages/data-connectors/src/index.js:plan-bucket:Objective S",
     "packages/data-connectors/src/types.js:plan-bucket:Objective S",
-    "packages/integration-tests/test/scenarios/identity/key-rotation-mid-call.scenario.test.js:plan-bucket:Track B",
     "packages/item-store/CHANGELOG.md:plan-bucket:Track A",
     "packages/item-store/src/CircleItemStore.js:plan-bucket:Objective L",
     "packages/item-store/src/causalMerge.js:plan-bucket:Objective L",

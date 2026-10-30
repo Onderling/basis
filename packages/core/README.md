@@ -35,7 +35,7 @@ The codebase is layered top-down:
 ```
 Agent           ←  composition root + skill registry
   ↑
-Protocol        ←  hello, taskExchange, streaming, keyRotation, …
+Protocol        ←  hello, taskExchange, streaming, …
   ↑
 SecurityLayer   ←  encrypt + sign every envelope
   ↑

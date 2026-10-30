@@ -2,8 +2,8 @@
  * AgentIdentity — Ed25519 keypair + nacl.box encryption + a separate
  * `stableId` (Pinboard V1 Phase 11, 2026-05-06).
  *
- * The agent's *network* identity is its Ed25519 public key (rotates
- * via `Agent.rotateIdentity()`).  The agent's *stable* identity is
+ * The agent's *network* identity is its Ed25519 public key (replaced only
+ * by `Agent.swapIdentity()`, the restore path).  The agent's *stable* identity is
  * `stableId` — opaque base64url, generated once at first construction,
  * persisted in the vault under `'agent-stable-id'`, **untouched by
  * rotation**.  Apps use it as the "this person" key for mute / ban /
@@ -70,8 +70,7 @@ function _deriveStableIdFromSeed(seed) {
 
 /**
  * Load (or lazy-init) the stableId for this vault.  Returns null for
- * detached identities (vault === null), e.g. the `previous` identity
- * handed back by `restoreWithPrevious` — those intentionally don't
+ * detached identities (vault === null) — those intentionally don't
  * persist anywhere.
  *
  * when the vault has nothing AND a
@@ -120,7 +119,7 @@ async function _loadOrInitDeviceId(vault) {
  * keypair derived from it for nacl.box encryption, both from one 32-byte seed. Also
  * carries `stableId` (rotation-surviving user id) and `deviceId` (per-install id),
  * persisted in the vault. Construct via the static factories (`generate`, `restore`,
- * `fromMnemonic`, `fromSeed`, `rotate`, …) so seed persistence and id init happen.
+ * `fromMnemonic`, `fromSeed`, …) so seed persistence and id init happen.
  */
 export class AgentIdentity {
   /** @type {{ publicKey: Uint8Array, secretKey: Uint8Array }} */
@@ -162,41 +161,6 @@ export class AgentIdentity {
     const stableId = await _loadOrInitStableId(vault, seed);
     const deviceId = await _loadOrInitDeviceId(vault);
     return new AgentIdentity({ seed, vault, stableId, deviceId });
-  }
-
-  /**
-   * Group FF — restore the current identity AND (if available + still in
-   * grace) the previous identity from before the most recent rotation.
-   * Callers that support grace-period decryption (e.g. SecurityLayer)
-   * use `previous` to keep decrypting envelopes addressed to our old
-   * pubkey until graceUntil expires.
-   *
-   * @param {import('./Vault.js').Vault} vault
-   * @returns {Promise<{ current: AgentIdentity, previous: { identity: AgentIdentity, graceUntil: number } | null }>}
-   */
-  static async restoreWithPrevious(vault) {
-    const raw = await vault.get('agent-privkey');
-    if (!raw) throw new Error('No agent key found in vault');
-    const parsed   = _parseEntry(raw);
-    const currentSeed = b64decode(parsed.current);
-    const stableId = await _loadOrInitStableId(vault, currentSeed);
-    const deviceId = await _loadOrInitDeviceId(vault);
-    const current  = new AgentIdentity({ seed: currentSeed, vault, stableId, deviceId });
-    let previous   = null;
-    if (parsed.previous?.seed
-        && typeof parsed.previous.graceUntil === 'number'
-        && parsed.previous.graceUntil > Date.now()) {
-      // Previous identity is NOT given the vault (we don't want it to
-      // overwrite the current-identity blob via any future writes).
-      // It carries the same stableId — rotation never changes it.
-      // deviceId is install-scoped: the previous keypair lived on the
-      // same install, so it carries the same deviceId too.
-      previous = {
-        identity:   new AgentIdentity({ seed: b64decode(parsed.previous.seed), vault: null, stableId, deviceId }),
-        graceUntil: parsed.previous.graceUntil,
-      };
-    }
-    return { current, previous };
   }
 
   /**
@@ -247,51 +211,9 @@ export class AgentIdentity {
     return b64encode(nacl.sign.keyPair.fromSeed(seedBytes).publicKey);
   }
 
-  /**
-   * Group FF — rotate the agent's Ed25519 keypair.
-   * Generates a fresh seed, persists a `{ current, previous: { seed,
-   * pubkey, graceUntil } }` blob to the vault, and returns both
-   * identities.  The caller (Agent.rotateIdentity) is responsible for:
-   *   • building + broadcasting the KeyRotationProof signed by `old`
-   *   • registering `old` with SecurityLayer for grace-period decryption
-   *   • swapping agent.identity to `new`
-   *
-   * @param {import('./Vault.js').Vault} vault
-   * @param {object} [opts]
-   * @param {number} [opts.gracePeriodSeconds=604800]  — 7 days default
-   * @returns {Promise<{ oldIdentity: AgentIdentity, newIdentity: AgentIdentity, graceUntil: number }>}
-   */
-  static async rotate(vault, { gracePeriodSeconds = 604_800 } = {}) {
-    const raw = await vault.get('agent-privkey');
-    if (!raw) throw new Error('No agent key found in vault');
-    const parsed = _parseEntry(raw);
-
-    const oldSeed     = b64decode(parsed.current);
-    /** stableId + deviceId both survive rotation — load (or lazy-init). */
-    const stableId    = await _loadOrInitStableId(vault, oldSeed);
-    const deviceId    = await _loadOrInitDeviceId(vault);
-    const oldIdentity = new AgentIdentity({ seed: oldSeed, vault, stableId, deviceId });
-
-    const newSeed     = nacl.randomBytes(32);
-    const graceUntil  = Date.now() + gracePeriodSeconds * 1_000;
-
-    const blob = {
-      current: b64encode(newSeed),
-      previous: {
-        seed:       b64encode(oldSeed),
-        pubkey:     oldIdentity.pubKey,
-        graceUntil,
-      },
-    };
-    await vault.set('agent-privkey', JSON.stringify(blob));
-
-    const newIdentity = new AgentIdentity({ seed: newSeed, vault, stableId, deviceId });
-    return { oldIdentity, newIdentity, graceUntil };
-  }
-
   // ── Identity ───────────────────────────────────────────────────────────────
 
-  /** Ed25519 public key as base64url string — rotates via `Agent.rotateIdentity()`. */
+  /** Ed25519 public key as base64url string — changes only when the identity is replaced (`Agent.swapIdentity`). */
   get pubKey() {
     return b64encode(this.#signKP.publicKey);
   }
@@ -302,11 +224,8 @@ export class AgentIdentity {
    * under `agent-stable-id`, **untouched by rotation**.  Apps use it
    * for the "this person" key (mute / ban / report / peer-cache).
    *
-   * Survives `Agent.rotateIdentity()`: the new keypair carries the
-   * same `stableId` because the rotation path doesn't touch the
-   * `agent-stable-id` vault key.  The detached `previous` identity
-   * handed back by `restoreWithPrevious()` carries the same value
-   * too — it's the same person under an older keypair.
+   * Kept in its own vault key (`agent-stable-id`), so a new keypair on the
+   * same vault carries the same value.
    */
   get stableId() {
     return this.#stableId;
@@ -330,8 +249,7 @@ export class AgentIdentity {
 
   /**
    * The underlying Vault instance (may be null for "detached" identities
-   * such as the previous-identity handed back by restoreWithPrevious —
-   * those intentionally can't write back to the vault).
+   * — those intentionally can't write back to the vault).
    */
   get vault() { return this.#vault; }
 
@@ -488,14 +406,10 @@ export class AgentIdentity {
   }
 }
 
-// ── Vault envelope helpers (Group FF) ────────────────────────────────────────
+// ── Vault envelope helpers ───────────────────────────────────────────────────
 //
-// Old format (legacy, pre-rotation): the vault stored a bare base64url seed
-// ("42-ish chars") under 'agent-privkey'.
-// New format: a JSON blob with a `current` seed (b64) and optional
-// `previous: { seed, pubkey, graceUntil }` for the last rotated-from
-// identity.  Legacy values read fine — they get parsed as current-only,
-// and any subsequent generate/rotate upgrades the blob in place.
+// The vault holds a JSON blob with a `current` seed (b64) under 'agent-privkey' (or, oldest, a bare base64url seed,
+// read as current-only). A `previous` field, written by the retired push rotation, is read past and never used.
 
 function _parseEntry(raw) {
   if (typeof raw !== 'string' || raw.length === 0) return { current: '', previous: null };

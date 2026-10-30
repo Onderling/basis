@@ -98,7 +98,7 @@ export function logHop({ kind, from, to, envelope, payload }) {
  * every path. `whatTheRelayLearns.test.js` asserts the two agree, so they cannot drift apart.
  */
 export const ROUTING_HEADER_FIELDS = Object.freeze([
-  '_v', '_p', '_id', '_re', '_from', '_to', '_topic', '_ts', '_sig', '_rotationProof',
+  '_v', '_p', '_id', '_re', '_from', '_to', '_topic', '_ts', '_sig',
   // Decision 1 (2026-07-31) — the key that signed the envelope. The relay neither reads nor checks
   // it (verification is end-to-end); it is listed so the sealing check does not mistake a routing
   // header field for readable content.

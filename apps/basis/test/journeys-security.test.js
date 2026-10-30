@@ -8,7 +8,7 @@
  *
  *   J-S1  /block then /blocked reports the muted peer
  *   J-S2  /block then sendPeerMessage to that peer is refused
- *   J-S3  /rotate-identity adds an audit-log entry
+ *   J-S3  /rotate-identity is gone: no key change, no audit entry
  *   J-S4  mute lifecycle is recorded in the audit chain
  *   J-S5  mute set + audit chain survive an agent rebuild on the
  *         same vaults (real persistence path)
@@ -40,7 +40,7 @@ import { createSecureAgent }           from '@onderling/secure-agent';
  * the parseInput → dispatch → runDispatch path.  Mirrors the real
  * boot for the surfaces the safety journeys exercise (no app
  * skills needed — these tests touch /block, /blocked, /audit-tail,
- * /rotate-identity, /security-status).
+ * /security-status).
  */
 async function bootSafetyWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}) {
   const agent = await createRealHouseholdAgent({ chatVault, ownerRootVault, secureAgentOpts });
@@ -136,22 +136,14 @@ describe('Safety integration journeys', () => {
     });
   });
 
-  describe('J-S3 — /rotate-identity adds an audit entry (S6 autoLog)', () => {
-    it('rotation fires identity.rotate in the audit chain', async () => {
+  describe('J-S3 — /rotate-identity is gone: the old key cannot push a new one', () => {
+    it('the command changes no key and writes no audit entry', async () => {
       const ws = await bootSafetyWorkspace();
-      const sa = ws.agent.sa;
-      expect(sa.audit.size).toBe(0);
       const before = ws.agent.identity.chat.pubKey;
-      await ws.run('/rotate-identity');
-      const after = ws.agent.sa.securityStatus().identityPub;
-      expect(after).not.toBe(before);
-      // Audit append is fire-and-forget (microtask).  Settle the queue:
+      await ws.run('/rotate-identity').catch(() => null);
       await Promise.resolve();
-      const entries = sa.audit.entries();
-      const rot = entries.find((e) => e.event === 'identity.rotate');
-      expect(rot).toBeTruthy();
-      expect(rot.subject).toBe(before);
-      expect(rot.data.newPubKey).toBe(after);
+      expect(ws.agent.sa.securityStatus().identityPub).toBe(before);
+      expect(ws.agent.sa.audit.entries().some((e) => e.event === 'identity.rotate')).toBe(false);
     });
   });
 
@@ -175,7 +167,7 @@ describe('Safety integration journeys', () => {
       const sharedRoot = new VaultMemory();
       const ws1 = await bootSafetyWorkspace({ chatVault: sharedChat, ownerRootVault: sharedRoot });
       await ws1.run('/block app.persist.test');
-      await ws1.run('/rotate-identity');
+      await ws1.run('/block app.persist.other');
       await Promise.resolve();
       const beforeSize = ws1.agent.sa.audit.size;
       const beforeMute = ws1.agent.sa.mute.list();
@@ -260,25 +252,24 @@ describe('Safety integration journeys', () => {
     it('after a mix of events, /audit-tail reports them in order with chain OK', async () => {
       const ws = await bootSafetyWorkspace();
       await ws.run('/block app.audit.peer');
-      await ws.run('/rotate-identity');
+      await ws.run('/block app.audit.other');
       await ws.run('/unblock app.audit.peer');
       await Promise.resolve();
       const res = await ws.run('/audit-tail');
       expect(res.message).toMatch(/chain verified/);
       expect(res.message).toMatch(/mute\.add/);
-      expect(res.message).toMatch(/identity\.rotate/);
       expect(res.message).toMatch(/mute\.remove/);
     });
 
     it('--event filter narrows the tail', async () => {
       const ws = await bootSafetyWorkspace();
       await ws.run('/block app.x');
-      await ws.run('/rotate-identity');
+      await ws.run('/unblock app.x');
       await ws.run('/block app.y');
       await Promise.resolve();
       const res = await ws.run('/audit-tail --event=mute.add');
       expect(res.message).toMatch(/mute\.add/);
-      expect(res.message).not.toMatch(/identity\.rotate/);
+      expect(res.message).not.toMatch(/mute\.remove/);
     });
   });
 });

@@ -98,9 +98,11 @@ export function createModelWatch({ listModels, model, fallback, t, tellAdmin, pr
   const checkKey = async () => {
     if (typeof probe !== 'function') return;
     let err = null;
+    const startedAt = now();
     try { await probe(); } catch (e) { err = e ?? new Error('refused'); }
     const status = err ? (Number(err?.status) || 0) : 200;
-    log({ kind: 'secret-check', secret: secretName, ok: !err, status });
+    // a one-token call: its time is the provider's latency, apart from any prompt a turn sends
+    log({ kind: 'secret-check', secret: secretName, ok: !err, status, ms: now() - startedAt });
     if (!err) { keyToldAt = null; await recovered(); return; }
     const cause = troubleCause(err);
     await failing(cause);

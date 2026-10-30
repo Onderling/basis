@@ -341,6 +341,14 @@ const SEED_HOUSEHOLD_ITEMS = [
  * }>}
  */
 export async function createRealHouseholdAgent(opts = {}) {
+  // A circle CHANGED here — this node's own write, or a member's that landed — told to whoever listens
+  // (`agent.onCircleChanged`): every shell hears it by construction, so a screen can keep its projection current
+  // instead of reading again on every landing. Fed by the same two places as the composition hooks below.
+  const circleChangedListeners = new Set();
+  const circleChanged = (circleId, origin) => {
+    if (typeof circleId !== 'string' || !circleId) return;
+    for (const fn of circleChangedListeners) { try { fn(circleId, { origin }); } catch { /* a listener never breaks a write */ } }
+  };
   // Durable storage for every vault this agent makes for itself, when the host has some (the phone hands its
   // AsyncStorage this way); otherwise the runtime's own (localStorage), and memory only as the last resort.
   const pickVault = (prefix, o) => (typeof opts.vaultFor === 'function' ? opts.vaultFor(prefix) : null) ?? makeBrowserVault(prefix, o);
@@ -1216,7 +1224,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // on a device-log composition a pre-emitter write REFUSES loudly instead of silently not-fanning.
         // …and the composition hears what this node wrote (`opts.onCircleWrite(circleId, item | null, removedId?)`:
         // the box's change feed — its event rows, its screens' nudge)
-        const wrote = (item, removedId) => { try { opts.onCircleWrite?.(id, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
+        const wrote = (item, removedId) => { try { opts.onCircleWrite?.(id, item ?? null, removedId); } catch { /* a listener never breaks a write */ } circleChanged(id, 'own'); };
         wireStoreMirror(circleStore, {
           publishItem:        (item)          => { const r = routeItemsMirror({ circleId: id, emitter: itemsEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(item); return r; },
           publishItemRemoved: (rid, removed)  => { const r = routeItemsMirror({ circleId: id, emitter: itemsEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
@@ -2308,7 +2316,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const valves = new Map();
     const valveFor = (lane) => valves.get(lane) ?? valves.set(lane, routeItemsMirror({ circleId: lane, emitter: itemsEmit })).get(lane);
     // …and the composition hears what this node wrote there, as it hears a circle's writes (`opts.onCircleWrite`)
-    const wrote = (item, removedId) => { try { opts.onCircleWrite?.(OWN_DEVICES_SCOPE, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
+    const wrote = (item, removedId) => { circleChanged(OWN_DEVICES_SCOPE, 'own'); try { opts.onCircleWrite?.(OWN_DEVICES_SCOPE, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
     wireStoreMirror(ownStoreNow, {
       publishItem:        (item)         => { const r = valveFor(ownLaneOf(selfOfOwnItem(item))).publishItem(item); wrote(item); return r; },
       // a removal whose item is not known here (no `createdBy` to read) rides the default's lane, as an item no persona wrote
@@ -4779,6 +4787,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
       onItemApplied: async (circleId, item, landing = {}) => {
         try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
+        circleChanged(circleId, 'landed');
         return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item, landing) : undefined;
       },
     });
@@ -8680,6 +8689,16 @@ export async function createRealHouseholdAgent(opts = {}) {
      * @param {string} appOrigin  'basis' (the only local app today)
      * @param {Record<string, Function>} ops  opId → handler, e.g. `createLocalBuiltins({…})`
      */
+    /**
+     * Hear that a circle changed here: `fn(circleId, { origin: 'own' | 'landed' })` after this node's own write and after
+     * a member's write landed (the own-devices scope included). Names the circle only — a listener reads what it needs.
+     * @returns {() => void} the unsubscribe
+     */
+    onCircleChanged: (fn) => {
+      if (typeof fn !== 'function') return () => {};
+      circleChangedListeners.add(fn);
+      return () => { circleChangedListeners.delete(fn); };
+    },
     mountAppOps: (appOrigin, ops, manifest = null) => {
       if (appOrigin === 'basis') {
         mountedBasisOps = ops && typeof ops === 'object' ? ops : null;

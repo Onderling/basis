@@ -1,29 +1,29 @@
 /**
  * THE ROSTER TRAVELS BY ITS OWN CARRIERS — two acceptance stories, walked on real browser bytes over a local relay.
  *
- * A roster row is patched in place by proven-address announces and reaches other devices by its own carriers (the
- * membership lane, the announces, the roster seed). Until 2026-09-13 the items lane ALSO carried it, as a signed
- * snapshot, last version wins — and a sibling's snapshot of "the person's row" (which never names that sibling's own
- * address) landed on the box after the box had patched the new device's address in, and replaced it. Everything the
- * new device signed was then refused on the box as unbindable, one enrol in ten. `isLaneCarriedItem` (circles'
- * rosterTrail.js) is the fix: the items lane neither serves nor applies a roster row.
+ * A member's proven per-circle addresses reach the circle's other devices by the roster's own carriers: the join
+ * statements on the membership lane, the proven-address announces, the admin's hand-over after a join, the roster seed
+ * between a person's own devices. These stories hold those carriers to what a person sees.
  *
- *   enrol-race    one person: A1 founds a circle with C in it; the box (A's always-on device, enrolled from A1) stays
- *                 up. Ten times over, a FRESH device is enrolled from A1, follows into the circle, and says a line in
- *                 its chat; the box must show that line within the catch-up window — a statement signed at the new
- *                 device's per-circle address binds on the box.
- *   pairing walk  A founds a circle with B, then C joins it. B and C never met: each line one says must reach the
- *                 other, and each holds the other's row with a proven per-circle address that is not the person's
- *                 global key. A fresh profile has the address fallback OFF, so a line that lands came by the
- *                 per-circle route.
+ *   a third own device   one person: A1 founds a circle with C in it; the box (A's always-on device, enrolled from A1)
+ *                        stays up. Ten times over, a FRESH device is enrolled from A1, follows into the circle and says a
+ *                        line in its chat; the box must show that line within the catch-up window — the new device's
+ *                        address has reached its already-enrolled sibling, so what it signs binds there. The box's tile
+ *                        must also carry the circle's name. EXPECTED TO FAIL today: A1, C and the new device fold the
+ *                        new address, the box does not (the announce reaches the others, never the sibling), and the
+ *                        box's tile shows the circle's id. The membership-lane address statement is the cure; the change
+ *                        that lands it turns this into a plain test, and is not done while it is red.
+ *   two joiners          A founds a circle with B, then C joins it. B and C never met: each holds the other's row at a
+ *                        proven per-circle address that is not the person's global key, and a line each way lands. A
+ *                        fresh profile has the address fallback OFF, so a line that lands came by the per-circle route.
+ *                        Its red leg: skip the admin's hand-over after a join (`propagateCircleAddressesAfterJoin`) and
+ *                        B and C cannot reach each other — the hole that hand-over closed.
  *
- * Both are the bar the roster-fold steps are held to. To see them RED, re-enable the items-lane carry of the trail row
- * with the test toggle below — a rewrite of the served `itemsRail.js` that lets `membership-redemption` rows through
- * the lane again (rules heads stay refused). The toggle lives here only, never in the product:
+ * The red leg's toggle is a rewrite of the served module, applied by this spec only, never by the product:
  *
- *   L467_TOGGLE_TRAIL_CARRY=1 PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay test-browser/walk-roster-carriers.spec.js
+ *   TOGGLE_SKIP_JOIN_HANDOVER=1 PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay test-browser/walk-roster-carriers.spec.js -g "two joiners"
  *
- * Without the variable the stories run against the app as it is (green):
+ * Without it the stories run against the app as it is:
  *
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay test-browser/walk-roster-carriers.spec.js
  */
@@ -36,37 +36,40 @@ import {
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-const TOGGLE = process.env.L467_TOGGLE_TRAIL_CARRY === '1';
+const SKIP_JOIN_HANDOVER = process.env.TOGGLE_SKIP_JOIN_HANDOVER === '1';
 const ENROLS = Number(process.env.ENROL_RACE_ROUNDS || 10);
 /** How long a line may take to reach a device that is already up (the catch-up window, with the relay's slack). */
 const CATCH_UP_MS = 90_000;
 
 /**
- * The test toggle: every context this browser opens serves an `itemsRail.js` whose lane refusal lets roster-trail rows
- * through. Counts the rewrites, so a run can prove the toggle took (a toggle that silently did not apply would make a
- * green run look like a pass against the reintroduced defect).
+ * Every context `browser` opens serves the modules matching `url` through `rewrite`. Counts what it served and what it
+ * changed, so a run can prove the toggle took: a toggle that silently did not apply makes a green run look like a pass
+ * against the defect it was meant to bring back.
  */
-function withTrailCarry(browser) {
+function withRewrite(browser, url, rewrite) {
   const stats = { served: 0, rewritten: 0 };
   const wrapped = Object.create(browser);
   wrapped.newContext = async (opts) => {
     const context = await browser.newContext(opts);
-    await context.route(/\/itemsRail\.js(\?|$)/, async (route) => {
+    await context.route(url, async (route) => {
       const res = await route.fetch();
       const body = await res.text();
       stats.served += 1;
-      const imp = /import\s*\{\s*isLaneCarriedItem\s*\}\s*from\s*(["'][^"']+["']);?/;
-      if (!imp.test(body)) { await route.fulfill({ response: res, body }); return; }
-      stats.rewritten += 1;
-      const next = body.replace(imp, (_, from) => `import { isLaneCarriedItem as __laneCarried } from ${from};`
-        + ' const isLaneCarriedItem = (it) => __laneCarried(it)'
-        + " && !(it?.type === 'membership-redemption' || it?.kind === 'membership-redemption');");
+      const next = rewrite(body);
+      if (next !== body) stats.rewritten += 1;
       await route.fulfill({ response: res, body: next });
     });
     return context;
   };
   return { browser: wrapped, stats };
 }
+
+/** The admin's hand-over after a join answers as if it had nobody to tell. */
+const skipJoinHandover = (body) => body.replace(
+  /export async function propagateCircleAddressesAfterJoin\(\{/,
+  'export async function propagateCircleAddressesAfterJoin() { return { toCircle: 0, toNewMember: 0, announced: 0 }; }\n'
+    + 'async function propagateSkippedByTest({',
+);
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
 const myCircles = async (page) => ((await call(page, 'pinboard', 'listMyCircles', {}))?.circles ?? [])
@@ -78,19 +81,17 @@ const rowOn = async (page, circleId, who) => {
   return m ? { present: true, primary: m.circleAddress ?? null, proven: m.circleAddresses ?? [] } : { present: false };
 };
 const dismissDialogs = (peer) => peer.page.on('dialog', (d) => d.dismiss().catch(() => {}));
-/**
- * Into a circle's chat from wherever the app stands (it opens on Vandaag; the tiles live on the launcher). By the
- * circle's id, not its name: a freshly enrolled device can show the tile before the name has followed. Returns the
- * tile's label, so a run can say what the device showed.
- */
-async function intoChat(page, circleId) {
+/** The circle's tile on the launcher (the app opens on Vandaag; the tiles live there). By id: the name may not have followed. */
+async function tileOf(page, circleId) {
   await gotoCircles(page);
   const tile = page.locator(`.circle-tile[data-circle-id="${circleId}"]`).first();
   await expect(tile, `a tile for ${circleId}`).toHaveCount(1, { timeout: 60_000 });
-  const label = (await tile.innerText()).replace(/\s+/g, ' ').trim();
-  await tile.click(); await page.waitForTimeout(2500);
+  return tile;
+}
+const tileLabel = async (page, circleId) => ((await (await tileOf(page, circleId)).innerText()) || '').replace(/\s+/g, ' ').trim();
+async function intoChat(page, circleId) {
+  await (await tileOf(page, circleId)).click(); await page.waitForTimeout(2500);
   await toChat(page);
-  return label;
 }
 
 /** Enrol a fresh device of `owner`'s person from `owner`, and wait until it is in `circle`. */
@@ -112,11 +113,8 @@ async function enrolFrom(browser, owner, label, circle) {
   return dev;
 }
 
-test.describe.configure({ mode: 'serial' });
-
-test('enrol-race: ten fresh devices of one person, each one\'s first line binds on the box', async ({ browser: real }) => {
+test('a third own device\'s address reaches an already-enrolled sibling, ten enrolments over', async ({ browser }) => {
   test.setTimeout(ENROLS * 4 * 60_000 + 10 * 60_000);
-  const { browser, stats } = TOGGLE ? withTrailCarry(real) : { browser: real, stats: null };
   const peers = [];
   try {
     const A1 = await bootPeer(browser, 'A1'); const C = await bootPeer(browser, 'C');
@@ -131,12 +129,21 @@ test('enrol-race: ten fresh devices of one person, each one\'s first line binds 
     const box = await enrolFrom(browser, A1, 'BOX', circle);
     peers.push(box);
     expect((await call(box.page, 'pinboard', 'whoAmI'))?.webid, 'the box is the same person').toBe(aId);
-    log('BOX tile', 'OBSERVED', await intoChat(box.page, circle));
-    for (const peer of [A1, C]) await intoChat(peer.page, circle);   // the bystanders' view, for a failed round's probe
+    for (const peer of [box, A1, C]) await intoChat(peer.page, circle);   // A1 and C: the bystanders, for a failed round's probe
     log('SETUP A1 + box + C in one circle', 'PASS', String(circle).slice(0, 10));
-    if (TOGGLE) expect(stats.rewritten, `the trail-carry toggle applied (served ${stats.served})`).toBeGreaterThan(0);
+    // Expected to fail from HERE, not before: a setup that breaks is the harness's failure and must show as one.
+    test.fail(true, 'the new address reaches A1 and C but never the box, and the box\'s tile shows the circle id — the membership-lane address statement cures both');
 
-    const refused = [];
+    // the circle's name followed to the sibling, as it did to every other device
+    let label = '';
+    for (const until = Date.now() + CATCH_UP_MS; Date.now() < until && !/inschrijfrace/i.test(label);) {
+      label = await tileLabel(box.page, circle);
+      if (!/inschrijfrace/i.test(label)) await box.page.waitForTimeout(2500);
+    }
+    log('BOX tile', /inschrijfrace/i.test(label) ? 'PASS' : 'FAIL', label);
+    expect.soft(label, 'the box\'s tile carries the circle\'s name').toMatch(/inschrijfrace/i);
+    await intoChat(box.page, circle);
+
     for (let i = 1; i <= ENROLS; i++) {
       const dev = await enrolFrom(browser, A1, `NEW${i}`, circle);
       try {
@@ -144,29 +151,30 @@ test('enrol-race: ten fresh devices of one person, each one\'s first line binds 
         const line = `eerste woord ${i} ${Date.now().toString(36).slice(-5)}`;
         await sendChat(dev.page, line, 1000);
         const landed = await waitForBubble(box.page, line, { tries: Math.ceil(CATCH_UP_MS / 2500), every: 2500 });
+        log(`ROUND ${i} the new device's line on the box`, landed ? 'PASS' : 'FAIL', line);
         if (!landed) {
           // which branch: did the line leave the new device at all (A1 and C have it), and whose view lacks its address?
           const seen = {};
           for (const [label, peer] of [['A1', A1], ['C', C]]) seen[label] = (await readBubbles(peer.page)).some((t) => t.includes(line));
           const views = {};
           for (const [label, peer] of [['box', box], ['A1', A1], ['C', C], ['new', dev]]) views[label] = await rowOn(peer.page, circle, aId);
-          refused.push(`round ${i}: line on ${JSON.stringify(seen)} · A's row ${JSON.stringify(views).slice(0, 900)}`);
+          // one refused round is the defect; the rest of the rounds would only repeat it
+          expect(landed, `round ${i}: the box refused the new device's first line · line on ${JSON.stringify(seen)} · A's row ${JSON.stringify(views).slice(0, 900)}`).toBe(true);
         }
-        log(`ROUND ${i} the new device's line on the box`, landed ? 'PASS' : 'FAIL', line);
       } finally {
         await teardown([dev]);
       }
     }
-    expect(refused, `the box refused a new device's first line:\n${refused.join('\n')}`).toEqual([]);
   } finally {
-    if (stats) log('TOGGLE trail carry', 'OBSERVED', `served ${stats.served} · rewritten ${stats.rewritten}`);
     await teardown(peers);
   }
 });
 
-test('pairing walk: two joiners who never met reach each other at per-circle addresses', async ({ browser: real }) => {
+test('two joiners who never met reach each other at per-circle addresses', async ({ browser: real }) => {
   test.setTimeout(15 * 60_000);
-  const { browser, stats } = TOGGLE ? withTrailCarry(real) : { browser: real, stats: null };
+  const { browser, stats } = SKIP_JOIN_HANDOVER
+    ? withRewrite(real, /\/circleAddressAnnounce\.js(\?|$)/, skipJoinHandover)
+    : { browser: real, stats: null };
   const peers = [];
   try {
     const A = await bootPeer(browser, 'A'); const B = await bootPeer(browser, 'B'); const C = await bootPeer(browser, 'C');
@@ -175,16 +183,16 @@ test('pairing walk: two joiners who never met reach each other at per-circle add
     expect(p.joined, `B joined: ${p.outcome}`).toBe(true);
     for (const peer of [A, B]) dismissDialogs(peer);   // C's join prompt is a dialog the join accepts: C's handler after
     await gotoCircles(A.page); await openCircleMatching(A.page, /twee.?nieuwkomers/i);
-    const invite = await getInvite(A.page, 'pairing-walk-invite');
+    const invite = await getInvite(A.page, 'two-joiners-invite');
     expect(invite, 'A has an invite for the second joiner').toBeTruthy();
-    const c = await joinFromInvite(C.page, invite, { handle: 'cees', tag: 'pairing-walk-C' });
+    const c = await joinFromInvite(C.page, invite, { handle: 'cees', tag: 'two-joiners-C' });
     expect(c.joined, `C joined: ${c.outcome}`).toBe(true);
     dismissDialogs(C);
     const circle = (await myCircles(A.page)).find((id) => !/^pair-|^cc-help$/.test(String(id)));
     expect(circle, 'the circle').toBeTruthy();
     const bId = (await call(B.page, 'pinboard', 'whoAmI'))?.webid;
     const cId = (await call(C.page, 'pinboard', 'whoAmI'))?.webid;
-    if (TOGGLE) expect(stats.rewritten, `the trail-carry toggle applied (served ${stats.served})`).toBeGreaterThan(0);
+    if (stats) expect(stats.rewritten, `the skip-the-hand-over toggle applied (served ${stats.served})`).toBeGreaterThan(0);
     log('SETUP A + B + C in one circle, B and C never met', 'PASS', String(circle).slice(0, 10));
 
     // each joiner holds the other's row with a proven per-circle address — never the person's global key
@@ -209,7 +217,7 @@ test('pairing walk: two joiners who never met reach each other at per-circle add
       log(`STEP2 ${from.label} → ${to.label}`, 'PASS', line);
     }
   } finally {
-    if (stats) log('TOGGLE trail carry', 'OBSERVED', `served ${stats.served} · rewritten ${stats.rewritten}`);
+    if (stats) log('TOGGLE skip the join hand-over', 'OBSERVED', `served ${stats.served} · rewritten ${stats.rewritten}`);
     await teardown(peers);
   }
 });

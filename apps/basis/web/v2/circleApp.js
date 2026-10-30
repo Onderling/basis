@@ -364,7 +364,7 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, announceOwnCircleAddress,
 } from '../../src/v2/circleAddressAnnounce.js';
-import { isFeatureEnabled, defaultViewModeFromPolicy } from '../../src/v2/circlePolicy.js';
+import { isFeatureEnabled, defaultViewModeFromPolicy, composerGate } from '../../src/v2/circlePolicy.js';
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
 import { buildTaskRows } from '../../src/v2/taskRows.js';
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions block.
@@ -786,7 +786,7 @@ import { renderRulesEditor } from './circleRulesEditor.js';
 // per circle store at construction time; snapshots every save into
 // `cc.versions.<storeName>.<circleId>`.  Invisible to the UI in γ.2;
 // γ.3 will surface the history.
-import { loadCircles } from '../../src/v2/circleModel.js';
+import { loadCircles, loadRemovedCircles } from '../../src/v2/circleModel.js';
 import { circleSourcesFromAgent, makeResolvingCallSkill } from '../../src/v2/circleSources.js';
 import { loadCircleItems } from '../../src/v2/circleContent.js';
 import { DEFAULT_CIRCLE_RAG_MIN_SCORE } from '../../src/v2/circleRetriever.js';
@@ -839,7 +839,7 @@ import { renderCircleLauncher } from './circleLauncher.js';
 import { renderCircleTabBar, hideCircleTabBar } from './circleTabBar.js';
 import { renderCircleSettings } from './circleSettings.js';
 import { renderCircleOverride } from './circleOverride.js';
-import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../../src/v2/circleSecurityPriming.js';
 import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 // The SHARED security-status report — the same function mobile reaches through the builtins table.
 import { securityStatus } from '../../src/core/localBuiltins.js';
@@ -1001,16 +1001,10 @@ async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   // door refused that as "a member's canonical identity" — Frits' phone → Wilfred, 2026-09-21, three times, nothing
   // fanned. Mobile (`liveCircleIds`) and the box asked the substrate all along; the union keeps a circle the
   // substrate has not caught up on yet (a just-joined one arrives as `extraCircleIds`).
-  let held = [];
-  try {
-    held = ((await agent?.callSkill?.('pinboard', 'listMyCircles', {}))?.circles ?? [])
-      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-  } catch { held = []; }
-  const circleIds = [...new Set([
-    ...held,
-    ...circlesCache.map((c) => c?.id).filter(Boolean),
-    ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
-  ])];
+  // …minus a circle the fold says was left or removed (the shared filter: kept from the cache, it went back onto the relay)
+  let mine = null;
+  try { mine = await agent?.callSkill?.('pinboard', 'listMyCircles', {}); } catch { mine = null; }
+  const circleIds = presenceCircleIds(mine, mine?.circles, circlesCache, extraCircleIds);
   // Decisions 4 + 1 — the per-circle SIGNING identity AND the roster snapshot that authorizes senders,
   // for EVERY circle, before (and independently of) the relay scoping below. One shared primer, called
   // identically by mobile (`agentBundle.js`). Note it asks the SUBSTRATE rather than trusting the ids
@@ -1421,6 +1415,14 @@ const applyIncomingReceipt = makeReceiptReceiver({
 let rootEl = null;
 let tabBarEl = null;
 let circlesCache = [];
+// the circles an admin removed this person from: the launcher's marked, read-only tiles only — no other reader
+let removedCirclesCache = [];
+/** Both launcher lists, read together: the circles the person is in, and the removed ones kept until closed. */
+async function loadLauncherCircles() {
+  const [mine, removed] = await Promise.all([loadCircles(sources), loadRemovedCircles(sources).catch(() => [])]);
+  removedCirclesCache = removed;
+  return mine;
+}
 // CONNECTIONS — the last `listSurfaceGrants` read, kept so the Mij list paints without awaiting.
 // A cache, never an authority: the grants live in the agent's durable registry and the door reads
 // THAT, so a stale cache can only ever show a stale list, never permit a stale action.
@@ -3681,7 +3683,7 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  * enrolled device showed none of its circles until a reload (found 2026-09-24 by the own-devices browser walk).
  */
 async function circlesChangedUnderneath() {
-  try { circlesCache = await loadCircles(sources); } catch { return; }
+  try { circlesCache = await loadLauncherCircles(); } catch { return; }
   // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
   if (getActiveCircle() == null && _activeTab === 'circles') { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
 }
@@ -3698,6 +3700,7 @@ function paintLauncher() {
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
     circles: tileCircles(circlesShown()),   // the circles of the selves ticked in the header; the help circle's door is in Contacten
+    removedCircles: removedCirclesCache,
     previews,
     proposals: launcherProposals,
     pinnedMap: launcherPinnedMap,
@@ -3794,7 +3797,7 @@ async function onLeaveCircle(id, circle) {
   } catch (err) {
     console.warn('[circleApp] leaveGroup failed:', err?.message ?? err);
   }
-  try { circlesCache = await loadCircles(sources); }
+  try { circlesCache = await loadLauncherCircles(); }
   catch { /* keep cache */ }
   // Drop the pin if the circle is gone — the map otherwise keeps a
   // dangling key that the partition would happily filter out anyway,
@@ -5262,7 +5265,7 @@ async function showJoinCircle(inviteArg) {
         catch { /* best-effort — a failed prefs write must not break the join */ }
       }
       // (The joined circle's connection point is recorded in `circleOnJoined`, before presence and the pull.)
-      try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* */ }
+      try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* */ }
     },
   });
 }
@@ -6728,7 +6731,7 @@ async function maybeProvisionHelpCircle() {
       bot: onderlingBotMember(t('circle.onboarding.help_name')),
     });
     if (r.provisioned) {
-      try { circlesCache = await loadCircles(sources); } catch { /* keep current cache */ }
+      try { circlesCache = await loadLauncherCircles(); } catch { /* keep current cache */ }
     }
   } catch (err) {
     console.warn('[circleApp] help-circle provisioning failed', err?.message ?? err);
@@ -6799,7 +6802,7 @@ function openCreateCircleWizard() {
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
       // the founder's first policy (the wizard wrote it locally) goes on the lane, so a joiner catches it up
       if (gid) circlePolicyLane.state(gid).catch(() => {});
-      try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
+      try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
     },
   });
 }
@@ -6896,7 +6899,7 @@ async function showDetail(id) {
   // bump the seenAt marker so the next launcher render clears
   // this circle's unread badge.
   writeSeenAt(bumpSeenAt(readSeenAt(), id));
-  const circle = circlesCache.find((c) => c.id === id) || { id };
+  const circle = circlesCache.find((c) => c.id === id) || removedCirclesCache.find((c) => c.id === id) || { id };
   // no chat-shell auto-route anymore. Every circle opens the
   // circle view; v2 §1 says chat IS the circle view (CONVERSATION tab).  The
   // CONVERSATION render lands in.
@@ -7642,8 +7645,16 @@ function showCircle(id, circle, policy) {
       // Composer affordances (classic-shell parity): slash-suggest off the merged catalogue + bash history.
       catalogue: circleCatalogue,
       history: circleInputHistory,
-      // Permission gate — chat disabled for this circle ⇒ read-only composer (classic `allowCommands` analog).
-      canPost: isFeatureEnabled(policy, 'chat'),
+      // Permission gate (the shared `composerGate`): chat off, or a circle an admin removed me from ⇒ a read-only note in
+      // the composer's place; the removed one offers the close (`dismissRemovedCircle`, then back to the launcher).
+      canPost: composerGate(policy, circle).canPost,
+      composerNoteKey: composerGate(policy, circle).noteKey,
+      onCloseRemoved: composerGate(policy, circle).canClose ? async () => {
+        const r = await rawCallSkill('pinboard', 'dismissRemovedCircle', { groupId: id }).catch((err) => ({ ok: false, error: err?.message }));
+        if (r?.ok !== true) { console.warn('[circle] closing a removed circle failed:', r?.error ?? r); return; }
+        removedCirclesCache = removedCirclesCache.filter((c) => c.id !== id);
+        showLauncher();
+      } : null,
       // media — the sealed attach affordance + the chip's opener. Both null until the
       // circle's media composition resolves (and forever for p0/p1 — sealed-only).
       onAttachMedia: circleMedia ? circleAttachMedia : null,
@@ -9732,7 +9743,7 @@ async function boot() {
   }
 
   try {
-    circlesCache = await loadCircles(sources);
+    circlesCache = await loadLauncherCircles();
     registerCirclePresence();   // G13 — the connect-time call may have run before circles were known
     refreshAgentActors();       // P1.7 — populate the people/agents axis (best-effort, non-blocking)
   } catch (err) {

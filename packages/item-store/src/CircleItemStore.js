@@ -124,13 +124,17 @@ export class CircleItemStore {
   async #change(id, text, type, writeOpts) {
     const wasFresh = this.#fresh();
     const before = this.#revision();
+    // the memory this change started from: another change in the await may replace or drop it, and then this one's
+    // update belongs to nothing (it is dropped instead — the next read loads)
+    const held = this.#held;
     if (text === null) { if (typeof this.#source.delete === 'function') await this.#source.delete(this.#uri(id)); }
     else await this.#source.write(this.#uri(id), text, writeOpts);
     const after = this.#revision();
-    if (wasFresh && after === before + 1) {
-      if (text === null) this.#held.delete(id); else this.#held.set(id, { text, type });
+    const same = wasFresh && held !== null && this.#held === held && this.#heldAt === before;
+    if (same && after === before + 1) {
+      if (text === null) held.delete(id); else held.set(id, { text, type });
       this.#heldAt = after;
-    } else if (!(wasFresh && after === before)) {
+    } else if (!(same && after === before)) {
       this.#held = null;
     }
   }

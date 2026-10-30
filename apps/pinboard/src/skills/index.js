@@ -111,7 +111,6 @@ import { findNearDuplicate } from '../lib/dupCheck.js';
 import { deriveRoster } from '../lib/deriveRoster.js';
 // B4 — who has LEFT or been REMOVED from ONE circle. The rule lives in one place so the roster
 // projection, the fan-out roster and the legacy MemberMap fallback cannot disagree about who is in.
-import { readCircleExits, isExited, collectCircleExits, CIRCLE_EXIT_TYPES } from '../lib/circleExits.js';
 // B5 — how many people ONE invite may admit: circle ceiling → per-invite choice → system cap,
 // enforced at redemption on the side that issues the membership.
 import {
@@ -481,8 +480,8 @@ async function revokePodAccess(controlAgent, { webId, force = false, policy = 'g
   // stopped fan-out in the circle they were removed from AND erased them everywhere else: removing
   // someone from one circle severed the relationship in every circle you shared with them. Fan-out
   // no longer reads that cache for membership anyway — it reads the per-circle trail projection
-  // (`projectCircleRoster`), which now honours `group-removal`/`group-leave` for THAT circle
-  // (`../lib/circleExits.js`). So the coupling is kept and the collateral is gone.
+  // (`projectCircleRoster`), which folds the circle's own `leave`/`evict` statements for THAT circle.
+  // So the coupling is kept and the collateral is gone.
   return result;
 }
 
@@ -730,7 +729,7 @@ async function listGroupMembersCore(scope, a, ctx) {
     : projectCircleRoster;
   return listCircleMembers(
     {
-      store, members, projectCircleRoster: project, readCircleExits, isExited,
+      store, members, projectCircleRoster: project,
       rosterCallerIsForeign, gateRosterReplyForPeer,
     },
     { a, from: ctx?.from ?? null, localActor: scope.localActorIn ? scope.localActorIn(a?.groupId ?? groupId) : localActor, groupId },
@@ -1054,9 +1053,6 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     // The CURRENT rules version (monotonic integer: createGroupV2 starts at 1, updateGroupRules
     // increments). The fold's rules gate derives its valid set {1..current} from it.
     rulesVersion: latestRulesItem?.source?.version ?? latestRulesItem?.source?.rules?.version ?? null,
-    // A removal/leave recorded for THIS circle drops the member from THIS circle only. The
-    // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
-    exits: await readCircleExits({ store, groupId }),
     // The signed spine deltas fold ON TOP of the trail head (the cutover model — no data migration).
     spineStatements,
     // The fold's compaction verdict goes back to the rail (L121): only on the rail path, only when the fold names
@@ -1372,8 +1368,8 @@ export function buildSkills({
   };
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
   // a member; else the membership lane's last exit for them, in the fold's own order (`lastExit`: their leave, or an
-  // admin's evict); else, for a circle from before the lane, the exit items' latest (`exits.kinds`). Left → may join
-  // again on an invite they hold; removed → needs a new one. Null when nothing can say.
+  // admin's evict). Left → may join again on an invite they hold; removed → needs a new one. Null when nothing can
+  // say.
   const verdictWithRoster = () => (args) => inviteRedemptionVerdict({
     ...args,
     memberStatus: async (gid, webid) => {
@@ -1385,7 +1381,7 @@ export function buildSkills({
       if (!Array.isArray(rows)) return null;
       if (rows.some((m) => (m?.webid ?? m?.id) === webid)) return 'member';
       const onLane = folded?.lastExit?.[webid];
-      const last = onLane ?? (await readCircleExits({ store: scope.store, groupId: gid })).kinds?.get(webid) ?? null;
+      const last = onLane ?? null;
       if (last === 'evict') return 'removed';
       if (last === 'leave') return 'left';
       return null;
@@ -1407,8 +1403,8 @@ export function buildSkills({
   // rides (roster-fan, transport choice, the pod data-move branch, delivery-state
   // accounting, the `{sent, attempted, errors}` contract) — now lives in
   // `@onderling/circles`. Pinboard wires it ONCE here with its deps + the helpers it
-  // shares with the roster skills (`projectCircleRoster`/`readCircleExits`/`isExited`,
-  // injected because they are NOT owned by the fan) and its two private fan helpers
+  // shares with the roster skills (`projectCircleRoster`, injected because it is NOT owned by the fan) and its two
+  // private fan helpers
   // (`_fanOutViaReliableSend`/`_fanOutToMembers`, which close over the member-address
   // resolver, so they stay in pinboard and are injected). `toWireRefEnvelope` is injected
   // rather than imported into the package so the package needs no item-store dep.
@@ -1419,7 +1415,6 @@ export function buildSkills({
     projectCircleRoster: ((circleSignerFor || membershipRead)
       ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead }))
       : projectCircleRoster),
-    readCircleExits, isExited,
     fanOutViaReliableSend: _fanOutViaReliableSend,
     fanOutToMembers: _fanOutToMembers,
     toWireRefEnvelope,
@@ -2900,16 +2895,12 @@ export function buildSkills({
      */
     defineSkill('listMyCircles', async ({ from }) => {
       const ids = new Set();
-      /** groupId → my latest join there, so an exit can be compared against it (B4). */
-      const myJoinedAt = new Map();
       const redemptions = await store.listOpen({ type: 'membership-redemption' });
       for (const it of redemptions) {
         if (it?.source?.redeemedBy !== from) continue;
         const gid = it?.source?.groupId;
         if (typeof gid !== 'string' || !gid) continue;
         ids.add(gid);
-        const at = typeof it.source.redeemedAt === 'number' ? it.source.redeemedAt : 0;
-        if (at > (myJoinedAt.get(gid) ?? 0)) myJoinedAt.set(gid, at);
       }
       const rules = await store.listOpen({ type: 'group-rules' });
       /**
@@ -2930,19 +2921,24 @@ export function buildSkills({
         if (it?.addedBy !== from) continue;
         ids.add(gid);
       }
-      // B4 — a circle I have LEFT (or been removed from, where that item reached this device) is not
-      // one of "my circles". This is not cosmetic: this list drives `primeCircleSecurity` and the
-      // relay's per-circle address registration, so without the filter the next boot would re-record
-      // the authorize snapshot for a circle I left and re-register its address on the relay —
-      // silently undoing both halves of the leave, one restart later.
-      const exitItems = [];
-      for (const type of CIRCLE_EXIT_TYPES) {
-        try { exitItems.push(...(await store.listOpen({ type })) ?? []); } catch { /* absent ⇒ none */ }
-      }
+      // A circle I have LEFT (or been removed from) is not one of "my circles" — and the membership lane's fold is what
+      // says so: my own `leave` (or an admin's `evict`) as my last word there, and me not on the folded roster. My own
+      // leave is a statement in this device's own log, so it folds offline, at boot, with nothing else to read; a leave
+      // made on a sibling arrives by the lane's catch-up. This is not cosmetic: this list drives `primeCircleSecurity`
+      // and the relay's per-circle address registration, so a circle wrongly listed is one re-registered on the relay.
       const left = [];
       for (const gid of [...ids]) {
-        const exits = collectCircleExits({ items: exitItems, groupId: gid });
-        if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) { ids.delete(gid); left.push(gid); }
+        let folded = null;
+        let rows = null;
+        try {
+          rows = await projectCircleRoster({
+            store: scope.store, groupId: gid, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
+            selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
+          });
+        } catch { rows = null; }
+        const exit = folded?.lastExit?.[from];
+        const onRoster = Array.isArray(rows) && rows.some((m) => (m?.webid ?? m?.id) === from);
+        if ((exit === 'leave' || exit === 'evict') && !onRoster) { ids.delete(gid); left.push(gid); }
       }
       return {
         circles: [...ids],
@@ -3017,7 +3013,7 @@ export function buildSkills({
       // parsed args + carrier context.
       return listCircleRoster(
         {
-          store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync,
+          store, rosterCallerIsForeign, simulateSync,
           // The SAME folded projection every other authority answer here reads, spine and all — so
           // "am I still in this circle" gets the same answer at this door as at every other.
           projectCircleRoster: ({ groupId: gid }) => projectCircleRoster({

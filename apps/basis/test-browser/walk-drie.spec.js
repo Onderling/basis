@@ -321,6 +321,28 @@ test('de wandeling met drie — A maakt, B is de basis, C komt en gaat', async (
     const cStillIn = (cMine?.circles ?? []).length > 0 && (cMine?.circles ?? []).some((id) => cRemoved.includes(id));
     note('7 · C: de kring staat als verwijderd', cRemoved.length > 0 && !cStillIn ? 'PASS' : 'FAIL',
       `circles ${JSON.stringify(cMine?.circles ?? [])} · removed ${JSON.stringify(cRemoved)}`);
+    // …and C's launcher keeps it as a MARKED tile; opened, it reads but does not post; closing takes it away for good
+    await gotoCircles(C.page);
+    const cTile = C.page.locator('.circle-tile.is-removed').filter({ hasText: RE });
+    const marked = (await cTile.count()) > 0;
+    note('7 · C: de tegel staat er, gemarkeerd', marked ? 'PASS' : 'FAIL', marked ? (await cTile.first().innerText()).replace(/\s+/g, ' ').slice(0, 120) : 'geen gemarkeerde tegel');
+    if (marked) {
+      await cTile.first().click();
+      await C.page.waitForTimeout(1500);
+      const composers = await C.page.locator('form.circle-view__composer, form.cc-noticeboard__composer').count();
+      const closeBtn = C.page.locator('[data-testid="close-removed-circle"]');
+      note('7 · C: alleen lezen, met sluiten', composers === 0 && (await closeBtn.count()) > 0 ? 'PASS' : 'FAIL', `composers ${composers} · sluiten ${await closeBtn.count()}`);
+      if (await closeBtn.count()) {
+        await closeBtn.first().click();
+        await C.page.waitForTimeout(1500);
+        await C.page.reload();
+        await C.page.waitForTimeout(4000);
+        await gotoCircles(C.page);
+        const after = await C.page.evaluate(() => window.onderlingCall('pinboard', 'listMyCircles', {}));
+        const gone = (await C.page.locator('.circle-tile.is-removed').count()) === 0 && (after?.removed ?? []).length === 0;
+        note('7 · C: gesloten, en na herladen weg', gone ? 'PASS' : 'FAIL', `removed ${JSON.stringify((after?.removed ?? []).map((r) => r?.id))}`);
+      }
+    }
     await sendChat(B.page, "zijn we nog met z'n tweeën?");
     await sees(A, "zijn we nog met z'n tweeën?", '7');
     await C.page.waitForTimeout(6000);

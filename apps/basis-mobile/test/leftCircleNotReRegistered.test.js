@@ -37,6 +37,9 @@ describe('a left or removed circle on a re-register', () => {
     mine = { circles: ['kept'], left: ['left-one'], removed: [{ id: 'removed-one', name: 'Weg' }] };
     await bundle.registerCirclePresence();
     expect(primed.at(-1), 'only the circle still held').toEqual(['kept']);
+    // a caller that hands its own list (the launcher's tiles) is filtered the same way
+    await bundle.registerCirclePresence(['kept', 'removed-one']);
+    expect(primed.at(-1), 'an explicit list is filtered too').toEqual(['kept']);
     try { await agent.stop?.(); } catch { /* */ }
   });
 });

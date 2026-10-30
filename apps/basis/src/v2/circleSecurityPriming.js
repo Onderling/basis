@@ -53,6 +53,26 @@ export async function knownCircleIds({ agent } = {}) {
 }
 
 /**
+ * The circles to register this device's presence in (per-circle signing identity, relay address, announce): the ids a
+ * shell brings — the substrate's answer, a cached list, a just-joined circle the substrate has not caught up on — MINUS
+ * every circle `listMyCircles` says this person LEFT or was REMOVED from. A cached list is a rendering convenience; a
+ * left circle kept in it went back onto the relay on the next socket. Every shell asks this one function.
+ *
+ * @param {object|null} mine     `listMyCircles`' answer (`{circles, left, removed}`), or null when it could not be read
+ * @param {...Array<string|{id?: string, groupId?: string}>} lists  the ids to register, in any of the shapes shells hold
+ * @returns {string[]}
+ */
+export function presenceCircleIds(mine, ...lists) {
+  const idOf = (c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null));
+  const out = new Set([
+    ...(Array.isArray(mine?.left) ? mine.left : []).map(idOf),
+    ...(Array.isArray(mine?.removed) ? mine.removed : []).map(idOf),
+  ].filter(Boolean));
+  const ids = lists.flatMap((l) => (Array.isArray(l) ? l : [])).map(idOf).filter((id) => typeof id === 'string' && id);
+  return [...new Set(ids)].filter((id) => !out.has(id));
+}
+
+/**
  * Install signing identities and record roster snapshots for every circle.
  *
  * @param {object}   a

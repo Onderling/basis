@@ -11,8 +11,9 @@ import { createAgentRegistry } from '../src/AgentRegistry.js';
 
 const ENTRY = (id, name) => ({ agentId: id, pubKey: `pub-${id}`, webid: `https://x.pod/profile#me`, agentUri: `https://x.pod/agent/${id}`, role: 'profile', name, deviceId: id });
 
-function counted() {
+function counted({ singleWriter = true } = {}) {
   const backend = createMemoryBackend();
+  if (singleWriter) backend.singleWriter = true;   // the phone's and the box's registry backend say so
   const gets = { n: 0 };
   const get = backend.get.bind(backend);
   backend.get = async (...a) => { gets.n += 1; return get(...a); };
@@ -55,5 +56,33 @@ describe('the registry holds what it read', () => {
     expect((await reg.lookup('b'))?.name).toBe('Bram');
     expect(gets.n, 'the lookup after its own write reads nothing more').toBe(afterWrite);
     expect((await reg.list?.() ?? []).map((x) => x.agentId).sort()).toEqual(['a', 'b']);
+  });
+});
+
+describe('two writers that share no memory (two web tabs on one IndexedDB)', () => {
+  // Two backend OBJECTS over one storage, as two tabs each open the same IndexedDB: a write through one moves no count
+  // the other can see. Such a backend does not declare itself single-writer, so the registry keeps nothing and every
+  // lookup reads: a revoke in one tab is seen by the next lookup in the other at once.
+  function tabsOverOneStore() {
+    const store = new Map();
+    const tab = () => ({
+      async get(k) { return store.has(k) ? { ...store.get(k) } : null; },
+      async put(k, bytes, etag) { store.set(k, { bytes, etag: etag ?? String(Math.random()), _v: (store.get(k)?._v ?? 0) + 1 }); },
+      async putIf(k, bytes, ifMatch) { const cur = store.get(k); if ((cur?.etag ?? null) !== (ifMatch ?? null)) return { conflict: true }; store.set(k, { bytes, etag: String(Math.random()), _v: (cur?._v ?? 0) + 1 }); return { etag: store.get(k).etag }; },
+      async delete(k) { store.delete(k); },
+      async list(prefix) { return [...store.keys()].filter((k) => k.startsWith(prefix ?? '')); },
+      subscribe() { return () => {}; },
+    });
+    return [tab(), tab()];
+  }
+
+  it('a revoke in one is seen by a lookup in the other at once', async () => {
+    const [a, b] = tabsOverOneStore();
+    const regA = createAgentRegistry({ pseudoPod: createPseudoPod({ backend: a, mode: 'standalone', deviceId: 'dev-1' }), deviceId: 'dev-1' });
+    const regB = createAgentRegistry({ pseudoPod: createPseudoPod({ backend: b, mode: 'standalone', deviceId: 'dev-1' }), deviceId: 'dev-1' });
+    await regA.register(ENTRY('a', 'Anna'));
+    expect((await regA.lookup('a'))?.revokedAt ?? null).toBeNull();
+    await regB.revoke('a');
+    expect((await regA.lookup('a'))?.revokedAt, 'tab A sees the revoke at once').toBeTruthy();
   });
 });

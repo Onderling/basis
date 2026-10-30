@@ -834,8 +834,13 @@ export function createPseudoPod({
     read,
     write,
     delete: deleteResource,
-    /** How many times this resource changed through this pseudo-pod (a reader keeps what it parsed while it holds). */
-    revision: (uri) => revisions.get(_keyForUri(uri)) ?? 0,
+    /**
+     * How many times this resource changed through the pseudo-pods over this backend — a reader keeps what it parsed
+     * while it holds. Only for a backend that declares itself the ONLY writer of its storage (`singleWriter: true`: one
+     * process owns it, as the phone's app storage and the box's files). A backend another process writes too (web: two
+     * tabs on one IndexedDB share no memory, so a revoke in one moves no count the other sees) gets null: read every time.
+     */
+    revision: (uri) => (backendIn.singleWriter === true ? (revisions.get(_keyForUri(uri)) ?? 0) : null),
     list,
     subscribe,
     writeFromPeer,

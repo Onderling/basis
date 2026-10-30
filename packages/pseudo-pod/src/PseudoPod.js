@@ -124,8 +124,11 @@ const VALID_MODES = new Set(PSEUDO_POD_MODES);
  *   `drainWriteThroughQueue` / `listWriteThroughPending` / `writeThroughPendingCount`, plus
  *   introspection getters (`deviceId`, `backend`, `currentMode`, …).
  */
+/** Each backend's per-key revision, shared by every pseudo-pod over it (a WeakMap: a dropped backend takes its counts). */
+const REVISIONS_BY_BACKEND = new WeakMap();
+
 export function createPseudoPod({
-  backend,
+  backend: backendIn,
   mode,
   deviceId,
   transport,
@@ -136,12 +139,32 @@ export function createPseudoPod({
   isPodReachable,
   versioning,
 } = {}) {
-  if (!backend || typeof backend.get !== 'function') {
+  if (!backendIn || typeof backendIn.get !== 'function') {
     throw Object.assign(
       new Error('createPseudoPod: `backend` (StorageBackend) is required'),
       { code: 'INVALID_ARGUMENT' },
     );
   }
+
+  // THE REVISION of each resource here: bumped by every change this pseudo-pod makes to the backend (a local write, a
+  // pull from the pod, a peer's write, a delete), so a reader can keep what it parsed while nothing changed beneath it
+  // — the agent registry, whose backend seals at rest (one unseal of the whole blob per lookup otherwise).
+  // counted per BACKEND, not per pseudo-pod: two pseudo-pods over one backend (two registries, two tabs' worth of
+  // writers in one process) must each see the other's writes move the revision
+  let revisions = REVISIONS_BY_BACKEND.get(backendIn);
+  if (!revisions) { revisions = new Map(); REVISIONS_BY_BACKEND.set(backendIn, revisions); }
+  const bumpRevision = (key) => { revisions.set(key, (revisions.get(key) ?? 0) + 1); };
+  // a layer of this pseudo-pod's own in front of the backend: the backend itself is never changed (several pseudo-pods
+  // over one backend must not stack wrappers on it), and every other method reaches it as it was
+  const counted = new Set(['put', 'putIf', 'delete']);
+  const backend = new Proxy(backendIn, {
+    get(target, prop) {
+      const v = target[prop];
+      if (typeof v !== 'function') return v;
+      if (counted.has(prop)) return async (key, ...rest) => { try { return await v.call(target, key, ...rest); } finally { bumpRevision(key); } };
+      return v.bind(target);
+    },
+  });
   if (!VALID_MODES.has(mode)) {
     throw Object.assign(
       new Error('createPseudoPod: `mode` must be "standalone", "replication-ring", or "cache"'),
@@ -811,6 +834,8 @@ export function createPseudoPod({
     read,
     write,
     delete: deleteResource,
+    /** How many times this resource changed through this pseudo-pod (a reader keeps what it parsed while it holds). */
+    revision: (uri) => revisions.get(_keyForUri(uri)) ?? 0,
     list,
     subscribe,
     writeFromPeer,
@@ -830,7 +855,7 @@ export function createPseudoPod({
 
     // Introspection
     get deviceId()      { return deviceId; },
-    get backend()       { return backend; },
+    get backend()       { return backendIn; },
     get currentMode()   { return mode; },
     get _perUriMode()   { return new Map(perUriMode); },
     get _writeThroughQueue() { return writeThroughQueue; },

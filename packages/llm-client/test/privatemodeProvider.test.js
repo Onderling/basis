@@ -108,3 +108,64 @@ describe('prompt caching: one secret per box, a salt per person', () => {
     expect(client.calls[0].body.cacheKey).toBeUndefined();
   });
 });
+
+describe('one call into the SDK at a time, process-wide', () => {
+  // The SDK's attestation runs in one Go/Wasm program per process; two calls that both hit "secret expired" inside it
+  // refresh under one mutex and can deadlock the program (the box runner died that way: a person's turn and the hourly
+  // key probe, a second apart). A box builds two providers (the model and its fallback), each with its own client —
+  // so the gate is the process's, not a client's.
+  function refreshingClient(trace) {
+    return {
+      chat: { completions: { create: async (body, opts) => {
+        trace.inFlight += 1; trace.max = Math.max(trace.max, trace.inFlight);
+        try {
+          // the SDK's refresh-and-retry: a pause inside the call, where a second caller would enter
+          await new Promise((r) => { setTimeout(r, 20); });
+          if (opts?.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+          return { choices: [{ message: { role: 'assistant', content: body.model } }] };
+        } finally { trace.inFlight -= 1; }
+      } } },
+      models: { list: async () => { trace.listed += 1; return { data: [{ id: 'glm-5.3' }] }; } },
+    };
+  }
+  const ask = { system: 's', messages: [{ role: 'user', content: 'hoi' }] };
+
+  it('a turn on the model and a probe on the fallback, at once: the second waits for the first', async () => {
+    const trace = { inFlight: 0, max: 0, listed: 0 };
+    const primary = await privatemodeProvider({ client: refreshingClient(trace), model: 'glm-5.3' });
+    const fallback = await privatemodeProvider({ client: refreshingClient(trace), model: 'glm-5.3-flash' });
+    const out = await Promise.all([primary.invoke(ask), fallback.invoke({ ...ask, options: { maxTokens: 1 } }), primary.invoke(ask)]);
+    expect(out.map((r) => r.replyText)).toEqual(['glm-5.3', 'glm-5.3-flash', 'glm-5.3']);
+    expect(trace.max).toBe(1);
+  });
+
+  it('a caller whose time runs out while it waits never enters the SDK, and the queue moves on', async () => {
+    const trace = { inFlight: 0, max: 0, listed: 0 };
+    let calls = 0;
+    const client = refreshingClient(trace);
+    const create = client.chat.completions.create;
+    client.chat.completions.create = (...a) => { calls += 1; return create(...a); };
+    const door = privatemodeFetch(client);
+    const url = 'https://api.privatemode.ai/v1/chat/completions';
+    const ctl = new AbortController();
+    const first = door(url, { method: 'POST', body: JSON.stringify({ model: 'a' }) });
+    const waiting = door(url, { method: 'POST', body: JSON.stringify({ model: 'b' }), signal: ctl.signal });
+    ctl.abort();
+    const [r1, r2] = await Promise.all([first, waiting]);
+    expect(r1.status).toBe(200);
+    expect(r2.ok).toBe(false);
+    expect(calls).toBe(1);   // the aborted waiter never reached the SDK
+    const after = await door(url, { method: 'POST', body: JSON.stringify({ model: 'c' }) });
+    expect(after.status).toBe(200);
+  });
+
+  it('the models list rides the same gate', async () => {
+    const trace = { inFlight: 0, max: 0, listed: 0 };
+    const client = refreshingClient(trace);
+    const list = client.models.list;
+    client.models.list = async () => { trace.inFlight += 1; trace.max = Math.max(trace.max, trace.inFlight); try { await new Promise((r) => { setTimeout(r, 20); }); return await list(); } finally { trace.inFlight -= 1; } };
+    const p = await privatemodeProvider({ client });
+    await Promise.all([p.invoke(ask), p.listModels()]);
+    expect(trace.max).toBe(1);
+  });
+});

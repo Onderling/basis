@@ -46,6 +46,7 @@ import { renderMandateLegibility } from './mandatePicker.js';
 import { renderToDom } from '../../src/web/domAdapter.js';
 import { renderCircleScreen } from './circleScreen.js';
 import { renderCircleNoticeboard } from './circleNoticeboard.js';
+import { closeRemovedButton } from './closeRemovedButton.js';
 import { buildAttachControl } from './attachControl.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { pickRowText } from '../../src/v2/rowText.js';
@@ -133,6 +134,10 @@ export function renderCircleView(container, {
   // the composer is read-only — `canPost=false` renders a disabled note instead of the input. The host
   // computes it from `isFeatureEnabled(policy, 'chat')`.
   canPost = true,
+  // …and what is said in its place (`composerGate`'s note key; default: chat is off). `onCloseRemoved` is set only for a
+  // circle an admin removed this person from: the note then offers the close, and the noticeboard is read-only too.
+  composerNoteKey = null,
+  onCloseRemoved = null,
   // Multi-field inline form (web↔mobile parity with mobile's `MultiFieldFormBubble`). When a circle
   // dispatch trips `needsForm` with 2+ missing params, the host sets `pendingForm` to the
   // `PendingFormFollowUp` (shared `src/v2/followUp.js` `beginFormFollowUp`) and the composer renders an
@@ -366,6 +371,9 @@ export function renderCircleView(container, {
       onClearAttach:    noticeboard.onClearAttach,
       onViewAttachment: noticeboard.onViewAttachment,
       onEmbedOpen,
+      // a circle an admin removed this person from: the board reads, it does not post
+      readOnlyNote: typeof onCloseRemoved === 'function' ? tr(composerNoteKey ?? 'circle.membership.removed_note') : null,
+      onCloseRemoved,
     });
   } else if (effectiveTab === 'tasks') {
     // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the
@@ -461,7 +469,8 @@ export function renderCircleView(container, {
     const note = document.createElement('div');
     note.className = 'circle-view__composer-disabled';
     note.setAttribute('role', 'note');
-    note.textContent = tr('circle.view.chat_disabled');
+    note.textContent = tr(composerNoteKey ?? 'circle.view.chat_disabled');
+    if (typeof onCloseRemoved === 'function') note.appendChild(closeRemovedButton(tr, onCloseRemoved));
     container.appendChild(note);
   } else if (typeof onSend === 'function' && viewMode !== 'screen') {
     const form = document.createElement('form');
@@ -1372,3 +1381,4 @@ function buildChatFilterStrip(model, onChatFilter, tr) {
   strip.appendChild(note);
   return strip;
 }
+

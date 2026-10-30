@@ -16,6 +16,15 @@
  * Isolation is preserved WITHOUT app-keyed storage: the per-circle SEAL + the capability boundary (cluster B)
  * gate access, so mixing apps' typed items in one circle store loses nothing. (See REMAINING-WORK.md cluster L.)
  *
+ * WHAT IT HOLDS IN MEMORY. Once read, the store keeps each item's stored text (id → text, with its type, which is the
+ * type index) and serves reads from there while nothing beneath it has changed — Vandaag's blocks list every circle's
+ * store on each landing, and reading, parsing and walking every record again was most of a 2 s block of JS per screen
+ * on a phone. "Nothing changed" is the data source's own `revision` (bumped on every change to the medium): a write the
+ * store did not make itself — another circle's on a shared medium, a pod pull, a forget, a restore — drops what it
+ * holds and the next read loads once more. A source without a `revision` gets no memory. What is held is the text a
+ * read already returns in the clear on this device (the medium below seals it at rest), for as long as this store
+ * object lives — no copy outlives the agent, and every read still hands out fresh objects.
+ *
  * @example
  *   const store = new CircleItemStore({ dataSource, rootContainer, registry });
  *   await store.put({ type: 'task', text: 'fix the tap' });   // validated, id assigned
@@ -54,6 +63,10 @@ export class CircleItemStore {
   // so a store built without a manifest still dispatches identically to the pre-declaration behaviour.
   /** @type {{ hasChannel:(t:string,r:string)=>boolean }} */ #resolution;
   /** @type {(() => object|null) | null} */ #originOf;
+  // What this store holds of its items (id → {text, type}) and the source revision it is current at; null = nothing
+  // held (never read, a source without a revision, or a change beneath it). See the module doc.
+  /** @type {Map<string, {text: string, type: string|undefined}>|null} */ #held = null;
+  /** @type {number} */ #heldAt = -1;
 
   /**
    * @param {object} args
@@ -93,6 +106,34 @@ export class CircleItemStore {
   }
 
   #uri(id) { return `${this.#root}${ITEMS_DIR}/${id}.json`; }
+
+  /** The source's revision, or null when it keeps none (then nothing is held). */
+  #revision() { const r = this.#source.revision; return typeof r === 'number' ? r : null; }
+  /** Whether what is held is current: something is held and nothing changed beneath it since. */
+  #fresh() { return this.#held !== null && this.#revision() === this.#heldAt; }
+  /** Parse a stored text (someone else's JSON) and let its clock advance ours. */
+  #parse(raw) {
+    const item = typeof raw === 'string' ? parseUntrustedJson(raw) : raw;
+    if (item && typeof item === 'object') this.#observeClock(item.clock);   // Lamport: seeing an item advances the clock
+    return item;
+  }
+  /**
+   * Every write and delete of this store goes through here: what is held follows the store's own change only when the
+   * source moved by exactly that one change; anything else beneath it in the meantime drops what is held.
+   */
+  async #change(id, text, type, writeOpts) {
+    const wasFresh = this.#fresh();
+    const before = this.#revision();
+    if (text === null) { if (typeof this.#source.delete === 'function') await this.#source.delete(this.#uri(id)); }
+    else await this.#source.write(this.#uri(id), text, writeOpts);
+    const after = this.#revision();
+    if (wasFresh && after === before + 1) {
+      if (text === null) this.#held.delete(id); else this.#held.set(id, { text, type });
+      this.#heldAt = after;
+    } else if (!(wasFresh && after === before)) {
+      this.#held = null;
+    }
+  }
 
   /**
    * Register a SYNC HOOK — fired publish-on-write (cluster L3 / no-pod-sync-off-household). On every `put` the
@@ -202,7 +243,7 @@ export class CircleItemStore {
           if (overlay && claimClusterEqual(existing, merged)) merged = existing;   // local claim already won
           if (clockSets) merged = mergeFieldClocks(merged, existing, item, clockSets);
           if (merged === existing) return existing;                        // nothing of the inbound is newer → no churn
-          await this.#source.write(this.#uri(id), JSON.stringify(merged));
+          await this.#change(id, JSON.stringify(merged), merged.type);
           if (sync !== false) this.#emitWrite(merged);
           return merged;
         }
@@ -212,14 +253,14 @@ export class CircleItemStore {
         if (overlay || clockSets) {
           let merged = overlay ? applyClaimOverlay(stored, overlay) : stored;
           if (clockSets) merged = mergeFieldClocks(merged, existing, item, clockSets);
-          await this.#source.write(this.#uri(id), JSON.stringify(merged));
+          await this.#change(id, JSON.stringify(merged), merged.type);
           if (sync !== false) this.#emitWrite(merged);
           return merged;
         }
         // no claim and no field-clock set → fall through to write the plain content winner (`stored`)
       }
     }
-    await this.#source.write(this.#uri(id), JSON.stringify(stored));
+    await this.#change(id, JSON.stringify(stored), stored.type);
     // `sync:false` suppresses the fan-out — used for INBOUND writes (a peer's item we just received) so a sync
     // ingest never re-publishes the same item back to the mesh (the echo loop). Local writes default sync:true.
     if (sync !== false) this.#emitWrite(stored);
@@ -306,7 +347,7 @@ export class CircleItemStore {
       try { baseEtag = await src.readEtag(uri); } catch { baseEtag = null; }
     }
     try {
-      await src.write(uri, JSON.stringify(stored), baseEtag != null ? { ifMatch: baseEtag } : undefined);
+      await this.#change(id, JSON.stringify(stored), stored.type, baseEtag != null ? { ifMatch: baseEtag } : undefined);
     } catch (err) {
       const conflict = err && (err.code === 'CONFLICT' || err.status === 409 || err.status === 412);
       if (conflict) return { error: 'conflict', current: await this.get(id) };
@@ -319,11 +360,10 @@ export class CircleItemStore {
 
   /** Read one item by id, or `null` if absent. */
   async get(id) {
+    if (this.#fresh()) { const h = this.#held.get(id); return h ? this.#parse(h.text) : null; }
     const raw = await this.#source.read(this.#uri(id));
     if (raw === null || raw === undefined) return null;
-    const item = typeof raw === 'string' ? parseUntrustedJson(raw) : raw;
-    if (item && typeof item === 'object') this.#observeClock(item.clock);   // Lamport: seeing an item advances the clock
-    return item;
+    return this.#parse(raw);
   }
 
   /** Delete one item by id (no-op if absent, mirroring DataSource.delete). */
@@ -333,33 +373,49 @@ export class CircleItemStore {
     // route a bare id. Best-effort: an unreadable/absent row hands null and the hook falls back on the id.
     let removed = null;
     if (sync !== false) { try { removed = await this.get(id); } catch { removed = null; } }
-    if (typeof this.#source.delete === 'function') await this.#source.delete(this.#uri(id));
+    await this.#change(id, null);
     if (sync !== false) this.#emitRemove(id, removed);   // `sync:false` = inbound delete (don't re-publish the removal)
   }
 
   /** Every item in the circle (all types). */
   async list() {
-    const keys = await this.#source.list(`${this.#root}${ITEMS_DIR}/`);
+    if (this.#fresh()) return this.#fromHeld(() => true);
+    const at = this.#revision();
+    const prefix = `${this.#root}${ITEMS_DIR}/`;
+    const keys = await this.#source.list(prefix);
     const out = [];
+    const held = new Map();
     for (const k of (keys || [])) {
       const raw = await this.#source.read(k);
       if (raw === null || raw === undefined) continue;
       try {
-        const item = typeof raw === 'string' ? parseUntrustedJson(raw) : raw;
-        if (item && typeof item === 'object') this.#observeClock(item.clock);   // Lamport: seeing an item advances the clock
+        const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
+        const item = this.#parse(text);
         out.push(item);
+        held.set(k.slice(prefix.length).replace(/\.json$/, ''), { text, type: item?.type });
       } catch { /* skip malformed */ }
+    }
+    // held only when nothing changed beneath while it was being read (else the next read loads again)
+    if (at !== null && this.#revision() === at) { this.#held = held; this.#heldAt = at; } else this.#held = null;
+    return out;
+  }
+
+  /** The held items whose type passes `keep`, each parsed afresh (a caller's change never reaches what is held). */
+  #fromHeld(keep) {
+    const out = [];
+    for (const { text, type } of this.#held.values()) {
+      if (!keep(type)) continue;
+      try { out.push(this.#parse(text)); } catch { /* skip malformed */ }
     }
     return out;
   }
 
   /**
-   * Items of a given canonical `type` — the type index ("all tasks in this circle", "all offers").
-   * v0 filters on `list()`; a maintained per-type index (e.g. `byType/<type>/<id>` markers) is a later
-   * optimisation once write volume warrants it.
+   * Items of a given canonical `type` — the type index ("all tasks in this circle", "all offers"): once the store is
+   * held, the type each held item was stored with picks them, and only those are parsed.
    */
   async listByType(type) {
-    const all = await this.list();
-    return all.filter((it) => it && it.type === type);
+    if (this.#fresh()) return this.#fromHeld((t) => t === type);
+    return (await this.list()).filter((it) => it && it.type === type);
   }
 }

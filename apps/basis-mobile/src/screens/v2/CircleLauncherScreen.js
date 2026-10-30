@@ -16,7 +16,7 @@ import Btn from './Btn.js';
 import { pendingEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
 import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2/plusPins.js';
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
-import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
+import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../../../basis/src/v2/vandaag.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
@@ -1282,12 +1282,23 @@ export default function CircleLauncherScreen({
     if (view !== 'screens') return;
     refreshScreensBook();
   }, [view, refreshScreensBook]);
+  // ONE MATERIALIZE PER LANDING: the run reads what it is made from out of this ref, and fires again only when the
+  // landing key changes (the page, the block opened whole, the circles shown, the selves) — not when an input becomes
+  // a new object with the same content. Keyed on the objects, the run fired three times per landing, ~2.2 s each on a
+  // phone (the refreshed page book, the re-read circle list, the seen-marks).
+  const vandaagInputs = useRef({});
+  vandaagInputs.current = { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs };
+  const vandaagKey = useMemo(() => vandaagLandingKey({
+    book: screensBook, circles: circlesShown, expandedBlockId,
+    selves: [...selvesOn, ...heldSelves.map((p) => `held:${p?.id ?? p}`)],
+  }), [screensBook, circlesShown, expandedBlockId, selvesOn, heldSelves]);
   useEffect(() => {
     if (view !== 'screens') {
       setScreenViewBlocks(null);
       setScreenViewRefreshing(false);
       return;
     }
+    const { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs } = vandaagInputs.current;
     const active = getActiveScreen(screensBook);
     if (!active) { setScreenViewBlocks([]); setScreenViewRefreshing(false); return; }
     // the page, or one of its blocks opened whole ("meer"); only the page is cached
@@ -1344,7 +1355,7 @@ export default function CircleLauncherScreen({
       }
     })();
     return () => { alive = false; };
-  }, [view, expandedBlockId, screensBook, bundle, eventLog, circles, circlesShown, selvesOn, heldSelves, screenBlocksCache, seenAt, unreadMyRefs]);
+  }, [view, vandaagKey, bundle, eventLog, screenBlocksCache]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // `resolveSkill`, not `callSkill`: the 2-arg RESOLVING waist. The targeted 3-arg one lives on
   // `bundle.callSkill`; giving them one name is the arity trap (it has now bitten three times).

@@ -153,3 +153,25 @@ export function customiseOp(act, { pageId, blockId, index, kind, value, type, na
     default: throw new Error(`customiseOp: unknown act "${act}"`);
   }
 }
+
+/** A value's JSON with its object keys sorted, so two equal values in different objects give one string. */
+function stableJson(v) {
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stableJson(v[k])}`).join(',')}}`;
+  return JSON.stringify(v ?? null);
+}
+
+/**
+ * What a Vandaag landing materializes FROM, as one string: the active page (its blocks), the block opened whole, the
+ * circles shown (by id, order-free) and the selves switched on. A screen materializes when this changes — never because
+ * an input became a new object with the same content (a refreshed page book, a re-read circle list), which on a phone
+ * re-ran the whole materialize three times per landing. What the blocks show of each circle (news, unread) is read
+ * fresh by the run itself; it is not part of the key.
+ * @param {{book?: object|null, circles?: Array<{id?: string, groupId?: string}>, expandedBlockId?: string|null, selves?: string[]}} a
+ * @returns {string}
+ */
+export function vandaagLandingKey({ book = null, circles = [], expandedBlockId = null, selves = [] } = {}) {
+  const page = getActiveScreen(book);
+  const ids = (Array.isArray(circles) ? circles : []).map((c) => (typeof c === 'string' ? c : (c?.id ?? c?.groupId))).filter(Boolean).sort();
+  return stableJson({ page: page ? { id: page.id, blocks: page.blocks ?? [] } : null, expandedBlockId: expandedBlockId ?? null, circles: ids, selves: [...(selves ?? [])].sort() });
+}

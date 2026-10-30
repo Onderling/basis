@@ -69,7 +69,7 @@ describe('a follow-up after a read', () => {
     return bridge.outbox.map((m) => m.text);
   };
   /** What the model saw below the turn marker on its latest call (this turn's part of the prompt). */
-  const thisTurn = () => String(model.requests.at(-1)?.system ?? '').split(TURN_MARKER)[1] ?? '';
+  const thisTurn = () => String(model.requests.at(-1)?.messages?.at(-1)?.content ?? '').split(TURN_MARKER)[1] ?? '';
 
   it('the list just read is in what the model sees the next turn — its title and its lines', async () => {
     await say('/help');   // the welcome, out of the way

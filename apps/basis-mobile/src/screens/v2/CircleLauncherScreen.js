@@ -1934,6 +1934,8 @@ export default function CircleLauncherScreen({
           circles={circles}
           circleAddressFor={(cid) => bundle?.agent?.circleAddressFor?.(cid) ?? null}
           signCircleLink={(cid, gid, addr) => bundle?.agent?.signCircleLink?.(cid, gid, addr) ?? null}
+          // which persona this device holds a circle as: the join warns before a second persona of the person joins it
+          profileIdOf={(cid) => bundle?.agent?.profileIdOf?.(cid) ?? null}
           // J-CP1 — be on the circle's endpoint BEFORE the redeem. The invite names it; without this
           // the redeem goes out over whatever transport this device happens to have, and a relay-only
           // admin never hears it.

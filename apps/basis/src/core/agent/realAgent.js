@@ -5065,6 +5065,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     membershipEmit,
     membershipRead,
+    // closing a circle one was removed from forgets its content on this device (the same forget a bot's removal runs)
+    forgetCircleContent: (circleId) => selfAgent?.forgetCircleContent?.(circleId),
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
     currentPersonKey,
     rulesUpdateEmit,

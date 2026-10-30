@@ -56,6 +56,9 @@ export function ollamaProvider({
   // Optional per-request body fields, from the request (`{system, messages, tools, options, cacheKey}`): a provider's
   // own switches that depend on the call — Privatemode's per-person cache salt. Unset → the body as before.
   bodyFor        = null,
+  // The name a provider error starts with: the route that failed (a provider that reuses this protocol passes its own,
+  // so a Privatemode failure does not read as a local Ollama one).
+  label          = 'ollama',
   // Optional Bearer key. Local Ollama needs none; a key is required for an
   // OpenAI-compatible gateway behind the same `/v1/chat/completions` protocol —
   // notably the Privatemode (confidential-enclave) loopback proxy, which expects
@@ -141,14 +144,14 @@ export function ollamaProvider({
           }
           res = await post(baseBody);
         } else {
-          throw Object.assign(new Error(`ollama: ${res.status} ${text.slice(0, 200)}`),
+          throw Object.assign(new Error(`${label}: ${res.status} ${text.slice(0, 200)}`),
             { code: 'PROVIDER_ERROR', status: res.status });
         }
       }
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        throw Object.assign(new Error(`ollama: ${res.status} ${text.slice(0, 200)}`),
+        throw Object.assign(new Error(`${label}: ${res.status} ${text.slice(0, 200)}`),
           { code: 'PROVIDER_ERROR', status: res.status });
       }
       const json = await res.json();

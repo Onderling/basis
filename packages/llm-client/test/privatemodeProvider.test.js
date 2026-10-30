@@ -44,6 +44,8 @@ describe('privatemodeProvider', () => {
     expect(client.calls[0].body.chat_template_kwargs).toBeUndefined();
     const bad = await privatemodeProvider({ client: fakeClient(Object.assign(new Error('unauthorized'), { status: 401 })) });
     await expect(bad.invoke({ system: 's', messages: [{ role: 'user', content: 'hoi' }] })).rejects.toMatchObject({ code: 'PROVIDER_ERROR', status: 401 });
+    // the error names the route it came from, not the transport shape it reuses
+    await expect(bad.invoke({ system: 's', messages: [{ role: 'user', content: 'hoi' }] })).rejects.toThrow(/^privatemode: 401/);
   });
   it('the fetch door answers 404 for anything but chat completions', async () => {
     const f = privatemodeFetch(fakeClient({}));

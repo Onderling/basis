@@ -148,7 +148,7 @@ export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DE
   }
   const extraBody = reasoningBodyFor(model, thinking);
   const base = ollamaProvider({
-    baseUrl: PRIVATEMODE_ENDPOINT, model, timeoutMs, defaultOptions,
+    baseUrl: PRIVATEMODE_ENDPOINT, model, timeoutMs, defaultOptions, label: 'privatemode',
     fetchFn: privatemodeFetch(c, { extraBody }),
     ...(cacheSalt ? { bodyFor: ({ cacheKey }) => ({ cache_salt: cacheSaltFor(cacheSalt, cacheKey) }) } : {}),
   });

@@ -43,6 +43,22 @@ describe('the registry holds what it read', () => {
     expect(uri).toBeTruthy();
   });
 
+  it('a write straight to pseudoPod.backend moves the revision too', async () => {
+    // the pseudo-pod hands out its backend (introspection, and callers that write beneath it): that handle must be the
+    // counted one, or a write through it leaves the registry serving what it held
+    const { backend } = counted();
+    const pseudoPod = createPseudoPod({ backend, mode: 'standalone', deviceId: 'dev-1' });
+    const reg = createAgentRegistry({ pseudoPod, deviceId: 'dev-1' });
+    await reg.register(ENTRY('a', 'Anna'));
+    expect((await reg.lookup('a'))?.revokedAt ?? null).toBeNull();
+    const key = (await pseudoPod.backend.list(''))?.find((k) => String(k).includes('registry')) ?? (await pseudoPod.backend.list(''))?.[0];
+    const rec = await pseudoPod.backend.get(key);
+    const body = typeof rec.bytes === 'string' ? JSON.parse(rec.bytes) : rec.bytes;
+    body.agents = body.agents.map((x) => (x.agentId === 'a' ? { ...x, revokedAt: '2026-10-30T22:00:00Z' } : x));
+    await pseudoPod.backend.put(key, body);
+    expect((await reg.lookup('a'))?.revokedAt, 'the write beneath the pseudo-pod is seen').toBeTruthy();
+  });
+
   it('its own write is seen at once, and held without another read', async () => {
     const { backend, gets: COUNT } = counted();
     const pseudoPod = createPseudoPod({ backend, mode: 'standalone', deviceId: 'dev-1' });

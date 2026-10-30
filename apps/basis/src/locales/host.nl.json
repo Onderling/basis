@@ -345,20 +345,6 @@
       "doc": "/set-relay ving een fout op van sa.relay.connect()."
     }
   },
-  "rotate": {
-    "unavailable": {
-      "text": "Identiteitsrotatie niet beschikbaar in deze build.",
-      "doc": "Defensive."
-    },
-    "done": {
-      "text": "✓ Identiteit geroteerd.\n  oude pubKey: {{oldPub}}\n  nieuwe pubKey: {{newPub}}\n  grace period: {{grace}} dagen\n\nJe NKN-adres is gewijzigd.  Voer /me uit om het te zien.\nBekende peers zijn genotificeerd via KeyRotation.broadcast.",
-      "doc": "v0.7.P3d."
-    },
-    "failed": {
-      "text": "Rotatie mislukt: {{error}}",
-      "doc": "Defensive."
-    }
-  },
   "scan_qr": {
     "not_available": {
       "text": "QR-scanner niet beschikbaar op dit toestel.",

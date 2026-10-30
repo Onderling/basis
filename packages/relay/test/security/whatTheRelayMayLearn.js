@@ -165,7 +165,7 @@ export const CIRCLE_AWARE_CALL_SITES = Object.freeze([
        + 'do: it cannot register anybody. `clients.set` is not reachable from it.',
     exitPath: 'Deleting `acceptedGroups` deletes this call.',
     lines: [
-      'const { address, groupProof, rotationProof } = msg;',
+      'const { address, groupProof } = msg;',
       'const auth = groupAuth.verifyBound({',
       'proof: groupProof,',
     ],
@@ -490,7 +490,7 @@ export const FORBIDDEN_KNOWLEDGE = Object.freeze([
  */
 export const WIRE_FRAMES = Object.freeze({
   // client → relay
-  'register':                   { fact: 'addresses-on-a-socket', allowedKeys: ['type', 'address', 'groupProof', 'rotationProof'] },
+  'register':                   { fact: 'addresses-on-a-socket', allowedKeys: ['type', 'address', 'groupProof'] },
   // Registration became two frames on 2026-07-31 (Decision 3). `register` now only ASKS; the relay
   // answers with a nonce and registers nothing until the answer verifies against the address. Both
   // new frames carry an address the relay was going to be told anyway plus opaque random bytes, so
@@ -540,7 +540,7 @@ export const WIRE_FRAMES = Object.freeze({
  * asserts it rather than assuming it.
  */
 export const ENVELOPE_HEADER_FIELDS = Object.freeze([
-  '_v', '_p', '_id', '_re', '_from', '_to', '_topic', '_ts', '_sig', '_rotationProof', 'payload',
+  '_v', '_p', '_id', '_re', '_from', '_to', '_topic', '_ts', '_sig', 'payload',
   // Added 2026-07-31 by Decision 1: the key that signed the envelope, carried so the receiver
   // verifies against it instead of against whatever key the claimed `_from` maps to. See the
   // `signing-key` derivable fact — it is listed as something the relay reads, not argued away.

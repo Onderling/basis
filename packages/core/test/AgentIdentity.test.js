@@ -186,28 +186,6 @@ describe('AgentIdentity.stableId', () => {
     expect(a.stableId).not.toBe(b.stableId);
   });
 
-  it('survives rotation (new keypair, same stableId)', async () => {
-    const vault = makeVault();
-    const a = await AgentIdentity.generate(vault);
-    const oldStable = a.stableId;
-    const oldPubKey = a.pubKey;
-
-    const { newIdentity } = await AgentIdentity.rotate(vault);
-    expect(newIdentity.stableId).toBe(oldStable);
-    expect(newIdentity.pubKey).not.toBe(oldPubKey);
-  });
-
-  it('previous identity in restoreWithPrevious carries same stableId', async () => {
-    const vault = makeVault();
-    const a = await AgentIdentity.generate(vault);
-    const stable = a.stableId;
-    await AgentIdentity.rotate(vault);
-
-    const { current, previous } = await AgentIdentity.restoreWithPrevious(vault);
-    expect(current.stableId).toBe(stable);
-    expect(previous?.identity.stableId).toBe(stable);
-  });
-
   it('lazy-inits on legacy vaults (privkey present, no agent-stable-id)', async () => {
     const vault = makeVault();
     await AgentIdentity.generate(vault);

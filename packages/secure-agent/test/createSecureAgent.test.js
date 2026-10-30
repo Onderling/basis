@@ -2,7 +2,7 @@
  * @onderling/secure-agent — createSecureAgent tests (S0 foundation).
  *
  * Covers the identity persistence + Agent + (mocked) NknTransport
- * wiring + rotation + diagnostic.  Future S-slice tests add their
+ * wiring + diagnostic.  Future S-slice tests add their
  * own fixtures.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -117,16 +117,6 @@ describe('createSecureAgent — S0 foundation', () => {
     // ('envelope', ...) handler that calls tx.sendHello on first
     // contact); integration-verified in basis's two-tab
     // demo (Tab A's first OW after HI gets reciprocal HI back).
-  });
-
-  it('rotateIdentity() produces a new pubKey + reports grace period', async () => {
-    const sa = await createSecureAgent({ vault: new VaultMemory() });
-    const oldPub = sa.identity.pubKey;
-    const r = await sa.rotateIdentity();
-    expect(r.oldPubKey).toBe(oldPub);
-    expect(r.newPubKey).not.toBe(oldPub);
-    expect(r.graceUntilDays).toBe(7);
-    await sa.shutdown();
   });
 
   // (S8 completion note: STUB_OPTS is now empty.  The
@@ -1295,10 +1285,10 @@ describe('createSecureAgent — S6 audit integration', () => {
     expect(sa.auditAutoLog).toBe(true);
     expect(sa.audit.size).toBe(0);
 
-    // identity.rotate should fire an audit entry
-    await sa.rotateIdentity();
+    // a security-critical action fires an audit entry
+    await sa.mute.add('app.x');
     expect(sa.audit.size).toBe(1);
-    expect(sa.audit.entries()[0].event).toBe('identity.rotate');
+    expect(sa.audit.entries()[0].event).toBe('mute.add');
     await sa.shutdown();
   });
 
@@ -1344,7 +1334,7 @@ describe('createSecureAgent — S6 audit integration', () => {
     const sa = await createSecureAgent({
       vault: new VaultMemory(), auditLog: { autoLog: false },
     });
-    await sa.rotateIdentity();
+    await sa.mute.add('app.x');
     expect(sa.audit.size).toBe(0);
     await sa.audit.append({ event: 'manual.event' });
     expect(sa.audit.size).toBe(1);
@@ -1357,7 +1347,7 @@ describe('createSecureAgent — S6 audit integration', () => {
       vault,
       auditLog: { vaultKey: 'sa-audit' },
     });
-    await sa1.rotateIdentity();
+    await sa1.mute.add('app.x');
     await sa1.shutdown();
 
     const sa2 = await createSecureAgent({
@@ -1365,7 +1355,7 @@ describe('createSecureAgent — S6 audit integration', () => {
       auditLog: { vaultKey: 'sa-audit' },
     });
     expect(sa2.audit.size).toBe(1);
-    expect(sa2.audit.entries()[0].event).toBe('identity.rotate');
+    expect(sa2.audit.entries()[0].event).toBe('mute.add');
     expect(sa2.audit.verify()).toEqual({ ok: true });
     await sa2.shutdown();
   });

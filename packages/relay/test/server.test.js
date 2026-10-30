@@ -528,14 +528,14 @@ describe('startRelay — Phase 2: per-group msgsPerDay quota', () => {
   });
 });
 
-describe('startRelay — Phase 2: rotation chain at register', () => {
+describe('startRelay — Phase 2: the register binds the proof to the address', () => {
   let admin, oldId, newId, otherId, gm, oldProof, relay;
 
   beforeAll(async () => {
     admin   = await AgentIdentity.generate(new VaultMemory());
     oldId   = await AgentIdentity.generate(new VaultMemory());
     newId   = await AgentIdentity.generate(new VaultMemory());
-    useIdentity(newId);           // the rotation test connects with the NEW key and must prove it
+    useIdentity(newId);           // the first test connects with the NEW key and must prove it
     otherId = await AgentIdentity.generate(new VaultMemory());
     gm      = new GroupManager({ identity: admin, vault: new VaultMemory() });
     oldProof = await gm.issueProof(oldId.pubKey, 'my-block');
@@ -543,9 +543,11 @@ describe('startRelay — Phase 2: rotation chain at register', () => {
 
   afterEach(async () => { if (relay) await relay.stop(); });
 
-  it('accepts the new pubKey when a valid rotation chain is presented', async () => {
-    const { KeyRotation } = await import('@onderling/core');
-    const rotationProof = await KeyRotation.buildProof(oldId, newId.pubKey, 86_400);
+  it('a push-rotation proof from the OLD key bridges nothing: the new address is refused (BINDING_MISMATCH)', async () => {
+    // Built byte for byte as the retired push rotation built it; a revoked device holds the old key.
+    const unsigned = { type: 'key-rotation', oldPubKey: oldId.pubKey, newPubKey: newId.pubKey, issuedAt: Date.now(), gracePeriod: 86_400 };
+    const sorted = Object.fromEntries(Object.entries(unsigned).sort(([a], [b]) => a.localeCompare(b)));
+    const rotationProof = { ...unsigned, sig: Buffer.from(oldId.sign(new TextEncoder().encode(JSON.stringify(sorted)))).toString('base64url') };
 
     relay = await startRelay({
       port: 0,
@@ -555,17 +557,18 @@ describe('startRelay — Phase 2: rotation chain at register', () => {
     const ws = await openClient(`ws://127.0.0.1:${relay.port}`);
     send(ws, {
       type:          'register',
-      address:       newId.pubKey,        // CONNECTING with the NEW key
-      groupProof:    oldProof,            // proof was for OLD key
-      rotationProof,                       // chains old → new
+      address:       newId.pubKey,        // connecting with the NEW key
+      groupProof:    oldProof,            // proof was for the OLD key
+      rotationProof,                       // ignored
     });
 
-    await waitFor(() => ws.messages.some(m => m.type === 'registered'));
-    expect(ws.messages.some(m => m.type === 'error')).toBe(false);
+    await waitFor(() => ws.messages.some(m => m.type === 'error'));
+    expect(ws.messages.find(m => m.type === 'error').message).toBe('BINDING_MISMATCH');
+    expect(ws.messages.some(m => m.type === 'registered')).toBe(false);
     try { ws.close(); } catch {}
   });
 
-  it('rejects mismatched address without a rotation chain (BINDING_MISMATCH)', async () => {
+  it('rejects a mismatched address (BINDING_MISMATCH)', async () => {
     relay = await startRelay({
       port: 0,
       acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }],

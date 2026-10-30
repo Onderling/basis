@@ -201,7 +201,7 @@ describe('US-3 — Alice can prove her audit log is intact', () => {
   it('after some activity, the chain verifies cleanly', async () => {
     const alice = await makeFactory();
     await alice.mute.add('app.x');
-    await alice.rotateIdentity();
+    await alice.mute.remove('app.x');
     await alice.mute.add('app.y');
     await Promise.resolve();
     expect(alice.audit.size).toBeGreaterThanOrEqual(3);
@@ -374,22 +374,6 @@ describe('US-7 — Alice keeps the same pubKey + stableId after a page reload', 
     const a2 = await createRealHouseholdAgent({ chatVault: sharedVault, ownerRootVault: sharedRoot });
     expect(a2.identity.chat.pubKey).toBe(pub1);
     expect(a2.identity.chat.stableId).toBe(stable1);
-  });
-
-  it('after /rotate-identity the new pubKey replaces the old + persists too', async () => {
-    const sharedVault = new VaultMemory();
-    // The identity root persists across the reload too (the at-rest layer's fingerprint rule).
-    const sharedRoot = new VaultMemory();
-    const a1 = await createRealHouseholdAgent({ chatVault: sharedVault, ownerRootVault: sharedRoot });
-    const orig = a1.identity.chat.pubKey;
-    const r = await a1.rotateChatIdentity();
-    expect(r.oldPubKey).toBe(orig);
-    expect(r.newPubKey).not.toBe(orig);
-    const newPub = r.newPubKey;
-
-    // Reload — the NEW key should be what's restored, not the old one.
-    const a2 = await createRealHouseholdAgent({ chatVault: sharedVault, ownerRootVault: sharedRoot });
-    expect(a2.identity.chat.pubKey).toBe(newPub);
   });
 });
 

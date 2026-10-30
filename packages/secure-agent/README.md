@@ -43,9 +43,6 @@ await sa.peer.sendTo('app.peer.hex', {
   body: 'hello',
 });
 
-// Identity rotation
-const { newPubKey } = await sa.rotateIdentity();
-
 // Diagnostic
 console.log(sa.securityStatus());
 
@@ -159,7 +156,6 @@ const sa = await createSecureAgent({
 
 // All security-critical actions are auto-logged
 await sa.mute.add('app.spammer');          // → 'mute.add' entry
-await sa.rotateIdentity();                 // → 'identity.rotate' entry
 await sa.caps.issue({ subject: 'pk-r' });  // → 'caps.issue' entry  (when caps wired)
 
 // Manual entries for app-level events
@@ -264,7 +260,6 @@ S0 — foundation:
 - ✅ Optional `NknTransport` wired with `useSecurityLayer`
 - ✅ Auto-HI on first send (recipient registers our pubKey)
 - ✅ Bilateral HI on receive (we register their pubKey too)
-- ✅ `rotateIdentity` wrapper (7-day grace + `KeyRotation.broadcast`)
 - ✅ `securityStatus()` diagnostic
 
 S1 — mute / block + helloGate:

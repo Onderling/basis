@@ -94,7 +94,7 @@ registries, peer graph, storage, config, and routing strategy. Register skills w
 envelopes; talk to peers via `hello()` and `invoke()`. Emits lifecycle and protocol
 events (extends Emitter).
 
-**Methods:** `addTransport()` · `removeTransport()` · `getTransport()` · `addPeer()` · `forget()` · `register()` · `bindToHub()` · `unbindFromHub()` · `start()` · `stop()` · `transportFor()` · `routeFor()` · `reachabilityFor()` · `hello()` · `call()` · `invoke()` · `invokeWithHop()` · `callWithHop()` · `rotateIdentity()` · `swapIdentity()` · `enableRelayForward()` · `enableTunnelForward()` · `enableReachabilityOracle()` · `enableRendezvous()` · `upgradeToRendezvous()` · `isRendezvousActive()` · `enableSealedForwardFor()` · `disableSealedForwardFor()` · `getSealedForwardConfig()` · `setHelloGate()` · `startDiscovery()` · `enableAutoHello()` · `message()` · `introduce()` · `discoverA2A()` · `issueCapabilityToken()` · `issueA2ACapabilityToken()` · `storeA2AToken()` · `discoverSkills()` · `publish()` · `clearPubSubHistory()` · `export()` · `_asCallCtx()` · `_dispatch()`
+**Methods:** `addTransport()` · `removeTransport()` · `getTransport()` · `addPeer()` · `forget()` · `register()` · `bindToHub()` · `unbindFromHub()` · `start()` · `stop()` · `transportFor()` · `routeFor()` · `reachabilityFor()` · `hello()` · `call()` · `invoke()` · `invokeWithHop()` · `callWithHop()` · `swapIdentity()` · `enableRelayForward()` · `enableTunnelForward()` · `enableReachabilityOracle()` · `enableRendezvous()` · `upgradeToRendezvous()` · `isRendezvousActive()` · `enableSealedForwardFor()` · `disableSealedForwardFor()` · `getSealedForwardConfig()` · `setHelloGate()` · `startDiscovery()` · `enableAutoHello()` · `message()` · `introduce()` · `discoverA2A()` · `issueCapabilityToken()` · `issueA2ACapabilityToken()` · `storeA2AToken()` · `discoverSkills()` · `publish()` · `clearPubSubHistory()` · `export()` · `_asCallCtx()` · `_dispatch()`
 
 ## `src/Emitter.js`
 
@@ -762,7 +762,7 @@ An agent's cryptographic identity: an Ed25519 signing keypair plus the Curve2551
 keypair derived from it for nacl.box encryption, both from one 32-byte seed. Also
 carries `stableId` (rotation-surviving user id) and `deviceId` (per-install id),
 persisted in the vault. Construct via the static factories (`generate`, `restore`,
-`fromMnemonic`, `fromSeed`, `rotate`, …) so seed persistence and id init happen.
+`fromMnemonic`, `fromSeed`, …) so seed persistence and id init happen.
 
 **Methods:** `getMnemonic()` · `sign()` · `box()` · `unbox()` · `deriveSessionKey()` · `sharedCopyOpener()`
 
@@ -783,7 +783,7 @@ Construct via `Bootstrap.create()`, `Bootstrap.fromSeed(bytes)`, or
 `Bootstrap.fromMnemonic(phrase)`.  Direct `new Bootstrap(...)` is
 possible but the static factories validate inputs.
 
-**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveProfileAuthority()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()` · `onKeyRotated()` · `notifyKeyRotated()`
+**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveProfileAuthority()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()`
 
 ### `deriveVaultAtRestKeyFrom`
 
@@ -857,23 +857,6 @@ its constructor args: each `upload`/`restore` call performs a fresh round
 trip.
 
 **Methods:** `upload()` · `restore()` · `exists()` · `deleteRemote()`
-
-## `src/identity/KeyRotation.js`
-
-### `KeyRotation`
-
-**Kind:** class · **Import:** `KeyRotation` from `'@onderling/core'`
-
-```js
-class KeyRotation
-new KeyRotation()
-```
-
-Static helpers for Ed25519 key-rotation proofs: `buildProof()` signs an
-"old key → new key" assertion with the old identity, `verify()` and
-`isWithinGracePeriod()` validate it, `broadcast()` sends it one-way to all reachable
-peers, and `applyToRegistry()` copies the old key's tier/groups/token grants to the
-new key in a TrustRegistry.
 
 ## `src/identity/Mnemonic.js`
 
@@ -3269,11 +3252,10 @@ Per-agent envelope crypto: `encrypt()` boxes + signs outbound envelopes and
 Every outbound envelope carries the key that signed it, and every inbound one is verified against
 the key IT carries — never against a key looked up by the address it claims. Peer pubkeys are
 learned from HI envelopes — established when we hold none for that address, never replaced by one
-(that needs a rotation proof); HI itself is signed but plaintext.
-Also tracks key-rotation grace state so envelopes to/from a recently rotated key
-still validate, and can attach an inline rotation proof to outbound envelopes.
+(a key change arrives through the ceremony or the roster, not an envelope); HI itself is signed but
+plaintext.
 
-**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `inProcessPeerKeys()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
+**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `swapIdentity()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `inProcessPeerKeys()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `encrypt()` · `decryptAndVerify()`
 
 ## `src/security/authorChain.js`
 

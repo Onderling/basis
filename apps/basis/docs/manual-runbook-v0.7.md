@@ -171,30 +171,10 @@ re-verifying after any change to `web/main.js`'s openFilePicker.
 
 ---
 
-## H-5 — Identity rotation visible to peer
+## H-5 — (retired 2026-10-29) Identity rotation visible to peer
 
-**Linked**: CC-XA.5.
-
-**Steps**
-
-1. Both tabs connected; H-3 done so both can encrypt to each other
-2. Tab A: `/me` — note your current pubKey (`old`)
-3. Tab A: `/rotate-identity` — note the new pubKey (`new`)
-4. Tab A: `/me` — confirm pubKey matches `new`, NOT `old`
-5. Tab A: `/test-peer <b> hi-after-rotation`
-6. Tab B: confirm the message arrives
-7. Tab B: `/security-status` — Tab A's `new` pubKey should be in
-   Tab B's helloed list (the new key was registered via the
-   KeyRotation.broadcast envelope)
-
-**Pass**: Rotation completes, message delivers, peer learns the new
-key.  Old key has a 7-day grace period during which envelopes
-encrypted to the old key still decrypt.
-
-**Fail signals**:
-- `/rotate-identity` returns an error
-- Post-rotation `/test-peer` fails to deliver
-- Tab B's `/security-status` shows only the OLD pubKey
+`/rotate-identity` is gone: it let whoever held the old key push a new one to every peer, and a revoked device holds
+that key. A person's key now moves through the root-gated ceremony (Mij → devices), which the contact pulls.
 
 ---
 

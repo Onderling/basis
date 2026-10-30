@@ -156,7 +156,6 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `isReservedProfileLabel` | function | [`core.md`](core.md#isreservedprofilelabel) |
 | `isSelfPersonKeyStatement` | function | [`core.md`](core.md#isselfpersonkeystatement) |
 | `isStandardRole` | function | [`core.md`](core.md#isstandardrole) |
-| `KeyRotation` | class | [`core.md`](core.md#keyrotation) |
 | `lastWriteWins` | function | [`core.md`](core.md#lastwritewins) |
 | `listKnownRoles` | function | [`core.md`](core.md#listknownroles) |
 | `listRoleBundles` | function | [`core.md`](core.md#listrolebundles) |

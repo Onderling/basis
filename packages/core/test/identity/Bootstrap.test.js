@@ -6,7 +6,6 @@
  *   - BIP-39 round-trip (seed → mnemonic → seed; mnemonic → bootstrap → mnemonic)
  *   - HKDF-SHA256 key derivation (deterministic, path-bound, salt-bound)
  *   - bootstrap-derived pubkey fingerprint (stable across instances)
- *   - rotation hook fires + unsubscribe works
  */
 import { describe, it, expect } from 'vitest';
 import nacl   from 'tweetnacl';
@@ -255,43 +254,5 @@ describe('Bootstrap#fingerprint + #derivedPubKey', () => {
     const { bootstrap } = Bootstrap.create();
     expect(() => bootstrap.fingerprint(new Uint8Array(16))).toThrow();
     expect(() => bootstrap.fingerprint('not-bytes')).toThrow();
-  });
-});
-
-describe('Bootstrap#onKeyRotated', () => {
-  it('fires when notifyKeyRotated is invoked', () => {
-    const { bootstrap } = Bootstrap.create();
-    let received = null;
-    bootstrap.onKeyRotated(proof => { received = proof; });
-    const fakeProof = { type: 'key-rotation', oldPubKey: 'a', newPubKey: 'b' };
-    bootstrap.notifyKeyRotated(fakeProof);
-    expect(received).toEqual(fakeProof);
-  });
-
-  it('supports multiple subscribers', () => {
-    const { bootstrap } = Bootstrap.create();
-    let countA = 0;
-    let countB = 0;
-    bootstrap.onKeyRotated(() => { countA++; });
-    bootstrap.onKeyRotated(() => { countB++; });
-    bootstrap.notifyKeyRotated({});
-    expect(countA).toBe(1);
-    expect(countB).toBe(1);
-  });
-
-  it('returns an unsubscribe function', () => {
-    const { bootstrap } = Bootstrap.create();
-    let count = 0;
-    const off = bootstrap.onKeyRotated(() => { count++; });
-    bootstrap.notifyKeyRotated({});
-    off();
-    bootstrap.notifyKeyRotated({});
-    expect(count).toBe(1);
-  });
-
-  it('rejects non-function callbacks', () => {
-    const { bootstrap } = Bootstrap.create();
-    expect(() => bootstrap.onKeyRotated(null)).toThrow();
-    expect(() => bootstrap.onKeyRotated('foo')).toThrow();
   });
 });

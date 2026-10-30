@@ -38,7 +38,7 @@ const MODEL_DOWN_LINE = { refused: 'circle.bot.model_refused', slow: 'circle.bot
 
 // What an error may say in a chat, a note or the console: its message without credentials (a fetch error's message is
 // the request URL, and a bot's URL carries its token).
-const errorText = (err) => scrubSecrets(err?.message ?? err);
+const errorText = (err) => { if (err?.stack) console.warn('[circle-probe] errorText', err.stack); return scrubSecrets(err?.message ?? err); };
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';

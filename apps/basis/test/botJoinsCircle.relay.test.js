@@ -200,7 +200,7 @@ describe('the bot joins a circle on its admin\'s word', () => {
       await annSays('@huisbot zet melk op de groenlijst');
       return null;
     }, { timeout: 60_000, step: 5000 });
-    expect(melk, `melk is not on the circle's list. The bot said: ${JSON.stringify(botLines(ann).map((e) => e.payload?.text))}\nRunner:\n${out.split('\n').filter((l) => /circle|warn|error/i.test(l)).slice(-20).join('\n')}`).toBe(true);
+    expect(melk, `melk is not on the circle's list. The bot said: ${JSON.stringify(botLines(ann).map((e) => e.payload?.text))}\nRunner:\n${out.split('\n').slice(-160).join('\n')}`).toBe(true);
     // Bob sees the bot's reply in the circle — a line by the bot's own ref, not Ann's or his
     const onBob = await until(async () => (botLines(bob).some((e) => /melk/.test(e.payload?.text ?? '')) ? true : null), { timeout: 30_000, step: 500 });
     expect(onBob, `Bob did not see the bot's reply: ${JSON.stringify(bob.chatEvents.filter((e) => e.payload?.circleId === GREEN).map((e) => [String(e.actor).slice(0, 6), e.payload?.text]))}`).toBe(true);

@@ -593,8 +593,10 @@ export async function bootAgentBundle(opts = {}) {
         .map((b) => (typeof b === 'string' ? b : b?.id))
         .filter(Boolean);
       // Union with the cached list: a circle the substrate has not caught up on yet must not be
-      // DE-registered by a refresh, and registration is idempotent.
-      return [...new Set([...ids, ..._circleIdsForRegistration])];
+      // DE-registered by a refresh, and registration is idempotent. A circle the fold says this person LEFT or was
+      // REMOVED from is the exception: kept from the cache it went back onto the relay on the next socket.
+      const out = new Set([...(Array.isArray(res?.left) ? res.left : []), ...(Array.isArray(res?.removed) ? res.removed.map((r) => r?.id) : [])]);
+      return [...new Set([...ids, ..._circleIdsForRegistration])].filter((id) => !out.has(id));
     } catch {
       return _circleIdsForRegistration;
     }

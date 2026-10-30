@@ -388,6 +388,12 @@
       "wat staat er op de boodschappen"
     ]
   },
+  "_family": {
+    "doc": "Cue words per tool family: which of the model's tools a line can concern. A family leaves the offered tools only when none of its words is in the line and another family's is; the lists always stay. Words, not phrases: a cue is found anywhere in the line.",
+    "lists": ["lijst", "lijstje", "boodschappen", "zet", "voeg", "erbij", "toevoegen", "halen", "gehaald", "gekocht", "op de", "van de lijst", "klusjes", "reparaties", "nodig", "meer", "staat er"],
+    "calendar": ["afspraak", "afspraken", "agenda", "tandarts", "dokter", "verjaardag", "feest", "uitnodiging", "kom", "komen", "verzet", "verplaats", "afzeggen", "plannen", "gepland"],
+    "tasks": ["wie doet", "doet", "doen", "taak", "taken", "klusje", "klusjes", "open", "nog open", "ik pak", "ik doe", "mijn klusjes", "moet", "afgerond", "opgepakt"]
+  },
   "_trailing": {
     "doc": "Single words that, AFTER an item, mean it is done (\"afwas klaar\"). Dutch speakers code-switch, so English ones may be here too.",
     "complete": [

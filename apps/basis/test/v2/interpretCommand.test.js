@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildToolDescriptors, interpretToCommand } from '../../src/v2/interpretCommand.js';
+import { buildToolDescriptors, interpretToCommand, personsWords } from '../../src/v2/interpretCommand.js';
 
 // The LLM is host-supplied + duck-typed (`llm.invoke(req) → result`), so the test fakes it directly
 // rather than depending on @onderling/llm-client — mirroring how the host injects the client.
@@ -78,7 +78,7 @@ describe('interpretToCommand', () => {
       history: [{ role: 'user', content: 'what is on the list' }, { role: 'assistant', content: 'which list?' }],
     });
     expect(seenMessages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
-    expect(seenMessages[2].content).toBe('shopping');
+    expect(personsWords(seenMessages[2].content)).toBe('shopping');
   });
 
   it('passes the catalogue ops to the LLM as tools', async () => {
@@ -103,9 +103,9 @@ describe('interpretToCommand', () => {
     expect(cmd).toEqual({ opId: 'listOpen', args: {} });
   });
 
-  it('weaves RAG context into the system prompt (strings, entries, and {entry,score})', async () => {
+  it('weaves RAG context into the person\'s turn, below the turn marker (strings, entries, and {entry,score})', async () => {
     let seenSystem = null;
-    const llm = llmInspecting((req) => { seenSystem = req.system; });
+    const llm = llmInspecting((req) => { seenSystem = req.messages.at(-1).content; });
     await interpretToCommand('add milk', { catalogue: CHORES, llm, context: [
       'wash the dishes',
       { meaning: 'buy bread' },

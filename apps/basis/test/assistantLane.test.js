@@ -21,7 +21,7 @@ import { householdManifest } from '../../household/manifest.js';
 import { listsManifest } from '../../lists/manifest.js';
 import { createMockHouseholdAgent, mockHouseholdManifest } from '../src/core/agent/mockAgent.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
-import { interpretToCommand } from '../src/v2/interpretCommand.js';
+import { interpretToCommand, personsWords } from '../src/v2/interpretCommand.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { followUpClaim } from '../src/v2/assistantFollowUp.js';
 import { resolveDispatch } from '../src/router.js';
@@ -47,7 +47,7 @@ function lineModel({ ms = 100 } = {}) {
         seen.push(req);
         if (ms) await sleep(ms);
         running -= 1;
-        const text = req.messages.at(-1).content;
+        const text = personsWords(req.messages.at(-1).content);
         const calls = text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => ({ id: 'addItem', args: { type: 'shopping', text: l } }));
         return { toolCall: calls[0] ?? null, toolCalls: calls };
       },
@@ -175,7 +175,7 @@ describe('the collect window', () => {
     const results = await Promise.all(turns);
 
     expect(model.seen).toHaveLength(1);
-    expect(model.seen[0].messages.at(-1)).toEqual({ role: 'user', content: 'melk\nbrood\neieren' });
+    expect(personsWords(model.seen[0].messages.at(-1).content)).toBe('melk\nbrood\neieren');
     expect(dispatched.map((d) => [d.opId, d.args.text])).toEqual([['addItem', 'melk'], ['addItem', 'brood'], ['addItem', 'eieren']]);
     // every line's caller gets the one turn's result
     expect(results.every((r) => r === results[0] && r.via === 'llm')).toBe(true);
@@ -202,7 +202,7 @@ describe('the collect window', () => {
     await Promise.all(turns);
 
     expect(model.seen).toHaveLength(1);
-    expect(model.seen[0].messages.at(-1).content).toBe('melk\nbrood');
+    expect(personsWords(model.seen[0].messages.at(-1).content)).toBe('melk\nbrood');
     expect(dispatched.map((d) => d.args.text)).toEqual(['kaas', 'melk', 'brood']);
   });
 
@@ -219,7 +219,7 @@ describe('the collect window', () => {
     await vi.advanceTimersByTimeAsync(500);
     await Promise.all(turns);
     expect(model.seen).toHaveLength(1);
-    expect(model.seen[0].messages.at(-1).content).toBe('melk\nbrood');
+    expect(personsWords(model.seen[0].messages.at(-1).content)).toBe('melk\nbrood');
     expect(dispatched.map((d) => d.args.text)).toEqual(['melk', 'brood']);
   });
 

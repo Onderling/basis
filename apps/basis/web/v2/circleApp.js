@@ -2901,6 +2901,15 @@ function feedbackScreenState() {
   return { inCircle: !!getActiveCircle(), screen: _activeTab };
 }
 let _contactUnread = {};           // the last computed unread map (contactId → {unread, lastTs}); the bar reads its sum
+// A screen behind a tab (a settings group, a sub-screen) hides the tab bar: the tab's head is not shown any more, so a
+// change it hears waits for the next landing instead of painting the tab over the screen that is open.
+function hideTabBar() {
+  _vandaagHead?.hide();
+  _mijHead?.hide();
+  _mijShown += 1;
+  hideCircleTabBar(tabBarEl);
+}
+
 function showTabBar(active) {
   // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
   // it must not repaint the thread over whatever is showing.
@@ -3319,7 +3328,7 @@ async function addBotFromInput(input) {
 // the contact-thread channel (sa.peer → mdns/relay/nkn); the async reply lands
 // via `onContactReply` (registered in the peer router) and re-renders here.
 async function showContactThread(contactId, { draft = '' } = {}) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
 
   let row = null;
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
@@ -3894,7 +3903,7 @@ function connectedRelayUrls() {
 }
 
 function showConnectionPoints() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const store = getConnectionPoints();
   let removing = null;
   let addError = null;
@@ -4175,7 +4184,7 @@ function handleNearbyAction(action, row) {
 // active user webid stays null on web today; the substrate falls back to
 // "anything without an owner" which matches the V0 single-user state.
 async function showMyThings() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let files = [];
   const rerender = () => renderCircleMyThings(rootEl, {
     files, t, onBack: showLauncher,
@@ -4586,6 +4595,7 @@ function onScreenAction(action) {
 // MIJ'S HEAD (`screenHead.js`): Me's blocks as last read for its key, kept current by the circles' items, the event log
 // and the agent registry (a profile's facts are the registry's, no circle's) — a tab landing on a fresh head reads nothing.
 let _mijHead = null;
+let _mijShown = 0;   // bumped whenever a screen replaces the tab's own: a read that finishes after it paints nothing
 let _mijPaint = null;
 const _mijReads = { landings: 0, materializes: 0, ops: 0 };
 if (typeof window !== 'undefined') window.onderlingMijReads = _mijReads;
@@ -4605,6 +4615,7 @@ function showMijTab() { return showMij({ landing: true }); }
 
 async function showMij({ landing = false } = {}) {
   showTabBar('mij');
+  const shownAt = _mijShown;
   // The Advanced screen is a developer tool (raw parameter keys): offered only when the developer switch is on.
   let developer = false;
   try { developer = (await circleHouseholdAgent?.callSkill?.('params', 'get-param', { key: DEVELOPER_PARAM_KEY }))?.value === true; } catch { /* off */ }
@@ -4659,14 +4670,14 @@ async function showMij({ landing = false } = {}) {
   const key = JSON.stringify({ circles: circlesShown().map((c) => c?.id).filter(Boolean).sort(), selves: [...(_selfSet.on ?? [])].sort(), self: mijSelf?.id ?? null });
   _mijReads.landings += 1;
   blocks = await (head ? head.land(key, readMij) : readMij()).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
-  if (_activeTab === 'mij') rerender();
+  if (_activeTab === 'mij' && shownAt === _mijShown) rerender();
 }
 
 // Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card pinboard makes
 // (`getContactShareQr` — webid, key, name, the address I am written to, my relay), painted three ways. The LINK is
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
 async function showShareMyContact() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const { payload, link, qr } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
   renderShareMyContact(rootEl, { payload, link, qr, t, onBack: showMij });
 }
@@ -4685,7 +4696,7 @@ async function showShareMyContact() {
 // identity is available the opener is null and `onOpen` stays DENY-SAFE (a row tap is a no-op,
 // never ciphertext), exactly as the mobile SharedWithMeScreen degrades.
 async function showSharedWithMe() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let received = [];
   try { received = await sharedWithMeStore.list(); } catch { received = []; }
   // Project the raw store entries through the SHARED selector (newest-first, row shape) — the
@@ -4708,7 +4719,7 @@ async function showSharedWithMe() {
  * offers the only undo there is.
  */
 async function showBlocked() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const paint = async (loading) => {
     let peers = [];
     let members = [];
@@ -4736,7 +4747,7 @@ async function showBlocked() {
 
 /** This device's log as the person may copy it (codes + numbers only); nothing is sent from here. */
 function showLogReport() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
   renderLogReport(rootEl, { text, n, t, onBack: () => showMyData({ group: 'my-data' }) });   // its door is in Mijn gegevens
 }
@@ -4751,7 +4762,7 @@ function showLogReport() {
  * surface-less opId lands here automatically; nothing can be invisible by omission.
  */
 async function showAdvanced() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const ops = advancedOpRows({ manifests: Object.values(circleManifestsByOrigin) });
   let params = [];
   try { params = (await rawCallSkill('params', 'list-user-params', {}))?.params ?? []; } catch { /* register absent → ops only */ }
@@ -4891,7 +4902,7 @@ async function showMyData(opts) {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   // the selves this device holds now (a persona made since the last refresh): the pairing form asks which one a screen is for
   try { await refreshSelfSet(); } catch { /* the set as held stands */ }
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
   let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
@@ -5164,7 +5175,7 @@ async function showMyData(opts) {
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
 function showSettingsHome() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   renderSettingsHome(rootEl, {
     t, onBack: showMij,
     onOpenGroup: (id) => showMyData({ group: id }),
@@ -5182,7 +5193,7 @@ function showSettingsHome() {
 
 /** "Per kring": the person's circles, each opening that circle's own settings screen (a door, never a copy). */
 function showSettingsCircleChooser() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   renderCircleSettingsChooser(rootEl, {
     t, onBack: showSettingsHome,
     circles: (circlesCache ?? []).map((c) => ({ id: c.id, name: c.name ?? '' })),
@@ -6965,7 +6976,7 @@ async function runHelpLlm(id, query) {
 let _openOverride = {};   // the open circle's member override (my private per-circle choices), read at open
 
 async function showDetail(id) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   setActiveCircle(id);
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
   // so items added here fan out to them. Member-only + deduped; safe to call often.
@@ -8179,7 +8190,7 @@ function showSkills(id) {
 // id; each mutation persists via recipeStore.update then refreshes the
 // in-memory copy + the screen screenBlocks for whatever circle is open.
 function showRecipeEditor(circleId) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let book = { recipes: [], activeId: null };
   let mode = 'book';
   let editingRecipeId = null;
@@ -8728,7 +8739,7 @@ async function showOverride(id) {
 // group admin panel (member roster + role changes + remove + announcements). Reached from
 // the circle `⋯` menu. Ops are admin-gated server-side; a refusal surfaces a notice.
 async function showAdmin(id) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let members = [];
   let muted = [];
   let outboundShares = [];          // objective L — this circle's outbound canonical shares (Stop-sharing rows)

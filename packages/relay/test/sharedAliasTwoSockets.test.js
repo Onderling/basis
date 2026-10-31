@@ -37,7 +37,7 @@ describe('one shared alias on two sockets', () => {
     const again = await Promise.all(devices.map((d) => d.tx.addAddress(shared, { sign })));
     await settle(300);
     for (const [i, d] of devices.entries()) {
-      expect(d.errors.filter((e) => /does not demand proof/.test(e)), `socket ${i}: the possession audit fired`).toEqual([]);
+      expect(d.errors.filter((e) => /without demanding proof of possession/.test(e)), `socket ${i}: the possession audit fired`).toEqual([]);
       expect(d.tx.connected, `socket ${i} still connected`).toBe(true);
     }
     expect(results.map((r) => r.ok)).toEqual([true, true]);
@@ -63,7 +63,7 @@ describe('one shared alias on two sockets', () => {
       await Promise.all([tx.addAddress(alias, { sign }), tx.addAddress(alias, { sign, primary: true }), tx.addAddress(alias, { sign })]);
     }
     await settle(400);
-    expect(errors.filter((e) => /does not demand proof/.test(e)), 'the possession audit fired on an honest ack').toEqual([]);
+    expect(errors.filter((e) => /without demanding proof of possession/.test(e)), 'the possession audit fired on an honest ack').toEqual([]);
     expect(tx.connected).toBe(true);
     await tx.disconnect?.();
   }, 20_000);

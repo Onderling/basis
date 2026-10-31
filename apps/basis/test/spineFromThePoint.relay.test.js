@@ -119,8 +119,8 @@ describe('spine statements only from the point', () => {
     expect(await roleOn(B, C.pubKey), 'nothing lands while the point is off').not.toBe(want);
     await A.agent.connectPeerTransport({ relayUrl: relay.url, onPeerMessage: (env) => A._routerRef.fn?.(env), awaitRelayReady: true });
     await bindCircleAddresses([A], GROUP);
-    expect(await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 30000, step: 300 }),
-      'the held act never landed once the point was back').toBe(true);
+    const landed = await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 30000, step: 300 });
+    expect(landed, 'the held act never landed once the point was back').toBe(true);
     expect(signedByBox(), 'the box signed it itself').toBe(boxBefore);
     const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
     expect([...disputed]).not.toContain(A.pubKey);

@@ -3728,9 +3728,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the persona's chat key and person key are identities of ours that it owns, and it is on the circle's relay on a
   // socket of its own. `personaId` null/'default' gives the circle back to the default (a join that did not happen).
   // ONE SELF PER CIRCLE ON A DEVICE: the self this device is a member of a circle as, from the registry's membership
-  // records of the selves running here (null when it is in the circle as none of them).
+  // records of every self this device holds — the ones running AND the paused ones (a paused persona does not run, but
+  // its circles are still its own here) — null when it is in the circle as none of them.
   const circleHeldBy = async (circleId) => {
-    for (const pid of personas.keys()) {
+    for (const pid of new Set([...personas.keys(), ...pausedAtBoot])) {
       try { if (circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})[circleId]) return pid; } catch { /* that self unreadable: not held by it */ }
     }
     return null;

@@ -167,6 +167,31 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     expect(texts(A2).filter((t) => t === text), 'the always-on device holds it exactly once').toHaveLength(1);
   });
 
+  it("a sibling is a carrier, never an authority: Bea's statement carried on with its words changed is refused on the other device", async () => {
+    const text = `echt van bea ${Date.now().toString(36)}`;
+    const msgId = `m-forge-${Date.now().toString(36)}`;
+    const res = await B.chatRail.appendMessage(GROUP, { msgId, ts: Date.now(), text, actor: B.pubKey });
+    const forged = JSON.parse(JSON.stringify(res.statement));
+    const forgedText = `${text} — en een woord dat Bea nooit schreef`;
+    forged.body.payload.text = forgedText;
+    expect(JSON.stringify(forged)).toContain(forgedText);   // the change is in the signed body
+    // the phone carries it on as if it had landed from Bea — the production carry, the production receiving half
+    const carried = await carryLandedStatement({
+      carry: (p, o) => A.agent.siblingCarry.carry(p, o), subtype: CHAT_STATEMENT_BROADCAST, circleId: GROUP,
+      statement: forged, fromPeerAddr: B.agent.circleAddressFor(GROUP), msgId,
+    });
+    expect(carried?.attempted, 'the carry reached the always-on device').toBe(1);
+    await new Promise((r) => setTimeout(r, 2000));
+    expect(texts(A2), 'the changed words never land').not.toContain(forgedText);
+    // the control: the same carry of Bea's statement AS SIGNED lands — the refusal above is the signature, not the path
+    await carryLandedStatement({
+      carry: (p, o) => A.agent.siblingCarry.carry(p, o), subtype: CHAT_STATEMENT_BROADCAST, circleId: GROUP,
+      statement: res.statement, fromPeerAddr: B.agent.circleAddressFor(GROUP), msgId,
+    });
+    expect(await until(() => (texts(A2).includes(text) ? true : null), { timeout: 10000 }), 'Bea\'s own words, carried as signed, land').toBe(true);
+    expect(texts(A2), 'and only those').not.toContain(forgedText);
+  });
+
   it('a role change Anna makes on the phone is on the always-on device\'s roster, live — the membership lane rides the same carry', async () => {
     const roleOn = async (node) => (await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members?.find((m) => m.webid === B.pubKey)?.role ?? null;
     expect(await roleOn(A2)).toBe('member');

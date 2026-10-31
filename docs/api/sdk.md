@@ -92,6 +92,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `defineSkill` | function | [`core.md`](core.md#defineskill) |
 | `deriveCircleAddress` | function | [`core.md`](core.md#derivecircleaddress) |
 | `deriveCircleId` | function | [`core.md`](core.md#derivecircleid) |
+| `deriveCircleRoot` | function | [`core.md`](core.md#derivecircleroot) |
 | `deriveCircleSeed` | function | [`core.md`](core.md#derivecircleseed) |
 | `deriveDeviceSeed` | function | [`core.md`](core.md#derivedeviceseed) |
 | `derivePersonKeySeed` | function | [`core.md`](core.md#derivepersonkeyseed) |

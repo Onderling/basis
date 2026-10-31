@@ -29,7 +29,7 @@
  * install would be picked up on the next boot in preference to the restored one.
  */
 
-import { AgentIdentity, Bootstrap, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
+import { AgentIdentity, Bootstrap, deriveCircleRoot, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
 import { VaultEncrypted, migrateVaultToEncrypted, seedToString } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
@@ -49,7 +49,7 @@ export const RESTORE_PENDING_KEY = 'restore-pending';
 // The delegation blob's slot is one of a persona's vault slots (personaVault.js); re-exported for the callers that
 // import it from here.
 export { DEVICE_DELEGATION_VAULT_KEY } from './personaVault.js';
-import { DEVICE_DELEGATION_VAULT_KEY, HELD_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL, personaVault } from './personaVault.js';
+import { DEVICE_DELEGATION_VAULT_KEY, CIRCLE_ROOT_VAULT_KEY, HELD_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL, personaVault } from './personaVault.js';
 
 const _b64url = (bytes) => {
   let s = '';
@@ -191,6 +191,15 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
  * blob (its wire id, its device seed, the record signed by its own authority). Written only when the device holds it.
  * @returns {Promise<{identity: object}>}
  */
+/**
+ * Hand a persona's CIRCLE ROOT to this device, at a phrase ceremony: the root of every per-circle key the persona
+ * presents (one-way from its seed — no authority), so a device without the root presents the persona's one address in
+ * each circle. Epoch 0 until a re-key exists to move it.
+ */
+async function handCircleRoot(slots, profileSeed, epoch = 0) {
+  await slots.set(CIRCLE_ROOT_VAULT_KEY, JSON.stringify({ epoch, seed: seedToString(deriveCircleRoot(profileSeed, epoch)) }));
+}
+
 async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delegationSeed, internalId, label = null }) {
   // the general persona's slots (its chat seed, person key and delegation blob), as personaVault names them
   const sealedChat = personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), DEFAULT_PROFILE);
@@ -218,6 +227,7 @@ async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delega
   });
   if (blob.label) blob.record = { ...blob.record, label: blob.label };
   await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+  await handCircleRoot(sealedChat, root.deriveAgentSeed(DEFAULT_PROFILE));
   return { identity };
 }
 
@@ -260,6 +270,7 @@ export async function handPersonasInto({ root, chatVault, atRestKey, internalId,
     let pRecord = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
     if (label) pRecord = { ...pRecord, label };
     await pVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: _b64url(pDeviceSeed), deviceId: pWire, internalId, record: pRecord, ...(label ? { label } : {}) }));
+    await handCircleRoot(pVault, pSeed);
     held.push(pid);
   }
   await defaultSlots.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify(held));

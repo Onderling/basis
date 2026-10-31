@@ -99,18 +99,31 @@ export function createAgentRegistry({
   const uri = resourceUri ?? registryResourceUri({ anchorPodUri, deviceId, preferPodUri });
   const withCAS = (args) => _serialised(pseudoPod, uri, () => withCASUnserialised(args));
 
-  async function _readCurrent() {
+  // What this registry last read, while the pseudo-pod's revision of the resource holds: every lookup read the whole
+  // resource and normalised it again — on a phone through a backend that seals at rest, one unseal per lookup. Kept only
+  // when nothing changed beneath the read itself; any write through the pseudo-pod (this registry's, a pull, a peer's)
+  // moves the revision, and the next read loads again. A pseudo-pod without a revision keeps nothing.
+  let held = null;   // { rev, body, etag }
+  const revisionNow = () => (typeof pseudoPod.revision === 'function' ? pseudoPod.revision(uri) : null);
+  // A WRITE never builds on what is held: it reads the resource itself (a writer in another tab or process shares no
+  // memory with this one, and a merge over a stale body would lose its entry). Only lookups read through the memory.
+  async function _readForWrite() { return _readCurrent({ fresh: true }); }
+  async function _readCurrent({ fresh = false } = {}) {
+    const before = revisionNow();
+    if (!fresh && held && typeof before === 'number' && held.rev === before) return { body: held.body, etag: held.etag };
     const rec = await pseudoPod.read(uri);
-    if (!rec) return { body: emptyResource(), etag: null };
-    return {
-      body: normaliseResource(rec.bytes),
-      etag: rec.etag ?? null,
-    };
+    const out = rec ? { body: normaliseResource(rec.bytes), etag: rec.etag ?? null } : { body: emptyResource(), etag: null };
+    held = typeof before === 'number' && revisionNow() === before ? { rev: before, body: out.body, etag: out.etag } : null;
+    return out;
   }
 
   async function _writeNext(body, etag) {
     try {
+      const before = revisionNow();
       const result = await pseudoPod.write(uri, body, etag);
+      // this registry's own write: what it holds follows it, when the write was the one change beneath it (the circle stores' rule)
+      const after = revisionNow();
+      held = typeof before === 'number' && after === before + 1 ? { rev: after, body: normaliseResource(body), etag: result?.etag ?? null } : null;
       // Snapshot the just-written resource (recovery). Best-effort: a versioning failure must
       // NEVER break the registry write.
       if (typeof versionStore?.capture === 'function') {
@@ -160,7 +173,7 @@ export function createAgentRegistry({
     }
     const signedAt = entry.signedAt ?? now();
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -213,7 +226,7 @@ export function createAgentRegistry({
    */
   async function revoke(identifier) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -245,7 +258,7 @@ export function createAgentRegistry({
       );
     }
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -277,7 +290,7 @@ export function createAgentRegistry({
    */
   async function updateExposure(identifier, exposure) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -304,7 +317,7 @@ export function createAgentRegistry({
       throw Object.assign(new Error(`updateKind: kind must be one of ${PROFILE_KINDS.join(', ')}`), { code: 'INVALID_ARGUMENT' });
     }
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -325,7 +338,7 @@ export function createAgentRegistry({
    */
   async function purge(identifier) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -357,7 +370,7 @@ export function createAgentRegistry({
       );
     }
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,
@@ -390,7 +403,7 @@ export function createAgentRegistry({
    */
   async function revokeGrant(identifier, tokenId) {
     return withCAS({
-      readCurrent: _readCurrent,
+      readCurrent: _readForWrite,
       writeNext:   _writeNext,
       maxRetries:  maxRetries ?? 3,
       onPersistentConflict,

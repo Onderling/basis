@@ -13,8 +13,8 @@
  */
 
 const TEXT_SLOTS = new Set(['item', 'items', 'text', 'name', 'title', 'what', 'shop']);
-const DAY_RE = '(?:volgende week|next week)\\s+(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|overmorgen|the day after tomorrow|morgen|tomorrow|vandaag|today|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday';
-const TIME_RE = '(?:om\\s+half\\s+\\d{1,2}(?:\\s+uur)?|(?:om\\s+|at\\s+)?\\d{1,2}[:.]\\d{2}(?:\\s*(?:am|pm)|\\s+uur)?|(?:om|at)\\s+\\d{1,2}(?:\\s*(?:am|pm))?(?:\\s+uur)?)';
+export const DAY_RE = '(?:volgende week|next week)\\s+(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|overmorgen|the day after tomorrow|morgen|tomorrow|vandaag|today|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday';
+export const TIME_RE = '(?:om\\s+half\\s+\\d{1,2}(?:\\s+uur)?|(?:om\\s+|at\\s+)?\\d{1,2}[:.]\\d{2}(?:\\s*(?:am|pm)|\\s+uur)?|(?:om|at)\\s+\\d{1,2}(?:\\s*(?:am|pm))?(?:\\s+uur)?)';
 // a span from now: "over 10 minuten", "in 10 minutes", "over een uur"
 const SPAN_RE = '(?:over|in)\\s+(?:\\d{1,3}\\s*(?:minuten|minuut|min|minutes|minute)|(?:een|an|1)\\s+(?:uur|hour))';
 const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

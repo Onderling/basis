@@ -125,7 +125,7 @@ apps need to share code, extract a substrate.
 | Kernel/adapter package | Primitive | Used for | Justification |
 |---|---|---|---|
 | `@onderling/core` | `Agent`, `AgentIdentity`, `VaultMemory`, `InternalBus`, `InternalTransport`, `MemorySource` | Constructing the per-member agent that the skill-match substrate composes. | No substrate wraps "construct an agent" — that's foundational kernel behaviour. The factory creates `core.Agent` directly so `SkillMatch` has a real agent + transport to subscribe over. |
-| `@onderling/core` | `GroupManager`, `Agent.rotateIdentity()` | Issuing / verifying group proofs, scheduled identity rotation (Phase 9 of the coding plan). | Group cryptography + identity rotation are foundational; substrate-of-substrates would be over-abstraction. |
+| `@onderling/core` | `GroupManager` | Issuing / verifying group proofs. | Group cryptography is foundational; substrate-of-substrates would be over-abstraction. |
 | `@onderling/core` | `Agent.enableSealedForwardFor`, `Agent.enableRelayForward` | Hop / sealed-forward routing (Phase 13.3 + Phase 28). | Routing primitives are kernel-foundational and already substrate-shaped (mesh-demo proves them at scale). Pinboard just wraps a UI toggle. |
 | `@onderling/core` | `SolidVault`, `SolidPodSource` (lazy-loaded) | Solid OIDC session + pod-backed `DataSource` (Phase 20 sign-in). | Cross-app concern; will likely lift into `@onderling/oidc-session` once a 3rd consumer materialises. Pinboard + Folio are the existing 2. |
 | `@onderling/core` | `Bootstrap`, `validateMnemonic`, `mnemonicToSeed` | Mnemonic validation + seed derivation for the Phase 30 device-restore flow. | Identity-bootstrap primitives; foundational. |
@@ -150,8 +150,9 @@ Group switcher lets a user belong to N groups (`--groups <gid1>,<gid2>`).
 
 **Capability scope:** subscribe to the user's joined groups;
 broadcast vraag / aanbod / lenen items within them; pod writes go
-through `item-store`. Each agent's network identity rotates every
-30 days via `Agent.rotateIdentity()` (Phase 9).
+through `item-store`. (The periodic identity rotation was removed on
+2026-10-29: a pushed rotation let whoever held the old key move the
+identity; a person's key now changes through the root-gated ceremony.)
 
 ## Bring it up
 

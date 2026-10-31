@@ -475,8 +475,7 @@ export const basisManifest = {
     /**
      * `/publish-peer` — v0.7.P3d.  Re-publishes the user's NKN
      * address to their pod's identity.ttl (auto-runs on sign-in;
-     * this command is for manual re-publish after /rotate-identity
-     * changes the address).
+     * this command is for a manual re-publish).
      */
     {
       id:    'publish-peer', visibility: 'authenticated',
@@ -487,25 +486,6 @@ export const basisManifest = {
       surfaces: {
         slash: { command: '/publish-peer' },
         chat:  { reply: 'text', hint: 'publish your NKN address to your pod' },
-      },
-    },
-
-    /**
-     * `/rotate-identity` — v0.7.P3d.  Generates a fresh Ed25519
-     * keypair for the chat-agent.  Old key stays valid 7 days
-     * (grace period); KeyRotation.broadcast notifies known peers.
-     * Your NKN address CHANGES (derived from pubKey), so peers will
-     * need to update.  Use /me to see the new address afterwards.
-     */
-    {
-      id:    'rotate-identity', visibility: 'private',
-      group: 'identity',
-      verb:  'add',
-      writes: { scope: 'device' },   // this device's chat key; peers are told, nothing shared is written
-      params: [],
-      surfaces: {
-        slash: { command: '/rotate-identity' },
-        chat:  { reply: 'text', hint: 'rotate your chat-agent identity (7-day grace period)' },
       },
     },
 

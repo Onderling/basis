@@ -213,6 +213,10 @@
         "hint": {
           "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld — niets bij een eerste keer. Later aanpassen kan bij Mij → persona's.",
           "doc": "Join wizard — persona disclosure hint."
+        },
+        "second_warning": {
+          "text": "Je bent al lid van deze kring als {{persona}}. Doe je mee als een andere persona, dan ben je hier twee leden, en de anderen kunnen niet zien dat het allebei jij bent.",
+          "doc": "Join wizard — a warning when this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One member per persona: only the person's own device can tell."
         }
       },
       "reveal": {
@@ -5523,11 +5527,11 @@
     "stepup_replaced": "Dat verzoek is vervangen door een nieuwer; daar is niets mee gedaan.",
     "stepup_what_op": "{{op}} doen ({{arg}})",
     "model_not_served": "Let op: het taalmodel {{model}} wordt niet meer aangeboden door de aanbieder. Ik gebruik nu {{using}}.",
-    "model_refused": "De assistent kan nu niet antwoorden: de aanbieder van het taalmodel weigert (een sleutel- of limietprobleem). De beheerder is gewaarschuwd.",
+    "model_refused": "Ik kan nu geen gewone zinnen lezen: de aanbieder van het taalmodel weigert. De beheerder weet ervan. Opdrachten en knoppen werken wel.",
     "model_slow": "De assistent is nu te traag om op tijd te antwoorden. Probeer het zo nog eens.",
-    "model_trouble_start": "Let op: de assistent beantwoordt geen vrije vragen meer. Oorzaak: {{cause}}. Opdrachten en knoppen werken nog. Ik zeg het je elk uur zolang het duurt, en als het weer werkt.",
-    "model_trouble_ongoing": "De assistent beantwoordt nog steeds geen vrije vragen ({{minutes}} minuten nu). Oorzaak: {{cause}}.",
-    "model_trouble_recovered": "De assistent antwoordt weer, na {{minutes}} minuten.",
+    "model_trouble_start": "Let op: ik kan nu geen gewone zinnen lezen. Oorzaak: {{cause}}. Opdrachten en knoppen werken wel. Ik meld het elk uur zolang het duurt, en als het weer werkt.",
+    "model_trouble_ongoing": "Ik kan nog steeds geen gewone zinnen lezen ({{minutes}} minuten nu). Oorzaak: {{cause}}. Opdrachten en knoppen werken wel.",
+    "model_trouble_recovered": "Ik kan weer gewone zinnen lezen, na {{minutes}} minuten.",
     "model_cause_key": "de sleutel bij de aanbieder van het taalmodel werkt niet meer",
     "model_cause_limit": "het account bij de aanbieder heeft een limiet of saldo bereikt",
     "model_cause_refused": "de aanbieder weigert de vragen",
@@ -5597,7 +5601,15 @@
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     },
     "feedback_contact": "Feedback over de app gaat naar Onderling — voeg ze toe als contact en schrijf ze daar: {{link}}. Ik kan mezelf niet veranderen en bewaar of stuur niets door.",
-    "feedback_no_contact": "Feedback over de app gaat naar Onderling, maar deze bot heeft geen contact van ze om te geven. In de app vind je ze onder Instellingen → Feedback. Ik kan mezelf niet veranderen en bewaar niets."
+    "feedback_no_contact": "Feedback over de app gaat naar Onderling, maar deze bot heeft geen contact van ze om te geven. In de app vind je ze onder Instellingen → Feedback. Ik kan mezelf niet veranderen en bewaar niets.",
+    "model_cause_key_or_route": {
+      "text": "de sleutel bij de aanbieder is mogelijk verlopen, of de verbinding met de aanbieder werkt niet",
+      "doc": "The model trouble's cause when the Privatemode SDK fails as \"502 Connection error\": an expired key and a route that does not reach the enclave look the same there, so both are named (2026-10-30: an expired key showed exactly this)."
+    },
+    "secret_check_key_or_route": {
+      "text": "Let op: de aanbieder van het taalmodel geeft geen antwoord (status {{status}}). De sleutel {{secret}} is mogelijk verlopen, of de verbinding met de aanbieder werkt niet: controleer eerst de sleutel. Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
+      "doc": "The alert chat's line for the SDK's \"502 Connection error\": names both an expired key and the route, key first (the cheaper check)."
+    }
   },
   "op": {
     "admin_only": {
@@ -7137,32 +7149,6 @@
       "text": "Waar je mee bezig bent of naar streeft. Blijft privé op dit apparaat; alleen gebruikt om items op te merken die aansluiten.",
       "doc": "drivers#5 — eerlijke framing: drijfveren blijven on-device, sturen matching."
     },
-    "driverkind": {
-      "hobby": {
-        "text": "Hobby",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "goal": {
-        "text": "Doel",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "desire": {
-        "text": "Wens",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "motivation": {
-        "text": "Motivatie",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "driver": {
-        "text": "Drijfveer",
-        "doc": "drivers#5 — algemene soort drijfveer."
-      },
-      "interest": {
-        "text": "Interesse",
-        "doc": "interesses→drijfveren fold-in (audit §4/Q6) — soort drijfveer: waar je mee bezig bent (geleerd uit wat je opmerkte)."
-      }
-    },
     "driver_label_ph": {
       "text": "label (bijv. zeilen)",
       "doc": "drivers#5 — placeholder: het label van de drijfveer."
@@ -7480,11 +7466,11 @@
       "doc": "mij#personas — eigenschap zonder waarde op de algemene persona."
     },
     "offerings_label": {
-      "text": "Aanbod & drijfveren",
-      "doc": "mij#personas — rij-label voor de chips met vaardigheden/drijfveren."
+      "text": "Aanbod",
+      "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ aanbod of drijfveer",
+      "text": "+ aanbod",
       "doc": "mij#personas — gestippelde toevoeg-knop (potentiële-actie-grammatica)."
     },
     "offering_text_ph": {
@@ -7646,6 +7632,30 @@
     "awaiting_shared": {
       "text": "Met je gedeeld: {{count}}",
       "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
+    },
+    "interests_label": {
+      "text": "Interesses",
+      "doc": "Mij → the person's interests: one driver whose tags say what they like (matched on the device, released per circle)."
+    },
+    "goals_label": {
+      "text": "Doelen",
+      "doc": "Mij → the person's goals: drivers of kind goal, each a phrase and tags (matched on the device, released per circle)."
+    },
+    "goal_add": {
+      "text": "+ doel",
+      "doc": "Mij → Goals: opens the form to add a goal."
+    },
+    "goal_text_ph": {
+      "text": "wat wil je bereiken, in een zin",
+      "doc": "Mij → Goals: the phrase field placeholder."
+    },
+    "interest_add_ph": {
+      "text": "een interesse, bv. tuinieren",
+      "doc": "Mij → Interests: the field to add one interest (a tag)."
+    },
+    "driver_remove": {
+      "text": "Haal {{what}} weg",
+      "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
     }
   },
   "attach": {

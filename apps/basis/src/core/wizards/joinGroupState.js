@@ -556,7 +556,7 @@ export function presentedCircleAddress(state, circleAddressFor) {
  * @param {{state:object, callSkill:Function, circles?:Array}} a
  * @returns {Promise<object>} the mutated state
  */
-export async function prepareJoinIdentity({ state, callSkill, circles } = {}) {
+export async function prepareJoinIdentity({ state, callSkill, circles, profileIdOf = null } = {}) {
   const [priorHandles, personalDefault] = await Promise.all([
     loadPriorHandles({ callSkill }),
     loadPersonalRevealDefault({ callSkill }),
@@ -570,7 +570,34 @@ export async function prepareJoinIdentity({ state, callSkill, circles } = {}) {
   state.revealPreset = resolveJoinRevealPreset({ personalDefault });
   // Existing selves = the circles you're already in (each a presentable key).
   state.existingSelves = existingSelvesFrom(Array.isArray(circles) ? circles : [], state.invite?.groupId ?? null);
+  // The persona this device is ALREADY in the invited circle as, if it is in it (`secondPersonaWarning`).
+  state.heldAs = heldPersonaIn(circles, state.invite?.groupId ?? null, profileIdOf);
   return state;
+}
+
+/**
+ * The persona this device is already a member of `circleId` as — null when it is not in that circle, or when the
+ * shell cannot say which persona a circle is (no `profileIdOf`): never a guess.
+ */
+function heldPersonaIn(circles, circleId, profileIdOf) {
+  if (!circleId || typeof profileIdOf !== 'function' || !Array.isArray(circles)) return null;
+  if (!circles.some((c) => c && (c.id ?? c.groupId) === circleId)) return null;
+  try { return profileIdOf(circleId) ?? 'default'; } catch { return null; }
+}
+
+/**
+ * ONE MEMBER PER PERSONA. Two personas of one person cannot be told apart on the wire (unlinkability, by design), so
+ * the circle cannot refuse a person's second persona; only the person's own device knows both are theirs. When the
+ * circle being joined is one this device is already in as ANOTHER persona, the join says so before it is made —
+ * a warning, not a refusal. `{ personaId }` = the persona already there; null = nothing to say.
+ * @param {object} state  the join wizard's state, after `prepareJoinIdentity`
+ * @returns {{personaId: string}|null}
+ */
+export function secondPersonaWarning(state) {
+  const held = state?.heldAs;
+  if (typeof held !== 'string' || !held) return null;
+  const joining = typeof state.persona === 'string' && state.persona ? state.persona : 'default';
+  return held === joining ? null : { personaId: held };
 }
 
 /* ─── Charter-driven skill-sharing default (fold-in phase C) ──── */

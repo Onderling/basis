@@ -60,6 +60,23 @@ export function readPrivatemodeKey({ env = process.env, file } = {}) {
 }
 
 /**
+ * One call into the SDK at a time, for the whole process. The SDK's attestation and secret refresh run in one Go/Wasm
+ * program per process, and two calls that both meet an expired secret refresh it under one mutex: on a box that
+ * deadlocked the program and killed the runner (a person's turn and the hourly key probe, a second apart). A box builds
+ * two providers — the model and its fallback — each with its own client, so the gate belongs to the process, not to a
+ * client. A caller whose signal aborts while it waits leaves the queue without entering the SDK.
+ */
+let sdkTail = Promise.resolve();
+function oneAtATime(fn, signal) {
+  const turn = sdkTail.then(() => {
+    if (signal?.aborted) throw Object.assign(new Error('aborted while waiting for the SDK'), { name: 'AbortError' });
+    return fn();
+  });
+  sdkTail = turn.then(() => {}, () => {});
+  return turn;
+}
+
+/**
  * A `fetch`-shaped door onto the SDK: the caller POSTs an OpenAI chat-completions body, the SDK
  * attests, encrypts, sends, decrypts; the caller gets a Response-like object back. Only chat
  * completions are served; anything else answers 404 in the same shape.
@@ -80,7 +97,10 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
     try { body = init.body ? JSON.parse(init.body) : {}; } catch { return respond(400, { error: 'bad_json' }); }
     const { stream: _stream, ...rest } = body;   // the provider never streams
     try {
-      const result = await client.chat.completions.create({ ...rest, ...(extraBody ?? {}) }, init.signal ? { signal: init.signal } : undefined);
+      const result = await oneAtATime(
+        () => client.chat.completions.create({ ...rest, ...(extraBody ?? {}) }, init.signal ? { signal: init.signal } : undefined),
+        init.signal,
+      );
       return respond(200, result);
     } catch (err) {
       const status = Number(err?.status) || 502;
@@ -128,7 +148,7 @@ export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DE
   }
   const extraBody = reasoningBodyFor(model, thinking);
   const base = ollamaProvider({
-    baseUrl: PRIVATEMODE_ENDPOINT, model, timeoutMs, defaultOptions,
+    baseUrl: PRIVATEMODE_ENDPOINT, model, timeoutMs, defaultOptions, label: 'privatemode',
     fetchFn: privatemodeFetch(c, { extraBody }),
     ...(cacheSalt ? { bodyFor: ({ cacheKey }) => ({ cache_salt: cacheSaltFor(cacheSalt, cacheKey) }) } : {}),
   });
@@ -141,6 +161,6 @@ export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DE
     confidential: true,
     attested: true,
     /** The models the provider serves now (its own list) — what a box watches its model against. */
-    async listModels() { const r = await c.models.list(); return (r?.data ?? []).map((m) => m?.id).filter(Boolean); },
+    async listModels() { const r = await oneAtATime(() => c.models.list()); return (r?.data ?? []).map((m) => m?.id).filter(Boolean); },
   };
 }

@@ -35,13 +35,10 @@
  *
  * Phase 2 (Pinboard V1, 2026-05-05) additions, all opt-in:
  *
- *   - `verifyBound({ proof, connectingPubKey, rotationProof? })` is the
- *     strict counterpart to `verify(proof)`.  It also checks that the
- *     proof was issued for the connecting key (closing the spoofing
- *     loophole) — UNLESS a valid `KeyRotationProof` is presented that
- *     links the proof's `memberPubKey` to the connecting `newPubKey`
- *     and is still within its grace period.  Composes
- *     `core.KeyRotation.verify` and `isWithinGracePeriod`.
+ *   - `verifyBound({ proof, connectingPubKey })` is the strict
+ *     counterpart to `verify(proof)`.  It also checks that the proof
+ *     was issued for the connecting key (closing the spoofing loophole);
+ *     nothing bridges a different key.
  *   - `revokedMembers: ['<pubKey>']` per accepted-group entry: members
  *     whose proofs are rejected even when otherwise valid.  Static
  *     config; dynamic admin-signed revocation messages are deferred
@@ -53,7 +50,7 @@
  *     removed 2026-07-31 — a connection cap is now per-connection and
  *     circle-blind: `maxAddressesPerConnection` in `server.js`.)
  */
-import { verifyGroupProof, KeyRotation, STANDARD_RANKS } from '@onderling/core';
+import { verifyGroupProof, STANDARD_RANKS } from '@onderling/core';
 
 /** Default rank table = the canonical one from core (single source of truth). */
 const DEFAULT_ROLE_RANKS = STANDARD_RANKS;
@@ -136,8 +133,7 @@ export class GroupAuthVerifier {
   /**
    * Strict counterpart to `verify()`.  Adds a binding check: the
    * `proof.memberPubKey` must equal the `connectingPubKey` (the address
-   * the client is trying to register with) UNLESS a valid
-   * `KeyRotationProof` is presented that links them.
+   * the client is trying to register with).
    *
    * Without this check, anyone holding any valid groupProof could
    * register at any address — the relay's `clients` map is keyed by
@@ -147,18 +143,14 @@ export class GroupAuthVerifier {
    * behaviour keep using `verify()`.
    *
    * Reasons (in addition to those of `verify`):
-   *   - 'BINDING_MISMATCH'     — proof.memberPubKey ≠ connectingPubKey and no valid rotationProof
-   *   - 'INVALID_ROTATION'     — rotationProof signature/shape invalid, or links the wrong keys
-   *   - 'ROTATION_EXPIRED'     — rotationProof outside its grace period
+   *   - 'BINDING_MISMATCH'     — proof.memberPubKey ≠ connectingPubKey
    *
    * @param {object} args
    * @param {object} args.proof              — the GroupProof being presented
    * @param {string} args.connectingPubKey   — the address the client is registering with
-   * @param {object} [args.rotationProof]    — optional KeyRotationProof bridging old → new
-   * @param {() => number} [args.now]        — clock injection for tests; defaults to Date.now
    * @returns {{ ok: true, group: object|null } | { ok: false, reason: string }}
    */
-  verifyBound({ proof, connectingPubKey, rotationProof, now } = {}) {
+  verifyBound({ proof, connectingPubKey } = {}) {
     if (typeof connectingPubKey !== 'string' || !connectingPubKey) {
       throw new TypeError('verifyBound: connectingPubKey required');
     }
@@ -170,34 +162,7 @@ export class GroupAuthVerifier {
     // Open mode → no binding to enforce.
     if (this.isOpen) return base;
 
-    // Fast path: proof is already issued for the connecting key.
-    if (proof.memberPubKey === connectingPubKey) return base;
-
-    // Slow path: must present a rotation chain.
-    if (!rotationProof) {
-      return { ok: false, reason: 'BINDING_MISMATCH' };
-    }
-
-    const linksOldToNew =
-      rotationProof.oldPubKey === proof.memberPubKey
-      && rotationProof.newPubKey === connectingPubKey;
-    if (!linksOldToNew) {
-      return { ok: false, reason: 'INVALID_ROTATION' };
-    }
-
-    if (!KeyRotation.verify(rotationProof, proof.memberPubKey)) {
-      return { ok: false, reason: 'INVALID_ROTATION' };
-    }
-
-    // Grace-period check uses Date.now() inside KeyRotation by default;
-    // accept a `now` injection for deterministic tests.
-    const within = typeof now === 'function'
-      ? now() < rotationProof.issuedAt + rotationProof.gracePeriod * 1_000
-      : KeyRotation.isWithinGracePeriod(rotationProof);
-    if (!within) {
-      return { ok: false, reason: 'ROTATION_EXPIRED' };
-    }
-
+    if (proof.memberPubKey !== connectingPubKey) return { ok: false, reason: 'BINDING_MISMATCH' };
     return base;
   }
 }

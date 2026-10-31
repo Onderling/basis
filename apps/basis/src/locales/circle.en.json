@@ -213,6 +213,10 @@
         "hint": {
           "text": "Only what this persona discloses in this circle is shared — nothing on first join. Adjust later under Me → personas.",
           "doc": "Join wizard — persona disclosure hint."
+        },
+        "second_warning": {
+          "text": "You are already in this circle as {{persona}}. Joining as another persona makes you two members here, and the others cannot see that both are you.",
+          "doc": "Join wizard — a warning when this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One member per persona: only the person's own device can tell."
         }
       },
       "reveal": {
@@ -5518,11 +5522,11 @@
     "stepup_replaced": "That request was replaced by a newer one; nothing was done with it.",
     "stepup_what_op": "do {{op}} ({{arg}})",
     "model_not_served": "Note: the language model {{model}} is no longer offered by the provider. I now use {{using}}.",
-    "model_refused": "The assistant cannot answer right now: the language model provider refuses (a key or limit problem). The admin has been told.",
+    "model_refused": "I cannot read ordinary sentences right now: the language model provider refuses. The admin knows. Commands and buttons still work.",
     "model_slow": "The assistant is too slow to answer in time right now. Please try again in a moment.",
-    "model_trouble_start": "Note: the assistant no longer answers free-text questions. Cause: {{cause}}. Commands and buttons still work. I will tell you every hour while it lasts, and when it works again.",
-    "model_trouble_ongoing": "The assistant still answers no free-text questions ({{minutes}} minutes now). Cause: {{cause}}.",
-    "model_trouble_recovered": "The assistant answers again, after {{minutes}} minutes.",
+    "model_trouble_start": "Note: I cannot read ordinary sentences right now. Cause: {{cause}}. Commands and buttons still work. I will say so every hour while it lasts, and when it works again.",
+    "model_trouble_ongoing": "I still cannot read ordinary sentences ({{minutes}} minutes now). Cause: {{cause}}. Commands and buttons still work.",
+    "model_trouble_recovered": "I can read ordinary sentences again, after {{minutes}} minutes.",
     "model_cause_key": "the key at the language model provider no longer works",
     "model_cause_limit": "the provider account has reached a limit or run out of credit",
     "model_cause_refused": "the provider refuses the questions",
@@ -5592,7 +5596,15 @@
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     },
     "feedback_contact": "Feedback about the app goes to Onderling — add them as a contact and write to them there: {{link}}. I can't change myself and I don't keep or forward anything.",
-    "feedback_no_contact": "Feedback about the app goes to Onderling, but this bot has no contact of theirs to give. In the app they are under Settings → Feedback. I can't change myself and I don't keep anything."
+    "feedback_no_contact": "Feedback about the app goes to Onderling, but this bot has no contact of theirs to give. In the app they are under Settings → Feedback. I can't change myself and I don't keep anything.",
+    "model_cause_key_or_route": {
+      "text": "the key at the provider may have expired, or the connection to the provider does not work",
+      "doc": "The model trouble's cause when the Privatemode SDK fails as \"502 Connection error\": an expired key and a route that does not reach the enclave look the same there, so both are named (2026-10-30: an expired key showed exactly this)."
+    },
+    "secret_check_key_or_route": {
+      "text": "Note: the language model provider gives no answer (status {{status}}). The key {{secret}} may have expired, or the connection to the provider does not work: check the key first. Free-text questions get no answer until that is sorted; commands and buttons still work.",
+      "doc": "The alert chat's line for the SDK's \"502 Connection error\": names both an expired key and the route, key first (the cheaper check)."
+    }
   },
   "op": {
     "admin_only": {
@@ -7131,32 +7143,6 @@
       "text": "What you're into or trying to do. Kept private on this device; used only to notice items that resonate.",
       "doc": "drivers#5 — honest framing: drivers stay on-device, drive matching."
     },
-    "driverkind": {
-      "hobby": {
-        "text": "Hobby",
-        "doc": "drivers#5 — driver kind."
-      },
-      "goal": {
-        "text": "Goal",
-        "doc": "drivers#5 — driver kind."
-      },
-      "desire": {
-        "text": "Desire",
-        "doc": "drivers#5 — driver kind."
-      },
-      "motivation": {
-        "text": "Motivation",
-        "doc": "drivers#5 — driver kind."
-      },
-      "driver": {
-        "text": "Driver",
-        "doc": "drivers#5 — generic driver kind."
-      },
-      "interest": {
-        "text": "Interest",
-        "doc": "interests→drivers fold-in (audit §4/Q6) — driver kind: what you engage with (learned from what you noticed)."
-      }
-    },
     "driver_label_ph": {
       "text": "label (e.g. sailing)",
       "doc": "drivers#5 — placeholder: the driver's key/label."
@@ -7474,11 +7460,11 @@
       "doc": "mij#personas — property without a value on the general persona."
     },
     "offerings_label": {
-      "text": "Offerings & drivers",
-      "doc": "mij#personas — row label for the skills/drivers chips."
+      "text": "Offerings",
+      "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ offering or driver",
+      "text": "+ offering",
       "doc": "mij#personas — dashed add button (potential-action grammar)."
     },
     "offering_text_ph": {
@@ -7640,6 +7626,30 @@
     "awaiting_shared": {
       "text": "Shared with you: {{count}}",
       "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
+    },
+    "interests_label": {
+      "text": "Interests",
+      "doc": "Mij → the person's interests: one driver whose tags say what they like (matched on the device, released per circle)."
+    },
+    "goals_label": {
+      "text": "Goals",
+      "doc": "Mij → the person's goals: drivers of kind goal, each a phrase and tags (matched on the device, released per circle)."
+    },
+    "goal_add": {
+      "text": "+ goal",
+      "doc": "Mij → Goals: opens the form to add a goal."
+    },
+    "goal_text_ph": {
+      "text": "what you want to achieve, in a sentence",
+      "doc": "Mij → Goals: the phrase field placeholder."
+    },
+    "interest_add_ph": {
+      "text": "an interest, e.g. gardening",
+      "doc": "Mij → Interests: the field to add one interest (a tag)."
+    },
+    "driver_remove": {
+      "text": "Remove {{what}}",
+      "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
     }
   },
   "attach": {

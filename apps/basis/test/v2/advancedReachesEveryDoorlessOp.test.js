@@ -92,7 +92,7 @@ describe('the Advanced surface reaches every op with no declared screen', () => 
 
   it('groups the ops a person came looking for apart from the ones they did not', () => {
     const of = (g) => rows.filter((r) => r.group === g).map((r) => r.op).sort();
-    expect(of('identity')).toEqual(['rotate-identity', 'signin', 'signout', 'whoami']);
+    expect(of('identity')).toEqual(['signin', 'signout', 'whoami']);
     expect(of('diagnostics')).toEqual(['audit-tail', 'debug-dump', 'security-status']);
     expect(of('people'), 'blocking someone is a social act, not a transport setting')
       .toEqual(['mute', 'muted', 'unmute']);

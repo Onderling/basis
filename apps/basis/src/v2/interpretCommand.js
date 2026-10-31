@@ -130,8 +130,9 @@ export async function interpretToCommand(text, { catalogue, llm, system, hints, 
     ? history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content)
     : [];
   const result = await llm.invoke({
-    system: assemblePrompt({ stable: withAppBackgrounds(system || DEFAULT_INTERPRET_SYSTEM, catalogue), hints, context, now }),
-    messages: [...priorMsgs, { role: 'user', content: q }],
+    // the head the provider caches — the same bytes every turn; this turn's notes ride the person's own message
+    system: withAppBackgrounds(system || DEFAULT_INTERPRET_SYSTEM, catalogue),
+    messages: [...priorMsgs, { role: 'user', content: `${q}\n\n${turnNotes({ hints, context, now })}` }],
     tools,
     ...(options ? { options } : {}),
     // the turn's own "this is slow" hook: a provider that retries on a timeout calls it (the door tells the person)
@@ -163,6 +164,13 @@ export async function interpretToCommand(text, { catalogue, llm, system, hints, 
   return reply ? { reply } : null;
 }
 
+/** The person's own words in a user turn this module built: what comes before the turn notes. */
+export function personsWords(content) {
+  const s = String(content ?? '');
+  const at = s.indexOf(`\n\n${TURN_MARKER}`);
+  return at < 0 ? s : s.slice(0, at);
+}
+
 /** A reply shaped like a system confirmation — a check mark, or "added/done/marked …" as the first words. */
 export function looksLikeConfirmation(text) {
   const t = String(text ?? '').trim();
@@ -170,10 +178,12 @@ export function looksLikeConfirmation(text) {
 }
 
 /**
- * The system prompt: the STABLE part, the turn marker, then this turn's hints, the retrieved items (within the
- * budget) and the date. LLM-facing.
+ * What changes every turn — the turn marker, then this turn's hints, the retrieved items (within the budget) and the
+ * date — appended to the person's message. The system text and the tools stay the same bytes from turn to turn, so the
+ * provider's prompt cache can serve them; a date or a list above them would defeat it every turn, whatever order a
+ * chat template puts the tools in. LLM-facing.
  */
-function assemblePrompt({ stable, hints, context, now }) {
+function turnNotes({ hints, context, now }) {
   const volatile = (Array.isArray(hints) ? hints : []).filter((h) => typeof h === 'string' && h.trim());
   const items = contextBlock(context);
   if (items) volatile.push(items);
@@ -181,7 +191,7 @@ function assemblePrompt({ stable, hints, context, now }) {
   // The real local date and time. (Given the date alone, the model once invented a clock time; and a UTC date was
   // yesterday's between midnight and the UTC offset.) Local = the runtime's own clock: the box's TZ, the browser's.
   volatile.push(`It is now ${localNow(at)} (local time).`);
-  return `${stable}\n\n${TURN_MARKER}\n${volatile.join('\n\n')}`;
+  return `${TURN_MARKER}\n${volatile.join('\n\n')}`;
 }
 
 /** `2026-10-02 10:05, Friday` on the runtime's own clock. */

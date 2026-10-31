@@ -232,8 +232,8 @@ describe('GroupAuthVerifier — revokedMembers (Phase 2C)', () => {
 
 // ── Phase 2 (Pinboard V1, 2026-05-05) — verifyBound + rotation chain ─────────
 
-describe('GroupAuthVerifier — verifyBound + rotation chain (Phase 2B)', () => {
-  it('accepts when proof.memberPubKey === connectingPubKey (no rotation needed)', async () => {
+describe('GroupAuthVerifier — verifyBound binds the proof to the connecting key', () => {
+  it('accepts when proof.memberPubKey === connectingPubKey', async () => {
     const proof = await mintProof({ groupId: 'my-block' });
     const v = new GroupAuthVerifier({
       acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }],
@@ -241,7 +241,7 @@ describe('GroupAuthVerifier — verifyBound + rotation chain (Phase 2B)', () => 
     expect(v.verifyBound({ proof, connectingPubKey: member.pubKey }).ok).toBe(true);
   });
 
-  it('rejects BINDING_MISMATCH when no rotation chain is presented', async () => {
+  it('rejects BINDING_MISMATCH for any other key', async () => {
     const proof = await mintProof({ groupId: 'my-block' });
     const v = new GroupAuthVerifier({
       acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }],
@@ -250,64 +250,19 @@ describe('GroupAuthVerifier — verifyBound + rotation chain (Phase 2B)', () => 
       .toEqual({ ok: false, reason: 'BINDING_MISMATCH' });
   });
 
-  it('accepts a valid rotation chain linking old groupProof to new connecting key', async () => {
-    const { KeyRotation, AgentIdentity } = await import('@onderling/core');
+  it('a push-rotation proof stapled to the register bridges nothing: a different key is still BINDING_MISMATCH', async () => {
+    // The relay used to accept a proof signed by the member's OLD key as a bridge to a new address; a revoked
+    // device holds that old key. Nothing reads such a proof any more.
+    const { AgentIdentity } = await import('@onderling/core');
     const { VaultMemory } = await import('@onderling/vault');
     const proof = await mintProof({ groupId: 'my-block' });
     const newIdentity = await AgentIdentity.generate(new VaultMemory());
-    const rotationProof = await KeyRotation.buildProof(member, newIdentity.pubKey, 86_400);
-
-    const v = new GroupAuthVerifier({
-      acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }],
-    });
-    expect(v.verifyBound({ proof, connectingPubKey: newIdentity.pubKey, rotationProof }).ok).toBe(true);
-  });
-
-  it('rejects rotation chain with wrong newPubKey link', async () => {
-    const { KeyRotation, AgentIdentity } = await import('@onderling/core');
-    const { VaultMemory } = await import('@onderling/vault');
-    const proof = await mintProof({ groupId: 'my-block' });
-    const newIdentity   = await AgentIdentity.generate(new VaultMemory());
-    const otherIdentity = await AgentIdentity.generate(new VaultMemory());
-    const rotationProof = await KeyRotation.buildProof(member, newIdentity.pubKey, 86_400);
-
-    const v = new GroupAuthVerifier({
-      acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }],
-    });
-    // connecting with a key OTHER than rotation.newPubKey
-    expect(v.verifyBound({ proof, connectingPubKey: otherIdentity.pubKey, rotationProof }))
-      .toEqual({ ok: false, reason: 'INVALID_ROTATION' });
-  });
-
-  it('rejects rotation chain with tampered signature', async () => {
-    const { KeyRotation, AgentIdentity } = await import('@onderling/core');
-    const { VaultMemory } = await import('@onderling/vault');
-    const proof = await mintProof({ groupId: 'my-block' });
-    const newIdentity = await AgentIdentity.generate(new VaultMemory());
-    const rotationProof = await KeyRotation.buildProof(member, newIdentity.pubKey, 86_400);
-    rotationProof.sig = rotationProof.sig.slice(0, -2) + 'xx';
-
-    const v = new GroupAuthVerifier({
-      acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }],
-    });
-    expect(v.verifyBound({ proof, connectingPubKey: newIdentity.pubKey, rotationProof }))
-      .toEqual({ ok: false, reason: 'INVALID_ROTATION' });
-  });
-
-  it('rejects rotation chain past its grace period', async () => {
-    const { KeyRotation, AgentIdentity } = await import('@onderling/core');
-    const { VaultMemory } = await import('@onderling/vault');
-    const proof = await mintProof({ groupId: 'my-block' });
-    const newIdentity = await AgentIdentity.generate(new VaultMemory());
-    const rotationProof = await KeyRotation.buildProof(member, newIdentity.pubKey, 60); // 60 seconds
-    // simulate "now" 10 minutes later via the now injection
-    const tenMinLater = rotationProof.issuedAt + 600_000;
-
-    const v = new GroupAuthVerifier({
-      acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }],
-    });
-    expect(v.verifyBound({ proof, connectingPubKey: newIdentity.pubKey, rotationProof, now: () => tenMinLater }))
-      .toEqual({ ok: false, reason: 'ROTATION_EXPIRED' });
+    const unsigned = { type: 'key-rotation', oldPubKey: member.pubKey, newPubKey: newIdentity.pubKey, issuedAt: Date.now(), gracePeriod: 86_400 };
+    const sorted = Object.fromEntries(Object.entries(unsigned).sort(([a], [b]) => a.localeCompare(b)));
+    const sig = Buffer.from(member.sign(new TextEncoder().encode(JSON.stringify(sorted)))).toString('base64url');
+    const v = new GroupAuthVerifier({ acceptedGroups: [{ groupId: 'my-block', adminPubKey: admin.pubKey }] });
+    expect(v.verifyBound({ proof, connectingPubKey: newIdentity.pubKey, rotationProof: { ...unsigned, sig } }))
+      .toEqual({ ok: false, reason: 'BINDING_MISMATCH' });
   });
 
   it('open mode: verifyBound returns ok even with mismatching keys', async () => {

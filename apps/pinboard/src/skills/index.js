@@ -4240,45 +4240,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * rotateMyAddress({ gracePeriodSeconds? })  — Pinboard V3 mobile
-     * Phase 40.22 (2026-05-08).
-     *
-     * Wraps `core.Agent.rotateIdentity()`.  Generates a fresh
-     * Ed25519 keypair, broadcasts the rotation proof to current
-     * peers, swaps SecurityLayer to the new key + retains the old
-     * one for the grace period (default 7 days) so in-flight
-     * envelopes from peers that haven't heard yet still decrypt.
-     *
-     * The user-facing `stableId` is unchanged — contacts / mute
-     * lists keep tracking the same person.
-     *
-     * Returns `{ oldPubKey, newPubKey, graceUntil }`.
-     */
-    defineSkill('rotateMyAddress', async ({ parts, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof agent?.rotateIdentity !== 'function') {
-        return { error: 'rotation-not-supported' };
-      }
-      try {
-        const r = await agent.rotateIdentity({
-          gracePeriodSeconds: typeof a.gracePeriodSeconds === 'number'
-            ? a.gracePeriodSeconds : 7 * 24 * 60 * 60,
-          broadcast: a.broadcast !== false,
-        });
-        metrics?.record?.('identity-rotated');
-        return {
-          oldPubKey:  r.oldPubKey,
-          newPubKey:  r.newPubKey,
-          graceUntil: r.graceUntil,
-        };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Rotate the agent\'s Ed25519 keypair (network address). stableId is preserved.',
-      visibility:  'authenticated',
-    }),
 
     /**
      * whoAmI()

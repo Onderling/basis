@@ -72,6 +72,9 @@ export class CachingDataSource extends DataSource {
   #emitter = new Emitter();
   /** Optional persistence hook fired after every local mutation. */
   #onLocalChange = null;
+  // How many times the local cache has changed (every write, delete, read-through fill and pull). A store above
+  // that keeps what it read in memory compares it to know whether anything changed beneath it.
+  #revision = 0;
   /** @type {string[]} — Phase 34: paths matching a prefix never sync to inner. */
   #localOnlyPrefixes = [];
   /** @type {(logicalPath: string) => string} — Phase 1: map a logical key/prefix → the inner DataSource's URI. Identity by default. */
@@ -141,7 +144,11 @@ export class CachingDataSource extends DataSource {
   }
 
   /** Fire the persistence hook (best-effort). */
+  /** How many times the local cache has changed — any write, delete, read-through fill or pull, whoever made it. */
+  get revision() { return this.#revision; }
+
   #notifyLocalChange() {
+    this.#revision += 1;
     if (!this.#onLocalChange) return;
     try { this.#onLocalChange(this.#local); } catch { /* persistence is best-effort */ }
   }

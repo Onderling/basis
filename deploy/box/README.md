@@ -120,9 +120,11 @@ line).
 ## The HTML face (kept simple)
 
 `https://<relay-domain>/box/` is a **read-only status page**: profile and roles, whether `HOLD` is set,
-the last update and whether it rolled back, `state.json`, and the last 50 log lines. It is static HTML
-the updater rewrites on every state change (`data/www/`), served by Caddy — no server code, no login,
-nothing secret on it. Anything interactive (freeze, force an update) stays a command on the box.
+the last update and whether it rolled back, and `state.json`. It is static HTML the updater rewrites on
+every state change (`data/www/`), served by Caddy — no server code, no login, nothing secret on it.
+`box.log` is not on it: the page is public and the log also takes raw command output, so the operator
+reads it on the box (`tail /opt/onderling/box.log`, or under `BOX_DIR`). Anything interactive
+(freeze, force an update) stays a command on the box.
 
 ## The updater (`update.sh`, every minute via `onderling-box.timer`)
 

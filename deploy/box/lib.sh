@@ -255,13 +255,15 @@ write_state() {   # write_state <rolledBack:true|false> [failedRole]
 }
 
 # The box's HTML face, kept simple: a static page under data/www/ (served read-only by Caddy at /box/)
-# showing state.json, whether HOLD is set, and the last 50 log lines. No server code, no login — it
-# shows a sha and a tag, nothing secret. Rewritten on every state change.
+# showing state.json and whether HOLD is set. No server code, no login — it shows a sha and a tag, nothing
+# secret. Rewritten on every state change. box.log stays off it: the page is served to anyone, and box.log
+# also takes raw command output (a reload's, a role script's), which nothing vets. The operator reads
+# box.log on the box itself; a log.txt an older runner published is taken down here.
 write_status_page() {
   local www="$BOX_DIR/data/www"
   mkdir -p "$www"
   cp "$BOX_DIR/state.json" "$www/state.json"
-  tail -n 50 "$BOX_DIR/box.log" 2>/dev/null > "$www/log.txt" || true
+  rm -f "$www/log.txt"
   local hold="no"; [ -f "$BOX_DIR/HOLD" ] && hold="YES — the updater is frozen"
   local esc; esc() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
   {
@@ -273,8 +275,7 @@ write_status_page() {
     echo "<dt>last good version</dt><dd>$(good_json .good | esc) · before it: $(good_json .prevgood | esc)</dd>"
     echo "<dt>last update</dt><dd>$(sed -n 's/.*"updatedAt": *"\([^"]*\)".*/\1/p' "$BOX_DIR/state.json") · rolled back: $(sed -n 's/.*"rolledBack": *\([a-z]*\).*/\1/p' "$BOX_DIR/state.json")</dd></dl>"
     echo "<h2>running</h2><pre>$(esc < "$BOX_DIR/state.json")</pre>"
-    echo "<h2>log (last 50)</h2><pre>$(esc < "$www/log.txt")</pre>"
-    echo '<p><a href="state.json">state.json</a> · <a href="log.txt">log.txt</a></p>'
+    echo '<p><a href="state.json">state.json</a></p>'
   } > "$www/index.html"
 }
 

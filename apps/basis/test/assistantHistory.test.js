@@ -15,7 +15,7 @@ import { mergeManifests } from '../src/manifestMerge.js';
 import { householdManifest } from '../../household/manifest.js';
 import { listsManifest } from '../../lists/manifest.js';
 import { createAssistantEngine, assistantReplyText } from '../src/v2/assistantEngine.js';
-import { interpretToCommand } from '../src/v2/interpretCommand.js';
+import { interpretToCommand, personsWords } from '../src/v2/interpretCommand.js';
 import { parseOpenAIChatResponse } from '@onderling/llm-client/providers/ollama';
 import { sharedCircleLocale } from '../src/locales/index.js';
 
@@ -45,7 +45,7 @@ describe('the remembered turns go to the model as a conversation', () => {
     engine.remember('t', 'you', 'en broccoli ook');
     await engine.ask('t', 'wat staat er nu op');
 
-    expect(req.messages).toEqual([
+    expect(req.messages.map((m, i, all) => (i === all.length - 1 ? { ...m, content: personsWords(m.content) } : m))).toEqual([
       { role: 'user', content: 'zet kaas op de lijst' },
       { role: 'assistant', content: 'Welke lijst bedoel je?' },
       { role: 'user', content: '(the app answered: toegevoegd aan boodschappen: kaas)' },

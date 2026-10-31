@@ -113,7 +113,6 @@ export function createLocalBuiltins({
     me:        async (args) => meIdentity(args, { agent, t }),
     'peer-connect':     async (args) => peerConnect(args, { connectPeer, t }),
     'test-peer':        async (args) => testPeer(args, { agent, t }),
-    'rotate-identity':  async (args) => rotateIdentity(args, { agent, t }),
     'security-status':  async (args) => securityStatus(args, { agent, t }),
     'set-relay':        async (args) => setRelay(args, { agent, t }),
     'transport-mode':   async (args) => transportMode(args, { agent, t }),
@@ -551,30 +550,6 @@ async function publishPeerAddrCmd(_args, { publishPeerAddrToPod, t }) {
     return { message: t('publishPeerAddrCmd.done', { url: r.url }) };
   } catch (err) {
     return { ok: false, error: t('publishPeerAddrCmd.failed', { error: err.message ?? String(err) }) };
-  }
-}
-
-/**
- * `/rotate-identity` — v0.7.P3d.  Rotates the chat-agent's Ed25519
- * keypair.  Old key stays valid for 7 days (in-flight envelopes
- * still decrypt).  KeyRotation.broadcast notifies known peers.
- * Your peer address changes — share the new one via /me.
- */
-async function rotateIdentity(_args, { agent, t }) {
-  if (!agent || typeof agent.rotateChatIdentity !== 'function') {
-    return { ok: false, error: t('rotate.unavailable') };
-  }
-  try {
-    const result = await agent.rotateChatIdentity();
-    return {
-      message: t('rotate.done', {
-        oldPub:   result.oldPubKey.slice(0, 16) + '…',
-        newPub:   result.newPubKey.slice(0, 16) + '…',
-        grace:    result.graceUntilDays,
-      }),
-    };
-  } catch (err) {
-    return { ok: false, error: t('rotate.failed', { error: err.message ?? String(err) }) };
   }
 }
 

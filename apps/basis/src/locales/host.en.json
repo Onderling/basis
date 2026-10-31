@@ -345,20 +345,6 @@
       "doc": "/set-relay caught an exception from sa.relay.connect()."
     }
   },
-  "rotate": {
-    "unavailable": {
-      "text": "Identity rotation not available in this build.",
-      "doc": "Defensive."
-    },
-    "done": {
-      "text": "✓ Identity rotated.\n  old pubKey: {{oldPub}}\n  new pubKey: {{newPub}}\n  grace period: {{grace}} days\n\nYour NKN address has CHANGED.  Run /me to see it.\nKnown peers were notified via KeyRotation.broadcast.",
-      "doc": "v0.7.P3d."
-    },
-    "failed": {
-      "text": "Rotation failed: {{error}}",
-      "doc": "Defensive."
-    }
-  },
   "scan_qr": {
     "not_available": {
       "text": "QR scanner not available on this device.",

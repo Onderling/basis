@@ -545,6 +545,9 @@ describe how a *request* travels; this is what it travels **to**: one sentence, 
 **Circle → store.** The scope axis is also the storage axis: a circle's items live in one
 `CircleItemStore` (`packages/item-store`), rooted per circle. "Which circle" is not a filter applied to a
 shared pile — it is which store you are holding. Two stores for one circle is a defect, not a design.
+The store keeps its items in memory once read — the stored text per item, with its type as the type index, one
+truth whose at-rest form is the sealed medium below — and serves `list` / `listByType` / `get` from there while
+the medium's `revision` is where its own writes left it; any other change beneath it drops what it holds.
 
 One row in that store is not synced like the others, on purpose: the roster's **trail row** (the
 `membership-redemption` item a circle's membership is projected from). Its addresses enter the projection
@@ -638,6 +641,13 @@ from "happened fine". That is the failure mode this architecture is most exposed
 composed of best-effort seams — so **a seam is not done until something crosses it**, and the guard for
 this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival
 ([`apps/basis/test/perTypeSyncMatrix.test.js`](../apps/basis/test/perTypeSyncMatrix.test.js)).
+
+**A screen's data is a head, not a read per landing.** Vandaag's blocks (and, next, Mij's) are held as last read for
+the landing's key (`src/v2/screenHead.js`) — a projection in memory for the session, never persisted. What makes it
+stale is what changes it: the circles' items (`agent.onCircleChanged` — this node's own writes and members' items
+that landed, every shell by construction), the event log (chat, unread, news), a different key (the page, the circles
+shown, the selves), and an act of the person's own that writes no store (`invalidate()`). Stale while shown is one
+read after a short wait; stale while hidden waits for the next landing, so an idle screen does no work.
 
 **Reading across circles is ONE projection per noun, rows tagged with their circle.** "My things", "my agenda" —
 any item type across the circles a person is in — is `acrossCircles` (`src/v2/acrossCircles.js`): per circle the

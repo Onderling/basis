@@ -4,7 +4,7 @@
  * kimi-k2.6, and later the account hit its monthly token limit; neither was said to anyone).
  */
 import { describe, it, expect } from 'vitest';
-import { createModelWatch, isOverLimit } from '../src/v2/modelWatch.js';
+import { createModelWatch, isOverLimit, troubleCause, replyClass } from '../src/v2/modelWatch.js';
 
 const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
 function watch({ served = ['glm-5.3', 'glm-5.3-flash'] } = {}) {
@@ -96,11 +96,18 @@ describe('the box checks its model key with a real completion', () => {
   it('the walk log keeps one secret-check record per tick: the secret NAME and the status', async () => {
     const d = keyed({ probe: refuses });
     await d.w.check();
-    expect(d.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401 });
+    expect(d.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401, ms: 0 });
     const ok = keyed({ probe: async () => ({ text: '.' }) });
     await ok.w.check();
-    expect(ok.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: true, status: 200 });
+    expect(ok.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: true, status: 200, ms: 0 });
     expect(ok.alerted).toEqual([]);
+  });
+
+  it('the secret-check record carries how long the one-token call took: the provider\'s own latency, apart from any prompt', async () => {
+    let d = null;
+    d = keyed({ probe: async () => { d.advance(1234); return { text: '.' }; } });
+    await d.w.check();
+    expect(d.logged.find((e) => e.kind === 'secret-check')).toMatchObject({ ok: true, ms: 1234 });
   });
 
   it('no alert chat on this box: the admin hears it (as the episode\'s start)', async () => {
@@ -131,7 +138,7 @@ describe('a proxy that lists models but refuses completions', () => {
     const w = createModelWatch({ listModels: built.listModels, probe: built.probe, model: 'glm-5.3', fallback: 'glm-5.3-flash', t, tellAdmin: async () => {}, alertBox: async (x) => { alerted.push(x); }, log: (e) => logged.push(e) });
     await w.check();
     expect(logged).toContainEqual({ kind: 'model-watch', served: 2, missing: [] });
-    expect(logged).toContainEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401 });
+    expect(logged).toContainEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401, ms: expect.any(Number) });
     expect(alerted).toHaveLength(1);
   });
 });
@@ -241,5 +248,32 @@ describe('the household admin hears it: once when it starts, hourly while it las
     await w.check();
     expect(told).toHaveLength(1);
     expect(told[0]).toContain('circle.bot.model_trouble_start');
+  });
+});
+
+describe('an expired key that answers as a lost connection', () => {
+  // 2026-10-30: a key that had expired weeks earlier made the Privatemode SDK fail as '502 Connection error' after
+  // ~11 s, not as a 401 — and the watch filed it under 'unreachable', so the admin would have been sent to the network
+  // for a dead key. That shape says either; the words name both.
+  const expired = () => Object.assign(new Error('privatemode: 502 Connection error.'), { code: 'PROVIDER_ERROR', status: 502 });
+
+  it('is the key or the connection, not "unreachable"; the person still hears that it cannot be reached', () => {
+    expect(troubleCause(expired())).toBe('key_or_route');
+    expect(replyClass(troubleCause(expired()))).toBe('unreachable');
+    // another 502 (a gateway's own failure) stays unreachable
+    expect(troubleCause(Object.assign(new Error('privatemode: 502 Bad Gateway'), { status: 502 }))).toBe('unreachable');
+  });
+
+  it('the admin hears both causes, and the alert chat line carries both', async () => {
+    const told = []; const alerts = [];
+    const w = createModelWatch({
+      listModels: async () => ['glm-5.3'], model: 'glm-5.3', fallback: null, t,
+      probe: async () => { throw expired(); },
+      tellAdmin: async (x) => { told.push(x); }, alertBox: async (x) => { alerts.push(x); },
+    });
+    await w.check();
+    expect(told[0]).toContain('circle.bot.model_cause_key_or_route');
+    expect(alerts[0]).toContain('circle.bot.secret_check_key_or_route');
+    expect(alerts[0]).toContain('"status":502');
   });
 });

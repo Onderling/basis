@@ -156,6 +156,7 @@ import { renderRecordScreen } from './recordScreen.js';
 // personas#1 — the "Mij → persona's" surface (general persona + persona cards + per-circle sharing)
 // + its shared read-model; the one "About me" on both shells (the single-persona About-me it replaced is retired).
 import { renderMij } from './circleMij.js';
+import { saveDriver, removeDriver } from '../../src/v2/driversSection.js';
 import { loadMijModel } from '../../src/v2/mijLoader.js';
 // feedback-extension P2c — load downloadable extension mappings + the load-time sandbox gate.
 import { loadMappings } from '@onderling/pod-routing/mappings';
@@ -406,7 +407,8 @@ import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBl
 // The person's own pages (Vandaag): read here, edited only through the screen ops (no book function is called from
 // this shell to change the book).
 import { localUserScreenStore, getActiveScreen, blockTypesShowingCircle } from '../../src/v2/userScreens.js';
-import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../src/v2/vandaag.js';
+import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../src/v2/vandaag.js';
+import { createScreenHead } from '../../src/v2/screenHead.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderVandaagCustomise } from './vandaagCustomise.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
@@ -2901,6 +2903,7 @@ function showTabBar(active) {
   // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
   // it must not repaint the thread over whatever is showing.
   _activeContactThread = null;
+  if (active !== 'screens') _vandaagHead?.hide();   // Vandaag is not shown: a change waits for the next landing
   _activeTab = active;
   renderCircleTabBar(tabBarEl, {
     active, t,
@@ -3428,11 +3431,12 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     onDelete: hidden === null ? null : () => { deleteContactWithConfirm(contactId, thread.name).catch(() => {}); },
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
-    onButtonTap: async (b) => {
+    onButtonTap: async (b, _m, ev) => {
       const room = ensureNearbyRoom();
       if (b?.id === 'reach-back-no') { room?.settleReach?.(thread.peerAddr); rerender(); return; }
       if (b?.id === 'reach-back-yes' || b?.id === 'reach-share') {
-        const r = await room?.shareReach?.(thread.peerAddr, { wantBack: b.id === 'reach-share' });
+        // the click itself goes down with it: sharing how to reach me happens only from a press on these two
+        const r = await room?.shareReach?.(thread.peerAddr, { wantBack: b.id === 'reach-share', press: { trigger: b.id === 'reach-share' ? 'chip' : 'reach-back-yes', event: ev ?? null } });
         if (r?.ok) {
           room?.settleReach?.(thread.peerAddr);
           thread.messages.push({ origin: 'user', text: t('circle.nearbyScreen.reach_shared_you') });
@@ -3582,6 +3586,7 @@ function readSeenAt() {
 function writeSeenAt(map) {
   try { window.localStorage.setItem(SEEN_AT_KEY, JSON.stringify(map)); }
   catch { /* quota / disabled */ }
+  _vandaagHead?.invalidate();   // Vandaag's "circles with news" counts what is not yet seen
 }
 // …and on LEAVING a circle too: what happened while you were inside is not news on the launcher (one rule, both shells).
 subscribeActiveCircle(seenOnLeave((id) => writeSeenAt(bumpSeenAt(readSeenAt(), id))));
@@ -4193,6 +4198,29 @@ let _expandedBlockId = null;   // a block of the page opened whole ("meer"), or 
 // δ.1 — monotonically-increasing token for each paint of Vandaag. The async materialize compares its captured token
 // against the latest before touching the DOM, so a slow materialize from one page cannot stomp another.
 let _showActiveScreenToken = 0;
+// VANDAAG'S HEAD (`screenHead.js`): the blocks as last materialized for the landing's key, kept current by the circles'
+// item changes (`onCircleChanged`) and the event log's — so a tab landing on a fresh head reads nothing. Made once the
+// agent is there; a landing before that reads as it always did.
+let _vandaagHead = null;
+// what Vandaag read, for the browser spec's counters (landings · materializes · op calls)
+const _vandaagReads = { landings: 0, materializes: 0, ops: 0 };
+if (typeof window !== 'undefined') window.onderlingVandaagReads = _vandaagReads;
+function vandaagHead() {
+  if (_vandaagHead || typeof circleHouseholdAgent?.onCircleChanged !== 'function') return _vandaagHead;
+  _vandaagHead = createScreenHead({
+    materialize: () => materializeVandaag(),
+    subscribe: [(fn) => circleHouseholdAgent.onCircleChanged(fn), (fn) => eventLog.subscribe(fn)],
+  });
+  _vandaagHead.onUpdate((blocks) => { if (_activeTab === 'screens' && getActiveCircle() == null) paintVandaagBlocks(blocks); });
+  return _vandaagHead;
+}
+let _vandaagBody = null;
+let _vandaagOnMore;
+function paintVandaagBlocks(blocks) {
+  if (!_vandaagBody || !_vandaagBody.isConnected) return;
+  _screenViewBlocks = blocks;
+  renderCircleScreen(_vandaagBody, { blocks, t, refreshing: false, onAction: onScreenAction, onMore: _vandaagOnMore });
+}
 
 async function showScreens() {
   if (!isAlphaTab('screens')) { showTabBar(ALPHA_FALLBACK_TAB); return; }   // hidden in the alpha (alphaSurface.js)
@@ -4201,7 +4229,7 @@ async function showScreens() {
   // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with mobile
   try { _screensBook = await ensureVandaagBook({ store: userScreenStore, t }); }
   catch { _screensBook = { screens: [], activeId: null }; }
-  _showVandaag();
+  _showVandaag({ landing: true });
 }
 
 // The page change goes through the screen op, as every edit of the person's pages does (kept, logged, undoable)
@@ -4221,7 +4249,7 @@ function mySelfIn(circleId) {
   try { return circleHouseholdAgent?.circleSelf?.(circleId ?? null)?.webid ?? null; } catch { return null; }
 }
 
-async function _showVandaag() {
+async function _showVandaag({ landing = false } = {}) {
   const book = _screensBook ?? { screens: [], activeId: null };
   const screen = getActiveScreen(book);
   rootEl.innerHTML = '';
@@ -4286,31 +4314,48 @@ async function _showVandaag() {
   } else {
     renderCircleScreen(body, { blocks: null, t });
   }
+  _vandaagBody = body;
+  _vandaagOnMore = onMore;
   let blocks = [];
-  try {
-    blocks = await materializeScreen({
-      screen: shown,
-      hostOps: {
-        // The TARGETED 3-arg waist — materializers call `callSkill('calendar', 'listEvents', …)`.
-        callSkill: rawCallSkill,
-        eventLog, circles: circlesShown(),
-        // the switcher's set: own items show when the self that made them is ticked
-        ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
-        // the circles-with-news block counts what the circle tiles count
-        seenAt: readSeenAt(), myRefs: unreadMyRefs,
-        // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
-        selfIn: mySelfIn,
-        // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-        allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
-      },
-    });
-  } catch (err) {
-    console.warn('[vandaag] materializeScreen failed', err);
-  }
+  const screenHead = vandaagHead();
+  // a landing reads the head; any other paint follows an act of the person's own, which may change what Vandaag shows
+  // without a store write (the intro card seen, a page edited), so the head reads again
+  if (screenHead && !landing) screenHead.invalidate();
+  const key = vandaagLandingKey({ book, circles: circlesShown(), expandedBlockId: _expandedBlockId,
+    selves: [...(_selfSet.on ?? []), ...(_selfSet.held ?? []).map((p) => `held:${p?.id ?? p}`)] });
+  _vandaagReads.landings += 1;
+  try { blocks = (screenHead ? await screenHead.land(key) : await materializeVandaag()) ?? []; }
+  catch (err) { console.warn('[vandaag] materializeScreen failed', err); }
   if (token !== _showActiveScreenToken) return;
   _screenViewBlocks = blocks;
   renderCircleScreen(body, { blocks, t, refreshing: false, onAction: onScreenAction, onMore });
   if (cacheKey) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
+}
+
+/** Vandaag read from the stores, as the page stands now (the head's one read). */
+async function materializeVandaag() {
+  _vandaagReads.materializes += 1;
+  const book = _screensBook ?? { screens: [], activeId: null };
+  const screen = getActiveScreen(book);
+  if (!screen) return [];
+  const shown = _expandedBlockId ? (expandedPage(screen, _expandedBlockId) ?? screen) : screen;
+  const counted = (...a) => { _vandaagReads.ops += 1; return rawCallSkill(...a); };
+  return materializeScreen({
+    screen: shown,
+    hostOps: {
+      // The TARGETED 3-arg waist — materializers call `callSkill('calendar', 'listEvents', …)`.
+      callSkill: counted,
+      eventLog, circles: circlesShown(),
+      // the switcher's set: own items show when the self that made them is ticked
+      ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
+      // the circles-with-news block counts what the circle tiles count
+      seenAt: readSeenAt(), myRefs: unreadMyRefs,
+      // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
+      selfIn: mySelfIn,
+      // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
+      allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+    },
+  });
 }
 
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
@@ -5239,6 +5284,8 @@ async function showJoinCircle(inviteArg) {
     // the web shell, so it went unseen.
     circleAddressFor: (cid) => circleHouseholdAgent?.circleAddressFor?.(cid) ?? null,
     signCircleLink: (cid, gid, addr) => circleHouseholdAgent?.signCircleLink?.(cid, gid, addr) ?? null,
+    // which persona this device holds a circle as: the join warns before a second persona of the person joins it
+    profileIdOf: (cid) => circleHouseholdAgent?.profileIdOf?.(cid) ?? null,
     // be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
     dialEndpoint: (url) => dialRelayUrl(url),
     activeEndpointUrl: () => connectedRelayUrls(),
@@ -6588,12 +6635,13 @@ async function openAboutMePanel(personaId) {
         try { await rawCallSkill('agents', 'setProfileProperty', { id: model.defaultId ?? 'default', key, value }); } catch { /* */ }
         await draw();
       },
-      // Skills — a skill is a driver-like open item {text, tags[]};
-      // kind 'offering' is a first-class DRIVER_KIND (agent-registry) and its
-      // coarse rung is the taxonomy category (offeringsTaxonomy.js).
-      onAddOffering: async ({ text, tags }) => {
-        const key = (text || tags).trim().toLowerCase().slice(0, 40);   // keyed by the phrase; re-using it edits
-        try { await rawCallSkill('agents', 'setProfileDriver', { id: model.defaultId ?? 'default', key, kind: 'offering', text, tags }); } catch { /* */ }
+      // The drivers (offerings · interests · goals) on the general persona, through the one shared write path.
+      onSaveDriver: async (section, input) => {
+        await saveDriver({ callSkill: rawCallSkill, personaId: model.defaultId ?? 'default', section, input });
+        await draw();
+      },
+      onRemoveDriver: async (key) => {
+        await removeDriver({ callSkill: rawCallSkill, personaId: model.defaultId ?? 'default', key });
         await draw();
       },
       onCreatePersona: async (name, answers) => {

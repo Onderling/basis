@@ -31,8 +31,6 @@ import { Parts }              from './Parts.js';
 import { P }                  from './Envelope.js';
 import { sendHello, handleHello, forgetHello }       from './protocol/hello.js';
 import { handleMessage }                             from './protocol/messaging.js';
-import { handleKeyRotationOW, KeyRotation, migratePeerGraph } from './protocol/keyRotation.js';
-import { AgentIdentity }                              from './identity/AgentIdentity.js';
 import { handleSkillDiscovery }                      from './protocol/skillDiscovery.js';
 import { invokeAgentSkill, handleTaskRequest, handleTaskOneWay } from './protocol/taskExchange.js';
 import { handlePubSub }                              from './protocol/pubSub.js';
@@ -82,7 +80,6 @@ export class Agent extends Emitter {
   #protocol          = null;   // optional protocol substrate (or any object) — standardisation Phase 50.14 (direction)
   #helloGate     = null;   // optional (envelope) => boolean gate; see Group W
   #sealedConfigs = null;   // Map<groupId, { enabled, ... }> — Group BB
-  #rotationInlineSeen = new Set();  // Group FF+1 — newPubKey seen via inline proof (dedup)
 
   /**
    * @param {object} opts
@@ -597,78 +594,10 @@ export class Agent extends Emitter {
   }
 
   /**
-   * Group FF — rotate this agent's Ed25519 identity.
-   *
-   * Generates a new keypair, persists both current + previous (with
-   * graceUntil) to the vault, broadcasts a signed KeyRotationProof to
-   * reachable peers, and swaps SecurityLayer over to the new identity.
-   * During the grace window, envelopes addressed to our OLD pubkey
-   * still decrypt (peers that missed the broadcast), and outbound
-   * envelopes are signed with the NEW key only.
-   *
-   * Order of operations matters:
-   *   1. Generate + persist the new keypair (vault dual-key blob).
-   *   2. Build the proof with the OLD identity (before swap).
-   *   3. Broadcast while peers still have our OLD pubkey — their
-   *      receive-handler verifies against OLD, then migrates.  If we
-   *      swapped first, broadcasts signed by NEW would fail verification
-   *      on peers who haven't heard yet.
-   *   4. Register OLD in SecurityLayer.#selfHistory (for inbound
-   *      decryption from late peers) + swap to NEW for outbound.
-   *
-   * @param {object}  [opts]
-   * @param {number}  [opts.gracePeriodSeconds=604800]  — 7 days default
-   * @param {boolean} [opts.broadcast=true]             — send proof to reachable peers
-   * @returns {Promise<{ oldPubKey: string, newPubKey: string, proof: object, graceUntil: number }>}
-   */
-  async rotateIdentity({ gracePeriodSeconds = 604_800, broadcast = true } = {}) {
-    const vault = this.#identity.vault;
-    if (!vault) throw new Error('rotateIdentity: current identity has no vault');
-
-    // 1. Generate + persist.  Vault now contains { current: new, previous: { seed: old, graceUntil } }.
-    const { oldIdentity, newIdentity, graceUntil } =
-      await AgentIdentity.rotate(vault, { gracePeriodSeconds });
-
-    // 2. Build the proof BEFORE the swap so it's signed by the old key.
-    const proof = await KeyRotation.buildProof(oldIdentity, newIdentity.pubKey, gracePeriodSeconds);
-
-    // 3. Broadcast with old key still active.  Best-effort — peers that
-    //    miss this heal on next hello (SecurityLayer auto-registers
-    //    payload.pubKey from HI).
-    if (broadcast && this.#peers) {
-      try { await KeyRotation.broadcast(proof, this, this.#peers); }
-      catch (err) { this.emit('error', err); }
-    }
-
-    // 4. Register the old identity for grace-period inbound decryption,
-    //    then swap current.  Order matters: if we swapped first, a
-    //    race-arriving peer reply signed by a peer that's been informed
-    //    could use our old pubkey as _to and fail.
-    this.#security.registerSelfRotation(oldIdentity, graceUntil);
-    this.#security.swapIdentity(newIdentity);
-    // Group FF+1 — attach the proof inline to every outbound envelope
-    // until graceUntil, so peers that missed the broadcast still learn
-    // about the rotation on their first post-rotation message from us.
-    this.#security.setInlineProof(proof, graceUntil);
-    this.#identity = newIdentity;
-
-    this.emit('self-rotated', {
-      oldPubKey:   oldIdentity.pubKey,
-      newPubKey:   newIdentity.pubKey,
-      graceUntil,
-      proof,
-    });
-
-    return { oldPubKey: oldIdentity.pubKey, newPubKey: newIdentity.pubKey, graceUntil, proof };
-  }
-
-  /**
    * Mid-flight identity swap — replace the running agent's keypair
    * with a freshly-supplied AgentIdentity.
    *
-   * Unlike `rotateIdentity` (which rotates for unlinkability + emits
-   * a signed proof so peers heal smoothly), `swapIdentity` is the
-   * **restore** path: a new device has just decoded the user's
+   * `swapIdentity` is the **restore** path: a new device has just decoded the user's
    * mnemonic into a different keypair than the one this Agent
    * happens to be running with, and we want to adopt the
    * mnemonic-derived identity NOW without restarting the process.
@@ -693,9 +622,7 @@ export class Agent extends Emitter {
     const newPubKey = newIdentity.pubKey;
     if (oldPubKey === newPubKey) return { oldPubKey, newPubKey };   // no-op
 
-    // SecurityLayer swap (mirrors what rotateIdentity does, minus
-    // the grace-period / inline-proof bookkeeping — this is a
-    // wholesale replace, not a rotation with linkability).
+    // SecurityLayer swap — a wholesale replace.
     this.#security.swapIdentity(newIdentity);
     this.#identity = newIdentity;
 
@@ -1363,30 +1290,6 @@ export class Agent extends Emitter {
   // ── Inbound dispatch ──────────────────────────────────────────────────────
 
   _dispatch(envelope) {
-    // Group FF+1 — if SecurityLayer auto-migrated this peer via an
-    // inline rotation proof, mirror the migration into PeerGraph +
-    // TrustRegistry and emit `peer-rotated` so UIs + gossip see the new
-    // pubkey.  We only do this ONCE per proof (dedup on newPubKey) so
-    // subsequent envelopes within the grace window don't re-upsert.
-    if (envelope._rotationMigrated) {
-      const { oldPubKey, newPubKey, proof } = envelope._rotationMigrated;
-      if (!this.#rotationInlineSeen.has(newPubKey)) {
-        this.#rotationInlineSeen.add(newPubKey);
-        migratePeerGraph(this, proof).catch(err => this.emit('error', err));
-        if (this.trustRegistry) {
-          KeyRotation.applyToRegistry(proof, this.trustRegistry, { removeOld: false })
-            .catch(err => this.emit('error', err));
-        }
-        this.emit('peer-rotated', {
-          oldPubKey, newPubKey,
-          from:       envelope._from,
-          inGrace:    true,
-          via:        'inline-proof',
-          issuedAt:   proof.issuedAt,
-          gracePeriod: proof.gracePeriod,
-        });
-      }
-    }
 
     switch (envelope._p) {
 
@@ -1408,11 +1311,6 @@ export class Agent extends Emitter {
 
       case P.OW:
       case P.AS: {
-        // Group FF: peer key-rotation notifications arrive as OW envelopes
-        // with payload.type === 'key-rotation'. Intercepting here keeps
-        // rotation safety-critical (always-on, no opt-in) and out of the
-        // skill registry (rotation is protocol-level, not an app skill).
-        if (handleKeyRotationOW(this, envelope)) break;
         if (handleTaskOneWay(this, envelope)) break;
         if (handlePubSub(this, envelope)) break;
         handleMessage(this, envelope);

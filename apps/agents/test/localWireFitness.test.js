@@ -252,6 +252,7 @@ function buildWireDefs(registry, tokens = null, versionStoreFor = null, catalogu
     wire('getProfileProperties'),
     wire('setProfileDriver'),
     wire('getProfileDrivers'),
+    wire('removeProfileDriver'),
     wire('setProfileCircleMembership'),
     wire('removeProfileCircleMembership'),
     wire('setProfileDisclosure'),

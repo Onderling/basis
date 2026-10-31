@@ -13,7 +13,9 @@
  *   node scripts/assistant-eval.mjs --model gpt-oss-120b
  *   node scripts/assistant-eval.mjs --model glm-5.3 --thinking on   # the model's reasoning: off (its lowest) · low · on
  *   node scripts/assistant-eval.mjs --only add        # fixtures whose id contains "add"
+ *   node scripts/assistant-eval.mjs --slice 12 --cache   # the first twelve, prompt cache on (a short live check)
  *   node scripts/assistant-eval.mjs --apps lists   # the bot's app list (default: the household template's — lists, tasks)
+ *   node scripts/assistant-eval.mjs --slice 6 --report eval.json   # also every fixture's result, as JSON, to a file
  *   node scripts/assistant-eval.mjs --from-log ~/.basis-telegram/walk-log-*.jsonl   # print fixture stubs from a walk
  *
  * Exit code 1 when the pass rate is under --min (default 0.95: the baseline is 70/72, see the fixtures file). Fixtures: scripts/assistant-eval.fixtures.mjs.
@@ -31,9 +33,10 @@ import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';
 
 const { values } = parseArgs({ options: {
-  model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.95' },
+  model: { type: 'string' }, only: { type: 'string' }, report: { type: 'string' }, min: { type: 'string', default: '0.95' },
   mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' }, 'door-lang': { type: 'string' },
   apps: { type: 'string' }, thinking: { type: 'string', default: 'off' }, cache: { type: 'boolean', default: false },
+  slice: { type: 'string' },
 } });
 
 if (values['from-log']) {
@@ -78,14 +81,32 @@ if (!values.mock) {
   llm = new LlmClient({ provider: mockProvider({ responses: [{ replyText: 'Welke lijst bedoel je?' }] }) });
 }
 
-const fixtures = FIXTURES.filter((f) => !values.only || f.id.includes(values.only));
+// --slice N: the first N fixtures, for a short live run (a laptop check of a model, not the full baseline)
+const fixtures = FIXTURES.filter((f) => !values.only || f.id.includes(values.only)).slice(0, values.slice ? Number(values.slice) : undefined);
 const results = [];
 for (const f of fixtures) {
   const dispatched = [];
   const replies = [];
   let modelCalls = 0;
   let peeked = null;   // a read the model picked first and the turn looked at (the box's read-then-act step)
-  const counted = { invoke: (req) => { modelCalls += 1; return llm.invoke(req); } };
+  // every model call of the fixture, ok or not, with what it cost: a run where no call succeeded must say so, never
+  // read as a cache result (a 0-token run on 2026-10-30 was taken for an unwired meter)
+  const calls = [];
+  const counted = {
+    invoke: async (req) => {
+      modelCalls += 1;
+      const before = { ...tokens };
+      const t = Date.now();
+      try {
+        const r = await llm.invoke(req);
+        calls.push({ ok: true, ms: Date.now() - t, prompt: tokens.prompt - before.prompt, cached: tokens.cached - before.cached, completion: tokens.completion - before.completion });
+        return r;
+      } catch (err) {
+        calls.push({ ok: false, ms: Date.now() - t, error: String(err?.message ?? err).slice(0, 200) });
+        throw err;
+      }
+    },
+  };
   const engine = createAssistantEngine({
     // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
     catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm: counted, interpret: interpretToCommand,
@@ -117,13 +138,27 @@ for (const f of fixtures) {
   const got = dispatched[0] ? { op: dispatched[0].opId, args: dispatched[0].args ?? {} } : (replies[0] ? { reply: replies[0] } : null);
   let verdict = judge(f.expect, got, dispatched.length);
   if (verdict.ok && f.lines && modelCalls > 1) verdict = { ok: false, why: `${modelCalls} model calls, wanted one turn` };
-  results.push({ id: f.id, text, via, ms, got, ok: verdict.ok, why: verdict.why, readFirst: Boolean(peeked) });
+  results.push({ id: f.id, text, via, ms, got, wanted: f.expect ?? null, ok: verdict.ok, why: verdict.why, readFirst: Boolean(peeked), replies, calls });
   console.log(`${verdict.ok ? '✓' : '✗'} ${f.id.padEnd(22)} ${String(ms).padStart(5)}ms ${(peeked ? `${via}·read` : via).padEnd(15)} ${text.slice(0, 48).padEnd(48)} → ${verdict.ok ? describe(got) : `${describe(got)}  (wanted ${describe(f.expect)}) ${verdict.why}`}`);
 }
 const pass = results.filter((r) => r.ok).length;
 const rate = results.length ? pass / results.length : 0;
 console.log(`\n${pass}/${results.length} passed (${Math.round(rate * 100)}%) · model ${values.mock ? 'mock' : (values.model || 'default')} · median ${median(results.map((r) => r.ms))} ms`);
 if (!values.mock) console.log(`tokens: prompt ${tokens.prompt}${tokens.prompt ? ` (cached ${tokens.cached}, ${Math.round((tokens.cached / tokens.prompt) * 100)}%)` : ''} · completion ${tokens.completion}${values.cache ? ' · prompt cache on' : ''}`);
+// Did the model answer at all? Tokens and passes mean nothing about the model when none of its calls succeeded.
+const allCalls = results.flatMap((r) => r.calls);
+const failedCalls = allCalls.filter((c) => !c.ok);
+if (!values.mock) console.log(`model calls: ${allCalls.length - failedCalls.length} ok · ${failedCalls.length} failed${failedCalls.length ? ` (first: ${failedCalls[0].error})` : ''}`);
+if (values.report) {
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(values.report, `${JSON.stringify({
+    at: new Date().toISOString(), model: values.mock ? 'mock' : (values.model || 'default'), cache: Boolean(values.cache),
+    pass, total: results.length, medianMs: median(results.map((r) => r.ms)), tokens,
+    modelCalls: { ok: allCalls.length - failedCalls.length, failed: failedCalls.length },
+    results,
+  }, null, 2)}\n`);
+  console.log(`report: ${values.report}`);
+}
 // What the read-before-act step costs: the turns whose first pick was a read (one more model call each).
 const readFirst = results.filter((r) => r.readFirst);
 console.log(`read-first turns: ${readFirst.length}/${results.length}${readFirst.length ? ` (${readFirst.map((r) => r.id).join(', ')})` : ''}`);

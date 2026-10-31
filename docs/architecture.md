@@ -1129,19 +1129,21 @@ get to look like several by owning several devices, and the app will not manufac
 `root → profile → per-circle address` (decisions 2026-07-14), so two profiles are **two people on the wire**:
 different chat identities, different per-circle addresses, nothing a co-member can join up — unlinkable by
 default, linkable only by the person's choice. "Persona" is the user-facing word for a profile you present.
-**What runs today is narrower than the derivation allows, and that is a stated gap:** every device
-instantiates the **default** profile only (`deriveAgentSeed('default')`), derives its per-circle addresses from
-it, and records every membership under it; a persona chosen at a join changes only the *release* that rides
-(the disclosure lens). Running a second profile as its own person on the wire — its own chat identity, device
-delegation, pair circles — is designed and derivable, not built. Four properties follow from the design, and the
-first, third and fourth are in the code; the second's identity half is not:
+**Every persona runs as its own person on the wire.** The agent starts a runtime (`personaRuntime.js`) for every
+persona the registry holds: under root custody each derives from the resident root; a delegated device runs only
+the personas a ceremony handed it. Each has its own chat identity, person key, device delegation and per-circle
+addresses; a circle recorded under a persona takes its keys from that persona, and the persona's person address is
+registered only on that persona's own relay sockets (a socket holding two selves' addresses would link them at the
+relay). Still open: a capability grant can NAME a persona — as its subject, or as the profile a device may run — but
+every grant is issued by the default's chat identity; a persona does not yet issue grants as itself. Four properties
+follow from the design, and all four are in the code:
 
 - **Own or inherit.** A profile is an open property graph; every property is `own` or `inherit` from the
   default profile (`profileProperties.resolveProperty`). A persona overrides its label, its key and its
   disclosure and inherits the rest — settings, relay, storage — so making one is cheap and nothing migrates.
 - **A circle is joined AS one profile.** The join records the persona (`joinGroupState.setPersona`; `null`
-  is the protective default, "join minimally") and releases what that persona discloses there; in the design
-  the circle's address for you derives from that profile's seed — today from the default's — and the roster
+  is the protective default, "join minimally") and releases what that persona discloses there; the
+  circle's address for you derives from that profile's seed, and the roster
   row's `said` group — handle, displayName, the face — is that profile's name *in that
   circle*, carried by `member-props` on the membership lane. Handle uniqueness is per circle, at the fold;
   there is no global handle, on purpose. (The picker's logic is shared; painting it is on the persona brief.)

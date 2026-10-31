@@ -103,7 +103,7 @@ export default function RestoreFlowModal({ visible, callSkill, onClose, onPhrase
                 </View>
               </View>
             ) : view.form.step === 'merge' ? (
-              <ScrollView style={styles.mergeList}>
+              <ScrollView keyboardShouldPersistTaps="handled" style={styles.mergeList}>
                 <Text style={styles.body}>{t('circle.settings_restore.conflicts_body')}</Text>
                 {conflicts.map((c) => (
                   <View key={c.key} style={styles.mergeRow}>

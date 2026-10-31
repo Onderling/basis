@@ -1175,7 +1175,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
 
   // every section lives in a settings group: this screen paints the group's declared sections, nothing else
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
+    <ScrollView keyboardShouldPersistTaps="handled" style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
       <View style={styles.header}>
         {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
         <Text style={styles.title}>{groupTitle ?? t('circle.settings_home.title')}</Text>

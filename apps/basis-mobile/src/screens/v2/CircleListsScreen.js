@@ -115,7 +115,7 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
       <View style={styles.header}>
         <Pressable onPress={openList ? backToIndex : onBack} testID="lists-back"><Text style={styles.back}>‹ {t('circle.lists.title')}</Text></Pressable>
       </View>
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         {!openList ? (
           <>
             {containers.length === 0 ? <Text style={styles.empty}>{t('circle.lists.empty')}</Text> : null}

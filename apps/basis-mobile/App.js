@@ -516,8 +516,7 @@ export default function App() {
           // sealed mirror on the user's own pod under an opaque name when signed in.
           // NOT wrapped here on purpose: realAgent seals the registry itself, because it also owns the
           // pod mirror's strategy and the two must be the same key. Wrapping it again would seal twice.
-          // this app is the only writer of its storage: the registry may keep what it read (`singleWriter`, pseudo-pod revision)
-          registryBackend: Object.assign(createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }), { singleWriter: true }),
+          registryBackend: createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }),
           provisionRegistryMedium: async (strategy) => createRegistryPodMedium({
             fetch:   getCirclePodFetch(),
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,

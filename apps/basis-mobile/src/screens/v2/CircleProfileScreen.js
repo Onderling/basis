@@ -25,16 +25,19 @@ import { settingsGroupForAction } from '../../../../basis/src/v2/settingsHome.js
  * @param {object} [p.sources]   what the blocks read beside the waist: `{ eventLog, circles, seenAt, myRefs,
  *   availabilityStore, relays: () => rows, deviceId: () => id, selfIn: (circleId) => webid }`
  */
-export default function CircleProfileScreen({ callSkill, sources = {}, onSettings = null, onSettingsGroup = null, onSharedWithMe = null, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
+export default function CircleProfileScreen({ callSkill, sources = {}, head = null, landedByTab = null, onSettings = null, onSettingsGroup = null, onSharedWithMe = null, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the title and scrolled content drew under it
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [blocks, setBlocks] = useState(null);
 
+  // a refold of Mij's head while it is shown (a circle's item, a log entry, a profile fact changed)
+  useEffect(() => (head ? head.onUpdate((b) => setBlocks(b)) : undefined), [head]);
   useEffect(() => {
     let alive = true;
     (async () => {
       if (typeof callSkill !== 'function') return;
+      const readMij = async () => {
       const relays = (() => { try { return sources.relays?.() ?? []; } catch { return []; } })();
       const availability = await Promise.resolve().then(() => sources.availabilityStore?.get?.()).catch(() => null);
       const b = await mijScreenBlocks({ hostOps: {
@@ -51,10 +54,18 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onSetting
         ...(typeof sources.pendingDeviceOffer === 'function' ? { pendingDeviceOffer: sources.pendingDeviceOffer } : {}),
         ...(typeof sources.sharedWithMeCount === 'function' ? { sharedWithMeCount: sources.sharedWithMeCount } : {}),
       } }).catch(() => []);
+      return b;
+      };
+      // a tab landing reads the head as it is; any other way here (an edit, a sub-screen's back) reads again
+      const byTab = landedByTab?.current === true;
+      if (landedByTab) landedByTab.current = false;
+      if (head && !byTab) head.invalidate();
+      const key = JSON.stringify({ circles: (sources.circles ?? []).map((c) => c?.id).filter(Boolean).sort(), self: sources.mijSelf?.id ?? null });
+      const b = head ? await head.land(key, readMij).catch(() => []) : await readMij();
       if (alive) setBlocks(b);
     })();
     return () => { alive = false; };
-  }, [callSkill, sources]);
+  }, [callSkill, sources, head]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const onBlockAction = (a) => {
     if (a?.kind === 'edit-me') onEditMe?.();

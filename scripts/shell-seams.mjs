@@ -49,6 +49,9 @@ export const SEAMS = Object.freeze([
   // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time
   // (a phone: calendar.listEvents ×6 + tasks.listOpen ×3 per Vandaag landing). The box paints no screen.
   { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },
+  // MIJ IS A HEAD TOO, and it hears the agent registry (a profile's facts are no circle's items): a shell that kept only
+  // the circle and log subscriptions would show yesterday's name until the next act.
+  { id: 'mij-head-hears-registry', pattern: /onRegistryChanged/, shells: ['web', 'mobile'], why: 'Mij would miss a profile fact changed by a sibling while it is shown' },
   { id: 'seeded-contact', pattern: /seedContactCard\(/, shells: ['web', 'mobile'], why: 'a card the install is handed is a contact on every person\'s shell, through the one scanned-card path' },
   // A turn to a household bot the person's identity is linked to (`/koppel`) carries a statement from THIS device over
   // exactly that turn: the bot takes it as the person only by that, so a device they revoke stops speaking as them. A

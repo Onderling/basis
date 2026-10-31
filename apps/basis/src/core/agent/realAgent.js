@@ -8702,6 +8702,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       circleChangedListeners.add(fn);
       return () => { circleChangedListeners.delete(fn); };
     },
+    /**
+     * Hear that the agent registry changed — a profile's facts, a persona, a device (its own writes, and a sibling's facts
+     * landing through them). `fn()`; returns the unsubscribe. Mij's head listens: those facts are no circle's items.
+     */
+    onRegistryChanged: (fn) => {
+      if (typeof fn !== 'function' || typeof agentsRegistryRef?.onChanged !== 'function') return () => {};
+      return agentsRegistryRef.onChanged(fn);
+    },
     mountAppOps: (appOrigin, ops, manifest = null) => {
       if (appOrigin === 'basis') {
         mountedBasisOps = ops && typeof ops === 'object' ? ops : null;

@@ -198,7 +198,7 @@ function BookMode({ book, onBack, onOpenRecipe, onAddRecipe, onRenameRecipe, onR
       </View>
       <Text style={styles.title}>{t('circle.recipe.editor.book_title')}</Text>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         {book.recipes.length === 0 ? (
           <Text style={styles.muted}>{t('circle.recipe.editor.no_recipes')}</Text>
         ) : (
@@ -322,7 +322,7 @@ function RecipeMode({ book, policy, recipeId, onBackToBook, onAddBlock, onRemove
       </View>
       <Text style={styles.title}>{recipe.name || t('circle.recipe.editor.untitled')}</Text>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         {recipe.blocks.length === 0 ? (
           <Text style={styles.muted}>{t('circle.recipe.editor.no_blocks')}</Text>
         ) : (

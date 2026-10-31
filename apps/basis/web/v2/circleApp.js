@@ -2906,6 +2906,7 @@ function showTabBar(active) {
   // it must not repaint the thread over whatever is showing.
   _activeContactThread = null;
   if (active !== 'screens') _vandaagHead?.hide();   // Vandaag is not shown: a change waits for the next landing
+  if (active !== 'mij') _mijHead?.hide();
   _activeTab = active;
   renderCircleTabBar(tabBarEl, {
     active, t,
@@ -2913,7 +2914,7 @@ function showTabBar(active) {
     onCircles: showLauncher,
     onNearby: showNearby,
     onContacts: showContacts,
-    onMij: showMij,
+    onMij: showMijTab,
     badges: { contacten: totalUnread(_contactUnread) },
   });
   // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
@@ -3589,6 +3590,7 @@ function writeSeenAt(map) {
   try { window.localStorage.setItem(SEEN_AT_KEY, JSON.stringify(map)); }
   catch { /* quota / disabled */ }
   _vandaagHead?.invalidate();   // Vandaag's "circles with news" counts what is not yet seen
+  _mijHead?.invalidate();       // …and Mij's unread reading
 }
 // …and on LEAVING a circle too: what happened while you were inside is not news on the launcher (one rule, both shells).
 subscribeActiveCircle(seenOnLeave((id) => writeSeenAt(bumpSeenAt(readSeenAt(), id))));
@@ -4581,7 +4583,27 @@ function onScreenAction(action) {
 // person's agents and devices, one door to My data, Advanced behind the developer switch. The identity fields and
 // the location are in the person's own editor (the identity line's "Edit" → openAboutMePanel); the overview is on
 // Vandaag; the other doors are behind My data.
-async function showMij() {
+// MIJ'S HEAD (`screenHead.js`): Me's blocks as last read for its key, kept current by the circles' items, the event log
+// and the agent registry (a profile's facts are the registry's, no circle's) — a tab landing on a fresh head reads nothing.
+let _mijHead = null;
+let _mijPaint = null;
+const _mijReads = { landings: 0, materializes: 0, ops: 0 };
+if (typeof window !== 'undefined') window.onderlingMijReads = _mijReads;
+function mijHead() {
+  if (_mijHead || typeof circleHouseholdAgent?.onCircleChanged !== 'function') return _mijHead;
+  _mijHead = createScreenHead({ subscribe: [
+    (fn) => circleHouseholdAgent.onCircleChanged(fn),
+    (fn) => eventLog.subscribe(fn),
+    (fn) => circleHouseholdAgent.onRegistryChanged?.(fn) ?? (() => {}),
+  ] });
+  _mijHead.onUpdate((blocks) => { if (_activeTab === 'mij') _mijPaint?.(blocks); });
+  return _mijHead;
+}
+
+/** Mij from its tab: the one way in that reads the head as it is. */
+function showMijTab() { return showMij({ landing: true }); }
+
+async function showMij({ landing = false } = {}) {
   showTabBar('mij');
   // The Advanced screen is a developer tool (raw parameter keys): offered only when the developer switch is on.
   let developer = false;
@@ -4614,8 +4636,10 @@ async function showMij() {
   const mijSelf = oneSelf && oneSelf !== 'default'
     ? { id: oneSelf, name: _selfSet.held.find((p) => p.id === oneSelf)?.name ?? null, deviceId: circleHouseholdAgent?.persona?.(oneSelf)?.enrolledDevice?.deviceId ?? null }
     : null;
-  blocks = await mijScreenBlocks({ hostOps: {
-    callSkill: rawCallSkill, eventLog, circles: circlesShown(), ...(mijSelf ? { mijSelf } : {}),
+  _mijPaint = (b) => { blocks = b; rerender(); };
+  const counted = (...a) => { _mijReads.ops += 1; return rawCallSkill(...a); };
+  const readMij = async () => { _mijReads.materializes += 1; return mijScreenBlocks({ hostOps: {
+    callSkill: counted, eventLog, circles: circlesShown(), ...(mijSelf ? { mijSelf } : {}),
     seenAt: readSeenAt(), myRefs: unreadMyRefs, selfIn: mySelfIn,
     availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
@@ -4628,7 +4652,13 @@ async function showMij() {
     pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),
     // what was shared with the person: a chip on Mij (once a door on My data)
     sharedWithMeCount: async () => (await sharedWithMeStore.list()).length,
-  } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
+  } }); };
+  // a tab landing reads the head; every other way into Mij follows an act (an edit, a sub-screen's back) and reads again
+  const head = mijHead();
+  if (head && !landing) head.invalidate();
+  const key = JSON.stringify({ circles: circlesShown().map((c) => c?.id).filter(Boolean).sort(), selves: [...(_selfSet.on ?? [])].sort(), self: mijSelf?.id ?? null });
+  _mijReads.landings += 1;
+  blocks = await (head ? head.land(key, readMij) : readMij()).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
   if (_activeTab === 'mij') rerender();
 }
 

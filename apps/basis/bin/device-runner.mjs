@@ -333,8 +333,7 @@ const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
   chatVault,
   vaultFor: agentVaultFor,
-  // this process is the only writer of its registry files: the registry may keep what it read (`singleWriter`)
-  registryBackend: Object.assign(createNodeFsBackend({ dir: contentPaths.registry }), { singleWriter: true }),
+  registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
   pinboardPersistDb:     { path: contentPaths.pinboard },
   householdPersistDb: { path: contentPaths.household },
   tasksPersistDb:     { path: contentPaths.tasks },

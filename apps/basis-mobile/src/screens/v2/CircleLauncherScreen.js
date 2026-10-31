@@ -1338,7 +1338,24 @@ export default function CircleLauncherScreen({
     return () => { off(); head.dispose(); if (vandaagHead.current === head) vandaagHead.current = null; };
   }, [bundle, eventLog, materializeVandaagNow]);
   // the circles-with-news block counts what is not yet seen, and the marks live in AsyncStorage, not in a store
-  useEffect(() => { vandaagHead.current?.invalidate(); }, [seenAt]);
+  useEffect(() => { vandaagHead.current?.invalidate(); mijHead?.invalidate(); }, [seenAt]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // MIJ'S HEAD (web parity): Me's blocks kept current by the circles' items, the event log and the agent registry (a
+  // profile's facts are the registry's); CircleProfileScreen lands on it with its own reader. Only a TAB landing reads
+  // the head as it is (`mijByTab`): every other way into Mij follows an act and reads again.
+  const [mijHead, setMijHead] = useState(null);
+  const mijByTab = useRef(false);
+  useEffect(() => {
+    const agent = bundle?.agent;
+    if (typeof agent?.onCircleChanged !== 'function') return undefined;
+    const head = createScreenHead({ subscribe: [
+      (fn) => agent.onCircleChanged(fn),
+      ...(typeof eventLog?.subscribe === 'function' ? [(fn) => eventLog.subscribe(fn)] : []),
+      ...(typeof agent.onRegistryChanged === 'function' ? [(fn) => agent.onRegistryChanged(fn)] : []),
+    ] });
+    setMijHead(head);
+    return () => { head.dispose(); setMijHead((h) => (h === head ? null : h)); };
+  }, [bundle, eventLog]);
+  useEffect(() => { if (view !== 'profile') mijHead?.hide(); }, [view, mijHead]);
   useEffect(() => {
     if (view !== 'screens') {
       vandaagHead.current?.hide();   // not shown: a change waits for the next landing
@@ -1814,7 +1831,7 @@ export default function CircleLauncherScreen({
     else if (id === 'circles') { setActiveCircle(null); setSelected(null); setView('list'); }
     else if (id === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
     else if (id === 'contacten') { setContactThread(null); setView('contacten'); }
-    else if (id === 'mij') setView('profile');   // S2 — Mij is now the profile
+    else if (id === 'mij') { mijByTab.current = true; setView('profile'); }   // S2 — Mij is now the profile
     // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
     AsyncStorage.setItem(LAST_TAB_STORAGE_KEY, id).catch(() => {});
   };
@@ -2196,7 +2213,7 @@ export default function CircleLauncherScreen({
             </Pressable>
             {/* the "+" is the floating button on every tab now (WithTabBar) */}
           </View>
-          <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
               onMore={expandedBlockId ? null : setExpandedBlockId}
               onAction={(a) => {
@@ -2237,7 +2254,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} head={mijHead} landedByTab={mijByTab} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -4889,7 +4906,7 @@ function CircleDetail({
             </View>
             {listScreenData?.shape === 'record' ? (
               /* a record-shaped DETAIL screen (read-only key→value, web parity). */
-              <ScrollView>
+              <ScrollView keyboardShouldPersistTaps="handled">
                 <CircleRecordScreen record={listScreenData.record} activity={listScreenData.activity ?? null} />
               </ScrollView>
             ) : listScreenData ? (
@@ -4922,7 +4939,7 @@ function CircleDetail({
                   : undefined}
               />
             ) : (
-              <ScrollView ref={panelScrollRef}>
+              <ScrollView keyboardShouldPersistTaps="handled" ref={panelScrollRef}>
                 <View ref={panelContentRef} collapsable={false}>
                   <CircleScreenView blocks={panelBlocks} highlightRef={screenPanel?.highlightRef}
                     highlightRowRef={highlightRowRef} onHighlightLayout={scrollPanelToHighlight}
@@ -5543,7 +5560,7 @@ function ConnectionPointsScreen({
       {points.length === 0 ? (
         <Text style={styles.muted}>{t('circle.nearbyScreen.points_empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
           {points.map((point) => (
             <View key={point.url} style={styles.row} testID={`point-${point.url}`}>
               <Text style={styles.rowName}>{point.url}</Text>
@@ -6298,7 +6315,7 @@ function MyThingsScreen({ files = [], onBack }) {
       {files.length === 0 ? (
         <Text style={styles.muted}>{t('circle.folio.my_things_empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
           {files.map((file) => (
             <View key={file.id} style={styles.row} testID={`mythings-row-${file.id}`}>
               <Text style={styles.rowName}>{file.name}</Text>

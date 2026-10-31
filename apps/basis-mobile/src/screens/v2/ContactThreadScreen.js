@@ -262,7 +262,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         <Text style={styles.floor} testID="contact-thread-floor">{`🛡 ${t('circle.contacts.presend_floor')}`}</Text>
       ) : null}
 
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="handled"
         ref={scrollRef}
         style={styles.log}
         contentContainerStyle={{ paddingVertical: 8, gap: 8 }}

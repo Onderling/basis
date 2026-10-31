@@ -71,6 +71,9 @@ const REPLICATION_KIND = 'pseudo-pod.write';
 export const PSEUDO_POD_MODES = Object.freeze(['standalone', 'replication-ring', 'cache']);
 
 const VALID_MODES = new Set(PSEUDO_POD_MODES);
+/** Who hears each key change, per BACKEND (a WeakMap: a dropped backend takes its listeners): every pseudo-pod over one
+ *  backend tells the same listeners, so two registries in one process hear each other's writes. */
+const CHANGE_LISTENERS_BY_BACKEND = new WeakMap();
 
 /**
  * @param {object} opts
@@ -109,9 +112,6 @@ const VALID_MODES = new Set(PSEUDO_POD_MODES);
  *   lives INSIDE the pseudo-pod (not a wrapper) so peer writes can't bypass
  *   it via a stale inner reference — NotifyEnvelope et al. hold this object.
  */
-/** Each backend's per-key revision, shared by every pseudo-pod over it (a WeakMap: a dropped backend takes its counts). */
-const REVISIONS_BY_BACKEND = new WeakMap();
-
 /**
  * Create a PseudoPod — the Solid-shaped local store. `mode` sets the global behaviour: `standalone`
  * (local only), `replication-ring` (writes fan out to peers via `transport.publishEnvelope`;
@@ -145,23 +145,21 @@ export function createPseudoPod({
       { code: 'INVALID_ARGUMENT' },
     );
   }
-
-  // THE REVISION of each resource here: bumped by every change this pseudo-pod makes to the backend (a local write, a
-  // pull from the pod, a peer's write, a delete), so a reader can keep what it parsed while nothing changed beneath it
-  // — the agent registry, whose backend seals at rest (one unseal of the whole blob per lookup otherwise).
-  // counted per BACKEND, not per pseudo-pod: two pseudo-pods over one backend (two registries, two tabs' worth of
-  // writers in one process) must each see the other's writes move the revision
-  let revisions = REVISIONS_BY_BACKEND.get(backendIn);
-  if (!revisions) { revisions = new Map(); REVISIONS_BY_BACKEND.set(backendIn, revisions); }
-  const bumpRevision = (key) => { revisions.set(key, (revisions.get(key) ?? 0) + 1); };
-  // a layer of this pseudo-pod's own in front of the backend: the backend itself is never changed (several pseudo-pods
-  // over one backend must not stack wrappers on it), and every other method reaches it as it was
-  const counted = new Set(['put', 'putIf', 'delete']);
+  // Every write that reaches the backend through this pseudo-pod (a local write, a pull from the pod, a peer's write, a
+  // delete, a write through the exposed `backend`) tells who listens for that key (`onRevision`). A layer of this
+  // pseudo-pod's own in front of the backend: the backend itself is never changed (several pseudo-pods over one backend
+  // must not stack wrappers on it), and every other method reaches it as it was.
+  let changeListeners = CHANGE_LISTENERS_BY_BACKEND.get(backendIn);
+  if (!changeListeners) { changeListeners = new Map(); CHANGE_LISTENERS_BY_BACKEND.set(backendIn, changeListeners); }
+  const tellChanged = (key) => {
+    for (const fn of [...(changeListeners.get(key) ?? [])]) { try { fn(); } catch { /* a listener never breaks a write */ } }
+  };
+  const told = new Set(['put', 'putIf', 'delete']);
   const backend = new Proxy(backendIn, {
     get(target, prop) {
       const v = target[prop];
       if (typeof v !== 'function') return v;
-      if (counted.has(prop)) return async (key, ...rest) => { try { return await v.call(target, key, ...rest); } finally { bumpRevision(key); } };
+      if (told.has(prop)) return async (key, ...rest) => { try { return await v.call(target, key, ...rest); } finally { tellChanged(key); } };
       return v.bind(target);
     },
   });
@@ -835,12 +833,16 @@ export function createPseudoPod({
     write,
     delete: deleteResource,
     /**
-     * How many times this resource changed through the pseudo-pods over this backend — a reader keeps what it parsed
-     * while it holds. Only for a backend that declares itself the ONLY writer of its storage (`singleWriter: true`: one
-     * process owns it, as the phone's app storage and the box's files). A backend another process writes too (web: two
-     * tabs on one IndexedDB share no memory, so a revoke in one moves no count the other sees) gets null: read every time.
+     * Hear this resource change: every change made through the pseudo-pods over this backend — a local write, a pull from
+     * the pod, a peer's write, a delete, a write through `backend`. `fn()`; returns the unsubscribe.
      */
-    revision: (uri) => (backendIn.singleWriter === true ? (revisions.get(_keyForUri(uri)) ?? 0) : null),
+    onRevision: (uri, fn) => {
+      if (typeof fn !== 'function') return () => {};
+      const key = _keyForUri(uri);
+      if (!changeListeners.has(key)) changeListeners.set(key, new Set());
+      changeListeners.get(key).add(fn);
+      return () => { changeListeners.get(key)?.delete(fn); };
+    },
     list,
     subscribe,
     writeFromPeer,
@@ -860,7 +862,7 @@ export function createPseudoPod({
 
     // Introspection
     get deviceId()      { return deviceId; },
-    get backend()       { return backend; },   // the counted layer: a write through it moves the revision
+    get backend()       { return backend; },
     get currentMode()   { return mode; },
     get _perUriMode()   { return new Map(perUriMode); },
     get _writeThroughQueue() { return writeThroughQueue; },

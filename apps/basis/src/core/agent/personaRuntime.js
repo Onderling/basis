@@ -7,8 +7,9 @@
  * rotating person key. Before this the bundle lived spread over the agent's boot as loose values for the one
  * persona that ran; it is built here, and the agent reads it.
  *
- * Today the agent runs the 'default' persona only (N = 1). A second persona on the wire — its own chat identity,
- * sockets and memberships — is the next step; until then any other id is refused here, loudly.
+ * The agent runs one of these for EVERY persona the registry holds (`runPersona` in the agent): under root custody each
+ * derives from the resident root; a delegated device runs only the personas a ceremony handed it (their delegation in
+ * the persona's vault slots) and refuses any other id here, loudly (`ceremony-required`).
  *
  * What stays in the agent: the STATEFUL wiring around a persona (adopting a rotated person key, registering it with
  * the secure agent and the relays), because those reach parts of the agent built after this.
@@ -30,7 +31,7 @@ const CIRCLE_ADDRESS_MEMO_MAX = param({ key: 'persona.circleAddressMemoMax', sco
  * Build one persona's runtime bundle.
  *
  * @param {object} a
- * @param {string} [a.profileId='default']  the persona (only 'default' runs today)
+ * @param {string} [a.profileId='default']  the persona
  * @param {object|null} a.ownerRoot          the owner root (a core Bootstrap) under root custody; null under delegation
  * @param {{mode: string, deviceId?: string}} a.custody  the custody marker's reading
  * @param {Uint8Array|null} [a.custodySeed]  delegation custody: the key door's (delegation) seed

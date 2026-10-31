@@ -401,7 +401,7 @@ export async function verifyMembershipCodeForPeer({
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority
   // that validated the code + enforced the ceiling, and a join needs no authority in the fold anyway. Additive.
   const joinerKey = personKeyAnnouncement(a.personKey);
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
+  const joinStatement = await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
     redemptionRef: item.id,
     // A FUNCTION PROFILE, stated by THIS admin: only for a code the admin minted for a bot, and only when the
     // redeemer says it runs one. The fold reads it from this admin-signed join; a claim on an ordinary code says nothing.
@@ -422,6 +422,10 @@ export async function verifyMembershipCodeForPeer({
     codeId:       valid.id,
     groupId:      a.groupId,
     validUntil:   valid.source.expiresAt,
+    // The signed join itself, for the redeem reply: a joiner who LEFT (or was removed) no longer hears this circle's
+    // fan, and its own fold still says "out" until a join after its exit reaches it. The statement travels with the act
+    // that caused it; the joiner ingests it through its own membership rail (verified there, never trusted from here).
+    ...(joinStatement && typeof joinStatement === 'object' && joinStatement.body && joinStatement.sig ? { joinStatement } : {}),
     _sync:        simulateSync(),
   };
 }

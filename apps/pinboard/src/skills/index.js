@@ -2630,6 +2630,14 @@ export function buildSkills({
         },
         visibility: 'household',
       }], { actor: from });
+      // THE ADMIN'S JOIN, carried on the reply: a joiner who LEFT or was removed holds its own exit on its lane and no
+      // longer hears the circle's fan, so without this its fold keeps saying "out" after a redeem the admin accepted. It
+      // lands through this device's membership rail — the same gate a fanned statement passes (the admin's address is
+      // proven on the row written just above) — and the fold re-admits causally: a join after the exit.
+      let rejoined = null;
+      if (a.joinStatement?.body && a.joinStatement?.sig && typeof membershipRead?.ingest === 'function') {
+        try { rejoined = !!(await membershipRead.ingest(a.groupId, a.joinStatement))?.ok; } catch { rejoined = false; }
+      }
       // 2026-05-24 — also persist the rules locally so /group-rules
       // works on the joiner side after join.  Caller (basis's
       // join-group wizard) reads `rules` from the invite URL payload
@@ -2660,6 +2668,8 @@ export function buildSkills({
         redemptionId: item.id,
         groupId:      a.groupId,
         validUntil:   a.expiresAt ?? null,
+        // whether the admin's join landed here (null: none came with the reply)
+        rejoined,
         _sync:        simulateSync(),
       };
     }, {

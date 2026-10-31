@@ -4760,6 +4760,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
     // between here and the fold has to learn a new name.
     membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
+    // …and a statement that travelled with the act that caused it (the admin's join on a redeem reply) lands the same road
+    // a fanned one does: the rail's full ingest gate (verify + declared kind + key↔ref binding), never a direct write.
+    membershipRead.ingest = async (circleId, statement) => { try { return await membershipRail.ingest(circleId, statement); } catch { return { ok: false }; } };
     // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's items lane as a signed
     // full-item snapshot, fanned via broadcastCircleItems; receivers verify at their rail and causally merge
     // the head. The store's publish hook routes task types here instead of the legacy mirror (the per-type

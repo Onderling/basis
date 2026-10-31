@@ -95,17 +95,10 @@ describe('the box enrols from the phone\'s offer and the circle reaches it', () 
     const consumed = await until(async () => walkLog(dataDir).find((e) => e.kind === 'enroll-offer') ?? null, { timeout: 60_000, step: 500 });
     expect(consumed, `the box never consumed the offer:\n${box.out.slice(-1500)}`).toBeTruthy();
     expect(consumed.circles?.[0]?.steps, 'the box announced itself').toContain('announce');
-    // The phone's own row grows into the set holding the box — the box is now a sibling it can reach.
-    // (A device never records its OWN address on the shared row, so before the announce the set is
-    // empty; one address on it that is not the phone's own is the box.)
-    const own = phone.agent.circleAddressFor(CIRCLE);
-    const grown = await until(async () => {
-      const r = await phone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
-      const mine = (r?.members ?? []).find((m) => m.webid === phone.pubKey);
-      const others = (mine?.circleAddresses ?? []).filter((a) => a !== own);
-      return others.length ? others : null;
-    }, { timeout: 30_000, step: 250 });
-    expect(grown, `the phone never learned the box's per-circle address — phone refusals: ${JSON.stringify(phone.agent.refusedInboundByReason?.())}; phone person address: ${String(phone.agent.personAddress?.()).slice(0, 8)}; consume: ${JSON.stringify(consumed)}; runner:\n${box.out.slice(-1200)}`).toBeTruthy();
+    // The phone learns the BOX in its device map — the box introduced itself at the phone's device address (both present
+    // the person's one address in the circle, so the roster does not tell them apart): it is now a sibling the phone reaches.
+    const grown = await until(async () => { const d = await phone.agent.ownDeviceAddressesOf('default'); return d.length ? d : null; }, { timeout: 30_000, step: 250 });
+    expect(grown, `the phone never learned the box in its device map — consume: ${JSON.stringify(consumed)}; runner:\n${box.out.slice(-1200)}`).toBeTruthy();
     // THE claim: the circle's conversation from before the box existed is on the box — the consume's
     // content pull brought it from the phone, addressed to the box's per-circle address, which only
     // works when the box registered that address on the relay.
@@ -116,6 +109,6 @@ describe('the box enrols from the phone\'s offer and the circle reaches it', () 
     // raced it. A refusal here would mean the deferred re-ingest carried the walk — the fallback, not
     // the mechanism.
     const refusals = walkLog(dataDir).filter((e) => e.kind === 'chat-refused');
-    expect(refusals.length, `the pulled conversation was refused and only re-ingested later: ${JSON.stringify(refusals)}; the phone's address is ${own.slice(0, 8)}; consume ${JSON.stringify(consumed.circles?.[0]?.steps)}; runner said:\n${box.out.split('\n').filter((l) => /\[roster-seed\]|\[circle-address\]/.test(l)).slice(-10).join('\n')}`).toBe(0);
+    expect(refusals.length, `the pulled conversation was refused and only re-ingested later: ${JSON.stringify(refusals)}; the phone's address is ${String(phone.agent.circleAddressFor(CIRCLE)).slice(0, 8)}; consume ${JSON.stringify(consumed.circles?.[0]?.steps)}; runner said:\n${box.out.split('\n').filter((l) => /\[roster-seed\]|\[circle-address\]/.test(l)).slice(-10).join('\n')}`).toBe(0);
   }, 180_000);
 });

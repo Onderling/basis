@@ -199,13 +199,13 @@ describe('a restored phone is still a member — the circles talk to it again', 
     // ── Bea's roster row for Anna grows into the SET holding the new phone's address. ─────────────
     for (const id of [HUIS, KOOR]) {
       const addr = annaAgain.agent.circleAddressFor(id);
-      // The measured fact this half exists for: restore ENROLS the new device, so its per-circle address
-      // is FRESH — nobody's roster names it until it announces. (The first test's title predates this.)
-      expect(addr, `${id}: the restored phone derives a new per-circle address`).not.toBe(oldAddr[id]);
+      // ONE ADDRESS PER PERSONA PER CIRCLE: the phrase re-derives the persona's circle root, so the restored phone
+      // answers on the SAME address the lost one did — Bea's row already names it, nothing needs announcing.
+      expect(addr, `${id}: the restored phone answers on the persona's one address`).toBe(oldAddr[id]);
       const grown = await until(async () => {
         const r = await bea.agent.callSkill('pinboard', 'listGroupMembers', { groupId: id });
         const mine = (r?.members ?? []).find((m) => m.webid === annaAgain.pubKey);
-        return mine?.circleAddresses?.includes(addr) ? true : null;
+        return [mine?.circleAddress, ...(mine?.circleAddresses ?? [])].includes(addr) ? true : null;
       }, { timeout: 20_000, step: 100 });
       expect(grown, `${id}: Bea never learned where Anna's new phone answers`).toBe(true);
     }

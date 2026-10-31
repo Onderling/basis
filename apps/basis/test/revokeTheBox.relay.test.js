@@ -298,7 +298,9 @@ describe('the box is revoked while it holds the address', () => {
     const liveDevice = web.agent.persona('default')?.enrolledDevice?.record?.pubKey ?? '';
     const toLive = fanned.outcomes.filter((o) => live.startsWith(o.to) || (liveDevice && liveDevice.startsWith(o.to)));
     if (toLive.length) {
-      const refusedAtGate = () => (web.agent.refusedInboundByReason?.()?.SENDER_NOT_AUTHORIZED ?? 0) > 0;
+      // refused at the gate — or before it: the tombstone UNPINNED the box's device address, so its envelopes come from a
+      // sender this device no longer knows at all
+      const refusedAtGate = () => { const r = web.agent.refusedInboundByReason?.() ?? {}; return (r.SENDER_NOT_AUTHORIZED ?? 0) > 0 || (r.UNKNOWN_SENDER ?? 0) > 0; };
       const refusedAtLane = () => web.contactTurnsRefused.some((x) => x.reason === 'not-a-sibling');
       expect(await until(async () => ((refusedAtGate() || refusedAtLane()) ? true : null), { timeout: 30_000, step: 250 }),
         `the web app did not refuse the revoked box's fan — seen: ${JSON.stringify(web.contactTurnsSeen.map((t) => t?.text))}; refused: ${JSON.stringify(web.agent.refusedInboundByReason?.())}`).toBe(true);

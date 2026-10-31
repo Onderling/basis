@@ -345,7 +345,11 @@ export async function grantAgent(store, args = {}) {
   let tokenId;
   let expiresAt;
   if (tokens) {
-    const issued = await tokens.issue({ subject, skill: tokenSkill, expiresIn, constraints });
+    // the self that issues it: the one named, else the profile the grant is for (the issuer decides when neither)
+    const self = (typeof args?.persona === 'string' && args.persona) ? args.persona : profile;
+    const issued = await tokens.issue({ subject, skill: tokenSkill, expiresIn, constraints, ...(self ? { self } : {}) });
+    // an issuer that refuses (no self named where one must be) grants nothing, and says why
+    if (issued?.error) return { granted: false, error: issued.error, tokenBacked: true, tokenId: null, expiresAt: null, agent: null };
     tokenId   = issued.id;
     expiresAt = issued.expiresAt ?? new Date(Date.now() + expiresIn).toISOString();
   } else {

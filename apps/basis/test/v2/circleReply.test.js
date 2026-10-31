@@ -56,4 +56,11 @@ describe('circleReplyText — the household families read as on the bot', () => 
     const reply = await ran('someOtherOp', { title: 'X' });
     expect(circleReplyText(reply, { verb: 'claim', t })).toBe('circle.bot.ok:{"label":"X"}');
   });
+  it('a payload that says it failed is worded as a failure, never as done — a known code in its own sentence', () => {
+    // a two-self device, a grant naming no self: the op answers granted:false + a code, it did not throw
+    expect(circleReplyText({ payload: { granted: false, error: 'self-required' } }, { verb: 'update', t })).toBe('circle.errors.self_required');
+    expect(circleReplyText({ payload: { ok: false, error: 'self-required', installed: false } }, { verb: 'add', t })).toBe('circle.errors.self_required');
+    // a code without a sentence of its own: the failed line, with the code
+    expect(circleReplyText({ payload: { ok: false, error: 'card-parse-failed' } }, { verb: 'add', t })).toBe('circle.bot.failed:{"msg":"card-parse-failed"}');
+  });
 });

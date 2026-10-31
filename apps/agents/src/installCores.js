@@ -210,6 +210,7 @@ export async function listCatalogue(store, _args = {}) {
  * @param {Array<string|{skill,capability?,expiresInDays?,subject?}>} [args.grants]
  *   the user-picked grant set (default-deny: omitted ⇒ inert install)
  * @param {string} [args.name]  optional local display name override
+ * @param {string} [args.persona]  the self the grants are issued as (required with grants on a device of several selves)
  * @returns {Promise<object>} install result (see below)
  */
 export async function installAgent(store, args = {}) {
@@ -240,12 +241,20 @@ export async function installAgent(store, args = {}) {
   const entry = cardToEntry(card, { name: args?.name });
   if (!entry) return { ok: false, error: 'card-missing-identity', installed: false, source };
   const declared = declaredSkills(card);
+  const requested = normaliseGrants(args?.grants);
+  // The self the grants are issued as (a persona issues its grants as itself), asked BEFORE anything is registered: an
+  // install whose grants could not be issued (more than one self here, none named) is refused whole — never a half
+  // install that says installed while every grant came back refused.
+  const persona = typeof args?.persona === 'string' && args.persona ? args.persona : null;
+  if (requested.length > 0 && typeof store?.tokens?.resolveSelf === 'function') {
+    const self = await store.tokens.resolveSelf(persona);
+    if (self?.error) return { ok: false, error: self.error, installed: false, source };
+  }
   await registry.register(entry);
 
   // 3. Grant ONLY the requested skills that the card DECLARES it can do.
   //    Undeclared requests are REJECTED (never issued a token) — a card
   //    cannot be talked into authority it never advertised.
-  const requested = normaliseGrants(args?.grants);
   const granted  = [];
   const rejected = [];
   for (const req of requested) {
@@ -260,6 +269,7 @@ export async function installAgent(store, args = {}) {
       capability:    req.capability,
       expiresInDays: req.expiresInDays,
       subject:       req.subject,
+      ...(persona ? { persona } : {}),
     });
     granted.push({
       skill:       req.skill,

@@ -22,7 +22,7 @@ import { VaultMemory } from '@onderling/vault';
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
 import { startJourneyRelay } from '../support/testRelay.js';
 import {
-  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown,
+  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown, shareDeviceRecords,
 } from '../support/pairRealAgents.js';
 import { makeThisDevicePrimary, ownAnnouncementFor } from '../../src/v2/circleAddressAnnounce.js';
 import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
@@ -61,32 +61,17 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     await connectNodesOverRelay([A2], { relayUrl });
     await bindCircleAddresses([A2], GROUP);
 
-    // Each of Anna's devices announces its proven per-circle address into the other's roster row — the
-    // production announce wire — and the phone's row on Bea grows the same way. That address SET is what
-    // the sibling lookup reads.
-    const announce = async (from, to) => {
-      await from.agent.sendPeerMessage(to.agent.circleAddressFor(GROUP), {
-        type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: GROUP,
-        msgId: `announce-${from.label}-${to.label}`, ts: Date.now(),
-        announcements: [ownAnnouncementFor({ agent: from.agent, circleId: GROUP })],
-      }, SEND);
-    };
-    await announce(A2, A);
-    await announce(A, A2);
-    await announce(A2, B);
-    const knows = (node, webid, otherAddr) => until(async () => {
-      const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
-      const row = (res?.members ?? []).find((m) => m.webid === webid);
-      return row?.circleAddresses?.includes(otherAddr) ? row : null;
-    }, { timeout: 20000, step: 100 });
-    expect(await knows(A, A.pubKey, A2.agent.circleAddressFor(GROUP)), 'the phone never learned its sibling\'s address').toBeTruthy();
-    expect(await knows(A2, A.pubKey, A.agent.circleAddressFor(GROUP)), 'the always-on device never learned the phone\'s address').toBeTruthy();
-    expect(await knows(B, A.pubKey, A2.agent.circleAddressFor(GROUP)), 'Bea never learned Anna\'s second address').toBeTruthy();
+    // ONE ADDRESS PER PERSONA PER CIRCLE: both of Anna's devices present the same circle address, so they find each other
+    // through the device map (what an enrol offer introduces), not through the roster.
+    expect(A2.agent.circleAddressFor(GROUP), 'one address for Anna in the circle').toBe(A.agent.circleAddressFor(GROUP));
+    await shareDeviceRecords([A, A2], 'default');
 
-    // The roster seed: the always-on device asks the phone for the circle's trail rows (the enrol consume's act).
-    const seedRequest = await A2.agent.rosterSeed.buildRequest(GROUP, A2.agent.circleAddressFor(GROUP));
+    // The roster seed: the always-on device asks the phone, at the phone's DEVICE address, for the circle's rows (the
+    // enrol consume's act) — the answer comes to its own device address.
+    const phoneDevice = A.agent.ownDeviceAddress('default');
+    const seedRequest = await A2.agent.rosterSeed.buildRequest(GROUP, A2.agent.ownDeviceAddress('default'));
     expect(seedRequest, 'the enrolled device can sign a seed request').toBeTruthy();
-    await A2.agent.sendPeerMessage(A.agent.circleAddressFor(GROUP), seedRequest, SEND);
+    await A2.agent.sendPeerMessage(phoneDevice, seedRequest, { circleId: GROUP });
     expect(await until(async () => {
       const res = await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       return (res?.members ?? []).some((m) => m.webid === B.pubKey) ? true : null;
@@ -133,23 +118,15 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     expect(await until(() => (texts(B).includes(text) ? true : null), { timeout: 10000 }), 'Bea received it').toBe(true);
   });
 
-  it("the PRIMARY CONTACT ADDRESS is Anna's choice: enrolling the always-on device did not make it primary on Bea's roster; the tap on it does, over the production announce wire", async () => {
+  it("ONE ADDRESS ON BEA'S ROSTER, whichever device acts; 'make this my primary' now names the PRIMARY DEVICE (the point), not an address", async () => {
     const rowOnB = async () => ((await B.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === A.pubKey);
-    const phone = A.agent.circleAddressFor(GROUP), box = A2.agent.circleAddressFor(GROUP);
-    let row = await rowOnB();
-    expect(row.circleAddress, "the phone joined, so the phone is primary — the box's announce only added itself").toBe(phone);
-    expect(row.circleAddresses).toEqual([phone, box]);
+    const addrsOf = (row) => [...new Set([row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean))];
+    const anna = A.agent.circleAddressFor(GROUP);
+    expect(addrsOf(await rowOnB()), 'one member, one address — no device count').toEqual([anna]);
     // "Make this my primary contact address", tapped on the always-on device — the same function both shells call.
     const r = await makeThisDevicePrimary({ agent: A2.agent, circleIds: [GROUP], logger: { warn() {} } });
-    expect(r).toMatchObject({ circles: 1, announced: 1 });
-    expect(await until(async () => ((await rowOnB())?.circleAddress === box ? true : null), { timeout: 10000, step: 100 }), "Bea's roster never took the choice").toBe(true);
-    row = await rowOnB();
-    expect(row.circleAddresses, 'primary first, the phone kept behind it').toEqual([box, phone]);
-    // …and the choice is on Anna's own devices too (the fan reached the phone; the box recorded its own row).
-    expect(await until(async () => {
-      const res = await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
-      return (res?.members ?? []).find((m) => m.webid === A.pubKey)?.circleAddress === box ? true : null;
-    }, { timeout: 10000, step: 100 }), "the phone's own row never took the choice").toBe(true);
+    expect(r.device, 'the tap claims this device as the primary one').toBeTruthy();
+    expect(addrsOf(await rowOnB()), 'still one address on Bea\'s roster').toEqual([anna]);
   });
 
   it("what Bea writes lands on ONE of Anna's devices and is on the other, live, with no catch-up — each once", async () => {

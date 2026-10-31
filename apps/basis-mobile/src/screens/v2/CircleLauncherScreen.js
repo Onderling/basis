@@ -2318,7 +2318,7 @@ export default function CircleLauncherScreen({
   const myDataScreen = (extra = {}) => (
     <CircleMyDataScreen frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
-          personClock={personClockRef.current} {...extra} />
+          personClock={personClockRef.current} selfSet={{ held: heldSelves, on: selvesOn }} {...extra} />
   );
   // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {

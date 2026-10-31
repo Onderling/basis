@@ -872,13 +872,27 @@ export async function createRealHouseholdAgent(opts = {}) {
         isRevoked: anyRevoked([
           async (tokenId) => Boolean(await agentsTokenRegistry?.isRevoked(tokenId)),
           async (tokenId) => Boolean(await surfaceGrants?.isRevoked(tokenId)),
+          // …and every persona's own grants lane (each self issues and revokes its grants on its own)
+          async (tokenId) => {
+            for (const set of grantSets.values()) { if (set.grants !== surfaceGrants && await set.grants.isRevoked(tokenId)) return true; }
+            return false;
+          },
           async (tokenId) => (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false),
         ]),
         // A token issued by THIS agent's own key is honoured only while its id is ACTIVE on the grants lane, for the
         // same subject — statements count there only from this person's enrolled, unrevoked devices — so a token
         // signed off the record with this key (a revoked device keeps it) is refused, whatever it says it is. Before
         // the agent's own key is set, nothing is allowed (the gate cannot tell).
-        isAllowed: ownGrantsAllowList(() => secureAgentRef.current?.agent?.identity?.pubKey ?? null, () => surfaceGrants),
+        // …and a token a PERSONA of this device issued: honoured only while it is active on THAT persona's lane.
+        isAllowed: async (token) => {
+          const set = typeof token?.issuer === 'string' ? grantSetOfIssuer(token.issuer) : null;
+          if (set && set.grants !== surfaceGrants) {
+            await set.ready;
+            const entry = set.grants.activeEntryOf?.(token.id) ?? null;
+            return Boolean(entry && entry.viewPubKey === token.subject);
+          }
+          return ownGrantsAllowList(() => secureAgentRef.current?.agent?.identity?.pubKey ?? null, () => surfaceGrants)(token);
+        },
         // a refused token, told to the shell's log (`opts.onTokenDenied`): the op, the reason, whether the grants lane had
         // folded yet, how long since boot — never the token, the key or the args. A screen's "Token has been revoked" was
         // otherwise seen only on the screen (L196).
@@ -2112,8 +2126,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch { return null; }   // an unreadable registry cannot say whose circle it is: no kit
     return deviceKitOf('default');
   };
+  // the log every self's grants lane rides (one device log, a lane per self)
+  const grantsLog = opts.deviceLog ?? new EventLog({ initial: [], muted: [] });
   const grantsRail = makeGrantsRail({
-    eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+    eventLog: grantsLog,
     signerFor: () => grantsSignerPromise,
     verifyBinding: deviceSetVerifier,
   });
@@ -2204,13 +2220,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   // The fan's receive half, ready-made (the shells register it under GRANTS_BROADCAST): a landed
   // statement refolds the projection, so a sibling's revoke binds at THIS door live.
-  const grantsPeerHandler = makeGrantsPeerHandler({
+  const defaultGrantsPeerHandler = makeGrantsPeerHandler({
     rail: grantsRail,
     onChange: () => surfaceGrants.recompute(),
   });
   // The catch-up pair (shells register its handlers + kick requestFromSiblings on connect); a
   // landed batch refolds the projection, which is what makes an offline revoke bind before serving.
-  const grantsCatchUp = makeGrantsCatchUp({
+  const defaultGrantsCatchUp = makeGrantsCatchUp({
     rail: grantsRail,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     siblings: ownDeviceSiblings,
@@ -2220,6 +2236,73 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Kick the first fold; the door refuses until it lands (`isRevoked` fails closed), so a boot
   // cannot race it.
   const surfaceGrantsReady = surfaceGrants.hydrate().catch(() => false);
+  // ONE GRANT ISSUER PER SELF. A grant names its issuer, so a grant a persona makes must be issued by that persona — a
+  // grant for Werk issued by the general persona would let whoever holds it link Werk to the person's general self.
+  // Each persona this device runs gets the same set the general persona has: its own issuer (its chat identity), its own
+  // lane (its own-devices scope, signed by its device key, bound by its device set), its siblings' fan and catch-up.
+  // Made on first use; the general persona's is the set above.
+  const grantSets = new Map([['default', { grants: surfaceGrants, peerHandler: defaultGrantsPeerHandler, catchUp: defaultGrantsCatchUp, ready: surfaceGrantsReady }]]);
+  const grantSetFor = (pid) => {
+    const key = !pid || pid === 'default' ? 'default' : pid;
+    if (grantSets.has(key)) return grantSets.get(key);
+    const rt = personas.get(key);
+    const kit = rt?.chatId ? deviceKitOf(key) : null;
+    if (!rt?.chatId || !kit) return null;
+    const scope = ownLaneOf(key);
+    const rail = makeGrantsRail({ eventLog: grantsLog, signerFor: () => kit.signer, verifyBinding: kit.verify });
+    const sendAsSelf = (to, payload, o) => sendToSibling(to, payload, o, key);
+    const siblings = () => personaSiblings(key);
+    const grants = createSurfaceGrants({
+      identity: rt.chatId, agentId: rt.chatId.pubKey,
+      onReadGrantChange: () => { viewLanesSync?.(); },
+      rail, scope,
+      fan: makeGrantsFan({ siblings, sendToPeer: sendAsSelf, scope }),
+      delegationRecord: rt.enrolledDevice?.record ?? null,
+    });
+    // its tokens are checked at this agent's door, which wants their issuer `trusted` — as the general persona's are
+    const trusted = opts.trustOwnGrants !== false
+      ? Promise.resolve(sa.trust?.setTier?.(rt.chatId.pubKey, 'trusted')).catch((err) => { console.warn(`[realAgent] ${key}'s issuer tier not set: ${err?.message ?? err}`); })
+      : Promise.resolve();
+    const set = {
+      grants,
+      peerHandler: makeGrantsPeerHandler({ rail, scope, onChange: () => grants.recompute() }),
+      catchUp: makeGrantsCatchUp({ rail, sendToPeer: sendAsSelf, siblings, selfPubKey: rt.chatId.pubKey, onChange: () => grants.recompute(), scope }),
+      ready: Promise.all([trusted, grants.hydrate()]).then(() => true, () => false),
+    };
+    grantSets.set(key, set);
+    return set;
+  };
+  /** The grant sets of every self this device runs (made as they are asked for). */
+  const allGrantSets = () => [...new Set(['default', ...personas.keys()])].map((pid) => grantSetFor(pid)).filter(Boolean);
+  /** The self a token was issued by (its issuer is that self's chat key), or null when no self here issued it. */
+  const grantSetOfIssuer = (issuer) => {
+    for (const pid of personas.keys()) {
+      const rt = personas.get(pid);
+      if (rt?.chatId?.pubKey && rt.chatId.pubKey === issuer) return grantSetFor(pid);
+    }
+    return null;
+  };
+  // What the shells register (by construction, through `circleLanes`): ONE receiver and ONE catch-up, routed to the
+  // self whose lane a statement or a request names.
+  const grantsPeerHandler = async (from, payload) => {
+    const own = selfOfOwnLane(payload?.scope ?? OWN_DEVICES_SCOPE);
+    const set = own === 'default' || (own && personas.has(own)) ? grantSetFor(own) : null;
+    return set ? set.peerHandler(from, payload) : undefined;
+  };
+  const catchUpSetFor = (payload) => {
+    const own = selfOfOwnLane(payload?.circleId ?? null);
+    return own === 'default' || (own && personas.has(own)) ? grantSetFor(own) : null;
+  };
+  const grantsCatchUp = {
+    subtypes: defaultGrantsCatchUp.subtypes,
+    onRequest: async (from, payload) => catchUpSetFor(payload)?.catchUp.onRequest(from, payload),
+    onBatch: async (from, payload) => catchUpSetFor(payload)?.catchUp.onBatch(from, payload),
+    async requestFromSiblings() {
+      let requested = 0;
+      for (const set of allGrantSets()) { try { requested += (await set.catchUp.requestFromSiblings())?.requested ?? 0; } catch { /* the next self */ } }
+      return { requested };
+    },
+  };
   // THE CONTACT-THREAD FAN: the same sibling set, carrying conversation. `contactTurnFan` is what a
   // shell hands to `createContactThreadChannel`, so every turn in either direction is offered to the
   // person's other devices at the one place all of them pass. `contactTurnHandler(applyTurn)` is the
@@ -2309,6 +2392,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   /** The own lanes this device rides: its default's and each persona's it runs. */
   const ownLanes = () => [...personas.keys()].map(ownLaneOf);
+  // every persona running at boot has its grant set from the start: its lane folded and its issuer trusted before a
+  // token arrives (after `ownLaneOf`, which the set's lane is named by)
+  for (const pid of personas.keys()) if (pid !== 'default') grantSetFor(pid);
   const ownSeal = recoverySealStrategy();
   function wireOwnLane() {
     if (ownLaneWired || !ownStoreNow || !itemsEmit) return;
@@ -2917,10 +3003,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!viewPubKey || ops.length === 0) {
       return [DataPart({ ok: false, error: 'viewPubKey-and-ops-required' })];
     }
+    // THE SELF THAT ISSUES IT: the one the act names (the persona the person acts as on Mij, the circle's or the
+    // contact's self). A device holding one self issues as it; holding more, a grant naming none is refused — never a
+    // silent default, which would issue as the general persona and let the holder link a persona to it.
+    const named = typeof d.persona === 'string' && d.persona ? d.persona : null;
+    if (named && !personas.has(named)) return [DataPart({ ok: false, error: 'no-such-persona' })];
+    const selfId = named ?? (personas.size === 1 ? [...personas.keys()][0] : null);
+    if (!selfId) return [DataPart({ ok: false, error: 'self-required' })];
+    const grantSet = grantSetFor(selfId);
+    if (!grantSet) return [DataPart({ ok: false, error: 'self-cannot-grant' })];
     try {
+      await grantSet.ready;
       const expiresIn = (typeof d.expiresInDays === 'number' && d.expiresInDays > 0)
         ? d.expiresInDays * 24 * 60 * 60 * 1000 : undefined;
-      const r = await surfaceGrants.grant({
+      const r = await grantSet.grants.grant({
         viewPubKey, ops,
         // `reads` — the sections this view may SEE ({circles, kinds, device}); compiles to its
         // own sealed mirror lane (the "edition"). Omitted → acting only, no lane.
@@ -2949,8 +3045,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       let delivery = null;
       if (typeof d.nonce === 'string' && d.nonce) {
         try {
+          // delivered AS the issuing self (a persona's on its own sockets), so the view learns that self's key only
+          const sendAs = selfId === 'default' ? null : (personas.get(selfId)?.chatId?.pubKey ?? null);
           const res = await (opts.deliverConnectionGrant
-            ?? ((to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' })))(
+            ?? ((to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward', ...(sendAs ? { sendAs } : {}) })))(
             viewPubKey,
             { subtype: CONNECTION_GRANT_SUBTYPE, nonce: d.nonce, tokens: r.tokens, label: r.label },
           );
@@ -2964,7 +3062,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // `delivered` is kept as a convenience for the shells, and it is TRUE only for the state that
       // means the view can actually have it — a held grant is not a delivered one.
       return [DataPart({
-        ok: true, ...r, laneActive,
+        ok: true, ...r, laneActive, persona: selfId,
         ...(delivery === null ? {} : { delivery, delivered: delivery === 'sent' }),
       })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'grant-failed' })]; }
@@ -2973,12 +3071,26 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('revokeSurface', async ({ parts }) => {
     const viewPubKey = String(parts?.[0]?.data?.viewPubKey ?? '').trim();
     if (!viewPubKey) return [DataPart({ ok: false, error: 'viewPubKey-required' })];
-    return [DataPart({ ok: true, revoked: await surfaceGrants.revoke(viewPubKey) })];
+    // revoked on the lane of the self that issued it (each self's grants are its own)
+    let revoked = false;
+    for (const set of allGrantSets()) {
+      await set.ready;
+      if (set.grants.list().some((s) => s.viewPubKey === viewPubKey)) revoked = (await set.grants.revoke(viewPubKey)) || revoked;
+    }
+    return [DataPart({ ok: true, revoked })];
   }, { visibility: 'private' });
 
-  hostAgent.register('listSurfaceGrants', async () =>
-    [DataPart({ ok: true, surfaces: surfaceGrants.list() })],
-  { visibility: 'private' });
+  // Every self's grants, each row naming the self that issued it (Mij shows a grant under its persona).
+  hostAgent.register('listSurfaceGrants', async () => {
+    const surfaces = [];
+    for (const pid of new Set(['default', ...personas.keys()])) {
+      const set = grantSetFor(pid);
+      if (!set) continue;
+      await set.ready;
+      for (const s of set.grants.list()) surfaces.push({ ...s, persona: pid });
+    }
+    return [DataPart({ ok: true, surfaces })];
+  }, { visibility: 'private' });
 
   hostAgent.register('buildEnrollOffer', async ({ parts }) => {
     // The add-a-device OFFER (`onderling-enroll://`) this EXISTING device shows: relay hint +

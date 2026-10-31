@@ -23,6 +23,8 @@ import { isKeylessContact } from '@onderling/item-types';
  *
  *   - `projectCircleRoster`   the per-circle membership projection (shared with
  *                             the roster skill — injected, not owned here).
+ *   - `readCircleExits`       the circle's exit set (shared — injected).
+ *   - `isExited`              exit predicate (shared — injected).
  *   - `fanOutViaReliableSend` the reliable-sender fan (pinboard keeps it — it
  *                             closes over the member-address resolver).
  *   - `fanOutToMembers`       the bus-local `chat.send` fan (pinboard keeps it).
@@ -42,6 +44,8 @@ export function createCircleFanOut({
   preferCircleAddress = false,
   allowAddressFallback = true,
   projectCircleRoster,
+  readCircleExits,
+  isExited,
   fanOutViaReliableSend,
   fanOutToMembers,
   toWireRefEnvelope,
@@ -101,16 +105,22 @@ export function createCircleFanOut({
     let memberMapList = [];
     try { memberMapList = (await members.list()) ?? []; } catch { memberMapList = []; }
     const roster = await projectCircleRoster({ store, groupId: circleId, memberMapList });
+    // The no-trail fallback fans over the global MemberMap, so it must drop this circle's
+    // exits itself; otherwise a removed member keeps receiving the circle's traffic.
+    const fanExits = roster ? null : await readCircleExits({ store, groupId: circleId });
     // A person admitted at a bot's DOOR (a keyless contact row: `telegram:<uid>`, a channel, no key) is in the
     // MemberMap as a contact, never a peer: there is no address to reach them on. Found on the tablet (2026-09-29):
     // a circle with no trail fell back to the MemberMap below, and every write was "fanned" to a Telegram id over
     // the relay. Dropped from every branch.
     const peersOnly = (rows) => (Array.isArray(rows) ? rows : []).filter((m) => !isKeylessContact(typeof m === 'string' ? { webid: m } : m));
-    // No projection means the circle has no membership record on this device at all — no removal can have reached it,
-    // so the MemberMap fallback needs no exit filter (a leave or a removal is a statement the projection folds).
     const fanMembersAll = roster
       ? { list: async () => roster, resolveByWebid: (w) => members.resolveByWebid(w) }
-      : members;
+      : (fanExits && fanExits.size > 0
+        ? {
+          list: async () => ((await members.list()) ?? []).filter((m) => !isExited(fanExits, m?.webid ?? '', 0)),
+          resolveByWebid: (w) => members.resolveByWebid(w),
+        }
+        : members);
     const fanMembers = { list: async () => peersOnly(await fanMembersAll.list()), resolveByWebid: (w) => fanMembersAll.resolveByWebid(w) };
 
     // ── ONE RECIPIENT WHO IS DELIBERATELY NOT ON THE ROSTER ────────────────

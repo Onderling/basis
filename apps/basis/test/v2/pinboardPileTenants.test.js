@@ -65,11 +65,13 @@ describe('pinboard\'s pile and member cache after the usual acts', () => {
     await A.agent.callSkill('pinboard', 'setMyLocation', { location: 'Groningen' }); await take('profile');
     // Not covered here: an enrolment. On the in-process bus the consume stops at "seed-not-received" (the relay walks
     // cover the enrol: contactsReachEveryOwnDevice.relay.test.js); a census of it is the relay variant's to add.
-    // What the medium still holds after every act, by kind of row. Each removal step shrinks this to nothing: the exits
-    // are statements on the membership lane only (no row); left are the member entries — each device's own entry and the
-    // admin's entry per joiner.
+    // What the medium still holds after every act, by kind of row. Each removal step shrinks this to nothing:
+    //   the exits (group-leave / group-removal) have their home on the membership lane (`leave`, `evict`);
+    //   the member entries are each device's own entry and the admin's entry per joiner.
     const kinds = (c) => [...new Set(Object.keys(c).map((k) => k.replace(/^mem:\/\/neighbourhood\/(\w+)\/.* :: /, '$1 :: ')))].sort();
     expect(kinds(seen.profile), `the census after every act:\n${JSON.stringify(seen, null, 1)}`).toEqual([
+      'items :: group-leave',
+      'items :: group-removal',
       'members :: relation=group-member',
       'members :: relation=group-member role=admin',
     ]);

@@ -77,7 +77,7 @@ describe('createPinboardService — callCapability atom-dispatch over the real s
     // group-leave — remove·group-leave → leaveGroup (INERT gated capability; routing only)
     const left = await svc.callCapability('remove', 'group-leave', { groupId: 'g1' }, c);
     expect(left).toMatchObject({ ok: true, via: 'op', opId: 'leaveGroup' });
-    expect(left.result?.error).toBeUndefined();
+    expect(typeof left.result.leaveMarkerId).toBe('string');
   });
 
   it('(b) an atom ALIAS canonicalises to the same op (delete → remove)', async () => {

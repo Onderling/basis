@@ -76,7 +76,7 @@ import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnec
 // into the ENCAPSULATED identity secret (only the closure escapes).
 import { makeSharedWithMeStoreRN, makeAvailabilityStoreRN } from './circleStoresRN.js';
 import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
-import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../../../basis/src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../../../basis/src/v2/circleSecurityPriming.js';
 
 // The relay URL to connect with: the in-app setting (Settings → Mij) wins over the build-time env var,
 // so the no-server cross-device relay is configurable without a rebuild. Async (AsyncStorage) — boot +
@@ -586,13 +586,21 @@ export async function bootAgentBundle(opts = {}) {
   // was absent from the cached list, its per-circle address was never registered, and the new member was
   // unreachable until the app was relaunched and the launcher happened to load. Asking the substrate makes
   // a bare `registerCirclePresence()` correct from any caller, which is what the post-join seam needs.
-  const listMine = async () => { try { return await agent.callSkill?.('pinboard', 'listMyCircles', {}); } catch { return null; } };
+  const liveCircleIds = async () => {
+    try {
+      const res = await agent.callSkill?.('pinboard', 'listMyCircles', {});
+      const ids = (Array.isArray(res?.circles) ? res.circles : [])
+        .map((b) => (typeof b === 'string' ? b : b?.id))
+        .filter(Boolean);
+      // Union with the cached list: a circle the substrate has not caught up on yet must not be
+      // DE-registered by a refresh, and registration is idempotent.
+      return [...new Set([...ids, ..._circleIdsForRegistration])];
+    } catch {
+      return _circleIdsForRegistration;
+    }
+  };
   const registerCirclePresence = async (circleIds = null) => {   // primes security, then relay scoping
-    // Union with the cached list (a circle the substrate has not caught up on yet must not be DE-registered by a
-    // refresh; registration is idempotent), and an explicit list as given — both through the one shared filter that
-    // drops a circle the fold says was left or removed.
-    const mine = await listMine();
-    const ids = presenceCircleIds(mine, ...(Array.isArray(circleIds) ? [circleIds] : [mine?.circles, _circleIdsForRegistration]));
+    const ids = Array.isArray(circleIds) ? circleIds : await liveCircleIds();
     _circleIdsForRegistration = ids;
     // Decisions 4 + 1 — the per-circle SIGNING identity AND the roster snapshot that authorizes senders,
     // for EVERY circle the substrate knows, before (and independently of) the relay scoping below.

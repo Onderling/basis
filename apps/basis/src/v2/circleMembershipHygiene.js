@@ -7,7 +7,7 @@
  *   • **global** — the substrate's `removeMember` deleted the member from the ONE per-device
  *     `MemberMap`, which carries no circle on a row. Tidying up circle A dropped that person's
  *     identity in every circle you shared with them. Fixed in the substrate
- *     (a removal is now the circle's own `evict` statement, folded per circle).
+ *     (`apps/pinboard/src/lib/circleExits.js` replaces the cache deletion with a per-circle exit).
  *   • **inert** — the `group-removal` audit item was read by nothing, so the removed member stayed
  *     on the circle's roster, stayed in the fan-out, and — the part that matters — stayed in the
  *     **boundary-authentication snapshot**. Their key was still in `recordCircleRoster`'s allowed
@@ -79,7 +79,7 @@ const skillSeam = (agent, callSkill) =>
  * @param {string} [a.memberWebid]
  * @param {string} [a.memberStableId]
  * @param {'graceful'|'ban'} [a.policy]
- * @returns {Promise<{ok: boolean, error?: string, unbound: number, rosterKeys: number, remaining: number}>}
+ * @returns {Promise<{ok: boolean, error?: string, removalId?: string, unbound: number, rosterKeys: number, remaining: number}>}
  */
 export async function removeCircleMember({
   agent = null, callSkill = null, circleId, memberWebid = null, memberStableId = null, policy = 'graceful',
@@ -110,6 +110,7 @@ export async function removeCircleMember({
   } catch (err) { res = { error: err?.message ?? 'remove-failed' }; }
   if (res?.error) { out.error = res.error; return out; }
   out.ok = true;
+  out.removalId = res?.removalId;
 
   // 3 — stop being able to seal to their per-circle address. Hygiene, not the protection.
   if (goneAddress && agent) {

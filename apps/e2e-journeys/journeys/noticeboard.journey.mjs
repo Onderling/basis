@@ -116,8 +116,8 @@ export async function run({ relayUrl }) {
 
     // ── removal (the coupling fix, live): the admin bans the stranger → nothing more reaches them ──
     const removal = await call(host, 'removeMember', { groupId: GROUP, memberWebid: STRANGER, policy: 'ban' }, HOST);
-    check('admin removes the stranger (ban) → revoked',
-      !removal?.error && removal?.revoked === true && removal?.policy === 'ban');
+    check('admin removes the stranger (ban) → recorded + revoked',
+      !!removal?.removalId && removal?.revoked === true && removal?.policy === 'ban');
 
     // This asserts the OUTCOME — the removed person stops receiving — not the mechanism. It used to
     // assert that the ban pruned the MemberMap, and failed permanently, because the system

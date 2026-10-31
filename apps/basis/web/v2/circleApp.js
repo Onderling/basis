@@ -840,7 +840,7 @@ import { renderCircleLauncher } from './circleLauncher.js';
 import { renderCircleTabBar, hideCircleTabBar } from './circleTabBar.js';
 import { renderCircleSettings } from './circleSettings.js';
 import { renderCircleOverride } from './circleOverride.js';
-import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../../src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
 import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 // The SHARED security-status report — the same function mobile reaches through the builtins table.
 import { securityStatus } from '../../src/core/localBuiltins.js';
@@ -1002,10 +1002,16 @@ async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   // door refused that as "a member's canonical identity" — Frits' phone → Wilfred, 2026-09-21, three times, nothing
   // fanned. Mobile (`liveCircleIds`) and the box asked the substrate all along; the union keeps a circle the
   // substrate has not caught up on yet (a just-joined one arrives as `extraCircleIds`).
-  // …minus a circle the fold says was left or removed (the shared filter: kept from the cache, it went back onto the relay)
-  let mine = null;
-  try { mine = await agent?.callSkill?.('pinboard', 'listMyCircles', {}); } catch { mine = null; }
-  const circleIds = presenceCircleIds(mine, mine?.circles, circlesCache, extraCircleIds);
+  let held = [];
+  try {
+    held = ((await agent?.callSkill?.('pinboard', 'listMyCircles', {}))?.circles ?? [])
+      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+  } catch { held = []; }
+  const circleIds = [...new Set([
+    ...held,
+    ...circlesCache.map((c) => c?.id).filter(Boolean),
+    ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
+  ])];
   // Decisions 4 + 1 — the per-circle SIGNING identity AND the roster snapshot that authorizes senders,
   // for EVERY circle, before (and independently of) the relay scoping below. One shared primer, called
   // identically by mobile (`agentBundle.js`). Note it asks the SUBSTRATE rather than trusting the ids

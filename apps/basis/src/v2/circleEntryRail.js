@@ -166,17 +166,19 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */
   async function bindingOk(author, ref, circleId, kind = null, payload = null, subject = null, atSeq = null) {
-    // Self-binding — but never for a CEREMONY kind: that binds only by the root's reveal (the binding verifier's rule),
-    // and a person's full devices share one circle key, so "signed with my key" includes a lost device of mine.
-    if (!isCeremonyKind(kind)) {
-      try {
-        const mine = await signerFor(circleId);
-        const myId = mine?.identity ?? mine;
-        if (myId?.pubKey === author) return (mine?.ref ?? myId.pubKey) === ref;
-      } catch { /* fall through to the foreign resolver */ }
-    }
+    // Self-binding: a statement signed with this device's own circle key, as its own self. Never enough for a CEREMONY
+    // kind — that binds only by the root's reveal (the binding verifier's rule), and a person's full devices share one
+    // circle key, so "signed with my key" includes a lost device of mine; the verifier is told it is OWN, so it checks
+    // the reveal against this self's own commitment (a device holds no row for itself where it founded the circle).
+    let own = false;
+    try {
+      const mine = await signerFor(circleId);
+      const myId = mine?.identity ?? mine;
+      own = myId?.pubKey === author && (mine?.ref ?? myId.pubKey) === ref;
+    } catch { own = false; }
+    if (own && !isCeremonyKind(kind)) return true;
     if (typeof verifyBinding === 'function') {
-      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq })); } catch { return false; }
+      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq, own })); } catch { return false; }
     }
     return false;   // no resolver → only self-signed statements fold (honest single-device degrade)
   }

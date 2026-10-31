@@ -5028,6 +5028,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     membershipRail = makeMembershipRail({
       eventLog: opts.deviceLog,
       circleIdentityFor,
+      ownCeremonyCommitmentFor: ceremonyCommitmentFor,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     });

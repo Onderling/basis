@@ -98,7 +98,7 @@ export function rosterBindingVerifier(callSkill) {
  * revoked by statement at all — deny, never the any-attested rule. Spineless roster reads, like the base
  * verifier (no recursion, no breaker).
  */
-export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, memoMs = SPINELESS_MEMO_MS } = {}) {
+export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS } = {}) {
   // Spineless read → no recursion → no breaker (see rosterBindingVerifier above).
   const memo = new Map();   // circleId → { at, promise }
   const spinelessRoster = (circleId) => {
@@ -109,7 +109,7 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
     promise.catch(() => memo.delete(circleId));
     return promise;
   };
-  return async ({ author, ref, circleId, kind, payload, subject }) => {
+  return async ({ author, ref, circleId, kind, payload, subject, own = false }) => {
     try {
       // THE CEREMONY RULE, first and without a self-binding shortcut: even my own device's revoke must
       // carry the root's reveal, or my local fold would accept what every other member refuses.
@@ -118,10 +118,21 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
         if (kind === PERSON_KEY_KIND && subject !== ref) return false;
         const facts = ceremonyRevealFacts({ kind, payload });
         if (kind === PERSON_KEY_KIND && facts === null) return false;   // malformed announcement — no key, no version
-        const r = await spinelessRoster(circleId);
-        const row = (Array.isArray(r?.members) ? r.members : []).find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
-        return !!row && verifyCeremonyReveal(payload?.reveal, {
-          circleId, kind, subject, authorRef: ref, commitment: row.ceremonyCommitment, facts,
+        // The commitment the reveal must match: the row's — or, for this device's OWN statement (its own key, as its own
+        // self: the rail says so), the commitment it derives from its self's authority public key (a device holds no row
+        // for itself where it founded the circle, and records no commitment of its own). The reveal is required either way.
+        let commitment = null;
+        if (own && typeof ownCeremonyCommitmentFor === 'function') {
+          try { commitment = ownCeremonyCommitmentFor(circleId) ?? null; } catch { commitment = null; }
+        }
+        if (!commitment) {
+          const r = await spinelessRoster(circleId);
+          const row = (Array.isArray(r?.members) ? r.members : []).find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
+          if (!row) return false;
+          commitment = row.ceremonyCommitment ?? null;
+        }
+        return verifyCeremonyReveal(payload?.reveal, {
+          circleId, kind, subject, authorRef: ref, commitment, facts,
         });
       }
       // SELF-BINDING — a device can always verify its OWN key, with no roster involved. This is the
@@ -150,7 +161,7 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
   };
 }
 
-export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
+export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null, ownCeremonyCommitmentFor = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function') return null;
   return makeCircleEntryRail({
@@ -158,7 +169,7 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
-    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, { circleIdentityFor }),
+    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, { circleIdentityFor, ownCeremonyCommitmentFor }),
   });
 }
 

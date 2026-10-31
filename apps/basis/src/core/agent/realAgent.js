@@ -2400,16 +2400,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       const { circleId: _c, ...rest } = o;   // eslint-disable-line no-unused-vars
       return sa.peer.sendTo(to, payload, { ...rest, sendAs: from });
     }
-    // Otherwise the circle path: a device not in the map yet (a roster-seed reply to a device enrolling now) is reached in
-    // the circle its payload names, as this device's own address there.
-    let circleId = cidOfPayload;
-    if (!circleId) {
-      const rows = ownSelf && ownSelf !== 'default' ? await personaSiblingRows(ownSelf) : await rosterSiblingRowsOfDefault();
-      circleId = rows.find((d) => d.address === to)?.circleId ?? null;
-    }
-    if (!circleId) throw new Error(`not a device of mine on any circle: ${String(to).slice(0, 12)}…`);
-    const { circleId: _ignored, ...rest } = o;   // eslint-disable-line no-unused-vars
-    return sendCircleScoped(to, payload, { ...rest, circleId });
+    // Nothing else: a device not in this self's device map is no sibling of it yet (the device-map carry, or the enrol
+    // offer's introduction, makes it one). There is no circle path — every full device of the self presents the same
+    // address in a circle, so "as my address there, to its address there" would be a send to myself.
+    throw new Error(`not a device of mine: ${String(to).slice(0, 12)}…`);
   };
   const grantsFan = makeGrantsFan({
     siblings: ownDeviceSiblings,
@@ -2538,26 +2532,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE ONE SIBLING CARRY (L100): my other devices as a standing peer of every circle lane. The chat and task
   // emitters hand it every statement this device WRITES (after the member fan); the lane table hands it every
   // statement that LANDS here from a member. Same sibling set, same send, as the two fans above.
-  // A PERSONA'S SIBLINGS are the devices holding THAT persona: its rows in its own circles (its webid at an address
-  // that is not this device's). No person-level lane on the wire: a persona's circle traffic is carried to them only.
-  const personaSiblingRows = async (pid) => {
-    const rt = personas.get(pid);
-    if (!rt?.chatId?.pubKey) return [];
-    return siblingDevices({
-      callSkill: (...a) => callSkill(...a),
-      selfPubKey: rt.chatId.pubKey,
-      circleAddressFor,
-      isOwnAddress,
-      circleIds: async () => {
-        const ids = new Set(Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})));
-        try {
-          const r = (await chatAgent.invoke(pinboardAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data;
-          for (const c of r?.circles ?? []) { const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id); if (id) ids.add(id); }
-        } catch { /* the record's list alone still serves */ }
-        return [...ids];
-      },
-    }).catch(() => []);
-  };
   const personaSiblings = async (pid) => (await deviceSiblingRowsOf(pid)).map((d) => d.address);
   /** The siblings a payload is carried to: its circle's self's devices (a persona's own), else the default's set — an own
    *  lane's to that lane's self's devices. */

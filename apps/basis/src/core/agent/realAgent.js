@@ -1556,13 +1556,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       const tokenVault = await sealedVault(opts.agentsTokenVault ?? pickVault('cc-agent-tokens:'));
       const tokenRegistry = new TokenRegistry(tokenVault);
+      // THE SELF THAT ISSUES A TOKEN (a persona issues its grants as itself): the one named, else this device's only self;
+      // with more than one and none named, none — never a silent default to the general persona.
+      const resolveSelf = (self = null) => {
+        if (self && !personas.has(self)) return { error: 'no-such-persona' };
+        const selfId = self ?? (personas.size === 1 ? [...personas.keys()][0] : null);
+        return selfId ? { selfId } : { error: 'self-required' };
+      };
       agentsTokens = {
+        // asked BEFORE an act that will issue (an install with grants), so it refuses before it changes anything
+        resolveSelf,
         issue: async ({ subject, skill, expiresIn, constraints, self = null }) => {
-          // THE SELF THAT ISSUES IT (a persona issues its grants as itself): the one named, else this device's only self;
-          // with more than one and none named, nothing is issued — never a silent default to the general persona.
-          if (self && !personas.has(self)) return { error: 'no-such-persona' };
-          const selfId = self ?? (personas.size === 1 ? [...personas.keys()][0] : null);
-          if (!selfId) return { error: 'self-required' };
+          const resolved = resolveSelf(self);
+          if (resolved.error) return { error: resolved.error };
+          const { selfId } = resolved;
           const rt = selfId === 'default' ? null : personas.get(selfId);
           if (rt) await grantSetFor(selfId)?.ready;   // its issuer trusted at this door, as the general persona's is
           const token = rt

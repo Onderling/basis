@@ -41,3 +41,33 @@ describe('a persona issues its agent grants as itself', () => {
     expect({ granted: g?.granted ?? false, error: g?.error ?? null }).toEqual({ granted: false, error: 'self-required' });
   });
 });
+
+describe('installing an agent with grants on a device holding two selves', () => {
+  const CARD = {
+    name: 'Werkhulp', url: 'https://third-party.invalid/werkhulp', version: '1.0',
+    skills: [{ id: 'werkhulp.run' }],
+    'x-onderling': { id: 'override:werkhulp', pubKey: 'pub-override-werkhulp', role: 'service' },
+  };
+  let a; let w; let W;
+
+  beforeAll(async () => {
+    a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() });
+    w = (await a.callSkill('agents', 'createProfile', { name: 'Werk' })).id;
+    W = a.persona(w).chatId.pubKey;
+  }, 120_000);
+
+  it('naming no self is refused BEFORE anything is registered — never a half install', async () => {
+    const res = await a.callSkill('agents', 'installAgent', { card: JSON.stringify(CARD), grants: JSON.stringify(['werkhulp.run']) });
+    expect({ ok: res?.ok, error: res?.error, installed: res?.installed }).toEqual({ ok: false, error: 'self-required', installed: false });
+    const view = await a.callSkill('agents', 'viewAgent', { agentId: 'override:werkhulp' });
+    expect(view?.agent ?? view?.skills ?? null, 'nothing was registered').toBeFalsy();
+  });
+
+  it('naming Werk installs it with tokens issued by Werk', async () => {
+    const res = await a.callSkill('agents', 'installAgent', { card: JSON.stringify(CARD), grants: JSON.stringify(['werkhulp.run']), persona: w });
+    expect(res?.installed, JSON.stringify(res)).toBe(true);
+    expect(res.granted.map((g) => g.granted)).toEqual([true]);
+    const token = await a.agentsTokenRegistry.get(W, 'werkhulp.run');
+    expect(token?.issuer, 'issued by Werk').toBe(W);
+  });
+});

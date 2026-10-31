@@ -7725,6 +7725,14 @@
     }
   },
   "errors": {
+    "self_required": {
+      "text": "This device holds more than one persona — say which one this is for.",
+      "doc": "An op that issues as one of the person's selves (a grant, an install with grants) refused: the device holds more than one self and none was named."
+    },
+    "no_such_persona": {
+      "text": "That persona is not on this device.",
+      "doc": "An op named a persona this device does not hold."
+    },
     "invalid_handle": {
       "handle-taken": "That name is already taken in this circle. Pick another.",
       "handle-taken_hint": "If you restored this device, the circle may still hold your previous name — pick a new one, or ask an admin to remove the old entry."

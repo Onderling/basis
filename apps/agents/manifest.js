@@ -389,7 +389,8 @@ export const agentsManifest = {
           hint:  'Grant an agent (by agentId or pubKey) a scoped capability: issues a fresh '
                + 'signed capability token for the given skill (optional coarse capability '
                + 'label, expiry in days — default 30, subject — default the agent pubKey), '
-               + 'then mirrors it into the registry entry.',
+               + 'then mirrors it into the registry entry. On a device with more than one persona, name the '
+               + 'persona the grant is issued as (persona) — it is refused otherwise.',
         },
       },
     },
@@ -522,6 +523,9 @@ export const agentsManifest = {
         { name: 'grants',    kind: 'string' },
         // Optional local display-name override.
         { name: 'name',      kind: 'string' },
+        // The self the grants are issued as (a persona issues its grants as itself); required with grants on a
+        // device holding more than one self — refused before anything is installed otherwise.
+        { name: 'persona',   kind: 'string', schema: { minLength: 1 } },
       ],
       surfaces: {
         chat: {
@@ -530,7 +534,8 @@ export const agentsManifest = {
                + 'OR card (an A2A agent card object/JSON — the power-user override, any source). '
                + 'The agent is registered with NO capabilities by default; pass grants (skill '
                + 'names, or {skill,capability,expiresInDays,subject}) to grant ONLY those — and '
-               + 'only skills the card declares. Returns what was granted, declined, and rejected.',
+               + 'only skills the card declares. Returns what was granted, declined, and rejected. With grants on a '
+               + 'device with more than one persona, name the persona they are issued as (persona).',
         },
         // Install adds authority — a Tier-C consent gate (same red confirm
         // as the other capability-changing control ops).

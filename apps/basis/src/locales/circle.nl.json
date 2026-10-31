@@ -7731,6 +7731,14 @@
     }
   },
   "errors": {
+    "self_required": {
+      "text": "Dit apparaat heeft meer dan één persona — zeg als wie je dit doet.",
+      "doc": "An op that issues as one of the person's selves (a grant, an install with grants) refused: the device holds more than one self and none was named."
+    },
+    "no_such_persona": {
+      "text": "Die persona is niet op dit apparaat.",
+      "doc": "An op named a persona this device does not hold."
+    },
     "invalid_handle": {
       "handle-taken": "Die naam is al bezet in deze kring. Kies een andere.",
       "handle-taken_hint": "Als je dit apparaat hersteld hebt, houdt de kring je vorige naam misschien nog vast — kies een nieuwe, of vraag een beheerder de oude te verwijderen."

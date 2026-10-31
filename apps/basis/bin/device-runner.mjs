@@ -379,6 +379,11 @@ const walkLog = (entry) => { try { appendFileSync(walkLogFile, scrubSecrets(JSON
 // public by design: holding it grants nothing, because enrolling still takes the phrase.
 async function printEnrollOffer() {
   const built = await callSkill('household', 'buildEnrollOffer', relayUrl ? { relayUrl } : {}).catch((e) => ({ error: String(e?.message ?? e) }));
+  if (built?.error === 'no-recovery-seal') {
+    console.log('device-runner: this device cannot introduce a new one — it was added before the recovery seal existed.');
+    console.log('  Run a phrase ceremony on it once (--enroll with the recovery phrase), then show the offer again.');
+    return;
+  }
   if (!built?.ok || !built.uri) {
     console.log(`device-runner: no offer to show yet — ${built?.reason ?? built?.error ?? 'this device is in no circles'}.`);
     console.log('  An offer names the circles a new device should pick up. Join or create one first.');

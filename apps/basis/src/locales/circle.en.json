@@ -7817,6 +7817,7 @@
     "offer_title": "Add-device code",
     "offer_hint": "Scan or paste this code on the new device, then type the recovery phrase there. The code is not a secret — the phrase stays the only key.",
     "offer_error": "Could not build the code (this device is not in any circle yet).",
+    "offer_no_seal": "This device cannot show a code yet: it was added before the recovery seal existed. Type your recovery phrase on it once (Settings → Devices & keys), then try again.",
     "offer_paste_label": "Code from your current device (optional)",
     "personas_title": "Which personas does this device get?",
     "personas_hint": "Only what you tick comes to this device. A device you trust less is better given less.",

@@ -264,7 +264,7 @@ import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSON
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
-import { stashEnrollOffer, pendingEnrollOffer, offerWithPersonaCircles } from '../../v2/enrollOffer.js';
+import { stashEnrollOffer, pendingEnrollOffer, offerWithPersonaCircles, sealOfferDevices, offeredDevicesFor, parseEnrollOffer } from '../../v2/enrollOffer.js';
 import { parsePairUri } from '../qrSchemes.js';   // the pairing code's one reader (the declared pairCirclePeer op)
 import { bindCircleAddressKeysFor } from '../../v2/householdRosterPairing.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
@@ -948,12 +948,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   // it is resident, else the one a phrase ceremony left on this device. Never a persona's key, so a device opens them
   // whichever personas it holds. A device with neither (enrolled before the seal existed) has none until its next
   // phrase ceremony: its registry stays local and its export refuses.
-  const recoverySealIdentity = await (async () => {
+  const recoverySealSeed = await (async () => {
     try {
-      const seed = ownerRoot ? ownerRoot.deriveAgentSeed(RECOVERY_SEAL_LABEL)
+      return ownerRoot ? ownerRoot.deriveAgentSeed(RECOVERY_SEAL_LABEL)
         : await persona.vault.get(RECOVERY_SEAL_VAULT_KEY).then((s) => (s ? seedFromString(s) : null));
-      return seed ? await AgentIdentity.fromSeed(seed, new VaultMemory()) : null;
     } catch (err) { console.warn(`[recovery-seal] not loaded: ${err?.message ?? err}`); return null; }
+  })();
+  const recoverySealIdentity = await (async () => {
+    try { return recoverySealSeed ? await AgentIdentity.fromSeed(recoverySealSeed, new VaultMemory()) : null; }
+    catch (err) { console.warn(`[recovery-seal] not loaded: ${err?.message ?? err}`); return null; }
   })();
   // The settings seal strategy over that identity, built once: each build re-ran the identity's ed2curve conversion.
   let recoverySealStrategyBuilt = false;
@@ -2257,15 +2260,45 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   /** The receiver (the shells register it under OWN_DEVICE_RECORDS_SUBTYPE): records of a self I hold, from one of that
    *  self's devices, each kept only if this device's own verifier binds it. */
+  // The selves this device learned a sibling for from its enrol offer and has had no map from yet: until a live sibling's
+  // map arrives, no other device may introduce itself (it might be one the map tombstones).
+  const awaitingDeviceMap = new Set();
+  /** The offering device's records, verified at the ceremony and carried in this device's own stash: each learned
+   *  through its self's verifier (which keeps it, welcomes it and carries this device's map to it). */
+  const learnOfferedDevices = async (records = []) => {
+    let learned = 0;
+    for (const rec of Array.isArray(records) ? records : []) {
+      const pid = typeof rec?.profileId === 'string' ? rec.profileId : null;
+      const self = pid ? personas.get(pid) : null;
+      const kit = pid ? deviceKitOf(pid) : null;
+      if (!self?.chatId?.pubKey || !kit || rec.revoked === true) continue;
+      awaitingDeviceMap.add(pid);
+      try { if (await kit.verify({ author: rec.pubKey, ref: self.chatId.pubKey, payload: { delegation: rec } })) learned += 1; }
+      catch { /* not bound: not kept */ }
+    }
+    return { learned };
+  };
   const ownDeviceRecordsHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== OWN_DEVICE_RECORDS_SUBTYPE) return;
     const pid = typeof payload.profileId === 'string' ? payload.profileId : null;
     const self = pid ? personas.get(pid) : null;
     const kit = pid ? deviceKitOf(pid) : null;
     if (!self?.chatId?.pubKey || !kit) return;
-    if (!(await deviceSiblingRowsOf(pid)).some((d) => d.address === fromAddr)) return;   // only a device of that self
+    const records = Array.isArray(payload.records) ? payload.records.slice(0, 64) : [];
+    if (!(await deviceSiblingRowsOf(pid)).some((d) => d.address === fromAddr)) {
+      // A DEVICE INTRODUCING ITSELF (a new device, at its first boot, to the one its offer was shown on): only its OWN
+      // record, signed by the self's authority, and only through the verifier's deny-wins (a device tombstoned here is
+      // refused). A device still waiting for its first map takes no introduction — it cannot know yet who was revoked.
+      if (awaitingDeviceMap.has(pid)) return;
+      const own = records.find((r) => r && r.pubKey === fromAddr && r.revoked !== true);
+      if (!own) return;
+      const { revoked: _r, revocation: _v, ...claim } = own;   // eslint-disable-line no-unused-vars
+      try { await kit.verify({ author: claim.pubKey, ref: self.chatId.pubKey, payload: { delegation: claim } }); } catch { /* not bound */ }
+      return;   // its record learned → the learn step answers it with this device's whole map (tombstones included)
+    }
+    awaitingDeviceMap.delete(pid);   // a map from a live sibling: what was revoked is known here now
     const authority = self.authorityPubKeyB64 ?? self.enrolledDevice?.record?.by ?? null;
-    for (const rec of Array.isArray(payload.records) ? payload.records.slice(0, 64) : []) {
+    for (const rec of records) {
       if (!rec || typeof rec.pubKey !== 'string' || typeof rec.deviceId !== 'string') continue;
       if (rec.revoked === true) {
         // A TOMBSTONE WINS, WHATEVER ARRIVED FIRST — kept only with the authority's signed revocation of that device
@@ -3300,7 +3333,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         personasSealed = sealOfferPersonas(ownerRoot, list);
       }
       if (circles.length === 0 && personaCircles === 0) return [DataPart({ ok: false, error: 'no-circles' })];
-      const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles, personasSealed });
+      // THIS DEVICE, sealed to the phrase (its delegation record per self it runs): the new device shares every circle
+      // address with it, so nothing else introduces the two. A device without the recovery seal cannot seal it — it
+      // says so instead of showing an offer whose new device could never meet it.
+      if (!recoverySealSeed) return [DataPart({ ok: false, error: 'no-recovery-seal' })];
+      const ownRecords = {};
+      for (const [pid, rt] of personas) if (rt?.enrolledDevice?.record?.pubKey) ownRecords[pid] = rt.enrolledDevice.record;
+      const devicesSealed = sealOfferDevices(recoverySealSeed, ownRecords);
+      const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles, personasSealed, devicesSealed });
       return [DataPart({ ok: true, uri, circles: circles.length })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'offer-failed' })]; }
   }, { visibility: 'private' });   // enumerates the person's circles: owner-only
@@ -3355,12 +3395,25 @@ export async function createRealHouseholdAgent(opts = {}) {
       await retireCurrentSelfRow();
       // The picked personas' circles, opened now that the phrase is in hand, go into this device's own stashed offer —
       // each tagged with its persona, so the boot's consume rejoins it AS that persona.
-      if (pickedPersonas.length && opts.enrollOfferStorage) {
+      // …and the device the offer was shown on, opened and verified now (the phrase derives each persona's authority):
+      // this device shares every circle address with it, so its first boot introduces itself to it at its device address.
+      if (opts.enrollOfferStorage) {
         try {
           const pending = await pendingEnrollOffer(opts.enrollOfferStorage);
-          const widened = pending ? offerWithPersonaCircles(pending, mnemonic, pickedPersonas) : null;
-          if (widened) await stashEnrollOffer(opts.enrollOfferStorage, widened);
-        } catch (err) { console.warn(`[enrol] the picked personas' circles were not added to the bootstrap: ${err?.message ?? err}`); }
+          if (pending) {
+            const widened = pickedPersonas.length ? offerWithPersonaCircles(pending, mnemonic, pickedPersonas) : null;
+            const held = [...(withDefault ? ['default'] : []), ...pickedPersonas];
+            const introduce = offeredDevicesFor(pending, mnemonic, held);
+            if (widened || introduce.length) {
+              const parsed = widened ? parseEnrollOffer(widened) : pending;   // the pending offer comes parsed
+              if (parsed?.ok) {
+                await stashEnrollOffer(opts.enrollOfferStorage, encodeEnrollOffer({
+                  relays: parsed.relays, circles: parsed.circles, personasSealed: parsed.personasSealed, devicesSealed: parsed.devicesSealed, introduce,
+                }));
+              }
+            }
+          }
+        } catch (err) { console.warn(`[enrol] the offer's circles and device were not added to the bootstrap: ${err?.message ?? err}`); }
       }
       // …and the shell clears what the THROWAWAY self wrote before it reloads. This install was nobody's until
       // now — it booted unenrolled, with an identity and content of its own — and the ceremony has just replaced
@@ -8563,6 +8616,18 @@ export async function createRealHouseholdAgent(opts = {}) {
      * (returns a `{ held: true, ... }` result rather than throwing).
      */
     async sendPeerMessage(targetAddress, payload, opts = {}) {
+      // ONE OF MY OWN DEVICES (the registry's device map) is reached at its device address, as this device's own — never
+      // in a circle, whose address it shares with this device: a catch-up answer to a sibling, a pull aimed at it.
+      {
+        const cid = typeof opts?.circleId === 'string' && opts.circleId ? opts.circleId : (typeof payload?.circleId === 'string' ? payload.circleId : null);
+        const self = (cid && (circlePersonas.get(cid) ?? selfOfOwnLane(cid))) || 'default';
+        let mine = false;
+        try { mine = (await deviceSiblingRowsOf(self)).some((d) => d.address === targetAddress); } catch { mine = false; }
+        if (mine) {
+          const { asPerson: _p, ...rest } = opts ?? {};   // eslint-disable-line no-unused-vars
+          return sendToSibling(targetAddress, payload, rest, self);
+        }
+      }
       // `asPerson`: speak as the current PERSON key — for the own-device messages the other end cannot yet
       // place (an enrolling device's first requests). Without a person key the send speaks as it always did.
       // ONE path for every self: the person key of the circle's self — the general persona's, or the persona the circle
@@ -8827,6 +8892,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     grantsCatchUp,
     // the person's device map between their own devices (register under `ownDeviceRecordsSubtype`)
     ownDeviceRecordsHandler,
+    /** The enrol offer's device(s), learned at this device's first boot (`consumeEnrollOffer`). */
+    learnOfferedDevices,
+    /** Send to one of this device's own siblings at its device address (the registry's device map). */
+    sendToOwnDevice: (to, payload, o = {}) => sendToSibling(to, payload, o),
+    /** This device's own device address under a self (its delegation key there), or null. */
+    ownDeviceAddress: (pid = 'default') => deviceAddressOf(pid),
+    /** The device addresses of this device's siblings under a self (the registry's live device map). */
+    ownDeviceAddressesOf: async (pid = 'default') => (await deviceSiblingRowsOf(pid)).map((d) => d.address),
     ownDeviceRecordsSubtype: OWN_DEVICE_RECORDS_SUBTYPE,
     // The contact-thread fan (a DM reaches the person, not one of their devices): the shells hand
     // `contactTurnFan` to the contact channel and register `contactTurnHandler(applyTurn)` under

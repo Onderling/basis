@@ -234,7 +234,7 @@ import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, open
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
@@ -5900,7 +5900,7 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
     const built = await rawCallSkill('household', 'buildEnrollOffer', { relayUrl: CIRCLE_RELAY_URL || undefined }).catch(() => null);
     if (!built?.ok || !built.uri) {
       const err = document.createElement('p');
-      err.textContent = t('circle.enroll.offer_error');
+      err.textContent = t(enrollOfferErrorKey(built));
       card.append(err, back);
       return;
     }

@@ -26,7 +26,7 @@
 import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js';
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import {
-  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
+  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry, CapabilityToken,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId,
   signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
@@ -1557,8 +1557,17 @@ export async function createRealHouseholdAgent(opts = {}) {
       const tokenVault = await sealedVault(opts.agentsTokenVault ?? pickVault('cc-agent-tokens:'));
       const tokenRegistry = new TokenRegistry(tokenVault);
       agentsTokens = {
-        issue: async ({ subject, skill, expiresIn, constraints }) => {
-          const token = await hostAgent.issueCapabilityToken({ subject, skill, expiresIn, constraints });
+        issue: async ({ subject, skill, expiresIn, constraints, self = null }) => {
+          // THE SELF THAT ISSUES IT (a persona issues its grants as itself): the one named, else this device's only self;
+          // with more than one and none named, nothing is issued — never a silent default to the general persona.
+          if (self && !personas.has(self)) return { error: 'no-such-persona' };
+          const selfId = self ?? (personas.size === 1 ? [...personas.keys()][0] : null);
+          if (!selfId) return { error: 'self-required' };
+          const rt = selfId === 'default' ? null : personas.get(selfId);
+          if (rt) await grantSetFor(selfId)?.ready;   // its issuer trusted at this door, as the general persona's is
+          const token = rt
+            ? await CapabilityToken.issue(rt.chatId, { agentId: rt.chatId.pubKey, subject, skill, expiresIn, constraints })
+            : await hostAgent.issueCapabilityToken({ subject, skill, expiresIn, constraints });
           await tokenRegistry.store(token);
           // Registry mirror expects an ISO string (resource.js nulls non-strings);
           // token.expiresAt is unix-ms.

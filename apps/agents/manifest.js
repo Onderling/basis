@@ -379,6 +379,9 @@ export const agentsManifest = {
         { name: 'expiresInDays', kind: 'number', schema: { exclusiveMinimum: 0 } },
         // Token subject (grantee key); defaults to the agent's pubKey.
         { name: 'subject',       kind: 'string' },
+        // The SELF that issues it (a persona issues its grants as itself); a profile grant is issued by that
+        // profile. Required on a device holding more than one self when no profile names it.
+        { name: 'persona',       kind: 'string', schema: { minLength: 1 } },
       ],
       surfaces: {
         chat: {

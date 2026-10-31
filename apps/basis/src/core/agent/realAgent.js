@@ -29,7 +29,7 @@ import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry, CapabilityToken,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId,
-  signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
+  signDeviceRevocation, verifyDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
   deriveCircleSeed, ceremonyCommitment, authorityPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
@@ -64,6 +64,9 @@ import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content 
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
 import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
+
+/** The person's own device map carried between their devices (a self's delegation records). */
+const OWN_DEVICE_RECORDS_SUBTYPE = 'own-device-records';
 
 /** The CATCH-UP REPLY subtypes — the legitimate reconnect bursts the rate limiter must not eat
  *  (one replay serve is up to 1000 items against a burst-30 bucket). Replies only: requests and
@@ -679,6 +682,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
   /** A persona's chat key and person key, registered as identities of ours that the persona owns (the secure agent then
    *  signs a send as it, on its own sockets). Idempotent; late-bound to the secure agent (`secureAgentRef`). */
+  // A SELF'S DEVICE ADDRESS IS AN IDENTITY OF OURS FROM THE START — registered with the security layer as soon as the self
+  // runs, before any transport: a sibling that greets that address first must be answered AS it (signed by the device
+  // key), or it binds the address to another key for good. No transport is needed for this half.
+  const registerDeviceIdentity = async (rt) => {
+    const sa2 = secureAgentRef.current;
+    if (!sa2 || !rt?.chatId || !rt.enrolledDevice || !rt.deviceDerivationSeed) return;
+    try {
+      const identity = await AgentIdentity.fromSeed(rt.deviceDerivationSeed, new VaultMemory());
+      if (identity.pubKey === deviceDelegationPubKey(rt.deviceDerivationSeed)) sa2.registerSelfIdentity?.(identity.pubKey, identity, { owner: rt.chatId.pubKey });
+    } catch (err) { console.warn(`[device-address] could not register a device identity: ${err?.message ?? err}`); }
+  };
   const registerPersonaIdentities = async (personaId, rt) => {
     const sa2 = secureAgentRef.current;
     if (!sa2 || !rt?.chatId) return;
@@ -688,6 +702,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!rt.personIdentity && rt.personKey?.seed) rt.personIdentity = await AgentIdentity.fromSeed(rt.personKey.seed, new VaultMemory());
       if (rt.personIdentity) sa2.registerSelfIdentity?.(rt.personIdentity.pubKey, rt.personIdentity, { owner });
     } catch (err) { console.warn(`[persona] ${personaId} could not register its identities: ${err?.message ?? err}`); }
+    await registerDeviceIdentity(rt);
   };
   const persona = personas.get(primaryId);   // the primary's runtime: "this device speaks as"
   persona.personKey = persona.initialPersonKey;   // the persona's CURRENT person key — a rotation replaces it
@@ -705,7 +720,19 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** The relay proof for the person address: the same challenge-signing contract as a per-circle alias. */
   const personAddressSigner = () => (persona.personKey ? (message) => signWithPersonKey(persona.personKey.seed, new TextEncoder().encode(message)) : null);
   /** `[{ address, sign }]` — what a shell hands its relay alias registration beside the per-circle addresses. */
-  const ownAddressBindings = () => (personAddress() ? [{ address: personAddress(), sign: personAddressSigner() }] : []);
+  /** A self's DEVICE ADDRESS binding — its delegation key on this device, signed by its device seed: where the person's
+   *  other devices reach this one. Registered beside the person address, on that self's sockets only. */
+  const deviceBindingOf = (rt) => {
+    if (!rt?.enrolledDevice || !rt.deviceDerivationSeed) return null;
+    try {
+      const seed = rt.deviceDerivationSeed;
+      return { address: deviceDelegationPubKey(seed), sign: (message) => signWithPersonKey(seed, new TextEncoder().encode(message)) };
+    } catch { return null; }
+  };
+  const ownAddressBindings = () => [
+    ...(personAddress() ? [{ address: personAddress(), sign: personAddressSigner() }] : []),
+    ...[deviceBindingOf(persona)].filter(Boolean),
+  ];
   const secureAgentRef = { current: null };   // late-bound: the secure agent is created further down this scope
   const registerPersonIdentity = () => {
     const sa2 = secureAgentRef.current;
@@ -913,6 +940,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   notInProcessKeys.add(chatId.pubKey);
   // the persona's chat identity (its webid): the secure agent loaded it from the persona's slot
   persona.chatId = chatId;
+  // …and every running self's device address is one of our identities from here, before any transport (after the
+  // primary's chat identity is set: a device identity is registered under its self)
+  for (const rt of personas.values()) await registerDeviceIdentity(rt);
   // THE RECOVERY SEAL — what the recovery file and the registry's pod mirror are sealed to: derived from the root where
   // it is resident, else the one a phrase ceremony left on this device. Never a persona's key, so a device opens them
   // whichever personas it holds. A device with neither (enrolled before the seal existed) has none until its next
@@ -2091,6 +2121,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       const cur = await agentsRegistryRef?.lookup?.('default');
       if (!cur || deviceDelegationOf(cur, rec.deviceId)) return;
       await agentsRegistryRef.register({ ...cur, properties: registrySetDeviceDelegation(cur.properties ?? {}, rec.deviceId, rec) });
+      carryDeviceMap('default').catch(() => { /* the next record learned carries again */ });
+      welcomeNewDevice(rec).catch(() => { /* its connect-time catch-up asks again */ });
     },
   });
   // THE DEVICE KIT OF A SELF — what this device signs with, carries, and knows a sibling by, as the default or as one
@@ -2119,6 +2151,8 @@ export async function createRealHouseholdAgent(opts = {}) {
             const cur = await agentsRegistryRef?.lookup?.(pid);
             if (!cur || deviceDelegationOf(cur, rec.deviceId)) return;
             await agentsRegistryRef.register({ ...cur, properties: registrySetDeviceDelegation(cur.properties ?? {}, rec.deviceId, rec) });
+            carryDeviceMap(pid).catch(() => { /* the next record learned carries again */ });
+            welcomeNewDevice(rec).catch(() => { /* its connect-time catch-up asks again */ });
           },
         }),
         selfPubKey: rt.chatId.pubKey,
@@ -2157,7 +2191,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // first held self speaks for the device, it does not stand in for the general persona).
   // an address this device answers at (any self's, any circle's) is never one of its siblings
   const isOwnAddress = (addr) => Boolean(sa.agent.security?.selfIdentityFor?.(addr));
-  const ownDeviceSiblingRows = async () => (!personas.has('default') ? [] : siblingDevices({
+  const rosterSiblingRowsOfDefault = async () => (!personas.has('default') ? [] : siblingDevices({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
     circleAddressFor,
@@ -2175,7 +2209,109 @@ export async function createRealHouseholdAgent(opts = {}) {
       return [...ids].filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId);
     },
   }));
+  // MY OTHER DEVICES ARE FOUND IN THE REGISTRY'S DEVICE MAP, AND REACHED AT THEIR DEVICE ADDRESS — never through a circle.
+  // A device's device address under a self is its delegation key there (root-signed by that self's authority, one per
+  // (self, device)); the own lanes, the grants lane and the sibling carry travel device address to device address, and
+  // a device address is on no roster. Live records only — a revoked device is not a sibling — each bound by the self's
+  // own device-set verifier (the persona's authority, the tombstones).
+  const deviceSiblingRowsOf = async (pid) => {
+    const self = personas.get(pid);
+    const kit = deviceKitOf(pid);
+    if (!self?.chatId?.pubKey || !kit) return [];
+    const ownId = self.enrolledDevice?.deviceId ?? null;
+    let entry = null;
+    try { entry = await agentsRegistryRef?.lookup?.(pid); } catch { entry = null; }
+    const rows = [];
+    for (const rec of Object.values(deviceDelegationsOf(entry ?? {}))) {
+      if (!rec || rec.revoked === true || rec.deviceId === ownId || typeof rec.pubKey !== 'string' || !rec.pubKey) continue;
+      let bound = false;
+      try { bound = await kit.verify({ author: rec.pubKey, ref: self.chatId.pubKey, payload: { delegation: rec } }); } catch { bound = false; }
+      if (bound) rows.push({ address: rec.pubKey, deviceId: rec.deviceId });
+    }
+    return rows;
+  };
+  // THE DEVICE MAP TRAVELS BETWEEN THE PERSON'S OWN DEVICES. Without a pod mirror a device learns a sibling's record
+  // only from that sibling (the enrol's roster seed); with three devices, two of them never meet. So a device that
+  // learns a new record of a self hands it to that self's other devices, and hands the newcomer every record it holds —
+  // device address to device address, sealed, never on a circle. Each receiver keeps a record only when its own
+  // device-set verifier binds it (that self's authority, no tombstone).
+  // Through the ONE sibling carry, on the self's own lane: the whole live map (a handful of records) to every device of
+  // that self — the newcomer gets everything, the others what they lacked.
+  const carryDeviceMap = async (pid) => {
+    let entry = null;
+    try { entry = await agentsRegistryRef?.lookup?.(pid); } catch { entry = null; }
+    // live records, and the tombstones that carry the authority's signed revocation (a receiver verifies it)
+    const records = Object.values(deviceDelegationsOf(entry ?? {})).filter((r) => r && (r.revoked !== true || r.revocation));
+    if (!records.length) return;
+    await siblingCarry.carry({ subtype: OWN_DEVICE_RECORDS_SUBTYPE, circleId: ownLaneOf(pid), profileId: pid, records });
+  };
+  // A DEVICE OF MINE JUST APPEARED (its record learned): it knows nobody yet — hand it everyone this device knows (the
+  // bindings) and the own-devices rows (the contact book among them), at its device address. Late-bound: both syncs are
+  // composed further down this scope.
+  const welcomeNewDevice = async (rec) => {
+    const address = rec?.pubKey;
+    if (typeof address !== 'string' || !address || rec?.revoked === true) return;
+    try { await knownPeersSync?.pushTo?.(address); } catch { /* its catch-up asks */ }
+    try { await ownStoreSync?.pushTo?.(address); } catch { /* its catch-up asks */ }
+  };
+  /** The receiver (the shells register it under OWN_DEVICE_RECORDS_SUBTYPE): records of a self I hold, from one of that
+   *  self's devices, each kept only if this device's own verifier binds it. */
+  const ownDeviceRecordsHandler = async (fromAddr, payload) => {
+    if (payload?.subtype !== OWN_DEVICE_RECORDS_SUBTYPE) return;
+    const pid = typeof payload.profileId === 'string' ? payload.profileId : null;
+    const self = pid ? personas.get(pid) : null;
+    const kit = pid ? deviceKitOf(pid) : null;
+    if (!self?.chatId?.pubKey || !kit) return;
+    if (!(await deviceSiblingRowsOf(pid)).some((d) => d.address === fromAddr)) return;   // only a device of that self
+    const authority = self.authorityPubKeyB64 ?? self.enrolledDevice?.record?.by ?? null;
+    for (const rec of Array.isArray(payload.records) ? payload.records.slice(0, 64) : []) {
+      if (!rec || typeof rec.pubKey !== 'string' || typeof rec.deviceId !== 'string') continue;
+      if (rec.revoked === true) {
+        // A TOMBSTONE WINS, WHATEVER ARRIVED FIRST — kept only with the authority's signed revocation of that device
+        const rv = rec.revocation;
+        if (!authority || !rv || rv.deviceId !== rec.deviceId || rv.profileId !== pid || !verifyDeviceRevocation(rv, authority)) continue;
+        try {
+          const cur = await agentsRegistryRef?.lookup?.(pid);
+          if (!cur) continue;
+          const held = deviceDelegationOf(cur, rec.deviceId);
+          if (held?.revoked === true && held.revocation) continue;
+          await agentsRegistryRef.register({ ...cur, properties: registrySetDeviceDelegation(cur.properties ?? {}, rec.deviceId, held ? { revoked: true, revocation: rv } : rec) });
+        } catch { /* the next carry brings it again */ }
+        continue;
+      }
+      // a live record: learned only if absent and not tombstoned here (the verifier's deny-wins); a `revoked` flag without
+      // a signed revocation never travels this way
+      const { revoked: _r, revocation: _v, ...claim } = rec;   // eslint-disable-line no-unused-vars
+      try { await kit.verify({ author: claim.pubKey, ref: self.chatId.pubKey, payload: { delegation: claim } }); } catch { /* not bound: not kept */ }
+    }
+  };
+  const ownDeviceSiblingRows = async () => (personas.has('default') ? deviceSiblingRowsOf('default') : []);
   const ownDeviceSiblings = async () => (await ownDeviceSiblingRows()).map((d) => d.address);
+  /** This device's device address under a self (its delegation key there), or null. */
+  const deviceAddressOf = (pid) => {
+    const self = personas.get(pid);
+    if (!self?.enrolledDevice || !self.deviceDerivationSeed) return null;
+    try { return deviceDelegationPubKey(self.deviceDerivationSeed); } catch { return null; }
+  };
+  /** Every self's device address on this device: registered as an identity of ours and on that self's own relay
+   *  sockets (never another self's: a socket holding two selves' addresses would link them at the relay). */
+  const registerDeviceAddresses = async () => {
+    for (const [pid, self] of personas) {
+      const address = deviceAddressOf(pid);
+      if (!address || !self?.chatId?.pubKey) continue;
+      try {
+        const identity = await AgentIdentity.fromSeed(self.deviceDerivationSeed, new VaultMemory());
+        if (identity.pubKey !== address) continue;
+        sa.registerSelfIdentity?.(address, identity, { owner: self.chatId.pubKey });
+      } catch { continue; }
+      const sign = (message) => signWithPersonKey(self.deviceDerivationSeed, new TextEncoder().encode(message));
+      let sockets = [];
+      try { sockets = pid === 'default' ? (sa.relays?.list?.() ?? []) : (sa.relays?.list?.({ identity: self.chatId.pubKey }) ?? []); } catch { sockets = []; }
+      for (const rl of sockets) {
+        try { await rl.port?.addAddress?.(address, { sign, primary: false }); } catch (err) { console.warn(`[device-address] a relay did not take ${pid}'s device address: ${err?.message ?? err}`); }
+      }
+    }
+  };
   // EVERY ADDRESS THIS PERSON'S DEVICES SPEAK AS — the person-key address (shared by all my devices), the static
   // profile key, this device's per-circle addresses, my siblings' per-circle addresses. What a roster reads to
   // keep me out of my own Contacten: each of these reaches the peer graph as "someone greeted/reached", and none
@@ -2188,8 +2324,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       for (const a of [rt?.chatId?.pubKey, rt?.personIdentity?.pubKey]) if (a) out.add(a);
     }
     let rows = [];
-    try { rows = await ownDeviceSiblingRows(); } catch { rows = []; }
+    try { rows = await rosterSiblingRowsOfDefault(); } catch { rows = []; }
     for (const d of rows) { if (d?.address) out.add(d.address); if (d?.circleId) { const mine = circleAddressFor(d.circleId); if (mine) out.add(mine); } }
+    // …and every device address of the person's: this device's under each self, and its siblings'
+    for (const pid of personas.keys()) {
+      const mine = deviceAddressOf(pid);
+      if (mine) out.add(mine);
+      try { for (const d of await deviceSiblingRowsOf(pid)) out.add(d.address); } catch { /* the rest still serve */ }
+    }
     try {
       for (const c of ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])) {
         const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
@@ -2206,13 +2348,29 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the revoke walk, 2026-09-14). The circle comes from the sibling table; a caller that knows it
   // already — a seed reply to a device not yet on any roster — names it in the payload.
   const sendToSibling = async (to, payload, o = {}, asSelf = null) => {
-    // an OWN lane names no circle: the sibling is reached in a circle that lane's self shares with it — the default's
-    // lane over the default's circles, a persona's over that persona's (so it travels as that self, never another).
-    // A lane that IS one self's (a persona's person-key hand-over) names that self (`asSelf`): its siblings' circles.
+    // an OWN lane names no circle; its self is the lane's. A lane that IS one self's (a persona's person-key hand-over)
+    // names that self (`asSelf`); a circle's carry is the circle's self's.
     const ownSelf = asSelf ?? (typeof payload?.circleId === 'string' ? selfOfOwnLane(payload.circleId) : null);
-    let circleId = typeof payload?.circleId === 'string' && !ownSelf ? payload.circleId : null;
+    const cidOfPayload = typeof payload?.circleId === 'string' && !ownSelf ? payload.circleId : null;
+    const self = ownSelf ?? (cidOfPayload ? (circlePersonas.get(cidOfPayload) ?? 'default') : 'default');
+    // A SIBLING AT ITS DEVICE ADDRESS (the registry's device map): sent as this device's own device address under the
+    // same self — no circle in between, so nothing of it rides a circle address.
+    let atDevice = false;
+    try { atDevice = (await deviceSiblingRowsOf(self)).some((d) => d.address === to); } catch { atDevice = false; }
+    if (atDevice) {
+      const from = deviceAddressOf(self);
+      if (!from) throw new Error(`no device address of mine under ${self}`);
+      // the relay refuses a frame from an address its socket has not registered (it tells only its log): registered
+      // before the send, whatever the boot order — as the person address is
+      await registerDeviceAddresses().catch(() => {});
+      const { circleId: _c, ...rest } = o;   // eslint-disable-line no-unused-vars
+      return sa.peer.sendTo(to, payload, { ...rest, sendAs: from });
+    }
+    // Otherwise the circle path: a device not in the map yet (a roster-seed reply to a device enrolling now) is reached in
+    // the circle its payload names, as this device's own address there.
+    let circleId = cidOfPayload;
     if (!circleId) {
-      const rows = ownSelf && ownSelf !== 'default' ? await personaSiblingRows(ownSelf) : await ownDeviceSiblingRows();
+      const rows = ownSelf && ownSelf !== 'default' ? await personaSiblingRows(ownSelf) : await rosterSiblingRowsOfDefault();
       circleId = rows.find((d) => d.address === to)?.circleId ?? null;
     }
     if (!circleId) throw new Error(`not a device of mine on any circle: ${String(to).slice(0, 12)}…`);
@@ -2366,7 +2524,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       },
     }).catch(() => []);
   };
-  const personaSiblings = async (pid) => (await personaSiblingRows(pid)).map((d) => d.address);
+  const personaSiblings = async (pid) => (await deviceSiblingRowsOf(pid)).map((d) => d.address);
   /** The siblings a payload is carried to: its circle's self's devices (a persona's own), else the default's set — an own
    *  lane's to that lane's self's devices. */
   const siblingsFor = async (payload) => {
@@ -3271,9 +3429,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (!rec) {
           const revokedSeed = deriveDeviceSeed(root.deriveAgentSeed('default'), deviceId);
           const minted = signDeviceDelegation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed) });
-          props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true });
+          props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId }) });
         } else if (rec.revoked !== true) {
-          props = registrySetDeviceDelegation(props, deviceId, { revoked: true });
+          props = registrySetDeviceDelegation(props, deviceId, { revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId }) });
         }
       }
       if (props !== (cur.properties ?? {})) await bounded(agentsRegistryRef.register({ ...cur, properties: props }));
@@ -3454,9 +3612,9 @@ export async function createRealHouseholdAgent(opts = {}) {
             const minted = signDeviceDelegation(root.deriveProfileAuthority('default'), {
               profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed),
             });
-            props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true });
+            props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId }) });
           } else if (rec.revoked !== true) {
-            props = registrySetDeviceDelegation(props, deviceId, { revoked: true });
+            props = registrySetDeviceDelegation(props, deviceId, { revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId }) });
           }
           // THE FLOOR CLOSES with the first revoke ceremony (Frits' v1 ruling — L30's closer):
           // the ceremony proved the phrase and (below) self-enrolls this device into delegation
@@ -3557,10 +3715,10 @@ export async function createRealHouseholdAgent(opts = {}) {
               const seedAt = deriveDeviceSeed(pSeed, wireAt);
               if (!rec) {
                 const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wireAt, pubKey: deviceDelegationPubKey(seedAt) });
-                props = registrySetDeviceDelegation(props, wireAt, { ...minted, revoked: true });
+                props = registrySetDeviceDelegation(props, wireAt, { ...minted, revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wireAt }) });
               } else if (rec.revoked !== true) {
                 heldLive = true;
-                props = registrySetDeviceDelegation(props, wireAt, { revoked: true });
+                props = registrySetDeviceDelegation(props, wireAt, { revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wireAt }) });
               }
               pWire = wireAt;   // the last one the device had under this persona — the one its circles know
             }
@@ -3912,7 +4070,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     const p = personaOf(circleId);
     if (p === persona) return ownAddressBindings();
     const id = p.personIdentity; const seed = p.personKey?.seed;
-    return id?.pubKey && seed ? [{ address: id.pubKey, sign: (message) => signWithPersonKey(seed, new TextEncoder().encode(message)) }] : [];
+    return [
+      ...(id?.pubKey && seed ? [{ address: id.pubKey, sign: (message) => signWithPersonKey(seed, new TextEncoder().encode(message)) }] : []),
+      ...[deviceBindingOf(p)].filter(Boolean),
+    ];
   };
   const circleSelf = (circleId) => {
     const p = personaOf(circleId);
@@ -4307,8 +4468,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       let props = entry.properties ?? {};
       if (!rec) {
         const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
-        props = registrySetDeviceDelegation(props, wire, { ...minted, revoked: true });
-      } else if (rec.revoked !== true) props = registrySetDeviceDelegation(props, wire, { revoked: true });
+        props = registrySetDeviceDelegation(props, wire, { ...minted, revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire }) });
+      } else if (rec.revoked !== true) props = registrySetDeviceDelegation(props, wire, { revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire }) });
       if (props !== (entry.properties ?? {})) await strict(agentsRegistryRef.register({ ...entry, properties: props }));
       const back = await strict(agentsRegistryRef.lookup(pid));
       if (deviceDelegationOf(back, wire)?.revoked !== true) throw new Error('the tombstone did not read back');
@@ -8382,6 +8543,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       // revokes owed to a node the person owns (a contact deleted while it was away): told now that this device is on
       retryPendingRevokes().catch(() => {});
+      // every self's device address on its own relay sockets, so the person's other devices can reach this one
+      await registerDeviceAddresses().catch((err) => { console.warn(`[device-address] not registered at connect: ${err?.message ?? err}`); });
       return sa.peer;
     },
     /** Tell the person's nodes the revokes they are still owed (the connect and a node's answer do this themselves). */
@@ -8661,6 +8824,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     grantsRail,
     grantsPeerHandler,
     grantsCatchUp,
+    // the person's device map between their own devices (register under `ownDeviceRecordsSubtype`)
+    ownDeviceRecordsHandler,
+    ownDeviceRecordsSubtype: OWN_DEVICE_RECORDS_SUBTYPE,
     // The contact-thread fan (a DM reaches the person, not one of their devices): the shells hand
     // `contactTurnFan` to the contact channel and register `contactTurnHandler(applyTurn)` under
     // CONTACT_TURN_BROADCAST.

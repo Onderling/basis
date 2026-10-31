@@ -296,7 +296,9 @@ describe('the box is revoked while it holds the address', () => {
     const live = web.agent.circleAddressFor(CIRCLE);
     const fanned = await until(async () => walkLog(dataDir).slice(before).find((e) => e.kind === 'own-device-fan') ?? null, { timeout: 75_000, step: 250 });
     expect(fanned, `the box did not record its fan — its rosters at boot: ${JSON.stringify(presence.rosters)}:\n${box.out.slice(-800)}`).toBeTruthy();
-    const toLive = fanned.outcomes.filter((o) => live.startsWith(o.to));
+    // …or the web app's DEVICE address (siblings are reached there now): live too
+    const liveDevice = web.agent.persona('default')?.enrolledDevice?.record?.pubKey ?? '';
+    const toLive = fanned.outcomes.filter((o) => live.startsWith(o.to) || (liveDevice && liveDevice.startsWith(o.to)));
     if (toLive.length) {
       const refusedAtGate = () => (web.agent.refusedInboundByReason?.()?.SENDER_NOT_AUTHORIZED ?? 0) > 0;
       const refusedAtLane = () => web.contactTurnsRefused.some((x) => x.reason === 'not-a-sibling');

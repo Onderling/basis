@@ -42,6 +42,7 @@ import {
 } from '@onderling/pod-client';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { VaultMemory } from '@onderling/vault';
+import { setDeviceDelegation } from '@onderling/agent-registry';
 import { makeKeyEventLogSink } from '@onderling/kring-host/keyEventLogSink';
 
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
@@ -427,6 +428,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
       [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,
     } : {}),
+    // The person's device map between their own devices — the same registration the shared lane table makes.
+    ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
     // The roster seed (pod-less enroll S1) — the same registration both shells make.
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
@@ -872,6 +875,26 @@ export async function readRoster(node, groupId) {
 }
 
 /** Best-effort shutdown of the underlying secure-mesh agents. */
+/**
+ * Put each device's delegation record into the other devices' registries, under a self — what the registry mirror on
+ * the person's pod does (or the enrol offer's roster seed, pod-less). The person's devices find each other in that
+ * device map and reach each other at their device addresses; a harness that enrols without either has to stand in.
+ * @param {object[]} nodes  devices of one person (booted)
+ * @param {string} [profileId='default']  the self whose device map is shared
+ */
+export async function shareDeviceRecords(nodes, profileId = 'default') {
+  const recs = nodes.map((n) => n.agent.persona(profileId)?.enrolledDevice ?? null);
+  for (const [i, node] of nodes.entries()) {
+    const registry = node.agent.agentsRegistry();
+    for (const [j, dev] of recs.entries()) {
+      if (i === j || !dev?.record || !dev.deviceId) continue;
+      const entry = await registry.lookup(profileId);
+      if (!entry) continue;
+      await registry.register({ ...entry, properties: setDeviceDelegation(entry.properties ?? {}, dev.deviceId, dev.record) });
+    }
+  }
+}
+
 export async function teardown(...nodes) {
   for (const n of nodes) { try { LIVE_NODES.delete(n); } catch { /* */ } }
   // what every shell does when it goes away (the box on stop, web on pagehide, mobile on background): the saves still

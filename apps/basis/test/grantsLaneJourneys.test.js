@@ -23,7 +23,7 @@ import { VaultMemory } from '@onderling/vault';
 import { AgentIdentity, CIRCLE_ADDRESS_ANNOUNCE_KIND, signSpine } from '@onderling/core';
 import { InternalTransport } from '@onderling/core';
 import {
-  bootRealAgentNode, connectNodesOverBus, pairCircle, bindCircleAddresses, goOffline, goOnline,
+  bootRealAgentNode, connectNodesOverBus, pairCircle, bindCircleAddresses, goOffline, goOnline, shareDeviceRecords,
   until, teardown,
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
@@ -141,6 +141,8 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
       return (r?.circleAddresses?.includes(addrP)) ? r : null;
     }, { timeout: 15000, step: 50 });
     expect(rowL, 'L never learned P\'s proven address').toBeTruthy();
+    // …and each holds the other in its device map (the registry mirror's job; the offer's roster seed pod-less)
+    await shareDeviceRecords([P, L]);
   }, 120_000);
 
   afterAll(async () => {
@@ -322,7 +324,9 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
       const onN = ((await N.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === P.pubKey)?.circleAddresses?.includes(addrP);
       return (onP && onN) ? true : null;
     }, { timeout: 15000, step: 50 });
-    await N.agent.sendPeerMessage(addrP, { subtype: GRANTS_CATCHUP_SUBTYPES.request, circleId: OWN_DEVICES_SCOPE }, { ...SEND, circleId: GROUP });
+    // the person's devices know N in their device map (the registry mirror), and N asks them — the shells' connect kick
+    await shareDeviceRecords([P, L, N]);
+    await N.agent.grantsCatchUp.requestFromSiblings();
 
     const inherited = await until(async () => {
       const g = await listGrants(N);

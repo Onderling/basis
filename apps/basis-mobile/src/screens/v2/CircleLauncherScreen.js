@@ -43,13 +43,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subscribeToNetworkChange as subscribeAppState, combineSources } from '@onderling/react-native';
 import { createPersonClock } from '../../../../basis/src/v2/personClock.js';
 import {
-  loadCircles, circleSourcesFromAgent, makeResolvingCallSkill,
+  loadCircles, loadRemovedCircles, circleSourcesFromAgent, makeResolvingCallSkill,
   loadCircleItems, quickCreateCircle, setActiveCircle, normalizeCircleMembers,
   circleFilesFromListFiles,
   // 1:1-bot chat gate — the assistant-header strip shows ONLY in a genuine 1:1-with-a-bot chat.
   oneToOneBotLabel,
   // per-circle feature-flag consumption.
-  isFeatureEnabled,
+  isFeatureEnabled, composerGate,
   // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   // per-circle activity preview + unread badge.
@@ -568,6 +568,9 @@ export default function CircleLauncherScreen({
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [circles, setCircles] = useState([]);
+  // the circles an admin removed this person from: marked, read-only tiles until closed — never in `circles`, which
+  // sharing, invites and presence read
+  const [removedCircles, setRemovedCircles] = useState([]);
   // the boot timeline's last steps: the launcher mounted, and the first time it had circles read from the agent
   useEffect(() => { bootMark('launcher.mount', { bundle: !!bundle }); }, []);
   const circlesMarked = useRef(false);
@@ -1431,6 +1434,7 @@ export default function CircleLauncherScreen({
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);
+      setRemovedCircles(await loadRemovedCircles(sources));
       if (!circlesMarked.current) { circlesMarked.current = true; bootMark('launcher.circles', { n: _l.length }); }
       // G13 — feed the bundle's per-circle relay registration fresh ids (fire-and-forget, self-catching).
       bundle?.registerCirclePresence?.(_l.map((c) => c?.id).filter(Boolean));
@@ -2642,6 +2646,14 @@ export default function CircleLauncherScreen({
       <>
       <CircleDetail
         pagesBook={screensBook}
+        onCloseRemoved={async () => {
+          const id = selected?.id;
+          if (!id) return;
+          const r = await bundle?.callSkill?.('pinboard', 'dismissRemovedCircle', { groupId: id }).catch((err) => ({ ok: false, error: err?.message }));
+          if (r?.ok !== true) { console.warn('[circle] closing a removed circle failed:', r?.error ?? r); return; }
+          setRemovedCircles((rs) => rs.filter((c) => c.id !== id));
+          closeCircle();
+        }}
         onPinEntry={(e) => { if (selected?.id) runScreenOp('screen-pin', { kind: 'bookmark', circleId: selected.id, appOrigin: e.appOrigin, opId: e.opId }); }}
         openOp={pendingPinOpen} onOpenOpDone={() => setPendingPinOpen(null)}
         selfProfileId={profileIdOfCircle(selected?.id)}
@@ -2798,6 +2810,12 @@ export default function CircleLauncherScreen({
                 pinnedMap, mutedMap, onOpenMenu: openTileMenu,
               }, styles)
             )}
+            {/* a circle an admin removed this person from: kept, marked, read-only, until they close it from inside */}
+            {removedCircles.map((c) => (
+              <View key={`removed-${c.id}`} testID={`circle-launcher-removed-${c.id}`}>
+                <LauncherTile circle={c} onOpen={openCircle} />
+              </View>
+            ))}
             {/* OPBERGEN — the fold: put away (every device) and not on this device (the kring opt-out), each saying which */}
             {bySight.folded.length > 0 ? (
               <View testID="circle-launcher-sight-fold">
@@ -3019,13 +3037,15 @@ function renderLauncherGroups(circles, {
 function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted = false, onOpen, onLongPress, onProposals = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const subtitle = (preview && preview.subtitle)
-    ? preview.subtitle
-    : (c.memberCount != null ? t('circle.members', { count: c.memberCount }) : null);
+  const subtitle = c.removed
+    ? t('circle.membership.removed_note')
+    : (preview && preview.subtitle)
+      ? preview.subtitle
+      : (c.memberCount != null ? t('circle.members', { count: c.memberCount }) : null);
   const unread = preview?.unread ?? 0;
   return (
     <Pressable
-      style={[styles.tile, isPinned && styles.tilePinned]}
+      style={[styles.tile, isPinned && styles.tilePinned, c.removed && styles.tileRemoved]}
       accessibilityRole="button"
       onPress={() => onOpen(c)}
       onLongPress={typeof onLongPress === 'function' ? () => onLongPress(c) : undefined}
@@ -3034,9 +3054,10 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
       <View style={styles.tileBody}>
         <Text style={styles.tileName}>{c.name}</Text>
         {subtitle ? (
-          <Text style={styles.tileMeta} numberOfLines={1}>{subtitle}</Text>
+          <Text style={styles.tileMeta} numberOfLines={c.removed ? 3 : 1}>{subtitle}</Text>
         ) : null}
       </View>
+      {c.removed ? <Text style={styles.tileRemovedMark} testID={`circle-tile-removed-${c.id}`}>{t('circle.membership.removed_mark')}</Text> : null}
       {unread > 0 ? (
         <View
           style={styles.tileUnread}
@@ -3115,6 +3136,8 @@ function CircleDetail({
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost, onReportMessage,
   // A reply to a post persists into (and opens) the poster's contact thread — the launcher owns both.
   contactChannel = null, notePeer = null, identityOf = null, onOpenContact = null,
+  // a circle an admin removed this person from: the close (`dismissRemovedCircle`), offered where the composers were
+  onCloseRemoved = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -3369,7 +3392,9 @@ function CircleDetail({
     () => composerCommands.suggest(composerText), [composerCommands, composerText],
   );
   // Permission gate (classic shell's `allowCommands` analog): chat disabled for this circle ⇒ read-only.
-  const canPost = isFeatureEnabled(policy, 'chat');
+  // the shared gate: chat off, or a circle an admin removed me from (read-only, with the close)
+  const gate = composerGate(policy, circle);
+  const canPost = gate.canPost;
   // per-circle bottom tabs derived from policy.features.
   const tabs = useMemo(() => buildCircleTabs(policy, t), [policy]);
   const [activeTab, setActiveTab] = useState(DEFAULT_CIRCLE_TAB);
@@ -4683,6 +4708,7 @@ function CircleDetail({
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see pinboardCall above).
           <CircleNoticeboard callSkill={pinboardCall} onPinboardEvent={onPinboardEvent} refreshKey={tabRetap} media={circleMedia} selfProfileId={selfProfileId}
+            readOnlyNote={gate.canClose ? t(gate.noteKey) : null} onCloseRemoved={gate.canClose ? onCloseRemoved : null}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}
@@ -4981,9 +5007,14 @@ function CircleDetail({
       {viewMode !== 'screen' && activeTab === 'noticeboard' ? null
       : viewMode !== 'screen' && !canPost ? (
         /* Permission gate — chat disabled for this circle; read-only note in place of the composer. */
-        <Text style={styles.composerDisabled} testID="circle-detail-composer-disabled">
-          {t('circle.view.chat_disabled')}
-        </Text>
+        <View>
+          <Text style={styles.composerDisabled} testID="circle-detail-composer-disabled">
+            {t(gate.noteKey ?? 'circle.view.chat_disabled')}
+          </Text>
+          {gate.canClose && typeof onCloseRemoved === 'function' ? (
+            <Btn variant="primary" testID="close-removed-circle" label={t('circle.membership.removed_close')} onPress={onCloseRemoved} />
+          ) : null}
+        </View>
       ) : viewMode !== 'screen' ? (
       <>
         {/* Slash-command auto-suggest — sits above the composer, mirrors the web dropdown. Tap a row
@@ -6341,6 +6372,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   tileBody:   { flex: 1, minWidth: 0 },
   tileName:   { fontSize: 14, fontWeight: '600', color: theme.color.ink },
   tileMeta:   { fontSize: 11, color: theme.color.inkSoft, marginTop: 2 },
+  tileRemoved: { opacity: 0.75 },
+  tileRemovedMark: { fontSize: 12, color: theme.color.inkSoft, borderWidth: 1, borderColor: theme.color.inkSoft, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   // unread badge on the tile.
   tileUnread: {
     minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11,

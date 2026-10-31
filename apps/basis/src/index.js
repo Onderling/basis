@@ -76,7 +76,7 @@ export { QR_URI_PREFIXES, isQrUri }   from './core/qrSchemes.js';
 export { normalizeQuickReplies }      from './core/quickReplies.js';
 // v2 circle model — re-exported here so basis-mobile can import via
 // '@onderling-app/basis' (Metro can't resolve src/v2 subpaths directly).
-export { normalizeCircle, mergeCircles, loadCircles } from './v2/circleModel.js';
+export { normalizeCircle, mergeCircles, loadCircles, loadRemovedCircles } from './v2/circleModel.js';
 export { circleSourcesFromAgent, makeResolvingCallSkill, DEFAULT_CIRCLE_ORIGINS } from './v2/circleSources.js';
 export { loadCircleItems, normalizeContentItem }      from './v2/circleContent.js';
 export { quickCreateCircle }                          from './v2/circleCreate.js';
@@ -89,7 +89,7 @@ export {
   CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, decisionDeadlineDays,
   DEFAULT_CIRCLE_POLICY, normalizeCirclePolicy, mergeCirclePolicy, policyPatch,
   // feature-flag consumption seam.
-  isFeatureEnabled, enabledFeatures,
+  isFeatureEnabled, enabledFeatures, composerGate,
   // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   DEFAULT_MEMBER_OVERRIDE, normalizeMemberOverride, mergeMemberOverride,

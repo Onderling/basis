@@ -40,3 +40,21 @@ test('a second Mij landing reads nothing; a registry change while shown is read 
   expect(changed.materializes - after.materializes, 'the registry change was heard').toBeGreaterThanOrEqual(1);
   expect(errs).toEqual([]);
 });
+
+test('a registry change while a screen behind Mij is open does not paint Mij over it', async ({ page }) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
+  page.on('console', (m) => { if (m.text().includes('DEVPROBE')) console.log(m.text()); });
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(4000);
+  await page.locator('[data-tab="mij"]').first().click();
+  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-settings__group--devices-keys').click();
+  const myData = page.locator('.cc-mydata__claim-companion').first();
+  await expect(myData, 'the devices-and-keys screen is open').toBeVisible({ timeout: 20_000 });
+  await page.evaluate(() => window.onderlingCall('agents', 'setProfileProperty', { id: 'default', key: 'woont', value: 'daar' }));
+  await page.waitForTimeout(2500);   // past the head's debounce
+  await expect(myData, 'the devices-and-keys screen is still the screen').toBeVisible();
+  expect(errs).toEqual([]);
+});

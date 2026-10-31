@@ -16,13 +16,13 @@
  */
 import { VaultMemory, seedFromString, seedToString } from '@onderling/vault';
 import {
-  AgentIdentity, deriveCircleAddress, circleIdentity, deriveCircleSeed, signCeremonyCommitmentFromSeed, ceremonyCommitment,
+  AgentIdentity, deriveCircleAddress, circleIdentity, deriveCircleSeed, deriveCircleRoot, signCeremonyCommitmentFromSeed, ceremonyCommitment,
   authorityPubKeyB64Of, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId, firstDeviceIdFor,
   b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey,
 } from '@onderling/core';
 import { sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
-import { DEVICE_DELEGATION_VAULT_KEY, personaVault } from './personaVault.js';
+import { DEVICE_DELEGATION_VAULT_KEY, CIRCLE_ROOT_VAULT_KEY, personaVault } from './personaVault.js';
 
 /** How many circle addresses one persona runtime keeps derived; past it the oldest is derived again on next use. */
 const CIRCLE_ADDRESS_MEMO_MAX = param({ key: 'persona.circleAddressMemoMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
@@ -37,7 +37,8 @@ const CIRCLE_ADDRESS_MEMO_MAX = param({ key: 'persona.circleAddressMemoMax', sco
  * @param {Uint8Array|null} [a.custodySeed]  delegation custody: the key door's (delegation) seed
  * @param {object} a.chatVault                the sealed chat vault (the chat seed, the person key, the delegation blob)
  * @returns {Promise<{
- *   profileId: string, profileSeed: Uint8Array|null, deviceDerivationSeed: Uint8Array|null, enrolledDevice: object|null,
+ *   profileId: string, profileSeed: Uint8Array|null, deviceDerivationSeed: Uint8Array|null, circleSeed: Uint8Array|null,
+ *   circleRoot: {epoch: number, seed: Uint8Array}|null, enrolledDevice: object|null,
  *   circleIdentityFor: (circleId: string) => Promise<object>, circleAddressFor: (circleId: string) => string,
  *   circleSealingKeyPairFor: (circleId: string) => object, authorityPubKeyB64: string|null,
  *   ceremonyCommitmentFor: (circleId: string) => string|null, signCeremonyCommitment: Function,
@@ -160,13 +161,39 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     }
   }
 
-  // The per-circle SIGNING identity, one per circle, memoised — derived from THIS DEVICE'S derivation root, so this
-  // device presents an honestly distinct address per circle. The vault is deliberately EPHEMERAL: a per-circle key
-  // written to storage is one more copy of the thing we are trying not to spread. Re-derived every boot.
+  // THE CIRCLE ROOT — the root of every per-circle key (address, signing identity, sealing pair, commitment signer): the
+  // persona's, at its current epoch, the same on every full device of it, so a co-member sees one member, one address.
+  // A device with the root derives it (and keeps the epoch in the persona's slot); a device enrolled without the root
+  // was handed it at its ceremony. A delegated device from before the circle root keeps its device-derived keys until a
+  // phrase ceremony hands it the root (said once).
+  const circleRoot = await (async () => {
+    let slot = null;
+    try { const raw = await vault.get(CIRCLE_ROOT_VAULT_KEY); slot = raw ? JSON.parse(raw) : null; } catch { slot = null; }
+    const epoch = Number.isInteger(slot?.epoch) && slot.epoch >= 0 ? slot.epoch : 0;
+    if (profileSeed) {
+      const seed = deriveCircleRoot(profileSeed, epoch);
+      if (!slot || slot.epoch !== epoch || slot.seed !== seedToString(seed)) {
+        try { await vault.set(CIRCLE_ROOT_VAULT_KEY, JSON.stringify({ epoch, seed: seedToString(seed) })); }
+        catch { /* re-derived next boot */ }
+      }
+      return { epoch, seed };
+    }
+    const handed = typeof slot?.seed === 'string' ? seedFromString(slot.seed) : null;
+    if (handed instanceof Uint8Array && handed.length === 32) return { epoch, seed: handed };
+    console.warn(`[realAgent] persona "${profileId}" holds no circle root on this device — it keeps its device's own circle addresses until a phrase ceremony hands it one`);
+    return null;
+  })();
+  // Held, not yet presented: the per-circle keys below still derive from this device's own root, so every device keeps its
+  // own address per circle until the switch to the persona's one address (and the migration that announces it).
+  const circleSeed = deviceDerivationSeed;
+
+  // The per-circle SIGNING identity, one per circle, memoised — derived from `circleSeed` above. The vault is
+  // deliberately EPHEMERAL: a per-circle key written to storage is one more copy of the thing we are trying not to
+  // spread. Re-derived every boot.
   const circleIdentities = new Map();   // circleId → Promise<AgentIdentity>
   const circleIdentityFor = (circleId) => {
     if (!circleIdentities.has(circleId)) {
-      circleIdentities.set(circleId, circleIdentity(deviceDerivationSeed, circleId, new VaultMemory()));
+      circleIdentities.set(circleId, circleIdentity(circleSeed, circleId, new VaultMemory()));
     }
     return circleIdentities.get(circleId);
   };
@@ -176,7 +203,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   const circleAddressFor = (circleId) => {
     let address = circleAddresses.get(circleId);
     if (address === undefined) {
-      address = deriveCircleAddress(deviceDerivationSeed, circleId);
+      address = deriveCircleAddress(circleSeed, circleId);
       if (circleAddresses.size >= CIRCLE_ADDRESS_MEMO_MAX) circleAddresses.delete(circleAddresses.keys().next().value);
       circleAddresses.set(circleId, address);
     }
@@ -190,9 +217,9 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     if (personKeyMemo?.record !== record) personKeyMemo = { record, pubKey: personKeyPubKeyB64(record.seed) };
     return personKeyMemo.pubKey;
   };
-  // ONE sealing key family: this device's per-circle SEALING keypair is the ed2curve image of its per-circle address
-  // key — phrase-derivable, one per device, retired with the address.
-  const circleSealingKeyPairFor = (circleId) => sealingKeyPairFromNetworkKey(b64encode(deriveCircleSeed(deviceDerivationSeed, circleId)));
+  // ONE sealing key family: the per-circle SEALING keypair is the ed2curve image of the per-circle address key —
+  // phrase-derivable, retired with the address.
+  const circleSealingKeyPairFor = (circleId) => sealingKeyPairFromNetworkKey(b64encode(deriveCircleSeed(circleSeed, circleId)));
   // THE CEREMONY COMMITMENT (core ceremonyCommitment.js): who may retire this persona's addresses in a circle. Its key
   // is the persona's AUTHORITY, never the root (the root's own key on the wire would link every persona). Under
   // delegation custody it rides the device's own record (`by` — the authority signed it).
@@ -200,13 +227,13 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   if (!authorityPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
   const ceremonyCommitmentFor = (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null);
   const signCeremonyCommitment = (circleId, address, commitment) =>
-    signCeremonyCommitmentFromSeed(deriveCircleSeed(deviceDerivationSeed, circleId), { circleId, circleAddress: address, commitment });
+    signCeremonyCommitmentFromSeed(deriveCircleSeed(circleSeed, circleId), { circleId, circleAddress: address, commitment });
 
   // The persona's chat identity: the secure agent loads the DEFAULT's from its slot; any other persona's is loaded here.
   const chatId = isDefault ? null : await AgentIdentity.restore(vault);
 
   return {
-    profileId, vault, profileSeed, deviceDerivationSeed, enrolledDevice, internalDeviceId: deviceInternalId,
+    profileId, vault, profileSeed, deviceDerivationSeed, circleSeed, circleRoot, enrolledDevice, internalDeviceId: deviceInternalId,
     circleIdentityFor, circleAddressFor, circleSealingKeyPairFor, personKeyPubOf,
     authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
     initialPersonKey, derivedLinkKeyPub,

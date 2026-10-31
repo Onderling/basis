@@ -244,7 +244,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   };
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-admin">
+    <ScrollView keyboardShouldPersistTaps="handled" style={styles.wrap} contentContainerStyle={styles.content} testID="circle-admin">
       <View style={styles.header}>
         {typeof onBack === 'function' && <Pressable onPress={onBack} testID="admin-back"><Text style={styles.back}>{t('circle.admin.back')}</Text></Pressable>}
         <Text style={styles.title}>{t('circle.admin.title')}</Text>

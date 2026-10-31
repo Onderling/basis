@@ -97,7 +97,7 @@ export default function QrScannerModal({ visible, onClose, onResult, t }) {
               onBarcodeScanned={onBarcode}
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             />
-            <ScrollView contentContainerStyle={styles.controls}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.controls}>
               <Text style={styles.bodyText}>{t('chat.scan_subheading')}</Text>
               {hint ? <Text style={styles.hintText}>{hint}</Text> : null}
               <PasteToggle

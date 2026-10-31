@@ -168,7 +168,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.root}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.root}>
       {/* the person's own basics on top (handle, name, location) — Mij's "Edit" leads here (web: profileBasics.js) */}
       {personaId === 'default' || personaId === model.defaultId ? <ProfileBasics callSkill={callSkill} /> : null}
       {/* ── 1 · MIJN ALGEMENE PERSONA — de waarheidslaag ─────────────────── */}

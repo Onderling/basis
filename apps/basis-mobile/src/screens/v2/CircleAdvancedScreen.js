@@ -63,7 +63,7 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
   };
 
   return (
-    <ScrollView testID="circle-advanced-screen" style={styles.screen} contentContainerStyle={[styles.wrap, { paddingBottom: FAB_CLEARANCE }]}>
+    <ScrollView keyboardShouldPersistTaps="handled" testID="circle-advanced-screen" style={styles.screen} contentContainerStyle={[styles.wrap, { paddingBottom: FAB_CLEARANCE }]}>
       {onBack ? (
         <Pressable onPress={onBack} accessibilityRole="button" testID="circle-advanced-back">
           <Text style={styles.back}>{t('circle.back_me')}</Text>

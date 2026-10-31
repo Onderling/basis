@@ -111,6 +111,8 @@ const VALID_MODES = new Set(PSEUDO_POD_MODES);
  */
 /** Each backend's per-key revision, shared by every pseudo-pod over it (a WeakMap: a dropped backend takes its counts). */
 const REVISIONS_BY_BACKEND = new WeakMap();
+/** …and who hears each key's revision move (per backend too: every pseudo-pod over it tells the same listeners). */
+const REVISION_LISTENERS_BY_BACKEND = new WeakMap();
 
 /**
  * Create a PseudoPod — the Solid-shaped local store. `mode` sets the global behaviour: `standalone`
@@ -153,7 +155,12 @@ export function createPseudoPod({
   // writers in one process) must each see the other's writes move the revision
   let revisions = REVISIONS_BY_BACKEND.get(backendIn);
   if (!revisions) { revisions = new Map(); REVISIONS_BY_BACKEND.set(backendIn, revisions); }
-  const bumpRevision = (key) => { revisions.set(key, (revisions.get(key) ?? 0) + 1); };
+  let revisionListeners = REVISION_LISTENERS_BY_BACKEND.get(backendIn);
+  if (!revisionListeners) { revisionListeners = new Map(); REVISION_LISTENERS_BY_BACKEND.set(backendIn, revisionListeners); }
+  const bumpRevision = (key) => {
+    revisions.set(key, (revisions.get(key) ?? 0) + 1);
+    for (const fn of revisionListeners.get(key) ?? []) { try { fn(); } catch { /* a listener never breaks a write */ } }
+  };
   // a layer of this pseudo-pod's own in front of the backend: the backend itself is never changed (several pseudo-pods
   // over one backend must not stack wrappers on it), and every other method reaches it as it was
   const counted = new Set(['put', 'putIf', 'delete']);
@@ -841,6 +848,17 @@ export function createPseudoPod({
      * tabs on one IndexedDB share no memory, so a revoke in one moves no count the other sees) gets null: read every time.
      */
     revision: (uri) => (backendIn.singleWriter === true ? (revisions.get(_keyForUri(uri)) ?? 0) : null),
+    /**
+     * Hear this resource change: every change made through the pseudo-pods over this backend — a local write, a pull from
+     * the pod, a peer's write, a delete, a write through the counted `backend`. `fn()`; returns the unsubscribe.
+     */
+    onRevision: (uri, fn) => {
+      if (typeof fn !== 'function') return () => {};
+      const key = _keyForUri(uri);
+      if (!revisionListeners.has(key)) revisionListeners.set(key, new Set());
+      revisionListeners.get(key).add(fn);
+      return () => { revisionListeners.get(key)?.delete(fn); };
+    },
     list,
     subscribe,
     writeFromPeer,

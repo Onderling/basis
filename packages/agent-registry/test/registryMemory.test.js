@@ -100,4 +100,18 @@ describe('the registry says when it changed', () => {
     await reg.register(ENTRY('b', 'Bram'));
     expect(heard).toHaveLength(2);
   });
+
+  it('a write beneath it (the carrier pulling a newer copy from the pod) is heard too', async () => {
+    const { backend } = counted();
+    const pseudoPod = createPseudoPod({ backend, mode: 'standalone', deviceId: 'dev-1' });
+    const reg = createAgentRegistry({ pseudoPod, deviceId: 'dev-1' });
+    await reg.register(ENTRY('a', 'Anna'));
+    const heard = [];
+    reg.onChanged(() => heard.push('x'));
+    const cur = await pseudoPod.read(reg.resourceUri);
+    const body = typeof cur.bytes === 'string' ? JSON.parse(cur.bytes) : cur.bytes;
+    body.agents = body.agents.map((x) => (x.agentId === 'a' ? { ...x, name: 'Anna B' } : x));
+    await pseudoPod.write(reg.resourceUri, body);   // what registryCarrier.attach does with a newer pod copy
+    expect(heard.length, 'the pull is heard').toBeGreaterThanOrEqual(1);
+  });
 });

@@ -104,10 +104,7 @@ export function createAgentRegistry({
   // when nothing changed beneath the read itself; any write through the pseudo-pod (this registry's, a pull, a peer's)
   // moves the revision, and the next read loads again. A pseudo-pod without a revision keeps nothing.
   let held = null;   // { rev, body, etag }
-  // who hears that the registry changed (a screen that shows its facts: Mij) — after each of its own writes, which is
-  // also how a sibling's profile facts land here
-  const changedListeners = new Set();
-  const tellChanged = () => { for (const fn of changedListeners) { try { fn(); } catch { /* a listener never breaks a write */ } } };
+
   const revisionNow = () => (typeof pseudoPod.revision === 'function' ? pseudoPod.revision(uri) : null);
   // A WRITE never builds on what is held: it reads the resource itself (a writer in another tab or process shares no
   // memory with this one, and a merge over a stale body would lose its entry). Only lookups read through the memory.
@@ -128,7 +125,6 @@ export function createAgentRegistry({
       // this registry's own write: what it holds follows it, when the write was the one change beneath it (the circle stores' rule)
       const after = revisionNow();
       held = typeof before === 'number' && after === before + 1 ? { rev: after, body: normaliseResource(body), etag: result?.etag ?? null } : null;
-      tellChanged();
       // Snapshot the just-written resource (recovery). Best-effort: a versioning failure must
       // NEVER break the registry write.
       if (typeof versionStore?.capture === 'function') {
@@ -459,11 +455,14 @@ export function createAgentRegistry({
     reload,
 
     get resourceUri() { return uri; },
-    /** Hear that the registry changed (after each of its writes). Returns the unsubscribe. */
+    /**
+     * Hear that the registry changed — wherever the change came from: its own writes (a sibling's profile facts land
+     * through them), the carrier's pull of a newer copy from the pod, a write beneath it. Where the pseudo-pod tells when
+     * the resource's revision moves (`onRevision`); otherwise nothing is heard. Returns the unsubscribe.
+     */
     onChanged(fn) {
-      if (typeof fn !== 'function') return () => {};
-      changedListeners.add(fn);
-      return () => { changedListeners.delete(fn); };
+      if (typeof fn !== 'function' || typeof pseudoPod.onRevision !== 'function') return () => {};
+      return pseudoPod.onRevision(uri, () => fn());
     },
   };
 }

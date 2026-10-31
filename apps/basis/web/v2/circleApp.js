@@ -2914,7 +2914,7 @@ function showTabBar(active) {
     onCircles: showLauncher,
     onNearby: showNearby,
     onContacts: showContacts,
-    onMij: () => showMij({ landing: true }),
+    onMij: showMijTab,
     badges: { contacten: totalUnread(_contactUnread) },
   });
   // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
@@ -4599,6 +4599,9 @@ function mijHead() {
   _mijHead.onUpdate((blocks) => { if (_activeTab === 'mij') _mijPaint?.(blocks); });
   return _mijHead;
 }
+
+/** Mij from its tab: the one way in that reads the head as it is. */
+function showMijTab() { return showMij({ landing: true }); }
 
 async function showMij({ landing = false } = {}) {
   showTabBar('mij');

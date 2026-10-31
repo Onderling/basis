@@ -33,7 +33,7 @@ import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSha
 // CONNECTIONS — the same shared projections the web shell paints from, so the two shells cannot
 // drift on what a connection may see or do (invariant 2: web ≡ mobile by construction).
 import {
-  connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant,
+  connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant, connectionSelfChoice,
 } from '../../../../basis/src/v2/connections.js';
 import { parsePairingOffer } from '../../../../basis/src/v2/connectionPairing.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../../../basis/src/v2/syncSelection.js';
@@ -72,7 +72,9 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   personClock = null,
   // a settings group's screen: the section ids to paint, in order (`settingsGroupFor`), and its title; absent ⇒ the
   // old My data page, which paints every section NOT declared under the gear
-  only = null, groupTitle = null }) {
+  only = null, groupTitle = null,
+  // the switcher's set — this device's selves and the ones ticked — so the pairing form asks which self a screen is for
+  selfSet = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
@@ -129,6 +131,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [connections, setConnections] = useState([]);  // paired views ("gekoppelde apparaten")
   const [offerText, setOfferText] = useState('');      // the pasted onderling-connect:// code
   const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
+  // which self the screen is for, on a device holding more than one (the active self preselected; `null` = not chosen)
+  const selfChoice = useMemo(() => connectionSelfChoice({ held: selfSet?.held ?? [], on: selfSet?.on ?? [] }), [selfSet]);
+  const [pickedSelf, setPickedSelf] = useState(null);
+  const [selfMissing, setSelfMissing] = useState(false);
   const [pickedSections, setPickedSections] = useState([]); // what it may SEE
   const [circlesForConnections, setCirclesForConnections] = useState([]);
   // The SHARED list, not this shell's dispatch catalogue. Reusing the catalogue here made the mobile menu a
@@ -942,6 +948,20 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
                 <Text style={styles.privacyBody}>
                   {t('circle.mydata.connection_recognised', { name: parsed.label || parsed.viewPubKey.slice(0, 8) })}
                 </Text>
+                {selfChoice.required ? (
+                  <>
+                    <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_as_self')}</Text>
+                    {selfChoice.options.map((o) => {
+                      const chosen = (pickedSelf ?? selfChoice.preset) === o.id;
+                      return (
+                        <Pressable key={o.id} testID={`mydata-connection-self-${o.id}`} onPress={() => { setPickedSelf(o.id); setSelfMissing(false); }}>
+                          <Text style={styles.privacyBody}>{(chosen ? '◉ ' : '○ ') + (o.id === 'default' ? (o.name || t('circle.persona_default_name')) : (o.name || o.id))}</Text>
+                        </Pressable>
+                      );
+                    })}
+                    {selfMissing ? <Text style={styles.privacyBody}>{t('circle.mydata.connection_pick_self')}</Text> : null}
+                  </>
+                ) : null}
                 <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_do')}</Text>
                 {opChoices.map((o) => (
                   <Pressable key={o.id} testID={`mydata-op-${o.id}`} onPress={() => toggle(pickedOps, setPickedOps, o.id)}>
@@ -959,13 +979,16 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
                 <Pressable
                   testID="mydata-connection-confirm"
                   onPress={async () => {
+                    const persona = selfChoice.required ? (pickedSelf ?? selfChoice.preset) : null;
+                    // no self chosen where one must be: say so, grant nothing
+                    if (selfChoice.required && !persona) { setSelfMissing(true); return; }
                     const args = compileConnectionGrant({
-                      viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label,
+                      viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label, persona,
                     });
                     if (!args) return;                 // a pick that grants nothing creates nothing
                     try { await callSkill('household', 'grantSurface', { ...args, ...(parsed.nonce ? { nonce: parsed.nonce } : {}) }); }
                     catch { /* the list re-reads; a failure leaves no half-connection */ }
-                    setOfferText(''); setPickedOps([]); setPickedSections([]);
+                    setOfferText(''); setPickedOps([]); setPickedSections([]); setPickedSelf(null);
                     load();
                   }}
                 >

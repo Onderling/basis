@@ -912,6 +912,31 @@ export function renderCircleMyData(container, {
           return wrap;
         };
 
+        // WHICH SELF the screen is for, on a device holding more than one (the active self preselected)
+        const selfChoice = connectionChoices.self ?? { required: false, options: [], preset: null };
+        let selfSelect = null;
+        if (selfChoice.required) {
+          const wrap = document.createElement('label');
+          wrap.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.4rem 0;';
+          const h = document.createElement('span');
+          h.textContent = tr('circle.mydata.connection_as_self');
+          selfSelect = document.createElement('select');
+          selfSelect.className = 'cc-mydata__connection-self';
+          const none = document.createElement('option');
+          none.value = '';
+          none.textContent = tr('circle.mydata.connection_pick_self');
+          selfSelect.appendChild(none);
+          for (const o of selfChoice.options) {
+            const opt = document.createElement('option');
+            opt.value = o.id;
+            opt.textContent = o.id === 'default' ? (o.name || tr('circle.persona_default_name')) : (o.name || o.id);
+            selfSelect.appendChild(opt);
+          }
+          selfSelect.value = selfChoice.preset ?? '';
+          wrap.append(h, selfSelect);
+          picker.appendChild(wrap);
+        }
+
         const opsBox = tickList(tr('circle.mydata.connection_may_do'), connectionChoices.ops ?? [],
           (o) => o.id, (o) => o.label || o.id);
         const secBox = tickList(tr('circle.mydata.connection_may_see'), connectionChoices.sections ?? [],
@@ -940,10 +965,13 @@ export function renderCircleMyData(container, {
 
         confirm.addEventListener('click', () => {
           if (!offer) return;
+          // no self chosen where one must be: say so, grant nothing
+          if (selfSelect && !selfSelect.value) { note.textContent = tr('circle.mydata.connection_pick_self'); return; }
           const picked = (box) => [...box.querySelectorAll('input[type=checkbox]')].filter((c) => c.checked).map((c) => c.value);
           onPairConnection({
             viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label,
             ops: picked(opsBox), sections: picked(secBox),
+            ...(selfSelect ? { persona: selfSelect.value } : {}),
           });
           input.value = ''; note.textContent = ''; picker.hidden = true; offer = null;
         });

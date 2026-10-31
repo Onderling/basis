@@ -6836,6 +6836,14 @@
       "text": "apparaatinstellingen",
       "doc": "De niet-circle sectie: je eigen instellingen."
     },
+    "connection_as_self": {
+      "text": "Voor",
+      "doc": "Pairing a screen — the label beside the choice of which of the person's selves the screen is for (a persona issues its grants as itself)."
+    },
+    "connection_pick_self": {
+      "text": "Kies voor wie dit scherm is",
+      "doc": "Pairing a screen — the empty choice, and the line shown when none is chosen on a device holding more than one self."
+    },
     "connection_add": {
       "text": "Apparaat koppelen",
       "doc": "Kop van het koppel-formulier in Mij."

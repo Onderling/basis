@@ -116,14 +116,16 @@ export function makeGrantsRail({ eventLog, signerFor, verifyBinding }) {
  * Peer handler for `device-grants-broadcast` → the rail's full ingest gate (verify + declared kind
  * + device-set binding) before a fanned statement lands on this device's log. Signed-only.
  */
-export function makeGrantsPeerHandler({ rail, onChange = null } = {}) {
+export function makeGrantsPeerHandler({ rail, onChange = null, scope = OWN_DEVICES_SCOPE } = {}) {
   if (!rail) throw new Error('makeGrantsPeerHandler: a grants rail is required');
   return async function onDeviceGrants(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== GRANTS_BROADCAST) return;
+    // each self's grants ride its own lane: a statement for another self's lane is not this handler's
+    if ((payload.scope ?? OWN_DEVICES_SCOPE) !== scope) return;
     const statement = payload.event;
     if (!statement?.body || !statement?.sig) return;
     try {
-      const res = await rail.ingest(OWN_DEVICES_SCOPE, statement);
+      const res = await rail.ingest(scope, statement);
       if (res?.ok && typeof onChange === 'function') { try { await onChange(); } catch { /* best-effort */ } }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };
@@ -200,11 +202,12 @@ export async function siblingDevices({ callSkill, selfPubKey, circleAddressFor, 
  * like every durable fan — an offline sibling gets it on reconnect). Best-effort and REPORTING:
  * catch-up reconciles a miss either way, but the log says when it will have to.
  */
-export function makeGrantsFan({ siblings, sendToPeer }) {
+export function makeGrantsFan({ siblings, sendToPeer, scope = OWN_DEVICES_SCOPE }) {
   // One caller of the ONE sibling carry (siblingCarry.js) — this lane no longer loops over the set itself.
   const { carry } = makeSiblingCarry({ siblings, sendToPeer, onWarn: (m) => console.warn(m.replace('[sibling-carry]', '[grants-lane]')) });
   return async function fanGrantStatement(statement) {
-    const r = await carry({ subtype: GRANTS_BROADCAST, event: statement });
+    // a persona's lane names itself on the wire, so the sibling lands it on that self's rail (the general one says nothing)
+    const r = await carry({ subtype: GRANTS_BROADCAST, event: statement, ...(scope !== OWN_DEVICES_SCOPE ? { scope } : {}) });
     return { attempted: r.attempted };
   };
 }
@@ -217,7 +220,7 @@ export function makeGrantsFan({ siblings, sendToPeer }) {
  *
  * @returns the catch-up trio plus `requestFromSiblings()` — the boot/reconnect kick.
  */
-export function makeGrantsCatchUp({ rail, sendToPeer, siblings, selfPubKey, onChange = null, mayServe = null } = {}) {
+export function makeGrantsCatchUp({ rail, sendToPeer, siblings, selfPubKey, onChange = null, mayServe = null, scope = OWN_DEVICES_SCOPE } = {}) {
   // The profile key is NOT a sibling: every device of the person holds it, a revoked one included.
   // Only a proven per-circle address on the person's own row is one of their devices (2026-09-14).
   const serve = mayServe ?? (async (fromPeerAddr) => {
@@ -237,7 +240,7 @@ export function makeGrantsCatchUp({ rail, sendToPeer, siblings, selfPubKey, onCh
       try { addrs = (await siblings()) ?? []; } catch { return { requested: 0 }; }
       let requested = 0;
       for (const addr of addrs) {
-        try { await inner.requestFrom(addr, OWN_DEVICES_SCOPE); requested += 1; } catch { /* next sibling */ }
+        try { await inner.requestFrom(addr, scope); requested += 1; } catch { /* next sibling */ }
       }
       return { requested };
     },

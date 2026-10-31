@@ -286,6 +286,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `TIER_LEVEL` | constant | [`core.md`](core.md#tier_level) |
 | `tierForRouteVia` | function | [`core.md`](core.md#tierforroutevia) |
 | `tierForTransport` | function | [`core.md`](core.md#tierfortransport) |
+| `tokenAgentKeyFor` | function | [`core.md`](core.md#tokenagentkeyfor) |
 | `tokenGate` | function | [`core.md`](core.md#tokengate) |
 | `TokenRegistry` | class | [`core.md`](core.md#tokenregistry) |
 | `Transport` | class | [`core.md`](core.md#transport) |

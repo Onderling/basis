@@ -2974,6 +2974,25 @@ Native-only — A2A peers receive a 'requires-native-transport' error.
 
 ## `src/protocol/taskExchange.js`
 
+### `tokenAgentKeyFor`
+
+**Kind:** function · **Import:** `tokenAgentKeyFor` from `'@onderling/core'`
+
+```js
+tokenAgentKeyFor(agent, addressed)
+```
+
+The key a presented token must be FOR: the self the call was addressed to, when that is one of this agent's own
+selves (a persona's own address — a persona issues its grants as itself), else the agent's own key. Never another
+self's: a token Werk issued is honoured only on a call sent to Werk.
+
+**Parameters**
+
+- `agent` `object` — the receiving agent (its `pubKey`, its `security.selfIdentityFor`)
+- `addressed` `string|null` — the address the call was sent to (the envelope's `_to`)
+
+**Returns:** `string`
+
 ### `invokeAgentSkill`
 
 **Kind:** function · **Import:** `invokeAgentSkill` from `'@onderling/core'`

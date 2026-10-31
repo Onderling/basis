@@ -44,6 +44,10 @@ export const SEAMS = Object.freeze([
   // own device can refuse a second persona of theirs joining a circle it is already in (the device's bind refuses too).
   // The join wizard's shared state decides (`secondPersonaRefusal`) before anything is sent; the shell hands it which
   // persona the device holds each circle as. Only the person's shells run the join wizard.
+  // WHICH SELF A SCREEN IS PAIRED FOR: a persona issues its grants as itself, so on a device holding several selves the
+  // pairing form asks (the active self preselected) — the shared decision is `connectionSelfChoice`. The box pairs no
+  // screen through a form.
+  { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
   { id: 'second-persona-join-refusal', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the wizard cannot say before the submit that the person is already in the circle as another persona' },
   // A SCREEN'S DATA IS A HEAD: Vandaag's blocks kept current by the circles' changes and the event log (`screenHead.js`),
   // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time

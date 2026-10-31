@@ -6831,6 +6831,14 @@
       "text": "device settings",
       "doc": "The non-circle section: your own settings."
     },
+    "connection_as_self": {
+      "text": "For",
+      "doc": "Pairing a screen — the label beside the choice of which of the person's selves the screen is for (a persona issues its grants as itself)."
+    },
+    "connection_pick_self": {
+      "text": "Choose who this screen is for",
+      "doc": "Pairing a screen — the empty choice, and the line shown when none is chosen on a device holding more than one self."
+    },
     "connection_add": {
       "text": "Connect a device",
       "doc": "Heading of the pairing form in My data."

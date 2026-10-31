@@ -134,6 +134,8 @@ const readsKeyOf = (reads) => (reads ? JSON.stringify(reads) : null);
  *   sibling fan (best-effort; never blocks the local write)
  * @param {object|null} [a.delegationRecord]  this device's root-signed delegation record,
  *   carried on every statement so a sibling can verify the chain without the owner's registry
+ * @param {string} [a.scope]  the lane's scope: the self's own lane (`own-devices` for the general persona,
+ *   `own-devices:<persona>` for a persona — each self issues and folds its grants on its own)
  */
 /**
  * The kernel's allow-list for an agent's surface tokens: a token issued by the agent's OWN key is honoured only while
@@ -154,7 +156,7 @@ export function ownGrantsAllowList(ownKeyOf, grantsOf) {
   };
 }
 
-export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail, fan = null, delegationRecord = null } = {}) {
+export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail, fan = null, delegationRecord = null, scope = OWN_DEVICES_SCOPE } = {}) {
   if (!identity || typeof identity.sign !== 'function') {
     throw new Error('createSurfaceGrants: a signing identity is required');
   }
@@ -180,7 +182,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
    * every device); every other grant's tokens are revoked, as are all ids revoke statements name.
    */
   async function foldOnce() {
-    const { bodies } = await rail.readVerifiedBodies(OWN_DEVICES_SCOPE);
+    const { bodies } = await rail.readVerifiedBodies(scope);
     const byView = new Map();   // viewPubKey → { grants: [], revokes: [] }
     const byHash = new Map(bodies.map((b) => [b.hash, b]));
     // Plain token cancellations (task grants etc.) — no view semantics, no causal contest:
@@ -323,7 +325,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
         }));
       }
       // The lane carries METADATA + token ids; the signed token blobs go to the VIEW alone.
-      const res = await rail.append(OWN_DEVICES_SCOPE, {
+      const res = await rail.append(scope, {
         kind: 'grant',
         subject: viewPubKey,
         payload: statementPayload({
@@ -347,7 +349,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
       await settled();
       const entry = folded.granted.get(viewPubKey);
       if (!entry) return false;
-      const res = await rail.append(OWN_DEVICES_SCOPE, {
+      const res = await rail.append(scope, {
         kind: 'grant-revoke',
         subject: viewPubKey,
         payload: statementPayload({ viewPubKey, tokenIds: (entry.tokens ?? []).map((t) => t.id) }),
@@ -369,7 +371,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
       await settled();
       const ids = (Array.isArray(tokenIds) ? tokenIds : [tokenIds]).filter((t) => typeof t === 'string' && t);
       if (!ids.length) return false;
-      const res = await rail.append(OWN_DEVICES_SCOPE, {
+      const res = await rail.append(scope, {
         kind: 'token-revoke',
         subject: boundAgentId,
         payload: statementPayload({ tokenIds: ids, ...(reason ? { reason } : {}) }),

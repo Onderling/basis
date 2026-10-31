@@ -88,11 +88,26 @@ describe('spine statements only from the point', () => {
 
   it('the POINT is off: the box\'s act is held for it, and lands — signed by the point — when it is back', async () => {
     const roleOn = async (node, webid) => (((await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === webid)?.role ?? null);
-    const signedByBox = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).length;
-    const boxBefore = signedByBox();
+    // what the BOX signs itself (its rail's append), not what it stores — it also stores the point's statement by the fan
+    let boxAppends = 0;
+    const rail = A2.agent.membershipRail;
+    const origAppend = rail.append.bind(rail);
+    rail.append = async (...x) => { boxAppends += 1; return origAppend(...x); };
     const want = (await roleOn(B, C.pubKey)) === 'admin' ? 'member' : 'admin';
     await A.agent.sa.relay.disconnect();
+    // the point is REALLY off: its socket is closed and the relay has let go of its addresses (the close is async)
+    expect(await until(() => (A.agent.sa.relay.connected ? null : true), { timeout: 5000, step: 50 }), 'the phone is still connected').toBe(true);
+    await new Promise((res) => setTimeout(res, 800));
+    const forwards = [];
+    const peer = A2.agent.sa.peer;
+    const orig = peer.sendTo.bind(peer);
+    peer.sendTo = async (to, env, o) => { const out = await orig(to, env, o); if (env?.subtype === A2.agent.spineActSubtype) forwards.push(out); return out; };
     const r = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: want });
+    peer.sendTo = orig;
+    expect(forwards.length, 'the box forwarded nothing').toBeGreaterThanOrEqual(1);
+    // proven OFF: the phone holds no live relay socket while the box acts (the relay takes the act and queues it for the
+    // point's device address; "delivered" from the sender's side means the relay accepted it)
+    expect((A.agent.sa.relays?.list?.() ?? []).filter((x) => x.connected), 'the phone still has a live socket').toEqual([]);
     expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
     await new Promise((res) => setTimeout(res, 1500));
     expect(await roleOn(B, C.pubKey), 'nothing lands while the point is off').not.toBe(want);
@@ -100,7 +115,8 @@ describe('spine statements only from the point', () => {
     await bindCircleAddresses([A], GROUP);
     const landed = await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 30000, step: 300 });
     expect(landed, 'the held act never landed once the point was back').toBe(true);
-    expect(signedByBox(), 'the box signed it itself').toBe(boxBefore);
+    rail.append = origAppend;
+    expect(boxAppends, 'the box signed it itself').toBe(0);
     const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
     expect([...disputed]).not.toContain(A.pubKey);
   }, 120_000);

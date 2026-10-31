@@ -2655,7 +2655,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
     const act = payload.act ?? {};
     if (typeof act.circleId !== 'string' || !MEMBERSHIP_RAIL_KINDS.includes(act.kind)) return;
-    try { await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: act.actor }); }
+    // as the circle's own SELF — never an actor the forwarding device named
+    try { await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: circleSelfRef(act.circleId) }); }
     catch { /* the sibling's act is retried by nothing: it said 'forwarded' — the next act shows the roster as it is */ }
   };
   const localMembershipEmitRef = { current: null };
@@ -5211,8 +5212,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!to) return localMembershipEmit(act);   // the claim names a device this one cannot reach yet: as before
       const { signer: _signer, ...plain } = act;   // eslint-disable-line no-unused-vars
       try {
-        await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'membership', act: plain }, { guarantee: 'hold-forward' }, 'default');
-        return { forwarded: true };
+        const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'membership', act: plain }, { guarantee: 'hold-forward' }, 'default');
+        // `held`: the point is not online — the act waits for it (the screen says so)
+        return { forwarded: true, held: sent?.held === true };
       } catch { return null; }
     };
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);

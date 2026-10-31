@@ -441,5 +441,14 @@ export function createAgentRegistry({
     reload,
 
     get resourceUri() { return uri; },
+    /**
+     * Hear that the registry changed — wherever the change came from: its own writes (a sibling's profile facts land
+     * through them), the carrier's pull of a newer copy from the pod, a write beneath it. Where the pseudo-pod tells when
+     * the resource changes (`onRevision`); otherwise nothing is heard. Returns the unsubscribe.
+     */
+    onChanged(fn) {
+      if (typeof fn !== 'function' || typeof pseudoPod.onRevision !== 'function') return () => {};
+      return pseudoPod.onRevision(uri, () => fn());
+    },
   };
 }

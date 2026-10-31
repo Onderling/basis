@@ -32,6 +32,23 @@ describe('a contact filed under a persona talks to that persona', () => {
 
   afterAll(async () => { await teardown(phone, cor); await relay?.close?.(); });
 
+  /** Everything public of the default persona — its keys, not only its chat key: a contact who held any one of them
+   *  could link B to the default. */
+  const defaultMaterial = () => {
+    const d = phone.agent.persona('default');
+    const m = {
+      chat: d.chatId.pubKey,
+      personKey: d.personKeyPubOf?.(d.personKey ?? d.initialPersonKey) ?? null,
+      authority: d.authorityPubKeyB64 ?? null,
+      wireDevice: d.enrolledDevice?.deviceId ?? null,
+    };
+    for (const [k, v] of Object.entries(m)) expect(v, `the default has a ${k}`).toBeTruthy();
+    return m;
+  };
+  const carriesNoneOfTheDefault = (text, where) => {
+    for (const [k, v] of Object.entries(defaultMaterial())) expect(text.includes(v), `${where} carries the default's ${k}`).toBe(false);
+  };
+
   it('Cor receives the turn from B — never from the default, and nothing of the default rides along', async () => {
     const A = phone.pubKey;
     const before = cor.received.length;   // (the harness's own connect greets everyone first — not the contact's doing)
@@ -41,9 +58,8 @@ describe('a contact filed under a persona talks to that persona', () => {
     expect(inB, 'Cor has it from B').toBeTruthy();
     expect(((await cor.contactThreadChannel.rehydrate(A)) ?? []).length, 'and nothing from the default').toBe(0);
     // ...and nothing of the default reached Cor at all: not in what arrived, not in Cor's book
-    expect(JSON.stringify(cor.received.slice(before)).includes(A), 'no byte of the default in what reached Cor since the turn').toBe(false);
-    const book = JSON.stringify((await cor.agent.callSkill('pinboard', 'listContacts', {})) ?? {});
-    expect(book.includes(A), 'the default is not in Cor\'s book').toBe(false);
+    carriesNoneOfTheDefault(JSON.stringify(cor.received.slice(before)), 'what reached Cor since the turn');
+    carriesNoneOfTheDefault(JSON.stringify((await cor.agent.callSkill('pinboard', 'listContacts', {})) ?? {}), 'Cor\'s book');
   }, 60_000);
 
   it('the pair circle that forms is B\'s with Cor, never the default\'s', async () => {
@@ -62,16 +78,15 @@ describe('a contact filed under a persona talks to that persona', () => {
   }, 90_000);
 
   it('Cor\'s book learns B from B\'s own card — B\'s key, B\'s address — and nothing of the default', async () => {
-    const A = phone.pubKey;
     const row = await until(async () => (((await cor.agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === B.chatId.pubKey) ?? null), { timeout: 20_000, step: 200 });
     expect(row, 'Cor has a contact row for B, from the card the turn carried').toBeTruthy();
-    expect(JSON.stringify(row).includes(A), 'B\'s card carries no byte of the default').toBe(false);
+    carriesNoneOfTheDefault(JSON.stringify(row), 'Cor\'s row for B');
     // the card the phone hands out AS B, inspected whole
     const card = await phone.agent.callSkill('pinboard', 'getContactShareQr', { persona: personaId });
     const decoded = decodeContactCard(card?.payload);
     expect(decoded, 'a card').toBeTruthy();
     const text = JSON.stringify(decoded);
-    expect(text.includes(A), 'the persona card names nothing of the default').toBe(false);
+    carriesNoneOfTheDefault(text, 'the persona card');
     expect(text.includes(B.chatId.pubKey), 'it names B').toBe(true);
   }, 60_000);
 });

@@ -24,6 +24,8 @@ describe('a screen head', () => {
     expect(await h.head.land('k1')).toEqual([{ key: 'k1', run: 1 }]);
     expect(await h.head.land('k1')).toEqual([{ key: 'k1', run: 1 }]);
     expect(h.runs()).toBe(1);
+    expect(h.head.isFresh('k1')).toBe(true);
+    expect(h.head.isFresh('k2')).toBe(false);
   });
 
   it('a change while shown refolds ONCE after the wait, and tells the screen', async () => {

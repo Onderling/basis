@@ -121,7 +121,7 @@ export function createAgentRegistry({
     try {
       const before = revisionNow();
       const result = await pseudoPod.write(uri, body, etag);
-      // this registry's own write: what it holds follows it, when the write was the one change beneath it (#935's rule)
+      // this registry's own write: what it holds follows it, when the write was the one change beneath it (the circle stores' rule)
       const after = revisionNow();
       held = typeof before === 'number' && after === before + 1 ? { rev: after, body: normaliseResource(body), etag: result?.etag ?? null } : null;
       // Snapshot the just-written resource (recovery). Best-effort: a versioning failure must

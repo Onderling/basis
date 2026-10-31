@@ -642,6 +642,13 @@ composed of best-effort seams — so **a seam is not done until something crosse
 this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival
 ([`apps/basis/test/perTypeSyncMatrix.test.js`](../apps/basis/test/perTypeSyncMatrix.test.js)).
 
+**A screen's data is a head, not a read per landing.** Vandaag's blocks (and, next, Mij's) are held as last read for
+the landing's key (`src/v2/screenHead.js`) — a projection in memory for the session, never persisted. What makes it
+stale is what changes it: the circles' items (`agent.onCircleChanged` — this node's own writes and members' items
+that landed, every shell by construction), the event log (chat, unread, news), a different key (the page, the circles
+shown, the selves), and an act of the person's own that writes no store (`invalidate()`). Stale while shown is one
+read after a short wait; stale while hidden waits for the next landing, so an idle screen does no work.
+
 **Reading across circles is ONE projection per noun, rows tagged with their circle.** "My things", "my agenda" —
 any item type across the circles a person is in — is `acrossCircles` (`src/v2/acrossCircles.js`): per circle the
 type's own `list` (its bespoke op where the manifest declares one, else the generic store handler, through

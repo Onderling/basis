@@ -109,6 +109,9 @@ const VALID_MODES = new Set(PSEUDO_POD_MODES);
  *   lives INSIDE the pseudo-pod (not a wrapper) so peer writes can't bypass
  *   it via a stale inner reference — NotifyEnvelope et al. hold this object.
  */
+/** Each backend's per-key revision, shared by every pseudo-pod over it (a WeakMap: a dropped backend takes its counts). */
+const REVISIONS_BY_BACKEND = new WeakMap();
+
 /**
  * Create a PseudoPod — the Solid-shaped local store. `mode` sets the global behaviour: `standalone`
  * (local only), `replication-ring` (writes fan out to peers via `transport.publishEnvelope`;
@@ -124,9 +127,6 @@ const VALID_MODES = new Set(PSEUDO_POD_MODES);
  *   `drainWriteThroughQueue` / `listWriteThroughPending` / `writeThroughPendingCount`, plus
  *   introspection getters (`deviceId`, `backend`, `currentMode`, …).
  */
-/** Each backend's per-key revision, shared by every pseudo-pod over it (a WeakMap: a dropped backend takes its counts). */
-const REVISIONS_BY_BACKEND = new WeakMap();
-
 export function createPseudoPod({
   backend: backendIn,
   mode,

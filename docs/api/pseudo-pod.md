@@ -92,7 +92,7 @@ without re-hardcoding the vocabulary here and drifting apart.
 **Kind:** function · **Import:** `createPseudoPod` from `'@onderling/pseudo-pod'`
 
 ```js
-createPseudoPod({ backend: backendIn, mode, deviceId, transport, getPeers, fromActor, podFetcher, podUploader, isPodReachable, versioning, } = {})
+createPseudoPod({ backend, mode, deviceId, transport, getPeers, fromActor, podFetcher, podUploader, isPodReachable, versioning, } = {})
 ```
 
 Create a PseudoPod — the Solid-shaped local store. `mode` sets the global behaviour: `standalone`

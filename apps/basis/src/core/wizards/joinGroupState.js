@@ -834,13 +834,13 @@ export async function finalSubmit({
     // is sent — what the wizard already knows (`secondPersonaRefusal`), and what the device's own bind says.
     const refused = secondPersonaRefusal(state);
     if (refused) throw alreadyInAsError(refused.personaId);
-    if (state.invite?.groupId) {
+    if (asPersona && state.invite?.groupId) {
       const bound = await callSkill('household', 'bindCirclePersona', {
         circleId: state.invite.groupId, personaId: asPersona,
-        ...(asPersona && typeof state.invite.relayUrl === 'string' && state.invite.relayUrl ? { relayUrl: state.invite.relayUrl } : {}),
+        ...(typeof state.invite.relayUrl === 'string' && state.invite.relayUrl ? { relayUrl: state.invite.relayUrl } : {}),
       }).catch((err) => ({ ok: false, reason: err?.message ?? 'bind-failed' }));
       if (bound?.reason === 'already-in-as') throw alreadyInAsError(bound.personaId);
-      if (asPersona && !bound?.ok) throw Object.assign(new Error(`persona-not-bound: ${bound?.reason ?? 'unknown'}`), { reason: 'persona-not-bound' });
+      if (!bound?.ok) throw Object.assign(new Error(`persona-not-bound: ${bound?.reason ?? 'unknown'}`), { reason: 'persona-not-bound' });
     }
     const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
     // carry the joiner's declined caps out with the success envelope so the host records
@@ -1042,6 +1042,14 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     : {};
 
   if (inv?.kind === 'membershipCode' && inv.code && inv.groupId) {
+    // ONE SELF PER CIRCLE ON A DEVICE, for a join as the general persona too: the device's bind says whether this circle
+    // is held here by another self (a persona join asked it already, binding the circle to that persona).
+    const asPersona = typeof state.persona === 'string' && state.persona && state.persona !== 'default';
+    if (!asPersona) {
+      const held = await callSkill('household', 'bindCirclePersona', { circleId: inv.groupId, personaId: null })
+        .catch(() => null);
+      if (held?.reason === 'already-in-as') throw alreadyInAsError(held.personaId);
+    }
     // Path A — membershipCode. The join handle becomes the person's handle — unless the caller said it is for this
     // circle's row only (`profileHandle: false`: the pair roster's derived placeholder for a person without one).
     if (state.profileHandle !== false) {

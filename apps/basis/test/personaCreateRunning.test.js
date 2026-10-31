@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
 import { VaultMemory } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
-import { Bootstrap, b64encode, verifyDeviceDelegation, deriveDeviceSeed, deriveCircleAddress } from '@onderling/core';
+import { Bootstrap, b64encode, verifyDeviceDelegation, deriveDeviceSeed, deriveCircleAddress, deriveCircleRoot } from '@onderling/core';
 import { profilePubKey } from '@onderling/agent-registry';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 
@@ -37,7 +37,7 @@ describe('a created persona runs as its own identity (N = 2 on one device, no wi
     expect(rec.deviceId).toMatch(WIRE);
     expect(rec.deviceId).not.toBe(d.enrolledDevice.deviceId);
     expect(rec.pubKey).not.toBe(d.enrolledDevice.record.pubKey);
-    expect(b.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(deriveDeviceSeed(root.deriveAgentSeed(id), rec.deviceId), CIRCLE));
+    expect(b.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(deriveCircleRoot(root.deriveAgentSeed(id), 0), CIRCLE));
     expect(b.circleAddressFor(CIRCLE)).not.toBe(d.circleAddressFor(CIRCLE));
     // nothing root-level, and not the default's authority
     expect(verifyDeviceDelegation(rec)).toBe(true);

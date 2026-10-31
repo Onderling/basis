@@ -185,7 +185,7 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
     const storage = memStorage();
     expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('A2-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('A2-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     const enrolled = await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'tablet' });
     expect(enrolled.ok).toBe(true);
@@ -217,15 +217,22 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
     expect(consumed.cleared, 'a fully bootstrapped offer clears its stash').toBe(true);
     expect(await pendingEnrollOffer(storage)).toBeNull();
 
-    // (a) The SIBLING learned the new device: A's own roster row grows into the proven SET —
-    // exactly what the enroll walk used to hand-carry.
+    // (a) The SIBLING learned the new device — in its DEVICE MAP (the new device introduced itself at the sibling's
+    // device address), not on the roster: both present the person's one address in the circle, so A's row is unchanged.
     const addrA2 = A2.agent.circleAddressFor(CIRCLE);
-    const grew = await until(async () => {
-      const r = await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
-      const mine = (r?.members ?? []).find((m) => m.webid === A.pubKey);
-      return mine?.circleAddresses?.includes(addrA2) ? true : null;
+    expect(addrA2, 'one address per persona per circle').toBe(A.agent.circleAddressFor(CIRCLE));
+    const learned = await until(async () => {
+      const devices = await A.agent.ownDeviceAddressesOf('default');
+      return devices.includes(A2.agent.ownDeviceAddress('default')) ? true : null;
     }, { timeout: 15000, step: 100 });
-    expect(grew, 'the announce never grew the sibling\'s roster set').toBe(true);
+    expect(learned, 'the sibling never learned the new device in its device map').toBe(true);
+    // …and the co-member sees one member, one address (no device count)
+    const onB = await until(async () => {
+      const r = await B.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
+      const row = (r?.members ?? []).find((m) => m.webid === A.pubKey);
+      return row ? [...new Set([row.circleAddress, ...(row.circleAddresses ?? [])].filter(Boolean))] : null;
+    }, { timeout: 10000, step: 100 });
+    expect(onB, 'one address on the co-member\'s row').toEqual([addrA2]);
 
     // (b) The registry membership record on the NEW device carries the handle + its OWN derived
     // address — what reopenMemberCircles reads on every future boot.
@@ -287,7 +294,7 @@ describe('the enroll offer — the sibling is not there when the new device firs
     expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
 
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('A2-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('A2-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'tablet' })).ok).toBe(true);
     await teardown(pre);

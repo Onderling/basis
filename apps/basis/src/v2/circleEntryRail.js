@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -166,11 +166,15 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */
   async function bindingOk(author, ref, circleId, kind = null, payload = null, subject = null, atSeq = null) {
-    try {
-      const mine = await signerFor(circleId);
-      const myId = mine?.identity ?? mine;
-      if (myId?.pubKey === author) return (mine?.ref ?? myId.pubKey) === ref;
-    } catch { /* fall through to the foreign resolver */ }
+    // Self-binding — but never for a CEREMONY kind: that binds only by the root's reveal (the binding verifier's rule),
+    // and a person's full devices share one circle key, so "signed with my key" includes a lost device of mine.
+    if (!isCeremonyKind(kind)) {
+      try {
+        const mine = await signerFor(circleId);
+        const myId = mine?.identity ?? mine;
+        if (myId?.pubKey === author) return (mine?.ref ?? myId.pubKey) === ref;
+      } catch { /* fall through to the foreign resolver */ }
+    }
     if (typeof verifyBinding === 'function') {
       try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq })); } catch { return false; }
     }

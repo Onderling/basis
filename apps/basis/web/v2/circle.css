@@ -288,14 +288,6 @@
 .circle-tile__name { font-family: var(--font-sans); font-size: 16px; font-weight: 600; color: var(--ink); }
 .circle-tile__meta { font-size: 12px; color: var(--ink-soft); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* P6.3 — unread badge (board 5A): small red circle with the count. */
-/* a circle an admin removed you from: kept, quieter, marked, until you close it */
-.circle-tile.is-removed { opacity: 0.75; }
-.circle-tile__removed {
-  flex: 0 0 auto; padding: 2px 8px; border-radius: 10px;
-  border: 1px solid var(--line); color: var(--ink-soft, inherit);
-  font-family: var(--font-sans); font-size: 12px; line-height: 1.4;
-}
-.circle-view__close-removed { margin-left: 8px; }
 .circle-tile__unread {
   flex: 0 0 auto; min-width: 22px; height: 22px; padding: 0 6px;
   display: inline-flex; align-items: center; justify-content: center;

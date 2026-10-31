@@ -45,13 +45,6 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
         return raw;
       });
     },
-    // The circles an admin removed this person from: shown as tiles, MARKED and read-only, until they close them. A
-    // list of its own, on purpose: the launcher's main list feeds sharing, invites, presence and every per-circle act,
-    // and none of those may reach a circle the person is out of. Only the tile painter reads this.
-    fetchRemoved: async () => {
-      const res = await call('listMyCircles');
-      return (Array.isArray(res?.removed) ? res.removed : []).filter((r) => r?.id).map((r) => ({ id: r.id, name: r.name || r.id, removed: true }));
-    },
     // NO `fetchCircles` here. It used to read an optional `@onderling/circles` store off the agent — and
     // nothing has EVER assigned `agent.circlesStore`, on any branch, in 4,422 commits. So the branch was
     // permanently `undefined`: the source silently never existed, with no error and no warning. Its test

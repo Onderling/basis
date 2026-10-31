@@ -96,7 +96,7 @@ describe('sealed-pod membership — leave', () => {
     const bundle = await buildBundle({ controlAgent: ca });
     await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const r = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, BOB);
-    expect(r.error).toBeUndefined();
+    expect(r.leaveMarkerId).toBeTruthy();
     // `force: true` — a departure is not refusable, so the key custodian's ≥1-admin guard must not be
     // what decides whether the leave rotates. See the note at the `revokeKey` call in
     // `@onderling/circles` leaveGroup; the rotation itself is asserted at the bottom of this file.
@@ -106,7 +106,7 @@ describe('sealed-pod membership — leave', () => {
   it('leaveGroup with no control-agent still works', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, BOB);
-    expect(r.error).toBeUndefined();
+    expect(r.leaveMarkerId).toBeTruthy();
   });
 });
 
@@ -156,7 +156,7 @@ describe('sealed-pod membership — a leave ROTATES the group key (forward secre
     expect(canUnwrap(before, bobSeal.privateKey)).toBe(true);
 
     const left = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, BOB);
-    expect(left.error).toBeUndefined();
+    expect(left.leaveMarkerId).toBeTruthy();
 
     const after = ca.current();
     expect(after.version).toBe(before.version + 1);              // the key actually rotated
@@ -177,7 +177,7 @@ describe('sealed-pod membership — a leave ROTATES the group key (forward secre
     // The circle's only admin walks out. The circle is not stranded — the roster fold appoints a
     // caretaker from the remaining members — so there is nothing here to protect by refusing.
     const left = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, ADMIN);
-    expect(left.error).toBeUndefined();
+    expect(left.leaveMarkerId).toBeTruthy();
 
     const after = ca.current();
     expect(after.version).toBe(before.version + 1);               // ← this is what silently did not happen

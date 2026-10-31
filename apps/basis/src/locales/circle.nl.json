@@ -381,18 +381,6 @@
     "someone_joined": {
       "text": "{{name}} is lid geworden van deze kring.",
       "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
-    },
-    "removed_mark": {
-      "text": "verwijderd",
-      "doc": "The mark on a circle tile an admin removed you from; the tile stays (read-only) until you close it."
-    },
-    "removed_note": {
-      "text": "Je bent uit deze kring gehaald. Je kunt nog lezen wat je had; sluiten haalt de kring weg.",
-      "doc": "Said on the tile and in place of the composer of a circle an admin removed you from: you are out, what you had stays readable, and closing takes the circle away from this device."
-    },
-    "removed_close": {
-      "text": "Sluiten",
-      "doc": "The button that closes a circle you were removed from: forgets what this device held of it."
     }
   },
   "members_tab": {

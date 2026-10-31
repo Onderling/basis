@@ -126,7 +126,7 @@ import { boxStores } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
-import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
@@ -333,8 +333,7 @@ const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
   chatVault,
   vaultFor: agentVaultFor,
-  // this process is the only writer of its registry files: the registry may keep what it read (`singleWriter`)
-  registryBackend: Object.assign(createNodeFsBackend({ dir: contentPaths.registry }), { singleWriter: true }),
+  registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
   pinboardPersistDb:     { path: contentPaths.pinboard },
   householdPersistDb: { path: contentPaths.household },
   tasksPersistDb:     { path: contentPaths.tasks },
@@ -762,10 +761,9 @@ if (relayUrl) {
   // address alone: a circle's fan to its per-circle address went to a relay that had never heard of
   // it, and "a full member of your circles" was true of the lanes and false of the wire.
   const registerCirclePresence = async (extraCircleIds = []) => {
-    let mine = null;
-    try { mine = await callSkill('pinboard', 'listMyCircles', {}); } catch { mine = null; }
-    // …minus a circle the fold says was left or removed (the one shared filter every shell asks)
-    const circleIds = presenceCircleIds(mine, mine?.circles, extraCircleIds);
+    let ids = [];
+    try { ids = ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean); } catch { ids = []; }
+    const circleIds = [...new Set([...ids, ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : [])])];
     if (circleIds.length === 0) return;
     await primeCircleSecurity({ agent, circleIds }).catch((err) => console.warn('device-runner: circle security priming failed:', err?.message ?? err));
     if (!agent.relay?.supportsAliases) return;

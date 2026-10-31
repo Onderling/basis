@@ -25,7 +25,6 @@ export function normalizeCircle(raw = {}) {
     memberCount,
     lastActivity: raw.lastActivity ?? raw.lastMessageAt ?? raw.updatedAt ?? null,
     features: Array.isArray(raw.features) ? raw.features : null,
-    ...(raw.removed === true ? { removed: true } : {}),
   };
 }
 
@@ -79,14 +78,6 @@ export async function loadCircles({ fetchTasksCircles, fetchGroups, fetchCircles
   ]);
   // A pair roster (a contact's, made automatically — `pairRoster.js`) is never a tile.
   return mergeCircles(tasksCircles, groups, circles).filter((c) => !isPairCircleId(c?.id)).sort(byActivityThenName);
-}
-
-/**
- * The circles an admin removed this person from, as tiles (`{id, name, removed: true}`): never merged into
- * `loadCircles`' list, whose every reader acts on a circle the person is in.
- */
-export async function loadRemovedCircles({ fetchRemoved } = {}) {
-  return (await safe(fetchRemoved)).map(normalizeCircle).filter(Boolean).sort(byActivityThenName);
 }
 
 async function safe(fn) {

@@ -177,7 +177,7 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     const storage = memStorage();
     expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('A2-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('A2-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'tablet' })).ok).toBe(true);
     await teardown(pre);

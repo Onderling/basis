@@ -120,7 +120,7 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
 
     addrP = P.agent.circleAddressFor(GROUP);
     addrL = L.agent.circleAddressFor(GROUP);
-    expect(addrL).not.toBe(addrP);   // per-DEVICE circle addresses under one member
+    expect(addrL).toBe(addrP);   // one address per persona per circle: both devices present the member's one address
 
     // L's re-announce reaches P (and its own row grows on B's side in production the same way);
     // P's OWN roster row becoming the SET is what gives the grants fan its sibling target.

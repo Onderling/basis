@@ -126,7 +126,10 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     expect(r.known, 'A never held the revoked device\'s record').toBe(false);
     expect(r.circles).toBeGreaterThanOrEqual(1);
     expect(r.revokedIn.map((x) => x.circleId)).toContain(GROUP);
-    expect(r.revokedIn.find((x) => x.circleId === GROUP).address).toBe(addrA2);
+    // what is retired in the circle is the address the revoked device's OWN seed derives (a device from before the circle
+    // root presents it) — never the persona's one address, which every remaining device presents: that stays
+    expect(r.revokedIn.find((x) => x.circleId === GROUP).address).not.toBe(addrA2);
+    expect(A.agent.circleAddressFor(GROUP)).toBe(addrA2);
 
     // The registry tombstone — the durable subject revocation acts on.
     const props = (await A.agent.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {};
@@ -134,22 +137,16 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     expect(rec?.revoked).toBe(true);
 
     expect(r.migrated, 'a second ceremony before the reload must not migrate the device again').toBeUndefined();
-    // A's OWN fold retires the thief's address at once; A's own address stays (it was the device's from its
-    // first boot, and the cutover kept it).
+    // The thief's device is a FULL device: it presents the persona's one address, which stays on every row — retiring
+    // it would take the person out. Its device is tombstoned above (no sibling send reaches it); what closes its reach
+    // in the circle is the full-device RE-KEY (a new epoch, a new address), which has its own test.
+    expect(addrA2).toBe(addrA);
     const aRow = await rowFor(A, A.pubKey);
-    expect(aRow?.circleAddresses ?? []).not.toContain(addrA2);
-    expect(aRow?.circleAddresses).toContain(addrA);
-    expect(aRow?.circleAddress).toBe(addrA);
-    // …and B's follows over the wire, through the production ingest + fold.
-    await until(async () => {
-      const row = await rowFor(B, A.pubKey);
-      return row && !(row.circleAddresses ?? []).includes(addrA2) ? row : null;
-    }, { timeout: 15000, step: 100 });
-    // the MEMBER stays, on both ends — and B really retired the address (a null from `until` must not pass)
-    expect(await rowFor(A, A.pubKey)).toBeTruthy();
-    const bRowAfter = await rowFor(B, A.pubKey);
-    expect(bRowAfter).toBeTruthy();
-    expect(bRowAfter.circleAddresses ?? [], 'B retired the revoked address').not.toContain(addrA2);
+    expect([aRow?.circleAddress, ...(aRow?.circleAddresses ?? [])].filter(Boolean)).toContain(addrA);
+    // …and on B the member stays with the persona's one address (the re-key is what moves it)
+    const bRowAfter = await until(async () => rowFor(B, A.pubKey), { timeout: 15000, step: 100 });
+    expect(bRowAfter, 'the member stays on B').toBeTruthy();
+    expect([bRowAfter.circleAddress, ...(bRowAfter.circleAddresses ?? [])].filter(Boolean)).toContain(addrA);
 
     // idempotent: revoking again is still ok (the tombstone already stands)
     const again = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
@@ -207,10 +204,9 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const banned = rotations.filter((r) => r.groupId === GROUP);
     expect(banned.length, 'the ceremony banned nothing in this circle').toBeGreaterThanOrEqual(1);
     expect(banned.every((r) => r.policy === 'ban')).toBe(true);
-    expect(
-      banned.map((r) => r.publicKey),
-      "the stolen device's sealing key was never banned — the island can still be re-admitted by a pod fetch",
-    ).toContain(sealingPublicKeyFromNetworkKey(addrA2));
+    // the ban is on the stolen device's DEVICE-derived sealing key (a device from before the circle root sealed with it) —
+    // never on the persona's, which every remaining device opens with; the re-key moves that one
+    expect(banned.map((r) => r.publicKey), 'the persona\'s own sealing key was banned').not.toContain(sealingPublicKeyFromNetworkKey(addrA2));
     expect(
       banned.map((r) => r.publicKey),
       'the SURVIVING device was banned from its own circle',

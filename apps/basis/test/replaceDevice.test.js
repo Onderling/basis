@@ -11,7 +11,6 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { openAcrossKeyChain, sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import {
   bootRealAgentNode, connectNodesOverBus, pairCircle, sealCircleViaProducer, postSealed, readSealed, until, teardown,
 } from './support/pairRealAgents.js';
@@ -73,7 +72,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     expect(A2.pubKey, 'one person: the same webid').toBe(A.pubKey);
     const addrA = A.agent.circleAddressFor(GROUP);
     const addrA2 = A2.agent.circleAddressFor(GROUP);
-    expect(addrA2).not.toBe(addrA);
+    expect(addrA2).toBe(addrA);   // one address per persona per circle
     const mine = ownAnnouncementFor({ agent: A2.agent, circleId: GROUP });
     for (const node of [A, B, A2]) {
       await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...mine });
@@ -101,47 +100,28 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const r = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: phrase, circleIds: [GROUP] });
     expect(r.ok, r.error).toBe(true);
     expect(r.firstDeviceRetired, "the first phone is retired by derivation — its id derives from the root, so the new phone never needed its record").toBe(true);
-    expect(r.retiredIn.map((x) => x.address)).toContain(addrA);
-    expect(r.historyKeys, 'the old key opened the chain; the keys came along').toBeGreaterThanOrEqual(1);
-
-    // JOURNEY 1 — sealed history opens on the new phone, through the sidecar, with nobody re-keying anything.
-    const chain = await A2.agent.historyKeyChainFor(GROUP);
-    expect(openAcrossKeyChain(beforeEnv, chain)).toBe(before);
-
-    // The old address is retired on Bram's roster — the root reveal bound there; the member stays.
-    await until(async () => {
-      const row = await rowFor(B, A.pubKey);
-      return row && !(row.circleAddresses ?? []).includes(addrA) && (row.circleAddresses ?? []).includes(addrA2) ? row : null;
-    }, { timeout: 15000, step: 100 });
-    expect(await rowFor(B, A.pubKey)).toBeTruthy();
-
-    // JOURNEY 2 — the old phone is cut off from what comes next: A2 (an admin) rotated to v2, fanned to
-    // Bram (a survivor) and not to the retired sealing key.
-    expect(r.rotated.map((x) => x.circleId)).toContain(GROUP);
-    const v2 = r.rotated.find((x) => x.circleId === GROUP).version;
-    await until(() => B.keyEventStore.has(GROUP, v2), { timeout: 15000, step: 100 });
-    const events = (await A2.agent.keyRail.readVerifiedBodies(GROUP)).bodies.filter((b) => b.payload?.event?.version === v2);
-    expect(events[0].payload.event.recipients).not.toContain(sealingPublicKeyFromNetworkKey(addrA));
-    expect(events[0].payload.event.recipients).toContain(sealingPublicKeyFromNetworkKey(addrA2));
-
-    // …and the old phone is REALLY cut off: content sealed under the new version opens for Bram and not for
-    // the old phone, whose per-circle sealing key is not a recipient any more (one key family).
+    // what it retires in the circle is the old phone's DEVICE-derived address (a device from before the circle root
+    // presented it) — never the persona's one address, which the new phone presents too; the re-key moves that one
+    expect(r.retiredIn.map((x) => x.address)).not.toContain(addrA);
+    expect(A2.agent.circleAddressFor(GROUP)).toBe(addrA);
+    // JOURNEY 1 — sealed history opens on the new phone: it holds the persona's circle key (the old phone's too), so the
+    // chain opens as it is — nothing needed bringing along.
     await projectKeyEventsIntoStore({ rail: A2.agent.keyRail, store: A2.keyEventStore, circleId: GROUP });
+    expect(readSealed(A2, beforeEnv, GROUP), 'the new phone reads what was sealed before it').toBe(before);
+
+    // The member stays on Bram's roster with the persona's one address.
+    const bRow = await until(async () => rowFor(B, A.pubKey), { timeout: 15000, step: 100 });
+    expect([bRow.circleAddress, ...(bRow.circleAddresses ?? [])].filter(Boolean)).toContain(addrA);
+
+    // THE WINDOW, stated (the stable point §7): the old phone is a FULL device holding the persona's circle key, so a
+    // group-key rotation that keeps the person a recipient keeps the old phone one too — it can read what comes next
+    // until the full-device RE-KEY moves the persona to a new epoch (its own test shows the old phone cut off then).
+    // (no group-key rotation here: the old phone's key IS the persona's, so there is no recipient to drop — the re-key
+    // is what rotates past it)
     const after = `na de wissel ${Date.now().toString(36)}`;
     const afterEnv = await postSealed({ admin: A2, members: [B, A], groupId: GROUP, text: after });
-    await until(() => B.sealedContent.length >= 2 && A.sealedContent.length >= 1);
+    await until(() => B.sealedContent.length >= 2);
     expect(readSealed(B, afterEnv, GROUP), 'Bram reads what comes next').toBe(after);
-    expect(() => readSealed(A, afterEnv, GROUP), 'the old phone cannot').toThrow();
-
-    // The retired address keeps its PAST: the key chain the old phone established (v1) is still
-    // folded on both devices after its address was retired, because those statements landed on each log
-    // before the revocation did. Without this the circle's own chain vanished with the device.
-    for (const node of [A2, B]) {
-      const versions = (await keyEventsFromRail(node.agent.keyRail, GROUP)).map((e) => e.version);
-      expect(versions, `${node.label}: v1 by the retired device still folds`).toContain(1);
-    }
-    const bRowNow = await rowFor(B, A.pubKey);
-    expect(bRowNow.retiredAddresses?.map((r) => r.address), 'the roster row remembers the retired address').toContain(addrA);
 
     // The wrong phrase is refused; running it again is harmless.
     const wrong = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' });

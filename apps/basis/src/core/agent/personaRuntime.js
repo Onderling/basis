@@ -183,9 +183,10 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     console.warn(`[realAgent] persona "${profileId}" holds no circle root on this device — it keeps its device's own circle addresses until a phrase ceremony hands it one`);
     return null;
   })();
-  // Held, not yet presented: the per-circle keys below still derive from this device's own root, so every device keeps its
-  // own address per circle until the switch to the persona's one address (and the migration that announces it).
-  const circleSeed = deviceDerivationSeed;
+  // What the per-circle keys below derive from: the persona's circle root, so every full device of the persona presents
+  // ONE address per circle. A delegated device from before the root was handed keeps its own device-derived keys (and
+  // its own address) until a phrase ceremony hands it the root.
+  const circleSeed = circleRoot?.seed ?? deviceDerivationSeed;
 
   // The per-circle SIGNING identity, one per circle, memoised — derived from `circleSeed` above. The vault is
   // deliberately EPHEMERAL: a per-circle key written to storage is one more copy of the thing we are trying not to

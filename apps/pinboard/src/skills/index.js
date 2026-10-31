@@ -1251,9 +1251,6 @@ export function buildSkills({
   // rail's VERIFIED bodies for the roster fold. Absent → the legacy store-based spine path, unchanged.
   membershipEmit,
   membershipRead,
-  // Let go of ONE circle's content on this device (host-injected `(circleId) => Promise<{ok}>`): its store's rows and its
-  // device-log entries, beneath the store. Closing a circle you were removed from uses it. Absent → nothing to forget.
-  forgetCircleContent = null,
   // The person key this device announces on a join or create (host-injected `() => {version, pubKey} | null`).
   currentPersonKey = null,
   // THE PERSON'S OWN PROFILE (handle, display name, availability, place) — lib/selfProfile.js; the host injects it over
@@ -2960,37 +2957,6 @@ export function buildSkills({
     }, {
       description: 'List the circle groupIds the calling actor is a member or admin of, with the names people gave them.',
       visibility:  'authenticated',
-    }),
-    /**
-     * CLOSE a circle an admin removed me from. Refused unless the fold says so (my last word there is an `evict` and I
-     * am off its roster) — never a way to drop a circle I am in. Forgets what this device held of it (the store's rows,
-     * the device-log entries) and the rows here that listed it, so it is in neither list and a restart keeps it gone.
-     * All of it local, beneath the stores: no member hears of it.
-     */
-    defineSkill('dismissRemovedCircle', async ({ parts, from }) => {
-      const groupId = dataArgs(parts)?.groupId;
-      if (typeof groupId !== 'string' || !groupId) return { ok: false, error: 'missing-groupId' };
-      let folded = null;
-      let rows = null;
-      try {
-        rows = await projectCircleRoster({
-          store: scope.store, groupId, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
-          selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
-        });
-      } catch { rows = null; }
-      const onRoster = Array.isArray(rows) && rows.some((m) => (m?.webid ?? m?.id) === from);
-      if (folded?.lastExit?.[from] !== 'evict' || onRoster) return { ok: false, error: 'not-removed' };
-      const listing = [
-        ...(await store.listOpen({ type: 'membership-redemption' })),
-        ...(await store.listOpen({ type: 'group-rules' })),
-      ].filter((it) => it?.source?.groupId === groupId);
-      if (listing.length === 0) return { ok: false, error: 'not-removed' };   // already closed here
-      const forgot = typeof forgetCircleContent === 'function' ? await forgetCircleContent(groupId) : null;
-      const dropped = await store.removeItems(listing.map((it) => it.id), { actor: localActor });
-      return { ok: true, rows: forgot?.rows ?? 0, entries: forgot?.entries ?? 0, listed: dropped.length };
-    }, {
-      description: 'Close a circle an admin removed you from: forget what this device held of it. Refused for a circle you are in.',
-      visibility:  'private',
     }),
 
     /**

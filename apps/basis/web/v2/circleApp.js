@@ -1777,7 +1777,13 @@ let circleAvailabilityNow = null;
 if (typeof window !== 'undefined') {
   /** The relays this device is on — the primary and the ones its circles ride (an e2e/debug seam). */
   window.onderlingRelays = () => {
-    try { return (_peerAgent?.relays?.list?.() ?? []).map((r) => ({ url: r.url, primary: r.primary, connected: r.connected })); }
+    try {
+      return (_peerAgent?.relays?.list?.() ?? []).map((r) => {
+        const reg = r.port?.registrations ?? r.transport?.registrations ?? null;
+        const short = (a) => String(a).slice(0, 10);
+        return { url: r.url, primary: r.primary, connected: r.connected, ...(reg ? { asked: reg.asked.map(short), acked: reg.acked.map(short) } : {}) };
+      });
+    }
     catch { return []; }
   };
   /** @param {object[]} [items] the rows in front of the walker, if it is looking at a list. */

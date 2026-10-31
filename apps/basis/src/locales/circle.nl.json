@@ -214,9 +214,9 @@
           "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld — niets bij een eerste keer. Later aanpassen kan bij Mij → persona's.",
           "doc": "Join wizard — persona disclosure hint."
         },
-        "second_warning": {
-          "text": "Je bent al lid van deze kring als {{persona}}. Doe je mee als een andere persona, dan ben je hier twee leden, en de anderen kunnen niet zien dat het allebei jij bent.",
-          "doc": "Join wizard — a warning when this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One member per persona: only the person's own device can tell."
+        "already_in": {
+          "text": "Je bent hier al als {{persona}} — met een andere persona kan dat vanaf een ander apparaat.",
+          "doc": "Join wizard — refused: this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One self per circle on a device; two personas in one circle need two devices."
         }
       },
       "reveal": {

@@ -352,6 +352,21 @@ export async function loadPersonas({ callSkill } = {}) {
  * @param {{id: string, name?: string}} p
  * @param {(key: string, vars?: object) => string} t
  */
+/**
+ * The sentence a failed join shows: its locale key with what the key names (the persona already there), or the raw
+ * failure when the cause had no key. Both wizards render this one.
+ * @param {object} state  the join wizard's state after a failed submit
+ * @param {Function} t     the translator
+ * @returns {string|null}
+ */
+export function submitErrorText(state, t) {
+  if (!state?.submitErrorKey) return state?.submitError ?? null;
+  const pid = state.submitErrorParams?.personaId;
+  if (!pid) return t(state.submitErrorKey);
+  const held = (state.personas ?? []).find((p) => p?.id === pid) ?? { id: pid };
+  return t(state.submitErrorKey, { persona: personaLabel(held, t) });
+}
+
 export function personaLabel(p, t) {
   const own = typeof p?.name === 'string' && p.name && p.name !== p.id ? p.name : null;
   if (p?.id !== 'default') return own ?? String(p?.id ?? '');
@@ -570,7 +585,7 @@ export async function prepareJoinIdentity({ state, callSkill, circles, profileId
   state.revealPreset = resolveJoinRevealPreset({ personalDefault });
   // Existing selves = the circles you're already in (each a presentable key).
   state.existingSelves = existingSelvesFrom(Array.isArray(circles) ? circles : [], state.invite?.groupId ?? null);
-  // The persona this device is ALREADY in the invited circle as, if it is in it (`secondPersonaWarning`).
+  // The persona this device is ALREADY in the invited circle as, if it is in it (`secondPersonaRefusal`).
   state.heldAs = heldPersonaIn(circles, state.invite?.groupId ?? null, profileIdOf);
   return state;
 }
@@ -586,14 +601,15 @@ function heldPersonaIn(circles, circleId, profileIdOf) {
 }
 
 /**
- * ONE MEMBER PER PERSONA. Two personas of one person cannot be told apart on the wire (unlinkability, by design), so
- * the circle cannot refuse a person's second persona; only the person's own device knows both are theirs. When the
- * circle being joined is one this device is already in as ANOTHER persona, the join says so before it is made —
- * a warning, not a refusal. `{ personaId }` = the persona already there; null = nothing to say.
+ * ONE SELF PER CIRCLE ON A DEVICE. Two personas of one person cannot be told apart on the wire (unlinkability, by
+ * design), so the circle cannot refuse a person's second persona; only the person's own device knows both are theirs.
+ * A device holds a circle as one self, so when the circle being joined is one this device is already in as ANOTHER
+ * persona, the join is refused before it is made (from another device it can be done). `{ personaId }` = the persona
+ * already there; null = nothing in the way.
  * @param {object} state  the join wizard's state, after `prepareJoinIdentity`
  * @returns {{personaId: string}|null}
  */
-export function secondPersonaWarning(state) {
+export function secondPersonaRefusal(state) {
   const held = state?.heldAs;
   if (typeof held !== 'string' || !held) return null;
   const joining = typeof state.persona === 'string' && state.persona ? state.persona : 'default';
@@ -751,6 +767,8 @@ export function initialState() {
     submitErrorKey:   null,
     /** Machine-readable failure reason — see the catch in `finalSubmit` for why both exist. */
     submitErrorReason: null,
+    /** What the error key names (`{ personaId }` for the persona a circle is already held as), or null. */
+    submitErrorParams: null,
     // Wave B — reveal-state default (C7 · §1.6). `revealPreset` = the chosen
     // in-circle disclosure level (handle|profile|full), starting at the personal
     // default; `personalRevealDefault` = your usual level (loaded, overridable);
@@ -801,6 +819,7 @@ export async function finalSubmit({
   state.submitStage   = 'redeeming';
   state.submitError   = null;
   state.submitErrorKey = null;
+  state.submitErrorParams = null;
   state.handleRejected = false;
   try {
     // J-CP1 (S4, 2026-07-29) — be ON the circle's endpoint before asking its admin for anything.
@@ -811,11 +830,16 @@ export async function finalSubmit({
     // proof and the redeem's sender computed below are then the persona's, and the persona is on the invite's relay on
     // its own socket. (A join without a persona, or as the default, is exactly as before.)
     asPersona = typeof state.persona === 'string' && state.persona && state.persona !== 'default' ? state.persona : null;
+    // ONE SELF PER CIRCLE ON A DEVICE: a circle this device is already in as another persona is refused before anything
+    // is sent — what the wizard already knows (`secondPersonaRefusal`), and what the device's own bind says.
+    const refused = secondPersonaRefusal(state);
+    if (refused) throw alreadyInAsError(refused.personaId);
     if (asPersona && state.invite?.groupId) {
       const bound = await callSkill('household', 'bindCirclePersona', {
         circleId: state.invite.groupId, personaId: asPersona,
         ...(typeof state.invite.relayUrl === 'string' && state.invite.relayUrl ? { relayUrl: state.invite.relayUrl } : {}),
       }).catch((err) => ({ ok: false, reason: err?.message ?? 'bind-failed' }));
+      if (bound?.reason === 'already-in-as') throw alreadyInAsError(bound.personaId);
       if (!bound?.ok) throw Object.assign(new Error(`persona-not-bound: ${bound?.reason ?? 'unknown'}`), { reason: 'persona-not-bound' });
     }
     const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
@@ -879,7 +903,7 @@ export async function finalSubmit({
     return { result, state };
   } catch (err) {
     // The join did not happen: a circle bound to a persona for it goes back to the default.
-    if (asPersona && state.invite?.groupId) {
+    if (asPersona && state.invite?.groupId && err?.reason !== 'already-in-as-another-persona') {
       await callSkill('household', 'bindCirclePersona', { circleId: state.invite.groupId, personaId: null }).catch(() => {});
     }
     // Handle-uniqueness rejection (Decision C): surface it as a localisable prompt to
@@ -893,7 +917,13 @@ export async function finalSubmit({
     // reached it as a bare `join-failed`. That made "this invite expired" indistinguishable from "the admin
     // is offline" — a distinction that matters to the person joining, and one that made the invite-expiry
     // bug found the same week harder to diagnose than it needed to be.
-    if (err?.reason === 'handle-taken' || /handle-taken/.test(String(err?.message ?? ''))) {
+    if (err?.reason === 'already-in-as-another-persona') {
+      // This device is in the circle already, as another of the person's personas — one self per circle on a device.
+      state.submitError = err.message;
+      state.submitErrorKey = 'circle.join.wizard.persona.already_in';
+      state.submitErrorParams = { personaId: err.personaId ?? null };
+      state.submitErrorReason = 'already-in-as-another-persona';
+    } else if (err?.reason === 'handle-taken' || /handle-taken/.test(String(err?.message ?? ''))) {
       state.handleRejected = true;
       state.submitErrorKey = 'circle.errors.invalid_handle.handle-taken';
       state.submitErrorReason = 'handle-taken';
@@ -981,6 +1011,11 @@ function adminUnreachableError() {
 }
 
 /** Throw a typed handle-taken error the finalSubmit catch maps to the localised prompt. */
+/** The refusal of a second persona's join of a circle this device is already in (`personaId` = the one it is in as). */
+function alreadyInAsError(personaId) {
+  return Object.assign(new Error(`already-in-as-another-persona: ${personaId ?? '?'}`), { reason: 'already-in-as-another-persona', personaId: personaId ?? null });
+}
+
 function handleTakenError() {
   const e = new Error('handle-taken');
   e.reason = 'handle-taken';
@@ -1007,6 +1042,14 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     : {};
 
   if (inv?.kind === 'membershipCode' && inv.code && inv.groupId) {
+    // ONE SELF PER CIRCLE ON A DEVICE, for a join as the general persona too: the device's bind says whether this circle
+    // is held here by another self (a persona join asked it already, binding the circle to that persona).
+    const asPersona = typeof state.persona === 'string' && state.persona && state.persona !== 'default';
+    if (!asPersona) {
+      const held = await callSkill('household', 'bindCirclePersona', { circleId: inv.groupId, personaId: null })
+        .catch(() => null);
+      if (held?.reason === 'already-in-as') throw alreadyInAsError(held.personaId);
+    }
     // Path A — membershipCode. The join handle becomes the person's handle — unless the caller said it is for this
     // circle's row only (`profileHandle: false`: the pair roster's derived placeholder for a person without one).
     if (state.profileHandle !== false) {

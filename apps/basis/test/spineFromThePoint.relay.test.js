@@ -85,4 +85,44 @@ describe('spine statements only from the point', () => {
     const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
     expect([...disputed], 'Anna forked her own key: her standing is disputed').not.toContain(A.pubKey);
   }, 90_000);
+
+  it('a CEREMONY on the box (not the point) while the phone writes: the act and its reveal go to the point — one chain, no fork', async () => {
+    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    const signedByBox = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).length;
+    const boxBefore = signedByBox();
+    const prior = A2._routerRef.fn;
+    A2._routerRef.fn = () => undefined;
+    const [cer, role] = await Promise.all([
+      // a device that never was (a lost one by id): the ceremony rotates the person key and retires what it derives
+      A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'd-' + '0'.repeat(32), circleIds: [GROUP] }),
+      A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: 'member' }),
+    ]);
+    await new Promise((r) => setTimeout(r, 1500));
+    A2._routerRef.fn = prior;
+    expect(cer?.ok, JSON.stringify(cer)).toBe(true);
+    expect(role?.error ?? null, JSON.stringify(role)).toBeNull();
+    expect(signedByBox(), 'the box signed the ceremony\'s statements itself').toBe(boxBefore);
+    await new Promise((r) => setTimeout(r, 2000));
+    const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
+    expect([...disputed], 'the ceremony forked Anna\'s key').not.toContain(A.pubKey);
+  }, 90_000);
+
+  it('the POINT is off: the box\'s act is held for it, and lands — signed by the point — when it is back', async () => {
+    const roleOn = async (node, webid) => (((await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === webid)?.role ?? null);
+    const signedByBox = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).length;
+    const boxBefore = signedByBox();
+    const want = (await roleOn(B, C.pubKey)) === 'admin' ? 'member' : 'admin';
+    await A.agent.sa.relay.disconnect();
+    const r = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: want });
+    expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
+    await new Promise((res) => setTimeout(res, 1500));
+    expect(await roleOn(B, C.pubKey), 'nothing lands while the point is off').not.toBe(want);
+    await A.agent.connectPeerTransport({ relayUrl: relay.url, onPeerMessage: (env) => A._routerRef.fn?.(env), awaitRelayReady: true });
+    await bindCircleAddresses([A], GROUP);
+    expect(await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 30000, step: 300 }),
+      'the held act never landed once the point was back').toBe(true);
+    expect(signedByBox(), 'the box signed it itself').toBe(boxBefore);
+    const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
+    expect([...disputed]).not.toContain(A.pubKey);
+  }, 120_000);
 });

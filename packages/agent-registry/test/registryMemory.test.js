@@ -86,3 +86,18 @@ describe('two writers that share no memory (two web tabs on one IndexedDB)', () 
     expect((await regA.lookup('a'))?.revokedAt, 'tab A sees the revoke at once').toBeTruthy();
   });
 });
+
+describe('the registry says when it changed', () => {
+  it('onChanged fires after each of its own writes (a sibling\'s facts land through them too), and unsubscribes', async () => {
+    const { backend } = counted();
+    const reg = createAgentRegistry({ pseudoPod: createPseudoPod({ backend, mode: 'standalone', deviceId: 'dev-1' }), deviceId: 'dev-1' });
+    const heard = [];
+    const off = reg.onChanged(() => heard.push('x'));
+    await reg.register(ENTRY('a', 'Anna'));
+    await reg.revoke('a');
+    expect(heard).toHaveLength(2);
+    off();
+    await reg.register(ENTRY('b', 'Bram'));
+    expect(heard).toHaveLength(2);
+  });
+});

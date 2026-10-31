@@ -860,7 +860,7 @@ export function createPseudoPod({
 
     // Introspection
     get deviceId()      { return deviceId; },
-    get backend()       { return backendIn; },
+    get backend()       { return backend; },   // the counted layer: a write through it moves the revision
     get currentMode()   { return mode; },
     get _perUriMode()   { return new Map(perUriMode); },
     get _writeThroughQueue() { return writeThroughQueue; },

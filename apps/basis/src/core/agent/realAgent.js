@@ -2227,10 +2227,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { entry = await agentsRegistryRef?.lookup?.(pid); } catch { entry = null; }
     const rows = [];
     for (const rec of Object.values(deviceDelegationsOf(entry ?? {}))) {
-      if (!rec || rec.revoked === true || rec.deviceId === ownId || typeof rec.pubKey !== 'string' || !rec.pubKey) continue;
+      if (!rec || rec.deviceId === ownId || typeof rec.pubKey !== 'string' || !rec.pubKey) continue;
+      // a TOMBSTONED device is unpinned: its address is no key of ours to seal to any more (deny wins)
+      if (rec.revoked === true) {
+        try { if (sa.agent?.security?.getPeerKey?.(rec.pubKey) === rec.pubKey) sa.agent?.security?.unregisterPeer?.(rec.pubKey); } catch { /* not pinned */ }
+        continue;
+      }
       let bound = false;
       try { bound = await kit.verify({ author: rec.pubKey, ref: self.chatId.pubKey, payload: { delegation: rec } }); } catch { bound = false; }
-      if (bound) rows.push({ address: rec.pubKey, deviceId: rec.deviceId });
+      if (!bound) continue;
+      // A sibling's device address IS its delegation key, which the verified record names: it is pinned as its own key,
+      // so the first send to it needs no HI round trip (a first-contact wait of seconds per direction otherwise). Fed only
+      // from these verified, live, authority-bound rows; a tombstoned record never reaches this line.
+      try { if (!sa.agent?.security?.getPeerKey?.(rec.pubKey)) sa.agent?.security?.registerPeer?.(rec.pubKey, rec.pubKey); } catch { /* the HI still works */ }
+      rows.push({ address: rec.pubKey, deviceId: rec.deviceId });
     }
     return rows;
   };

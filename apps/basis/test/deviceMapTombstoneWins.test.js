@@ -70,6 +70,18 @@ describe('the device map: a tombstone wins, whatever arrives first', () => {
     expect((await recOf(C, bId))?.revoked, 'the old live record did not revive B').toBe(true);
   }, 120_000);
 
+  it('a sibling\'s device address is pinned as its own key while live, and unpinned once its tombstone lands', async () => {
+    const C = await deviceC();
+    await hold(C, live);
+    const security = C.sa?.agent?.security;
+    expect(security, 'the harness exposes the security layer').toBeTruthy();
+    expect((await C.ownDeviceAddressesOf('default')), 'B is C\'s sibling').toContain(live.pubKey);
+    expect(security.getPeerKey(live.pubKey), 'pinned: B\'s device address is its own key').toBe(live.pubKey);
+    await carry(C, [tomb]);
+    expect((await C.ownDeviceAddressesOf('default')), 'B is no sibling any more').not.toContain(live.pubKey);
+    expect(security.getPeerKey(live.pubKey) ?? null, 'unpinned once revoked').toBeNull();
+  }, 120_000);
+
   it('a tombstone whose revocation is not the authority\'s is not kept', async () => {
     const C = await deviceC();
     await hold(C, live);

@@ -21,6 +21,10 @@
 /** A seam: what it is, why every shell needs it, and the text that proves a shell composes it. `shells` narrows a
  *  seam to the shells it applies to (a view seam has no meaning on the box) — with the reason beside it. */
 export const SEAMS = Object.freeze([
+  // PRESENCE ONLY WHERE THE PERSON STILL IS: every shell registers its per-circle addresses on the relay from a union
+  // of lists (the substrate's, a cached one, a just-joined circle); a circle the fold says was left or removed is taken
+  // out by one shared filter. Web and mobile kept a cached list that put a left circle back on the next socket.
+  { id: 'presence-drops-left-circles', pattern: /presenceCircleIds\(/, why: 'a circle the person left or was removed from must never be re-registered on the relay — its address would take traffic again' },
   // A freshly enrolled device forgets what its THROWAWAY self wrote. Every shell boots unenrolled first, writes
   // content under an identity of its own, and the ceremony then replaces that identity and its content key. The
   // box swept its own named paths from 2026-09-14; web and mobile did not, and nothing failed — which is exactly

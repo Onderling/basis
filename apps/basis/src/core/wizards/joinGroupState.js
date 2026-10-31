@@ -1094,6 +1094,8 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
         ...(peerReply.circleAddress ? { confirmedByCircleAddress: peerReply.circleAddress } : {}),
         ...(peerReply.circleAddressProof ? { confirmedByCircleAddressProof: peerReply.circleAddressProof } : {}),
         ...(typeof peerReply.confirmedByDisplay === 'string' && peerReply.confirmedByDisplay ? { confirmedByDisplay: peerReply.confirmedByDisplay } : {}),
+        // the admin's signed join for this redeem — ingested on this side's own membership rail, which judges it
+        ...(peerReply.joinStatement?.body && peerReply.joinStatement?.sig ? { joinStatement: peerReply.joinStatement } : {}),
         // The joiner's OWN per-circle address + proof (batch 5) — the same pair just presented to the
         // admin, so the LOCAL mirror row is complete at redeem too (the substrate re-verifies the
         // proof; an unproven address is dropped there, never recorded).

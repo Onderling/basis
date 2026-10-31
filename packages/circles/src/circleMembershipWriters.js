@@ -4,7 +4,7 @@ import { releaseUnchanged } from '@onderling/agent-registry';
 /**
  * Key-coupled membership WRITERS — pure-body lift out of pinboard's `buildSkills` (the §8c migration, slice-b).
  * These persist a circle's membership STATE transitions as typed `store.addItems([{type}])` items
- * (`membership-redemption` / `group-leave` / `group-removal`) — validation, redemption-ceiling, the
+ * (`membership-redemption`; a leave and a removal are statements on the membership lane) — validation, redemption-ceiling, the
  * cross-circle-link proof, the admin gate, the roster upsert, the deletePosts loop. The state body is entirely
  * KEY-FREE.
  *
@@ -401,7 +401,7 @@ export async function verifyMembershipCodeForPeer({
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority
   // that validated the code + enforced the ceiling, and a join needs no authority in the fold anyway. Additive.
   const joinerKey = personKeyAnnouncement(a.personKey);
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
+  const joinStatement = await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
     redemptionRef: item.id,
     // A FUNCTION PROFILE, stated by THIS admin: only for a code the admin minted for a bot, and only when the
     // redeemer says it runs one. The fold reads it from this admin-signed join; a claim on an ordinary code says nothing.
@@ -422,18 +422,23 @@ export async function verifyMembershipCodeForPeer({
     codeId:       valid.id,
     groupId:      a.groupId,
     validUntil:   valid.source.expiresAt,
+    // The signed join itself, for the redeem reply: a joiner who LEFT (or was removed) no longer hears this circle's
+    // fan, and its own fold still says "out" until a join after its exit reaches it. The statement travels with the act
+    // that caused it; the joiner ingests it through its own membership rail (verified there, never trusted from here).
+    ...(joinStatement && typeof joinStatement === 'object' && joinStatement.body && joinStatement.sig ? { joinStatement } : {}),
     _sync:        simulateSync(),
   };
 }
 
 /**
  * leaveGroup(deps, {a, from})
- *   — record a `group-leave` audit marker, revoke the leaver's pod ACL + rotate the group key (graceful:
+ *   — revoke the leaver's pod ACL + rotate the group key (graceful:
  *   the leaver keeps content they already hold), then optionally delete the actor's own items + cancel any
  *   pending lend reminders. `from` is the leaving actor. The revoke is forced — see the note at the call:
  *   a departure is never refusable, so the ≥1-admin guard must not be what decides whether it rotates.
+ *   The leave itself is the signed `leave` statement on the circle's membership lane: every reader asks the fold.
  *
- * @returns {Promise<{leaveMarkerId, deletedItems, _sync}|{error}>}
+ * @returns {Promise<{deletedItems, _sync}|{error}>}
  */
 export async function leaveGroup({
   store, simulateSync, notifier, revokeKey, emitSpine,
@@ -441,20 +446,11 @@ export async function leaveGroup({
   if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
 
   // `followed`: this leave FOLLOWS a sibling's (2026-09-22) — the person already left on another device, whose
-  // self-signed `leave` folded them out of the circle everywhere and whose custodian rotated the key. This device
-  // writes its own exit marker (what `listMyCircles` reads) and nothing else: no second statement (it would be
-  // refused — the row is gone), no second rotation, no deleting.
+  // self-signed `leave` folded them out of the circle everywhere and whose custodian rotated the key. That statement is
+  // what this device's fold reads too, so there is nothing to write here: no second statement (it would be refused —
+  // the row is gone), no second rotation, no deleting.
   const followed = a.followed === true;
-  const [marker] = await store.addItems(
-    [{
-      type:       'group-leave',
-      text:       `${from} left ${a.groupId}${followed ? ' (followed from another device)' : ''}`,
-      source:     { groupId: a.groupId, leftBy: from, leftAt: Date.now(), ...(followed ? { followed: true } : {}) },
-      visibility: 'household',
-    }],
-    { actor: from },
-  );
-  if (followed) return { leaveMarkerId: marker.id, deletedItems: 0, followed: true, _sync: simulateSync() };
+  if (followed) return { deletedItems: 0, followed: true, _sync: simulateSync() };
 
   // Sealed household pod: revoke the leaver's ACL + rotate the group key (forward secrecy) + drop
   // them from the MemberMap so fan-out stops. A self-leave is 'graceful' — the leaver keeps access
@@ -462,8 +458,8 @@ export async function leaveGroup({
   //
   // WHY A LEAVE FORCES THE REVOKE. The key custodian refuses to remove the LAST ADMIN unless the caller
   // forces it, so that nobody can strip a circle of its last admin by removing them. A leave is not that
-  // act. The person is walking out, and no layer here can refuse it: by the time this line runs the
-  // `group-leave` marker is already written, the signed `leave` goes onto the spine just below, and the
+  // act. The person is walking out, and no layer here can refuse it: the signed `leave` goes onto the spine just
+  // below, and the
   // roster fold answers a departure that empties the admin set by appointing a caretaker from whoever
   // remains — the circle is never stranded by a departure. So the guard could not keep the admin; it only
   // threw on the way past, and every layer above swallowed the throw. The leave reported success, the
@@ -475,12 +471,12 @@ export async function leaveGroup({
 
   // ALSO record the LEAVE on the circle's membership spine. A leave is always self-authored (the fold only
   // honours a leave whose author IS its subject), so the acting device signs `leave` with its own identity
-  // (author = subject = the leaver). Additive to the typed `group-leave` marker above; optional hook.
+  // (author = subject = the leaver). It is the leave's only record: every reader asks the membership fold.
   await emitSpine?.({ kind: 'leave', circleId: a.groupId, subject: from, actor: from });
 
   let deleted = 0;
   if (a.deletePosts) {
-    const myItems = (await store.listOpen({})).filter(i => i.addedBy === from && i.id !== marker.id);
+    const myItems = (await store.listOpen({})).filter(i => i.addedBy === from);
     for (const it of myItems) {
       await store.removeItems([{ id: it.id }], { actor: from });
       // Also cancel any lend reminders the user had pending.
@@ -490,17 +486,17 @@ export async function leaveGroup({
       deleted += 1;
     }
   }
-  return { leaveMarkerId: marker.id, deletedItems: deleted, _sync: simulateSync() };
+  return { deletedItems: deleted, _sync: simulateSync() };
 }
 
 /**
  * removeMember(deps, {a, from})
- *   — admin-only. Records a `group-removal` audit item (naming the RESOLVED webid so the roster projection
- *   can match it), then rotates the group key + re-seals history per policy (graceful|ban) via the injected
+ *   — admin-only. Rotates the group key + re-seals history per policy (graceful|ban) via the injected
  *   revoke hook (`force` overrides the ≥1-admin guard — the op's own admin gate is the authority). `from` is
- *   the admin.
+ *   the admin. The removal itself is the admin-signed `evict` statement on the circle's membership lane (below):
+ *   every reader asks the fold.
  *
- * @returns {Promise<{removalId, revoked, policy}|{error}>}
+ * @returns {Promise<{revoked, policy}|{error}>}
  */
 export async function removeMember({
   store, members, revokeKey, isCircleAdmin, emitSpine, defaultGroupId = null, circleRoleOf = null,
@@ -535,23 +531,6 @@ export async function removeMember({
   }
   const policy = a.policy === 'ban' ? 'ban' : 'graceful';
 
-  // The RESOLVED webid, not only what the caller happened to pass. An admin who removes by
-  // stableId used to write a row naming nobody the roster projection could match, so the removal
-  // was unprojectable and therefore inert. `memberStableId` is still recorded for the audit.
-  const [item] = await store.addItems([{
-    type:       'group-removal',
-    text:       `${memberWebid ?? a.memberStableId} removed from ${_groupId} (${policy})`,
-    visibility: 'household',
-    source: {
-      groupId:        _groupId,
-      memberStableId: a.memberStableId ?? null,
-      memberWebid:    memberWebid      ?? null,
-      removedBy:      from,
-      removedAt:      Date.now(),
-      policy,
-      reason:         a.reason ?? null,
-    },
-  }], { actor: from });
 
   // ACTUALLY remove (not just record intent): tell the person, then rotate the group key + re-seal
   // history per policy + drop them from the MemberMap so the fan-out stops. Both steps below, in that
@@ -588,7 +567,7 @@ export async function removeMember({
     await revokeKey({ webId: memberWebid, force: true, policy, groupId: _groupId });
     revoked = true;
   }
-  return { removalId: item.id, revoked, policy, told };
+  return { revoked, policy, told };
 }
 
 /**

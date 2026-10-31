@@ -142,11 +142,12 @@ describe("a persona's contact book, per self", () => {
   it("the receiver binds the turn's self by who sent it: another self's contact, or one not here, is refused", async () => {
     // a turn naming W's contact from the box (a sibling of the GENERAL persona only): another self's — refused
     const h = laptop.agent.contactTurnHandler((wire) => { laptop.landed.push(wire); }, (reason) => laptop.refusedTurns.push(reason));
-    const boxAddr = box.agent.circleAddressFor(X);
+    // a sibling speaks at its DEVICE address (its delegation key under the self): the box's under the general persona
+    const boxAddr = box.agent.persona('default').enrolledDevice?.record?.pubKey;
     const before = laptop.landed.length;
     await h(boxAddr, { subtype: laptop.agent.contactTurnBroadcast, turn: { direction: 'in', contactId: 'w:colleague-of-werk', text: 'vals', messageId: 'm-x', ts: Date.now() } });
     // …and a turn for a W contact this device does not have, from W's own sibling (the phone): refused, never conjured
-    const phoneW = phone.agent.persona(w).circleAddressFor?.(Y) ?? phone.agent.circleAddressFor(Y);
+    const phoneW = phone.agent.persona(w).enrolledDevice?.record?.pubKey;
     await h(phoneW, { subtype: laptop.agent.contactTurnBroadcast, turn: { direction: 'in', contactId: 'w:nobody-here', text: 'niemand', messageId: 'm-y', ts: Date.now() } });
     expect(laptop.landed.length, 'nothing landed').toBe(before);
     expect(laptop.refusedTurns.slice(-2)).toEqual(['another-self', 'no-such-contact']);

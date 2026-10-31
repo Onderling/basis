@@ -287,6 +287,9 @@ export function buildCircleLanes({
     // enrolled sibling; and a contact-thread turn reaches the person rather than one of their devices.
     ...(agent.grantsPeerHandler ? { [GRANTS_BROADCAST]: agent.grantsPeerHandler } : {}),
     ...catchUpEntries(agent.grantsCatchUp),
+    // the person's device map, between their own devices (a self's delegation records): how three devices without a
+    // pod find each other when only one of them met each of the others
+    ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,

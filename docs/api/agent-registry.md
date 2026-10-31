@@ -547,7 +547,7 @@ Upsert one device's delegation record as an OWN property. Returns a NEW frozen p
 (other devices' records preserved). A REPLACE per device, not a facet merge — the record is a
 signed statement and partial edits would detach the signature from what it covers. The one
 sanctioned mutation of an existing record is the tombstone: `patch` may be `{revoked: true}`
-alone, which flips the flag and keeps the signed fields intact.
+(and the authority's signed `revocation`), which flips the flag and keeps the signed fields intact.
 
 **Parameters**
 

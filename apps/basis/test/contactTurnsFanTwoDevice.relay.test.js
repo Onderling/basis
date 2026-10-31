@@ -27,7 +27,7 @@ import { VaultMemory } from '@onderling/vault';
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
 import { startJourneyRelay } from './support/testRelay.js';
 import {
-  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown,
+  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown, shareDeviceRecords,
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { CONTACT_TURN_BROADCAST } from '../src/v2/contactTurnFan.js';
@@ -98,6 +98,10 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
       'the phone never learned the always-on device\'s address').toBeTruthy();
     expect(await knows(alwaysOn, phone.agent.circleAddressFor(GROUP)),
       'the always-on device never learned the phone\'s address').toBeTruthy();
+    // …and each holds the other in its device map (the registry mirror's job; the offer's roster seed pod-less), with
+    // its device address on the relay beside the person address
+    await shareDeviceRecords([phone, alwaysOn]);
+    await bindCircleAddresses([phone, alwaysOn], GROUP);
   }, 180_000);
 
   afterAll(async () => {

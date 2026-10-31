@@ -35,7 +35,13 @@ export function isDeviceDelegationRecord(v) {
   if (v.label != null && typeof v.label !== 'string') return false;
   if (v.issuedAt != null && typeof v.issuedAt !== 'string') return false;
   if (v.revoked != null && typeof v.revoked !== 'boolean') return false;
+  if (v.revocation != null && !isRevocationShape(v.revocation)) return false;
   return true;
+}
+/** The signed revocation a tombstone carries (core's `signDeviceRevocation`): verifiable by any device of the person. */
+function isRevocationShape(r) {
+  return !!r && typeof r === 'object' && !Array.isArray(r)
+    && ['profileId', 'deviceId', 'by', 'sig'].every((k) => typeof r[k] === 'string' && r[k]);
 }
 
 /** Freeze-normalise a record to exactly the known fields (drops unknown). Invalid → null. */
@@ -45,6 +51,7 @@ export function normaliseDeviceDelegation(v) {
   if (v.label != null) rec.label = v.label;
   if (v.issuedAt != null) rec.issuedAt = v.issuedAt;
   if (v.revoked != null) rec.revoked = v.revoked;
+  if (v.revocation != null) rec.revocation = Object.freeze({ profileId: v.revocation.profileId, deviceId: v.revocation.deviceId, by: v.revocation.by, sig: v.revocation.sig });
   return Object.freeze(rec);
 }
 
@@ -75,7 +82,7 @@ export function deviceDelegationOf(entry, deviceId) {
  * (other devices' records preserved). A REPLACE per device, not a facet merge — the record is a
  * signed statement and partial edits would detach the signature from what it covers. The one
  * sanctioned mutation of an existing record is the tombstone: `patch` may be `{revoked: true}`
- * alone, which flips the flag and keeps the signed fields intact.
+ * (and the authority's signed `revocation`), which flips the flag and keeps the signed fields intact.
  * @param {object} properties  the profile's current properties map
  * @param {string} deviceId
  * @param {object} patch       a full record, or `{revoked: true}` for an existing one
@@ -88,8 +95,10 @@ export function setDeviceDelegation(properties, deviceId, patch) {
     ? cur.value
     : {};
   const existing = curMap[deviceId] ?? null;
-  const candidate = (patch.revoked === true && Object.keys(patch).length === 1 && existing)
-    ? { ...existing, revoked: true }
+  // the tombstone: `{revoked: true}` (with the authority's signed `revocation`, when it has one) flips an existing record
+  const tombstoneOnly = patch.revoked === true && Object.keys(patch).every((k) => k === 'revoked' || k === 'revocation');
+  const candidate = (tombstoneOnly && existing)
+    ? { ...existing, revoked: true, ...(patch.revocation ? { revocation: patch.revocation } : {}) }
     : patch;
   const rec = normaliseDeviceDelegation(candidate);
   if (!rec) throw new TypeError('setDeviceDelegation: invalid delegation record');

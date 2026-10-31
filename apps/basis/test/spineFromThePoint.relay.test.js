@@ -141,4 +141,23 @@ describe('spine statements only from the point', () => {
     expect([...disputed], 'the ceremony forked Anna\'s key').not.toContain(A.pubKey);
   }, 90_000);
 
+
+  it('an act naming someone else (actor, by, voter or authorRef) is refused by the point — identity comes from the point', async () => {
+    let pointAppends = 0;
+    const rail = A.agent.membershipRail;
+    const origAppend = rail.append.bind(rail);
+    rail.append = async (...x) => { pointAppends += 1; return origAppend(...x); };
+    const from = A2.agent.ownDeviceAddress('default');
+    const base = { kind: 'role', circleId: GROUP, subject: C.pubKey, payload: { role: 'member' } };
+    for (const forged of [
+      { ...base, actor: B.pubKey },
+      { ...base, payload: { ...base.payload, by: B.pubKey } },
+      { ...base, payload: { ...base.payload, voter: B.pubKey } },
+      { ...base, payload: { ...base.payload, authorRef: B.pubKey } },
+    ]) {
+      await A.agent.spineActHandler(from, { subtype: A.agent.spineActSubtype, lane: 'membership', act: forged });
+    }
+    rail.append = origAppend;
+    expect(pointAppends, 'the point signed an act that named someone else').toBe(0);
+  }, 30_000);
 });

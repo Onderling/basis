@@ -2127,6 +2127,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       await agentsRegistryRef.register({ ...cur, properties: registrySetDeviceDelegation(cur.properties ?? {}, rec.deviceId, rec) });
       carryDeviceMap('default').catch(() => { /* the next record learned carries again */ });
       welcomeNewDevice(rec).catch(() => { /* its connect-time catch-up asks again */ });
+      // THE POINT, when a second device arrives: the EXISTING device claims it unless a claim exists — never the newcomer
+      // (it is still waiting for its first map), so the person's spine has one signer from the moment there are two.
+      if (!primaryDeviceRef.current?.current?.() && !awaitingDeviceMap.has('default')) {
+        Promise.resolve(primaryDeviceRef.current?.claim?.()).catch(() => { /* the tap on Mij still claims */ });
+      }
     },
   });
   // THE DEVICE KIT OF A SELF — what this device signs with, carries, and knows a sibling by, as the default or as one
@@ -2655,6 +2660,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
     const act = payload.act ?? {};
     if (typeof act.circleId !== 'string' || !MEMBERSHIP_RAIL_KINDS.includes(act.kind)) return;
+    // IDENTITY COMES FROM THE POINT: an act naming any other self (actor, by, voter, authorRef) is refused whole — a
+    // device of the person may ask the point to act AS the person, never as anyone else
+    const me = circleSelfRef(act.circleId);
+    const named = [act.actor, act.payload?.by, act.payload?.voter, act.payload?.authorRef].filter((x) => x !== undefined && x !== null);
+    if (named.some((x) => x !== me)) return;
     // as the circle's own SELF — never an actor the forwarding device named
     try { await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: circleSelfRef(act.circleId) }); }
     catch { /* the sibling's act is retried by nothing: it said 'forwarded' — the next act shows the roster as it is */ }

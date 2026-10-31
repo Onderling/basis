@@ -145,7 +145,7 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
       rosterOnA: await rosterRowsOf(A.page), rosterOnB: await rosterRowsOf(B.page),
     };
     expect(arrived, `A's message after B's reload never reached B — ${JSON.stringify(seen)}`).toBe(true);
-    log('STEP5 after reload', 'PASS', 'extra relay redialled from the connection point; message arrived');
+    log('STEP5 after reload', 'PASS', `extra relay redialled from the connection point; message arrived; B holds ${JSON.stringify(seen ?? await relaysOf(B.page))}`);
   } finally {
     await teardown([A, B]);
   }

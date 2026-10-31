@@ -140,6 +140,10 @@ export class RelayTransport extends Transport {
    *  comparing THIS against the scope's points — with more than one relay up, a transport that cannot say
    *  which relay it is would be eligible for every circle (2026-09-08). */
   get url() { return this.#relayUrl; }
+  /** What this socket holds, for a diagnosis line: the addresses it asked the relay for, and which of them the relay acked. */
+  get registrations() {
+    return { asked: [this.address, ...this.#signers.keys()].filter(Boolean), acked: [...this.#bound] };
+  }
 
   /**
    * `addAddress` means "the relay agrees this address is ours ON THIS SOCKET" — for every caller, not only the

@@ -1116,6 +1116,26 @@ Verify a declared commitment against the (proven) circle address that declared i
 
 ## `src/identity/circleAddress.js`
 
+### `deriveCircleRoot`
+
+**Kind:** function · **Import:** `deriveCircleRoot` from `'@onderling/core'`
+
+```js
+deriveCircleRoot(profileSeed, epoch = 0)
+```
+
+A persona's CIRCLE ROOT at an epoch: the derivation root of every per-circle key the persona presents. One-way from
+the persona's seed (holding it gives no authority), the same on every FULL device of the persona (the phrase
+re-derives it; a device enrolled without the phrase is handed it), so a co-member sees one member, one address. A
+re-key moves the persona to the next epoch, and with it every per-circle key.
+
+**Parameters**
+
+- `profileSeed` `Uint8Array` — the persona's 32-byte seed (`ownerRoot.deriveAgentSeed(profileId)`)
+- `[epoch=0]` `number` — a non-negative integer
+
+**Returns:** `Uint8Array` — 32-byte seed, to pass as the `derivationSeed` below
+
 ### `deriveCircleSeed`
 
 **Kind:** function · **Import:** `deriveCircleSeed` from `'@onderling/core'`

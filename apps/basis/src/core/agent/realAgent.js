@@ -768,7 +768,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   const circlePersonas = new Map();   // circleId → profileId (non-default only)
   let onPersonaStarted = null;   // set once the own store exists: a persona that starts writes its device-map row
   const personaOf = (circleId) => personas.get(circlePersonas.get(circleId)) ?? persona;
-  const deviceSeedFor = (circleId) => personaOf(circleId).deviceDerivationSeed;
+  // the root this device derives a circle's per-circle keys from: the persona's circle root
+  const circleSeedFor = (circleId) => personaOf(circleId).circleSeed;
   const circleIdentityFor = (circleId) => personaOf(circleId).circleIdentityFor(circleId);
   const circleAddressFor = (circleId) => personaOf(circleId).circleAddressFor(circleId);
   const circleSealingKeyPairFor = (circleId) => personaOf(circleId).circleSealingKeyPairFor(circleId);
@@ -3156,7 +3157,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleId: cid,
         memberWebid: circleSelfRef(cid),   // the circle's self: in a persona's circle, the persona
         circleAddressFor,
-        signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceSeedFor(cid2), cid2, cid2, address),
+        signCircleAddress: (cid2, address) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address),
         ceremonyCommitmentFor, signCeremonyCommitment,
       }),
     }),
@@ -4260,7 +4261,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           ownAnnouncement: ownCircleAddressAnnouncement({
             // the circle's OWN self: in a persona's circle the persona — never the default's webid there
             circleId, memberWebid: circleSelfRef(circleId), circleAddressFor,
-            signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceSeedFor(cid2), cid2, cid2, address),
+            signCircleAddress: (cid2, address) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address),
             ceremonyCommitmentFor, signCeremonyCommitment,
           }),
         });
@@ -6708,7 +6709,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // A founder proves their address in the creation statement, as a joiner proves theirs on the trail.
       if (realOpId === 'createGroupV2' && typeof realArgs.circleAddress === 'string' && realArgs.circleAddress && !realArgs.circleAddressProof) {
         try {
-          const proof = signCircleLinkFromSeed(deviceSeedFor(realArgs.groupId), realArgs.groupId, realArgs.groupId, realArgs.circleAddress);
+          const proof = signCircleLinkFromSeed(circleSeedFor(realArgs.groupId), realArgs.groupId, realArgs.groupId, realArgs.circleAddress);
           if (proof) realArgs = { ...realArgs, circleAddressProof: proof };
         } catch { /* unproven: the founder's row shows no address, as before the statement carried it */ }
       }
@@ -8807,7 +8808,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The address IS a public key, so registering it on a relay means answering a challenge with the
     // matching private key. This is that signer — it stays beside circleAddressFor because the two are
     // one fact: an address you cannot prove is an address you cannot register.
-    circleAddressSignerFor: (circleId) => circleAddressSigner(deviceSeedFor(circleId), circleId),
+    circleAddressSignerFor: (circleId) => circleAddressSigner(circleSeedFor(circleId), circleId),
     // Decision 4 — the per-circle SIGNING identity behind that address, and the one call a shell
     // makes to switch it on. `installCircleIdentities(ids)` must run for every circle this device is
     // in: without it this device cannot OPEN what was sent to its per-circle address, and a shell
@@ -8987,7 +8988,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
     // join wizard passes this on the redeem seam; the admin verifies it before recording.
-    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(deviceSeedFor(circleId), circleId, groupId, address),
+    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(circleSeedFor(circleId), circleId, groupId, address),
     /**
      * Mount an app's LOCAL ops on this agent's waist — today `basis`, whose handlers end in the
      * device's own affordances (a picker, a camera, a panel, a pod login) and so cannot be agent

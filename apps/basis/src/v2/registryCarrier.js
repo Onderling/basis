@@ -101,8 +101,9 @@ export function unionTombstones(into, from) {
     const map = cur?.mode === 'own' && cur.value && typeof cur.value === 'object' ? cur.value : {};
     const next = { ...map };
     for (const [wire, rec] of Object.entries(gone)) {
-      if (next[wire]?.revoked === true) continue;
-      next[wire] = next[wire] ? { ...next[wire], revoked: true } : rec;
+      if (next[wire]?.revoked === true && (next[wire].revocation || !rec.revocation)) continue;
+      // the signed revocation goes with the flag: without it the tombstone never travels on the device-map carry
+      next[wire] = next[wire] ? { ...next[wire], revoked: true, ...(rec.revocation ? { revocation: rec.revocation } : {}) } : rec;
       changed = true;
     }
     return { ...a, properties: { ...(a.properties ?? {}), deviceDelegations: { mode: 'own', value: next } } };

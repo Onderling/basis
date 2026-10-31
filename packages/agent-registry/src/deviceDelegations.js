@@ -81,11 +81,11 @@ export function deviceDelegationOf(entry, deviceId) {
  * Upsert one device's delegation record as an OWN property. Returns a NEW frozen properties map
  * (other devices' records preserved). A REPLACE per device, not a facet merge — the record is a
  * signed statement and partial edits would detach the signature from what it covers. The one
- * sanctioned mutation of an existing record is the tombstone: `patch` may be `{revoked: true}`
- * (and the authority's signed `revocation`), which flips the flag and keeps the signed fields intact.
+ * sanctioned mutation of an existing record is the tombstone: `patch` may be `{revoked: true, revocation}`
+ * (a NEW tombstone without the authority's signed revocation is refused), which flips the flag and keeps the signed fields.
  * @param {object} properties  the profile's current properties map
  * @param {string} deviceId
- * @param {object} patch       a full record, or `{revoked: true}` for an existing one
+ * @param {object} patch       a full record, or `{revoked: true, revocation}` for an existing one
  */
 export function setDeviceDelegation(properties, deviceId, patch) {
   if (typeof deviceId !== 'string' || !deviceId) throw new TypeError('setDeviceDelegation: deviceId required');
@@ -95,12 +95,16 @@ export function setDeviceDelegation(properties, deviceId, patch) {
     ? cur.value
     : {};
   const existing = curMap[deviceId] ?? null;
-  // the tombstone: `{revoked: true}` (with the authority's signed `revocation`, when it has one) flips an existing record
+  // the tombstone: `{revoked: true, revocation}` (the authority's signed revocation) flips an existing record
   const tombstoneOnly = patch.revoked === true && Object.keys(patch).every((k) => k === 'revoked' || k === 'revocation');
   const candidate = (tombstoneOnly && existing)
     ? { ...existing, revoked: true, ...(patch.revocation ? { revocation: patch.revocation } : {}) }
     : patch;
   const rec = normaliseDeviceDelegation(candidate);
   if (!rec) throw new TypeError('setDeviceDelegation: invalid delegation record');
+  // a NEW tombstone carries the authority's signed revocation: without it the other devices cannot take it
+  if (rec.revoked === true && !rec.revocation && existing?.revoked !== true) {
+    throw new TypeError('setDeviceDelegation: a new tombstone needs its signed revocation');
+  }
   return setOwn(properties, DEVICE_DELEGATIONS_KEY, { ...curMap, [deviceId]: rec });
 }

@@ -4468,8 +4468,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       let props = entry.properties ?? {};
       if (!rec) {
         const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
-        props = registrySetDeviceDelegation(props, wire, { ...minted, revoked: true });
-      } else if (rec.revoked !== true) props = registrySetDeviceDelegation(props, wire, { revoked: true });
+        props = registrySetDeviceDelegation(props, wire, { ...minted, revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire }) });
+      } else if (rec.revoked !== true) props = registrySetDeviceDelegation(props, wire, { revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire }) });
       if (props !== (entry.properties ?? {})) await strict(agentsRegistryRef.register({ ...entry, properties: props }));
       const back = await strict(agentsRegistryRef.lookup(pid));
       if (deviceDelegationOf(back, wire)?.revoked !== true) throw new Error('the tombstone did not read back');

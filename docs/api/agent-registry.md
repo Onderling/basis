@@ -546,14 +546,14 @@ setDeviceDelegation(properties, deviceId, patch)
 Upsert one device's delegation record as an OWN property. Returns a NEW frozen properties map
 (other devices' records preserved). A REPLACE per device, not a facet merge — the record is a
 signed statement and partial edits would detach the signature from what it covers. The one
-sanctioned mutation of an existing record is the tombstone: `patch` may be `{revoked: true}`
-(and the authority's signed `revocation`), which flips the flag and keeps the signed fields intact.
+sanctioned mutation of an existing record is the tombstone: `patch` may be `{revoked: true, revocation}`
+(a NEW tombstone without the authority's signed revocation is refused), which flips the flag and keeps the signed fields.
 
 **Parameters**
 
 - `properties` `object` — the profile's current properties map
 - `deviceId` `string`
-- `patch` `object` — a full record, or `{revoked: true}` for an existing one
+- `patch` `object` — a full record, or `{revoked: true, revocation}` for an existing one
 
 ## `src/disclosure.js`
 

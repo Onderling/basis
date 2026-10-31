@@ -1763,6 +1763,8 @@ export async function createSecureAgent(opts = {}) {
       port: {
         get supportsAliases() { return tx?.supportsAliases ?? false; },
         get addresses()       { return tx?.addresses ?? []; },
+        /** For a diagnosis line: the addresses this socket asked the relay for, and which it acked. */
+        get registrations()   { return tx?.registrations ?? null; },
         addAddress:    (a, o) => (tx ? tx.addAddress(a, o) : Promise.resolve({ ok: false, reason: 'not-connected' })),
         removeAddress: (a) => { try { tx?.removeAddress(a); } catch { /* best-effort */ } },
       },

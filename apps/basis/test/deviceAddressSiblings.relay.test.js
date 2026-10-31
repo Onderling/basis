@@ -75,11 +75,13 @@ describe('my own devices reach each other at their device address', () => {
     expect(landed, 'the own scope reached the box').toBeTruthy();
     // THE POINT: the existing device claimed it when the box arrived — the box learns the claim, and it names the phone
     const phoneId = phone.agent.persona('default').enrolledDevice?.deviceId;
-    expect(await until(() => (phone.agent.primaryDeviceClaim()?.deviceId === phoneId ? true : null), { timeout: 15_000, step: 200 }),
+    expect(await until(() => (phone.agent.spinePointClaim()?.deviceId === phoneId ? true : null), { timeout: 15_000, step: 200 }),
       'the existing device did not claim the point when the box arrived').toBe(true);
-    await box.agent.primaryDevice?.requestFromSiblings?.();
-    expect(await until(() => (box.agent.primaryDeviceClaim()?.deviceId === phoneId ? true : null), { timeout: 15_000, step: 200 }),
+    await box.agent.spinePoint?.requestFromSiblings?.();
+    expect(await until(() => (box.agent.spinePointClaim()?.deviceId === phoneId ? true : null), { timeout: 15_000, step: 200 }),
       'the box does not know the phone is the point').toBe(true);
+    // …and the POINT alone: where direct messages land is still nobody's choice (the box keeps taking them as before)
+    expect(phone.agent.primaryDevice?.current?.() ?? null, 'the enrol made the phone the DM primary too').toBeNull();
 
     // …delivered AT THE BOX'S DEVICE ADDRESS, as the relay saw it (the relay names the socket's own identity as the
     // sender, not the address a frame speaks as, so the destination is what it can witness)

@@ -834,6 +834,7 @@ if (relayUrl) {
         const r = await makeThisDevicePrimary({ agent, logger: console });
         walkLog({ kind: 'primary-device', circles: r.circles, announced: r.announced, claimed: r.device?.ok === true, personAddress: String(agent.personAddress?.() ?? '').slice(0, 12), profile: String(agent.pubKey ?? '').slice(0, 12) });
         console.log(`device-runner: this device is the primary contact address (${r.announced}/${r.circles} circle(s) told; the relays re-registered).`);
+        if (r.device?.point?.ok === false) console.log('device-runner: it cannot sign the circle changes yet (no circle root): run a phrase ceremony on it once.');
       } catch (err) { console.warn('device-runner: could not claim the primary contact address:', err?.message ?? err); }
     }
   });

@@ -53,8 +53,8 @@ describe('spine statements only from the point', () => {
     expect(A2.agent.circleAddressFor(GROUP), 'one address for Anna: both devices sign with one key').toBe(A.agent.circleAddressFor(GROUP));
     // the phone is the point: it claims, and the box holds the claim (the sibling carry)
     await A.agent.claimPrimaryDevice();
-    await A2.agent.primaryDevice?.requestFromSiblings?.();
-    expect(await until(() => (A2.agent.primaryDeviceClaim()?.deviceId === A.agent.primaryDeviceClaim()?.deviceId ? true : null), { timeout: 15000, step: 200 }),
+    await A2.agent.spinePoint?.requestFromSiblings?.();
+    expect(await until(() => (A2.agent.spinePointClaim()?.deviceId === A.agent.spinePointClaim()?.deviceId ? true : null), { timeout: 15000, step: 200 }),
       'the box never learned that the phone is the point').toBe(true);
     // first, both devices on ONE head: a statement by the phone that the box holds too (the sibling carry)
     const headOf = (node) => (node.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === A.agent.circleAddressFor(GROUP)).map((x) => x.body.hash);

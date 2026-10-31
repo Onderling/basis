@@ -6807,6 +6807,10 @@
       "text": "Dit apparaat als eerste contactadres",
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
     },
+    "make_primary_no_point": {
+      "text": "Directe berichten komen nu op dit apparaat binnen ({{count}} kringen ingelicht). Het kan je kringwijzigingen nog niet ondertekenen: typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels).",
+      "doc": "After the main-device tap on a device without the circle root: direct messages land here, but it cannot be the point that signs the spine."
+    },
     "make_primary_done": {
       "text": "Dit apparaat is nu je eerste contactadres in {{count}} kringen",
       "doc": "After the tap: how many circles took the choice (count)."

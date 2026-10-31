@@ -37,7 +37,7 @@ import {
 } from '../../../../basis/src/v2/connections.js';
 import { parsePairingOffer } from '../../../../basis/src/v2/connectionPairing.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../../../basis/src/v2/syncSelection.js';
-import { makeThisDevicePrimary } from '../../../../basis/src/v2/circleAddressAnnounce.js';
+import { makeThisDevicePrimary, makePrimaryResultWords } from '../../../../basis/src/v2/circleAddressAnnounce.js';
 import { CONNECTION_MANIFESTS } from '../../../../basis/src/v2/connectionManifests.js';
 import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
 import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
@@ -282,7 +282,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   // circle with the primary flag, so others deliver here first. Said back with the count that took it.
   const makePrimary = useCallback(async () => {
     const r = await makeThisDevicePrimary({ agent: agent ?? { callSkill } }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
-    Alert.alert(t('circle.mydata.make_primary'), t('circle.mydata.make_primary_done', { count: r.announced }));
+    const w = makePrimaryResultWords(r);
+    Alert.alert(t('circle.mydata.make_primary'), t(w.key, w.params));
   }, [agent, callSkill]);
   const revealMnemonic = useCallback(async () => {
     // The OWNER-ROOT phrase (host `revealOwnerPhrase`, step 1b) — re-derives every

@@ -322,6 +322,7 @@ export function buildCircleLanes({
     ...(agent.profileFactsSync?.handlers ?? {}),
     // Which of the person's devices is primary for direct messages: a sibling's claim lands here, a request is answered.
     ...(agent.primaryDevice?.handlers ?? {}),
+    ...(agent.spinePoint?.handlers ?? {}),
     // A circle a sibling founded or joined lands here and this device joins itself (the kring opt-out wins); a
     // sibling's request is answered with the circles this device is in. Entries only — the agent owns the gate.
     ...(agent.circleFollowSync?.handlers ?? {}),

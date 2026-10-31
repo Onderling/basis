@@ -362,7 +362,7 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
-  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, announceOwnCircleAddress,
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, makePrimaryResultWords, announceOwnCircleAddress,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { isFeatureEnabled, defaultViewModeFromPolicy, composerGate } from '../../src/v2/circlePolicy.js';
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
@@ -4936,7 +4936,7 @@ async function showMyData(opts) {
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
     const r = await makeThisDevicePrimary({ agent: _peerAgent }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
-    try { window.alert(t('circle.mydata.make_primary_done', { count: r.announced })); } catch { /* headless */ }
+    try { const w = makePrimaryResultWords(r); window.alert(t(w.key, w.params)); } catch { /* headless */ }
   };
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen

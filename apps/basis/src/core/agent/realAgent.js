@@ -103,7 +103,7 @@ import {
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
-import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
+import { createPrimaryDeviceChoice, SPINE_POINT_VAULT_KEY, SPINE_POINT_SUBTYPES } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createProfileFactsSync, routeProfileFactsBySender } from '../../v2/profileFactsSync.js';
@@ -793,6 +793,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // THE PRIMARY DEVICE (sync-policy §12, the DM half): read lazily — the choice store is composed further down.
   const primaryDeviceRef = { current: null };
+  const spinePointRef = { current: null };
   const sa = await createSecureMeshAgent({
     bus,
     // Other agents' kernel task requests over the relay (a connected screen calling the door's ops): only where the
@@ -2129,8 +2130,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       welcomeNewDevice(rec).catch(() => { /* its connect-time catch-up asks again */ });
       // THE POINT, when a second device arrives: the EXISTING device claims it unless a claim exists — never the newcomer
       // (it is still waiting for its first map), so the person's spine has one signer from the moment there are two.
-      if (!primaryDeviceRef.current?.current?.() && !awaitingDeviceMap.has('default')) {
-        Promise.resolve(primaryDeviceRef.current?.claim?.()).catch(() => { /* the tap on Mij still claims */ });
+      if (!spinePointRef.current?.current?.() && !awaitingDeviceMap.has('default') && personas.get('default')?.circleRoot) {
+        Promise.resolve(spinePointRef.current?.claim?.()).catch(() => { /* the tap on Mij still claims */ });
       }
     },
   });
@@ -2646,9 +2647,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   // yet → every device is its own point (a lone device; the existing device claims when a second one arrives).
   const SPINE_ACT_SUBTYPE = 'own-spine-act';
   const myPointId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
-  const isPointDevice = () => { const c = primaryDevice.current?.(); return !c || c.deviceId === myPointId; };
+  const isPointDevice = () => { const c = spinePoint.current?.(); return !c || c.deviceId === myPointId; };
   const pointDeviceAddress = async () => {
-    const c = primaryDevice.current?.();
+    const c = spinePoint.current?.();
     if (!c) return null;
     try { return (await deviceSiblingRowsOf('default')).find((d) => d.deviceId === c.deviceId)?.address ?? null; } catch { return null; }
   };
@@ -2671,6 +2672,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   const localMembershipEmitRef = { current: null };
   primaryDeviceRef.current = primaryDevice;
+  // THE POINT, its own record (the same shape and carry): who signs this person's spine statements. The enrol claims it
+  // alone — direct messages keep landing where they did — and the person's "main device" tap sets both.
+  const spinePoint = createPrimaryDeviceChoice({
+    vault: chatVault,
+    myDeviceId: enrolledDevice?.deviceId ?? custody.deviceId ?? null,
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    vaultKey: SPINE_POINT_VAULT_KEY,
+    subtypes: SPINE_POINT_SUBTYPES,
+  });
+  spinePointRef.current = spinePoint;
   await primaryDevice.load();
   const primaryKeySync = createPersonKeySync({
     siblings: ownDeviceSiblings,
@@ -9014,8 +9026,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     ownAddressRetireHandler,
     spineActHandler,
     spineActSubtype: SPINE_ACT_SUBTYPE,
-    /** The primary-device claim (`{deviceId, at}`) or null — the point that signs this person's spine statements. */
-    primaryDeviceClaim: () => primaryDevice.current?.() ?? null,
     ownAddressRetireSubtype: OWN_ADDRESS_RETIRE_SUBTYPE,
     /** Send to one of this device's own siblings at its device address (the registry's device map). */
     sendToOwnDevice: (to, payload, o = {}) => sendToSibling(to, payload, o),
@@ -9052,7 +9062,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     myDeviceId: () => enrolledDevice?.deviceId ?? custody.deviceId ?? null,
     /** Where a message to a contact goes once their pair roster exists (`pairRoster.js`): `{ to, circleId, personKey }` or null. */
     pairRouteFor: (contactWebid) => pairRouteFor({ callSkill: (a, o, g) => callSkill(a, o, g), selfWebid: chatId.pubKey, contactWebid }),
-    claimPrimaryDevice: () => primaryDevice.claim(),
+    /** "Make this my main device": where direct messages land AND the point that signs the spine — the point only on a
+     *  device that holds the persona's circle root (one without it signs with its own key and cannot be the point). */
+    claimPrimaryDevice: async () => {
+      const primary = await primaryDevice.claim();
+      const point = personas.get('default')?.circleRoot ? await spinePoint.claim() : { ok: false, reason: 'no-circle-root' };
+      return { ...primary, point };
+    },
+    spinePoint,
+    /** The point claim (`{deviceId, at}`) or null — the device that signs this person's spine statements. */
+    spinePointClaim: () => spinePoint.current?.() ?? null,
     personKeySync,
     /** My person-key chain `{ current, links }` — what a contact pulls after a rotation. */
     personKeyChain,

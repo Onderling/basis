@@ -58,7 +58,7 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
@@ -2637,6 +2637,28 @@ export async function createRealHouseholdAgent(opts = {}) {
       console.info(`[primary-device] this device is ${mine ? 'now' : 'no longer'} the primary contact address`);
     },
   });
+  // THE POINT: the device the primary-device claim names — the one that signs this person's spine statements. No claim
+  // yet → every device is its own point (a lone device; the existing device claims when a second one arrives).
+  const SPINE_ACT_SUBTYPE = 'own-spine-act';
+  const myPointId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
+  const isPointDevice = () => { const c = primaryDevice.current?.(); return !c || c.deviceId === myPointId; };
+  const pointDeviceAddress = async () => {
+    const c = primaryDevice.current?.();
+    if (!c) return null;
+    try { return (await deviceSiblingRowsOf('default')).find((d) => d.deviceId === c.deviceId)?.address ?? null; } catch { return null; }
+  };
+  /** The point signs a sibling's spine act: from a live device of this person only, a declared membership kind only, as
+   *  the circle's own self, on this device's own head. */
+  const spineActHandler = async (fromAddr, payload) => {
+    if (payload?.subtype !== SPINE_ACT_SUBTYPE || payload.lane !== 'membership') return;
+    if (!isPointDevice() || typeof localMembershipEmitRef.current !== 'function') return;
+    if (!(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
+    const act = payload.act ?? {};
+    if (typeof act.circleId !== 'string' || !MEMBERSHIP_RAIL_KINDS.includes(act.kind)) return;
+    try { await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: act.actor }); }
+    catch { /* the sibling's act is retried by nothing: it said 'forwarded' — the next act shows the roster as it is */ }
+  };
+  const localMembershipEmitRef = { current: null };
   primaryDeviceRef.current = primaryDevice;
   await primaryDevice.load();
   const primaryKeySync = createPersonKeySync({
@@ -5155,7 +5177,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         console.info(`[membership-fan] retold a ${kind} in ${String(circleId).slice(0, 8)} ${amAdmin ? 'as its admin' : 'as the departure emptied its admins'}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`);
       })().catch(() => { /* best-effort: the departed's own copy and catch-up remain */ });
     }
-    membershipEmit = makeMembershipEmitter({
+    const localMembershipEmit = makeMembershipEmitter({
       rail: membershipRail,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
@@ -5177,6 +5199,22 @@ export async function createRealHouseholdAgent(opts = {}) {
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
         .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     });
+    // SPINE STATEMENTS ONLY FROM THE POINT (Frits, 2026-10-31): every full device of a person signs a circle's statements
+    // with the same circle key, and two of them signing the spine at once would fork it. So a device that is not the
+    // point hands the ACT (kind, subject, payload) to the point over the own lane — held for it while it sleeps — and
+    // the point builds the statement on its own head and signs it. The point is the primary-device claim; with no claim
+    // yet, this device signs as before (a lone device, or the moment before the claim is made).
+    localMembershipEmitRef.current = localMembershipEmit;
+    membershipEmit = async (act = {}) => {
+      if (!act?.circleId || isPointDevice()) return localMembershipEmit(act);
+      const to = await pointDeviceAddress();
+      if (!to) return localMembershipEmit(act);   // the claim names a device this one cannot reach yet: as before
+      const { signer: _signer, ...plain } = act;   // eslint-disable-line no-unused-vars
+      try {
+        await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'membership', act: plain }, { guarantee: 'hold-forward' }, 'default');
+        return { forwarded: true };
+      } catch { return null; }
+    };
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
@@ -8962,6 +9000,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** The migration to one address per persona: this device's own old address — retired here (root), else asked. */
     retireDeviceCircleAddresses,
     ownAddressRetireHandler,
+    spineActHandler,
+    spineActSubtype: SPINE_ACT_SUBTYPE,
+    /** The primary-device claim (`{deviceId, at}`) or null — the point that signs this person's spine statements. */
+    primaryDeviceClaim: () => primaryDevice.current?.() ?? null,
     ownAddressRetireSubtype: OWN_ADDRESS_RETIRE_SUBTYPE,
     /** Send to one of this device's own siblings at its device address (the registry's device map). */
     sendToOwnDevice: (to, payload, o = {}) => sendToSibling(to, payload, o),

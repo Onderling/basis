@@ -292,6 +292,8 @@ export function buildCircleLanes({
     ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
     // …and a sibling's ask to retire its old device-derived address (the migration to one address per persona)
     ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
+    // …and a sibling's spine act for the point to sign (spine statements only from the point)
+    ...(agent.spineActHandler ? { [agent.spineActSubtype]: agent.spineActHandler } : {}),
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,

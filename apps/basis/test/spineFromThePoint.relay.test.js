@@ -51,6 +51,11 @@ describe('spine statements only from the point', () => {
 
   it('the phone and the box change two roles at once: Bea sees both, and Anna is NOT disputed (no fork on the shared key)', async () => {
     expect(A2.agent.circleAddressFor(GROUP), 'one address for Anna: both devices sign with one key').toBe(A.agent.circleAddressFor(GROUP));
+    // the phone is the point: it claims, and the box holds the claim (the sibling carry)
+    await A.agent.claimPrimaryDevice();
+    await A2.agent.primaryDevice?.requestFromSiblings?.();
+    expect(await until(() => (A2.agent.primaryDeviceClaim()?.deviceId === A.agent.primaryDeviceClaim()?.deviceId ? true : null), { timeout: 15000, step: 200 }),
+      'the box never learned that the phone is the point').toBe(true);
     // first, both devices on ONE head: a statement by the phone that the box holds too (the sibling carry)
     const headOf = (node) => (node.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === A.agent.circleAddressFor(GROUP)).map((x) => x.body.hash);
     const seed = await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: 'member' });
@@ -60,6 +65,8 @@ describe('spine statements only from the point', () => {
     expect(await until(() => { const a = headOf(A); const b = headOf(A2); return a.length && a.every((h) => b.includes(h)) ? true : null; }, { timeout: 20000, step: 200 }),
       `the box never held the phone's chain — phone ${headOf(A).length}, box ${headOf(A2).length}`).toBe(true);
     // then at the same moment, neither having seen the other's: the box hears nothing while both act
+    const signedByBox = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).length;
+    const boxBefore = signedByBox();
     const prior = A2._routerRef.fn;
     A2._routerRef.fn = () => undefined;
     const [r1, r2] = await Promise.all([
@@ -68,6 +75,7 @@ describe('spine statements only from the point', () => {
     ]);
     await new Promise((r) => setTimeout(r, 1500));
     A2._routerRef.fn = prior;
+    expect(signedByBox(), 'the box signed a spine statement itself instead of handing it to the point').toBe(boxBefore);
     expect(r1?.error ?? null, JSON.stringify(r1)).toBeNull();
     expect(r2?.error ?? null, JSON.stringify(r2)).toBeNull();
     const roleOn = async (node, webid) => (((await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === webid)?.role ?? null);

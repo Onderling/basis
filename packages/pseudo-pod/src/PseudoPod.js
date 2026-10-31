@@ -71,6 +71,9 @@ const REPLICATION_KIND = 'pseudo-pod.write';
 export const PSEUDO_POD_MODES = Object.freeze(['standalone', 'replication-ring', 'cache']);
 
 const VALID_MODES = new Set(PSEUDO_POD_MODES);
+/** Who hears each key change, per BACKEND (a WeakMap: a dropped backend takes its listeners): every pseudo-pod over one
+ *  backend tells the same listeners, so two registries in one process hear each other's writes. */
+const CHANGE_LISTENERS_BY_BACKEND = new WeakMap();
 
 /**
  * @param {object} opts
@@ -125,7 +128,7 @@ const VALID_MODES = new Set(PSEUDO_POD_MODES);
  *   introspection getters (`deviceId`, `backend`, `currentMode`, …).
  */
 export function createPseudoPod({
-  backend,
+  backend: backendIn,
   mode,
   deviceId,
   transport,
@@ -136,12 +139,30 @@ export function createPseudoPod({
   isPodReachable,
   versioning,
 } = {}) {
-  if (!backend || typeof backend.get !== 'function') {
+  if (!backendIn || typeof backendIn.get !== 'function') {
     throw Object.assign(
       new Error('createPseudoPod: `backend` (StorageBackend) is required'),
       { code: 'INVALID_ARGUMENT' },
     );
   }
+  // Every write that reaches the backend through this pseudo-pod (a local write, a pull from the pod, a peer's write, a
+  // delete, a write through the exposed `backend`) tells who listens for that key (`onRevision`). A layer of this
+  // pseudo-pod's own in front of the backend: the backend itself is never changed (several pseudo-pods over one backend
+  // must not stack wrappers on it), and every other method reaches it as it was.
+  let changeListeners = CHANGE_LISTENERS_BY_BACKEND.get(backendIn);
+  if (!changeListeners) { changeListeners = new Map(); CHANGE_LISTENERS_BY_BACKEND.set(backendIn, changeListeners); }
+  const tellChanged = (key) => {
+    for (const fn of [...(changeListeners.get(key) ?? [])]) { try { fn(); } catch { /* a listener never breaks a write */ } }
+  };
+  const told = new Set(['put', 'putIf', 'delete']);
+  const backend = new Proxy(backendIn, {
+    get(target, prop) {
+      const v = target[prop];
+      if (typeof v !== 'function') return v;
+      if (told.has(prop)) return async (key, ...rest) => { try { return await v.call(target, key, ...rest); } finally { tellChanged(key); } };
+      return v.bind(target);
+    },
+  });
   if (!VALID_MODES.has(mode)) {
     throw Object.assign(
       new Error('createPseudoPod: `mode` must be "standalone", "replication-ring", or "cache"'),
@@ -811,6 +832,17 @@ export function createPseudoPod({
     read,
     write,
     delete: deleteResource,
+    /**
+     * Hear this resource change: every change made through the pseudo-pods over this backend — a local write, a pull from
+     * the pod, a peer's write, a delete, a write through `backend`. `fn()`; returns the unsubscribe.
+     */
+    onRevision: (uri, fn) => {
+      if (typeof fn !== 'function') return () => {};
+      const key = _keyForUri(uri);
+      if (!changeListeners.has(key)) changeListeners.set(key, new Set());
+      changeListeners.get(key).add(fn);
+      return () => { changeListeners.get(key)?.delete(fn); };
+    },
     list,
     subscribe,
     writeFromPeer,

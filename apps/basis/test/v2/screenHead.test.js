@@ -69,3 +69,14 @@ describe('a screen head', () => {
     expect(h.listeners.size).toBe(0);
   });
 });
+
+describe('a head whose reader comes with the landing', () => {
+  it('a screen mounted anew per landing brings its reader; the head still reads once', async () => {
+    const head = createScreenHead({ subscribe: [], debounceMs: 20 });
+    let runs = 0;
+    const reader = async (k) => { runs += 1; return [k]; };
+    expect(await head.land('mij', reader)).toEqual(['mij']);
+    expect(await head.land('mij', reader)).toEqual(['mij']);
+    expect(runs).toBe(1);
+  });
+});

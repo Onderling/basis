@@ -2218,7 +2218,21 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (self, device)); the own lanes, the grants lane and the sibling carry travel device address to device address, and
   // a device address is on no roster. Live records only — a revoked device is not a sibling — each bound by the self's
   // own device-set verifier (the persona's authority, the tombstones).
+  // Memoised per self until the registry changes (a record learned, a tombstone): every send to an own device asks, and
+  // each answer verifies every record's signature.
+  // Bounded in time as well: a backend whose change signal misses a write still answers fresh within the window.
+  const DEVICE_ROWS_MEMO_MS = 2000;
+  const deviceRowsMemo = new Map();   // pid → { at, promise }
+  try { agentsRegistryRef?.onChanged?.(() => deviceRowsMemo.clear()); } catch { /* the time bound still holds */ }
   const deviceSiblingRowsOf = async (pid) => {
+    const hit = deviceRowsMemo.get(pid);
+    if (hit && Date.now() - hit.at < DEVICE_ROWS_MEMO_MS) return hit.promise;
+    const promise = deviceSiblingRowsOfNow(pid);
+    deviceRowsMemo.set(pid, { at: Date.now(), promise });
+    promise.catch(() => deviceRowsMemo.delete(pid));
+    return promise;
+  };
+  const deviceSiblingRowsOfNow = async (pid) => {
     const self = personas.get(pid);
     const kit = deviceKitOf(pid);
     if (!self?.chatId?.pubKey || !kit) return [];
@@ -3393,7 +3407,7 @@ export async function createRealHouseholdAgent(opts = {}) {
               if (parsed?.ok) {
                 await stashEnrollOffer(opts.enrollOfferStorage, encodeEnrollOffer({
                   relays: parsed.relays, circles: parsed.circles, personasSealed: parsed.personasSealed, devicesSealed: parsed.devicesSealed, introduce,
-                }));
+                }), { keepIntroduce: true });
               }
             }
           }
@@ -3432,47 +3446,71 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return { ok: true, root };
   };
+  // THE MIGRATION TO ONE ADDRESS PER PERSONA. A membership from before the switch lists each device's DEVICE-derived
+  // address. A device retires only ITS OWN old address — the device holding the root signs the reveal for it; a sibling's
+  // old address goes only at that sibling's REQUEST over the own lane, which it makes once it holds the circle root and
+  // its persona address is on its row. A device without the root (enrolled before the circle root) never asks: it still
+  // speaks only on its device address, which stays until a phrase ceremony hands it the root.
+  const OWN_ADDRESS_RETIRE_SUBTYPE = 'own-address-retire';
+  /** In `circleId`, this device's old device-derived address when the row still lists it beside the persona's, else null. */
+  const oldOwnAddressIn = async (circleId) => {
+    const self = personas.get(profileIdOf(circleId));
+    if (!self?.circleRoot || !(self.deviceDerivationSeed instanceof Uint8Array)) return null;   // no root: nothing to leave
+    const persona = self.circleAddressFor(circleId);
+    const old = deriveCircleAddress(self.deviceDerivationSeed, circleId);
+    if (old === persona) return null;
+    let row = null;
+    try {
+      const res = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
+      row = (res?.members ?? []).find((m) => m?.webid === circleSelfRef(circleId)) ?? null;
+    } catch { row = null; }
+    const onRow = new Set([row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean));
+    // only once the persona's address is on the row: the member is never left without an address there
+    return onRow.has(persona) && onRow.has(old) ? old : null;
+  };
   /**
-   * THE MIGRATION TO ONE ADDRESS PER PERSONA (root custody): in each circle, retire the DEVICE-derived addresses a
-   * membership from before the switch still lists — this device's own and its siblings' (from the self's device map, each
-   * device's seed derived from the root) — with the authority's reveal, as the revoke ceremony does. The persona's one
-   * address is never retired (`retireAddresses` refuses it). A device without the root retires nothing: it stopped
-   * speaking on its old address at the switch, and the device holding the root retires it for it.
+   * This device's own old address, in each circle: retired here when the root is resident (the authority's reveal), else
+   * asked of the self's devices that hold it (the request names no address — the root device derives it from this
+   * device's own record).
    * @param {string[]} circleIds
-   * @returns {Promise<{retired: number, skipped?: string}>}
+   * @returns {Promise<{retired: number, asked: number}>}
    */
   const retireDeviceCircleAddresses = async (circleIds = []) => {
-    if (!ownerRoot) return { retired: 0, skipped: 'no-root' };
-    let retired = 0;
+    let retired = 0; let asked = 0;
     for (const circleId of Array.isArray(circleIds) ? circleIds : []) {
+      const old = await oldOwnAddressIn(circleId);
+      if (!old) continue;
+      if (ownerRoot) {
+        retired += (await retireAddresses({ root: ownerRoot, circleIds: [circleId], addressFor: () => old })).length;
+        continue;
+      }
       const pid = profileIdOf(circleId);
-      const self = personas.get(pid);
-      if (!self) continue;
-      let row = null;
-      try {
-        const res = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
-        row = (res?.members ?? []).find((m) => m?.webid === circleSelfRef(circleId)) ?? null;
-      } catch { row = null; }
-      const onRow = new Set([row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean));
-      const persona = self.circleAddressFor(circleId);
-      // only once the persona's address is on this self's row: the member is never left without an address there
-      if (!onRow.has(persona)) continue;
-      const profileSeed = ownerRoot.deriveAgentSeed(pid);
-      const seeds = [self.deviceDerivationSeed];
-      try {
-        const entry = await agentsRegistryRef?.lookup?.(pid);
-        for (const rec of Object.values(deviceDelegationsOf(entry ?? {}))) {
-          if (rec?.deviceId) seeds.push(deriveDeviceSeed(profileSeed, rec.deviceId));
-        }
-      } catch { /* this device's own old address at least */ }
-      const old = [...new Set(seeds.filter((x) => x instanceof Uint8Array).map((seed) => deriveCircleAddress(seed, circleId)))]
-        .filter((a) => a !== persona && onRow.has(a));
-      for (const address of old) {
-        const done = await retireAddresses({ root: ownerRoot, circleIds: [circleId], addressFor: () => address });
-        retired += done.length;
+      for (const d of await deviceSiblingRowsOf(pid).catch(() => [])) {
+        try { await sendToSibling(d.address, { subtype: OWN_ADDRESS_RETIRE_SUBTYPE, profileId: pid, circleId }, {}, pid); asked += 1; } catch { /* the next boot asks again */ }
       }
     }
-    return { retired };
+    return { retired, asked };
+  };
+  /** A sibling asks this ROOT device to retire ITS old device-derived address in a circle: derived here from its own
+   *  record (never taken from the request), retired only if the row still lists it beside the persona's. */
+  const ownAddressRetireHandler = async (fromAddr, payload) => {
+    if (payload?.subtype !== OWN_ADDRESS_RETIRE_SUBTYPE || !ownerRoot) return;
+    const pid = typeof payload.profileId === 'string' ? payload.profileId : null;
+    const circleId = typeof payload.circleId === 'string' ? payload.circleId : null;
+    if (!pid || !circleId || profileIdOf(circleId) !== pid || !personas.has(pid)) return;
+    if (!(await deviceSiblingRowsOf(pid)).some((d) => d.address === fromAddr)) return;   // a live device of that self only
+    let rec = null;
+    try { rec = Object.values(deviceDelegationsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})).find((r) => r?.pubKey === fromAddr && r.revoked !== true) ?? null; } catch { rec = null; }
+    if (!rec?.deviceId) return;
+    const old = deriveCircleAddress(deriveDeviceSeed(ownerRoot.deriveAgentSeed(pid), rec.deviceId), circleId);
+    let row = null;
+    try {
+      const res = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
+      row = (res?.members ?? []).find((m) => m?.webid === circleSelfRef(circleId)) ?? null;
+    } catch { row = null; }
+    const onRow = new Set([row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean));
+    if (!onRow.has(old) || !onRow.has(personas.get(pid).circleAddressFor(circleId))) return;
+    await retireAddresses({ root: ownerRoot, circleIds: [circleId], addressFor: () => old }).catch(() => []);
   };
   const retireAddresses = async ({ root, addressFor, circleIds, includeOwn = false }) => {
     const revokedIn = [];
@@ -8921,8 +8959,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     ownDeviceRecordsHandler,
     /** The enrol offer's device(s), learned at this device's first boot (`consumeEnrollOffer`). */
     learnOfferedDevices,
-    /** The migration to one address per persona: retire the old device-derived addresses (root custody). */
+    /** The migration to one address per persona: this device's own old address — retired here (root), else asked. */
     retireDeviceCircleAddresses,
+    ownAddressRetireHandler,
+    ownAddressRetireSubtype: OWN_ADDRESS_RETIRE_SUBTYPE,
     /** Send to one of this device's own siblings at its device address (the registry's device map). */
     sendToOwnDevice: (to, payload, o = {}) => sendToSibling(to, payload, o),
     /** This device's own device address under a self (its delegation key there), or null. */

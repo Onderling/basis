@@ -290,6 +290,8 @@ export function buildCircleLanes({
     // the person's device map, between their own devices (a self's delegation records): how three devices without a
     // pod find each other when only one of them met each of the others
     ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
+    // …and a sibling's ask to retire its old device-derived address (the migration to one address per persona)
+    ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,

@@ -430,6 +430,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     } : {}),
     // The person's device map between their own devices — the same registration the shared lane table makes.
     ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
+    ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
     // The roster seed (pod-less enroll S1) — the same registration both shells make.
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,

@@ -395,12 +395,21 @@ export function enrollOfferFromLink(hrefOrHash) {
  * mobile — both shapes work; results are awaited). Plain storage on purpose: the offer is public
  * data, and the sealed vaults are re-keyed mid-ceremony — exactly the wrong home for it. */
 
-export async function stashEnrollOffer(storage, uriOrLink) {
+export async function stashEnrollOffer(storage, uriOrLink, { keepIntroduce = false } = {}) {
   // One paste box takes anything: the raw `onderling-enroll://` code OR the clickable link form.
   const parsed = enrollOfferFromLink(uriOrLink);
   if (!parsed.ok) return parsed;
-  await storage.setItem(ENROLL_OFFER_STORAGE_KEY, parsed.uri);
-  return parsed;
+  // The introduction (`i`) is the CEREMONY's to write — opened and verified with the phrase in hand. A scanned or pasted
+  // offer never carries one into the stash: it would name devices to wait on from whoever made the code.
+  let uri = parsed.uri;
+  if (!keepIntroduce) {
+    const inner = parseEnrollOffer(uri);
+    if (inner.ok && inner.introduce?.length) {
+      uri = encodeEnrollOffer({ relays: inner.relays, circles: inner.circles, personasSealed: inner.personasSealed, devicesSealed: inner.devicesSealed });
+    }
+  }
+  await storage.setItem(ENROLL_OFFER_STORAGE_KEY, uri);
+  return uri === parsed.uri ? parsed : { ...parsed, uri };
 }
 
 /**

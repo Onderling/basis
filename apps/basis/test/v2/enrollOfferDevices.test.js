@@ -46,3 +46,17 @@ describe('the new device keeps only what the person\'s authority signed', () => 
     expect(at({ default: alien }, ['default']), 'another person\'s authority').toEqual([]);
   });
 });
+
+describe('only the ceremony writes the introduction', () => {
+  it('a SCANNED offer carrying an introduction is stashed without it; the ceremony\'s own stash keeps it', async () => {
+    const { stashEnrollOffer, pendingEnrollOffer } = await import('../../src/v2/enrollOffer.js');
+    const mem = () => { const m = new Map(); return { getItem: async (k) => m.get(k) ?? null, setItem: async (k, v) => { m.set(k, v); }, removeItem: async (k) => { m.delete(k); } }; };
+    const crafted = encodeEnrollOffer({ circles: [{ id: 'c', address: 'a' }], introduce: [{ profileId: 'default', deviceId: 'x', pubKey: 'ATTACKER', by: 'b', sig: 's' }] });
+    const scanned = mem();
+    expect((await stashEnrollOffer(scanned, crafted)).ok).toBe(true);
+    expect((await pendingEnrollOffer(scanned))?.introduce ?? [], 'a scanned offer introduces nobody').toEqual([]);
+    const ceremony = mem();
+    expect((await stashEnrollOffer(ceremony, crafted, { keepIntroduce: true })).ok).toBe(true);
+    expect((await pendingEnrollOffer(ceremony))?.introduce?.length, 'the ceremony\'s own stash keeps it').toBe(1);
+  });
+});

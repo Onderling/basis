@@ -182,14 +182,17 @@ describe('Pinboard V1 Phase 16 — editGroupRules', () => {
 // ── removeMember ─────────────────────────────────────────────────────────
 
 describe('Pinboard V1 Phase 16 — removeMember', () => {
-  it('an admin\'s removal revokes the member and writes no exit row (the lane\'s evict statement is its record)', async () => {
+  it('admin records a removal item with full source metadata', async () => {
     const bundle = await buildCircle();
     const r = await callSkill(bundle.agent, 'removeMember', {
       memberWebid: BOB, reason: 'overtreding huisregels',
     });
-    expect(r.error).toBeUndefined();
-    expect(r.revoked).toBe(true);
-    expect((await bundle.itemStore.listOpen({ type: 'group-removal' })) ?? []).toEqual([]);
+    expect(r.removalId).toBeTruthy();
+    const item = await bundle.itemStore.getById(r.removalId);
+    expect(item.type).toBe('group-removal');
+    expect(item.source.memberWebid).toBe(BOB);
+    expect(item.source.reason).toBe('overtreding huisregels');
+    expect(item.source.removedBy).toBe(ANNE);
   });
 
   it('non-admin gets admin-only error', async () => {
@@ -201,8 +204,9 @@ describe('Pinboard V1 Phase 16 — removeMember', () => {
   it('accepts memberStableId in addition to memberWebid', async () => {
     const bundle = await buildCircle();
     const r = await callSkill(bundle.agent, 'removeMember', { memberStableId: 'sid-bob' });
-    expect(r.error).toBeUndefined();
-    expect(r.revoked, 'the stable id resolves to the member, who is revoked').toBe(true);
+    expect(r.removalId).toBeTruthy();
+    const item = await bundle.itemStore.getById(r.removalId);
+    expect(item.source.memberStableId).toBe('sid-bob');
   });
 
   it('rejects when neither identifier is supplied', async () => {

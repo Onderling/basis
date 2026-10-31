@@ -115,7 +115,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
   it('THE REMOVAL: the shared shell operation drops him from A and reports the remaining roster', async () => {
     const r = await removeCircleMember({ agent: admin.agent, circleId: CIRCLE_A, memberWebid: bram.pubKey });
     expect(r.ok, `removal failed: ${r.error}`).toBe(true);
-    expect(r.error).toBeUndefined();
+    expect(r.removalId).toBeTruthy();
     // Step 4 of the operation actually ran: it re-read the roster and got a smaller one.
     expect(r.remaining, 'admin + cato remain').toBe(2);
 

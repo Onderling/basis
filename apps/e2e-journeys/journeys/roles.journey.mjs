@@ -140,12 +140,12 @@ export async function run({ relayUrl }) {
     const left = await call(cato, 'leaveGroup', { groupId: GROUP, confirm: true }, CATO);
     check('a member can leave without asking an admin', !refused(left), JSON.stringify(left)?.slice(0, 120));
     await wait(2000);
-    // What a leave DOES is deliberately NOT asserted here — neither on the leaver's own device nor on the others.
-    // A leave is the `leave` statement on the circle's membership lane and nothing else (no exit row any more), and
-    // this harness runs pinboard agents over the substrate mirror with no device log and therefore no membership
-    // rail: the statement has no lane to fold on. The shipping composition folds it on the leaver's own device and
-    // carries it to the others — pinned by the app-composition journey (same run) and by
-    // `apps/basis/test/v2/leavePropagation.test.js`. Asserting it here would measure the harness, not the product.
+    check('the leaver\'s own device drops the membership', !has(await rosterOf(cato, CATO), CATO));
+    // PROPAGATION is deliberately NOT asserted here. `leaveGroup` emits a `leave` spine statement, and a
+    // statement needs a lane: this harness runs pinboard agents over the substrate mirror with no device log
+    // and therefore no membership rail, so the statement has nowhere to travel. The shipping composition
+    // does propagate it, pinned in `apps/basis/test/v2/leavePropagation.test.js`. Asserting it here would
+    // measure the harness, not the product.
   } finally {
     for (const b of [anne, bram, cato]) await b.agent.transport.disconnect().catch(() => {});
   }

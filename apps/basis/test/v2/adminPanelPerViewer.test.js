@@ -65,8 +65,7 @@ describe('the admin panel, per viewer — gate first, then the paint', () => {
     const { bundle, members, row } = await buildCircle();
     expect(removeControlFor({ members, member: row(CARLA), myRef: ANNE })).toMatchObject({ kind: 'remove', disabled: false });
     const r = await callSkill(bundle.agent, 'removeMember', { memberWebid: CARLA, reason: 'test' }, ANNE);
-    expect(r.error).toBeUndefined();
-    expect(r.revoked).toBe(true);
+    expect(r.removalId).toBeTruthy();
   });
 
   it('a member\'s OWN row is leaving, not a removal — offered, as "Leave circle"', async () => {

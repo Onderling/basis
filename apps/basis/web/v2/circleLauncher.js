@@ -54,9 +54,6 @@ export function renderCircleLauncher(container, {
   // A failed agent boot, said HERE — the surface a person is looking at. Without it a dead boot and an
   // empty account paint the same "No circles yet.", and people conclude their data is gone.
   bootFailure = null,
-  // The circles an admin removed this person from (`loadRemovedCircles`): tiles of their own, marked, read-only, until
-  // the person closes them from inside the circle. No context menu — pin, mute and leave mean nothing there.
-  removedCircles = [],
 } = {}) {
   const tr = translatorOr(t, 'circleLauncher.js');
   container.innerHTML = '';
@@ -151,26 +148,6 @@ export function renderCircleLauncher(container, {
       list.appendChild(renderTile(c, {
         previews, proposals, pinnedMap, mutedMap, sights, tr, handlers: tileHandlers,
       }));
-    }
-    container.appendChild(list);
-  }
-
-  if (removedCircles.length > 0) {
-    const list = document.createElement('div');
-    list.className = 'circle-launcher__list circle-launcher__list--removed';
-    for (const c of removedCircles) {
-      const tile = renderTile({ ...c, memberCount: null }, { previews: null, proposals: null, pinnedMap: {}, mutedMap: {}, sights: {}, tr, handlers: { onOpenCircle } });
-      tile.classList.add('is-removed');
-      tile.dataset.removed = 'true';
-      const meta = document.createElement('div');
-      meta.className = 'circle-tile__meta';
-      meta.textContent = tr('circle.membership.removed_note');
-      tile.querySelector('.circle-tile__body')?.appendChild(meta);
-      const mark = document.createElement('span');
-      mark.className = 'circle-tile__removed';
-      mark.textContent = tr('circle.membership.removed_mark');
-      tile.appendChild(mark);
-      list.appendChild(tile);
     }
     container.appendChild(list);
   }

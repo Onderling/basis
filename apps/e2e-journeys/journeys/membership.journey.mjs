@@ -213,7 +213,7 @@ export async function run({ relayUrl }) {
     check('scenario 6 — redeemMembershipCode succeeded (a real join)', !!redeem.redemptionId);
     const realJoin = await lastEmitted(mel);
     const removal = await removeMember(removeDeps(alpha), { a: { memberWebid: mel.id.pubKey, policy: 'graceful' }, from: alpha.id.pubKey });
-    check('scenario 6 — removeMember succeeded (a real eviction)', !removal.error && removal.revoked);
+    check('scenario 6 — removeMember succeeded (a real eviction)', !!removal.removalId && removal.revoked);
     const realEvict = await lastEmitted(alpha);
     check('scenario 6 — both writers actually EMITTED a signed spine statement',
       !!realJoin && !!realEvict && realJoin.body.kind === 'join' && realEvict.body.kind === 'evict');
@@ -243,7 +243,7 @@ export async function run({ relayUrl }) {
     check('scenario 7 — the deeper re-join re-admits mel on BOTH devices, identically',
       roster(alpha).members.includes(mel.id.pubKey) && rosterKey(alpha) === rosterKey(beta));
     const leave = await leaveGroup(leaveDeps(mel), { a: { groupId: CIRCLE }, from: mel.id.pubKey });
-    check('scenario 7 — leaveGroup succeeded (a real, self-authored leave)', !leave.error);
+    check('scenario 7 — leaveGroup succeeded (a real, self-authored leave)', !!leave.leaveMarkerId);
     const realLeave = await lastEmitted(mel);
     check('scenario 7 — the leave is self-authored (author === subject === mel), as the fold requires',
       realLeave.body.author === mel.id.pubKey && realLeave.body.subject === mel.id.pubKey);

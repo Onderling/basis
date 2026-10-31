@@ -1008,17 +1008,6 @@ export const pinboardManifest = {
       },
     },
     {
-      // closing a circle an admin removed you from: forgets what this device held of it (refused for one you are in)
-      id:   'dismissRemovedCircle', visibility: 'private', verb: 'remove',
-      writes: { scope: 'device' },   // this device's copy only: nothing reaches a member
-      circleScoped: false,
-      params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
-      surfaces: {
-        chat: { hint: 'Close a circle you were removed from; what this device held of it is forgotten.' },
-        ui:   { control: 'button' },
-      },
-    },
-    {
       id:   'listCirclePostsSince', visibility: 'authenticated', verb: 'list',
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },

@@ -107,13 +107,6 @@ describe('a circle left on one device is left on the person\'s others', () => {
   }, 300_000);   // the enrol corridor over three circles, then the leave + the follow — heavy, and heavier on a loaded runner
 
   it('the offline half: A2 is dark while A leaves Y; on connect A2 asks its siblings and leaves Y too', async () => {
-    // A relay that records what comes off it: A2's per-circle address for Y must leave the relay with the circle
-    const removed = [];
-    const recordingRelay = { url: 'ws://recording.example', port: { removeAddress: (addr) => { removed.push(addr); } } };
-    const yAddress = A2.agent.circleAddressFor?.(Y) ?? null;
-    const sa = A2.agent.sa;
-    const relaysBefore = sa.relays;
-    sa.relays = { ...(relaysBefore ?? {}), list: () => [...(relaysBefore?.list?.() ?? []), recordingRelay] };
     const live = A2._routerRef.fn;
     A2._routerRef.fn = () => undefined;   // dark: inbound dropped, as for a phone that is off
     const left = await leaveCircleLocally({ agent: A.agent, callSkill: (app, op, args) => A.agent.callSkill(app, op, args), circleId: Y });
@@ -125,8 +118,6 @@ describe('a circle left on one device is left on the person\'s others', () => {
     const followed = await until(async () => ((await myCircles(A2)).includes(Y) ? null : true), { timeout: 20000, step: 250 });
     expect(followed, 'A2 never left Y after asking its siblings').toBe(true);
     expect(await registryHas(A2, Y)).toBe(false);
-    expect(yAddress, 'A2 had a per-circle address for Y').toBeTruthy();
-    expect(removed, 'A2\'s address for Y came off the relay when it followed the leave').toContain(yAddress);
     expect(await myCircles(A2), 'Z stays on both').toContain(Z);
     expect(leavesOnLane(B, Y, A.pubKey), 'one leave in Y too').toBe(1);
   }, 120_000);

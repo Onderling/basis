@@ -130,7 +130,7 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
       <View style={styles.backdrop}>
         <View style={styles.card} testID="restore-finish-modal">
           <Text style={styles.title}>{t('circle.restore_finish.title')}</Text>
-          <ScrollView>{body}</ScrollView>
+          <ScrollView keyboardShouldPersistTaps="handled">{body}</ScrollView>
         </View>
       </View>
     </Modal>

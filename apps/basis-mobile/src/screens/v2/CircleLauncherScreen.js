@@ -2196,7 +2196,7 @@ export default function CircleLauncherScreen({
             </Pressable>
             {/* the "+" is the floating button on every tab now (WithTabBar) */}
           </View>
-          <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
               onMore={expandedBlockId ? null : setExpandedBlockId}
               onAction={(a) => {
@@ -4889,7 +4889,7 @@ function CircleDetail({
             </View>
             {listScreenData?.shape === 'record' ? (
               /* a record-shaped DETAIL screen (read-only key→value, web parity). */
-              <ScrollView>
+              <ScrollView keyboardShouldPersistTaps="handled">
                 <CircleRecordScreen record={listScreenData.record} activity={listScreenData.activity ?? null} />
               </ScrollView>
             ) : listScreenData ? (
@@ -4922,7 +4922,7 @@ function CircleDetail({
                   : undefined}
               />
             ) : (
-              <ScrollView ref={panelScrollRef}>
+              <ScrollView keyboardShouldPersistTaps="handled" ref={panelScrollRef}>
                 <View ref={panelContentRef} collapsable={false}>
                   <CircleScreenView blocks={panelBlocks} highlightRef={screenPanel?.highlightRef}
                     highlightRowRef={highlightRowRef} onHighlightLayout={scrollPanelToHighlight}
@@ -5543,7 +5543,7 @@ function ConnectionPointsScreen({
       {points.length === 0 ? (
         <Text style={styles.muted}>{t('circle.nearbyScreen.points_empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
           {points.map((point) => (
             <View key={point.url} style={styles.row} testID={`point-${point.url}`}>
               <Text style={styles.rowName}>{point.url}</Text>
@@ -6298,7 +6298,7 @@ function MyThingsScreen({ files = [], onBack }) {
       {files.length === 0 ? (
         <Text style={styles.muted}>{t('circle.folio.my_things_empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
           {files.map((file) => (
             <View key={file.id} style={styles.row} testID={`mythings-row-${file.id}`}>
               <Text style={styles.rowName}>{file.name}</Text>

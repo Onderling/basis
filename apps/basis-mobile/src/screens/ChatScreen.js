@@ -1631,7 +1631,7 @@ export default function ChatScreen({
         )}
       </View>
 
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="handled"
         ref={scrollRef}
         style={styles.messageList}
         contentContainerStyle={styles.messageListContent}

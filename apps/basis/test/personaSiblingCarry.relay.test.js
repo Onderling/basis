@@ -36,7 +36,7 @@ describe('the sibling carry is per self', () => {
     const storage = memStorage();
     expect((await stashEnrollOffer(storage, offer.uri)).ok).toBe(true);
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('box-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('box-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await phone.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'box' })).ok).toBe(true);
     await teardown(pre);

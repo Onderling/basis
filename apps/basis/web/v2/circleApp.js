@@ -190,7 +190,7 @@ import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
 import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsHome.js';
-import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
+import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant, connectionSelfChoice } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
   createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
@@ -4889,6 +4889,8 @@ async function showMyData(opts) {
   // a ceremony or wizard that closes comes back to the screen it was opened from
   const again = () => showMyData(opts);
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
+  // the selves this device holds now (a persona made since the last refresh): the pairing form asks which one a screen is for
+  try { await refreshSelfSet(); } catch { /* the set as held stands */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
   let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
@@ -5036,10 +5038,12 @@ async function showMyData(opts) {
       // dispatch catalogue can never disagree about what an op is.
       ops: connectionOpChoices({ manifests: connectionManifestSources() }),
       sections: connectionSectionChoices({ circles: circleListForConnections() }),
+      // which self the screen is for (a persona issues its grants as itself): the switcher's set
+      self: connectionSelfChoice({ held: _selfSet.held, on: _selfSet.on }),
     },
     parseConnectionOffer: parsePairingOffer,
-    onPairConnection: async ({ viewPubKey, nonce, label, ops, sections }) => {
-      const args = compileConnectionGrant({ viewPubKey, ops, sections, label });
+    onPairConnection: async ({ viewPubKey, nonce, label, ops, sections, persona }) => {
+      const args = compileConnectionGrant({ viewPubKey, ops, sections, label, persona });
       if (!args) return;                      // a pick that grants nothing creates nothing
       try { await circleHouseholdAgent.callSkill('household', 'grantSurface', { ...args, ...(nonce ? { nonce } : {}) }); }
       catch { /* the list re-reads; a failure leaves no half-connection */ }

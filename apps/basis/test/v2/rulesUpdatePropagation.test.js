@@ -80,7 +80,7 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
     // B holds the doc the invite carried (v1) and, since the admin's signed join rides back on the redeem reply, folds it
     // at once — so B starts on v1. Anything past v1 can only have come over the PEER LANE, which keeps the arrival
     // below unambiguous.
-    expect(await currentVersionOn(B), 'B starts on the version its invite carried').toBeLessThanOrEqual(1);
+    expect(await currentVersionOn(B), 'B folds the admin\'s join at once: the version its invite carried').toBe(1);
 
     // The admin raises the rules to v2. The doc + version now RIDE THE FAN — no pod anywhere.
     const edited = await A.agent.callSkill('pinboard', 'editGroupRules', {

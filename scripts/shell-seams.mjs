@@ -40,11 +40,11 @@ export const SEAMS = Object.freeze([
   // A card handed to the install at build goes into its contacts the way a scanned card does: the alpha's feedback
   // contact on web and mobile. The box had it for a household bot's companion until the bot's admin could hand the
   // companion over from their app (the identity link's `identity-link.companion`); a box is handed nothing at boot.
-  // ONE MEMBER PER PERSONA: two personas of one person cannot be told apart on the wire, so only the person's own
-  // device can warn before a second persona of theirs joins a circle it is already in. The join wizard's shared state
-  // decides (`secondPersonaWarning`); the shell hands it which persona the device holds each circle as. Only the
-  // person's shells run the join wizard.
-  { id: 'second-persona-join-warning', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the join cannot see that the person is already in the circle as another persona, and makes a second member silently' },
+  // ONE SELF PER CIRCLE ON A DEVICE: two personas of one person cannot be told apart on the wire, so only the person's
+  // own device can refuse a second persona of theirs joining a circle it is already in (the device's bind refuses too).
+  // The join wizard's shared state decides (`secondPersonaRefusal`) before anything is sent; the shell hands it which
+  // persona the device holds each circle as. Only the person's shells run the join wizard.
+  { id: 'second-persona-join-refusal', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the wizard cannot say before the submit that the person is already in the circle as another persona' },
   // A SCREEN'S DATA IS A HEAD: Vandaag's blocks kept current by the circles' changes and the event log (`screenHead.js`),
   // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time
   // (a phone: calendar.listEvents ×6 + tasks.listOpen ×3 per Vandaag landing). The box paints no screen.

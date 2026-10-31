@@ -3727,9 +3727,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   // JOINING AS A PERSONA (the bind before the redeem): the circle is the persona's from here — its keys and its "me" —
   // the persona's chat key and person key are identities of ours that it owns, and it is on the circle's relay on a
   // socket of its own. `personaId` null/'default' gives the circle back to the default (a join that did not happen).
+  // ONE SELF PER CIRCLE ON A DEVICE: the self this device is a member of a circle as, from the registry's membership
+  // records of the selves running here (null when it is in the circle as none of them).
+  const circleHeldBy = async (circleId) => {
+    for (const pid of personas.keys()) {
+      try { if (circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})[circleId]) return pid; } catch { /* that self unreadable: not held by it */ }
+    }
+    return null;
+  };
   const bindCirclePersona = async ({ circleId, personaId = null, relayUrl = null } = {}) => {
     if (typeof circleId !== 'string' || !circleId) return { ok: false, reason: 'circleId-required' };
-    if (!personaId || personaId === 'default') { circlePersonas.delete(circleId); return { ok: true, address: circleAddressFor(circleId) }; }
+    // A circle this device is already in as ANOTHER self is refused: rebinding it would orphan that membership (still on
+    // the co-members' rosters, while this device could no longer speak, read or be reached as it there).
+    const held = await circleHeldBy(circleId);
+    const target = personaId && personaId !== 'default' ? personaId : 'default';
+    if (held && held !== target) return { ok: false, reason: 'already-in-as', personaId: held };
+    if (target === 'default') { circlePersonas.delete(circleId); return { ok: true, address: circleAddressFor(circleId) }; }
     const rt = personas.get(personaId);
     if (!rt?.chatId) return { ok: false, reason: 'no-such-persona' };
     circlePersonas.set(circleId, personaId);

@@ -52,7 +52,7 @@ import {
   prepareJoinIdentity,
   setLinkChoice,
   setJoinReveal,
-  REVEAL_PRESETS, isJoinDirty, personaLabel, secondPersonaWarning } from '../../core/wizards/joinGroupState.js';
+  REVEAL_PRESETS, isJoinDirty, personaLabel, secondPersonaRefusal, submitErrorText } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
 import { mkHandleField } from './_wizardKit.js';   // the one handle field the join and create wizards share
@@ -433,7 +433,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
       // …and the persona brings its own handle into the field, when the field is still empty. Prefill,
       // never override: going back to this picker must not undo what the person typed.
       applyPersonaHandle({ state, callSkill }).then((r) => { if (r.applied) rerender(); }).catch(() => {});
-      if (state.heldAs) rerender();   // the second-persona warning follows the choice
+      if (state.heldAs) rerender();   // the second-persona refusal follows the choice
     });
     pWrap.appendChild(select);
 
@@ -442,13 +442,13 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     pHint.textContent = t('circle.join.wizard.persona.hint');
     pWrap.appendChild(pHint);
 
-    // ONE MEMBER PER PERSONA — this device is already in the circle as another of the person's personas
-    const second = secondPersonaWarning(state);
+    // ONE SELF PER CIRCLE ON A DEVICE — this device is already in the circle as another of the person's personas
+    const second = secondPersonaRefusal(state);
     if (second) {
       const held = state.personas.find((p) => p.id === second.personaId) ?? { id: second.personaId };
       const warn = doc.createElement('div');
       warn.className = 'cc-wizard-error';
-      warn.textContent = t('circle.join.wizard.persona.second_warning', { persona: personaLabel(held, t) });
+      warn.textContent = t('circle.join.wizard.persona.already_in', { persona: personaLabel(held, t) });
       pWrap.appendChild(warn);
     }
     wrap.appendChild(pWrap);
@@ -518,7 +518,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
   // themselves — the admin being offline, and a handle already taken — showed the joiner NOTHING: a blank
   // re-render, indistinguishable from the button not working. Found walking J-NP2 (2026-07-30), one layer
   // above where the machine-readable half was fixed the same day.
-  const failure = state.submitErrorKey ? t(state.submitErrorKey) : state.submitError;
+  const failure = submitErrorText(state, t);
   if (failure) {
     const err = doc.createElement('div');
     err.className = 'cc-wizard-error';

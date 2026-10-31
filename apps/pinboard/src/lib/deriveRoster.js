@@ -1,6 +1,5 @@
 import { foldRoster, verifyCircleLink, foldPersonKeys } from '@onderling/core';
 import { hasHumanRules } from '@onderling/circles';
-import { isExited } from './circleExits.js';
 
 /**
  * deriveRoster — project a circle's membership FROM the durable, signed
@@ -34,11 +33,9 @@ import { isExited } from './circleExits.js';
  * Nothing outside the circle's record is joined in: no display cache, no contact
  * book. A row is the trail, the spine, and what the member said about themselves.
  *
- * B4 (2026-08-02) — EXITS are part of the projection, per circle. A `group-removal` or
- * `group-leave` for THIS circle drops the member from THIS circle's roster and nothing else: the
- * trail is already circle-scoped, so removing someone here cannot touch a circle you share with them
- * elsewhere. An exit only counts while it is LATER than the member's most recent join, so a re-join
- * re-admits them rather than removal being permanent and unappealable. → `circleExits.js`.
+ * EXITS are part of the projection, per circle: a `leave` (self-signed) or an `evict` (an admin's) on THIS
+ * circle's membership lane drops the member from THIS circle's roster and nothing else, folded in causal order,
+ * so a re-join after it re-admits them rather than removal being permanent and unappealable.
  *
  * @param {object} o
  * @param {Array<object>} [o.redemptions]         `membership-redemption` items for ONE group.
@@ -46,7 +43,6 @@ import { isExited } from './circleExits.js';
  * @param {Object<string, {groupId:string, circleAddress?:string, circleAddressProof?:string, handle?:string}>} [o.founderFacts]
  *   founder → what their own creation statement says: their per-circle address (verified here, like a joiner's) and
  *   the handle they go by.
- * @param {Map<string, number>} [o.exits]         webid → latest exit ts (`collectCircleExits`).
  * @param {Array<object>} [o.spineStatements]     VERIFIED spine statement bodies (join/leave/evict/role) for
  *   THIS circle. When present, they are folded DENY-WINS on top of the trail-derived head — the spine may only
  *   STRENGTHEN it (drop a member, promote to admin), never re-admit or invent one (the safe cutover — see
@@ -64,14 +60,13 @@ export function deriveRoster({
   // says: the founder's instance of the member address statement (a founder never redeems, so no trail row carries
   // it), and the handle they go by there
   founderFacts = {},
-  exits = null,
   spineStatements = [],
   // After the fold, its full result — the host uses `folded.superseded` to compact the lane (L121). Optional.
   onFolded = null,
   // The membership-rider cutover switch: TRUE when the statements come from the RAIL's verified read
   // (bindings resolved against real per-circle keys) — the fold is then AUTHORITATIVE and the wall-clock
   // exit rule retires. FALSE (legacy store path / compositions where author==ref is the global-identity
-  // convention) keeps the pre-rider semantics: wall-clock exits + the strengthen-only spine overlay.
+  // convention) keeps the pre-rider semantics: the strengthen-only spine overlay.
   foldAuthoritative = false,
   // The circle's `group-rules` blob (latest, or null). Read for `maxDevicesPerMember` — the
   // per-member device ceiling, a CIRCLE policy ("some circles disallow multiple devices"),
@@ -209,16 +204,9 @@ export function deriveRoster({
     if (proven) addProvenAddress(w, fa.groupId, fa.circleAddress, fa.circleAddressProof);
   }
 
-  // B4 — the wall-clock exit drop. LEGACY PATH ONLY: with verified spine statements present the causal
-  // fold below is AUTHORITATIVE and the wall-clock comparison retires (two skewed devices must agree on
-  // who-is-in; `exitAt >= joinedAt` cannot give that — the deps-chain can). A circle with no statements
-  // (pre-rail, or a composition without the rail) keeps the old rule unchanged.
+  // With verified spine statements present the causal fold below is AUTHORITATIVE; a leave and a removal are
+  // statements it folds (deny-wins), the only record of either.
   const authoritative = foldAuthoritative && Array.isArray(spineStatements) && spineStatements.length > 0;
-  if (!authoritative && exits instanceof Map && exits.size > 0) {
-    for (const webid of [...roster.keys()]) {
-      if (isExited(exits, webid, joinedAt.get(webid) ?? 0)) roster.delete(webid);
-    }
-  }
 
   // ── The CAUSAL FOLD is AUTHORITATIVE (the membership rider cutover) ──────────────────────────────────
   // No data migration (the record decision for membership): the trail-derived roster above is the

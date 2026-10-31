@@ -2788,8 +2788,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   // connect kick asks the siblings what this device lacks. A kring the person switched off here is not joined.
   let circleFollowConsume = null;
   const followSelection = makeSyncSelection({ getParamValue: (key) => paramsService.register.valueOf(key) });
-  // THE LEAVE FOLLOWS (2026-09-22): a sibling's `device-circle-left` lands → this device's own local leave — the exit
-  // marker (no statement: the sibling's already folded the person out), the members' keys unbound, the authorize
+  // THE LEAVE FOLLOWS (2026-09-22): a sibling's `device-circle-left` lands — or this device's fold takes its own self out
+  // (an admin's `evict`) — → this device's own local leave (no statement: the fold already has one), the members' keys unbound, the authorize
   // snapshot dropped, the per-circle address off every relay, the registry record off. Composed here, not in the
   // shells: every part of it is the agent's (the relays included), so web ≡ mobile ≡ box by construction.
   const leaveFollowed = async (circleId) => {
@@ -2815,6 +2815,18 @@ export async function createRealHouseholdAgent(opts = {}) {
       ? circleFollowConsume(entry)
       : Promise.resolve({ circleId: entry.id, ok: false, steps: [], error: 'no-consume' })),   // a composition without the step joins nothing
     leave: leaveFollowed,
+    // the leave itself rides the carry: this device's own signed `leave` for the circle, and a sibling's ingested here
+    leaveStatementOf: (circleId) => {
+      const me = circleSelfRef(circleId);
+      const mine = (membershipRail?.storedStatements?.(circleId) ?? []).filter((st) => st?.body?.kind === 'leave' && st?.body?.subject === me);
+      return mine.length ? mine[mine.length - 1] : null;
+    },
+    ingestLeave: (circleId, statement) => membershipRail?.ingest?.(circleId, statement),
+    // the fold's word, not the landing's: out only when my last word there is an exit the fold granted and I am off its roster
+    outByFold: async (circleId) => {
+      const r = await rawPinboard('listMyCircles', {});
+      return (r?.left ?? []).includes(circleId) || (r?.removed ?? []).some((x) => x?.id === circleId);
+    },
     // PUT AWAY (opbergen): the mark lives on the circle's registry record (restore carries it); a sibling's newer lands
     sightOf: async (circleId) => (await readAllSelvesCircleMemberships().catch(() => ({})))?.[circleId]?.sight ?? null,
     setSight: (circleId, sight) => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, sight }),
@@ -4674,7 +4686,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         const adminsBefore = fn === 'ingest' && cid && isDeparture(a[1]) ? await adminsOf(cid).catch(() => null) : null;
         const r = await raw(...a);
         if (cid) rosterReads.invalidate(cid); else rosterReads.invalidateAll();
-        if (fn === 'ingest' && r?.ok && !r.existed) retellDeparture(cid, a[1], adminsBefore);
+        if (fn === 'ingest' && r?.ok && !r.existed) {
+          retellDeparture(cid, a[1], adminsBefore);
+          // An exit naming THIS DEVICE'S OWN SELF landed (an admin's evict; a sibling's leave when the lane brings it):
+          // `foldedOut` asks the fold whether it holds — landing proves a signature, not authority — and if so the local
+          // leave runs in the same tick: the circle's address off the relays, its authorize snapshot and member keys
+          // dropped, instead of on the next boot's list of "my circles".
+          const k = a[1]?.body?.kind;
+          if (cid && (k === 'leave' || k === 'evict') && a[1]?.body?.subject === circleSelfRef(cid)) {
+            circleFollowSync?.foldedOut?.(cid)?.catch?.(() => { /* the next fold landing tries again */ });
+          }
+        }
         return r;
       };
     }
@@ -5052,6 +5074,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     membershipEmit,
     membershipRead,
+    // closing a circle one was removed from forgets its content on this device (the same forget a bot's removal runs)
+    forgetCircleContent: (circleId) => selfAgent?.forgetCircleContent?.(circleId),
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
     currentPersonKey,
     rulesUpdateEmit,

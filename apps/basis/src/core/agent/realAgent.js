@@ -31,7 +31,7 @@ import {
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId,
   signDeviceRevocation, verifyDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, authorityPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
+  deriveCircleSeed, deriveCircleRoot, ceremonyCommitment, authorityPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
@@ -2934,7 +2934,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!fold.recipients.some((r) => gone.has(r))) return null;
     const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
     const recipients = fold.recipients.filter((r) => !gone.has(r));
-    if (!recipients.includes(mine)) recipients.push(mine);
+    if (!gone.has(mine) && !recipients.includes(mine)) recipients.push(mine);
     const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
     const statement = await keyEmitRef.current(circleId, event);
     if (!statement) return null;
@@ -2951,6 +2951,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!ctl || typeof act?.circleId !== 'string') return;
     if (['publicKey', 'sealingKey', 'groupKey', 'wrap', 'seed'].some((k) => k in act)) return;   // no key material, ever
     const rows = await callSkill('pinboard', 'listGroupMembers', { groupId: act.circleId }).then((r) => r?.members ?? []).catch(() => []);
+    if (act.op === 'grant-self') {
+      // the point wraps the current key to the address IT presents — no key travels in the act
+      await ctl.grantRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(act.circleId)) });
+      return;
+    }
     if (act.op === 'add' || act.op === 'remove') {
       if (typeof act.webId !== 'string') return;
       const row = rows.find((m) => m?.webid === act.webId) ?? null;
@@ -3987,7 +3992,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       try {
         // the ban is a key-lane statement on the shared circle key: only the point writes it (handed the ADDRESS — public,
         // on the person's own row — never a key)
-        if (signsHere(circleId)) await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
+        if (signsHere(circleId) && !spineOpen(circleId)) await queueOwnSpineAct('key', { op: 'ban', circleId, address });
+        else if (signsHere(circleId)) await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
         else await forwardKeyAct({ op: 'ban', circleId, address });
       } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
     }
@@ -4106,6 +4112,86 @@ export async function createRealHouseholdAgent(opts = {}) {
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'replace-failed' })]; }
   }, { visibility: 'private' });   // retires every other device of this person: owner-only, phrase-proven
+
+  // THE FULL-DEVICE RE-KEY. Every full device of a persona holds its circle root and presents its address, so a revoked
+  // full device could still sign and open as the person: retiring the device's own derived addresses does not touch it.
+  // The ceremony — root in hand — moves the persona to the next epoch: it introduces the new address in every circle
+  // while the old one still binds, switches this device to the new root, rotates the group key past the old address,
+  // and retires it. Spine acts like any other: on a point that has not caught up they wait; on a device that is not the
+  // point they go to it. If the revoked device IS the point, the point moves here first.
+  const circleRootMovedListeners = new Set();
+  const rekeyPrimaryPersona = async ({ root, circleIds, revokedDeviceId }) => {
+    const rt = personas.get(primaryId);
+    if (!rt?.circleRoot || typeof rt.switchCircleRoot !== 'function') return { ok: false, reason: 'no-circle-root' };
+    // THE POINT MOVES HERE FIRST — the device with the phrase in hand does the re-key, and a revoked point must sign
+    // nothing of it (a new point catches up before it signs, as any)
+    if (!isPointDevice()) {
+      try { await spinePoint.claim(); } catch { /* the acts below still wait for a reachable point */ }
+    }
+    const epoch = rt.circleRoot.epoch + 1;
+    const seed = deriveCircleRoot(root.deriveAgentSeed(primaryId), epoch);
+    const circles = [...new Set(circleIds)].filter((c) => typeof c === 'string' && c && (circlePersonas.get(c) ?? primaryId) === primaryId);
+    const before = Object.fromEntries(circles.map((c) => [c, circleAddressFor(c)]));
+    // 1. INTRODUCE the next address while the old one still binds — the same announcement a new device's needs
+    const introduced = [];
+    for (const c of circles) {
+      try {
+        const ann = ownCircleAddressAnnouncement({
+          circleId: c, memberWebid: circleSelfRef(c),
+          // the persona's ONE address moves: the new one is where members deliver from now on
+          primary: true,
+          circleAddressFor: (cid) => deriveCircleAddress(seed, cid),
+          signCircleAddress: (cid, address) => signCircleLinkFromSeed(seed, cid, cid, address),
+          ceremonyCommitmentFor,
+          signCeremonyCommitment: (cid, address, commitment) =>
+            signCeremonyCommitmentFromSeed(deriveCircleSeed(seed, cid), { circleId: cid, circleAddress: address, commitment }),
+        });
+        if (!ann) continue;
+        await callSkill('pinboard', 'broadcastCircleAddresses', { groupId: c, announcements: [ann] });
+        await callSkill('pinboard', 'recordCircleAddressAnnouncement', {
+          groupId: c, memberWebid: ann.memberWebid, circleAddress: ann.circleAddress, circleAddressProof: ann.circleAddressProof,
+          ...(ann.ceremonyCommitment ? { ceremonyCommitment: ann.ceremonyCommitment, ceremonyCommitmentProof: ann.ceremonyCommitmentProof } : {}),
+          ...(ann.primary ? { primary: true } : {}),
+        });
+        introduced.push(c);
+      } catch (err) { console.warn(`[ceremony] the next address was not introduced in ${c}: ${err?.message ?? err}`); }
+    }
+    // 2. SWITCH — this device moves to the next root before it signs anything more: what it signs from here on (the
+    //    rotation past the old address, the retirement) is signed by the NEW address, which no member will ever retire.
+    //    Signed by the old one, a member whose membership lane folds the retirement before its key lane verifies the
+    //    rotation refuses the rotation as coming from a retired address (found by the re-key walk). The per-circle
+    //    signing identities are re-installed here; the shells register the new addresses on the relays.
+    await rt.switchCircleRoot({ epoch, seed });
+    try {
+      installCircleSigningIdentities({
+        circleIds: introduced, circleAddressFor, circleIdentityFor,
+        registerSelfIdentity: (address, identity, meta) => sa.registerSelfIdentity(address, identity, { owner: ownerFor(meta?.circleId) }),
+        onFailed: (cid) => console.warn(`[ceremony] no per-circle signing identity for ${cid} after the re-key`),
+      });
+    } catch (err) { console.warn(`[ceremony] the new per-circle identities were not installed: ${err?.message ?? err}`); }
+    await Promise.all([...circleRootMovedListeners].map(async (fn) => { try { await fn({ epoch, circleIds: introduced }); } catch { /* a shell's re-registration is best-effort */ } }));
+    // 3. GRANT the new address's sealing key on the current version (a no-op when the announcement already did), then
+    //    BAN the old: the rotation past it goes to the members and the new address, never to the old
+    const granted = [];
+    const banned = [];
+    for (const c of introduced) {
+      try {
+        if (!spineOpen(c)) {
+          await queueOwnSpineAct('key', { op: 'grant-self', circleId: c });
+          await queueOwnSpineAct('key', { op: 'ban', circleId: c, address: before[c] });
+          granted.push({ circleId: c, waiting: true });
+          continue;
+        }
+        const g = await opts.pinboardControlAgent?.grantRecipient?.({ groupId: c, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(c)) });
+        granted.push({ circleId: c, granted: g?.granted === true });
+        await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: c, publicKey: sealingPublicKeyFromNetworkKey(before[c]), policy: 'ban' });
+        banned.push(c);
+      } catch (err) { console.warn(`[ceremony] the key did not move past the old address in ${c}: ${err?.message ?? err}`); }
+    }
+    // 4. RETIRE the old address (root-revealed — the reveal is the authority, whichever key signs)
+    const retired = await retireAddresses({ root, circleIds: introduced, addressFor: (c) => before[c] ?? null });
+    return { ok: true, epoch, introduced: introduced.length, granted, banned: banned.length, retired: retired.length };
+  };
 
   hostAgent.register('revokeDevice', async ({ parts }) => {
     // The DEVICE-REVOCATION CEREMONY ("evict my device" — the eviction machinery pointed inward):
@@ -4244,6 +4330,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         await primaryKeySync.carryCurrent({ exclude: [...circleIds].map((cid) => deriveCircleAddress(revokedSeed, cid)) });
       } catch (err) { console.warn(`[ceremony] the person key did not rotate: ${err?.message ?? err}`); }
       const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
+      // …and the persona's own address, which a FULL device held through the circle root: the re-key
+      const rekey = holdsGeneral ? await rekeyPrimaryPersona({ root, circleIds: [...circleIds], revokedDeviceId: deviceId }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
       // EVERY PERSONA THE DEVICE HELD loses it too. Each persona knows the device by its own wire id (its seed over the
       // device's internal id — unlinkable by design); the internal id is on the person's private device map (a
       // `device-link` row in the own-devices scope, each device writes its own), so the ceremony — root in hand — derives
@@ -4427,6 +4515,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const botsTold = await tellLinkedBotsRevoked(root, deviceId);
       return [DataPart({
         ok: true, deviceId, known, revokedIn, revokedUnder, circles: revokedIn.length, nodesTold, botsTold,
+        ...(rekey ? { rekey } : {}),
         // a device without the general persona did only its personas' parts — the lost device most likely held the
         // general persona too, and that part has to be done on a device that holds it (it is a member of those circles)
         // partial: the general persona's circles (not held here), and any persona another device holds that this one
@@ -9527,6 +9616,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     emitPolicyUpdate: policyUpdateEmit,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
     forgetSelfIdentity:   (address) => sa.forgetSelfIdentity?.(address) ?? false,
+    /** A persona's circle root moved (a re-key): the host registers the new per-circle addresses on its relays. */
+    onCircleRootMoved: (fn) => { if (typeof fn !== 'function') return () => {}; circleRootMovedListeners.add(fn); return () => circleRootMovedListeners.delete(fn); },
     installCircleIdentities: (circleIds) => installCircleSigningIdentities({
       circleIds,
       circleAddressFor,

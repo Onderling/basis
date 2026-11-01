@@ -166,7 +166,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   // A device with the root derives it (and keeps the epoch in the persona's slot); a device enrolled without the root
   // was handed it at its ceremony. A delegated device from before the circle root keeps its device-derived keys until a
   // phrase ceremony hands it the root (said once).
-  const circleRoot = await (async () => {
+  let circleRoot = await (async () => {
     let slot = null;
     try { const raw = await vault.get(CIRCLE_ROOT_VAULT_KEY); slot = raw ? JSON.parse(raw) : null; } catch { slot = null; }
     const epoch = Number.isInteger(slot?.epoch) && slot.epoch >= 0 ? slot.epoch : 0;
@@ -186,7 +186,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   // What the per-circle keys below derive from: the persona's circle root, so every full device of the persona presents
   // ONE address per circle. A delegated device from before the root was handed keeps its own device-derived keys (and
   // its own address) until a phrase ceremony hands it the root.
-  const circleSeed = circleRoot?.seed ?? deviceDerivationSeed;
+  let circleSeed = circleRoot?.seed ?? deviceDerivationSeed;
 
   // The per-circle SIGNING identity, one per circle, memoised — derived from `circleSeed` above. The vault is
   // deliberately EPHEMERAL: a per-circle key written to storage is one more copy of the thing we are trying not to
@@ -230,11 +230,28 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   const signCeremonyCommitment = (circleId, address, commitment) =>
     signCeremonyCommitmentFromSeed(deriveCircleSeed(circleSeed, circleId), { circleId, circleAddress: address, commitment });
 
+  /** THE RE-KEY: the persona's circle root moves to a later epoch (a full device was revoked). Kept in the slot first, then
+   *  every per-circle key derives from it — the memoised identities and addresses are dropped, so the next read is the new. */
+  const switchCircleRoot = async ({ epoch, seed }) => {
+    if (!Number.isInteger(epoch) || epoch < 0 || !(seed instanceof Uint8Array) || seed.length !== 32) throw new Error('switchCircleRoot: an epoch and a 32-byte seed are required');
+    if (circleRoot && epoch <= circleRoot.epoch) return false;   // never back, never sideways
+    await vault.set(CIRCLE_ROOT_VAULT_KEY, JSON.stringify({ epoch, seed: seedToString(seed) }));
+    circleRoot = { epoch, seed };
+    circleSeed = seed;
+    circleIdentities.clear();
+    circleAddresses.clear();
+    return true;
+  };
+
   // The persona's chat identity: the secure agent loads the DEFAULT's from its slot; any other persona's is loaded here.
   const chatId = isDefault ? null : await AgentIdentity.restore(vault);
 
   return {
-    profileId, vault, profileSeed, deviceDerivationSeed, circleSeed, circleRoot, enrolledDevice, internalDeviceId: deviceInternalId,
+    profileId, vault, profileSeed, deviceDerivationSeed, enrolledDevice, internalDeviceId: deviceInternalId,
+    // read live: a re-key moves both
+    get circleSeed() { return circleSeed; },
+    get circleRoot() { return circleRoot; },
+    switchCircleRoot,
     circleIdentityFor, circleAddressFor, circleSealingKeyPairFor, personKeyPubOf,
     authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
     initialPersonKey, derivedLinkKeyPub,

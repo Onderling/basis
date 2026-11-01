@@ -497,6 +497,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
+  // a re-key moved this persona's circle addresses: register them as the shells do
+  agent.onCircleRootMoved?.(async ({ circleIds }) => { await bindCircleAddresses([node], circleIds); });
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });

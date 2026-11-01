@@ -211,7 +211,12 @@ export function makeMembershipEmitter({ rail, myRef, fan = null }) {
       // forgotten how to reach anyone, greeted, could not accept the answer, and held the statement for ever. The
       // members learned of the leave only by luck (the journeys leave without the hygiene, so they never saw it);
       // on web and mobile a leave did not travel. Found by the leave-follows relay walk.
-      if (kind === 'evict' || kind === 'leave') {
+      //
+      // An ADDRESS-REVOKE waits as well (2026-11-01): when a persona moves to its next circle root (a full device was
+      // revoked), retiring the old address is the last thing that address ever says, and the device switches keys the
+      // moment the ceremony returns — a fan still in flight then left under the NEW key, which no member authorizes yet,
+      // and the retirement never reached them. Found by the full-device re-key walk.
+      if (kind === 'evict' || kind === 'leave' || kind === 'address-revoke') {
         try { await fan(circleId, res.statement); } catch { /* reported by the caller as told:false */ }
       } else {
         try { fan(circleId, res.statement); } catch { /* fan is best-effort — never block the writer */ }

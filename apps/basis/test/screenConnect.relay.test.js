@@ -42,7 +42,7 @@ describe('a person connects a screen to the bot over the relay', () => {
   let relay; let dataDir; let child; let out = ''; let ann; let screen;
   // every walk-log line of the runner (it writes walk-log-*.jsonl in its data dir) whose kind names the screen, the
   // grant, the point or the spine outbox — what a failed grant prints, so a red in CI names where the grant stopped
-  const walkWhy = () => { try { return readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dataDir, f), 'utf8').split('\n')).filter((l) => /screen|grant|point|spine|primary|unrouted|token-refused/.test(l)).slice(-25).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
+  const walkWhy = () => { try { return readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dataDir, f), 'utf8').split('\n')).filter((l) => /screen|grant|point|spine|primary|unrouted|token-refused|contact-turn|inbox|admission|door/.test(l)).slice(-25).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
   const heard = (node) => JSON.stringify((node?.received ?? []).map((m) => m.payload?.subtype ?? m.payload?.type ?? '?').slice(-15));
   const walkTail = () => { try { const dir = path.join(dataDir, 'walks'); return readdirSync(dir).map((f) => readFileSync(path.join(dir, f), 'utf8')).join('').split('\n').filter((l) => /screen|unrouted/.test(l)).slice(-10).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
 

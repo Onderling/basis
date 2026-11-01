@@ -5636,6 +5636,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     membershipEmit = async (act = {}) => {
       // the point that has not caught up in this circle queues its own act — a ceremony's too: its authority is the root
       // reveal it carries (bound to circle, subject and kind), which keeps; the statement is signed with the circle key on open
+      // a circle FOUNDED here: its creation starts a chain nothing came before, so there is nothing to catch up on — it is
+      // open from this statement on (found by the box-as-primary walk: a pair circle founded right after the point moved
+      // here had its creation held, so the box was not its founder and its invite was refused 'admin-only')
+      if (act?.kind === 'create' && typeof act.circleId === 'string' && !spineOpen(act.circleId)) {
+        spineCaughtUp.add(act.circleId);
+        Promise.resolve(saveSpineGate()).catch(() => {});
+      }
       if (act?.circleId && pointGoverns(act.circleId) && isPointDevice() && !spineOpen(act.circleId)) { const { signer: _s, ...kept } = act; return queueOwnSpineAct('membership', kept); }   // eslint-disable-line no-unused-vars
       if (!act?.circleId || signsHere(act.circleId)) return localMembershipEmit(act);
       const { signer: _signer, ...plain } = act;   // eslint-disable-line no-unused-vars

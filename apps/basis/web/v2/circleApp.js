@@ -787,7 +787,7 @@ import { renderRulesEditor } from './circleRulesEditor.js';
 // per circle store at construction time; snapshots every save into
 // `cc.versions.<storeName>.<circleId>`.  Invisible to the UI in γ.2;
 // γ.3 will surface the history.
-import { loadCircles, loadRemovedCircles } from '../../src/v2/circleModel.js';
+import { loadCircles, loadRemovedCircles, withLeavingMarks } from '../../src/v2/circleModel.js';
 import { circleSourcesFromAgent, makeResolvingCallSkill } from '../../src/v2/circleSources.js';
 import { loadCircleItems } from '../../src/v2/circleContent.js';
 import { DEFAULT_CIRCLE_RAG_MIN_SCORE } from '../../src/v2/circleRetriever.js';
@@ -1421,6 +1421,9 @@ let circlesCache = [];
 // the circles an admin removed this person from: the launcher's marked, read-only tiles only — no other reader
 let removedCirclesCache = [];
 /** Both launcher lists, read together: the circles the person is in, and the removed ones kept until closed. */
+// Circles left on this device whose leave was handed to the main device to sign (id → { held }): marked on the tile
+// until the signed leave lands back and the circle drops out of the list.
+const leavingCircles = new Map();
 async function loadLauncherCircles() {
   const [mine, removed] = await Promise.all([loadCircles(sources), loadRemovedCircles(sources).catch(() => [])]);
   removedCirclesCache = removed;
@@ -3722,7 +3725,9 @@ function paintLauncher() {
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
-    circles: tileCircles(circlesShown()),   // the circles of the selves ticked in the header; the help circle's door is in Contacten
+    // the circles of the selves ticked in the header; the help circle's door is in Contacten. A circle being left is
+    // marked at PAINT time, so a reload that started before the mark was set cannot paint it away
+    circles: tileCircles(withLeavingMarks(circlesShown(), leavingCircles)),
     removedCircles: removedCirclesCache,
     previews,
     proposals: launcherProposals,
@@ -3809,7 +3814,7 @@ async function onLeaveCircle(id, circle) {
   // Passed in as the shell's own step: it needs a transport handle, the one thing that genuinely
   // differs per shell.
   try {
-    await leaveCircleLocally({
+    const left = await leaveCircleLocally({
       agent: _peerAgent, callSkill: rawCallSkill,
       circleId: id,
       unregister: () => unregisterCircleAddressesOnRelays({
@@ -3817,6 +3822,7 @@ async function onLeaveCircle(id, circle) {
         circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
       }),
     });
+    if (left?.forwarded) leavingCircles.set(id, { held: left.held === true });
   } catch (err) {
     console.warn('[circleApp] leaveGroup failed:', err?.message ?? err);
   }
@@ -9501,7 +9507,9 @@ async function boot() {
         on: {
           govChange: govChanged,
           keyChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
-          membershipChange: (cid) => { pullRosterForCircle({ circleId: cid }).catch(() => { /* best-effort */ }); },
+          // …and the circles list: a leave made on a device that is not the point is signed there and lands back here
+          // seconds after the launcher re-read, so the left circle's tile would stay until a reload
+          membershipChange: (cid) => { pullRosterForCircle({ circleId: cid }).catch(() => { /* best-effort */ }); circlesChangedUnderneath().catch(() => {}); },
           chatLanded: ({ msgId, circleId: cid, fromPeerAddr, source }) => onCircleStored({ msgId, circleId: cid, fromPeerAddr, source }),
           chatChange: (cid) => { if (cid === _circleRender?.circleId) { try { _circleRender?.rerender?.(); } catch { /* the entry landed either way */ } } },
           // Above the auto-allow ceiling the person gets the real question, as a circle bubble here.

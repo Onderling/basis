@@ -472,7 +472,10 @@ export async function leaveGroup({
   // ALSO record the LEAVE on the circle's membership spine. A leave is always self-authored (the fold only
   // honours a leave whose author IS its subject), so the acting device signs `leave` with its own identity
   // (author = subject = the leaver). It is the leave's only record: every reader asks the membership fold.
-  await emitSpine?.({ kind: 'leave', circleId: a.groupId, subject: from, actor: from });
+  // On a device that is not the person's point the leave is signed THERE: the emit hands it over and answers so, and
+  // the leave is not applied here until it lands back — the caller hears that (`held`: the point is offline).
+  const spine = await emitSpine?.({ kind: 'leave', circleId: a.groupId, subject: from, actor: from });
+  const handed = spine?.forwarded === true ? { forwarded: true, held: spine.held === true } : {};
 
   let deleted = 0;
   if (a.deletePosts) {
@@ -486,7 +489,7 @@ export async function leaveGroup({
       deleted += 1;
     }
   }
-  return { deletedItems: deleted, _sync: simulateSync() };
+  return { deletedItems: deleted, ...handed, _sync: simulateSync() };
 }
 
 /**

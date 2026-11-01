@@ -39,7 +39,15 @@ describe('a revoked device held two personas', () => {
       sendPeerMessage: (to, pl, o) => node.agent.sendPeerMessage(to, pl, o), storage,
       registerCirclePresence: (ids) => bindCircleAddresses([node], ...(ids ?? circles)),
     });
-    for (const c of circles) expect(consumed.circles?.find((x) => x.circleId === c)?.ok, `${label} rejoined ${c}: ${JSON.stringify(consumed)}`).toBe(true);
+    // which sibling each persona's seed request went to (the first of its device list) — and whose device that is
+    const who = async () => {
+      const names = new Map([[phone?.agent?.ownDeviceAddress?.('default'), 'phone'], ...(laptop ? [[laptop.agent.ownDeviceAddress('default'), 'laptop']] : [])]);
+      for (const pid of personaIds) { names.set(phone?.agent?.ownDeviceAddress?.(pid), `phone/${pid.slice(0, 4)}`); if (laptop) names.set(laptop.agent.ownDeviceAddress(pid), `laptop/${pid.slice(0, 4)}`); }
+      const out = {};
+      for (const pid of personaIds) out[pid.slice(0, 4)] = ((await node.agent.ownDeviceAddressesOf(pid).catch(() => [])) ?? []).map((a) => names.get(a) ?? String(a).slice(0, 8));
+      return JSON.stringify(out);
+    };
+    for (const c of circles) { const ok = consumed.circles?.find((x) => x.circleId === c)?.ok; expect(ok, `${label} rejoined ${c}: ${JSON.stringify(consumed)}${ok ? '' : ` — seed asked of (per persona, first is asked): ${await who()}`}`).toBe(true); }
     return node;
   }
   async function found(circleId, pid, name) {

@@ -149,7 +149,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   // entry id (from the chain hash) lets the local copy + any fanned/received copy collapse.
   // SPINE STATEMENTS ONLY FROM THE POINT: on a device of the person that is not the point, the act goes to the point (the
   // agent's gate), which signs it on its own head — this device signs nothing on the chained governance lane.
-  const viaPoint = (channel, circleId, event) => (spineGate && typeof spineGate.isPoint === 'function' && !spineGate.isPoint()
+  const viaPoint = (channel, circleId, event) => (spineGate && typeof spineGate.isPoint === 'function' && !spineGate.isPoint(circleId)
     ? spineGate.forward({ lane: 'governance', channel, circleId, event })
     : null);
   const appendGovernanceEvent = async (circleId, event) => {

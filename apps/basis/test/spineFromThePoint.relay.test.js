@@ -11,7 +11,7 @@ import { startJourneyRelay } from './support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown, shareDeviceRecords,
 } from './support/pairRealAgents.js';
-import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
+import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../src/v2/membershipRail.js';
 import { EventLog } from '../src/eventLog.js';
 
 const GROUP = 'spine-from-point';
@@ -200,6 +200,34 @@ describe('spine statements only from the point', () => {
     expect(await until(async () => (((await A2.agent.resendSpineOutbox()).resent === 0) ? true : null), { timeout: 10000, step: 300 }), 'the outbox kept an acked act').toBe(true);
   }, 90_000);
 
+  it('THE OUTBOX IS BOUNDED: an act never acked is re-sent for the window, shows as waiting past a day, and past the window is dropped and reported as not sent', async () => {
+    // A phone point can be off overnight or for a trip: the act keeps going for the whole window. Past it, it stops, and
+    // the person is told it was not sent rather than left to think it will still land.
+    const prior = A._routerRef.fn;
+    A._routerRef.fn = (env) => (env?.payload?.subtype === A.agent.spineActSubtype ? undefined : prior?.(env));
+    const DAY = 24 * 3600_000;
+    try {
+      const r = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: 'member' });
+      expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
+      expect(r?.forwarded, 'the box signed the change itself').toBe(true);
+      const now = await A2.agent.spineOutboxWaiting();
+      expect(now.waiting.length, 'the lost act is not waiting').toBeGreaterThanOrEqual(1);
+      expect(now.waiting.every((w) => w.overDay === false), 'a fresh act already reads as over a day').toBe(true);
+      const op = await A2.agent.callSkill('household', 'ownSpineOutbox', {});
+      expect(op?.ok && op.waiting >= 1 && op.overDay === 0 && op.unsent === 0, `the panel's op says ${JSON.stringify(op)}`).toBe(true);
+      expect((await A2.agent.resendSpineOutbox()).resent, 'inside the window the act is re-sent').toBeGreaterThanOrEqual(1);
+      expect((await A2.agent.resendSpineOutbox({ now: Date.now() + 6 * DAY })).resent, 'six days on, the act no longer goes').toBeGreaterThanOrEqual(1);
+      expect((await A2.agent.spineOutboxWaiting({ now: Date.now() + 2 * DAY })).waiting.every((w) => w.overDay), 'past a day the act does not say so').toBe(true);
+      // past the window: dropped from the outbox, and listed as not sent
+      const past = Date.now() + 8 * DAY;
+      const before = (await A2.agent.spineOutboxWaiting()).waiting.filter((w) => !w.acked).length;
+      const peek = await A2.agent.spineOutboxWaiting({ now: past });
+      expect(peek.waiting.length, 'past the window the act still waits').toBe(0);
+      expect(peek.unsent.length, 'past the window the act is not reported as not sent').toBe(before);
+      expect((await A2.agent.resendSpineOutbox({ now: past })).resent, 'past the window the act went again').toBe(0);
+    } finally { A._routerRef.fn = prior; }
+  }, 60_000);
+
   it('a re-sent act whose ack was lost is signed once (the point dedupes by act id)', async () => {
     let pointAppends = 0;
     const rail = A.agent.membershipRail;
@@ -255,4 +283,67 @@ describe('spine statements only from the point', () => {
       `the point never signed the forwarded proposal (result: ${JSON.stringify(r)})`).toBe(true);
   }, 60_000);
 
+
+  // ── A NEW POINT CATCHES UP FIRST ── (after every case above: these move the point)
+  const roleOnAt = async (node, webid) => (((await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === webid)?.role ?? null);
+  const ownRoleStatements = (node) => (node.agent.membershipRail.storedStatements(GROUP) ?? [])
+    .filter((x) => x?.body?.author === A.agent.circleAddressFor(GROUP) && x.body.kind === 'role' && x.body.subject === B.pubKey);
+
+  it('the point MOVES to the box before the phone\'s newest statement reached it: the box catches up first, and its first statement chains on that one — no fork', async () => {
+    const prior = A2._routerRef.fn;
+    // the box hears no live membership fan or carry: only a catch-up can bring it the phone's newest statement
+    A2._routerRef.fn = (env) => (env?.payload?.subtype === MEMBERSHIP_BROADCAST ? undefined : prior?.(env));
+    try {
+      const want1 = (await roleOnAt(A, B.pubKey)) === 'admin' ? 'member' : 'admin';
+      expect((await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: want1 }))?.error ?? null).toBeNull();
+      const s1 = ownRoleStatements(A).find((x) => x.body.payload?.role === want1)?.body?.hash;
+      expect(s1, 'the phone signed nothing').toBeTruthy();
+      expect(ownRoleStatements(A2).some((x) => x.body.hash === s1), 'the box already held the phone\'s newest statement — the case proves nothing').toBe(false);
+      expect(A2.agent.spinePointClaim()?.deviceId, 'the box did not know the phone was the point').toBe(A.agent.spinePointClaim()?.deviceId);
+      const moved = await A2.agent.claimPrimaryDevice();
+      expect(moved?.point?.ok, JSON.stringify(moved?.point)).toBe(true);
+      const want2 = want1 === 'admin' ? 'member' : 'admin';
+      const r2 = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: want2 });
+      expect(r2?.error ?? null, JSON.stringify(r2)).toBeNull();
+      const s2 = await until(() => ownRoleStatements(A2).find((x) => x.body.payload?.role === want2) ?? null, { timeout: 20000, step: 200 });
+      expect(s2, `the box never signed — closed: ${JSON.stringify(A2.agent.spineClosedCircles())}`).toBeTruthy();
+      expect(s2.body.parentHash, 'the box signed off its stale head: a fork on the shared key').toBe(s1);
+      expect(await until(async () => ((await roleOnAt(B, B.pubKey)) === want2 ? true : null), { timeout: 20000, step: 200 }), 'Bea never saw the box\'s change').toBe(true);
+      expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
+    } finally { A2._routerRef.fn = prior; }
+  }, 90_000);
+
+  it('the point moves while nobody can answer: the act WAITS (nothing signed, past the time-out too), and lands chained on the head once someone answers', async () => {
+    const prior = A._routerRef.fn;
+    // the phone takes the point back while no catch-up answer can reach it (the members and the box all "away")
+    A._routerRef.fn = (env) => (env?.payload?.subtype === MEMBERSHIP_CATCHUP_SUBTYPES.batch || env?.payload?.subtype === MEMBERSHIP_BROADCAST ? undefined : prior?.(env));
+    let released = false;
+    try {
+      // the tip of Anna's chain as the box (the previous point) holds it: her statement no other of hers names as parent
+      const mine = (A2.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === A.agent.circleAddressFor(GROUP));
+      const named = new Set(mine.map((x) => x.body.parentHash).filter(Boolean));
+      const tips = mine.filter((x) => !named.has(x.body.hash)).map((x) => x.body.hash);
+      expect(tips.length, 'Anna\'s chain on the box is already forked').toBe(1);
+      const head = tips[0];
+      const moved = await A.agent.claimPrimaryDevice();
+      expect(moved?.point?.ok, JSON.stringify(moved?.point)).toBe(true);
+      expect(await until(() => (A.agent.spineClosedCircles().includes(GROUP) ? true : null), { timeout: 10000, step: 100 }), 'the phone never closed the circle').toBe(true);
+      const before = ownRoleStatements(A).length;
+      const want = (await roleOnAt(A, B.pubKey)) === 'admin' ? 'member' : 'admin';
+      const r = await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: want });
+      expect(r?.waitingCatchUp, `the act did not say it waits: ${JSON.stringify(r)}`).toBe(true);
+      await new Promise((res) => setTimeout(res, 17_000));   // past the time-out: members exist, so it must not release
+      expect(A.agent.spineClosedCircles(), 'the time-out released a circle that has members to fork against').toContain(GROUP);
+      expect(ownRoleStatements(A).length, 'the phone signed blind').toBe(before);
+      // someone answers
+      A._routerRef.fn = prior;
+      released = true;
+      await A.agent.spineCatchUpAgain();
+      const s = await until(() => ownRoleStatements(A).find((x) => x.body.payload?.role === want) ?? null, { timeout: 20000, step: 200 });
+      expect(s, 'the waiting act never landed').toBeTruthy();
+      expect(s.body.parentHash, 'it did not chain on the head the box had signed').toBe(head);
+      expect(await until(async () => ((await roleOnAt(B, B.pubKey)) === want ? true : null), { timeout: 20000, step: 200 }), 'Bea never saw the change').toBe(true);
+      expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
+    } finally { if (!released) A._routerRef.fn = prior; }
+  }, 90_000);
 });

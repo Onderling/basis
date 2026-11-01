@@ -3884,7 +3884,9 @@ export function buildSkills({
         payload: { role: a.role }, actor: from,
       });
       if (!res) return { error: 'not-signed' };   // no per-circle signer → nothing lands unsigned
-      return { ok: true, groupId: _groupId, memberWebid: a.memberWebid, role: a.role, _sync: simulateSync() };
+      // handed to the person's main device to sign (`held`: it is offline) — not applied yet, and the screen says so
+      const handed = res.forwarded === true ? { forwarded: true, held: res.held === true, ...(res.waitingCatchUp === true ? { waitingCatchUp: true } : {}) } : {};
+      return { ok: true, groupId: _groupId, memberWebid: a.memberWebid, role: a.role, ...handed, _sync: simulateSync() };
     }, {
       description: 'Admin-only: promote a member to admin or demote an admin to member; the roster fold on every device is the gate.',
       visibility:  'authenticated',

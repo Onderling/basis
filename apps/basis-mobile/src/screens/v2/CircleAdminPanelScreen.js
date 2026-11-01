@@ -23,7 +23,7 @@ import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circ
 import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
 // decision (web ≡ mobile); the screen paints it and works nothing out for itself.
-import { roleControlFor, roleChangeConfirm, removeControlFor, announceControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
+import { roleControlFor, roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, removeControlFor, announceControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
 // The confirm the op declares, run through the SAME gate the chat path uses — Alert.alert is only
 // this platform's presenter.
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
@@ -47,16 +47,19 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
   const [announce, setAnnounce] = useState('');
   const [notice, setNotice] = useState(null);
+  const [outboxLine, setOutboxLine] = useState(null);   // changes handed to the main device: over a day, or not sent
   const [outbound, setOutbound] = useState({ shares: [], revocable: false });
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
-    const [mem, mut, who] = await Promise.all([
+    const [mem, mut, who, outbox] = await Promise.all([
       callSkill('pinboard', 'listGroupMembers', { groupId }).catch(() => null),
       // The ONE block set — the same list the stream filters by and the transport refuses on.
       callSkill('basis', 'muted', {}).catch(() => null),
       callSkill('pinboard', 'whoAmI', {}).catch(() => null),
+      callSkill('household', 'ownSpineOutbox', {}).catch(() => null),
     ]);
+    setOutboxLine(ownSpineOutboxLine(outbox));
     // whose row is mine IN THIS CIRCLE: a persona's circle is the persona's
     setMyWebid((() => { try { return agent?.circleSelf?.(groupId)?.webid ?? null; } catch { return null; } })() ?? who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
@@ -114,7 +117,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
           const r = await callSkill('pinboard', 'setMemberRole', {
             groupId, memberWebid: m.webid, role: control.role,
           });
-          setNotice(r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name }));
+          setNotice(t(roleChangeNoticeWords(r, control).key, { name }));
         } catch { setNotice(t('circle.admin.refused')); }
         load();
       },
@@ -250,6 +253,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
         <Text style={styles.title}>{t('circle.admin.title')}</Text>
       </View>
       {notice && <Text style={styles.notice}>{notice}</Text>}
+      {outboxLine && <Text style={styles.notice}>{t(outboxLine.key, outboxLine.params)}</Text>}
 
       {sectionsOf('adminPanel').map((d) => PAINT[d.id]?.(d) ?? null)}
     </ScrollView>

@@ -6962,6 +6962,20 @@
         "doc": "Confirm body when the last admin is also the only member. There is nobody to hand to, so the fold keeps the demotion from standing at all — said plainly here instead of a handover that cannot happen."
       }
     },
+    "outbox": {
+      "over_day": {
+        "text": "{{count}} wijziging(en) wachten al langer dan een dag op je hoofdapparaat. Ze gelden zodra het weer online is.",
+        "doc": "Admin panel line: changes this device handed the person's main device to sign have waited over a day (it is offline). Not lost; they still go."
+      },
+      "maybe_lost": {
+        "text": "{{count}} wijziging(en) zijn misschien niet doorgekomen — controleer en doe ze opnieuw.",
+        "doc": "Admin panel line: this device became the person's main device while changes it had handed the previous main device were never confirmed. Nobody can sign them now and whether they landed cannot be told, so the person checks."
+      },
+      "unsent": {
+        "text": "{{count}} wijziging(en) niet verstuurd — je hoofdapparaat was te lang onbereikbaar. Doe ze opnieuw, hier of op je hoofdapparaat.",
+        "doc": "Admin panel line: changes this device handed the main device were dropped — it was unreachable for the whole window (7 days). They will not land."
+      }
+    },
     "role_notice": {
       "promoted": {
         "text": "{{name}} is nu beheerder van deze kring.",
@@ -6978,6 +6992,18 @@
       "no_one_else": {
         "text": "{{name}} is nog steeds beheerder: er is niemand anders in deze kring om het over te nemen.",
         "doc": "Panel notice when the demotion could not stand — the circle would have been left with nobody to run it."
+      },
+      "forwarded": {
+        "text": "Doorgestuurd naar je hoofdapparaat. De wijziging geldt zodra dat apparaat haar heeft ondertekend.",
+        "doc": "Panel notice when this device is not the person's main device: the role change was handed to the main device, which signs it. Not yet applied."
+      },
+      "waiting_catch_up": {
+        "text": "Wacht tot je apparaat is bijgewerkt. Daarna geldt de wijziging.",
+        "doc": "Panel notice when this device has just become the person's main device and first catches up with the circle (so its first change chains on the newest one, no fork). The change waits until then."
+      },
+      "forwarded_held": {
+        "text": "Je hoofdapparaat is offline. De wijziging wacht erop en geldt zodra het terug is.",
+        "doc": "Panel notice when the role change was handed to the main device while that device is offline: it is held for it."
       }
     },
     "announce": {

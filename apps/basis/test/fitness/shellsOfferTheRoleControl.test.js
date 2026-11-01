@@ -81,7 +81,8 @@ describe('FITNESS — both shells dispatch the op, behind the confirm it declare
     });
 
     it(`${name} says what happened through the decision's notice key`, () => {
-      expect(/t\(\s*control\.noticeKey/.test(source),
+      // the shared words decide between the decision's notice key and "sent to your main device" / "waits for it"
+      expect(/t\(\s*roleChangeNoticeWords\(\s*r\s*,\s*control\s*\)\.key/.test(source),
         `${name} reports the outcome in words of its own`).toBe(true);
     });
   }

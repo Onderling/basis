@@ -56,7 +56,7 @@ export function claimSupersedes(next, cur) {
  * @param {string|null} a.myDeviceId   this device's id (the delegation record's); null on a device from before ids
  * @param {() => Promise<string[]>} a.siblings   the person's other proven device addresses
  * @param {(to: string, payload: object, opts?: object) => Promise<any>} a.sendToPeer   hold-forward send to a sibling
- * @param {(isMine: boolean) => any} [a.onChanged]   the host re-registers on the relays with the new flag
+ * @param {(isMine: boolean, prev: object|null) => any} [a.onChanged]   the host re-registers on the relays with the new flag
  * @param {() => number} [a.now]
  */
 export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, sendToPeer, onChanged = null, now = () => Date.now(), vaultKey = PRIMARY_DEVICE_VAULT_KEY, subtypes = PRIMARY_DEVICE_SUBTYPES } = {}) {
@@ -81,7 +81,8 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
     try { await vault?.set?.(vaultKey, JSON.stringify(next)); } catch { /* the carry still runs; the next boot asks */ }
   }
   const isMine = () => !!claim && !!myDeviceId && claim.deviceId === myDeviceId;
-  const changed = (was) => { const now_ = isMine(); if (now_ !== was && typeof onChanged === 'function') { try { onChanged(now_); } catch { /* re-registration is best-effort */ } } };
+  // `prev`: the claim this one replaced — a host can tell a device that BECAME the choice from one that always was
+  const changed = (was, prev = null) => { const now_ = isMine(); if (now_ !== was && typeof onChanged === 'function') { try { onChanged(now_, prev); } catch { /* re-registration is best-effort */ } } };
   const isSibling = async (fromAddr) => {
     let addrs = [];
     try { addrs = (await siblings()) ?? []; } catch { return false; }
@@ -100,9 +101,10 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
       await load();
       if (!myDeviceId) return { ok: false, reason: 'no-device-id' };
       const was = isMine();
+      const prev = claim;
       const next = { deviceId: myDeviceId, at: Math.max(now(), (claim?.at ?? 0) + 1) };
       await store(next);
-      changed(was);
+      changed(was, prev);
       let attempted = 0;
       // the ONE sibling carry; a sibling that misses it follows by request
       try { attempted = (await carry(wire(next))).attempted; } catch { /* no siblings reachable now; they ask on connect */ }
@@ -121,8 +123,9 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
         await load();
         if (!claimSupersedes(next, claim)) return;
         const was = isMine();
+        const prev = claim;
         await store(next);
-        changed(was);
+        changed(was, prev);
       },
       [subtypes.request]: async (fromAddr, payload) => {
         if (payload?.subtype !== subtypes.request) return;

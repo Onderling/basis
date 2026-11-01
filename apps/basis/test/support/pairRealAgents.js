@@ -324,9 +324,16 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // The membership lane's catch-up pair (registered below when the node has the rail), exposed on the node so a
   // walk can run the pull a fresh joiner makes (`requestCircle`) instead of replaying the admin's spine by hand.
   const membershipCatchUp = agent.membershipRail
-    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES })
+    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES, onBatchFrom: (cid) => agent.spineBatchArrived?.(cid) })
     : null;
   pairSeams.membershipCatchUp = membershipCatchUp;
+  // a new point catches up first — the same registration the shared lane table makes (own devices, then members)
+  if (membershipCatchUp) {
+    agent.setSpineCatchUp?.(async (circleId, { own = [] } = {}) => {
+      for (const a of own) { try { await membershipCatchUp.requestFrom(a, circleId); } catch { /* next */ } }
+      try { await membershipCatchUp.requestCircle(circleId, { callSkill: (...x) => agent.callSkill(...x) }); } catch { /* next */ }
+    });
+  }
   pairSeams.bindSelf = (circleId) => bindCircleAddresses([nodeRef.current], circleId);
   const nodeRef = { current: null };
   const handlers = {

@@ -847,6 +847,16 @@ if (relayUrl) {
   const dark = Object.entries(live).filter(([, on]) => !on).map(([k]) => k);
   if (dark.length) console.warn(`device-runner: no rail for ${dark.join(', ')} — this device will not converge on ${dark.length === 1 ? 'that lane' : 'those lanes'}`);
 
+  // Changes this box handed the main device and has not seen signed: the panel line the shells paint, said at startup
+  // (the box has no screen). Counts only.
+  callSkill('household', 'ownSpineOutbox', {}).then((s) => {
+    if (!s?.ok) return;
+    walkLog({ kind: 'own-spine-outbox', waiting: s.waiting, overDay: s.overDay, unsent: s.unsent, maybeLost: s.maybeLost });
+    if (s.maybeLost > 0) console.warn(`device-runner: ${s.maybeLost} change(s) may not have come through — sent to the previous main device and never confirmed; check them.`);
+    else if (s.unsent > 0) console.warn(`device-runner: ${s.unsent} change(s) were not sent — the main device was unreachable for too long; make them again.`);
+    else if (s.overDay > 0) console.log(`device-runner: ${s.overDay} change(s) have waited over a day for the main device.`);
+  }).catch(() => {});
+
   // The reconnect kicks: pull what arrived while this device was down, on every lane that has one.
   const kick = (cu, label, ms) => {
     if (!cu) return;

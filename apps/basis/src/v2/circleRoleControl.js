@@ -63,6 +63,13 @@ export const ROLE_CONTROL_KEYS = Object.freeze({
   notice_demoted:      'circle.admin.role_notice.demoted',
   notice_handed_over:  'circle.admin.role_notice.handed_over',
   notice_no_one_else:  'circle.admin.role_notice.no_one_else',
+  notice_forwarded:    'circle.admin.role_notice.forwarded',
+  notice_forwarded_held: 'circle.admin.role_notice.forwarded_held',
+  notice_waiting_catch_up: 'circle.admin.role_notice.waiting_catch_up',
+  refused:             'circle.admin.refused',
+  outbox_over_day:     'circle.admin.outbox.over_day',
+  outbox_unsent:       'circle.admin.outbox.unsent',
+  outbox_maybe_lost:   'circle.admin.outbox.maybe_lost',
   founder_stays:       'circle.admin.founder_stays',
   no_one_to_take_over: 'circle.admin.no_one_to_take_over',
 });
@@ -161,6 +168,42 @@ export function roleChangeConfirm({ control, name, t } = {}) {
   if (!control) return null;
   const tr = translatorOr(t, 'circleRoleControl.js');
   return confirmRequestForOp(SET_MEMBER_ROLE_OP, { t: tr, message: tr(control.confirmKey, { name }) });
+}
+
+/**
+ * What the panel says once the change was asked for. A device that is not the person's main device does not sign
+ * the change itself: it hands it to the main device, which signs it — so "is now an admin" would be said too early.
+ * `held`: the main device is offline and the change waits for it.
+ *
+ * @param {object|null} r        `setMemberRole`'s result
+ * @param {RoleControl} control
+ * @returns {{key: string}}
+ */
+export function roleChangeNoticeWords(r, control) {
+  if (!r || r.error || r.ok === false) return { key: ROLE_CONTROL_KEYS.refused };
+  // this device just became the main device and is first catching up with the circle
+  if (r.waitingCatchUp) return { key: ROLE_CONTROL_KEYS.notice_waiting_catch_up };
+  if (r.forwarded) return { key: r.held ? ROLE_CONTROL_KEYS.notice_forwarded_held : ROLE_CONTROL_KEYS.notice_forwarded };
+  return { key: control?.noticeKey ?? ROLE_CONTROL_KEYS.refused };
+}
+
+/**
+ * The admin panel's one line about changes this device handed the main device (`ownSpineOutbox`'s counts). Given up on
+ * wins over waiting: once the window has passed the change will not land, and the person must not think it still might.
+ *
+ * @param {{waiting?: number, overDay?: number, unsent?: number, maybeLost?: number}|null} status
+ * @returns {{key: string, params: {count: number}}|null}
+ */
+export function ownSpineOutboxLine(status) {
+  const unsent = Number(status?.unsent) || 0;
+  const overDay = Number(status?.overDay) || 0;
+  const maybeLost = Number(status?.maybeLost) || 0;
+  // this device became the main device while changes it had handed the previous one were never confirmed: nobody can
+  // sign them now, and whether they landed cannot be told — the person checks
+  if (maybeLost > 0) return { key: ROLE_CONTROL_KEYS.outbox_maybe_lost, params: { count: maybeLost } };
+  if (unsent > 0) return { key: ROLE_CONTROL_KEYS.outbox_unsent, params: { count: unsent } };
+  if (overDay > 0) return { key: ROLE_CONTROL_KEYS.outbox_over_day, params: { count: overDay } };
+  return null;
 }
 
 /** The sentence a greyed admin-only action says (one general key, shared with the ⋯ menu's admin-only entries). */

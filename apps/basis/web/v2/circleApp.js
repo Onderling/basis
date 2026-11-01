@@ -122,7 +122,7 @@ import { renderConfirmDialog } from './confirmDialog.js';
 import { renderRelayQuestionDialog } from './relayQuestionDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -8755,14 +8755,17 @@ async function showAdmin(id) {
   let outboundCanonical = false;    // circle-level posture gate: only a `canonical` circle can revoke in place
   let busy = false;
   let notice = null;
+  let outboxLine = null;            // changes handed to the main device: over a day, or not sent
   let myWebid = '';                 // whose row is mine — the role control is offered to an admin only
 
   async function load() {
-    const [mem, mut, who] = await Promise.all([
+    const [mem, mut, who, outbox] = await Promise.all([
       rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }).catch(() => null),
       rawCallSkill('pinboard', 'listMutedPeers', {}).catch(() => null),
       rawCallSkill('pinboard', 'whoAmI', {}).catch(() => null),
+      rawCallSkill('household', 'ownSpineOutbox', {}).catch(() => null),
     ]);
+    outboxLine = ownSpineOutboxLine(outbox);
     myWebid = who?.webid ?? who?.webId ?? '';
     members = Array.isArray(mem?.members) ? mem.members : [];
     muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
@@ -8777,7 +8780,7 @@ async function showAdmin(id) {
     rerender();
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
-    members, muted, outboundShares, outboundCanonical, busy, notice, t,
+    members, muted, outboundShares, outboundCanonical, busy, notice, outboxLine, t,
     resolvePicture: circlePictureResolver(id),
     viewerWebid: mySelfIn(id) ?? myWebid,
     onBack: () => showDetail(id),
@@ -8800,7 +8803,7 @@ async function showAdmin(id) {
             const r = await rawCallSkill('pinboard', 'setMemberRole', {
               groupId: id, memberWebid: m.webid, role: control.role,
             });
-            notice = r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name });
+            notice = t(roleChangeNoticeWords(r, control).key, { name });
           } catch { notice = t('circle.admin.refused'); }
           busy = false; await load();
         },

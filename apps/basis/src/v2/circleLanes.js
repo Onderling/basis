@@ -126,6 +126,7 @@ export function buildCircleLanes({
     ...aim,
     subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
     onChange: onMembership,
+    onBatchFrom: (circleId) => { try { agent.spineBatchArrived?.(circleId); } catch { /* the gate stays as it was */ } },
   }) : null;
 
   // Pull-all for keys — one small statement per version, so a long-offline or freshly enrolled device
@@ -333,6 +334,17 @@ export function buildCircleLanes({
     // being) a linked contact in my book, which carries to my other devices. Entries only — the agent owns the check.
     ...(agent.identityLinks?.handlers ?? {}),
   };
+
+  // A NEW POINT CATCHES UP FIRST: before it signs a circle's spine, it pulls that circle's membership, governance and key
+  // statements — from the person's OWN devices first (the previous point most likely holds the newest own statement), then
+  // from the circle's members. The agent opens the circle for signing when a membership batch has landed from any of them.
+  agent.setSpineCatchUp?.(async (circleId, { own = [], callSkill = null } = {}) => {
+    const lanesFor = [membership, gov, key].filter(Boolean);
+    let asked = 0;
+    for (const addr of own) for (const lane of lanesFor) { try { await lane.requestFrom(addr, circleId); asked += 1; } catch { /* next */ } }
+    for (const lane of lanesFor) { try { asked += (await lane.requestCircle(circleId, { callSkill: callSkill ?? ((...a) => agent.callSkill(...a)) })).requested; } catch { /* next */ } }
+    return { asked };
+  });
 
   return {
     handlers,

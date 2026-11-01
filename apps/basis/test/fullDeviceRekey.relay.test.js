@@ -15,50 +15,63 @@ import {
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
 import { EventLog } from '../src/eventLog.js';
+import { MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
 
 const CIRCLE = 'full-device-rekey';
 const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, removeItem: (k) => { m.delete(k); } }; };
 
+/** Another FULL device of Anna's, enrolled through the real offer (it holds her circle root), joined to `circle`. */
+async function enrolFull({ A, label, relay, circle, phrase }) {
+  const built = await A.agent.callSkill('household', 'buildEnrollOffer', {});
+  expect(built.ok, JSON.stringify(built)).toBe(true);
+  const storage = memStorage();
+  expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
+  const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
+  const pre = await bootRealAgentNode(`${label}-pre`, { agentOpts: { ...vaults, enrollOfferStorage: storage } });
+  expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label })).ok).toBe(true);
+  await teardown(pre);
+  const node = await bootRealAgentNode(label, { agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
+  await connectNodesOverRelay([node], { relayUrl: relay.url });
+  await bindCircleAddresses([node], circle);
+  const consumed = await consumeEnrollOffer({
+    agent: node.agent, callSkill: (a, o, x) => node.agent.callSkill(a, o, x),
+    sendPeerMessage: (to, p, o) => node.agent.sendPeerMessage(to, p, o), storage,
+  });
+  expect(consumed.circles?.find((c) => c.circleId === circle)?.ok, JSON.stringify(consumed)).toBe(true);
+  return node;
+}
+
+/** Anna (phone + a FULL box, enrolled through the real offer) and Bea in one sealed circle; the phone is the point. */
+async function setup(circle) {
+  const relay = await startJourneyRelay();
+  const [A, B] = await Promise.all([
+    // as a shell composes them: each with its device log (the membership lane rides it)
+    bootRealAgentNode('A', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), deviceLog: new EventLog({ initial: [], muted: [] }) } }),
+    bootRealAgentNode('B', { agentOpts: { deviceLog: new EventLog({ initial: [], muted: [] }) } }),
+  ]);
+  await connectNodesOverRelay([A, B], { relayUrl: relay.url });
+  await createCircle(A, { groupId: circle, name: 'Re-key' });
+  const joined = await joinExistingCircle(A, B, { groupId: circle, handle: 'bea' });
+  expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);
+  await bindCircleAddresses([A, B], circle);
+  await Promise.all([A, B].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: circle })));
+  await sealCircleViaProducer({ admin: A, members: [B], groupId: circle });
+  expect(await until(() => (B.keyEventStore.list(circle).length > 0 ? true : null), { timeout: 10000, step: 50 })).toBe(true);
+
+  // the box: a FULL device of Anna's (enrolled through the real offer — it holds her circle root)
+  const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+  const A2 = await enrolFull({ A, label: 'A2', relay, circle, phrase });
+  const oldAddr = A.agent.circleAddressFor(circle);
+  expect(A2.agent.circleAddressFor(circle), 'the box is not a full device of Anna (another address)').toBe(oldAddr);
+  return { relay, A, B, A2, phrase, oldAddr };
+}
+
 describe('revoking a full device re-keys the persona', () => {
-  let relay; let A; let B; let A2;
+  let relay; let A; let B; let A2; let phrase; let oldAddr;
   afterAll(async () => { await teardown(A, B, A2); try { await relay?.close?.(); } catch { /* */ } });
 
   it('the phone revokes the box: a new persona address in the circle, the old one retired, and the box opens nothing sealed after', async () => {
-    relay = await startJourneyRelay();
-    [A, B] = await Promise.all([
-      // as a shell composes them: each with its device log (the membership lane rides it)
-      bootRealAgentNode('A', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), deviceLog: new EventLog({ initial: [], muted: [] }) } }),
-      bootRealAgentNode('B', { agentOpts: { deviceLog: new EventLog({ initial: [], muted: [] }) } }),
-    ]);
-    await connectNodesOverRelay([A, B], { relayUrl: relay.url });
-    await createCircle(A, { groupId: CIRCLE, name: 'Re-key' });
-    const joined = await joinExistingCircle(A, B, { groupId: CIRCLE, handle: 'bea' });
-    expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);
-    await bindCircleAddresses([A, B], CIRCLE);
-    await Promise.all([A, B].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: CIRCLE })));
-    await sealCircleViaProducer({ admin: A, members: [B], groupId: CIRCLE });
-    expect(await until(() => (B.keyEventStore.list(CIRCLE).length > 0 ? true : null), { timeout: 10000, step: 50 })).toBe(true);
-
-    // the box: a FULL device of Anna's (enrolled through the real offer — it holds her circle root)
-    const built = await A.agent.callSkill('household', 'buildEnrollOffer', {});
-    expect(built.ok, JSON.stringify(built)).toBe(true);
-    const storage = memStorage();
-    expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
-    const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('A2-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
-    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
-    expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'box' })).ok).toBe(true);
-    await teardown(pre);
-    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
-    await connectNodesOverRelay([A2], { relayUrl: relay.url });
-    await bindCircleAddresses([A2], CIRCLE);
-    const consumed = await consumeEnrollOffer({
-      agent: A2.agent, callSkill: (a, o, x) => A2.agent.callSkill(a, o, x),
-      sendPeerMessage: (to, p, o) => A2.agent.sendPeerMessage(to, p, o), storage,
-    });
-    expect(consumed.circles?.find((c) => c.circleId === CIRCLE)?.ok, JSON.stringify(consumed)).toBe(true);
-    const oldAddr = A.agent.circleAddressFor(CIRCLE);
-    expect(A2.agent.circleAddressFor(CIRCLE), 'the box is not a full device of Anna (another address)').toBe(oldAddr);
+    ({ relay, A, B, A2, phrase, oldAddr } = await setup(CIRCLE));
 
     const beaIngests = [];
     { const rail = B.agent.membershipRail; const orig = rail.ingest.bind(rail);
@@ -96,4 +109,63 @@ describe('revoking a full device re-keys the persona', () => {
     try { leaked = openAcrossKeyChain(env, boxChain); } catch { leaked = null; }
     expect(leaked, 'the revoked box\'s root opened a message sealed after the re-key').not.toBe('na de nieuwe sleutel');
   }, 240_000);
+});
+
+describe('a re-key run on a device that was not the point', () => {
+  const C2 = 'rekey-from-the-box';
+  let relay; let A; let B; let A2; let phrase; let oldAddr;
+  afterAll(async () => { await teardown(A, B, A2); try { await relay?.close?.(); } catch { /* */ } });
+
+  it('the box revokes the phone — the point — after missing its newest statement: it takes the point, catches up, then re-keys; no fork', async () => {
+    ({ relay, A, B, A2, phrase, oldAddr } = await setup(C2));
+    const phoneId = A.agent.persona('default').enrolledDevice?.deviceId;
+    await A2.agent.spinePoint?.requestFromSiblings?.();
+    expect(await until(() => (A2.agent.spinePointClaim()?.deviceId === phoneId ? true : null), { timeout: 15000, step: 200 }), 'the box does not know the phone is the point').toBe(true);
+    // the box misses the phone's newest statement: no live fan or carry reaches it, only a catch-up can
+    const prior = A2._routerRef.fn;
+    A2._routerRef.fn = (env) => (env?.payload?.subtype === MEMBERSHIP_BROADCAST ? undefined : prior?.(env));
+    try {
+      expect((await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: C2, memberWebid: B.pubKey, role: 'admin' }))?.error ?? null).toBeNull();
+      const annaStmts = (node) => (node.agent.membershipRail.storedStatements(C2) ?? []).filter((x) => x?.body?.author === oldAddr);
+      const s1 = annaStmts(A).find((x) => x.body.kind === 'role')?.body?.hash;
+      expect(s1, 'the phone signed nothing').toBeTruthy();
+      expect(annaStmts(A2).some((x) => x.body.hash === s1), 'the box already held the newest statement').toBe(false);
+
+      const r = await A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: phoneId, circleIds: [C2] });
+      expect(r?.ok, JSON.stringify(r)).toBe(true);
+      expect(A2.agent.spinePointClaim()?.deviceId, 'the box did not take the point').not.toBe(phoneId);
+      expect(await until(() => (A2.agent.circleAddressFor(C2) !== oldAddr ? true : null), { timeout: 20000, step: 200 }), 'the box still presents the old address').toBe(true);
+      const newAddr = A2.agent.circleAddressFor(C2);
+      const annaOnBea = async () => (((await B.agent.callSkill('pinboard', 'listGroupMembers', { groupId: C2 }))?.members ?? []).find((m) => m.webid === A.pubKey) ?? null);
+      expect(await until(async () => { const row = await annaOnBea(); const set = [row?.circleAddress, ...(row?.circleAddresses ?? [])]; return row?.circleAddress === newAddr && !set.includes(oldAddr) ? true : null; }, { timeout: 30000, step: 300 }),
+        `Bea's row for Anna did not move: ${JSON.stringify(await annaOnBea())}`).toBe(true);
+      expect(annaStmts(A2).some((x) => x.body.hash === s1), 'the box re-keyed without catching up first').toBe(true);
+      expect([...(await B.agent.membershipRail.readVerified(C2)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
+    } finally { A2._routerRef.fn = prior; }
+  }, 240_000);
+});
+
+describe('the surviving full devices take the next root', () => {
+  const C3 = 'rekey-survivor';
+  let relay; let A; let B; let A2; let A3; let phrase; let oldAddr;
+  afterAll(async () => { await teardown(A, B, A2, A3); try { await relay?.close?.(); } catch { /* */ } });
+
+  it('the phone revokes the laptop: the box (a survivor) moves to the new address and reads what comes next; the laptop does not', async () => {
+    ({ relay, A, B, A2, phrase, oldAddr } = await setup(C3));
+    A3 = await enrolFull({ A, label: 'A3', relay, circle: C3, phrase });
+    expect(A3.agent.circleAddressFor(C3), 'the laptop is not a full device of Anna').toBe(oldAddr);
+    const laptopId = A3.agent.persona('default').enrolledDevice?.deviceId;
+    const r = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: laptopId, circleIds: [C3] });
+    expect(r?.ok, JSON.stringify(r)).toBe(true);
+    const newAddr = A.agent.circleAddressFor(C3);
+    expect(newAddr, 'the phone did not move').not.toBe(oldAddr);
+    expect(r?.rekey?.handOver?.handed, `the next root was handed to nobody: ${JSON.stringify(r?.rekey)}`).toBeGreaterThanOrEqual(1);
+    expect(await until(() => (A2.agent.circleAddressFor(C3) === newAddr ? true : null), { timeout: 20000, step: 200 }), 'the box did not take the next root').toBe(true);
+    expect(A3.agent.circleAddressFor(C3), 'the revoked laptop took the next root').toBe(oldAddr);
+    const env = await postSealed({ admin: A, members: [B, A2], groupId: C3, text: 'voor wie overblijft' });
+    const boxReads = await until(() => { try { return readSealed(A2, env, C3) === 'voor wie overblijft' ? true : null; } catch { return null; } }, { timeout: 15000, step: 200 });
+    expect(boxReads, 'the surviving box cannot read after the re-key').toBe(true);
+    let laptopRead = null; try { laptopRead = readSealed(A3, env, C3); } catch { laptopRead = null; }
+    expect(laptopRead, 'the revoked laptop read what came after').not.toBe('voor wie overblijft');
+  }, 300_000);
 });

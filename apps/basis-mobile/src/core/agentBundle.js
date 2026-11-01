@@ -708,6 +708,8 @@ export async function bootAgentBundle(opts = {}) {
         console.log('[cc/boot] peer transport connected, address:', agent.peer?.address);
         bootMark('peer.connected');
         registerCirclePresence();   // G13 — fire-and-forget; never awaited (self-catching)
+        // a re-key moved this person's circle addresses: register the new ones (the ceremony waits for it)
+        agent.onCircleRootMoved?.(({ circleIds }) => registerCirclePresence(circleIds));
       } catch (err) {
         // Connect failures are non-fatal — local-only flows stay live.
         // Log so /me can be debugged when it shows "not connected".

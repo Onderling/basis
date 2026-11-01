@@ -52,7 +52,8 @@ export function createRosterReadCache({ ttlMs = ROSTER_READ_TTL_MS, now = () => 
   const keyFor = (opId, args) => {
     if (!isRosterRead(opId)) return null;
     const circleId = args?.groupId ?? '';
-    return `${opId}|${circleId}|${args?.spineless === true ? 's' : ''}`;
+    // the spineless read comes in two (the ceremony rule's plain trail, and the trail with the ceremony retirements)
+    return `${opId}|${circleId}|${args?.spineless === true ? (args?.withRetirements === false ? 't' : 's') : ''}`;
   };
 
   function invalidate(circleId) {

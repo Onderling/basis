@@ -809,6 +809,8 @@ if (relayUrl) {
     walkLog({ kind: 'presence', circles: circleIds.length, rosters });
   };
   await registerCirclePresence();
+  // a re-key moved this person's circle addresses: register the new ones (the ceremony waits for it)
+  agent.onCircleRootMoved?.(({ circleIds }) => registerCirclePresence(circleIds));
 
   // The stashed offer (from `--enrol`, or a re-try from an earlier start): consumed exactly as both
   // shells consume a scanned one — registry record, presence, the roster seed from the sibling, the

@@ -55,6 +55,9 @@ export const SEAMS = Object.freeze([
   // A CHANGE HANDED TO THE MAIN DEVICE IS SAID AS SUCH. A device that is not the person's main device does not sign a
   // role change itself; "is now an admin" would be said before it is true. And what waits over a day, or was given up on,
   // is said on every shell — the box at startup, having no screen.
+  // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
+  // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
+  { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
   { id: 'role-change-forwarded-words', pattern: /roleChangeNoticeWords\(/, shells: ['web', 'mobile'], why: 'a forwarded role change read as done before the main device signed it' },
   { id: 'own-spine-outbox-said', pattern: /'ownSpineOutbox'/, why: 'a change that waited days for the main device, or was dropped, would be said nowhere' },
   { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },

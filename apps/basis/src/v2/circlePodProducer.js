@@ -179,10 +179,11 @@ export function createCircleControlAgentRouter(getProducer) {
   // also swallowed the throw BEFORE the callers' own reporting could see it, which is why a warning
   // belongs here and not only there. `what` names the operation that did not reach the key.
   const route = async (groupId, fn, what) => {
-    if (!groupId || typeof getProducer !== 'function') return;
+    if (!groupId || typeof getProducer !== 'function') return null;
     const prod = await getProducer(groupId);
-    if (!prod?.controlAgent) return;                 // circle not sealed / producer not live → no-op
-    try { await fn(prod.controlAgent); await prod.persist?.(); }
+    if (!prod?.controlAgent) return null;            // circle not sealed / producer not live → no-op (null: nothing routed)
+    // the control agent's own answer — or `{ routed: true }` — so a caller can tell a routed act from no producer
+    try { const out = await fn(prod.controlAgent); await prod.persist?.(); return out ?? { routed: true }; }
     catch (err) {
       console.warn(
         `[circlePods] ${what} did not reach circle ${groupId}'s group key → the key audience is unchanged:`,
@@ -203,11 +204,11 @@ export function createCircleControlAgentRouter(getProducer) {
     // sealing keys joins or leaves the group key's audience.
     async grantRecipient({ publicKey, groupId }) {
       if (!publicKey) return;
-      await route(groupId, (ca) => ca.grantRecipient?.({ publicKey }), 'enrolling a device');
+      return route(groupId, (ca) => ca.grantRecipient?.({ publicKey }), 'enrolling a device');
     },
     async revokeRecipient({ publicKey, policy, groupId }) {
       if (!publicKey) return;
-      await route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }), 'revoking a device');
+      return route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }), 'revoking a device');
     },
   };
 }

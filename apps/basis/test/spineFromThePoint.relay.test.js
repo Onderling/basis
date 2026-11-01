@@ -48,7 +48,15 @@ describe('spine statements only from the point', () => {
       const prior = node._routerRef.fn;
       node._routerRef.fn = (env) => (env?.payload?.subtype === MEMBERSHIP_BROADCAST ? on(env.from, env.payload) : prior?.(env));
     }
+    // what reaches Bea, and what her rail says to it — a failure names whether a statement never arrived or was refused
+    const beaIngest = B.agent.membershipRail.ingest.bind(B.agent.membershipRail);
+    B.agent.membershipRail.ingest = async (cid, st) => {
+      const res = await beaIngest(cid, st);
+      beaHeard.push(`${String(st?.body?.hash ?? '').slice(0, 8)}:${res?.ok ? (res.existed ? 'dup' : 'ok') : `refused(${res?.reason ?? '?'})`}`);
+      return res;
+    };
   }, 240_000);
+  const beaHeard = [];   // filled by the ingest recorder in beforeAll
   afterAll(async () => { await teardown(A, B, C, A2); await relay?.close?.(); });
 
   it('the phone and the box change two roles at once: Bea sees both, and Anna is NOT disputed (no fork on the shared key)', async () => {
@@ -309,7 +317,15 @@ describe('spine statements only from the point', () => {
       const s2 = await until(() => ownRoleStatements(A2).find((x) => x.body.payload?.role === want2) ?? null, { timeout: 20000, step: 200 });
       expect(s2, `the box never signed — closed: ${JSON.stringify(A2.agent.spineClosedCircles())}`).toBeTruthy();
       expect(s2.body.parentHash, 'the box signed off its stale head: a fork on the shared key').toBe(s1);
-      expect(await until(async () => ((await roleOnAt(B, B.pubKey)) === want2 ? true : null), { timeout: 20000, step: 200 }), 'Bea never saw the box\'s change').toBe(true);
+      const beaSaw = await until(async () => ((await roleOnAt(B, B.pubKey)) === want2 ? true : null), { timeout: 20000, step: 200 });
+      // where it stopped, when it did: did the statement reach Bea at all, and if so what her fold made of it
+      const why = async () => {
+        const held = B.agent.membershipRail.storedStatements(GROUP) ?? [];
+        const mineThere = held.filter((x) => x?.body?.author === s2.body.author).map((x) => `${x.body.hash.slice(0, 8)}<-${String(x.body.parentHash ?? '').slice(0, 8)}`);
+        let disputed = null; try { disputed = [...((await B.agent.membershipRail.readVerified?.(GROUP))?.disputed ?? [])].map((r) => String(r).slice(0, 8)); } catch (e) { disputed = `err ${e.message}`; }
+        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), beaHeardLast: beaHeard.slice(-8), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
+      };
+      expect(beaSaw, `Bea never saw the box's change — ${beaSaw ? '' : await why()}`).toBe(true);
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
     } finally { A2._routerRef.fn = prior; }
   }, 90_000);
@@ -377,16 +393,19 @@ describe('spine statements only from the point', () => {
       expect((await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: want }))?.error ?? null).toBeNull();
       const s1 = ownRoleStatements(A).find((x) => x.body.payload?.role === want)?.body?.hash;
       expect(ownRoleStatements(A2).some((x) => x.body.hash === s1), 'the box already held the newest statement').toBe(false);
-      const mine = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === A.agent.circleAddressFor(GROUP));
-      const revokesBefore = mine().filter((x) => x.body.kind === 'address-revoke').length;
+      // Anna's chain as it is NOW (the ceremony re-keys her to a new address; this one is the chain that must not fork)
+      const oldAuthor = A.agent.circleAddressFor(GROUP);
+      const mine = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === oldAuthor);
+      const all = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []);
+      const revokesBefore = all().filter((x) => x.body.kind === 'address-revoke').length;
       expect((await A2.agent.claimPrimaryDevice())?.point?.ok).toBe(true);
       const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
       const r = await A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'd-' + 'c'.repeat(32), circleIds: [GROUP] });
       expect(r?.ok, JSON.stringify(r)).toBe(true);
       const tipsOf = (list) => { const named = new Set(list.map((x) => x.body.parentHash).filter(Boolean)); return list.filter((x) => !named.has(x.body.hash)); };
-      expect(await until(() => (mine().filter((x) => x.body.kind === 'address-revoke').length > revokesBefore ? true : null), { timeout: 20000, step: 200 }),
+      expect(await until(() => (all().filter((x) => x.body.kind === 'address-revoke').length > revokesBefore ? true : null), { timeout: 20000, step: 200 }),
         'the ceremony\'s statement never signed').toBe(true);
-      expect(mine().some((x) => x.body.hash === s1), 'the box signed without catching up first').toBe(true);
+      expect(all().some((x) => x.body.hash === s1), 'the box signed without catching up first').toBe(true);
       expect(tipsOf(mine()).length, 'Anna\'s chain on the box forked').toBe(1);
       await new Promise((res) => setTimeout(res, 1500));
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);

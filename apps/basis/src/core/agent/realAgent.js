@@ -2750,7 +2750,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const named = [act.actor, act.payload?.by, act.payload?.voter, act.payload?.authorRef].filter((x) => x !== undefined && x !== null);
     if (named.some((x) => x !== me)) return;
     // as the circle's own SELF — never an actor the forwarding device named
-    try { const res = await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: circleSelfRef(act.circleId) }); await done(res?.statement?.body?.hash ?? null); }
+    try { const res = await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: circleSelfRef(act.circleId) }); await done(res?.body?.hash ?? res?.statement?.body?.hash ?? null); }   // the emit returns the signed statement itself
     catch { /* the sibling's act is retried by nothing: it said 'forwarded' — the next act shows the roster as it is */ }
   };
   const localMembershipEmitRef = { current: null };

@@ -121,28 +121,6 @@ describe('spine statements only from the point', () => {
     const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
     expect([...disputed]).not.toContain(A.pubKey);
   }, 120_000);
-  it('a CEREMONY on the box (not the point) while the phone writes: the act and its reveal go to the point — one chain, no fork', async () => {
-    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
-    const signedByBox = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).length;
-    const boxBefore = signedByBox();
-    const prior = A2._routerRef.fn;
-    A2._routerRef.fn = () => undefined;
-    const [cer, role] = await Promise.all([
-      // a device that never was (a lost one by id): the ceremony rotates the person key and retires what it derives
-      A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'd-' + '0'.repeat(32), circleIds: [GROUP] }),
-      A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: 'member' }),
-    ]);
-    await new Promise((r) => setTimeout(r, 1500));
-    A2._routerRef.fn = prior;
-    expect(cer?.ok, JSON.stringify(cer)).toBe(true);
-    expect(role?.error ?? null, JSON.stringify(role)).toBeNull();
-    expect(signedByBox(), 'the box signed the ceremony\'s statements itself').toBe(boxBefore);
-    await new Promise((r) => setTimeout(r, 2000));
-    const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
-    expect([...disputed], 'the ceremony forked Anna\'s key').not.toContain(A.pubKey);
-  }, 90_000);
-
-
   it('an act naming someone else (actor, by, voter or authorRef) is refused by the point — identity comes from the point', async () => {
     let pointAppends = 0;
     const rail = A.agent.membershipRail;
@@ -200,6 +178,64 @@ describe('spine statements only from the point', () => {
     expect(bans[0].policy).toBe('ban');
   }, 30_000);
 
+  it('THE OUTBOX: an act lost on the way is re-sent until the point acks it — and signed once, however often it arrives', async () => {
+    const roleOn = async (node, webid) => (((await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === webid)?.role ?? null);
+    const want = (await roleOn(B, C.pubKey)) === 'admin' ? 'member' : 'admin';
+    // the point loses the first act that reaches it
+    const prior = A._routerRef.fn;
+    let dropped = 0;
+    A._routerRef.fn = (env) => { if (env?.payload?.subtype === A.agent.spineActSubtype && dropped === 0) { dropped += 1; return undefined; } return prior?.(env); };
+    const r = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: want });
+    expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
+    expect(await until(() => (dropped === 1 ? true : null), { timeout: 10000, step: 100 }), 'the act never reached the point at all').toBe(true);
+    A._routerRef.fn = prior;
+    await new Promise((res) => setTimeout(res, 1000));
+    expect(await roleOn(B, C.pubKey), 'the lost act landed anyway').not.toBe(want);
+    const first = await A2.agent.resendSpineOutbox();
+    expect(first.resent, 'the box had nothing waiting').toBeGreaterThanOrEqual(1);
+    const landedR = await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 20000, step: 300 });
+    const cOnA = (((await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).map((m) => String(m.webid).slice(0, 6)));
+    expect(landedR, `the re-sent act never landed — the point shows ${await roleOn(A, C.pubKey)}, Bea ${await roleOn(B, C.pubKey)}, wanted ${want}; the point's roster ${JSON.stringify(cOnA)}, Cas ${String(C.pubKey).slice(0, 6)}, B ${String(B.pubKey).slice(0, 6)}, Anna ${String(A.pubKey).slice(0, 6)}`).toBe(true);
+    // the ack cleared it: nothing goes again
+    expect(await until(async () => (((await A2.agent.resendSpineOutbox()).resent === 0) ? true : null), { timeout: 10000, step: 300 }), 'the outbox kept an acked act').toBe(true);
+  }, 90_000);
+
+  it('a re-sent act whose ack was lost is signed once (the point dedupes by act id)', async () => {
+    let pointAppends = 0;
+    const rail = A.agent.membershipRail;
+    const origAppend = rail.append.bind(rail);
+    rail.append = async (...x) => { pointAppends += 1; return origAppend(...x); };
+    const from = A2.agent.ownDeviceAddress('default');
+    const act = { kind: 'role', circleId: GROUP, subject: C.pubKey, payload: { role: 'member' }, actor: A.pubKey };
+    const msg = { subtype: A.agent.spineActSubtype, lane: 'membership', act, actId: 'act-dedupe-test-1' };
+    await A.agent.spineActHandler(from, msg);
+    await A.agent.spineActHandler(from, msg);
+    rail.append = origAppend;
+    expect(pointAppends, 'the point signed one act twice').toBe(1);
+  }, 30_000);
+  it('a CEREMONY on the box (not the point) while the phone writes: the act and its reveal go to the point — one chain, no fork', async () => {
+    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    const signedByBox = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).length;
+    const boxBefore = signedByBox();
+    const prior = A2._routerRef.fn;
+    A2._routerRef.fn = () => undefined;
+    const [cer, role] = await Promise.all([
+      // a device that never was (a lost one by id): the ceremony rotates the person key and retires what it derives
+      A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'd-' + '0'.repeat(32), circleIds: [GROUP] }),
+      A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: 'member' }),
+    ]);
+    await new Promise((r) => setTimeout(r, 1500));
+    A2._routerRef.fn = prior;
+    expect(cer?.ok, JSON.stringify(cer)).toBe(true);
+    expect(role?.error ?? null, JSON.stringify(role)).toBeNull();
+    expect(signedByBox(), 'the box signed the ceremony\'s statements itself').toBe(boxBefore);
+    await new Promise((r) => setTimeout(r, 2000));
+    const { disputed } = await B.agent.membershipRail.readVerified(GROUP);
+    expect([...disputed], 'the ceremony forked Anna\'s key').not.toContain(A.pubKey);
+  }, 90_000);
+
+
+  // (last: an admin's proposal to remove Cas passes at once under the test's empty policy, and evicts Cas)
   it('a GOVERNANCE act on the box (a proposal) goes to the point: the point signs it on its own log, the box signs nothing', async () => {
     const { bindCircleGovernance } = await import('../src/v2/governanceAppWiring.js');
     const boxLog = new EventLog({ initial: [], muted: [] });
@@ -219,38 +255,4 @@ describe('spine statements only from the point', () => {
       `the point never signed the forwarded proposal (result: ${JSON.stringify(r)})`).toBe(true);
   }, 60_000);
 
-  it('THE OUTBOX: an act lost on the way is re-sent until the point acks it — and signed once, however often it arrives', async () => {
-    const roleOn = async (node, webid) => (((await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === webid)?.role ?? null);
-    const want = (await roleOn(B, C.pubKey)) === 'admin' ? 'member' : 'admin';
-    // the point loses the first act that reaches it
-    const prior = A._routerRef.fn;
-    let dropped = 0;
-    A._routerRef.fn = (env) => { if (env?.payload?.subtype === A.agent.spineActSubtype && dropped === 0) { dropped += 1; return undefined; } return prior?.(env); };
-    const r = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: want });
-    expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
-    expect(await until(() => (dropped === 1 ? true : null), { timeout: 10000, step: 100 }), 'the act never reached the point at all').toBe(true);
-    A._routerRef.fn = prior;
-    await new Promise((res) => setTimeout(res, 1000));
-    expect(await roleOn(B, C.pubKey), 'the lost act landed anyway').not.toBe(want);
-    const first = await A2.agent.resendSpineOutbox();
-    expect(first.resent, 'the box had nothing waiting').toBeGreaterThanOrEqual(1);
-    const landedR = await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 20000, step: 300 });
-    expect(landedR, `the re-sent act never landed — the point shows ${await roleOn(A, C.pubKey)}, Bea ${await roleOn(B, C.pubKey)}, wanted ${want}`).toBe(true);
-    // the ack cleared it: nothing goes again
-    expect(await until(async () => (((await A2.agent.resendSpineOutbox()).resent === 0) ? true : null), { timeout: 10000, step: 300 }), 'the outbox kept an acked act').toBe(true);
-  }, 90_000);
-
-  it('a re-sent act whose ack was lost is signed once (the point dedupes by act id)', async () => {
-    let pointAppends = 0;
-    const rail = A.agent.membershipRail;
-    const origAppend = rail.append.bind(rail);
-    rail.append = async (...x) => { pointAppends += 1; return origAppend(...x); };
-    const from = A2.agent.ownDeviceAddress('default');
-    const act = { kind: 'role', circleId: GROUP, subject: C.pubKey, payload: { role: 'member' }, actor: A.pubKey };
-    const msg = { subtype: A.agent.spineActSubtype, lane: 'membership', act, actId: 'act-dedupe-test-1' };
-    await A.agent.spineActHandler(from, msg);
-    await A.agent.spineActHandler(from, msg);
-    rail.append = origAppend;
-    expect(pointAppends, 'the point signed one act twice').toBe(1);
-  }, 30_000);
 });

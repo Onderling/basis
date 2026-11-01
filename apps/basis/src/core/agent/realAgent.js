@@ -2656,7 +2656,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** The point signs a sibling's spine act: from a live device of this person only, a declared membership kind only, as
    *  the circle's own self, on this device's own head. */
   const spineActHandler = async (fromAddr, payload) => {
-    if (payload?.subtype !== SPINE_ACT_SUBTYPE || payload.lane !== 'membership') return;
+    if (payload?.subtype !== SPINE_ACT_SUBTYPE) return;
+    if (payload.lane === 'key') {
+      if (!isPointDevice() || !(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
+      try { await keyActOnPoint(payload.act ?? {}); } catch { /* the act said 'forwarded'; the roster shows what is */ }
+      return;
+    }
+    if (payload.lane !== 'membership') return;
     if (!isPointDevice() || typeof localMembershipEmitRef.current !== 'function') return;
     if (!(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
     const act = payload.act ?? {};
@@ -2671,6 +2677,48 @@ export async function createRealHouseholdAgent(opts = {}) {
     catch { /* the sibling's act is retried by nothing: it said 'forwarded' — the next act shows the roster as it is */ }
   };
   const localMembershipEmitRef = { current: null };
+  // THE KEY LANE FROM THE POINT TOO: a circle's group key is produced, wrapped and its key event signed only on the point.
+  // Another device of the person hands the point the ACT — add or remove a member — and never key material: the point
+  // generates and wraps from its own state, and takes a recipient's sealing key from ITS OWN roster.
+  const pointGatedControlAgent = (ctl) => {
+    if (!ctl || typeof ctl !== 'object') return ctl;
+    const forward = async (act) => {
+      const to = await pointDeviceAddress();
+      if (!to) return null;
+      try {
+        const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'key', act }, { guarantee: 'hold-forward' }, 'default');
+        return { forwarded: true, held: sent?.held === true };
+      } catch { return null; }
+    };
+    return new Proxy(ctl, {
+      get(target, prop) {
+        if (prop === 'addMember') {
+          return async (a = {}) => (isPointDevice() ? target.addMember(a)
+            : ((await forward({ op: 'add', circleId: a.groupId, webId: a.webId, role: a.role ?? null })) ?? target.addMember(a)));
+        }
+        if (prop === 'removeMember') {
+          return async (a = {}) => (isPointDevice() ? target.removeMember(a)
+            : ((await forward({ op: 'remove', circleId: a.groupId, webId: a.webId, policy: a.policy ?? null, force: a.force === true })) ?? target.removeMember(a)));
+        }
+        const v = target[prop];
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+  };
+  /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
+  const keyActOnPoint = async (act) => {
+    const ctl = opts.pinboardControlAgent;
+    if (!ctl || typeof act?.circleId !== 'string' || typeof act.webId !== 'string') return;
+    if ('publicKey' in act || 'sealingKey' in act || 'groupKey' in act || 'wrap' in act || 'seed' in act) return;   // no key material, ever
+    let row = null;
+    try { row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: act.circleId }))?.members ?? []).find((m) => m?.webid === act.webId) ?? null; } catch { row = null; }
+    if (act.op === 'add') {
+      if (!row?.circleAddress) return;   // not a current member of this circle here: nothing to grant
+      await ctl.addMember({ webId: act.webId, publicKey: sealingPublicKeyFromNetworkKey(row.circleAddress), role: act.role ?? row.role ?? 'member', groupId: act.circleId });
+    } else if (act.op === 'remove') {
+      await ctl.removeMember({ webId: act.webId, groupId: act.circleId, ...(act.policy ? { policy: act.policy } : {}), ...(act.force ? { force: true } : {}) });
+    }
+  };
   primaryDeviceRef.current = primaryDevice;
   // THE POINT, its own record (the same shape and carry): who signs this person's spine statements. The enrol claims it
   // alone — direct messages keep landing where they did — and the person's "main device" tap sets both.
@@ -5593,7 +5641,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // S4 — per-circle control-agent router: redeem→addMember / leave→removeMember route
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent
     // → membership hooks no-op (the pre-S4 behaviour).
-    controlAgent: opts.pinboardControlAgent,
+    controlAgent: pointGatedControlAgent(opts.pinboardControlAgent),
     // Route circle chat fan-out through the SAME reliable choke durable circle content uses:
     // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`. This is what gives a circle chat
     // failover (`_sendWithFailover`) + offline hold-forward — the reliability the bus-local

@@ -160,4 +160,22 @@ describe('spine statements only from the point', () => {
     rail.append = origAppend;
     expect(pointAppends, 'the point signed an act that named someone else').toBe(0);
   }, 30_000);
+
+  it('a KEY act from the box: the point grants only a current member, from its own roster — never a key the act brings', async () => {
+    const ctl = A.circleControlAgentRouter;
+    expect(ctl, 'the harness gives the phone a control agent').toBeTruthy();
+    const calls = [];
+    const orig = ctl.addMember?.bind(ctl);
+    ctl.addMember = async (a) => { calls.push(a); return orig ? orig(a).catch(() => null) : null; };
+    const from = A2.agent.ownDeviceAddress('default');
+    const send = (act) => A.agent.spineActHandler(from, { subtype: A.agent.spineActSubtype, lane: 'key', act });
+    await send({ op: 'add', circleId: GROUP, webId: 'webid:not-a-member' });
+    await send({ op: 'add', circleId: GROUP, webId: B.pubKey, publicKey: 'ATTACKER-SEALING-KEY' });
+    expect(calls, 'the point granted a non-member or a key the act brought').toEqual([]);
+    await send({ op: 'add', circleId: GROUP, webId: B.pubKey });
+    ctl.addMember = orig;
+    expect(calls.length, 'a current member is granted by the point').toBe(1);
+    expect(calls[0].publicKey, 'the sealing key is the point\'s own reading of the roster').toBeTruthy();
+    expect(calls[0].publicKey).not.toBe('ATTACKER-SEALING-KEY');
+  }, 30_000);
 });

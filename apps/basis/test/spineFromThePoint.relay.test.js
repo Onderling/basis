@@ -309,7 +309,15 @@ describe('spine statements only from the point', () => {
       const s2 = await until(() => ownRoleStatements(A2).find((x) => x.body.payload?.role === want2) ?? null, { timeout: 20000, step: 200 });
       expect(s2, `the box never signed — closed: ${JSON.stringify(A2.agent.spineClosedCircles())}`).toBeTruthy();
       expect(s2.body.parentHash, 'the box signed off its stale head: a fork on the shared key').toBe(s1);
-      expect(await until(async () => ((await roleOnAt(B, B.pubKey)) === want2 ? true : null), { timeout: 20000, step: 200 }), 'Bea never saw the box\'s change').toBe(true);
+      const beaSaw = await until(async () => ((await roleOnAt(B, B.pubKey)) === want2 ? true : null), { timeout: 20000, step: 200 });
+      // where it stopped, when it did: did the statement reach Bea at all, and if so what her fold made of it
+      const why = async () => {
+        const held = B.agent.membershipRail.storedStatements(GROUP) ?? [];
+        const mineThere = held.filter((x) => x?.body?.author === s2.body.author).map((x) => `${x.body.hash.slice(0, 8)}<-${String(x.body.parentHash ?? '').slice(0, 8)}`);
+        let disputed = null; try { disputed = [...((await B.agent.membershipRail.readVerified?.(GROUP))?.disputed ?? [])].map((r) => String(r).slice(0, 8)); } catch (e) { disputed = `err ${e.message}`; }
+        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
+      };
+      expect(beaSaw, `Bea never saw the box's change — ${beaSaw ? '' : await why()}`).toBe(true);
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
     } finally { A2._routerRef.fn = prior; }
   }, 90_000);

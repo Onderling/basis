@@ -112,5 +112,14 @@ describe('the key lane from the point, sealed', () => {
     const env = await postSealed({ admin: A, members: [A2], groupId: CIRCLE, text: 'na de intrekking' });
     const opened = await until(() => { try { return readSealed(A2, env, CIRCLE) === 'na de intrekking' ? true : null; } catch { return null; } }, { timeout: 15000, step: 200 });
     expect(opened, 'the box cannot read after its own ceremony').toBe(true);
+    // …and the claim itself: the REVOKED device's own key opens nothing that came after
+    const { sealingKeyPairFromNetworkKey, readKeyChain, openAcrossKeyChain, open } = await import('@onderling/pod-client');
+    const { deriveCircleSeed, b64encode } = await import('@onderling/core');
+    const lostPriv = sealingKeyPairFromNetworkKey(b64encode(deriveCircleSeed(lostSeed, CIRCLE))).privateKey;
+    let lostChain = [];
+    try { lostChain = readKeyChain(await keyEventsFromRail(A.agent.keyRail, CIRCLE), { groupId: CIRCLE, opener: (sealed) => open(sealed, lostPriv) }); } catch { lostChain = []; }
+    let leaked = null;
+    try { leaked = openAcrossKeyChain(env, lostChain); } catch { leaked = null; }
+    expect(leaked, 'the revoked device\'s key opened a message sealed after the ceremony').not.toBe('na de intrekking');
   }, 120_000);
 });

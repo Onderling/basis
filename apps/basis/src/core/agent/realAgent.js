@@ -117,7 +117,7 @@ import { unregisterCircleAddressesOnRelays } from '../../v2/circleAddressRegistr
 import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
-import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
+import { makeGovernanceRail, bindCircleGovernance, makeGovernanceBroadcast } from '../../v2/governanceAppWiring.js';
 import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 // …and the circle POLICY, the same way: a signed statement on the governance lane, caught up by joiners.
 import { makePolicyUpdateEmitter } from '../../v2/policyUpdateLane.js';
@@ -2657,6 +2657,11 @@ export async function createRealHouseholdAgent(opts = {}) {
    *  the circle's own self, on this device's own head. */
   const spineActHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== SPINE_ACT_SUBTYPE) return;
+    if (payload.lane === 'governance') {
+      if (!isPointDevice() || !(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
+      try { await governanceActOnPoint(payload.act ?? {}); } catch { /* the act said 'forwarded'; the fold shows what is */ }
+      return;
+    }
     if (payload.lane === 'key') {
       if (!isPointDevice() || !(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
       try { await keyActOnPoint(payload.act ?? {}); } catch { /* the act said 'forwarded'; the roster shows what is */ }
@@ -2704,6 +2709,38 @@ export async function createRealHouseholdAgent(opts = {}) {
         return typeof v === 'function' ? v.bind(target) : v;
       },
     });
+  };
+  /** The gate the shells hand their governance binding: not the point → the act goes to the point. */
+  const spineGate = {
+    isPoint: () => isPointDevice(),
+    forward: async (act) => {
+      const to = await pointDeviceAddress();
+      if (!to) return null;
+      try {
+        const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'governance', act }, { guarantee: 'hold-forward' }, 'default');
+        return { forwarded: true, held: sent?.held === true };
+      } catch { return null; }
+    },
+  };
+  /** The point's own governance binding (no gate: it IS the point) — what it runs a sibling's governance act through. */
+  let pointGovernance = null;
+  const governanceActOnPoint = async (act) => {
+    const circleId = typeof act?.circleId === 'string' ? act.circleId : null;
+    const event = act?.event;
+    if (!circleId || !event || typeof event !== 'object' || (act.channel !== 'governance' && act.channel !== 'report')) return;
+    // identity from the point: an event naming any other self is refused whole
+    const me = circleSelfRef(circleId);
+    if ([event.by, event.voter, event.actor].some((x) => x !== undefined && x !== null && x !== me)) return;
+    if (!pointGovernance) {
+      pointGovernance = bindCircleGovernance({
+        eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+        callSkill: (...a) => callSkill(...a), getPolicy: async () => ({}), myRef: circleSelfRef,
+        genId: () => `gov-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        broadcast: makeGovernanceBroadcast((...a) => callSkill(...a)), circleIdentityFor,
+      });
+    }
+    if (act.channel === 'governance') await pointGovernance.appendGovernanceEvent(circleId, event);
+    else await pointGovernance.appendReportEvent(circleId, event);
   };
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
   const keyActOnPoint = async (act) => {
@@ -9088,6 +9125,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     retireDeviceCircleAddresses,
     ownAddressRetireHandler,
     spineActHandler,
+    /** The gate a shell hands its governance binding (`bindCircleGovernance({ spineGate })`). */
+    spineGate,
     spineActSubtype: SPINE_ACT_SUBTYPE,
     ownAddressRetireSubtype: OWN_ADDRESS_RETIRE_SUBTYPE,
     /** Send to one of this device's own siblings at its device address (the registry's device map). */

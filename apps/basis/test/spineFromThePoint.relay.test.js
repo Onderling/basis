@@ -18,10 +18,11 @@ const GROUP = 'spine-from-point';
 const log = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
 
 describe('spine statements only from the point', () => {
-  let relay; let A; let B; let A2; let C;
+  let relay; let A; let B; let A2; let C; let logA;
   beforeAll(async () => {
     relay = await startJourneyRelay();
-    A = await bootRealAgentNode('phone', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), ...log() } });
+    logA = new EventLog({ initial: [], muted: [] });
+    A = await bootRealAgentNode('phone', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), deviceLog: logA } });
     B = await bootRealAgentNode('bea', { agentOpts: log() });
     C = await bootRealAgentNode('cas', { agentOpts: log() });
     await connectNodesOverRelay([A, B, C], { relayUrl: relay.url });
@@ -198,4 +199,23 @@ describe('spine statements only from the point', () => {
     expect(bans.length, 'the old address on the person\'s own row is banned').toBe(1);
     expect(bans[0].policy).toBe('ban');
   }, 30_000);
+
+  it('a GOVERNANCE act on the box (a proposal) goes to the point: the point signs it on its own log, the box signs nothing', async () => {
+    const { bindCircleGovernance } = await import('../src/v2/governanceAppWiring.js');
+    const boxLog = new EventLog({ initial: [], muted: [] });
+    const govBox = bindCircleGovernance({
+      eventLog: boxLog, callSkill: (...a) => A2.agent.callSkill(...a), getPolicy: async () => ({}), myRef: () => A.pubKey,
+      genId: () => `gov-${Math.random().toString(36).slice(2, 8)}`, circleIdentityFor: A2.agent.circleIdentityFor, spineGate: A2.agent.spineGate,
+    });
+    let boxAppends = 0;
+    const orig = govBox.rail.append.bind(govBox.rail);
+    govBox.rail.append = async (...x) => { boxAppends += 1; return orig(...x); };
+    const govOnPhone = () => logA.query({}).filter((e) => e?.kind === 'governance' || e?.type === 'governance' || e?.payload?.body?.kind === 'propose').length;
+    const before = govOnPhone();
+    const r = await govBox.propose({ circleId: GROUP, action: 'removeMember', subject: C.pubKey, actor: { ref: A.pubKey } });
+    govBox.rail.append = orig;
+    expect(boxAppends, 'the box signed a governance statement itself').toBe(0);
+    expect(await until(() => (govOnPhone() > before ? true : null), { timeout: 15000, step: 200 }),
+      `the point never signed the forwarded proposal (result: ${JSON.stringify(r)})`).toBe(true);
+  }, 60_000);
 });

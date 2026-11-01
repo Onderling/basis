@@ -4390,6 +4390,7 @@ function shellGovernance({ myWebid = '' } = {}) {
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;
@@ -8602,6 +8603,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
   });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
   catch { return { ok: false }; }
@@ -8619,6 +8621,7 @@ async function showGovernance(id) {
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;

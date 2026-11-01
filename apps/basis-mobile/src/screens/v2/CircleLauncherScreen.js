@@ -991,6 +991,7 @@ export default function CircleLauncherScreen({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
         myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
         circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
+        spineGate: bundle?.agent?.spineGate ?? null,   // spine acts only from the point
       });
       await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason });
     } catch { /* best-effort */ }
@@ -2416,6 +2417,7 @@ export default function CircleLauncherScreen({
       <CircleGovernanceScreen
         callSkill={bundle?.callSkill}
         circleIdentityFor={bundle?.agent?.circleIdentityFor ?? null}
+        spineGate={bundle?.agent?.spineGate ?? null}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         eventLog={eventLog}
         getPolicy={(cid) => policyStore.get(cid)}

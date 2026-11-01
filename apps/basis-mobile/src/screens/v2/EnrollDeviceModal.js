@@ -14,7 +14,7 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { currentRelayUrl } from './RelayQuestionModal.js';
 import { t } from '../../core/localisation.js';
-import { openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs } from '../../../../basis/src/v2/enrollOffer.js';
+import { openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../../../basis/src/v2/enrollOffer.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
@@ -87,8 +87,8 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
     try { await beforeOffer?.(); } catch { /* the question is a convenience; the offer still shows */ }
     const relayUrl = await currentRelayUrl();
     Promise.resolve(callSkill('household', 'buildEnrollOffer', relayUrl ? { relayUrl } : {}))
-      .then((r) => setOfferView(r?.ok && r.uri ? { uri: r.uri } : { error: true }))
-      .catch(() => setOfferView({ error: true }));
+      .then((r) => setOfferView(r?.ok && r.uri ? { uri: r.uri } : { error: enrollOfferErrorKey(r) }))
+      .catch(() => setOfferView({ error: enrollOfferErrorKey(null) }));
   };
   const finish = () => { setInst(null); setOfferView(null); setOfferDraft(''); onClose?.(); };
 
@@ -100,7 +100,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
           {offerView ? (
             <View>
               {offerView.error ? (
-                <Text style={styles.body}>{t('circle.enroll.offer_error')}</Text>
+                <Text style={styles.body}>{t(offerView.error)}</Text>
               ) : (
                 <View>
                   <Text style={styles.body}>{t('circle.enroll.offer_hint')}</Text>

@@ -7823,6 +7823,7 @@
     "offer_title": "Toevoeg-code",
     "offer_hint": "Scan of plak deze code op het nieuwe apparaat en typ daar de herstelzin. De code is geen geheim — de herstelzin blijft de enige sleutel.",
     "offer_error": "Code maken lukte niet (dit apparaat zit nog in geen enkele kring).",
+    "offer_no_seal": "Dit apparaat kan nog geen code tonen: het is toegevoegd voordat het herstelzegel bestond. Typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels) en probeer het dan opnieuw.",
     "offer_paste_label": "Code van je huidige apparaat (optioneel)",
     "personas_title": "Welke persona's krijgt dit apparaat?",
     "personas_hint": "Alleen wat je aanvinkt komt op dit apparaat. Een apparaat dat minder vertrouwd is, geef je er beter minder.",

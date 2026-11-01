@@ -138,13 +138,14 @@ describe('the box is revoked while it holds the address', () => {
     expect(boxDeviceIdPrefix, `the ceremony did not say which device it made:\n${once.out.slice(-600)}`).toBeTruthy();
     box = await startBox(dataDir, env);
     expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'enroll-offer') ?? null, { timeout: 60_000, step: 500 }), 'the box never consumed the offer').toBeTruthy();
-    // The box's per-circle address lands in the person's row — on the web app and on Bea's device.
+    // ONE ADDRESS PER PERSONA PER CIRCLE: the box presents the person's one address in Thuis; the web app learns the BOX in
+    // its device map (the box introduced itself at the web app's device address), and Bea's row keeps one address.
     const webOwn = web.agent.circleAddressFor(CIRCLE);
-    boxAddr = await until(async () => (await addressesOf(web, web.pubKey)).find((a) => a !== webOwn) ?? null, { timeout: 30_000, step: 250 });
-    expect(boxAddr, 'the web app never learned the box\'s per-circle address').toBeTruthy();
-    const beaKnows = await until(async () => ((await addressesOf(bea, web.pubKey)).includes(boxAddr) ? true : null), { timeout: 30_000, step: 250 });
-    expect(beaKnows,
-      `Bea never learned the box's per-circle address — nothing to retire at her end. The box's consume: ${JSON.stringify(walkLog(dataDir).find((e) => e.kind === 'enroll-offer'))}; Bea's row: ${JSON.stringify(await addressesOf(bea, web.pubKey))}; box out:\n${box.out.slice(-2500)}`).toBe(true);
+    const before = (await web.agent.ownDeviceAddressesOf('default')).length;
+    boxAddr = await until(async () => (await web.agent.ownDeviceAddressesOf('default')).find(() => true) ?? null, { timeout: 30_000, step: 250 });
+    expect(boxAddr, `the web app never learned the box in its device map (had ${before})`).toBeTruthy();
+    const beaRow = await until(async () => { const a = await addressesOf(bea, web.pubKey); return a.length ? a : null; }, { timeout: 30_000, step: 250 });
+    expect(beaRow, 'Bea\'s row for the person: one address').toEqual([webOwn]);
 
     // A person with the card writes; the box takes it (it holds the profile address as the last
     // registration) and hands it to the web app — the alpha's feedback path, as the baseline.
@@ -195,16 +196,13 @@ describe('the box is revoked while it holds the address', () => {
     expect(r.ok, r.error).toBe(true);
     expect(r.known, 'the ceremony flipped the record it had, rather than minting one').toBe(true);
     expect(r.revokedIn.map((x) => x.circleId), 'the retirement covers Thuis').toContain(CIRCLE);
-    expect(r.revokedIn.find((x) => x.circleId === CIRCLE)?.address, 'the retired address is the box\'s').toBe(boxAddr);
-    // The tombstone: the device list shows the box struck through.
+    // The tombstone: the device list shows the box struck through, and no sibling send reaches its device address.
     expect((await devicesOn(web)).find((d) => d.deviceId === deviceId)?.revoked, 'the registry did not tombstone the box').toBe(true);
-
-    // Bea's row for the person no longer names the box; the web app's own row neither.
-    expect(await until(async () => ((await addressesOf(bea, web.pubKey)).includes(boxAddr) ? null : true), { timeout: 30_000, step: 250 }),
-      'Bea still names the box\'s address').toBe(true);
-    expect(await addressesOf(web, web.pubKey), 'the web app still names the box\'s address on its own row').not.toContain(boxAddr);
-    // Bea's door: a statement the box signs in this circle no longer binds to the person.
-    expect(await productionBinding(beaRef)({ author: boxAddr, ref: web.pubKey, circleId: CIRCLE }), 'Bea would still accept the box as the person').toBe(false);
+    expect(await web.agent.ownDeviceAddressesOf('default'), 'the box is no sibling any more').not.toContain(boxAddr);
+    // THE WINDOW, stated: the box was a FULL device holding the persona's circle key, so the person's one address stays on
+    // Bea's row (retiring it would take the person out) — the full-device RE-KEY moves the person to a new address, and
+    // its own test shows the box's statements refused then.
+    expect(await addressesOf(bea, web.pubKey)).toContain(web.agent.circleAddressFor(CIRCLE));
 
     // The ceremony's end on a first device: it enrolled ITSELF (every legitimate device now signs with a
     // revocable key), so it asks for a reload. The reload is the reconnect: a delegation boot, fresh
@@ -300,7 +298,9 @@ describe('the box is revoked while it holds the address', () => {
     const liveDevice = web.agent.persona('default')?.enrolledDevice?.record?.pubKey ?? '';
     const toLive = fanned.outcomes.filter((o) => live.startsWith(o.to) || (liveDevice && liveDevice.startsWith(o.to)));
     if (toLive.length) {
-      const refusedAtGate = () => (web.agent.refusedInboundByReason?.()?.SENDER_NOT_AUTHORIZED ?? 0) > 0;
+      // refused at the gate — or before it: the tombstone UNPINNED the box's device address, so its envelopes come from a
+      // sender this device no longer knows at all
+      const refusedAtGate = () => { const r = web.agent.refusedInboundByReason?.() ?? {}; return (r.SENDER_NOT_AUTHORIZED ?? 0) > 0 || (r.UNKNOWN_SENDER ?? 0) > 0; };
       const refusedAtLane = () => web.contactTurnsRefused.some((x) => x.reason === 'not-a-sibling');
       expect(await until(async () => ((refusedAtGate() || refusedAtLane()) ? true : null), { timeout: 30_000, step: 250 }),
         `the web app did not refuse the revoked box's fan — seen: ${JSON.stringify(web.contactTurnsSeen.map((t) => t?.text))}; refused: ${JSON.stringify(web.agent.refusedInboundByReason?.())}`).toBe(true);

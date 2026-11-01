@@ -82,6 +82,8 @@ export class RelayTransport extends Transport {
    */
   #asked             = new Set();
   #proved            = new Set();
+  /** address → proofs sent on THIS socket whose `registered` ack has not come yet (each ack spends one). */
+  #proofsInFlight    = new Map();
   /** Aliases the relay has ACKED on THIS socket — what an awaited `addAddress` promises. Cleared with every new socket. */
   #bound             = new Set();
   #primaryDevice = () => false;
@@ -241,6 +243,7 @@ export class RelayTransport extends Transport {
   _unbindAddress(address) {
     this.#signers.delete(address);
     this.#proved.delete(address);
+    this.#proofsInFlight.delete(address);
     this.#asked.delete(address);
     this.#bound.delete(address);
   }
@@ -357,7 +360,6 @@ export class RelayTransport extends Transport {
   /** Ask to register `address`; the relay answers with a challenge, never with a registration. */
   #sendRegister(address, primary = false) {
     this.#asked.add(address);
-    this.#proved.delete(address);
     // `serves` rides only the socket's OWN address — an alias never opts the node into anything
     const serves = address === this.address && this.#serves.length ? { serves: this.#serves } : {};
     this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}), ...serves }));
@@ -380,6 +382,7 @@ export class RelayTransport extends Transport {
       return;
     }
     this.#proved.add(address);
+    this.#proofsInFlight.set(address, (this.#proofsInFlight.get(address) ?? 0) + 1);
     if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'register-proof', address, nonce, proof }));
   }
 
@@ -507,6 +510,7 @@ export class RelayTransport extends Transport {
       // one.
       this.#asked.clear();
       this.#proved.clear();
+      this.#proofsInFlight.clear();
       this.#bound.clear();
       this.#primaryAcked = false;
       this.#sendRegister(this.address, this.#primaryDevice() === true);
@@ -531,10 +535,15 @@ export class RelayTransport extends Transport {
         // The audit. `address` is absent on a relay old enough not to say which registration it is
         // acking — which is also a relay old enough not to have challenged us, so it fails here.
         const address = msg.address ?? this.address;
-        if (!this.#proved.has(address)) {
+        // Each ack answers ONE proof this socket sent for that address — a re-registration in flight (a moved primary
+        // flag, a boot re-announce: several of a person's devices hold one circle address now) never un-proves the
+        // earlier one, and an ack with no proof outstanding is still the relay that did not demand one.
+        const outstanding = this.#proofsInFlight.get(address) ?? 0;
+        if (!this.#proved.has(address) || outstanding < 1) {
           this.#failUnprovenRelay(address);
           return;
         }
+        this.#proofsInFlight.set(address, outstanding - 1);
         // An alias landed: release whoever is awaiting `addAddress` for it. The connect promise
         // belongs to the primary, so an alias never resolves that one.
         this.#bound.add(address);

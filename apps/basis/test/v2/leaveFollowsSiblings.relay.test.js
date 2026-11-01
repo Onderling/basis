@@ -57,7 +57,7 @@ describe('a circle left on one device is left on the person\'s others', () => {
     const storage = memStorage();
     expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('A2-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('A2-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'tablet' })).ok).toBe(true);
     await teardown(pre);
@@ -77,12 +77,9 @@ describe('a circle left on one device is left on the person\'s others', () => {
     if (!consumed.cleared) consumed = await consume();
     expect(consumed.cleared, JSON.stringify(consumed)).toBe(true);
     expect(await myCircles(A2)).toEqual(expect.arrayContaining([X, Y, Z]));
-    // the siblings know each other (A's row holds A2's address) before the carry is asked to reach A2
-    const known = await until(async () => {
-      const r = await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: X });
-      return (r?.members ?? []).find((m) => m.webid === A.pubKey)?.circleAddresses?.includes(A2.agent.circleAddressFor(X)) ? true : null;
-    }, { timeout: 15000, step: 100 });
-    expect(known).toBe(true);
+    // the siblings know each other (A's device map holds A2's device) before the carry is asked to reach A2
+    const known = await until(async () => ((await A.agent.ownDeviceAddressesOf('default')).includes(A2.agent.ownDeviceAddress('default')) ? true : null), { timeout: 15000, step: 100 });
+    expect(known, 'the phone never learned the enrolled device in its device map').toBe(true);
 
     // ── A LEAVES X — the shells' shared op ──────────────────────────────────────────────────────────
     const left = await leaveCircleLocally({ agent: A.agent, callSkill: (app, op, args) => A.agent.callSkill(app, op, args), circleId: X });

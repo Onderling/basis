@@ -88,13 +88,11 @@ describe('B1 — the recovery phrase brings back the same person, on a fresh ins
 
       // (i) the same person …
       expect(after.pubKey).toBe(before.pubKey);
-      // (ii) … on THEIR OWN device addresses. Since the custody cutover a restore ENROLLS: the
-      // reinstall is a new device with its own per-circle keys (announced into every roster's
-      // address set at boot; the lost install's addresses retire at the revoke ceremony). The
-      // OLD pin — "the same address in every circle" — was the pre-device-model semantics; the
-      // same-address world is exactly what made a second device a clone.
+      // (ii) … at the SAME address in every circle: one address per persona per circle, from the persona's circle root,
+      // which the phrase re-derives — the restored install is a new DEVICE (its own delegation key, on the device map) but
+      // presents the person's one address, so nobody's roster needs anything announced.
       for (const circleId of CIRCLES) {
-        expect(after.addresses[circleId], `circle ${circleId}`).not.toBe(before.addresses[circleId]);
+        expect(after.addresses[circleId], `circle ${circleId}`).toBe(before.addresses[circleId]);
         expect(typeof after.addresses[circleId]).toBe('string');
       }
       // …and DETERMINISTIC for this install: another boot derives the identical addresses.
@@ -187,11 +185,10 @@ describe('B1 — first-run "I have a recovery phrase" restores properly (FIXED 2
       const after = identitySnapshot(await bootAgentBundle({ asyncStorage: newPhone }));
 
       expect(after.pubKey).toBe(before.pubKey);
-      // Since the custody cutover a restore ENROLLS: this install's per-circle addresses are its
-      // OWN (delegation-derived), announced into the roster sets at boot — see the wizard-door
-      // test above for the full reasoning.
+      // A restore ENROLLS a new device — at the person's one address in every circle (the persona's circle root, which the
+      // phrase re-derives); see the wizard-door test above.
       for (const circleId of CIRCLES) {
-        expect(after.addresses[circleId]).not.toBe(before.addresses[circleId]);
+        expect(after.addresses[circleId]).toBe(before.addresses[circleId]);
         expect(typeof after.addresses[circleId]).toBe('string');
       }
     });

@@ -189,5 +189,12 @@ export async function announceCircleAddresses({ agent, circleIds = null, onWarn 
   for (const a of announces) {
     if (a.status === 'fulfilled' && a.value?.announced) out.announced += 1;
   }
+  // THE MIGRATION TO ONE ADDRESS PER PERSONA: once the persona's address is announced, a device holding the root retires
+  // the device-derived addresses a membership from before the switch still lists (its own and its siblings'). A no-op
+  // where there is nothing left to retire, and on a device without the root.
+  if (typeof agent?.retireDeviceCircleAddresses === 'function') {
+    try { out.retired = (await agent.retireDeviceCircleAddresses(ids))?.retired ?? 0; }
+    catch (err) { warn?.('[circle-address] the old device addresses were not retired', err); }
+  }
   return out;
 }

@@ -112,7 +112,6 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
       const all = await callSkill('pinboard', 'listOpenRequests', { type: 'membership-redemption' });
       const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
       const rows = items.filter((it) => it?.source?.groupId === body.circleId);
-      if (rows.length === 0) return;   // nothing to seed — silence, not an empty parcel
       // The MEMBER rows too — the trail alone cannot carry a circle's FOUNDER (a creator never
       // redeems), so the sibling's DERIVED roster rides along as display+authority facts for the
       // receiver's member map (the same back-compat source the founder derivation already reads).
@@ -132,6 +131,10 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
             ...(typeof m.ceremonyCommitment === 'string' && m.ceremonyCommitment ? { ceremonyCommitment: m.ceremonyCommitment } : {}),
           }));
       } catch { memberRows = []; }
+      // nothing to seed — silence, not an empty parcel. A circle with only its FOUNDER has no trail row (a creator never
+      // redeems) but a member row: it is seeded too — a device of the founder holding the same circle address has no
+      // other way to learn the circle's roster (no announce-back crosses between two holders of one address).
+      if (rows.length === 0 && memberRows.length === 0) return;
       const signer = kit.signer ?? signerPromise;
       const identity = (await signer)?.identity ?? (await signer);
       if (!identity?.pubKey) return;

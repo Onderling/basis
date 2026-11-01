@@ -28,7 +28,7 @@ describe('the persona\'s circle root', () => {
     const b = await boot(v);
     expect(rootOf(a, 'default')?.epoch).toBe(0);
     expect(rootOf(b, 'default'), 'the same root').toEqual(rootOf(a, 'default'));
-    expect(addr(b, 'default', 'circle-x'), 'not yet presented: each device its own address').not.toBe(addr(a, 'default', 'circle-x'));
+    expect(addr(b, 'default', 'circle-x'), 'and presented: one address for the persona').toBe(addr(a, 'default', 'circle-x'));
     await a.shutdown?.(); await b.shutdown?.();
   }, 120_000);
 

@@ -79,7 +79,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
     const storage = memStorage();
     expect((await stashEnrollOffer(storage, offer.uri)).ok).toBe(true);
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('box-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('box-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await phone.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(typeof phrase).toBe('string');
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'box' })).ok).toBe(true);

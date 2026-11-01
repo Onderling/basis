@@ -119,7 +119,23 @@ export function rosterBindingVerifier(callSkill) {
  * revoked by statement at all — deny, never the any-attested rule. Spineless roster reads, like the base
  * verifier (no recursion, no breaker).
  */
-export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS, chainFor = null } = {}) {
+export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS, chainFor = null, storedFor = null } = {}) {
+  /** THIS SELF's own retired address, where it stopped: its retirement is on this lane, and its reveal verifies against
+   *  this self's OWN commitment (derived from the persona's authority this device holds) — no roster involved. A
+   *  device that has just re-keyed and reloaded holds no trail row yet, and its own history must still bind. */
+  const ownRetiredCut = (circleId, author, ref) => {
+    if (typeof ownCeremonyCommitmentFor !== 'function' || typeof storedFor !== 'function') return null;
+    let commitment = null;
+    try { commitment = ownCeremonyCommitmentFor(circleId) ?? null; } catch { commitment = null; }
+    if (!commitment) return null;
+    for (const st of storedFor(circleId) ?? []) {
+      const b = st?.body;
+      if (b?.kind !== 'address-revoke' || b.subject !== author || typeof b.payload?.upTo !== 'string' || b.payload?.authorRef !== ref) continue;
+      const facts = ceremonyRevealFacts({ kind: b.kind, payload: b.payload });
+      if (verifyCeremonyReveal(b.payload?.reveal, { circleId, kind: b.kind, subject: author, authorRef: ref, commitment, facts })) return b.payload.upTo;
+    }
+    return null;
+  };
   // Spineless read → no recursion → no breaker (see rosterBindingVerifier above). Two of them: the base binding reads the
   // trail WITH the ceremony retirements folded in (they verify by their root reveal, so folding them reads only the
   // plain trail below — no recursion); the ceremony rule reads the plain trail.
@@ -170,6 +186,11 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
           if (mine?.pubKey && mine.pubKey === author) return true;
         } catch { /* fall through to the roster read */ }
       }
+      // …and an address this self RETIRED (a re-key), for exactly its chain up to where it stopped
+      if (typeof hash === 'string' && typeof chainFor === 'function') {
+        const upTo = ownRetiredCut(circleId, author, ref);
+        if (upTo && inAuthorChainUpTo(chainFor(circleId), author, upTo, hash)) return true;
+      }
       // SPINELESS, for the same reason as the base verifier above — and memoised for a moment: a fold
       // verifies EVERY statement of a circle, and each verification re-read the whole trail. On the
       // phone that was the roster read running ~1.5×/s continuously and the JS thread so busy that
@@ -201,7 +222,10 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
-    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, { circleIdentityFor, ownCeremonyCommitmentFor, chainFor }),
+    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, {
+      circleIdentityFor, ownCeremonyCommitmentFor, chainFor,
+      storedFor: (circleId) => { try { return railRef.current?.storedStatements?.(circleId) ?? []; } catch { return []; } },
+    }),
   });
   railRef.current = rail;
   return rail;

@@ -13,6 +13,7 @@ import {
 } from './support/pairRealAgents.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../src/v2/membershipRail.js';
 import { EventLog } from '../src/eventLog.js';
+import { SPINE_POINT_SUBTYPES } from '../src/v2/primaryDevice.js';
 
 const GROUP = 'spine-from-point';
 const log = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
@@ -345,5 +346,50 @@ describe('spine statements only from the point', () => {
       expect(await until(async () => ((await roleOnAt(B, B.pubKey)) === want ? true : null), { timeout: 20000, step: 200 }), 'Bea never saw the change').toBe(true);
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
     } finally { if (!released) A._routerRef.fn = prior; }
+  }, 90_000);
+
+  it('a device whose claim names a point it cannot place yet signs NOTHING itself: the act waits, and goes to the point once it can be placed', async () => {
+    // the newcomer that learned the claim before the device map: a non-point device signing on the shared key is the fork
+    const carry = A2.agent.spinePoint.handlers[SPINE_POINT_SUBTYPES.carry];
+    const fromPhone = A.agent.ownDeviceAddress('default');
+    const phoneClaim = A.agent.spinePointClaim();
+    await carry(fromPhone, { subtype: SPINE_POINT_SUBTYPES.carry, deviceId: 'd-' + 'f'.repeat(32), at: (phoneClaim?.at ?? Date.now()) + 1 });
+    expect(A2.agent.spinePointClaim()?.deviceId, 'the box did not take the claim').toBe('d-' + 'f'.repeat(32));
+    const signedOnBox = () => ownRoleStatements(A2).length;
+    const before = signedOnBox();
+    const want = (await roleOnAt(A2, B.pubKey)) === 'admin' ? 'member' : 'admin';
+    const r = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: want });
+    expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
+    expect(r?.forwarded, `the box did not hand the act on: ${JSON.stringify(r)}`).toBe(true);
+    await new Promise((res) => setTimeout(res, 1500));
+    expect(signedOnBox(), 'the box signed on the shared key while the point was elsewhere').toBe(before);
+    // the point becomes placeable: the claim names the phone again
+    await carry(fromPhone, { subtype: SPINE_POINT_SUBTYPES.carry, deviceId: phoneClaim.deviceId, at: (phoneClaim?.at ?? Date.now()) + 2 });
+    expect(await until(async () => ((await roleOnAt(B, B.pubKey)) === want ? true : null), { timeout: 20000, step: 200 }), 'the waiting act never reached the point').toBe(true);
+    expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
+  }, 60_000);
+
+  it('a CEREMONY run on a point that has not caught up waits like any other act: its statements chain on the newest head — no fork', async () => {
+    const prior = A2._routerRef.fn;
+    A2._routerRef.fn = (env) => (env?.payload?.subtype === MEMBERSHIP_BROADCAST ? undefined : prior?.(env));
+    try {
+      const want = (await roleOnAt(A, B.pubKey)) === 'admin' ? 'member' : 'admin';
+      expect((await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: want }))?.error ?? null).toBeNull();
+      const s1 = ownRoleStatements(A).find((x) => x.body.payload?.role === want)?.body?.hash;
+      expect(ownRoleStatements(A2).some((x) => x.body.hash === s1), 'the box already held the newest statement').toBe(false);
+      const mine = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === A.agent.circleAddressFor(GROUP));
+      const revokesBefore = mine().filter((x) => x.body.kind === 'address-revoke').length;
+      expect((await A2.agent.claimPrimaryDevice())?.point?.ok).toBe(true);
+      const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+      const r = await A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'd-' + 'c'.repeat(32), circleIds: [GROUP] });
+      expect(r?.ok, JSON.stringify(r)).toBe(true);
+      const tipsOf = (list) => { const named = new Set(list.map((x) => x.body.parentHash).filter(Boolean)); return list.filter((x) => !named.has(x.body.hash)); };
+      expect(await until(() => (mine().filter((x) => x.body.kind === 'address-revoke').length > revokesBefore ? true : null), { timeout: 20000, step: 200 }),
+        'the ceremony\'s statement never signed').toBe(true);
+      expect(mine().some((x) => x.body.hash === s1), 'the box signed without catching up first').toBe(true);
+      expect(tipsOf(mine()).length, 'Anna\'s chain on the box forked').toBe(1);
+      await new Promise((res) => setTimeout(res, 1500));
+      expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
+    } finally { A2._routerRef.fn = prior; }
   }, 90_000);
 });

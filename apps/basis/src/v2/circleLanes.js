@@ -294,6 +294,7 @@ export function buildCircleLanes({
     ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
     // …and a sibling's spine act for the point to sign (spine statements only from the point)
     ...(agent.spineActHandler ? { [agent.spineActSubtype]: agent.spineActHandler } : {}),
+    ...(agent.spineAckHandler ? { [agent.spineAckSubtype]: agent.spineAckHandler } : {}),
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,

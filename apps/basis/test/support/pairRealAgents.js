@@ -432,6 +432,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
     ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
     ...(agent.spineActHandler ? { [agent.spineActSubtype]: agent.spineActHandler } : {}),
+    ...(agent.spineAckHandler ? { [agent.spineAckSubtype]: agent.spineAckHandler } : {}),
     // The roster seed (pod-less enroll S1) — the same registration both shells make.
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,

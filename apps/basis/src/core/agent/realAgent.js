@@ -794,6 +794,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE PRIMARY DEVICE (sync-policy §12, the DM half): read lazily — the choice store is composed further down.
   const primaryDeviceRef = { current: null };
   const spinePointRef = { current: null };
+  const resendSpineOutboxRef = { current: null };
   const sa = await createSecureMeshAgent({
     bus,
     // Other agents' kernel task requests over the relay (a connected screen calling the door's ops): only where the
@@ -2646,6 +2647,65 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE POINT: the device the primary-device claim names — the one that signs this person's spine statements. No claim
   // yet → every device is its own point (a lone device; the existing device claims when a second one arrives).
   const SPINE_ACT_SUBTYPE = 'own-spine-act';
+  // THE OWN-SPINE OUTBOX: at least once until signed. Every act this device hands the point is kept (under an act id of
+  // its own — never in any signed statement) until the point ACKS it, and re-sent on reconnect and when the point moves;
+  // the point dedupes by act id, so a re-send after a lost ack never signs twice.
+  const SPINE_ACK_SUBTYPE = 'own-spine-ack';
+  const SPINE_OUTBOX_KEY = 'spine-outbox';
+  const spineOutbox = new Map();   // actId → { lane, act, at, ackedHash? }
+  let spineOutboxLoaded = false;
+  const loadSpineOutbox = async () => {
+    if (spineOutboxLoaded) return;
+    spineOutboxLoaded = true;
+    try { const raw = await chatVault.get(SPINE_OUTBOX_KEY); for (const [k, v] of Object.entries(raw ? JSON.parse(raw) : {})) spineOutbox.set(k, v); } catch { /* an empty outbox */ }
+  };
+  const saveSpineOutbox = async () => { try { await chatVault.set(SPINE_OUTBOX_KEY, JSON.stringify(Object.fromEntries(spineOutbox))); } catch { /* kept in memory */ } };
+  const sendSpineAct = async (lane, act) => {
+    const to = await pointDeviceAddress();
+    if (!to) return null;
+    await loadSpineOutbox();
+    const actId = `act-${Date.now().toString(36)}-${b64encode(globalThis.crypto.getRandomValues(new Uint8Array(9)))}`;
+    spineOutbox.set(actId, { lane, act, at: Date.now() });
+    await saveSpineOutbox();
+    try {
+      const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane, act, actId }, { guarantee: 'hold-forward' }, 'default');
+      return { forwarded: true, held: sent?.held === true, actId };
+    } catch { return { forwarded: true, held: true, actId }; }   // kept: the next reconnect sends it
+  };
+  /** An act's statement hash is on this device's own membership rail (it arrived by the carry or the fan). */
+  const ownRailHolds = (hash, circleId) => {
+    try { return !!hash && typeof circleId === 'string' && (membershipRail?.storedStatements?.(circleId) ?? []).some((x) => x?.body?.hash === hash); } catch { return false; }
+  };
+  const resendSpineOutbox = async () => {
+    await loadSpineOutbox();
+    if (!spineOutbox.size || isPointDevice()) return { resent: 0 };
+    const to = await pointDeviceAddress();
+    if (!to) return { resent: 0 };
+    let resent = 0;
+    for (const [actId, e] of [...spineOutbox]) {
+      if (e.ackedHash) { if (ownRailHolds(e.ackedHash, e.act?.circleId)) spineOutbox.delete(actId); continue; }   // signed: waits only to be seen
+      try { await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: e.lane, act: e.act, actId }, { guarantee: 'hold-forward' }, 'default'); resent += 1; } catch { /* next time */ }
+    }
+    await saveSpineOutbox();
+    return { resent };
+  };
+  resendSpineOutboxRef.current = () => resendSpineOutbox();
+  const spineAckHandler = async (fromAddr, payload) => {
+    if (payload?.subtype !== SPINE_ACK_SUBTYPE || typeof payload.actId !== 'string') return;
+    if (!(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
+    await loadSpineOutbox();
+    const e = spineOutbox.get(payload.actId);
+    if (!e) return;
+    if (typeof payload.hash === 'string' && payload.hash && !ownRailHolds(payload.hash, e.act?.circleId)) spineOutbox.set(payload.actId, { ...e, ackedHash: payload.hash });
+    else spineOutbox.delete(payload.actId);
+    await saveSpineOutbox();
+  };
+  // the point's seen-set: an act id signed in the last hour is acked again, never signed again
+  const seenSpineActs = new Map();   // actId → { at, hash }
+  const ackSpineAct = async (to, actId, hash = null) => {
+    if (typeof actId !== 'string') return;
+    try { await sendToSibling(to, { subtype: SPINE_ACK_SUBTYPE, actId, ...(hash ? { hash } : {}) }, { guarantee: 'hold-forward' }, 'default'); } catch { /* the forwarder re-sends; the seen-set acks again */ }
+  };
   const myPointId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
   const isPointDevice = () => { const c = spinePoint.current?.(); return !c || c.deviceId === myPointId; };
   const pointDeviceAddress = async () => {
@@ -2657,14 +2717,26 @@ export async function createRealHouseholdAgent(opts = {}) {
    *  the circle's own self, on this device's own head. */
   const spineActHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== SPINE_ACT_SUBTYPE) return;
+    const actId = typeof payload.actId === 'string' ? payload.actId : null;
+    if (actId) {
+      const now = Date.now();
+      for (const [k, v] of seenSpineActs) if (now - v.at > 3600_000) seenSpineActs.delete(k);
+      const seen = seenSpineActs.get(actId);
+      if (seen) { if (isPointDevice()) await ackSpineAct(fromAddr, actId, seen.hash); return; }   // signed already: ack again
+    }
+    const done = async (hash = null) => {
+      if (!actId) return;
+      seenSpineActs.set(actId, { at: Date.now(), hash });
+      await ackSpineAct(fromAddr, actId, hash);
+    };
     if (payload.lane === 'governance') {
       if (!isPointDevice() || !(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
-      try { await governanceActOnPoint(payload.act ?? {}); } catch { /* the act said 'forwarded'; the fold shows what is */ }
+      try { await governanceActOnPoint(payload.act ?? {}); await done(); } catch { /* the act said 'forwarded'; the fold shows what is */ }
       return;
     }
     if (payload.lane === 'key') {
       if (!isPointDevice() || !(await deviceSiblingRowsOf('default')).some((d) => d.address === fromAddr)) return;
-      try { await keyActOnPoint(payload.act ?? {}); } catch { /* the act said 'forwarded'; the roster shows what is */ }
+      try { await keyActOnPoint(payload.act ?? {}); await done(); } catch { /* the act said 'forwarded'; the roster shows what is */ }
       return;
     }
     if (payload.lane !== 'membership') return;
@@ -2678,7 +2750,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const named = [act.actor, act.payload?.by, act.payload?.voter, act.payload?.authorRef].filter((x) => x !== undefined && x !== null);
     if (named.some((x) => x !== me)) return;
     // as the circle's own SELF — never an actor the forwarding device named
-    try { await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: circleSelfRef(act.circleId) }); }
+    try { const res = await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: circleSelfRef(act.circleId) }); await done(res?.statement?.body?.hash ?? null); }
     catch { /* the sibling's act is retried by nothing: it said 'forwarded' — the next act shows the roster as it is */ }
   };
   const localMembershipEmitRef = { current: null };
@@ -2688,10 +2760,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const forwardKeyAct = async (act) => {
     const to = await pointDeviceAddress();
     if (!to) return null;
-    try {
-      const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'key', act }, { guarantee: 'hold-forward' }, 'default');
-      return { forwarded: true, held: sent?.held === true };
-    } catch { return null; }
+    return sendSpineAct('key', act);
   };
   const pointGatedControlAgent = (ctl) => {
     if (!ctl || typeof ctl !== 'object') return ctl;
@@ -2716,10 +2785,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     forward: async (act) => {
       const to = await pointDeviceAddress();
       if (!to) return null;
-      try {
-        const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'governance', act }, { guarantee: 'hold-forward' }, 'default');
-        return { forwarded: true, held: sent?.held === true };
-      } catch { return null; }
+      return sendSpineAct('governance', act);
     },
   };
   /** The point's own governance binding (no gate: it IS the point) — what it runs a sibling's governance act through. */
@@ -2814,6 +2880,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     vaultKey: SPINE_POINT_VAULT_KEY,
     subtypes: SPINE_POINT_SUBTYPES,
+    // the point moved: what is still waiting goes to the new one
+    onChanged: () => { Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {}); },
   });
   spinePointRef.current = spinePoint;
   await primaryDevice.load();
@@ -5354,11 +5422,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       const to = await pointDeviceAddress();
       if (!to) return localMembershipEmit(act);   // the claim names a device this one cannot reach yet: as before
       const { signer: _signer, ...plain } = act;   // eslint-disable-line no-unused-vars
-      try {
-        const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'membership', act: plain }, { guarantee: 'hold-forward' }, 'default');
-        // `held`: the point is not online — the act waits for it (the screen says so)
-        return { forwarded: true, held: sent?.held === true };
-      } catch { return null; }
+      // `held`: the point is not online — the act waits for it (the screen says so)
+      return sendSpineAct('membership', plain);
     };
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
@@ -8848,6 +8913,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       retryPendingRevokes().catch(() => {});
       // every self's device address on its own relay sockets, so the person's other devices can reach this one
       await registerDeviceAddresses().catch((err) => { console.warn(`[device-address] not registered at connect: ${err?.message ?? err}`); });
+      // what this device handed the point and is still waiting on goes again (the point dedupes)
+      Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {});
       return sa.peer;
     },
     /** Tell the person's nodes the revokes they are still owed (the connect and a node's answer do this themselves). */
@@ -9147,6 +9214,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     retireDeviceCircleAddresses,
     ownAddressRetireHandler,
     spineActHandler,
+    spineAckHandler,
+    spineAckSubtype: SPINE_ACK_SUBTYPE,
+    /** Re-send every act still waiting for the point's ack (the shells' connect, a point change). */
+    resendSpineOutbox,
     /** The gate a shell hands its governance binding (`bindCircleGovernance({ spineGate })`). */
     spineGate,
     spineActSubtype: SPINE_ACT_SUBTYPE,

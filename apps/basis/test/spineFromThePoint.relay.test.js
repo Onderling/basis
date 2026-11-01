@@ -218,4 +218,38 @@ describe('spine statements only from the point', () => {
     expect(await until(() => (govOnPhone() > before ? true : null), { timeout: 15000, step: 200 }),
       `the point never signed the forwarded proposal (result: ${JSON.stringify(r)})`).toBe(true);
   }, 60_000);
+
+  it('THE OUTBOX: an act lost on the way is re-sent until the point acks it — and signed once, however often it arrives', async () => {
+    const roleOn = async (node, webid) => (((await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === webid)?.role ?? null);
+    const want = (await roleOn(B, C.pubKey)) === 'admin' ? 'member' : 'admin';
+    // the point loses the first act that reaches it
+    const prior = A._routerRef.fn;
+    let dropped = 0;
+    A._routerRef.fn = (env) => { if (env?.payload?.subtype === A.agent.spineActSubtype && dropped === 0) { dropped += 1; return undefined; } return prior?.(env); };
+    const r = await A2.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: C.pubKey, role: want });
+    expect(r?.error ?? null, JSON.stringify(r)).toBeNull();
+    expect(await until(() => (dropped === 1 ? true : null), { timeout: 10000, step: 100 }), 'the act never reached the point at all').toBe(true);
+    A._routerRef.fn = prior;
+    await new Promise((res) => setTimeout(res, 1000));
+    expect(await roleOn(B, C.pubKey), 'the lost act landed anyway').not.toBe(want);
+    const first = await A2.agent.resendSpineOutbox();
+    expect(first.resent, 'the box had nothing waiting').toBeGreaterThanOrEqual(1);
+    expect(await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 20000, step: 300 }), 'the re-sent act never landed').toBe(true);
+    // the ack cleared it: nothing goes again
+    expect(await until(async () => (((await A2.agent.resendSpineOutbox()).resent === 0) ? true : null), { timeout: 10000, step: 300 }), 'the outbox kept an acked act').toBe(true);
+  }, 90_000);
+
+  it('a re-sent act whose ack was lost is signed once (the point dedupes by act id)', async () => {
+    let pointAppends = 0;
+    const rail = A.agent.membershipRail;
+    const origAppend = rail.append.bind(rail);
+    rail.append = async (...x) => { pointAppends += 1; return origAppend(...x); };
+    const from = A2.agent.ownDeviceAddress('default');
+    const act = { kind: 'role', circleId: GROUP, subject: C.pubKey, payload: { role: 'member' }, actor: A.pubKey };
+    const msg = { subtype: A.agent.spineActSubtype, lane: 'membership', act, actId: 'act-dedupe-test-1' };
+    await A.agent.spineActHandler(from, msg);
+    await A.agent.spineActHandler(from, msg);
+    rail.append = origAppend;
+    expect(pointAppends, 'the point signed one act twice').toBe(1);
+  }, 30_000);
 });

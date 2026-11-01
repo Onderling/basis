@@ -4944,7 +4944,7 @@ async function showMyData(opts) {
   // "Make this device my primary contact address": announce this device's address in every circle with the
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
-    const r = await makeThisDevicePrimary({ agent: _peerAgent }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
+    const r = await makeThisDevicePrimary({ agent: _peerAgent, personas: _selfSet.on }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
     try { const w = makePrimaryResultWords(r); window.alert(t(w.key, w.params)); } catch { /* headless */ }
   };
   const onViewMnemonic = () => showMnemonicReveal();

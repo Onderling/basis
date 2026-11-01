@@ -93,6 +93,10 @@ describe('a person connects a screen to the bot over the relay', () => {
     expect(await answerYes(ann, card.peerAddr, await screenCode(viewPubKey, link.nonce), () => botSaid(ann)), `no question with the code:\n${out.slice(-1500)}`).toBe(true);
     const grant = await until(async () => screen.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
     expect(grant, `no grant reached the screen:\n${out.slice(-1500)}`).toBeTruthy();
+    // the offer that went pending (a question, not yet a grant) is logged as such — it once threw on the missing ops
+    expect(out, 'the box threw on a pending screen offer').not.toMatch(/screen-offer failed/);
+    const walks = (() => { try { return readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dataDir, f), 'utf8').split('\n')).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }); } catch { return []; } })();
+    expect(walks.some((e) => e?.kind === 'screen-offer' && e.ok === true && e.pending === true), 'no walk-log line for the pending offer').toBe(true);
     const accepted = acceptConnectionGrant(grant, { nonce: link.nonce, viewPubKey });
     expect(accepted.ok, JSON.stringify(accepted)).toBe(true);
     expect(accepted.issuer).toBe(link.botAddress);

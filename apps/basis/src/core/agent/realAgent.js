@@ -5639,7 +5639,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       // a circle FOUNDED here: its creation starts a chain nothing came before, so there is nothing to catch up on — it is
       // open from this statement on (found by the box-as-primary walk: a pair circle founded right after the point moved
       // here had its creation held, so the box was not its founder and its invite was refused 'admin-only')
-      if (act?.kind === 'create' && typeof act.circleId === 'string' && !spineOpen(act.circleId)) {
+      // — only the creation of a circle this device founds NOW: its lane holds nothing for that circle yet (a statement
+      // merely claiming kind 'create' on an existing circle is held like any other)
+      const foundsNow = act?.kind === 'create' && typeof act.circleId === 'string'
+        && !(membershipRail?.storedStatements?.(act.circleId) ?? []).length;
+      if (foundsNow && !spineOpen(act.circleId)) {
         spineCaughtUp.add(act.circleId);
         Promise.resolve(saveSpineGate()).catch(() => {});
       }

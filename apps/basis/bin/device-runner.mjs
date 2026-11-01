@@ -64,6 +64,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { makeCarriedTurnLanding } from '../src/v2/contactTurnFan.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
 import { createIdentityLink, createLinkTombstones, linkedCompanionSkill } from '../src/v2/botIdentityLink.js';
@@ -590,7 +591,14 @@ if (relayUrl) {
         console.log(`device-runner: catching up ${count} message(s) in ${String(circleId).slice(0, 12)}… (~${(approxBytes / 1e6).toFixed(1)} MB)`);
         Promise.resolve(allow()).catch(() => {});
       },
-      ownDeviceTurn: (wire) => contactChannel.applyOwnDeviceTurn(wire).catch(() => {}),
+      // a turn carried from a sibling lands as a direct one does: logged, and a person's message answered — here, when
+      // this box is the person's primary (the profile address can land on the phone for a moment; the person is not dropped)
+      ownDeviceTurn: makeCarriedTurnLanding({
+        apply: (wire) => contactChannel.applyOwnDeviceTurn(wire),
+        isPrimary: () => agent.primaryDevice?.isMine?.() === true,
+        feed: (t) => inboxDoor.feed(t),
+        log: walkLog,
+      }),
       // A circle message landed. Nothing to paint — but said in the log, because "did the circle reach
       // this device" is the one question an operator (and the walk) has.
       chatLanded: ({ msgId, circleId, source }) => {

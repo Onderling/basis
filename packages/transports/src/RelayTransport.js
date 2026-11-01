@@ -92,6 +92,8 @@ export class RelayTransport extends Transport {
   #serves = [];
   /** alias address → `primary: true` when it registers as the primary (from `addAddress`). */
   #primaryFlags = new Map();
+  /** address → true once this device stepped DOWN from primary for it: it then registers as a standby (never takes a held address). */
+  #standbyFlags = new Map();
   /** alias address → the caller's `sign(message)` (from `addAddress`). The primary uses `identity`. */
   #signers           = new Map();
   /** Set once this relay has failed the audit — we do not reconnect to it, and say why. */
@@ -186,6 +188,9 @@ export class RelayTransport extends Transport {
         + 'prove possession to the relay');
     }
     this.#signers.set(address, opts.sign);
+    // stepping DOWN (it was this device's primary and is no longer): from here it registers as a standby
+    if (this.#primaryFlags.get(address) === true && opts?.primary !== true) this.#standbyFlags.set(address, true);
+    if (opts?.primary === true) this.#standbyFlags.delete(address);
     this.#primaryFlags.set(address, opts?.primary === true);
     if (!this.connected) return;      // replayed by `_rebindAddresses()` on the next connect
     this.#bound.delete(address);      // a rebind (the flag moved) waits for the relay's fresh ack
@@ -198,6 +203,11 @@ export class RelayTransport extends Transport {
    * reconnect would read it anyway). Aliases keep their own flag (`addAddress(address, { sign, primary })`).
    */
   async setPrimaryDevice(isPrimary) {
+    // stepping DOWN (this socket held the person's address as primary and another device is now chosen): register as a
+    // STANDBY from here on — take the address only if no live socket holds it. A plain registration would take it back
+    // from the new primary in the moment before that one's primary registration is proven (the relay's last-plain rule).
+    if (isPrimary !== true && this.#primaryDevice() === true) this.#standbyFlags.set(this.address, true);
+    if (isPrimary === true) this.#standbyFlags.delete(this.address);
     this.#primaryDevice = () => isPrimary === true;
     if (!this.connected) return { ok: true, pending: true };
     this.#bound.delete(this.address);
@@ -362,7 +372,8 @@ export class RelayTransport extends Transport {
     this.#asked.add(address);
     // `serves` rides only the socket's OWN address — an alias never opts the node into anything
     const serves = address === this.address && this.#serves.length ? { serves: this.#serves } : {};
-    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}), ...serves }));
+    const standby = !primary && this.#standbyFlags.get(address) === true ? { standby: true } : {};
+    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}), ...standby, ...serves }));
   }
 
   /** Sign the relay's nonce for `address` and send the proof. Silent about addresses we never asked for. */

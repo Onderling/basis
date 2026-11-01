@@ -468,8 +468,22 @@ export async function startRelay(opts = {}) {
   const standbyOf = new Map();     // address → Set<socket> registered plainly while a primary held it
   // Decides the ROLE only; the routing-table write (`clients.set`) stays at the one acceptance line in the
   // register-proof branch, where the circle-blind fitness test reads it.
-  const takeAddress = (address, socket, primary) => {
+  // A STANDBY registration (a device stepping down from primary) only ever makes a registration WEAKER: it takes the
+  // address when no live socket holds it, and otherwise stands by behind whoever does — it never displaces a live
+  // holder. Without it, 'last plain registration wins' let a device that had just been told another is the primary
+  // take the address back in the moment before that other's primary registration was proven. The proof is required
+  // for it exactly as for any registration.
+  const takeAddress = (address, socket, primary, standby = false) => {
     const holder = primaryOf.get(address);
+    if (standby && !primary) {
+      if (holder === socket) primaryOf.delete(address);   // stepping down from primary: plain from here
+      const holding = clients.get(address);
+      if (holding && holding !== socket && holding.readyState === 1) {
+        if (!standbyOf.has(address)) standbyOf.set(address, new Set());
+        standbyOf.get(address).add(socket);
+        return 'standby';
+      }
+    }
     if (primary) {
       primaryOf.set(address, socket);
       standbyOf.get(address)?.delete(socket);
@@ -659,6 +673,7 @@ export async function startRelay(opts = {}) {
     let registeredAddress = null;
     const registeredAddresses = new Set();
     const pendingPrimary = new Map();   // address → the `primary` flag its register frame carried, read at proof time
+    const pendingStandby = new Map();   // address → the `standby` flag (a device stepping down), read at proof time
     const pendingServes = new Map();    // address → whether its register frame said it serves links (`serves: ['feed']`), read at proof time
     /**
      * nonce → { address, expiresAt, meterGroupId } — challenges this socket has been issued and
@@ -762,6 +777,7 @@ export async function startRelay(opts = {}) {
       if (msg.type === 'register') {
         const { address, groupProof } = msg;
         pendingPrimary.set(address, msg.primary === true);
+        pendingStandby.set(address, msg.standby === true);
         pendingServes.set(address, Array.isArray(msg.serves) && msg.serves.includes('feed'));
         if (!address) {
           socket.send(JSON.stringify({ type: 'error', message: 'Missing address' }));
@@ -871,8 +887,8 @@ export async function startRelay(opts = {}) {
 
         if (registeredAddress === null) registeredAddress = address;   // first one is the socket's own
         registeredAddresses.add(address);
-        const role = takeAddress(address, socket, pendingPrimary.get(address) === true);
-        if (role === 'standby') logLine(`[relay] standby     ${shortId(address)} (a primary holds it)`);
+        const role = takeAddress(address, socket, pendingPrimary.get(address) === true, pendingStandby.get(address) === true);
+        if (role === 'standby') logLine(`[relay] standby     ${shortId(address)} (another socket holds it)`);
         else clients.set(address, socket);
         // The seat may ask this address only if it said so itself, here, on the socket that just proved its key.
         if (pendingServes.get(address) === true) feedNodes.set(address, socket);

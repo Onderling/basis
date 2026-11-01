@@ -2742,6 +2742,32 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (act.channel === 'governance') await pointGovernance.appendGovernanceEvent(circleId, event);
     else await pointGovernance.appendReportEvent(circleId, event);
   };
+  /** Rotate a circle's group key past the given sealing keys, as its admin, from THIS device's own producer state: the
+   *  next version goes to the survivors (this device included), never to a retired key. Null when there is nothing to
+   *  do (not an admin, no keys yet, or another admin already rotated past them). */
+  const rotateCircleExcluding = async (circleId, gone) => {
+    const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
+    const me = (Array.isArray(roster?.members) ? roster.members : []).find((m) => (m.webid ?? m.addr ?? m.ref) === chatId.pubKey);
+    if (me?.role !== 'admin' || typeof keyEmitRef.current !== 'function') return null;
+    const events = await keyEventsFromRail(keyRail, circleId);
+    const fold = foldKeyEvents(events, { groupId: circleId });
+    if (!fold?.recipients?.length) return null;
+    // ALREADY DONE? Another admin may have rotated this circle between our read and now — minting a second version off
+    // the same parent would only create the honest concurrency the fold has to resolve afterwards.
+    if (!fold.recipients.some((r) => gone.has(r))) return null;
+    const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
+    const recipients = fold.recipients.filter((r) => !gone.has(r));
+    if (!recipients.includes(mine)) recipients.push(mine);
+    const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
+    const statement = await keyEmitRef.current(circleId, event);
+    if (!statement) return null;
+    await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
+    await callSkill('pinboard', 'broadcastCircleKeyStatement', {
+      groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
+    }).catch(() => {});
+    return { circleId, version: event.version };
+  };
+  const keyEmitRef = { current: null };
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
   const keyActOnPoint = async (act) => {
     const ctl = opts.pinboardControlAgent;
@@ -2757,6 +2783,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       } else {
         await ctl.removeMember({ webId: act.webId, groupId: act.circleId, ...(act.policy ? { policy: act.policy } : {}), ...(act.force ? { force: true } : {}) });
       }
+      return;
+    }
+    if (act.op === 'rotate') {
+      // past OLD addresses of this person's only — each on this point's own row for them, none the persona's current one
+      const exclude = Array.isArray(act.exclude) ? act.exclude.filter((x) => typeof x === 'string') : [];
+      const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
+      const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
+      const ok = exclude.filter((a) => a !== circleAddressFor(act.circleId) && listed.has(a));
+      if (!ok.length) return;
+      await rotateCircleExcluding(act.circleId, new Set(ok.map((a) => sealingPublicKeyFromNetworkKey(a))));
       return;
     }
     if (act.op === 'ban') {
@@ -3766,30 +3802,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       const retiredSealingFor = (circleId) => new Set(retired.map(({ seed }) => sealingPublicKeyFromNetworkKey(deriveCircleAddress(seed, circleId))));
       for (const circleId of circles) {
         try {
-          const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
-          const me = (Array.isArray(roster?.members) ? roster.members : []).find((m) => (m.webid ?? m.addr ?? m.ref) === chatId.pubKey);
-          if (me?.role !== 'admin' || typeof keyEmit !== 'function') continue;
-          const events = await keyEventsFromRail(keyRail, circleId);
-          const fold = foldKeyEvents(events, { groupId: circleId });
-          if (!fold?.recipients?.length) continue;
-          const gone = retiredSealingFor(circleId);
-          // ALREADY DONE? Another admin may have rotated this circle between our read and now. If the current
-          // fold no longer names any retired address, the work exists and minting a second version off the same
-          // parent would only create the honest concurrency the fold has to resolve afterwards. This decides
-          // nothing — two admins who genuinely race still both land, and `collapseKeyEvents` keeps both keys —
-          // it just makes the race rare instead of routine.
-          if (!fold.recipients.some((r) => gone.has(r))) continue;
-          const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
-          const recipients = fold.recipients.filter((r) => !gone.has(r));
-          if (!recipients.includes(mine)) recipients.push(mine);
-          const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
-          const statement = await keyEmit(circleId, event);
-          if (!statement) continue;
-          await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
-          await callSkill('pinboard', 'broadcastCircleKeyStatement', {
-            groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
-          }).catch(() => {});
-          rotated.push({ circleId, version: event.version });
+          // the rotation is a key-lane statement on the shared circle key: only the point writes it — handed the ADDRESSES
+          // to drop (public, on the person's own row), never a key
+          if (!isPointDevice()) {
+            const f = await forwardKeyAct({ op: 'rotate', circleId, exclude: retired.map(({ seed }) => deriveCircleAddress(seed, circleId)) });
+            if (f) rotated.push({ circleId, forwarded: true });
+            continue;
+          }
+          const done = await rotateCircleExcluding(circleId, retiredSealingFor(circleId));
+          if (done) rotated.push(done);
         } catch { /* rotation is best-effort per circle — the retirement statements are the enforcement */ }
       }
       // 3. retire: the root-revealed address-revoke, per circle, per retired root
@@ -5480,6 +5501,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (statement) siblingCarry.carry({ subtype: KEY_STATEMENT_BROADCAST, circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now() }).catch(() => {});
     return statement;
   } : null;
+  keyEmitRef.current = keyEmit;
   // THE RULES-UPDATE RIDER: `editGroupRules` also fans the new doc + version as a signed statement
   // on the governance lane (this rail instance shares the device log with the shells' receive-side
   // rail — same lane, same declaration, the multi-instance shape governance already has). Without

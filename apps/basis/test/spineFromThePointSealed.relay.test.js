@@ -12,6 +12,7 @@ import {
 } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
+import { EventLog } from '../src/eventLog.js';
 
 const CIRCLE = 'point-sealed-circle';
 const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, removeItem: (k) => { m.delete(k); } }; };
@@ -45,7 +46,7 @@ describe('the key lane from the point, sealed', () => {
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'box' })).ok).toBe(true);
     await teardown(pre);
-    A2 = await bootRealAgentNode('A2', { agentOpts: vaults });
+    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });   // as a shell composes it
     await connectNodesOverRelay([A2], { relayUrl: relay.url });
     await bindCircleAddresses([A2], CIRCLE);
     const consumed = await consumeEnrollOffer({
@@ -78,4 +79,38 @@ describe('the key lane from the point, sealed', () => {
     const opened = await until(() => { try { return readSealed(A2, env, CIRCLE) === 'na het verwijderen' ? true : null; } catch { return null; } }, { timeout: 15000, step: 200 });
     expect(opened, 'the box cannot read what its own person sealed').toBe(true);
   }, 240_000);
+
+  it('a revoke CEREMONY on the box (not the point) in a sealed circle: the point bans + rotates — the revoked device reads nothing new', async () => {
+    const { Bootstrap, deriveDeviceSeed, deriveCircleAddress, ownCircleAddressAnnouncementFromSeed } = await import('@onderling/core');
+    const { sealingPublicKeyFromNetworkKey } = await import('@onderling/pod-client');
+    const { keyEventsFromRail } = await import('../src/v2/keyRail.js');
+    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    // a lost device of Anna's, from before the switch: its own address on her row, and its key a recipient
+    const lostId = 'd-' + 'a'.repeat(32);
+    const lostSeed = deriveDeviceSeed(Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), lostId);
+    const lostAddr = deriveCircleAddress(lostSeed, CIRCLE);
+    const ann = ownCircleAddressAnnouncementFromSeed({ derivationSeed: lostSeed, circleId: CIRCLE, memberWebid: A.pubKey });
+    await A.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: CIRCLE, ...ann });
+    await A.circleControlAgentRouter.grantRecipient({ groupId: CIRCLE, publicKey: sealingPublicKeyFromNetworkKey(lostAddr) });
+    const lostKey = sealingPublicKeyFromNetworkKey(lostAddr);
+    const { foldKeyEvents } = await import('@onderling/pod-client');
+    // the CURRENT recipients, as the key fold reads the phone's key lane (a grant adds to a version; a rotation moves on)
+    const latestRecipients = async () => foldKeyEvents(await keyEventsFromRail(A.agent.keyRail, CIRCLE), { groupId: CIRCLE })?.recipients ?? [];
+    expect(await until(async () => ((await latestRecipients()).includes(lostKey) ? true : null), { timeout: 15000, step: 200 }), 'the lost key was never a recipient').toBe(true);
+
+    let boxKeyAppends = 0;
+    const keyRail = A2.agent.keyRail;
+    const origAppend = keyRail.append.bind(keyRail);
+    keyRail.append = async (...x) => { boxKeyAppends += 1; return origAppend(...x); };
+    const r = await A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: lostId, circleIds: [CIRCLE] });
+    expect(r?.ok, JSON.stringify(r)).toBe(true);
+    expect(await until(async () => ((await latestRecipients()).includes(lostKey) ? null : true), { timeout: 20000, step: 200 }),
+      'the point never rotated past the revoked device\'s key').toBe(true);
+    keyRail.append = origAppend;
+    expect(boxKeyAppends, 'the box wrote on the key lane itself').toBe(0);
+    // what comes next is sealed to the survivors — the box (the person) among them
+    const env = await postSealed({ admin: A, members: [A2], groupId: CIRCLE, text: 'na de intrekking' });
+    const opened = await until(() => { try { return readSealed(A2, env, CIRCLE) === 'na de intrekking' ? true : null; } catch { return null; } }, { timeout: 15000, step: 200 });
+    expect(opened, 'the box cannot read after its own ceremony').toBe(true);
+  }, 120_000);
 });

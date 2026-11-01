@@ -2946,6 +2946,19 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   const keyEmitRef = { current: null };
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
+  const rotatesAwaitingRoot = [];   // rotations past this point's own address, until it takes the next root
+  /** Rotate a circle's key past addresses of this person's that are gone, as the point: through the circle's key PRODUCER
+   *  when this device holds one (its own current address granted first, then each old one banned — the rotation goes to
+   *  the members and this address), otherwise on the key lane from this device's own state. */
+  const rotatePastOwnOld = async (circleId, oldAddresses) => {
+    const ctl = opts.pinboardControlAgent;
+    const viaProducer = await ctl?.grantRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(circleId)) }).catch(() => null);
+    if (viaProducer) {
+      for (const a of oldAddresses) await ctl.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(a), policy: 'ban' }).catch(() => null);
+      return { circleId, producer: true };
+    }
+    return rotateCircleExcluding(circleId, new Set(oldAddresses.map((a) => sealingPublicKeyFromNetworkKey(a))));
+  };
   const keyActOnPoint = async (act) => {
     const ctl = opts.pinboardControlAgent;
     if (!ctl || typeof act?.circleId !== 'string') return;
@@ -2970,11 +2983,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (act.op === 'rotate') {
       // past OLD addresses of this person's only — each on this point's own row for them, none the persona's current one
       const exclude = Array.isArray(act.exclude) ? act.exclude.filter((x) => typeof x === 'string') : [];
+      // past the address this point PRESENTS: a re-key elsewhere, whose next root has not reached this point yet — it
+      // waits for the hand-over (parked here, and not acked, so the forwarder keeps it too)
+      if (exclude.includes(circleAddressFor(act.circleId))) {
+        rotatesAwaitingRoot.push(act);
+        throw new Error('waits-for-the-next-circle-root');
+      }
       const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
       const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
       const ok = exclude.filter((a) => a !== circleAddressFor(act.circleId) && listed.has(a));
       if (!ok.length) return;
-      await rotateCircleExcluding(act.circleId, new Set(ok.map((a) => sealingPublicKeyFromNetworkKey(a))));
+      await rotatePastOwnOld(act.circleId, ok);
       return;
     }
     if (act.op === 'ban') {
@@ -4109,11 +4128,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       // 4. tombstone the registry records
       const known = await tombstoneDevices({ root, deviceIds: retired.map((r) => r.deviceId).filter(Boolean) });
+      // 5. RE-KEY — every other device is gone (the point among them: this device claims it), full ones included, and those held the persona's circle root: the persona
+      //    moves to the next epoch (the tombstones above are written first, so the hand-over reaches no retired device)
+      const rekey = personas.get(primaryId)?.circleRoot ? await rekeyPrimaryPersona({ root, circleIds: circles, claimPoint: true }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
       return [DataPart({
         ok: true, outcome: 'ok',
         retiredDevices: retired.map((r) => r.deviceId).filter(Boolean),
         firstDeviceRetired: retired.some((r) => r.deviceId === firstId),
         retiredIn: retiredAddresses, circles: retiredAddresses.length, historyKeys, rotated, known,
+        ...(rekey ? { rekey } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'replace-failed' })]; }
   }, { visibility: 'private' });   // retires every other device of this person: owner-only, phrase-proven
@@ -4128,7 +4151,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE HAND-OVER of the next circle root to the person's SURVIVING full devices: sent only to the device addresses live
   // on the device map at that moment (the revoked device's tombstone is written before the re-key starts, so it is not
   // among them), over the own-devices lane, held for a device that is away. Each carries, per circle, the root's own
-  // reveal for the new address there — a survivor takes the root only when its own roster's commitment verifies one.
+  // reveal for the new address there — a survivor takes the root only when one verifies against its own self's commitment.
   const CIRCLE_ROOT_SUBTYPE = 'own-circle-root';
   const handOverCircleRoot = async ({ root, profileId, epoch, seed, circleIds }) => {
     const proofs = [];
@@ -4153,7 +4176,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     return { handed, to: live.length };
   };
   /** A SURVIVOR takes the next circle root: from a live device of this self, an epoch above its own, and only when the
-   *  root's reveal for the new address verifies against the commitment its own roster holds for this self. */
+   *  root's reveal for the new address verifies against this self's ceremony commitment (derived here from the persona's
+   *  authority — only the phrase can sign a reveal that verifies). */
   const circleRootHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== CIRCLE_ROOT_SUBTYPE) return;
     const pid = typeof payload.profileId === 'string' ? payload.profileId : null;
@@ -4169,11 +4193,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const pr of Array.isArray(payload.proofs) ? payload.proofs : []) {
       if (typeof pr?.circleId !== 'string' || (circlePersonas.get(pr.circleId) ?? primaryId) !== pid) continue;
       const me = circleSelfRef(pr.circleId);
-      let row = null;
-      try { row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: pr.circleId }))?.members ?? []).find((m) => (m.webid ?? m.addr ?? m.ref) === me) ?? null; } catch { row = null; }
-      if (row?.ceremonyCommitment && verifyCeremonyReveal(pr.reveal, {
+      // the commitment this device derives for its own self (the persona's authority, which it holds) — not a roster row,
+      // which may not carry one for this device's own self
+      const commitment = ceremonyCommitmentFor(pr.circleId);
+      if (commitment && verifyCeremonyReveal(pr.reveal, {
         circleId: pr.circleId, kind: CIRCLE_ROOT_SUBTYPE, subject: deriveCircleAddress(seed, pr.circleId), authorRef: me,
-        commitment: row.ceremonyCommitment, facts: String(payload.epoch),
+        commitment, facts: String(payload.epoch),
       })) { vouched = true; moved.push(pr.circleId); }
     }
     if (!vouched) { console.warn(`[circle-root] a next root from ${String(fromAddr).slice(0, 8)}… was not vouched for by any circle here — kept the current one`); return; }
@@ -4186,19 +4211,40 @@ export async function createRealHouseholdAgent(opts = {}) {
       });
     } catch { /* the next boot installs them */ }
     await Promise.all([...circleRootMovedListeners].map(async (fn) => { try { await fn({ epoch: payload.epoch, circleIds: moved }); } catch { /* best-effort */ } }));
+    // the rotations that waited for this root run now (the point presents the new address, so the old one is past)
+    for (const act of rotatesAwaitingRoot.splice(0)) { try { await keyActOnPoint(act); } catch { /* the forwarder re-sends */ } }
     console.info(`[circle-root] took the next circle root (epoch ${payload.epoch}) for ${moved.length} circle(s)`);
   };
-  const rekeyPrimaryPersona = async ({ root, circleIds, revokedDeviceId }) => {
+  const CIRCLE_ROOT_EPOCH_BOUND = 16;
+  /** The highest circle-root epoch this self's rows show in these circles (live or retired), or -1. */
+  const highestEpochOnRows = async (profileSeed, circles) => {
+    let hi = -1;
+    for (const c of circles) {
+      let row = null;
+      try { row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: c }))?.members ?? []).find((m) => (m.webid ?? m.addr ?? m.ref) === circleSelfRef(c)) ?? null; } catch { row = null; }
+      const seen = new Set([row?.circleAddress, ...(row?.circleAddresses ?? []), ...(row?.retiredAddresses ?? []).map((r) => r?.address)].filter(Boolean));
+      if (!seen.size) continue;
+      for (let e = CIRCLE_ROOT_EPOCH_BOUND; e > hi; e -= 1) {
+        if (seen.has(deriveCircleAddress(deriveCircleRoot(profileSeed, e), c))) { hi = e; break; }
+      }
+    }
+    return hi;
+  };
+  const rekeyPrimaryPersona = async ({ root, circleIds, revokedDeviceId = null, claimPoint = false }) => {
     const rt = personas.get(primaryId);
     if (!rt?.circleRoot || typeof rt.switchCircleRoot !== 'function') return { ok: false, reason: 'no-circle-root' };
-    // THE POINT MOVES HERE FIRST — the device with the phrase in hand does the re-key, and a revoked point must sign
-    // nothing of it (a new point catches up before it signs, as any)
-    if (!isPointDevice()) {
+    // A REVOKED POINT signs nothing of the re-key: the point moves here first (and catches up before it signs, as any).
+    // Otherwise the point stays where it is — it holds the circle's key producer — and is handed the next root below.
+    if (claimPoint || (revokedDeviceId && spinePoint.current?.()?.deviceId === revokedDeviceId)) {
       try { await spinePoint.claim(); } catch { /* the acts below still wait for a reachable point */ }
     }
-    const epoch = rt.circleRoot.epoch + 1;
-    const seed = deriveCircleRoot(root.deriveAgentSeed(primaryId), epoch);
+    const profileSeed = root.deriveAgentSeed(primaryId);
     const circles = [...new Set(circleIds)].filter((c) => typeof c === 'string' && c && (circlePersonas.get(c) ?? primaryId) === primaryId);
+    // ABOVE EVERY EPOCH EVER USED, not only above this device's own: a restored or long-away device may hold an older one,
+    // and moving to an epoch a lost device already holds would re-key to a root it has. The phrase is in hand, so each
+    // circle's row (live and retired addresses) is matched against the epochs up to the bound.
+    const epoch = Math.max(rt.circleRoot.epoch, await highestEpochOnRows(profileSeed, circles)) + 1;
+    const seed = deriveCircleRoot(profileSeed, epoch);
     const before = Object.fromEntries(circles.map((c) => [c, circleAddressFor(c)]));
     // 1. INTRODUCE the next address while the old one still binds — the same announcement a new device's needs
     const introduced = [];
@@ -4229,6 +4275,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     //    Signed by the old one, a member whose membership lane folds the retirement before its key lane verifies the
     //    rotation refuses the rotation as coming from a retired address (found by the re-key walk). The per-circle
     //    signing identities are re-installed here; the shells register the new addresses on the relays.
+    //    What the old address could open is kept first (the history sidecar), so the person still reads the past.
+    for (const c of introduced) {
+      try {
+        const events = await keyEventsFromRail(keyRail, c);
+        if (!events.length) continue;
+        const opener = (await circleIdentityFor(c)).sharedCopyOpener(deviceSharedCopyOpener);
+        await absorbHistoryKeys(c, readKeyChain(events, { groupId: c, opener }));
+      } catch { /* a circle with no chain here — nothing to keep */ }
+    }
     await rt.switchCircleRoot({ epoch, seed });
     try {
       installCircleSigningIdentities({
@@ -4238,29 +4293,27 @@ export async function createRealHouseholdAgent(opts = {}) {
       });
     } catch (err) { console.warn(`[ceremony] the new per-circle identities were not installed: ${err?.message ?? err}`); }
     await Promise.all([...circleRootMovedListeners].map(async (fn) => { try { await fn({ epoch, circleIds: introduced }); } catch { /* a shell's re-registration is best-effort */ } }));
-    // 3. GRANT the new address's sealing key on the current version (a no-op when the announcement already did), then
-    //    BAN the old: the rotation past it goes to the members and the new address, never to the old
-    const granted = [];
-    const banned = [];
+    // 3. ROTATE past the old address, signed by the new one: the next version goes to the members and the address this
+    //    device presents now (the new one), never to the old. On the key lane, as the point rotates for any act — a
+    //    circle this point has not caught up in waits; on a device that is not the point, the point holds the next
+    //    root first (handed over now), takes the new address as its own, and is asked to rotate.
+    const rotated = [];
+    let handOver = null;
+    if (introduced.some((c) => !signsHere(c))) handOver = await handOverCircleRoot({ root, profileId: primaryId, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
     for (const c of introduced) {
+      const exclude = [before[c]];
       try {
-        if (!spineOpen(c)) {
-          await queueOwnSpineAct('key', { op: 'grant-self', circleId: c });
-          await queueOwnSpineAct('key', { op: 'ban', circleId: c, address: before[c] });
-          granted.push({ circleId: c, waiting: true });
-          continue;
-        }
-        const g = await opts.pinboardControlAgent?.grantRecipient?.({ groupId: c, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(c)) });
-        granted.push({ circleId: c, granted: g?.granted === true });
-        await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: c, publicKey: sealingPublicKeyFromNetworkKey(before[c]), policy: 'ban' });
-        banned.push(c);
-      } catch (err) { console.warn(`[ceremony] the key did not move past the old address in ${c}: ${err?.message ?? err}`); }
+        if (!signsHere(c)) { if (await forwardKeyAct({ op: 'rotate', circleId: c, exclude })) rotated.push({ circleId: c, forwarded: true }); continue; }
+        if (!spineOpen(c)) { await queueOwnSpineAct('key', { op: 'rotate', circleId: c, exclude }); rotated.push({ circleId: c, waiting: true }); continue; }
+        const done = await rotatePastOwnOld(c, exclude);
+        if (done) rotated.push(done);
+      } catch (err) { console.warn(`[ceremony] the key did not rotate past the old address in ${c}: ${err?.message ?? err}`); }
     }
     // 4. RETIRE the old address (root-revealed — the reveal is the authority, whichever key signs)
     const retired = await retireAddresses({ root, circleIds: introduced, addressFor: (c) => before[c] ?? null });
     // 5. HAND the next root to the surviving full devices (the revoked one's tombstone is already written)
-    const handOver = await handOverCircleRoot({ root, profileId: primaryId, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
-    return { ok: true, epoch, introduced: introduced.length, granted, banned: banned.length, retired: retired.length, handOver };
+    if (!handOver) handOver = await handOverCircleRoot({ root, profileId: primaryId, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
+    return { ok: true, epoch, introduced: introduced.length, rotated, retired: retired.length, handOver };
   };
 
   hostAgent.register('revokeDevice', async ({ parts }) => {

@@ -48,7 +48,15 @@ describe('spine statements only from the point', () => {
       const prior = node._routerRef.fn;
       node._routerRef.fn = (env) => (env?.payload?.subtype === MEMBERSHIP_BROADCAST ? on(env.from, env.payload) : prior?.(env));
     }
+    // what reaches Bea, and what her rail says to it — a failure names whether a statement never arrived or was refused
+    const beaIngest = B.agent.membershipRail.ingest.bind(B.agent.membershipRail);
+    B.agent.membershipRail.ingest = async (cid, st) => {
+      const res = await beaIngest(cid, st);
+      beaHeard.push(`${String(st?.body?.hash ?? '').slice(0, 8)}:${res?.ok ? (res.existed ? 'dup' : 'ok') : `refused(${res?.reason ?? '?'})`}`);
+      return res;
+    };
   }, 240_000);
+  const beaHeard = [];   // filled by the ingest recorder in beforeAll
   afterAll(async () => { await teardown(A, B, C, A2); await relay?.close?.(); });
 
   it('the phone and the box change two roles at once: Bea sees both, and Anna is NOT disputed (no fork on the shared key)', async () => {
@@ -315,7 +323,7 @@ describe('spine statements only from the point', () => {
         const held = B.agent.membershipRail.storedStatements(GROUP) ?? [];
         const mineThere = held.filter((x) => x?.body?.author === s2.body.author).map((x) => `${x.body.hash.slice(0, 8)}<-${String(x.body.parentHash ?? '').slice(0, 8)}`);
         let disputed = null; try { disputed = [...((await B.agent.membershipRail.readVerified?.(GROUP))?.disputed ?? [])].map((r) => String(r).slice(0, 8)); } catch (e) { disputed = `err ${e.message}`; }
-        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
+        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), beaHeardLast: beaHeard.slice(-8), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
       };
       expect(beaSaw, `Bea never saw the box's change — ${beaSaw ? '' : await why()}`).toBe(true);
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);

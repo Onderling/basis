@@ -82,6 +82,21 @@ export async function loadCircles({ fetchTasksCircles, fetchGroups, fetchCircles
 }
 
 /**
+ * The circles list with each circle this device LEFT, but whose leave the main device has not signed yet, marked
+ * `leaving: { held }` — the tile says so instead of looking untouched. `leaving` (id → { held }) is pruned in place of
+ * every circle no longer in the list: its signed leave landed.
+ *
+ * @param {Array<object>} circles
+ * @param {Map<string, {held: boolean}>} leaving
+ * @returns {Array<object>}
+ */
+export function withLeavingMarks(circles, leaving) {
+  if (!(leaving instanceof Map) || leaving.size === 0) return circles;
+  for (const id of [...leaving.keys()]) if (!circles.some((c) => c?.id === id)) leaving.delete(id);
+  return circles.map((c) => (leaving.has(c?.id) ? { ...c, leaving: leaving.get(c.id) } : c));
+}
+
+/**
  * The circles an admin removed this person from, as tiles (`{id, name, removed: true}`): never merged into
  * `loadCircles`' list, whose every reader acts on a circle the person is in.
  */

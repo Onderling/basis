@@ -76,7 +76,7 @@ export { QR_URI_PREFIXES, isQrUri }   from './core/qrSchemes.js';
 export { normalizeQuickReplies }      from './core/quickReplies.js';
 // v2 circle model — re-exported here so basis-mobile can import via
 // '@onderling-app/basis' (Metro can't resolve src/v2 subpaths directly).
-export { normalizeCircle, mergeCircles, loadCircles, loadRemovedCircles } from './v2/circleModel.js';
+export { normalizeCircle, mergeCircles, loadCircles, loadRemovedCircles, withLeavingMarks } from './v2/circleModel.js';
 export { circleSourcesFromAgent, makeResolvingCallSkill, DEFAULT_CIRCLE_ORIGINS } from './v2/circleSources.js';
 export { loadCircleItems, normalizeContentItem }      from './v2/circleContent.js';
 export { quickCreateCircle }                          from './v2/circleCreate.js';

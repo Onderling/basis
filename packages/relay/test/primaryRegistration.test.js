@@ -112,4 +112,26 @@ describe('the primary registration', () => {
     expect(received(box)).toEqual([1]);
     box.close();
   });
+
+  it('a STANDBY registration (a device stepping down) never takes an address a live socket holds — only an address nobody holds', async () => {
+    // the race it closes: the box holds the address (plainly; its primary registration is still being proven) and the
+    // phone, told the box is now the main device, re-registers — 'last plain registration wins' handed it the address
+    const box = await openClient(url); send(box, { type: 'register', address: ANNA });
+    await waitFor(() => box.messages.some((m) => m.type === 'registered'));
+    const phone = await openClient(url); send(phone, { type: 'register', address: ANNA, standby: true });
+    await waitFor(() => phone.messages.some((m) => m.type === 'registered'));
+    await dm(1);
+    expect(received(box), 'the stepping-down device took the address from the one holding it').toEqual([1]);
+    expect(received(phone)).toEqual([]);
+    // …and it stands by: when the holder goes, it takes over live
+    box.close(); await settle();
+    await dm(2);
+    expect(received(phone), 'the standby did not take over').toEqual([2]);
+    // with nobody holding the address, a standby registration takes it
+    const other = await openClient(url); send(other, { type: 'register', address: addr('nobody-holds'), standby: true });
+    await waitFor(() => other.messages.some((m) => m.type === 'registered'));
+    send(bea, { type: 'send', to: addr('nobody-holds'), envelope: { subtype: 'dm', n: 3 } }); await settle();
+    expect(received(other), 'an address nobody holds was not taken by a standby registration').toEqual([3]);
+    phone.close(); other.close();
+  });
 });

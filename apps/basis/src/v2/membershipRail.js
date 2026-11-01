@@ -36,12 +36,33 @@ export const SPINELESS_MEMO_MS = 300;
  * anything that arrives after — including a backdated statement, whose writer-stamped time is never
  * consulted — is refused. A retirement whose position is unknown retires everything (deny-favouring).
  */
-export function addressBindsOnRow(row, author, atSeq = null) {
+export function addressBindsOnRow(row, author, atSeq = null, { hash = null, chainOf = null } = {}) {
   if (!row || typeof author !== 'string' || !author) return false;
   if (row.circleAddress === author) return true;
   if (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author)) return true;
-  if (!Array.isArray(row.retiredAddresses) || !Number.isFinite(atSeq)) return false;
-  return row.retiredAddresses.some((r) => r?.address === author && Number.isFinite(r.atSeq) && atSeq < r.atSeq);
+  if (!Array.isArray(row.retiredAddresses)) return false;
+  return row.retiredAddresses.some((r) => {
+    if (r?.address !== author) return false;
+    // WHERE IT STOPPED, when the retirement says so (a re-key): the address binds exactly the statements of its own
+    // author chain up to and including `upTo` — the same on every device, in any arrival order; nothing after it.
+    // Local arrival order cannot be that cut (a fresh device may hear the retirement first), nor causal depth (the
+    // signer picks its own parents). Read where the chain is at hand (`chainOf`); elsewhere, no binding.
+    if (typeof r.upTo === 'string' && r.upTo) return typeof chainOf === 'function' && typeof hash === 'string' && inAuthorChainUpTo(chainOf, author, r.upTo, hash);
+    return Number.isFinite(atSeq) && Number.isFinite(r.atSeq) && atSeq < r.atSeq;
+  });
+}
+
+/** Is `hash` the statement `upTo` or one of its ancestors along `author`'s own parent chain? `chainOf(hash)` → the body. */
+export function inAuthorChainUpTo(chainOf, author, upTo, hash) {
+  if (hash === upTo) return true;
+  let at = upTo;
+  for (let steps = 0; steps < 100000 && at; steps++) {
+    const b = chainOf(at);
+    if (!b || b.author !== author) return false;   // a gap, or the chain leaves the author: not provably before the cut
+    at = b.parentHash ?? null;
+    if (at === hash) return true;
+  }
+  return false;
 }
 
 export function rosterBindingVerifier(callSkill) {
@@ -98,18 +119,21 @@ export function rosterBindingVerifier(callSkill) {
  * revoked by statement at all — deny, never the any-attested rule. Spineless roster reads, like the base
  * verifier (no recursion, no breaker).
  */
-export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS } = {}) {
-  // Spineless read → no recursion → no breaker (see rosterBindingVerifier above).
-  const memo = new Map();   // circleId → { at, promise }
-  const spinelessRoster = (circleId) => {
-    const hit = memo.get(circleId);
+export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS, chainFor = null } = {}) {
+  // Spineless read → no recursion → no breaker (see rosterBindingVerifier above). Two of them: the base binding reads the
+  // trail WITH the ceremony retirements folded in (they verify by their root reveal, so folding them reads only the
+  // plain trail below — no recursion); the ceremony rule reads the plain trail.
+  const memo = new Map();   // `${mode}|${circleId}` → { at, promise }
+  const spinelessRoster = (circleId, { retirements = true } = {}) => {
+    const key = `${retirements ? 'r' : 't'}|${circleId}`;
+    const hit = memo.get(key);
     if (hit && Date.now() - hit.at < memoMs) return hit.promise;
-    const promise = callSkill('pinboard', 'listGroupMembers', { groupId: circleId, spineless: true });
-    memo.set(circleId, { at: Date.now(), promise });
-    promise.catch(() => memo.delete(circleId));
+    const promise = callSkill('pinboard', 'listGroupMembers', { groupId: circleId, spineless: true, ...(retirements ? {} : { withRetirements: false }) });
+    memo.set(key, { at: Date.now(), promise });
+    promise.catch(() => memo.delete(key));
     return promise;
   };
-  return async ({ author, ref, circleId, kind, payload, subject, own = false, atSeq = null }) => {
+  return async ({ author, ref, circleId, kind, payload, subject, own = false, atSeq = null, hash = null }) => {
     try {
       // THE CEREMONY RULE, first and without a self-binding shortcut: even my own device's revoke must
       // carry the root's reveal, or my local fold would accept what every other member refuses.
@@ -126,7 +150,7 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
           try { commitment = ownCeremonyCommitmentFor(circleId) ?? null; } catch { commitment = null; }
         }
         if (!commitment) {
-          const r = await spinelessRoster(circleId);
+          const r = await spinelessRoster(circleId, { retirements: false });   // the plain trail: the retirements fold through here
           const row = (Array.isArray(r?.members) ? r.members : []).find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
           if (!row) return false;
           commitment = row.ceremonyCommitment ?? null;
@@ -155,9 +179,9 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;
-      // a RETIRED address still binds a statement that landed before its retirement — a re-key retires the address the
-      // person's whole earlier history was signed with (the circle's creation, the joins it admitted)
-      return addressBindsOnRow(row, author, atSeq);
+      // a RETIRED address still binds what it signed before it stopped — a re-key retires the address the person's whole
+      // earlier history was signed with (the circle's creation, the joins it admitted)
+      return addressBindsOnRow(row, author, atSeq, { hash, chainOf: typeof chainFor === 'function' ? chainFor(circleId) : null });
     } catch { return false; }
   };
 }
@@ -165,13 +189,22 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
 export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null, ownCeremonyCommitmentFor = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function') return null;
-  return makeCircleEntryRail({
+  const railRef = { current: null };
+  // the lane's own statements by hash, for the retired-address cut (a chain walk reads them, it verifies nothing)
+  const chainFor = (circleId) => {
+    const byHash = new Map();
+    try { for (const x of railRef.current?.storedStatements?.(circleId) ?? []) if (x?.body?.hash) byHash.set(x.body.hash, x.body); } catch { /* none */ }
+    return (h) => byHash.get(h) ?? null;
+  };
+  const rail = makeCircleEntryRail({
     eventLog,
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
-    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, { circleIdentityFor, ownCeremonyCommitmentFor }),
+    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, { circleIdentityFor, ownCeremonyCommitmentFor, chainFor }),
   });
+  railRef.current = rail;
+  return rail;
 }
 
 /**

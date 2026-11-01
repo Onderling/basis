@@ -31,7 +31,7 @@ import {
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId,
   signDeviceRevocation, verifyDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, deriveCircleRoot, ceremonyCommitment, verifyCeremonyReveal, b64decode, authorityPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
+  deriveCircleSeed, deriveCircleRoot, ceremonyCommitment, verifyCeremonyReveal, ceremonyRevealFacts, b64decode, authorityPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
@@ -3997,7 +3997,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!onRow.has(old) || !onRow.has(personas.get(pid).circleAddressFor(circleId))) return;
     await retireAddresses({ root: ownerRoot, circleIds: [circleId], addressFor: () => old }).catch(() => []);
   };
-  const retireAddresses = async ({ root, addressFor, circleIds, includeOwn = false }) => {
+  const retireAddresses = async ({ root, addressFor, circleIds, includeOwn = false, upToFor = null }) => {
     const revokedIn = [];
     for (const circleId of circleIds) {
       if (typeof membershipEmit !== 'function') break;
@@ -4007,10 +4007,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!address || (!includeOwn && address === circleAddressFor(circleId))) continue;
       // as the circle's own self: its persona's authority reveals, its persona's ref says it (the default's, by default)
       const me = circleSelfRef(circleId);
-      const reveal = signCeremonyReveal(root.deriveProfileAuthority(profileIdOf(circleId)), { circleId, kind: 'address-revoke', subject: address, authorRef: me });
+      // WHERE THE ADDRESS STOPPED (a re-key of the persona's own address): the hash of its last statement in its author
+      // chain, covered by the reveal — it then binds exactly that chain up to it, in any arrival order, and nothing after
+      const upTo = typeof upToFor === 'function' ? (upToFor(circleId) ?? null) : null;
+      const payloadFacts = upTo ? { upTo } : {};
+      const reveal = signCeremonyReveal(root.deriveProfileAuthority(profileIdOf(circleId)), {
+        circleId, kind: 'address-revoke', subject: address, authorRef: me, facts: ceremonyRevealFacts({ kind: 'address-revoke', payload: payloadFacts }),
+      });
       const stmt = await membershipEmit({
         kind: 'address-revoke', circleId, subject: address,
-        payload: { by: me, reveal }, actor: me,
+        payload: { by: me, reveal, ...payloadFacts }, actor: me,
       }).catch(() => null);
       if (stmt) revokedIn.push({ circleId, address });
       try {
@@ -4215,6 +4221,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const act of rotatesAwaitingRoot.splice(0)) { try { await keyActOnPoint(act); } catch { /* the forwarder re-sends */ } }
     console.info(`[circle-root] took the next circle root (epoch ${payload.epoch}) for ${moved.length} circle(s)`);
   };
+  /** The last statement an address signed on this device's membership lane (its author chain's tip), or null. */
+  const authorChainTip = (circleId, address) => {
+    try {
+      const mine = (membershipRail?.storedStatements?.(circleId) ?? []).map((x) => x?.body).filter((b) => b?.author === address && typeof b.hash === 'string');
+      if (!mine.length) return null;
+      const named = new Set(mine.map((b) => b.parentHash).filter(Boolean));
+      const tips = mine.filter((b) => !named.has(b.hash));
+      return tips.length === 1 ? tips[0].hash : null;   // a forked chain has no single place it stopped
+    } catch { return null; }
+  };
   const CIRCLE_ROOT_EPOCH_BOUND = 16;
   /** The highest circle-root epoch this self's rows show in these circles (live or retired), or -1. */
   const highestEpochOnRows = async (profileSeed, circles) => {
@@ -4310,7 +4326,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch (err) { console.warn(`[ceremony] the key did not rotate past the old address in ${c}: ${err?.message ?? err}`); }
     }
     // 4. RETIRE the old address (root-revealed — the reveal is the authority, whichever key signs)
-    const retired = await retireAddresses({ root, circleIds: introduced, addressFor: (c) => before[c] ?? null });
+    const retired = await retireAddresses({ root, circleIds: introduced, addressFor: (c) => before[c] ?? null, upToFor: (c) => authorChainTip(c, before[c]) });
     // 5. HAND the next root to the surviving full devices (the revoked one's tombstone is already written)
     if (!handOver) handOver = await handOverCircleRoot({ root, profileId: primaryId, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
     return { ok: true, epoch, introduced: introduced.length, rotated, retired: retired.length, handOver };
@@ -5857,6 +5873,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       return sendSpineAct('membership', plain);
     };
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
+    // the ceremony retirements alone — what the spineless roster folds (they bind by the root's reveal, no recursion)
+    membershipRead.ceremony = (circleId) => membershipRail.readVerifiedBodies(circleId, { kinds: ['address-revoke'] });
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
     // between here and the fold has to learn a new name.

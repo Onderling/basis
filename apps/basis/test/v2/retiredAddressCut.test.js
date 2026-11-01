@@ -47,8 +47,9 @@ describe('a retired address binds exactly its own chain up to where it stopped',
     expect(addressBindsOnRow(retired, OLD, 0, { hash: create.hash, chainOf: chainOf(personKey, join, create) })).toBe(true);
   });
 
-  it('without the chain at hand, a cut address binds nothing; a retirement without a cut keeps the position rule', () => {
-    expect(addressBindsOnRow(retired, OLD, 0, { hash: create.hash })).toBe(false);
+  it('without the chain at hand (a content lane), a cut address falls back to the position rule, as does a retirement without a cut', () => {
+    expect(addressBindsOnRow(retired, OLD, 0, { hash: create.hash }), 'landed before the retirement (atSeq 99)').toBe(true);
+    expect(addressBindsOnRow(retired, OLD, 120, { hash: create.hash }), 'landed after it').toBe(false);
     const positional = { circleAddress: NEW, retiredAddresses: [{ address: OLD, atSeq: 10 }] };
     expect(addressBindsOnRow(positional, OLD, 5)).toBe(true);
     expect(addressBindsOnRow(positional, OLD, 15)).toBe(false);
@@ -58,5 +59,19 @@ describe('a retired address binds exactly its own chain up to where it stopped',
     const other = { hash: 'h-other', author: 'addr-someone', parentHash: 'h-create' };
     const pkViaOther = { hash: 'h-pk2', author: OLD, parentHash: 'h-other' };
     expect(inAuthorChainUpTo(chainOf(create, other, pkViaOther), OLD, 'h-pk2', 'h-create'), 'the chain left the author').toBe(false);
+  });
+});
+
+describe('on the CONTENT lanes a re-keyed address keeps its history by position', () => {
+  // `upTo` names the membership lane's tip — it is in no chat or items author chain. A content lane therefore keeps the
+  // position rule for it (what landed here before the retirement still binds), or a re-key would erase everything the
+  // person ever posted from every co-member's view on the next re-read.
+  it('a chat line / item signed with the old address that landed before the retirement still binds on a co-member; one after does not', async () => {
+    const { rosterBindingVerifier } = await import('../../src/v2/membershipRail.js');
+    const row = { webid: 'w:anna', circleAddress: NEW, circleAddresses: [NEW], retiredAddresses: [{ address: OLD, atSeq: 40, upTo: 'h-pk' }] };
+    const verify = rosterBindingVerifier(async () => ({ members: [row] }));
+    expect(await verify({ author: OLD, ref: 'w:anna', circleId: 'c', atSeq: 12 }), 'the person\'s earlier post vanished').toBe(true);
+    expect(await verify({ author: OLD, ref: 'w:anna', circleId: 'c', atSeq: 41 }), 'a post with the old key after the retirement bound').toBe(false);
+    expect(await verify({ author: NEW, ref: 'w:anna', circleId: 'c', atSeq: 99 })).toBe(true);
   });
 });

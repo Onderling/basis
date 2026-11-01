@@ -43,11 +43,14 @@ export function addressBindsOnRow(row, author, atSeq = null, { hash = null, chai
   if (!Array.isArray(row.retiredAddresses)) return false;
   return row.retiredAddresses.some((r) => {
     if (r?.address !== author) return false;
-    // WHERE IT STOPPED, when the retirement says so (a re-key): the address binds exactly the statements of its own
-    // author chain up to and including `upTo` — the same on every device, in any arrival order; nothing after it.
-    // Local arrival order cannot be that cut (a fresh device may hear the retirement first), nor causal depth (the
-    // signer picks its own parents). Read where the chain is at hand (`chainOf`); elsewhere, no binding.
-    if (typeof r.upTo === 'string' && r.upTo) return typeof chainOf === 'function' && typeof hash === 'string' && inAuthorChainUpTo(chainOf, author, r.upTo, hash);
+    // WHERE IT STOPPED, when the retirement says so (a re-key): on the MEMBERSHIP lane, where `upTo` lives and the chain
+    // is at hand (`chainOf`), the address binds exactly the statements of its own author chain up to and including
+    // `upTo` — the same on every device, in any arrival order; nothing after it. Local arrival order cannot be that cut
+    // there (a fresh device may hear the retirement first), nor causal depth (the signer picks its own parents).
+    if (typeof r.upTo === 'string' && r.upTo && typeof chainOf === 'function') return typeof hash === 'string' && inAuthorChainUpTo(chainOf, author, r.upTo, hash);
+    // a CONTENT lane (chat, items, grants, keys) has no `upTo` in its own chains: the POSITION rule — what landed here
+    // before the retirement did still binds. Weaker than the spine's cut (a forged line backdated into the window before
+    // the retirement reached this device binds); a per-lane cut is the later fix. Erasing the person's history is worse.
     return Number.isFinite(atSeq) && Number.isFinite(r.atSeq) && atSeq < r.atSeq;
   });
 }

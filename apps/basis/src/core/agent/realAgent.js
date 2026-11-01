@@ -264,7 +264,7 @@ import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSON
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
-import { stashEnrollOffer, pendingEnrollOffer, offerWithPersonaCircles, sealOfferDevices, offeredDevicesFor, parseEnrollOffer } from '../../v2/enrollOffer.js';
+import { stashEnrollOffer, pendingEnrollOffer, offerWithPersonaCircles, sealOfferDevices, offeredDevicesFor, parseEnrollOffer, openOfferEpochs } from '../../v2/enrollOffer.js';
 import { parsePairUri } from '../qrSchemes.js';   // the pairing code's one reader (the declared pairCirclePeer op)
 import { bindCircleAddressKeysFor } from '../../v2/householdRosterPairing.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
@@ -3798,7 +3798,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!recoverySealSeed) return [DataPart({ ok: false, error: 'no-recovery-seal' })];
       const ownRecords = {};
       for (const [pid, rt] of personas) if (rt?.enrolledDevice?.record?.pubKey) ownRecords[pid] = rt.enrolledDevice.record;
-      const devicesSealed = sealOfferDevices(recoverySealSeed, ownRecords);
+      const epochs = {};
+      for (const [pid, rt] of personas) if (Number.isInteger(rt?.circleRoot?.epoch)) epochs[pid] = rt.circleRoot.epoch;
+      const devicesSealed = sealOfferDevices(recoverySealSeed, ownRecords, epochs);
       const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles, personasSealed, devicesSealed });
       return [DataPart({ ok: true, uri, circles: circles.length })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'offer-failed' })]; }
@@ -3842,9 +3844,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       let throwawayCircleIds = [];
       try { throwawayCircleIds = circleIdsFrom(await rawPinboard('listMyCircles', {})); }
       catch { /* a registry that cannot be read leaves the named stores to the list's own constants */ }
+      // each persona's CURRENT circle-root epoch, from the offer's sealed part (after a re-key it is not 0)
+      let epochs = {};
+      try { const pendingOffer = opts.enrollOfferStorage ? await pendingEnrollOffer(opts.enrollOfferStorage) : null; epochs = pendingOffer ? openOfferEpochs(pendingOffer, mnemonic) : {}; } catch { epochs = {}; }
       const r = await restoreOwnerRoot({
         mnemonic, rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault,
-        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds, personas: pickedPersonas, withDefault,
+        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds, personas: pickedPersonas, withDefault, epochs,
       });
       if (!r.ok) {
         if (r.code === 'no-persona') return [DataPart({ ok: false, outcome: 'no-persona', error: 'no-persona' })];

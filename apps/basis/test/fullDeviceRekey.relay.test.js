@@ -147,8 +147,8 @@ describe('a re-key run on a device that was not the point', () => {
 
 describe('the surviving full devices take the next root', () => {
   const C3 = 'rekey-survivor';
-  let relay; let A; let B; let A2; let A3; let phrase; let oldAddr;
-  afterAll(async () => { await teardown(A, B, A2, A3); try { await relay?.close?.(); } catch { /* */ } });
+  let relay; let A; let B; let A2; let A3; let A4; let phrase; let oldAddr;
+  afterAll(async () => { await teardown(A, B, A2, A3, A4); try { await relay?.close?.(); } catch { /* */ } });
 
   it('the phone revokes the laptop: the box (a survivor) moves to the new address and reads what comes next; the laptop does not', async () => {
     ({ relay, A, B, A2, phrase, oldAddr } = await setup(C3));
@@ -167,5 +167,8 @@ describe('the surviving full devices take the next root', () => {
     expect(boxReads, 'the surviving box cannot read after the re-key').toBe(true);
     let laptopRead = null; try { laptopRead = readSealed(A3, env, C3); } catch { laptopRead = null; }
     expect(laptopRead, 'the revoked laptop read what came after').not.toBe('voor wie overblijft');
-  }, 300_000);
+    // a device added AFTER the re-key is handed the current epoch (from the offer's sealed part), not epoch 0
+    A4 = await enrolFull({ A, label: 'A4', relay, circle: C3, phrase });
+    expect(A4.agent.circleAddressFor(C3), 'a device added after the re-key presents the retired address').toBe(newAddr);
+  }, 400_000);
 });

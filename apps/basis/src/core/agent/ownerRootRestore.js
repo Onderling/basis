@@ -108,7 +108,7 @@ export function newDeviceId({ crypto: c = globalThis.crypto } = {}) {
  *                                    (root in the key door) so legacy callers keep working.
  * @returns {Promise<{ok: true, pubKey: string, deviceId?: string, custody?: string} | {ok: false, code: string, detail?: string}>}
  */
-export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault, throwawayCircleIds = [], personas = [], withDefault = true } = {}) {
+export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault, throwawayCircleIds = [], personas = [], withDefault = true, epochs = {} } = {}) {
   if (typeof mnemonic !== 'string' || !mnemonic.trim()) return { ok: false, code: 'empty' };
   if (!rootKeyStore || !chatVault) return { ok: false, code: 'no-vault' };
 
@@ -149,12 +149,12 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //      names them), only when this device holds it: a device without it has nothing of it, not even an empty slot.
     let identity = null;
     const label = typeof enrollDevice?.label === 'string' && enrollDevice.label ? enrollDevice.label : null;
-    if (withDefault) ({ identity } = await handGeneralPersona({ root, chatVault, atRestKey, deviceId, delegationSeed, internalId, label }));
+    if (withDefault) ({ identity } = await handGeneralPersona({ root, chatVault, atRestKey, deviceId, delegationSeed, internalId, label, epoch: epochs?.default ?? 0 }));
     // 3b. THE PICKED PERSONAS (the picker): each is handed here, the one moment the root is in hand — its chat identity,
     //     its person key, and its own delegation (its wire id of this device, its device seed, the record signed by its
     //     own authority) — into its own slots. A delegated device can never derive a persona later; what it is not
     //     handed now, it does not run. The list it holds is a device entry, read at its boots.
-    const held = await handPersonasInto({ root, chatVault, atRestKey, internalId, label, personas: picked });
+    const held = await handPersonasInto({ root, chatVault, atRestKey, internalId, label, personas: picked, epochs });
     // without the general persona the primary is the first picked — the one this device now speaks as
     if (!withDefault) identity = { pubKey: (await AgentIdentity.restore(personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), primaryId)))?.pubKey ?? null };
     if (!withDefault && !held.includes(primaryId)) return { ok: false, code: 'storage', detail: 'the primary persona was not handed' };
@@ -200,7 +200,7 @@ async function handCircleRoot(slots, profileSeed, epoch = 0) {
   await slots.set(CIRCLE_ROOT_VAULT_KEY, JSON.stringify({ epoch, seed: seedToString(deriveCircleRoot(profileSeed, epoch)) }));
 }
 
-async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delegationSeed, internalId, label = null }) {
+async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delegationSeed, internalId, label = null, epoch = 0 }) {
   // the general persona's slots (its chat seed, person key and delegation blob), as personaVault names them
   const sealedChat = personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), DEFAULT_PROFILE);
   const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
@@ -227,7 +227,7 @@ async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delega
   });
   if (blob.label) blob.record = { ...blob.record, label: blob.label };
   await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
-  await handCircleRoot(sealedChat, root.deriveAgentSeed(DEFAULT_PROFILE));
+  await handCircleRoot(sealedChat, root.deriveAgentSeed(DEFAULT_PROFILE), epoch);
   return { identity };
 }
 
@@ -251,7 +251,7 @@ async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delega
  */
 export function personaWireAt(profileSeed, internalId, gen = 0) { return wireDeviceId(profileSeed, gen ? `${internalId}/${gen}` : internalId); }
 
-export async function handPersonasInto({ root, chatVault, atRestKey, internalId, label = null, personas = [], isTombstoned = async () => false } = {}) {
+export async function handPersonasInto({ root, chatVault, atRestKey, internalId, label = null, personas = [], isTombstoned = async () => false, epochs = {} } = {}) {
   const sealed = new VaultEncrypted({ backing: chatVault, key: atRestKey });
   const defaultSlots = personaVault(sealed, DEFAULT_PROFILE);
   let held = [];
@@ -270,7 +270,7 @@ export async function handPersonasInto({ root, chatVault, atRestKey, internalId,
     let pRecord = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
     if (label) pRecord = { ...pRecord, label };
     await pVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: _b64url(pDeviceSeed), deviceId: pWire, internalId, record: pRecord, ...(label ? { label } : {}) }));
-    await handCircleRoot(pVault, pSeed);
+    await handCircleRoot(pVault, pSeed, Number.isInteger(epochs?.[pid]) ? epochs[pid] : 0);
     held.push(pid);
   }
   await defaultSlots.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify(held));

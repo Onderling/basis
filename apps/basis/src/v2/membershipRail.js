@@ -109,7 +109,7 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
     promise.catch(() => memo.delete(circleId));
     return promise;
   };
-  return async ({ author, ref, circleId, kind, payload, subject, own = false }) => {
+  return async ({ author, ref, circleId, kind, payload, subject, own = false, atSeq = null }) => {
     try {
       // THE CEREMONY RULE, first and without a self-binding shortcut: even my own device's revoke must
       // carry the root's reveal, or my local fold would accept what every other member refuses.
@@ -155,8 +155,9 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;
-      return row.circleAddress === author
-        || (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author));
+      // a RETIRED address still binds a statement that landed before its retirement — a re-key retires the address the
+      // person's whole earlier history was signed with (the circle's creation, the joins it admitted)
+      return addressBindsOnRow(row, author, atSeq);
     } catch { return false; }
   };
 }

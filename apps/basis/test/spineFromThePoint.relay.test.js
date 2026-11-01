@@ -377,16 +377,19 @@ describe('spine statements only from the point', () => {
       expect((await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: want }))?.error ?? null).toBeNull();
       const s1 = ownRoleStatements(A).find((x) => x.body.payload?.role === want)?.body?.hash;
       expect(ownRoleStatements(A2).some((x) => x.body.hash === s1), 'the box already held the newest statement').toBe(false);
-      const mine = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === A.agent.circleAddressFor(GROUP));
-      const revokesBefore = mine().filter((x) => x.body.kind === 'address-revoke').length;
+      // Anna's chain as it is NOW (the ceremony re-keys her to a new address; this one is the chain that must not fork)
+      const oldAuthor = A.agent.circleAddressFor(GROUP);
+      const mine = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []).filter((x) => x?.body?.author === oldAuthor);
+      const all = () => (A2.agent.membershipRail.storedStatements(GROUP) ?? []);
+      const revokesBefore = all().filter((x) => x.body.kind === 'address-revoke').length;
       expect((await A2.agent.claimPrimaryDevice())?.point?.ok).toBe(true);
       const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
       const r = await A2.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'd-' + 'c'.repeat(32), circleIds: [GROUP] });
       expect(r?.ok, JSON.stringify(r)).toBe(true);
       const tipsOf = (list) => { const named = new Set(list.map((x) => x.body.parentHash).filter(Boolean)); return list.filter((x) => !named.has(x.body.hash)); };
-      expect(await until(() => (mine().filter((x) => x.body.kind === 'address-revoke').length > revokesBefore ? true : null), { timeout: 20000, step: 200 }),
+      expect(await until(() => (all().filter((x) => x.body.kind === 'address-revoke').length > revokesBefore ? true : null), { timeout: 20000, step: 200 }),
         'the ceremony\'s statement never signed').toBe(true);
-      expect(mine().some((x) => x.body.hash === s1), 'the box signed without catching up first').toBe(true);
+      expect(all().some((x) => x.body.hash === s1), 'the box signed without catching up first').toBe(true);
       expect(tipsOf(mine()).length, 'Anna\'s chain on the box forked').toBe(1);
       await new Promise((res) => setTimeout(res, 1500));
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);

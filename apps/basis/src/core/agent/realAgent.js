@@ -4372,12 +4372,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       // without it leaves those undone and says so (its personas' parts, below, still run as each persona).
       const holdsGeneral = personas.has('default');
       let generalRowTombstoned = false;   // the general persona's row was read here and tombstoned (any device can)
+      let alreadyRevoked = false;         // a ceremony for this device ran before: its re-key is done, not redone
       try {
         const cur = await bounded(agentsRegistryRef?.lookup?.('default'));
         if (cur) {
           generalRowTombstoned = true;
           const rec = deviceDelegationOf(cur, deviceId);
           known = !!rec;
+          alreadyRevoked = rec?.revoked === true;
           let props = cur.properties ?? {};
           if (!rec) {
             const minted = signDeviceDelegation(root.deriveProfileAuthority('default'), {
@@ -4454,7 +4456,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch (err) { console.warn(`[ceremony] the person key did not rotate: ${err?.message ?? err}`); }
       const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
       // …and the persona's own address, which a FULL device held through the circle root: the re-key
-      const rekey = holdsGeneral ? await rekeyPrimaryPersona({ root, circleIds: [...circleIds], revokedDeviceId: deviceId }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
+      const rekey = holdsGeneral && !alreadyRevoked ? await rekeyPrimaryPersona({ root, circleIds: [...circleIds], revokedDeviceId: deviceId }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
       // EVERY PERSONA THE DEVICE HELD loses it too. Each persona knows the device by its own wire id (its seed over the
       // device's internal id — unlinkable by design); the internal id is on the person's private device map (a
       // `device-link` row in the own-devices scope, each device writes its own), so the ceremony — root in hand — derives

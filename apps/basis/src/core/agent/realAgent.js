@@ -9768,11 +9768,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     pairRouteFor: (contactWebid) => pairRouteFor({ callSkill: (a, o, g) => callSkill(a, o, g), selfWebid: chatId.pubKey, contactWebid }),
     /** "Make this my main device": where direct messages land AND the point that signs the spine — the point only on a
      *  device that holds the persona's circle root (one without it signs with its own key and cannot be the point). */
-    claimPrimaryDevice: async ({ persona = primaryId } = {}) => {
+    claimPrimaryDevice: async ({ personas: under = null } = {}) => {
       const primary = await primaryDevice.claim();
-      // the point of the persona the tap is made under (the person's main device for that persona's circles)
-      const point = personas.get(persona)?.circleRoot ? await spinePoint.claim(persona) : { ok: false, reason: 'no-circle-root' };
-      return { ...primary, point };
+      // the point of each persona the tap is made under (the selves the person has on) — the primary persona when none
+      // is named; a persona without its circle root here cannot be the point
+      const pids = (Array.isArray(under) && under.length ? under : [primaryId]).filter((pid) => personas.has(pid));
+      const points = {};
+      for (const pid of pids) points[pid] = personas.get(pid)?.circleRoot ? await spinePoint.claim(pid) : { ok: false, reason: 'no-circle-root' };
+      const point = points[pids[0]] ?? { ok: false, reason: 'no-circle-root' };
+      return { ...primary, point, points };
     },
     spinePoint,
     /** The point claim (`{deviceId, at}`) or null — the device that signs this person's spine statements. */

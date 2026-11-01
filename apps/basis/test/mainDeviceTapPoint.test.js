@@ -39,3 +39,14 @@ describe('the main-device tap and the point', () => {
     await a.shutdown?.(); await box.shutdown?.();
   }, 120_000);
 });
+
+describe('the main-device tap is made under the selves the person has on', () => {
+  it('hands those personas to the claim (the point of each); none named → the agent\'s primary persona', async () => {
+    const { makeThisDevicePrimary } = await import('../src/v2/circleAddressAnnounce.js');
+    const asked = [];
+    const agent = { callSkill: async () => ({ circles: [] }), claimPrimaryDevice: async (a) => { asked.push(a ?? null); return { ok: true }; } };
+    await makeThisDevicePrimary({ agent, personas: ['p-aaaaaaaaaaaa', 'p-bbbbbbbbbbbb'], logger: { info() {}, warn() {} } });
+    await makeThisDevicePrimary({ agent, logger: { info() {}, warn() {} } });
+    expect(asked).toEqual([{ personas: ['p-aaaaaaaaaaaa', 'p-bbbbbbbbbbbb'] }, null]);
+  });
+});

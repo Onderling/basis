@@ -234,7 +234,8 @@ describe('spine statements only from the point', () => {
     expect(await roleOn(B, C.pubKey), 'the lost act landed anyway').not.toBe(want);
     const first = await A2.agent.resendSpineOutbox();
     expect(first.resent, 'the box had nothing waiting').toBeGreaterThanOrEqual(1);
-    expect(await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 20000, step: 300 }), 'the re-sent act never landed').toBe(true);
+    const landedR = await until(async () => ((await roleOn(B, C.pubKey)) === want ? true : null), { timeout: 20000, step: 300 });
+    expect(landedR, `the re-sent act never landed — the point shows ${await roleOn(A, C.pubKey)}, Bea ${await roleOn(B, C.pubKey)}, wanted ${want}`).toBe(true);
     // the ack cleared it: nothing goes again
     expect(await until(async () => (((await A2.agent.resendSpineOutbox()).resent === 0) ? true : null), { timeout: 10000, step: 300 }), 'the outbox kept an acked act').toBe(true);
   }, 90_000);

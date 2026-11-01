@@ -43,7 +43,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subscribeToNetworkChange as subscribeAppState, combineSources } from '@onderling/react-native';
 import { createPersonClock } from '../../../../basis/src/v2/personClock.js';
 import {
-  loadCircles, loadRemovedCircles, circleSourcesFromAgent, makeResolvingCallSkill,
+  loadCircles, loadRemovedCircles, withLeavingMarks, circleSourcesFromAgent, makeResolvingCallSkill,
   loadCircleItems, quickCreateCircle, setActiveCircle, normalizeCircleMembers,
   circleFilesFromListFiles,
   // 1:1-bot chat gate — the assistant-header strip shows ONLY in a genuine 1:1-with-a-bot chat.
@@ -574,6 +574,8 @@ export default function CircleLauncherScreen({
   // the boot timeline's last steps: the launcher mounted, and the first time it had circles read from the agent
   useEffect(() => { bootMark('launcher.mount', { bundle: !!bundle }); }, []);
   const circlesMarked = useRef(false);
+  // circles left here whose leave the main device has not signed yet (id → { held }): the tile says so (web parity)
+  const leavingCircles = useRef(new Map());
   // The persona the Me tab's pointers open (the general one — there is no circle context here).
   const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -964,7 +966,8 @@ export default function CircleLauncherScreen({
   const selvesOn = useMemo(() => (heldSelves.length ? activeSelves(screensBook ?? {}, heldSelves) : ['default']), [screensBook, heldSelves]);
   const profileIdOfCircle = useCallback((cid) => { try { return bundle?.agent?.profileIdOf?.(cid) ?? 'default'; } catch { return 'default'; } }, [bundle]);
   /** The circles of the selves ticked in the header (all of them with one self). */
-  const circlesShown = useMemo(() => (heldSelves.length > 1 ? circlesInSet(circles, selvesOn, profileIdOfCircle) : circles), [circles, heldSelves, selvesOn, profileIdOfCircle]);
+  // a circle being left is marked at render time (web parity), so a load that started before the mark cannot drop it
+  const circlesShown = useMemo(() => withLeavingMarks(heldSelves.length > 1 ? circlesInSet(circles, selvesOn, profileIdOfCircle) : circles, leavingCircles.current), [circles, heldSelves, selvesOn, profileIdOfCircle]);
   // with one self the avatar is the person's editor; with several it is the switcher
   const openMyEditor = useCallback(() => {
     if (heldSelves.length > 1) { setSwitcherOpen(true); return; }
@@ -1740,7 +1743,7 @@ export default function CircleLauncherScreen({
             // address de-registration at all, which web has had since J-R4.
             if (typeof bundle?.callSkill === 'function') {
               try {
-                await leaveCircleLocally({
+                const left = await leaveCircleLocally({
                   agent: bundle.agent, callSkill: bundle.callSkill,
                   circleId: cid,
                   unregister: () => unregisterCircleAddressesOnRelays({
@@ -1748,6 +1751,7 @@ export default function CircleLauncherScreen({
                     circleAddressFor: (id) => bundle.agent?.circleAddressFor?.(id) ?? null,
                   }),
                 });
+                if (left?.forwarded) leavingCircles.current.set(cid, { held: left.held === true });
               } catch (err) {
                 console.warn('[circleLauncher] leaveGroup failed:', err?.message ?? err);
               }
@@ -3041,6 +3045,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const subtitle = c.removed
     ? t('circle.membership.removed_note')
+    : c.leaving
+      ? t(c.leaving.held ? 'circle.membership.leaving_note_held' : 'circle.membership.leaving_note')
     : (preview && preview.subtitle)
       ? preview.subtitle
       : (c.memberCount != null ? t('circle.members', { count: c.memberCount }) : null);

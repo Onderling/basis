@@ -100,12 +100,16 @@ export function rosterBindingVerifier(callSkill) {
  */
 export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, ownCeremonyCommitmentFor = null, memoMs = SPINELESS_MEMO_MS } = {}) {
   // Spineless read → no recursion → no breaker (see rosterBindingVerifier above).
-  const memo = new Map();   // circleId → { at, promise }
-  const spinelessRoster = (circleId) => {
+  const memo = new Map();   // circleId → { at, promise, fresh } — fresh: a re-read after a miss
+  const held = (circleId) => {
     const hit = memo.get(circleId);
-    if (hit && Date.now() - hit.at < memoMs) return hit.promise;
+    return hit && Date.now() - hit.at < memoMs ? hit : null;
+  };
+  const spinelessRoster = (circleId, { fresh = false } = {}) => {
+    const hit = fresh ? null : held(circleId);
+    if (hit) return hit.promise;
     const promise = callSkill('pinboard', 'listGroupMembers', { groupId: circleId, spineless: true });
-    memo.set(circleId, { at: Date.now(), promise });
+    memo.set(circleId, { at: Date.now(), promise, fresh });
     promise.catch(() => memo.delete(circleId));
     return promise;
   };
@@ -151,12 +155,24 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
       // phone that was the roster read running ~1.5×/s continuously and the JS thread so busy that
       // taps were dropped (2026-08-30). One read per burst is the same answer at a fraction of the cost;
       // the window is short enough that a row landing mid-burst is seen by the next one.
-      const r = await spinelessRoster(circleId);
-      const row = (Array.isArray(r?.members) ? r.members : [])
-        .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
-      if (!row) return false;
-      return row.circleAddress === author
-        || (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author));
+      //
+      // A MISS IS READ AGAIN, FRESH, ONCE. The window cuts both ways: a statement that arrives right
+      // after its author's address row landed (a second device's first act) was refused against the
+      // read from just before, though the binding was already true here. A hit stays cheap; only a miss
+      // pays one more read, and only when the answer came from a read held over from before (a read this
+      // check started is already fresh) that was not itself such a re-read — so a burst of statements
+      // that truly do not bind costs one extra read per window, not one each.
+      const before = held(circleId);
+      const reread = !!before && !before.fresh;
+      const binds = (r) => {
+        const row = (Array.isArray(r?.members) ? r.members : [])
+          .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
+        return !!row && (row.circleAddress === author
+          || (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author)));
+      };
+      if (binds(await spinelessRoster(circleId))) return true;
+      if (!reread) return false;
+      return binds(await spinelessRoster(circleId, { fresh: true }));
     } catch { return false; }
   };
 }

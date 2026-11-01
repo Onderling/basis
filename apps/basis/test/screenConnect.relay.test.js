@@ -40,6 +40,10 @@ const botSaid = async (node) => (await node.contactThreadChannel.rehydrateAll())
 
 describe('a person connects a screen to the bot over the relay', () => {
   let relay; let dataDir; let child; let out = ''; let ann; let screen;
+  // every walk-log line of the runner (it writes walk-log-*.jsonl in its data dir) whose kind names the screen, the
+  // grant, the point or the spine outbox — what a failed grant prints, so a red in CI names where the grant stopped
+  const walkWhy = () => { try { return readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dataDir, f), 'utf8').split('\n')).filter((l) => /screen|grant|point|spine|primary|unrouted|token-refused/.test(l)).slice(-25).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
+  const heard = (node) => JSON.stringify((node?.received ?? []).map((m) => m.payload?.subtype ?? m.payload?.type ?? '?').slice(-15));
   const walkTail = () => { try { const dir = path.join(dataDir, 'walks'); return readdirSync(dir).map((f) => readFileSync(path.join(dir, f), 'utf8')).join('').split('\n').filter((l) => /screen|unrouted/.test(l)).slice(-10).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
 
   beforeAll(async () => {
@@ -92,7 +96,7 @@ describe('a person connects a screen to the bot over the relay', () => {
     // nothing is granted until Ann says yes, privately, to the code the screen shows
     expect(await answerYes(ann, card.peerAddr, await screenCode(viewPubKey, link.nonce), () => botSaid(ann)), `no question with the code:\n${out.slice(-1500)}`).toBe(true);
     const grant = await until(async () => screen.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
-    expect(grant, `no grant reached the screen:\n${out.slice(-1500)}`).toBeTruthy();
+    expect(grant, `no grant reached the screen — the screen heard: ${heard(screen)}; the box's walk log:\n${walkWhy()}\n— its output:\n${out.slice(-1500)}`).toBeTruthy();
     const accepted = acceptConnectionGrant(grant, { nonce: link.nonce, viewPubKey });
     expect(accepted.ok, JSON.stringify(accepted)).toBe(true);
     expect(accepted.issuer).toBe(link.botAddress);
@@ -138,7 +142,7 @@ describe('a person connects a screen to the bot over the relay', () => {
       await view.agent.sendPeerMessage(link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey: view.pubKey, relayUrl: relay.url, nonce: link.nonce }) });
       expect(await answerYes(ann, card.peerAddr, await screenCode(view.pubKey, link.nonce), () => botSaid(ann))).toBe(true);
       const grant = await until(async () => view.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
-      expect(grant, `no grant reached the screen:\n${out.slice(-1500)}`).toBeTruthy();
+      expect(grant, `no grant reached the screen — the view heard: ${heard(view)}; the box's walk log:\n${walkWhy()}\n— its output:\n${out.slice(-1500)}`).toBeTruthy();
       const accepted = acceptConnectionGrant(grant, { nonce: link.nonce, viewPubKey: view.pubKey });
       expect(accepted.ok).toBe(true);
       const tokenFor = (skill) => accepted.tokens.find((tk) => tk.skill === skill);

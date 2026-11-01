@@ -382,6 +382,14 @@
       "text": "{{name}} joined this circle.",
       "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
     },
+    "leaving_note": {
+      "text": "Left — this waits for your main device. The circle goes once that device has signed it.",
+      "doc": "Said on a circle tile you just left from a device that is not your main device: the leave was handed to the main device to sign, and the tile goes when that signed leave lands here."
+    },
+    "leaving_note_held": {
+      "text": "Left — your main device is offline. The circle goes once it is back.",
+      "doc": "The same, when the main device is offline: the leave waits for it."
+    },
     "removed_mark": {
       "text": "removed",
       "doc": "The mark on a circle tile an admin removed you from; the tile stays (read-only) until you close it."

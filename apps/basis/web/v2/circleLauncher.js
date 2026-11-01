@@ -259,6 +259,15 @@ function renderTile(c, { previews, proposals, pinnedMap, mutedMap, sights = {}, 
     meta.textContent = tr('circle.members', { count: c.memberCount });
     body.appendChild(meta);
   }
+  // left on this device, the leave handed to the main device to sign: the tile says so until the signed leave lands
+  if (c.leaving) {
+    tile.classList.add('is-leaving');
+    tile.dataset.leaving = c.leaving.held ? 'held' : 'forwarded';
+    const meta = document.createElement('div');
+    meta.className = 'circle-tile__meta';
+    meta.textContent = tr(c.leaving.held ? 'circle.membership.leaving_note_held' : 'circle.membership.leaving_note');
+    body.appendChild(meta);
+  }
   tile.appendChild(body);
 
   // unread badge (red circle with the count). Surfaces only

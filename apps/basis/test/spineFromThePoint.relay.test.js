@@ -178,4 +178,24 @@ describe('spine statements only from the point', () => {
     expect(calls[0].publicKey, 'the sealing key is the point\'s own reading of the roster').toBeTruthy();
     expect(calls[0].publicKey).not.toBe('ATTACKER-SEALING-KEY');
   }, 30_000);
+
+  it('a BAN act names an address: the point bans only an old address on the person\'s own row — never the persona\'s, never another member\'s', async () => {
+    const { ownCircleAddressAnnouncementFromSeed } = await import('@onderling/core');
+    const ctl = A.circleControlAgentRouter;
+    const bans = [];
+    const orig = ctl.revokeRecipient?.bind(ctl);
+    ctl.revokeRecipient = async (a) => { bans.push(a); return null; };
+    // an old device-derived address of the box's, on Anna's own row (a membership from before the switch)
+    const old = ownCircleAddressAnnouncementFromSeed({ derivationSeed: A2.agent.persona('default').deviceDerivationSeed, circleId: GROUP, memberWebid: A.pubKey });
+    await A.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, ...old });
+    const from = A2.agent.ownDeviceAddress('default');
+    const send = (act) => A.agent.spineActHandler(from, { subtype: A.agent.spineActSubtype, lane: 'key', act });
+    await send({ op: 'ban', circleId: GROUP, address: A.agent.circleAddressFor(GROUP) });   // the persona's own
+    await send({ op: 'ban', circleId: GROUP, address: B.agent.circleAddressFor(GROUP) });   // another member's
+    expect(bans, 'the point banned the persona\'s own address or another member\'s').toEqual([]);
+    await send({ op: 'ban', circleId: GROUP, address: old.circleAddress });
+    ctl.revokeRecipient = orig;
+    expect(bans.length, 'the old address on the person\'s own row is banned').toBe(1);
+    expect(bans[0].policy).toBe('ban');
+  }, 30_000);
 });

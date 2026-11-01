@@ -2680,25 +2680,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE KEY LANE FROM THE POINT TOO: a circle's group key is produced, wrapped and its key event signed only on the point.
   // Another device of the person hands the point the ACT — add or remove a member — and never key material: the point
   // generates and wraps from its own state, and takes a recipient's sealing key from ITS OWN roster.
+  const forwardKeyAct = async (act) => {
+    const to = await pointDeviceAddress();
+    if (!to) return null;
+    try {
+      const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'key', act }, { guarantee: 'hold-forward' }, 'default');
+      return { forwarded: true, held: sent?.held === true };
+    } catch { return null; }
+  };
   const pointGatedControlAgent = (ctl) => {
     if (!ctl || typeof ctl !== 'object') return ctl;
-    const forward = async (act) => {
-      const to = await pointDeviceAddress();
-      if (!to) return null;
-      try {
-        const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: 'key', act }, { guarantee: 'hold-forward' }, 'default');
-        return { forwarded: true, held: sent?.held === true };
-      } catch { return null; }
-    };
     return new Proxy(ctl, {
       get(target, prop) {
         if (prop === 'addMember') {
           return async (a = {}) => (isPointDevice() ? target.addMember(a)
-            : ((await forward({ op: 'add', circleId: a.groupId, webId: a.webId, role: a.role ?? null })) ?? target.addMember(a)));
+            : ((await forwardKeyAct({ op: 'add', circleId: a.groupId, webId: a.webId, role: a.role ?? null })) ?? target.addMember(a)));
         }
         if (prop === 'removeMember') {
           return async (a = {}) => (isPointDevice() ? target.removeMember(a)
-            : ((await forward({ op: 'remove', circleId: a.groupId, webId: a.webId, policy: a.policy ?? null, force: a.force === true })) ?? target.removeMember(a)));
+            : ((await forwardKeyAct({ op: 'remove', circleId: a.groupId, webId: a.webId, policy: a.policy ?? null, force: a.force === true })) ?? target.removeMember(a)));
         }
         const v = target[prop];
         return typeof v === 'function' ? v.bind(target) : v;
@@ -2708,15 +2708,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
   const keyActOnPoint = async (act) => {
     const ctl = opts.pinboardControlAgent;
-    if (!ctl || typeof act?.circleId !== 'string' || typeof act.webId !== 'string') return;
-    if ('publicKey' in act || 'sealingKey' in act || 'groupKey' in act || 'wrap' in act || 'seed' in act) return;   // no key material, ever
-    let row = null;
-    try { row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: act.circleId }))?.members ?? []).find((m) => m?.webid === act.webId) ?? null; } catch { row = null; }
-    if (act.op === 'add') {
-      if (!row?.circleAddress) return;   // not a current member of this circle here: nothing to grant
-      await ctl.addMember({ webId: act.webId, publicKey: sealingPublicKeyFromNetworkKey(row.circleAddress), role: act.role ?? row.role ?? 'member', groupId: act.circleId });
-    } else if (act.op === 'remove') {
-      await ctl.removeMember({ webId: act.webId, groupId: act.circleId, ...(act.policy ? { policy: act.policy } : {}), ...(act.force ? { force: true } : {}) });
+    if (!ctl || typeof act?.circleId !== 'string') return;
+    if (['publicKey', 'sealingKey', 'groupKey', 'wrap', 'seed'].some((k) => k in act)) return;   // no key material, ever
+    const rows = await callSkill('pinboard', 'listGroupMembers', { groupId: act.circleId }).then((r) => r?.members ?? []).catch(() => []);
+    if (act.op === 'add' || act.op === 'remove') {
+      if (typeof act.webId !== 'string') return;
+      const row = rows.find((m) => m?.webid === act.webId) ?? null;
+      if (act.op === 'add') {
+        if (!row?.circleAddress) return;   // not a current member of this circle here: nothing to grant
+        await ctl.addMember({ webId: act.webId, publicKey: sealingPublicKeyFromNetworkKey(row.circleAddress), role: act.role ?? row.role ?? 'member', groupId: act.circleId });
+      } else {
+        await ctl.removeMember({ webId: act.webId, groupId: act.circleId, ...(act.policy ? { policy: act.policy } : {}), ...(act.force ? { force: true } : {}) });
+      }
+      return;
+    }
+    if (act.op === 'ban') {
+      // an OLD address of this person's — on this point's own row for them — and never the persona's current one
+      if (typeof act.address !== 'string' || act.address === circleAddressFor(act.circleId)) return;
+      const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
+      const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
+      if (!listed.has(act.address)) return;
+      await ctl.revokeRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(act.address), policy: 'ban' });
     }
   };
   primaryDeviceRef.current = primaryDevice;
@@ -3622,7 +3634,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       }).catch(() => null);
       if (stmt) revokedIn.push({ circleId, address });
       try {
-        await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
+        // the ban is a key-lane statement on the shared circle key: only the point writes it (handed the ADDRESS — public,
+        // on the person's own row — never a key)
+        if (isPointDevice()) await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
+        else await forwardKeyAct({ op: 'ban', circleId, address });
       } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
     }
     return revokedIn;

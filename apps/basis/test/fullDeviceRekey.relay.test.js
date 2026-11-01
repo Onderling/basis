@@ -155,12 +155,28 @@ describe('the surviving full devices take the next root', () => {
     A3 = await enrolFull({ A, label: 'A3', relay, circle: C3, phrase });
     expect(A3.agent.circleAddressFor(C3), 'the laptop is not a full device of Anna').toBe(oldAddr);
     const laptopId = A3.agent.persona('default').enrolledDevice?.deviceId;
+    // THE NEXT ROOT IS THE MOST SECRET THING ON THE WIRE (whoever holds it is the person in every circle until the next
+    // re-key): no frame the relay sees during the hand-over carries its bytes, raw or encoded
+    const frames = [];
+    const stopTap = relay.tapFrames?.((raw) => frames.push(Buffer.isBuffer(raw) ? raw : Buffer.from(String(raw))));
     const r = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: laptopId, circleIds: [C3] });
     expect(r?.ok, JSON.stringify(r)).toBe(true);
     const newAddr = A.agent.circleAddressFor(C3);
     expect(newAddr, 'the phone did not move').not.toBe(oldAddr);
     expect(r?.rekey?.handOver?.handed, `the next root was handed to nobody: ${JSON.stringify(r?.rekey)}`).toBeGreaterThanOrEqual(1);
     expect(await until(() => (A2.agent.circleAddressFor(C3) === newAddr ? true : null), { timeout: 20000, step: 200 }), 'the box did not take the next root').toBe(true);
+    stopTap?.();
+    {
+      const { Bootstrap, deriveCircleRoot, b64encode } = await import('@onderling/core');
+      const nextRoot = deriveCircleRoot(Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), r.rekey.epoch);
+      const b64 = Buffer.from(nextRoot).toString('base64');
+      const forms = [Buffer.from(nextRoot), Buffer.from(b64.replace(/=+$/, '')), Buffer.from(b64encode(nextRoot)), Buffer.from(Buffer.from(nextRoot).toString('base64url')), Buffer.from(Buffer.from(nextRoot).toString('hex'))];
+      expect(frames.length, 'the tap saw no frames — it proves nothing').toBeGreaterThan(0);
+      // the canary: the hand-over's traffic WAS seen (the box's device address routes it, in the clear)
+      expect(frames.some((f) => f.includes(Buffer.from(A2.agent.ownDeviceAddress('default')))), 'the tap did not see the traffic to the box').toBe(true);
+      const leaked = frames.findIndex((f) => forms.some((form) => f.includes(form)));
+      expect(leaked, `frame ${leaked} of ${frames.length} carries the next circle root in the clear`).toBe(-1);
+    }
     expect(A3.agent.circleAddressFor(C3), 'the revoked laptop took the next root').toBe(oldAddr);
     const env = await postSealed({ admin: A, members: [B, A2], groupId: C3, text: 'voor wie overblijft' });
     const boxReads = await until(() => { try { return readSealed(A2, env, C3) === 'voor wie overblijft' ? true : null; } catch { return null; } }, { timeout: 15000, step: 200 });

@@ -118,7 +118,18 @@ describe('an exit the fold does not grant takes nobody out', () => {
       const forged = await B.agent.membershipRail.append(CIRCLE2, { kind, subject: C.pubKey });
       expect(forged?.statement, 'B could sign the statement').toBeTruthy();
       const landed = await C.agent.membershipRail.ingest(CIRCLE2, forged.statement);
-      expect(landed?.ok, `the ${kind} passes ingest (signature + binding): ${JSON.stringify(landed)}`).toBe(true);
+      // L560: this refusal appeared under full-suite load only. When it does, SAY WHICH BRANCH: the same ingest again past
+      // the verifier's roster memo (300 ms), and B's row as C holds it then — a stale memo read, a row without B's
+      // address at that seq, or a real refusal are three different findings.
+      let named = null;
+      if (!landed?.ok) {
+        const first = landed;
+        await new Promise((r) => { setTimeout(r, 400); });
+        const again = await C.agent.membershipRail.ingest(CIRCLE2, forged.statement);
+        const row = ((await C.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE2, spineless: true }))?.members ?? []).find((m) => (m.webid ?? m.addr) === B.pubKey) ?? null;
+        named = { first, again: { ok: again?.ok, reason: again?.reason }, author: String(forged.statement?.body?.author ?? '').slice(0, 8), rowAddrs: [row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean).map((a) => String(a).slice(0, 8)) };
+      }
+      expect(landed?.ok, `the ${kind} passes ingest (signature + binding): ${JSON.stringify(named ?? landed)}`).toBe(true);
       await new Promise((r) => { setTimeout(r, 1500); });
 
       const cMine = await C.agent.callSkill('pinboard', 'listMyCircles', {});

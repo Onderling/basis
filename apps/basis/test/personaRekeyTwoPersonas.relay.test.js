@@ -101,4 +101,17 @@ describe('a revoked device held two personas', () => {
     expect(lost.agent.persona(p).circleAddressFor(X)).toBe(before.x);
     expect(lost.agent.persona(q).circleAddressFor(Y)).toBe(before.y);
   }, 240_000);
+
+  it('a REPLACE retires every other device: every persona this device holds re-keys — P and Q — and the retired laptop takes neither root', async () => {
+    const before = { x: phone.agent.persona(p).circleAddressFor(X), y: phone.agent.persona(q).circleAddressFor(Y) };
+    const laptopX = laptop.agent.persona(p).circleAddressFor(X);
+    const r = await phone.agent.callSkill('household', 'replaceDevice', { mnemonic: phrase, circleIds: [] });
+    expect(r?.ok, JSON.stringify(r)).toBe(true);
+    expect(r.personaRekeys?.[p]?.ok, `P did not re-key at the replace: ${JSON.stringify(r.personaRekeys)}`).toBe(true);
+    expect(r.personaRekeys?.[q]?.ok, `Q did not re-key at the replace: ${JSON.stringify(r.personaRekeys)}`).toBe(true);
+    expect(phone.agent.persona(p).circleAddressFor(X)).not.toBe(before.x);
+    expect(phone.agent.persona(q).circleAddressFor(Y)).not.toBe(before.y);
+    await new Promise((res) => setTimeout(res, 1500));
+    expect(laptop.agent.persona(p).circleAddressFor(X), 'the retired laptop took P\'s next root').toBe(laptopX);
+  }, 240_000);
 });

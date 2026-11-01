@@ -4178,13 +4178,45 @@ export async function createRealHouseholdAgent(opts = {}) {
       const known = await tombstoneDevices({ root, deviceIds: retired.map((r) => r.deviceId).filter(Boolean) });
       // 5. RE-KEY — every other device is gone (the point among them: this device claims it), full ones included, and those held the persona's circle root: the persona
       //    moves to the next epoch (the tombstones above are written first, so the hand-over reaches no retired device)
-      const rekey = personas.get(primaryId)?.circleRoot ? await rekeyPersona({ root, circleIds: circles, claimPoint: true }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
+      //    EVERY persona this device holds the root of: a replace retires every other device, so a lost device of a second
+      //    persona would otherwise keep acting as it in all its circles. Each persona re-keys in its own circles and claims
+      //    its own point; its next root goes only to its own live devices (none: they are all retired here).
+      let held = circles;
+      try {
+        const mine = ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id)));
+        held = [...new Set([...circles, ...mine].filter((c) => typeof c === 'string' && c))];
+      } catch { /* the general persona's circles at least */ }
+      const rekeys = {};
+      for (const [pid, rt] of personas) {
+        if (!rt?.circleRoot) continue;
+        // every OTHER device under this persona is tombstoned FIRST (the general persona's are above): the hand-over that
+        // follows goes to this persona's live devices, and a retired one must not be among them
+        if (pid !== 'default') {
+          try {
+            const entry = await bounded(agentsRegistryRef?.lookup?.(pid));
+            if (entry) {
+              const mine = deviceIdIn(pid);
+              let props = entry.properties ?? {};
+              for (const [devId, rec] of Object.entries(deviceDelegationsOf(entry))) {
+                if (devId === mine || rec?.revoked === true) continue;
+                props = registrySetDeviceDelegation(props, devId, { revoked: true, revocation: signDeviceRevocation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: devId }) });
+              }
+              if (props !== (entry.properties ?? {})) { await bounded(agentsRegistryRef.register({ ...entry, properties: props })); deviceRowsMemo.clear(); }
+            }
+          } catch (err) { console.warn(`[ceremony] a persona's other devices were not tombstoned before its re-key: ${err?.message ?? err}`); }
+        }
+        rekeys[pid] = await rekeyPersona({ root, pid, circleIds: held.filter((c) => pidOf(c) === pid), claimPoint: true })
+          .catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' }));
+      }
+      const rekey = rekeys[primaryId] ?? null;
+      const personaRekeys = Object.fromEntries(Object.entries(rekeys).filter(([pid]) => pid !== primaryId));
       return [DataPart({
         ok: true, outcome: 'ok',
         retiredDevices: retired.map((r) => r.deviceId).filter(Boolean),
         firstDeviceRetired: retired.some((r) => r.deviceId === firstId),
         retiredIn: retiredAddresses, circles: retiredAddresses.length, historyKeys, rotated, known,
         ...(rekey ? { rekey } : {}),
+        ...(Object.keys(personaRekeys).length ? { personaRekeys } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'replace-failed' })]; }
   }, { visibility: 'private' });   // retires every other device of this person: owner-only, phrase-proven

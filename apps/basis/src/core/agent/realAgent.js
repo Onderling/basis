@@ -793,7 +793,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // THE PRIMARY DEVICE (sync-policy §12, the DM half): read lazily — the choice store is composed further down.
   const primaryDeviceRef = { current: null };
-  const spinePointRef = { current: null };
+  const pointOfRef = { current: null };   // persona id → its point record (bound below, where the records are made)
   const resendSpineOutboxRef = { current: null };
   const closeSpineAfterMoveRef = { current: null };
   const askSpineCatchUpRef = { current: null };
@@ -2133,8 +2133,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       welcomeNewDevice(rec).catch(() => { /* its connect-time catch-up asks again */ });
       // THE POINT, when a second device arrives: the EXISTING device claims it unless a claim exists — never the newcomer
       // (it is still waiting for its first map), so the person's spine has one signer from the moment there are two.
-      if (!spinePointRef.current?.current?.() && !awaitingDeviceMap.has(primaryId) && personas.get(primaryId)?.circleRoot) {
-        Promise.resolve(spinePointRef.current?.claim?.()).catch(() => { /* the tap on Mij still claims */ });
+      // …per persona: the existing device claims the point of every persona it holds the root of and that has no claim
+      for (const [pid, rt] of personas) {
+        const rec = pointOfRef.current?.(pid);
+        if (!rec || !rt?.circleRoot || awaitingDeviceMap.has(pid) || rec.current?.()) continue;
+        Promise.resolve(rec.claim?.()).catch(() => { /* the tap on Mij still claims */ });
       }
     },
   });
@@ -2677,14 +2680,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   // acts meanwhile wait, as acts already do. A time-out opens a circle only when nobody exists to fork against: no other
   // member and no other live device of this self.
   const SPINE_CATCHUP_RELEASE_MS = 15_000;
-  let spineMovedAt = 0;              // when the point last moved HERE (0: it never did — every circle is open)
+  const spineMovedAt = new Map();    // persona id → when its point last moved HERE (absent: it never did — its circles are open)
   const spineCaughtUp = new Set();   // circles caught up since that move
   const spineClosed = new Map();     // circleId → the release timer, for a circle asked and not yet caught up
   const spineParked = new Map();     // actId → { fromAddr, payload } — a sibling's act that arrived while its circle was closed
   const spineCatchUpRef = { current: null };
   // per circle, and lazily: a circle this device did not list at the move closes on its first spine act
-  const spineOpen = (circleId) => !spineMovedAt || typeof circleId !== 'string' || !pointGovernsRef.current(circleId) || spineCaughtUp.has(circleId);
-  const pointGovernsRef = { current: () => true };
+  const pidOf = (circleId) => (typeof circleId === 'string' ? (circlePersonas.get(circleId) ?? primaryId) : primaryId);
+  const spineOpen = (circleId) => typeof circleId !== 'string' || !spineMovedAt.get(pidOf(circleId)) || spineCaughtUp.has(circleId);
   const spineOutbox = new Map();   // actId → { lane, act, at, ackedHash? }
   let spineOutboxLoaded = false;
   const loadSpineOutbox = async () => {
@@ -2695,14 +2698,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // a restart mid-catch-up keeps the circles closed that were not caught up yet (their queued acts still wait)
     try {
       const g = JSON.parse((await chatVault.get(SPINE_GATE_KEY)) ?? 'null');
-      if (g && Number.isFinite(g.movedAt) && g.movedAt > spineMovedAt) {
-        spineMovedAt = g.movedAt;
+      if (g && g.movedAt && typeof g.movedAt === 'object') {
+        for (const [pid, at] of Object.entries(g.movedAt)) if (Number.isFinite(at) && at > (spineMovedAt.get(pid) ?? 0)) spineMovedAt.set(pid, at);
         for (const c of Array.isArray(g.caughtUp) ? g.caughtUp : []) spineCaughtUp.add(c);
       }
     } catch { /* none */ }
   };
   const saveSpineGate = async () => {
-    try { await chatVault.set(SPINE_GATE_KEY, JSON.stringify({ movedAt: spineMovedAt, caughtUp: [...spineCaughtUp] })); } catch { /* kept in memory */ }
+    try { await chatVault.set(SPINE_GATE_KEY, JSON.stringify({ movedAt: Object.fromEntries(spineMovedAt), caughtUp: [...spineCaughtUp] })); } catch { /* kept in memory */ }
   };
   const saveSpineOutbox = async () => {
     try { await chatVault.set(SPINE_OUTBOX_KEY, JSON.stringify(Object.fromEntries(spineOutbox))); } catch { /* kept in memory */ }
@@ -2728,10 +2731,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     const actId = `act-${Date.now().toString(36)}-${b64encode(globalThis.crypto.getRandomValues(new Uint8Array(9)))}`;
     spineOutbox.set(actId, { lane, act, at: Date.now() });
     await saveSpineOutbox();
-    const to = await pointDeviceAddress();
+    const to = await pointDeviceAddress(act?.circleId);
     if (!to) return { forwarded: true, held: true, actId };   // the map or the claim's move sends it
     try {
-      const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane, act, actId }, { guarantee: 'hold-forward' }, primaryId);
+      const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane, act, actId }, { guarantee: 'hold-forward' }, pidOf(act?.circleId));
       return { forwarded: true, held: sent?.held === true, actId };
     } catch { return { forwarded: true, held: true, actId }; }   // kept: the next reconnect sends it
   };
@@ -2751,18 +2754,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   const resendSpineOutbox = async ({ now = Date.now() } = {}) => {
     await loadSpineOutbox();
     if (expireSpineOutbox(now)) await saveSpineOutbox();
-    if (isPointDevice()) {
-      // the point's own acts that wait for a circle to catch up (from before a restart, too): ask for those circles
-      for (const e of spineOutbox.values()) if (!e.ackedHash) askSpineCatchUpRef.current?.(e.act?.circleId);
-      return { resent: 0 };
-    }
     if (!spineOutbox.size) return { resent: 0 };
-    const to = await pointDeviceAddress();
-    if (!to) return { resent: 0 };
     let resent = 0;
+    // per act, to the point of ITS circle's persona: where this device is that point, its own act waits for the circle to
+    // catch up (from before a restart, too)
     for (const [actId, e] of [...spineOutbox]) {
-      if (e.ackedHash) { if (ownRailHolds(e.ackedHash, e.act?.circleId)) spineOutbox.delete(actId); continue; }   // signed: waits only to be seen
-      try { await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: e.lane, act: e.act, actId }, { guarantee: 'hold-forward' }, primaryId); resent += 1; } catch { /* next time */ }
+      const c = e.act?.circleId;
+      if (e.ackedHash) { if (ownRailHolds(e.ackedHash, c)) spineOutbox.delete(actId); continue; }   // signed: waits only to be seen
+      if (isPointDevice(c)) { askSpineCatchUpRef.current?.(c); continue; }
+      const to = await pointDeviceAddress(c);
+      if (!to) continue;
+      try { await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: e.lane, act: e.act, actId }, { guarantee: 'hold-forward' }, pidOf(c)); resent += 1; } catch { /* next time */ }
     }
     await saveSpineOutbox();
     return { resent };
@@ -2782,10 +2784,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   const spineAckHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== SPINE_ACK_SUBTYPE || typeof payload.actId !== 'string') return;
-    if (!(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
     await loadSpineOutbox();
     const e = spineOutbox.get(payload.actId);
     if (!e) return;
+    // only a device of the act's own persona answers for it
+    if (!(await deviceSiblingRowsOf(pidOf(e.act?.circleId))).some((d) => d.address === fromAddr)) return;
     if (typeof payload.hash === 'string' && payload.hash && !ownRailHolds(payload.hash, e.act?.circleId)) spineOutbox.set(payload.actId, { ...e, ackedHash: payload.hash });
     else spineOutbox.delete(payload.actId);
     await saveSpineOutbox();
@@ -2799,36 +2802,39 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { const raw = await chatVault.get(SPINE_SEEN_KEY); for (const [k, v] of Object.entries(raw ? JSON.parse(raw) : {})) seenSpineActs.set(k, v); } catch { /* none */ }
   };
   const saveSeenSpineActs = async () => { try { await chatVault.set(SPINE_SEEN_KEY, JSON.stringify(Object.fromEntries(seenSpineActs))); } catch { /* kept in memory */ } };
-  const ackSpineAct = async (to, actId, hash = null) => {
+  const ackSpineAct = async (to, actId, hash = null, pid = primaryId) => {
     if (typeof actId !== 'string') return;
-    try { await sendToSibling(to, { subtype: SPINE_ACK_SUBTYPE, actId, ...(hash ? { hash } : {}) }, { guarantee: 'hold-forward' }, primaryId); } catch { /* the forwarder re-sends; the seen-set acks again */ }
+    try { await sendToSibling(to, { subtype: SPINE_ACK_SUBTYPE, actId, ...(hash ? { hash } : {}) }, { guarantee: 'hold-forward' }, pid); } catch { /* the forwarder re-sends; the seen-set acks again */ }
   };
-  const myPointId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
-  const isPointDevice = () => { const c = spinePoint.current?.(); return !c || c.deviceId === myPointId; };
-  // THE POINT IS THE PRIMARY PERSONA'S, for now: the claim names a device of it, and another persona's circles live only on
-  // the devices that hold that persona — so those circles sign where they are, as before (a point per persona is open)
-  const pointGoverns = (circleId) => typeof circleId !== 'string' || (circlePersonas.get(circleId) ?? primaryId) === primaryId;
-  const signsHere = (circleId) => !pointGoverns(circleId) || isPointDevice();
-  pointGovernsRef.current = pointGoverns;
-  const pointDeviceAddress = async () => {
-    const c = spinePoint.current?.();
+  /** THE POINT IS PER PERSONA: the device that signs a circle's spine statements is the point of the persona the circle
+   *  belongs to — a record on that persona's own lane, naming one of that persona's devices. */
+  const deviceIdIn = (pid) => personas.get(pid)?.enrolledDevice?.deviceId ?? (pid === primaryId ? (enrolledDevice?.deviceId ?? custody.deviceId ?? null) : null);
+  const isPointDevice = (circleId) => { const pid = pidOf(circleId); const c = pointOfRef.current?.(pid)?.current?.(); return !c || c.deviceId === deviceIdIn(pid); };
+  const signsHere = (circleId) => isPointDevice(circleId);
+  const pointDeviceAddress = async (circleId) => {
+    const pid = pidOf(circleId);
+    const c = pointOfRef.current?.(pid)?.current?.();
     if (!c) return null;
-    try { return (await deviceSiblingRowsOf(primaryId)).find((d) => d.deviceId === c.deviceId)?.address ?? null; } catch { return null; }
+    try { return (await deviceSiblingRowsOf(pid)).find((d) => d.deviceId === c.deviceId)?.address ?? null; } catch { return null; }
   };
   /** The point signs a sibling's spine act: from a live device of this person only, a declared membership kind only, as
    *  the circle's own self, on this device's own head. */
   const spineActHandler = async (fromAddr, payload) => {
     if (payload?.subtype !== SPINE_ACT_SUBTYPE) return;
     const actId = typeof payload.actId === 'string' ? payload.actId : null;
+    // the act's circle names its persona: this device answers only as THAT persona's point, to that persona's devices
+    const actCircle = payload.act?.circleId;
+    const actPid = pidOf(actCircle);
+    const fromOwnDevice = async () => (await deviceSiblingRowsOf(actPid)).some((d) => d.address === fromAddr);
     if (actId) {
       const now = Date.now();
       await loadSeenSpineActs();
       for (const [k, v] of seenSpineActs) if (now - v.at > SPINE_ACT_WINDOW_MS) seenSpineActs.delete(k);
       const seen = seenSpineActs.get(actId);
-      if (seen) { if (isPointDevice()) await ackSpineAct(fromAddr, actId, seen.hash); return; }   // signed already: ack again
+      if (seen) { if (isPointDevice(actCircle)) await ackSpineAct(fromAddr, actId, seen.hash, actPid); return; }   // signed already: ack again
     }
     // this point has not caught up in that circle yet: the act waits, unacked (the forwarder keeps it), and is signed on open
-    if (isPointDevice() && !spineOpen(payload.act?.circleId)) {
+    if (isPointDevice(actCircle) && !spineOpen(actCircle)) {
       spineParked.set(actId ?? `parked-${spineParked.size}-${Date.now()}`, { fromAddr, payload });
       askSpineCatchUpRef.current?.(payload.act?.circleId);
       return;
@@ -2837,21 +2843,21 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!actId) return;
       seenSpineActs.set(actId, { at: Date.now(), hash });
       await saveSeenSpineActs();
-      await ackSpineAct(fromAddr, actId, hash);
+      await ackSpineAct(fromAddr, actId, hash, actPid);
     };
     if (payload.lane === 'governance') {
-      if (!isPointDevice() || !(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
+      if (!isPointDevice(actCircle) || !(await fromOwnDevice())) return;
       try { await governanceActOnPoint(payload.act ?? {}); await done(); } catch { /* the act said 'forwarded'; the fold shows what is */ }
       return;
     }
     if (payload.lane === 'key') {
-      if (!isPointDevice() || !(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
+      if (!isPointDevice(actCircle) || !(await fromOwnDevice())) return;
       try { await keyActOnPoint(payload.act ?? {}); await done(); } catch { /* the act said 'forwarded'; the roster shows what is */ }
       return;
     }
     if (payload.lane !== 'membership') return;
-    if (!isPointDevice() || typeof localMembershipEmitRef.current !== 'function') return;
-    if (!(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
+    if (!isPointDevice(actCircle) || typeof localMembershipEmitRef.current !== 'function') return;
+    if (!(await fromOwnDevice())) return;
     const act = payload.act ?? {};
     if (typeof act.circleId !== 'string' || !MEMBERSHIP_RAIL_KINDS.includes(act.kind)) return;
     // IDENTITY COMES FROM THE POINT: an act naming any other self (actor, by, voter, authorRef) is refused whole — a
@@ -3076,14 +3082,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     Promise.resolve(spineCatchUpRef.current?.(circleId, { own })).catch(() => {});
   };
   askSpineCatchUpRef.current = (circleId) => { askSpineCatchUp(circleId).catch(() => {}); };
-  /** This device just BECAME the point (the claim moved here from another device): every circle closes until caught up. */
-  const closeSpineAfterMove = async () => {
-    spineMovedAt = Date.now();
-    spineCaughtUp.clear();
-    await saveSpineGate();
+  /** This device just BECAME a persona's point (its claim moved here from another device): that persona's circles close
+   *  until caught up — another persona's are untouched. */
+  const closeSpineAfterMove = async (pid = primaryId) => {
+    spineMovedAt.set(pid, Date.now());
     let circles = [];
     try { circles = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { circles = []; }
-    for (const c of circles) await askSpineCatchUp(typeof c === 'string' ? c : (c?.groupId ?? c?.id));
+    const ids = circles.map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((c) => typeof c === 'string' && c && pidOf(c) === pid);
+    for (const c of ids) spineCaughtUp.delete(c);
+    for (const c of [...spineCaughtUp]) if (pidOf(c) === pid) spineCaughtUp.delete(c);
+    await saveSpineGate();
+    for (const c of ids) await askSpineCatchUp(c);
     console.info(`[spine-point] this device is now the point: catching up in ${spineClosed.size} circle(s) before it signs`);
   };
   closeSpineAfterMoveRef.current = closeSpineAfterMove;
@@ -3099,25 +3108,58 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   closeSpineAfterMoveRef.again = spineCatchUpAgain;
   primaryDeviceRef.current = primaryDevice;
-  // THE POINT, its own record (the same shape and carry): who signs this person's spine statements. The enrol claims it
-  // alone — direct messages keep landing where they did — and the person's "main device" tap sets both.
-  const spinePoint = createPrimaryDeviceChoice({
-    vault: chatVault,
-    myDeviceId: enrolledDevice?.deviceId ?? custody.deviceId ?? null,
-    siblings: ownDeviceSiblings,
-    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
-    vaultKey: SPINE_POINT_VAULT_KEY,
-    subtypes: SPINE_POINT_SUBTYPES,
-    // the point moved HERE from another device: catch up before signing
-    onChanged: (mine, prev) => {
-      if (mine && prev?.deviceId && prev.deviceId !== (enrolledDevice?.deviceId ?? custody.deviceId ?? null)) {
-        Promise.resolve(closeSpineAfterMoveRef.current?.()).catch(() => {});
-      }
+  // THE POINT, PER PERSONA (the same shape and carry as the primary-device record): who signs a persona's spine
+  // statements. Each persona's record lives in that persona's vault and travels on that persona's own lane, naming one of
+  // that persona's devices — never across personas. The enrol claims it on the existing device; the person's "main
+  // device" tap sets it for the persona it is made under (and the DM primary, as before).
+  const spinePoints = new Map();   // persona id → its point record
+  const pointOf = (pid) => {
+    if (spinePoints.has(pid)) return spinePoints.get(pid);
+    if (!personas.has(pid)) return null;
+    const rec = createPrimaryDeviceChoice({
+      vault: pid === primaryId ? chatVault : (personas.get(pid)?.vault ?? chatVault),
+      myDeviceId: deviceIdIn(pid),
+      siblings: async () => (await deviceSiblingRowsOf(pid)).map((d) => d.address),
+      sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, pid),
+      vaultKey: SPINE_POINT_VAULT_KEY,
+      subtypes: SPINE_POINT_SUBTYPES,
+      // the point moved HERE from another device: that persona's circles catch up before signing
+      onChanged: (mine, prev) => {
+        if (mine && prev?.deviceId && prev.deviceId !== deviceIdIn(pid)) Promise.resolve(closeSpineAfterMoveRef.current?.(pid)).catch(() => {});
+      },
+      // the point moved, wherever to: what waits for it goes to the device it now names
+      onMoved: () => { Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {}); },
+    });
+    spinePoints.set(pid, rec);
+    Promise.resolve(rec.load?.()).catch(() => {});
+    return rec;
+  };
+  pointOfRef.current = pointOf;
+  for (const pid of personas.keys()) pointOf(pid);
+  /** A carry or request goes to the record of the persona whose device sent it — one wire pair, never across personas. */
+  const pidOfSibling = async (fromAddr) => {
+    for (const pid of personas.keys()) {
+      try { if ((await deviceSiblingRowsOf(pid)).some((d) => d.address === fromAddr)) return pid; } catch { /* next */ }
+    }
+    return null;
+  };
+  const spinePointHandlers = Object.fromEntries(Object.values(SPINE_POINT_SUBTYPES).map((st) => [st, async (fromAddr, payload) => {
+    const pid = await pidOfSibling(fromAddr);
+    if (pid) await pointOf(pid)?.handlers?.[st]?.(fromAddr, payload);
+  }]));
+  /** The person's point surface: the primary persona's record, the routed handlers, and a pull for every persona. */
+  const spinePoint = {
+    load: () => Promise.all([...spinePoints.values()].map((r) => r.load?.())),
+    current: () => pointOf(primaryId)?.current?.() ?? null,
+    claim: (pid = primaryId) => pointOf(pid)?.claim?.() ?? Promise.resolve({ ok: false, reason: 'no-such-persona' }),
+    requestFromSiblings: async () => {
+      let attempted = 0;
+      for (const rec of spinePoints.values()) { try { attempted += (await rec.requestFromSiblings?.())?.attempted ?? 0; } catch { /* next */ } }
+      return { attempted };
     },
-    // the point moved, wherever to: what waits for it goes to the device it now names
-    onMoved: () => { Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {}); },
-  });
-  spinePointRef.current = spinePoint;
+    handlers: spinePointHandlers,
+    of: (pid) => pointOf(pid)?.current?.() ?? null,
+  };
   await primaryDevice.load();
   const primaryKeySync = createPersonKeySync({
     siblings: ownDeviceSiblings,
@@ -4136,7 +4178,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const known = await tombstoneDevices({ root, deviceIds: retired.map((r) => r.deviceId).filter(Boolean) });
       // 5. RE-KEY — every other device is gone (the point among them: this device claims it), full ones included, and those held the persona's circle root: the persona
       //    moves to the next epoch (the tombstones above are written first, so the hand-over reaches no retired device)
-      const rekey = personas.get(primaryId)?.circleRoot ? await rekeyPrimaryPersona({ root, circleIds: circles, claimPoint: true }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
+      const rekey = personas.get(primaryId)?.circleRoot ? await rekeyPersona({ root, circleIds: circles, claimPoint: true }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
       return [DataPart({
         ok: true, outcome: 'ok',
         retiredDevices: retired.map((r) => r.deviceId).filter(Boolean),
@@ -4246,16 +4288,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return hi;
   };
-  const rekeyPrimaryPersona = async ({ root, circleIds, revokedDeviceId = null, claimPoint = false }) => {
-    const rt = personas.get(primaryId);
+  const rekeyPersona = async ({ root, pid = primaryId, circleIds, revokedDeviceId = null, claimPoint = false }) => {
+    const rt = personas.get(pid);
     if (!rt?.circleRoot || typeof rt.switchCircleRoot !== 'function') return { ok: false, reason: 'no-circle-root' };
     // A REVOKED POINT signs nothing of the re-key: the point moves here first (and catches up before it signs, as any).
     // Otherwise the point stays where it is — it holds the circle's key producer — and is handed the next root below.
-    if (claimPoint || (revokedDeviceId && spinePoint.current?.()?.deviceId === revokedDeviceId)) {
-      try { await spinePoint.claim(); } catch { /* the acts below still wait for a reachable point */ }
+    if (claimPoint || (revokedDeviceId && pointOf(pid)?.current?.()?.deviceId === revokedDeviceId)) {
+      try { await pointOf(pid)?.claim?.(); } catch { /* the acts below still wait for a reachable point */ }
     }
-    const profileSeed = root.deriveAgentSeed(primaryId);
-    const circles = [...new Set(circleIds)].filter((c) => typeof c === 'string' && c && (circlePersonas.get(c) ?? primaryId) === primaryId);
+    const profileSeed = root.deriveAgentSeed(pid);
+    const circles = [...new Set(circleIds)].filter((c) => typeof c === 'string' && c && pidOf(c) === pid);
     // ABOVE EVERY EPOCH EVER USED, not only above this device's own: a restored or long-away device may hold an older one,
     // and moving to an epoch a lost device already holds would re-key to a root it has. The phrase is in hand, so each
     // circle's row (live and retired addresses) is matched against the epochs up to the bound.
@@ -4315,7 +4357,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     //    root first (handed over now), takes the new address as its own, and is asked to rotate.
     const rotated = [];
     let handOver = null;
-    if (introduced.some((c) => !signsHere(c))) handOver = await handOverCircleRoot({ root, profileId: primaryId, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
+    if (introduced.some((c) => !signsHere(c))) handOver = await handOverCircleRoot({ root, profileId: pid, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
     for (const c of introduced) {
       const exclude = [before[c]];
       try {
@@ -4328,7 +4370,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // 4. RETIRE the old address (root-revealed — the reveal is the authority, whichever key signs)
     const retired = await retireAddresses({ root, circleIds: introduced, addressFor: (c) => before[c] ?? null, upToFor: (c) => authorChainTip(c, before[c]) });
     // 5. HAND the next root to the surviving full devices (the revoked one's tombstone is already written)
-    if (!handOver) handOver = await handOverCircleRoot({ root, profileId: primaryId, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
+    if (!handOver) handOver = await handOverCircleRoot({ root, profileId: pid, epoch, seed, circleIds: introduced }).catch(() => ({ handed: 0 }));
     return { ok: true, epoch, introduced: introduced.length, rotated, retired: retired.length, handOver };
   };
 
@@ -4472,7 +4514,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch (err) { console.warn(`[ceremony] the person key did not rotate: ${err?.message ?? err}`); }
       const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
       // …and the persona's own address, which a FULL device held through the circle root: the re-key
-      const rekey = holdsGeneral && !alreadyRevoked ? await rekeyPrimaryPersona({ root, circleIds: [...circleIds], revokedDeviceId: deviceId }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
+      const rekey = holdsGeneral && !alreadyRevoked ? await rekeyPersona({ root, circleIds: [...circleIds], revokedDeviceId: deviceId }).catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' })) : null;
       // EVERY PERSONA THE DEVICE HELD loses it too. Each persona knows the device by its own wire id (its seed over the
       // device's internal id — unlinkable by design); the internal id is on the person's private device map (a
       // `device-link` row in the own-devices scope, each device writes its own), so the ceremony — root in hand — derives
@@ -4480,6 +4522,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // default's is), and retires its addresses in that persona's circles as that persona.
       const revokedUnder = holdsGeneral || generalRowTombstoned ? { default: deviceId } : {};
       const personaKeyVersions = {};   // personaId → the person-key version it rotated to here
+      const personaRekeys = {};        // personaId → its re-key here (the lost device held it live)
       const personaKeysUndone = [];    // personas the lost device held that this device could not rotate (another holds them)
       const personaKeysAlone = [];     // personas only the lost device held: its key lived there alone, nothing to rotate
       try {
@@ -4563,6 +4606,13 @@ export async function createRealHouseholdAgent(opts = {}) {
                 console.warn(`[ceremony] a persona's person key did not rotate: ${err?.message ?? err}`);
               }
             }
+          }
+          // …and THE PERSONA RE-KEYS when the lost device held it live and this device holds its circle root: the same
+          // window as the general persona's (a full device of this persona), closed the same way — its next root goes only
+          // to this persona's own live devices (its tombstone above is already written)
+          if (heldLive && personas.get(pid)?.circleRoot) {
+            personaRekeys[pid] = await rekeyPersona({ root, pid, circleIds: pCircles, revokedDeviceId: pWire })
+              .catch((err) => ({ ok: false, reason: err?.message ?? 'rekey-failed' }));
           }
         }
         if (!internalId && entries.length === 0) console.info('[ceremony] no device-link row for this device — its personas (if any) are not known to this device yet');
@@ -4657,6 +4707,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       return [DataPart({
         ok: true, deviceId, known, revokedIn, revokedUnder, circles: revokedIn.length, nodesTold, botsTold,
         ...(rekey ? { rekey } : {}),
+        ...(Object.keys(personaRekeys).length ? { personaRekeys } : {}),
         // a device without the general persona did only its personas' parts — the lost device most likely held the
         // general persona too, and that part has to be done on a device that holds it (it is a member of those circles)
         // partial: the general persona's circles (not held here), and any persona another device holds that this one
@@ -5866,7 +5917,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     membershipEmit = async (act = {}) => {
       // the point that has not caught up in this circle queues its own act — a ceremony's too: its authority is the root
       // reveal it carries (bound to circle, subject and kind), which keeps; the statement is signed with the circle key on open
-      if (act?.circleId && pointGoverns(act.circleId) && isPointDevice() && !spineOpen(act.circleId)) { const { signer: _s, ...kept } = act; return queueOwnSpineAct('membership', kept); }   // eslint-disable-line no-unused-vars
+      if (act?.circleId && isPointDevice(act.circleId) && !spineOpen(act.circleId)) { const { signer: _s, ...kept } = act; return queueOwnSpineAct('membership', kept); }   // eslint-disable-line no-unused-vars
       if (!act?.circleId || signsHere(act.circleId)) return localMembershipEmit(act);
       const { signer: _signer, ...plain } = act;   // eslint-disable-line no-unused-vars
       // `held`: the point is not online — the act waits for it (the screen says so)
@@ -9717,9 +9768,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     pairRouteFor: (contactWebid) => pairRouteFor({ callSkill: (a, o, g) => callSkill(a, o, g), selfWebid: chatId.pubKey, contactWebid }),
     /** "Make this my main device": where direct messages land AND the point that signs the spine — the point only on a
      *  device that holds the persona's circle root (one without it signs with its own key and cannot be the point). */
-    claimPrimaryDevice: async () => {
+    claimPrimaryDevice: async ({ persona = primaryId } = {}) => {
       const primary = await primaryDevice.claim();
-      const point = personas.get(primaryId)?.circleRoot ? await spinePoint.claim() : { ok: false, reason: 'no-circle-root' };
+      // the point of the persona the tap is made under (the person's main device for that persona's circles)
+      const point = personas.get(persona)?.circleRoot ? await spinePoint.claim(persona) : { ok: false, reason: 'no-circle-root' };
       return { ...primary, point };
     },
     spinePoint,

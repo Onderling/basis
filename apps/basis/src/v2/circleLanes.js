@@ -126,6 +126,7 @@ export function buildCircleLanes({
     ...aim,
     subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
     onChange: onMembership,
+    onBatchFrom: (circleId) => { try { agent.spineBatchArrived?.(circleId); } catch { /* the gate stays as it was */ } },
   }) : null;
 
   // Pull-all for keys — one small statement per version, so a long-offline or freshly enrolled device
@@ -292,6 +293,9 @@ export function buildCircleLanes({
     ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
     // …and a sibling's ask to retire its old device-derived address (the migration to one address per persona)
     ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
+    // …and a sibling's spine act for the point to sign (spine statements only from the point)
+    ...(agent.spineActHandler ? { [agent.spineActSubtype]: agent.spineActHandler } : {}),
+    ...(agent.spineAckHandler ? { [agent.spineAckSubtype]: agent.spineAckHandler } : {}),
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
@@ -320,6 +324,7 @@ export function buildCircleLanes({
     ...(agent.profileFactsSync?.handlers ?? {}),
     // Which of the person's devices is primary for direct messages: a sibling's claim lands here, a request is answered.
     ...(agent.primaryDevice?.handlers ?? {}),
+    ...(agent.spinePoint?.handlers ?? {}),
     // A circle a sibling founded or joined lands here and this device joins itself (the kring opt-out wins); a
     // sibling's request is answered with the circles this device is in. Entries only — the agent owns the gate.
     ...(agent.circleFollowSync?.handlers ?? {}),
@@ -329,6 +334,17 @@ export function buildCircleLanes({
     // being) a linked contact in my book, which carries to my other devices. Entries only — the agent owns the check.
     ...(agent.identityLinks?.handlers ?? {}),
   };
+
+  // A NEW POINT CATCHES UP FIRST: before it signs a circle's spine, it pulls that circle's membership, governance and key
+  // statements — from the person's OWN devices first (the previous point most likely holds the newest own statement), then
+  // from the circle's members. The agent opens the circle for signing when a membership batch has landed from any of them.
+  agent.setSpineCatchUp?.(async (circleId, { own = [], callSkill = null } = {}) => {
+    const lanesFor = [membership, gov, key].filter(Boolean);
+    let asked = 0;
+    for (const addr of own) for (const lane of lanesFor) { try { await lane.requestFrom(addr, circleId); asked += 1; } catch { /* next */ } }
+    for (const lane of lanesFor) { try { asked += (await lane.requestCircle(circleId, { callSkill: callSkill ?? ((...a) => agent.callSkill(...a)) })).requested; } catch { /* next */ } }
+    return { asked };
+  });
 
   return {
     handlers,

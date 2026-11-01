@@ -122,7 +122,7 @@ import { renderConfirmDialog } from './confirmDialog.js';
 import { renderRelayQuestionDialog } from './relayQuestionDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -362,7 +362,7 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
-  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, announceOwnCircleAddress,
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, makePrimaryResultWords, announceOwnCircleAddress,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { isFeatureEnabled, defaultViewModeFromPolicy, composerGate } from '../../src/v2/circlePolicy.js';
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
@@ -4390,6 +4390,7 @@ function shellGovernance({ myWebid = '' } = {}) {
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;
@@ -4936,7 +4937,7 @@ async function showMyData(opts) {
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
     const r = await makeThisDevicePrimary({ agent: _peerAgent }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
-    try { window.alert(t('circle.mydata.make_primary_done', { count: r.announced })); } catch { /* headless */ }
+    try { const w = makePrimaryResultWords(r); window.alert(t(w.key, w.params)); } catch { /* headless */ }
   };
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
@@ -8602,6 +8603,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
   });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
   catch { return { ok: false }; }
@@ -8619,6 +8621,7 @@ async function showGovernance(id) {
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;
@@ -8752,14 +8755,17 @@ async function showAdmin(id) {
   let outboundCanonical = false;    // circle-level posture gate: only a `canonical` circle can revoke in place
   let busy = false;
   let notice = null;
+  let outboxLine = null;            // changes handed to the main device: over a day, or not sent
   let myWebid = '';                 // whose row is mine — the role control is offered to an admin only
 
   async function load() {
-    const [mem, mut, who] = await Promise.all([
+    const [mem, mut, who, outbox] = await Promise.all([
       rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }).catch(() => null),
       rawCallSkill('pinboard', 'listMutedPeers', {}).catch(() => null),
       rawCallSkill('pinboard', 'whoAmI', {}).catch(() => null),
+      rawCallSkill('household', 'ownSpineOutbox', {}).catch(() => null),
     ]);
+    outboxLine = ownSpineOutboxLine(outbox);
     myWebid = who?.webid ?? who?.webId ?? '';
     members = Array.isArray(mem?.members) ? mem.members : [];
     muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
@@ -8774,7 +8780,7 @@ async function showAdmin(id) {
     rerender();
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
-    members, muted, outboundShares, outboundCanonical, busy, notice, t,
+    members, muted, outboundShares, outboundCanonical, busy, notice, outboxLine, t,
     resolvePicture: circlePictureResolver(id),
     viewerWebid: mySelfIn(id) ?? myWebid,
     onBack: () => showDetail(id),
@@ -8797,7 +8803,7 @@ async function showAdmin(id) {
             const r = await rawCallSkill('pinboard', 'setMemberRole', {
               groupId: id, memberWebid: m.webid, role: control.role,
             });
-            notice = r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name });
+            notice = t(roleChangeNoticeWords(r, control).key, { name });
           } catch { notice = t('circle.admin.refused'); }
           busy = false; await load();
         },

@@ -11,7 +11,7 @@
  * @vitest-environment node
  */
 import { describe, it, expect } from 'vitest';
-import { roleControlFor, roleChangeConfirm, ROLE_CONTROL_KEYS } from '../../src/v2/circleRoleControl.js';
+import { roleControlFor, roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, ROLE_CONTROL_KEYS } from '../../src/v2/circleRoleControl.js';
 
 const ann  = { webid: 'w-ann',  displayName: 'Ann',  role: 'admin' };
 const bob  = { webid: 'w-bob',  handle: 'bob',  role: 'member' };
@@ -130,5 +130,46 @@ describe('the confirmation comes from the op’s own declaration', () => {
 
   it('no control ⇒ no confirmation to present', () => {
     expect(roleChangeConfirm({ control: null, t })).toBeNull();
+  });
+});
+
+describe('what the panel says after a role change', () => {
+  const control = roleControlFor({ members: [ann, bob], member: bob, myRef: 'w-ann' });
+  it('a change this device signed says what happened', () => {
+    expect(roleChangeNoticeWords({ ok: true }, control)).toEqual({ key: control.noticeKey });
+  });
+  it('a change handed to the main device says so — it has not happened yet — and says when that device is offline', () => {
+    expect(roleChangeNoticeWords({ ok: true, forwarded: true }, control)).toEqual({ key: ROLE_CONTROL_KEYS.notice_forwarded });
+    expect(roleChangeNoticeWords({ ok: true, forwarded: true, held: true }, control)).toEqual({ key: ROLE_CONTROL_KEYS.notice_forwarded_held });
+  });
+  it('a refusal says refused', () => {
+    expect(roleChangeNoticeWords({ error: 'admin-only' }, control)).toEqual({ key: 'circle.admin.refused' });
+    expect(roleChangeNoticeWords(null, control)).toEqual({ key: 'circle.admin.refused' });
+  });
+});
+
+describe('the admin panel line for changes this device handed the main device', () => {
+  it('nothing waiting over a day and nothing given up on: no line', () => {
+    expect(ownSpineOutboxLine({ ok: true, waiting: 2, overDay: 0, unsent: 0 })).toBeNull();
+    expect(ownSpineOutboxLine(null)).toBeNull();
+  });
+  it('waiting over a day says so, with the count', () => {
+    expect(ownSpineOutboxLine({ ok: true, waiting: 3, overDay: 2, unsent: 0 })).toEqual({ key: ROLE_CONTROL_KEYS.outbox_over_day, params: { count: 2 } });
+  });
+  it('given up on wins: the person must not think it will still land', () => {
+    expect(ownSpineOutboxLine({ ok: true, waiting: 3, overDay: 2, unsent: 1 })).toEqual({ key: ROLE_CONTROL_KEYS.outbox_unsent, params: { count: 1 } });
+  });
+});
+
+describe('a change made on a device that just became the main device', () => {
+  it('says it waits for the device to catch up', () => {
+    const control = roleControlFor({ members: [ann, bob], member: bob, myRef: 'w-ann' });
+    expect(roleChangeNoticeWords({ ok: true, forwarded: true, held: true, waitingCatchUp: true }, control)).toEqual({ key: ROLE_CONTROL_KEYS.notice_waiting_catch_up });
+  });
+});
+
+describe('changes that may not have come through', () => {
+  it('win over every other line: nobody can sign them now, the person checks', () => {
+    expect(ownSpineOutboxLine({ ok: true, waiting: 1, overDay: 1, unsent: 1, maybeLost: 2 })).toEqual({ key: ROLE_CONTROL_KEYS.outbox_maybe_lost, params: { count: 2 } });
   });
 });

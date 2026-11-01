@@ -26,7 +26,7 @@ import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClas
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
 
-export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy, updatePolicy, circleId, onBack, circleIdentityFor = null, selfIn = null }) {
+export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy, updatePolicy, circleId, onBack, circleIdentityFor = null, spineGate = null, selfIn = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState({ view: { open: [], closed: [] }, isAdmin: false, policy: null });
@@ -40,6 +40,7 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
       // the self this device is in each circle (a persona's circle is the persona's) — the launcher hands `selfIn`
       eventLog, callSkill, getPolicy, myRef: (cid) => (typeof selfIn === 'function' ? selfIn(cid) : null) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
       circleIdentityFor,
+      spineGate,
     });
     ctxRef.current = { gov, myWebid };
     let ctx = { policy: {}, members: [] };

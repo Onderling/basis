@@ -324,9 +324,16 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // The membership lane's catch-up pair (registered below when the node has the rail), exposed on the node so a
   // walk can run the pull a fresh joiner makes (`requestCircle`) instead of replaying the admin's spine by hand.
   const membershipCatchUp = agent.membershipRail
-    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES })
+    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES, onBatchFrom: (cid) => agent.spineBatchArrived?.(cid) })
     : null;
   pairSeams.membershipCatchUp = membershipCatchUp;
+  // a new point catches up first — the same registration the shared lane table makes (own devices, then members)
+  if (membershipCatchUp) {
+    agent.setSpineCatchUp?.(async (circleId, { own = [] } = {}) => {
+      for (const a of own) { try { await membershipCatchUp.requestFrom(a, circleId); } catch { /* next */ } }
+      try { await membershipCatchUp.requestCircle(circleId, { callSkill: (...x) => agent.callSkill(...x) }); } catch { /* next */ }
+    });
+  }
   pairSeams.bindSelf = (circleId) => bindCircleAddresses([nodeRef.current], circleId);
   const nodeRef = { current: null };
   const handlers = {
@@ -431,6 +438,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // The person's device map between their own devices — the same registration the shared lane table makes.
     ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
     ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
+    ...(agent.spineActHandler ? { [agent.spineActSubtype]: agent.spineActHandler } : {}),
+    ...(agent.spineAckHandler ? { [agent.spineAckSubtype]: agent.spineAckHandler } : {}),
     // The roster seed (pod-less enroll S1) — the same registration both shells make.
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
@@ -443,6 +452,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ...(agent.personKeySync?.handlers ?? {}),
     ...(agent.profileFactsSync?.handlers ?? {}),
     ...(agent.primaryDevice?.handlers ?? {}),
+    ...(agent.spinePoint?.handlers ?? {}),
     // Siblings follow a circle — the join AND the leave (2026-09-21/22), the same entries the lane table spreads.
     ...(agent.circleFollowSync?.handlers ?? {}),
     // A household bot's identity-link statement → a contact row (the lane table's entry, every shell).

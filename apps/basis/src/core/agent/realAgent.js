@@ -58,7 +58,7 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
@@ -103,7 +103,7 @@ import {
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
-import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
+import { createPrimaryDeviceChoice, SPINE_POINT_VAULT_KEY, SPINE_POINT_SUBTYPES } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createProfileFactsSync, routeProfileFactsBySender } from '../../v2/profileFactsSync.js';
@@ -117,7 +117,7 @@ import { unregisterCircleAddressesOnRelays } from '../../v2/circleAddressRegistr
 import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
-import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
+import { makeGovernanceRail, bindCircleGovernance, makeGovernanceBroadcast } from '../../v2/governanceAppWiring.js';
 import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 // …and the circle POLICY, the same way: a signed statement on the governance lane, caught up by joiners.
 import { makePolicyUpdateEmitter } from '../../v2/policyUpdateLane.js';
@@ -793,6 +793,10 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // THE PRIMARY DEVICE (sync-policy §12, the DM half): read lazily — the choice store is composed further down.
   const primaryDeviceRef = { current: null };
+  const spinePointRef = { current: null };
+  const resendSpineOutboxRef = { current: null };
+  const closeSpineAfterMoveRef = { current: null };
+  const askSpineCatchUpRef = { current: null };
   const sa = await createSecureMeshAgent({
     bus,
     // Other agents' kernel task requests over the relay (a connected screen calling the door's ops): only where the
@@ -2127,6 +2131,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       await agentsRegistryRef.register({ ...cur, properties: registrySetDeviceDelegation(cur.properties ?? {}, rec.deviceId, rec) });
       carryDeviceMap('default').catch(() => { /* the next record learned carries again */ });
       welcomeNewDevice(rec).catch(() => { /* its connect-time catch-up asks again */ });
+      // THE POINT, when a second device arrives: the EXISTING device claims it unless a claim exists — never the newcomer
+      // (it is still waiting for its first map), so the person's spine has one signer from the moment there are two.
+      if (!spinePointRef.current?.current?.() && !awaitingDeviceMap.has(primaryId) && personas.get(primaryId)?.circleRoot) {
+        Promise.resolve(spinePointRef.current?.claim?.()).catch(() => { /* the tap on Mij still claims */ });
+      }
     },
   });
   // THE DEVICE KIT OF A SELF — what this device signs with, carries, and knows a sibling by, as the default or as one
@@ -2223,7 +2232,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Bounded in time as well: a backend whose change signal misses a write still answers fresh within the window.
   const DEVICE_ROWS_MEMO_MS = 2000;
   const deviceRowsMemo = new Map();   // pid → { at, promise }
-  try { agentsRegistryRef?.onChanged?.(() => deviceRowsMemo.clear()); } catch { /* the time bound still holds */ }
+  try {
+    agentsRegistryRef?.onChanged?.(() => {
+      deviceRowsMemo.clear();
+      // the device map moved: an act that waited for a point this device could not place yet may go now
+      Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {});
+    });
+  } catch { /* the time bound still holds */ }
   const deviceSiblingRowsOf = async (pid) => {
     const hit = deviceRowsMemo.get(pid);
     if (hit && Date.now() - hit.at < DEVICE_ROWS_MEMO_MS) return hit.promise;
@@ -2637,7 +2652,448 @@ export async function createRealHouseholdAgent(opts = {}) {
       console.info(`[primary-device] this device is ${mine ? 'now' : 'no longer'} the primary contact address`);
     },
   });
+  // THE POINT: the device the primary-device claim names — the one that signs this person's spine statements. No claim
+  // yet → every device is its own point (a lone device; the existing device claims when a second one arrives).
+  const SPINE_ACT_SUBTYPE = 'own-spine-act';
+  // THE OWN-SPINE OUTBOX: at least once until signed. Every act this device hands the point is kept (under an act id of
+  // its own — never in any signed statement) until the point ACKS it, and re-sent on reconnect and when the point moves;
+  // the point dedupes by act id, so a re-send after a lost ack never signs twice.
+  const SPINE_ACK_SUBTYPE = 'own-spine-ack';
+  const SPINE_OUTBOX_KEY = 'spine-outbox';
+  // ONE window for both sides, biased to DELIVERY: a phone point can be off overnight or for a trip. The point remembers an
+  // act id this long (in its vault, so a restart does not forget), and the forwarder re-sends this long, measured from its
+  // own clock. A double sign after a forgotten id is the cheaper failure: the acts settle the same applied twice, on one key
+  // and one head, so no fork. Past the window the act is dropped and the person is told it was not sent; past a day of
+  // waiting the screen already says it waits.
+  const SPINE_ACT_WINDOW_MS = 7 * 24 * 3600_000;
+  const SPINE_ACT_OVERDUE_MS = 24 * 3600_000;
+  const SPINE_UNSENT_KEY = 'spine-outbox-unsent';
+  const SPINE_SEEN_KEY = 'spine-seen';
+  const SPINE_GATE_KEY = 'spine-gate';
+  const spineUnsent = new Map();   // actId → { lane, circleId, at, droppedAt }
+  // A NEW POINT CATCHES UP FIRST. A device the point MOVED to may not yet hold the last statement the previous point
+  // signed — on the same key — and a statement off that stale head would fork the person's chain. So each circle is
+  // CLOSED for spine signing until a membership batch has landed from any source (own devices are asked first); the
+  // acts meanwhile wait, as acts already do. A time-out opens a circle only when nobody exists to fork against: no other
+  // member and no other live device of this self.
+  const SPINE_CATCHUP_RELEASE_MS = 15_000;
+  let spineMovedAt = 0;              // when the point last moved HERE (0: it never did — every circle is open)
+  const spineCaughtUp = new Set();   // circles caught up since that move
+  const spineClosed = new Map();     // circleId → the release timer, for a circle asked and not yet caught up
+  const spineParked = new Map();     // actId → { fromAddr, payload } — a sibling's act that arrived while its circle was closed
+  const spineCatchUpRef = { current: null };
+  // per circle, and lazily: a circle this device did not list at the move closes on its first spine act
+  const spineOpen = (circleId) => !spineMovedAt || typeof circleId !== 'string' || !pointGovernsRef.current(circleId) || spineCaughtUp.has(circleId);
+  const pointGovernsRef = { current: () => true };
+  const spineOutbox = new Map();   // actId → { lane, act, at, ackedHash? }
+  let spineOutboxLoaded = false;
+  const loadSpineOutbox = async () => {
+    if (spineOutboxLoaded) return;
+    spineOutboxLoaded = true;
+    try { const raw = await chatVault.get(SPINE_OUTBOX_KEY); for (const [k, v] of Object.entries(raw ? JSON.parse(raw) : {})) spineOutbox.set(k, v); } catch { /* an empty outbox */ }
+    try { const raw = await chatVault.get(SPINE_UNSENT_KEY); for (const [k, v] of Object.entries(raw ? JSON.parse(raw) : {})) spineUnsent.set(k, v); } catch { /* none */ }
+    // a restart mid-catch-up keeps the circles closed that were not caught up yet (their queued acts still wait)
+    try {
+      const g = JSON.parse((await chatVault.get(SPINE_GATE_KEY)) ?? 'null');
+      if (g && Number.isFinite(g.movedAt) && g.movedAt > spineMovedAt) {
+        spineMovedAt = g.movedAt;
+        for (const c of Array.isArray(g.caughtUp) ? g.caughtUp : []) spineCaughtUp.add(c);
+      }
+    } catch { /* none */ }
+  };
+  const saveSpineGate = async () => {
+    try { await chatVault.set(SPINE_GATE_KEY, JSON.stringify({ movedAt: spineMovedAt, caughtUp: [...spineCaughtUp] })); } catch { /* kept in memory */ }
+  };
+  const saveSpineOutbox = async () => {
+    try { await chatVault.set(SPINE_OUTBOX_KEY, JSON.stringify(Object.fromEntries(spineOutbox))); } catch { /* kept in memory */ }
+    try { await chatVault.set(SPINE_UNSENT_KEY, JSON.stringify(Object.fromEntries(spineUnsent))); } catch { /* kept in memory */ }
+  };
+  /** Past the window an act is dropped from the outbox and kept, for one more window, as NOT SENT — what the screen says. */
+  const expireSpineOutbox = (now) => {
+    let changed = false;
+    for (const [actId, e] of [...spineOutbox]) {
+      if (now - (e.at ?? 0) <= SPINE_ACT_WINDOW_MS) continue;
+      spineOutbox.delete(actId);
+      changed = true;
+      if (e.ackedHash) continue;   // signed by the point: it was sent, only never seen here — nothing to tell
+      spineUnsent.set(actId, { lane: e.lane, circleId: e.act?.circleId ?? null, at: e.at ?? 0, droppedAt: now });
+    }
+    for (const [actId, u] of [...spineUnsent]) if (now - (u.droppedAt ?? 0) > SPINE_ACT_WINDOW_MS) { spineUnsent.delete(actId); changed = true; }
+    return changed;
+  };
+  // A CLAIM NAMES THE POINT: from then on this device never signs a spine act itself, even when it cannot place the
+  // point yet (a claim learned before the device map) — the act waits in the outbox and goes once the point is placeable.
+  const sendSpineAct = async (lane, act) => {
+    await loadSpineOutbox();
+    const actId = `act-${Date.now().toString(36)}-${b64encode(globalThis.crypto.getRandomValues(new Uint8Array(9)))}`;
+    spineOutbox.set(actId, { lane, act, at: Date.now() });
+    await saveSpineOutbox();
+    const to = await pointDeviceAddress();
+    if (!to) return { forwarded: true, held: true, actId };   // the map or the claim's move sends it
+    try {
+      const sent = await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane, act, actId }, { guarantee: 'hold-forward' }, primaryId);
+      return { forwarded: true, held: sent?.held === true, actId };
+    } catch { return { forwarded: true, held: true, actId }; }   // kept: the next reconnect sends it
+  };
+  /** The point's OWN act while its circle is closed: kept in the outbox (as `local`) and signed when the circle opens. */
+  const queueOwnSpineAct = async (lane, act) => {
+    await loadSpineOutbox();
+    const actId = `own-${Date.now().toString(36)}-${b64encode(globalThis.crypto.getRandomValues(new Uint8Array(9)))}`;
+    spineOutbox.set(actId, { lane, act, at: Date.now(), local: true });
+    await saveSpineOutbox();
+    askSpineCatchUpRef.current?.(act?.circleId);
+    return { forwarded: true, held: true, waitingCatchUp: true, actId };
+  };
+  /** An act's statement hash is on this device's own membership rail (it arrived by the carry or the fan). */
+  const ownRailHolds = (hash, circleId) => {
+    try { return !!hash && typeof circleId === 'string' && (membershipRail?.storedStatements?.(circleId) ?? []).some((x) => x?.body?.hash === hash); } catch { return false; }
+  };
+  const resendSpineOutbox = async ({ now = Date.now() } = {}) => {
+    await loadSpineOutbox();
+    if (expireSpineOutbox(now)) await saveSpineOutbox();
+    if (isPointDevice()) {
+      // the point's own acts that wait for a circle to catch up (from before a restart, too): ask for those circles
+      for (const e of spineOutbox.values()) if (!e.ackedHash) askSpineCatchUpRef.current?.(e.act?.circleId);
+      return { resent: 0 };
+    }
+    if (!spineOutbox.size) return { resent: 0 };
+    const to = await pointDeviceAddress();
+    if (!to) return { resent: 0 };
+    let resent = 0;
+    for (const [actId, e] of [...spineOutbox]) {
+      if (e.ackedHash) { if (ownRailHolds(e.ackedHash, e.act?.circleId)) spineOutbox.delete(actId); continue; }   // signed: waits only to be seen
+      try { await sendToSibling(to, { subtype: SPINE_ACT_SUBTYPE, lane: e.lane, act: e.act, actId }, { guarantee: 'hold-forward' }, primaryId); resent += 1; } catch { /* next time */ }
+    }
+    await saveSpineOutbox();
+    return { resent };
+  };
+  resendSpineOutboxRef.current = () => resendSpineOutbox();
+  /** What this device handed the point and has not yet seen signed on its own rail, and what it gave up on — for the
+   *  screen's pending line. */
+  const spineOutboxWaiting = async ({ now = Date.now() } = {}) => {
+    await loadSpineOutbox();
+    if (expireSpineOutbox(now)) await saveSpineOutbox();
+    const waiting = [...spineOutbox].filter(([, e]) => !(e.ackedHash && ownRailHolds(e.ackedHash, e.act?.circleId))).map(([actId, e]) => ({
+      actId, lane: e.lane, circleId: e.act?.circleId ?? null, at: e.at ?? 0, acked: !!e.ackedHash,
+      overDay: now - (e.at ?? 0) > SPINE_ACT_OVERDUE_MS,
+    }));
+    const unsent = [...spineUnsent].map(([actId, u]) => ({ actId, ...u }));
+    return { waiting, unsent };
+  };
+  const spineAckHandler = async (fromAddr, payload) => {
+    if (payload?.subtype !== SPINE_ACK_SUBTYPE || typeof payload.actId !== 'string') return;
+    if (!(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
+    await loadSpineOutbox();
+    const e = spineOutbox.get(payload.actId);
+    if (!e) return;
+    if (typeof payload.hash === 'string' && payload.hash && !ownRailHolds(payload.hash, e.act?.circleId)) spineOutbox.set(payload.actId, { ...e, ackedHash: payload.hash });
+    else spineOutbox.delete(payload.actId);
+    await saveSpineOutbox();
+  };
+  // the point's seen-set: an act id signed inside the window is acked again, never signed again — kept in the vault
+  const seenSpineActs = new Map();   // actId → { at, hash }
+  let seenSpineLoaded = false;
+  const loadSeenSpineActs = async () => {
+    if (seenSpineLoaded) return;
+    seenSpineLoaded = true;
+    try { const raw = await chatVault.get(SPINE_SEEN_KEY); for (const [k, v] of Object.entries(raw ? JSON.parse(raw) : {})) seenSpineActs.set(k, v); } catch { /* none */ }
+  };
+  const saveSeenSpineActs = async () => { try { await chatVault.set(SPINE_SEEN_KEY, JSON.stringify(Object.fromEntries(seenSpineActs))); } catch { /* kept in memory */ } };
+  const ackSpineAct = async (to, actId, hash = null) => {
+    if (typeof actId !== 'string') return;
+    try { await sendToSibling(to, { subtype: SPINE_ACK_SUBTYPE, actId, ...(hash ? { hash } : {}) }, { guarantee: 'hold-forward' }, primaryId); } catch { /* the forwarder re-sends; the seen-set acks again */ }
+  };
+  const myPointId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
+  const isPointDevice = () => { const c = spinePoint.current?.(); return !c || c.deviceId === myPointId; };
+  // THE POINT IS THE PRIMARY PERSONA'S, for now: the claim names a device of it, and another persona's circles live only on
+  // the devices that hold that persona — so those circles sign where they are, as before (a point per persona is open)
+  const pointGoverns = (circleId) => typeof circleId !== 'string' || (circlePersonas.get(circleId) ?? primaryId) === primaryId;
+  const signsHere = (circleId) => !pointGoverns(circleId) || isPointDevice();
+  pointGovernsRef.current = pointGoverns;
+  const pointDeviceAddress = async () => {
+    const c = spinePoint.current?.();
+    if (!c) return null;
+    try { return (await deviceSiblingRowsOf(primaryId)).find((d) => d.deviceId === c.deviceId)?.address ?? null; } catch { return null; }
+  };
+  /** The point signs a sibling's spine act: from a live device of this person only, a declared membership kind only, as
+   *  the circle's own self, on this device's own head. */
+  const spineActHandler = async (fromAddr, payload) => {
+    if (payload?.subtype !== SPINE_ACT_SUBTYPE) return;
+    const actId = typeof payload.actId === 'string' ? payload.actId : null;
+    if (actId) {
+      const now = Date.now();
+      await loadSeenSpineActs();
+      for (const [k, v] of seenSpineActs) if (now - v.at > SPINE_ACT_WINDOW_MS) seenSpineActs.delete(k);
+      const seen = seenSpineActs.get(actId);
+      if (seen) { if (isPointDevice()) await ackSpineAct(fromAddr, actId, seen.hash); return; }   // signed already: ack again
+    }
+    // this point has not caught up in that circle yet: the act waits, unacked (the forwarder keeps it), and is signed on open
+    if (isPointDevice() && !spineOpen(payload.act?.circleId)) {
+      spineParked.set(actId ?? `parked-${spineParked.size}-${Date.now()}`, { fromAddr, payload });
+      askSpineCatchUpRef.current?.(payload.act?.circleId);
+      return;
+    }
+    const done = async (hash = null) => {
+      if (!actId) return;
+      seenSpineActs.set(actId, { at: Date.now(), hash });
+      await saveSeenSpineActs();
+      await ackSpineAct(fromAddr, actId, hash);
+    };
+    if (payload.lane === 'governance') {
+      if (!isPointDevice() || !(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
+      try { await governanceActOnPoint(payload.act ?? {}); await done(); } catch { /* the act said 'forwarded'; the fold shows what is */ }
+      return;
+    }
+    if (payload.lane === 'key') {
+      if (!isPointDevice() || !(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
+      try { await keyActOnPoint(payload.act ?? {}); await done(); } catch { /* the act said 'forwarded'; the roster shows what is */ }
+      return;
+    }
+    if (payload.lane !== 'membership') return;
+    if (!isPointDevice() || typeof localMembershipEmitRef.current !== 'function') return;
+    if (!(await deviceSiblingRowsOf(primaryId)).some((d) => d.address === fromAddr)) return;
+    const act = payload.act ?? {};
+    if (typeof act.circleId !== 'string' || !MEMBERSHIP_RAIL_KINDS.includes(act.kind)) return;
+    // IDENTITY COMES FROM THE POINT: an act naming any other self (actor, by, voter, authorRef) is refused whole — a
+    // device of the person may ask the point to act AS the person, never as anyone else
+    const me = circleSelfRef(act.circleId);
+    const named = [act.actor, act.payload?.by, act.payload?.voter, act.payload?.authorRef].filter((x) => x !== undefined && x !== null);
+    if (named.some((x) => x !== me)) return;
+    // as the circle's own SELF — never an actor the forwarding device named
+    try { const res = await localMembershipEmitRef.current({ kind: act.kind, circleId: act.circleId, subject: act.subject, payload: act.payload, actor: circleSelfRef(act.circleId) }); await done(res?.body?.hash ?? res?.statement?.body?.hash ?? null); }   // the emit returns the signed statement itself
+    catch { /* the sibling's act is retried by nothing: it said 'forwarded' — the next act shows the roster as it is */ }
+  };
+  const localMembershipEmitRef = { current: null };
+  // THE KEY LANE FROM THE POINT TOO: a circle's group key is produced, wrapped and its key event signed only on the point.
+  // Another device of the person hands the point the ACT — add or remove a member — and never key material: the point
+  // generates and wraps from its own state, and takes a recipient's sealing key from ITS OWN roster.
+  const forwardKeyAct = async (act) => sendSpineAct('key', act);
+  const pointGatedControlAgent = (ctl) => {
+    if (!ctl || typeof ctl !== 'object') return ctl;
+    return new Proxy(ctl, {
+      get(target, prop) {
+        if (prop === 'addMember') {
+          return async (a = {}) => (signsHere(a.groupId)
+            ? (spineOpen(a.groupId) ? target.addMember(a) : queueOwnSpineAct('key', { op: 'add', circleId: a.groupId, webId: a.webId, role: a.role ?? null }))
+            : forwardKeyAct({ op: 'add', circleId: a.groupId, webId: a.webId, role: a.role ?? null }));
+        }
+        if (prop === 'removeMember') {
+          return async (a = {}) => (signsHere(a.groupId)
+            ? (spineOpen(a.groupId) ? target.removeMember(a) : queueOwnSpineAct('key', { op: 'remove', circleId: a.groupId, webId: a.webId, policy: a.policy ?? null, force: a.force === true }))
+            : forwardKeyAct({ op: 'remove', circleId: a.groupId, webId: a.webId, policy: a.policy ?? null, force: a.force === true }));
+        }
+        const v = target[prop];
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+  };
+  /** The gate the shells hand their governance binding: not the point → the act goes to the point. */
+  const spineGate = {
+    // the point signs here only once it has caught up in that circle; until then its act waits like a sibling's
+    isPoint: (circleId) => signsHere(circleId) && spineOpen(circleId),
+    forward: async (act) => {
+      if (signsHere(act?.circleId)) return queueOwnSpineAct('governance', act);
+      return sendSpineAct('governance', act);
+    },
+  };
+  /** The point's own governance binding (no gate: it IS the point) — what it runs a sibling's governance act through. */
+  let pointGovernance = null;
+  const governanceActOnPoint = async (act) => {
+    const circleId = typeof act?.circleId === 'string' ? act.circleId : null;
+    const event = act?.event;
+    if (!circleId || !event || typeof event !== 'object' || (act.channel !== 'governance' && act.channel !== 'report')) return;
+    // identity from the point: an event naming any other self is refused whole
+    const me = circleSelfRef(circleId);
+    if ([event.by, event.voter, event.actor].some((x) => x !== undefined && x !== null && x !== me)) return;
+    if (!pointGovernance) {
+      pointGovernance = bindCircleGovernance({
+        eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+        // no policy here, on purpose: the point only APPENDS a forwarded event (governance or report); appending reads
+        // no policy (the rail signs it; a report's readers come from the roster's admins). The policy is read where the
+        // act is DECIDED — the governance model on the device the person acted on — before it is handed over.
+        callSkill: (...a) => callSkill(...a), getPolicy: async () => ({}), myRef: circleSelfRef,
+        genId: () => `gov-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        broadcast: makeGovernanceBroadcast((...a) => callSkill(...a)), circleIdentityFor,
+      });
+    }
+    if (act.channel === 'governance') await pointGovernance.appendGovernanceEvent(circleId, event);
+    else await pointGovernance.appendReportEvent(circleId, event);
+  };
+  /** Rotate a circle's group key past the given sealing keys, as its admin, from THIS device's own producer state: the
+   *  next version goes to the survivors (this device included), never to a retired key. Null when there is nothing to
+   *  do (not an admin, no keys yet, or another admin already rotated past them). */
+  const rotateCircleExcluding = async (circleId, gone) => {
+    const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
+    const me = (Array.isArray(roster?.members) ? roster.members : []).find((m) => (m.webid ?? m.addr ?? m.ref) === chatId.pubKey);
+    if (me?.role !== 'admin' || typeof keyEmitRef.current !== 'function') return null;
+    const events = await keyEventsFromRail(keyRail, circleId);
+    const fold = foldKeyEvents(events, { groupId: circleId });
+    if (!fold?.recipients?.length) return null;
+    // ALREADY DONE? Another admin may have rotated this circle between our read and now — minting a second version off
+    // the same parent would only create the honest concurrency the fold has to resolve afterwards.
+    if (!fold.recipients.some((r) => gone.has(r))) return null;
+    const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
+    const recipients = fold.recipients.filter((r) => !gone.has(r));
+    if (!recipients.includes(mine)) recipients.push(mine);
+    const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
+    const statement = await keyEmitRef.current(circleId, event);
+    if (!statement) return null;
+    await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
+    await callSkill('pinboard', 'broadcastCircleKeyStatement', {
+      groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
+    }).catch(() => {});
+    return { circleId, version: event.version };
+  };
+  const keyEmitRef = { current: null };
+  /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
+  const keyActOnPoint = async (act) => {
+    const ctl = opts.pinboardControlAgent;
+    if (!ctl || typeof act?.circleId !== 'string') return;
+    if (['publicKey', 'sealingKey', 'groupKey', 'wrap', 'seed'].some((k) => k in act)) return;   // no key material, ever
+    const rows = await callSkill('pinboard', 'listGroupMembers', { groupId: act.circleId }).then((r) => r?.members ?? []).catch(() => []);
+    if (act.op === 'add' || act.op === 'remove') {
+      if (typeof act.webId !== 'string') return;
+      const row = rows.find((m) => m?.webid === act.webId) ?? null;
+      if (act.op === 'add') {
+        if (!row?.circleAddress) return;   // not a current member of this circle here: nothing to grant
+        await ctl.addMember({ webId: act.webId, publicKey: sealingPublicKeyFromNetworkKey(row.circleAddress), role: act.role ?? row.role ?? 'member', groupId: act.circleId });
+      } else {
+        await ctl.removeMember({ webId: act.webId, groupId: act.circleId, ...(act.policy ? { policy: act.policy } : {}), ...(act.force ? { force: true } : {}) });
+      }
+      return;
+    }
+    if (act.op === 'rotate') {
+      // past OLD addresses of this person's only — each on this point's own row for them, none the persona's current one
+      const exclude = Array.isArray(act.exclude) ? act.exclude.filter((x) => typeof x === 'string') : [];
+      const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
+      const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
+      const ok = exclude.filter((a) => a !== circleAddressFor(act.circleId) && listed.has(a));
+      if (!ok.length) return;
+      await rotateCircleExcluding(act.circleId, new Set(ok.map((a) => sealingPublicKeyFromNetworkKey(a))));
+      return;
+    }
+    if (act.op === 'ban') {
+      // an OLD address of this person's — on this point's own row for them — and never the persona's current one
+      if (typeof act.address !== 'string' || act.address === circleAddressFor(act.circleId)) return;
+      const mine = rows.find((m) => m?.webid === circleSelfRef(act.circleId));
+      const listed = new Set([mine?.circleAddress, ...(mine?.circleAddresses ?? []), ...((mine?.retiredAddresses ?? []).map((x) => x?.address))].filter(Boolean));
+      if (!listed.has(act.address)) return;
+      await ctl.revokeRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(act.address), policy: 'ban' });
+    }
+  };
+  /** A membership act this person's chain already carries (same kind, subject and payload) — it landed. */
+  const landedOnOwnRail = (act) => {
+    try {
+      const mine = circleAddressFor(act.circleId);
+      const want = JSON.stringify(act.payload ?? null);
+      return !!mine && (membershipRail?.storedStatements?.(act.circleId) ?? []).some((x) => x?.body?.author === mine
+        && x.body.kind === act.kind && x.body.subject === act.subject && JSON.stringify(x.body.payload ?? null) === want);
+    } catch { return false; }
+  };
+  /** A circle caught up (or nobody is there to fork against): sign what waited, in the order it waited. */
+  const openSpine = async (circleId) => {
+    if (spineOpen(circleId)) return;
+    clearTimeout(spineClosed.get(circleId));
+    spineClosed.delete(circleId);
+    spineCaughtUp.add(circleId);
+    await saveSpineGate();
+    await loadSpineOutbox();
+    // What waited HERE is signed. What this device handed the PREVIOUS point without ever seeing an ack is not: it may have
+    // been signed and then superseded, and signing it again now would quietly undo the later change. One that is on this
+    // device's rail as signed is dropped; the rest can now never be signed by anyone (this device is the point), so they
+    // leave the outbox at once and the person is told they may not have come through.
+    for (const [actId, e] of [...spineOutbox]) {
+      if (e.ackedHash || e.act?.circleId !== circleId) continue;
+      if (!e.local) {
+        spineOutbox.delete(actId);
+        if (!(e.lane === 'membership' && landedOnOwnRail(e.act))) {
+          spineUnsent.set(actId, { lane: e.lane, circleId, at: e.at ?? 0, droppedAt: Date.now(), maybe: true });
+        }
+        continue;
+      }
+      try {
+        if (e.lane === 'membership') await localMembershipEmitRef.current?.(e.act);
+        else if (e.lane === 'governance') await governanceActOnPoint(e.act);
+        else if (e.lane === 'key') await keyActOnPoint(e.act);
+        spineOutbox.delete(actId);
+      } catch { /* kept: the next open signs it */ }
+    }
+    await saveSpineOutbox();
+    for (const [actId, p] of [...spineParked]) {
+      if (p.payload?.act?.circleId !== circleId) continue;
+      spineParked.delete(actId);
+      await spineActHandler(p.fromAddr, p.payload).catch(() => {});
+    }
+  };
+  /** A membership batch landed for a circle: this point now holds what that source holds there. */
+  // (closeSpineAfterMove is bound below; the point record above reaches it through this ref)
+  const spineBatchArrived = (circleId) => { if (!spineOpen(circleId)) openSpine(circleId).catch(() => {}); };
+  const armSpineRelease = (circleId) => {
+    const timer = setTimeout(() => { releaseSpineIfAlone(circleId).catch(() => {}); }, SPINE_CATCHUP_RELEASE_MS);
+    timer?.unref?.();
+    spineClosed.set(circleId, timer);
+  };
+  /** The time-out opens a circle only when nobody exists to fork against; otherwise the held requests answer later. */
+  const releaseSpineIfAlone = async (circleId) => {
+    if (spineOpen(circleId)) return;
+    const me = circleSelfRef(circleId);
+    let others = 1;
+    try { others = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []).filter((m) => m && (m.webid ?? m.addr) !== me).length; } catch { others = 1; }
+    let siblings = 1;
+    try { siblings = (await deviceSiblingRowsOf(circlePersonas.get(circleId) ?? primaryId)).length; } catch { siblings = 1; }
+    if (others === 0 && siblings === 0) await openSpine(circleId);
+  };
+  /** Ask one circle's catch-up (own devices first) and arm its release check — once per closed circle. */
+  const askSpineCatchUp = async (circleId) => {
+    if (typeof circleId !== 'string' || !circleId || spineOpen(circleId) || spineClosed.has(circleId)) return;
+    armSpineRelease(circleId);
+    let own = [];
+    try { own = (await deviceSiblingRowsOf(circlePersonas.get(circleId) ?? primaryId)).map((d) => d.address); } catch { own = []; }
+    Promise.resolve(spineCatchUpRef.current?.(circleId, { own })).catch(() => {});
+  };
+  askSpineCatchUpRef.current = (circleId) => { askSpineCatchUp(circleId).catch(() => {}); };
+  /** This device just BECAME the point (the claim moved here from another device): every circle closes until caught up. */
+  const closeSpineAfterMove = async () => {
+    spineMovedAt = Date.now();
+    spineCaughtUp.clear();
+    await saveSpineGate();
+    let circles = [];
+    try { circles = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { circles = []; }
+    for (const c of circles) await askSpineCatchUp(typeof c === 'string' ? c : (c?.groupId ?? c?.id));
+    console.info(`[spine-point] this device is now the point: catching up in ${spineClosed.size} circle(s) before it signs`);
+  };
+  closeSpineAfterMoveRef.current = closeSpineAfterMove;
+  /** Ask again in every circle still closed (on connect: a member that was away answers now). */
+  const spineCatchUpAgain = async () => {
+    let asked = 0;
+    for (const circleId of [...spineClosed.keys()]) {
+      let own = [];
+      try { own = (await deviceSiblingRowsOf(circlePersonas.get(circleId) ?? primaryId)).map((d) => d.address); } catch { own = []; }
+      try { await spineCatchUpRef.current?.(circleId, { own }); asked += 1; } catch { /* next connect */ }
+    }
+    return { asked };
+  };
+  closeSpineAfterMoveRef.again = spineCatchUpAgain;
   primaryDeviceRef.current = primaryDevice;
+  // THE POINT, its own record (the same shape and carry): who signs this person's spine statements. The enrol claims it
+  // alone — direct messages keep landing where they did — and the person's "main device" tap sets both.
+  const spinePoint = createPrimaryDeviceChoice({
+    vault: chatVault,
+    myDeviceId: enrolledDevice?.deviceId ?? custody.deviceId ?? null,
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    vaultKey: SPINE_POINT_VAULT_KEY,
+    subtypes: SPINE_POINT_SUBTYPES,
+    // the point moved HERE from another device: catch up before signing
+    onChanged: (mine, prev) => {
+      if (mine && prev?.deviceId && prev.deviceId !== (enrolledDevice?.deviceId ?? custody.deviceId ?? null)) {
+        Promise.resolve(closeSpineAfterMoveRef.current?.()).catch(() => {});
+      }
+    },
+    // the point moved, wherever to: what waits for it goes to the device it now names
+    onMoved: () => { Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {}); },
+  });
+  spinePointRef.current = spinePoint;
   await primaryDevice.load();
   const primaryKeySync = createPersonKeySync({
     siblings: ownDeviceSiblings,
@@ -3529,7 +3985,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       }).catch(() => null);
       if (stmt) revokedIn.push({ circleId, address });
       try {
-        await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
+        // the ban is a key-lane statement on the shared circle key: only the point writes it (handed the ADDRESS — public,
+        // on the person's own row — never a key)
+        if (signsHere(circleId)) await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
+        else await forwardKeyAct({ op: 'ban', circleId, address });
       } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
     }
     return revokedIn;
@@ -3621,30 +4080,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       const retiredSealingFor = (circleId) => new Set(retired.map(({ seed }) => sealingPublicKeyFromNetworkKey(deriveCircleAddress(seed, circleId))));
       for (const circleId of circles) {
         try {
-          const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
-          const me = (Array.isArray(roster?.members) ? roster.members : []).find((m) => (m.webid ?? m.addr ?? m.ref) === chatId.pubKey);
-          if (me?.role !== 'admin' || typeof keyEmit !== 'function') continue;
-          const events = await keyEventsFromRail(keyRail, circleId);
-          const fold = foldKeyEvents(events, { groupId: circleId });
-          if (!fold?.recipients?.length) continue;
-          const gone = retiredSealingFor(circleId);
-          // ALREADY DONE? Another admin may have rotated this circle between our read and now. If the current
-          // fold no longer names any retired address, the work exists and minting a second version off the same
-          // parent would only create the honest concurrency the fold has to resolve afterwards. This decides
-          // nothing — two admins who genuinely race still both land, and `collapseKeyEvents` keeps both keys —
-          // it just makes the race rare instead of routine.
-          if (!fold.recipients.some((r) => gone.has(r))) continue;
-          const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
-          const recipients = fold.recipients.filter((r) => !gone.has(r));
-          if (!recipients.includes(mine)) recipients.push(mine);
-          const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
-          const statement = await keyEmit(circleId, event);
-          if (!statement) continue;
-          await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
-          await callSkill('pinboard', 'broadcastCircleKeyStatement', {
-            groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
-          }).catch(() => {});
-          rotated.push({ circleId, version: event.version });
+          // the rotation is a key-lane statement on the shared circle key: only the point writes it — handed the ADDRESSES
+          // to drop (public, on the person's own row), never a key
+          if (!signsHere(circleId)) {
+            const f = await forwardKeyAct({ op: 'rotate', circleId, exclude: retired.map(({ seed }) => deriveCircleAddress(seed, circleId)) });
+            if (f) rotated.push({ circleId, forwarded: true });
+            continue;
+          }
+          const done = await rotateCircleExcluding(circleId, retiredSealingFor(circleId));
+          if (done) rotated.push(done);
         } catch { /* rotation is best-effort per circle — the retirement statements are the enforcement */ }
       }
       // 3. retire: the root-revealed address-revoke, per circle, per retired root
@@ -4287,6 +4731,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return [DataPart({ ok: true, outcome: 'ok', ops: res.ops ?? [], delivery: res.delivery ?? null })];
   }, { visibility: 'private' });   // hands another agent standing authority on the person's node: owner-only
+  hostAgent.register('ownSpineOutbox', async () => {
+    const { waiting, unsent } = await spineOutboxWaiting();
+    const open = waiting.filter((w) => !w.acked);
+    return [DataPart({ ok: true, waiting: open.length, overDay: open.filter((w) => w.overDay).length,
+      unsent: unsent.filter((u) => !u.maybe).length, maybeLost: unsent.filter((u) => u.maybe).length })];
+  }, { visibility: 'private' });   // this device's own pending changes: owner-only
   hostAgent.register('companionGrantList', async ({ parts }) => {
     const { node } = parts?.[0]?.data ?? {};
     const { res, outcome } = await askOwnedNode(node, 'grants.list', {});
@@ -5155,7 +5605,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         console.info(`[membership-fan] retold a ${kind} in ${String(circleId).slice(0, 8)} ${amAdmin ? 'as its admin' : 'as the departure emptied its admins'}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`);
       })().catch(() => { /* best-effort: the departed's own copy and catch-up remain */ });
     }
-    membershipEmit = makeMembershipEmitter({
+    const localMembershipEmit = makeMembershipEmitter({
       rail: membershipRail,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
@@ -5177,6 +5627,32 @@ export async function createRealHouseholdAgent(opts = {}) {
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
         .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     });
+    // SPINE STATEMENTS ONLY FROM THE POINT (Frits, 2026-10-31): every full device of a person signs a circle's statements
+    // with the same circle key, and two of them signing the spine at once would fork it. So a device that is not the
+    // point hands the ACT (kind, subject, payload) to the point over the own lane — held for it while it sleeps — and
+    // the point builds the statement on its own head and signs it. The point is the primary-device claim; with no claim
+    // yet, this device signs as before (a lone device, or the moment before the claim is made).
+    localMembershipEmitRef.current = localMembershipEmit;
+    membershipEmit = async (act = {}) => {
+      // the point that has not caught up in this circle queues its own act — a ceremony's too: its authority is the root
+      // reveal it carries (bound to circle, subject and kind), which keeps; the statement is signed with the circle key on open
+      // a circle FOUNDED here: its creation starts a chain nothing came before, so there is nothing to catch up on — it is
+      // open from this statement on (found by the box-as-primary walk: a pair circle founded right after the point moved
+      // here had its creation held, so the box was not its founder and its invite was refused 'admin-only')
+      // — only the creation of a circle this device founds NOW: its lane holds nothing for that circle yet (a statement
+      // merely claiming kind 'create' on an existing circle is held like any other)
+      const foundsNow = act?.kind === 'create' && typeof act.circleId === 'string'
+        && !(membershipRail?.storedStatements?.(act.circleId) ?? []).length;
+      if (foundsNow && !spineOpen(act.circleId)) {
+        spineCaughtUp.add(act.circleId);
+        Promise.resolve(saveSpineGate()).catch(() => {});
+      }
+      if (act?.circleId && pointGoverns(act.circleId) && isPointDevice() && !spineOpen(act.circleId)) { const { signer: _s, ...kept } = act; return queueOwnSpineAct('membership', kept); }   // eslint-disable-line no-unused-vars
+      if (!act?.circleId || signsHere(act.circleId)) return localMembershipEmit(act);
+      const { signer: _signer, ...plain } = act;   // eslint-disable-line no-unused-vars
+      // `held`: the point is not online — the act waits for it (the screen says so)
+      return sendSpineAct('membership', plain);
+    };
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
@@ -5318,6 +5794,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (statement) siblingCarry.carry({ subtype: KEY_STATEMENT_BROADCAST, circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now() }).catch(() => {});
     return statement;
   } : null;
+  keyEmitRef.current = keyEmit;
   // THE RULES-UPDATE RIDER: `editGroupRules` also fans the new doc + version as a signed statement
   // on the governance lane (this rail instance shares the device log with the shells' receive-side
   // rail — same lane, same declaration, the multi-instance shape governance already has). Without
@@ -5531,7 +6008,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // S4 — per-circle control-agent router: redeem→addMember / leave→removeMember route
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent
     // → membership hooks no-op (the pre-S4 behaviour).
-    controlAgent: opts.pinboardControlAgent,
+    controlAgent: pointGatedControlAgent(opts.pinboardControlAgent),
     // Route circle chat fan-out through the SAME reliable choke durable circle content uses:
     // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`. This is what gives a circle chat
     // failover (`_sendWithFailover`) + offline hold-forward — the reliability the bus-local
@@ -8664,6 +9141,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       retryPendingRevokes().catch(() => {});
       // every self's device address on its own relay sockets, so the person's other devices can reach this one
       await registerDeviceAddresses().catch((err) => { console.warn(`[device-address] not registered at connect: ${err?.message ?? err}`); });
+      // what this device handed the point and is still waiting on goes again (the point dedupes)
+      Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {});
+      // a circle this point has not caught up in asks again: a member that was away answers now
+      Promise.resolve(closeSpineAfterMoveRef.again?.()).catch(() => {});
       return sa.peer;
     },
     /** Tell the person's nodes the revokes they are still owed (the connect and a node's answer do this themselves). */
@@ -8962,6 +9443,19 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** The migration to one address per persona: this device's own old address — retired here (root), else asked. */
     retireDeviceCircleAddresses,
     ownAddressRetireHandler,
+    spineActHandler,
+    spineAckHandler,
+    spineAckSubtype: SPINE_ACK_SUBTYPE,
+    /** Re-send every act still waiting for the point's ack (the shells' connect, a point change). */
+    resendSpineOutbox,
+    spineOutboxWaiting,
+    spineBatchArrived,
+    setSpineCatchUp: (fn) => { spineCatchUpRef.current = typeof fn === 'function' ? fn : null; },
+    spineClosedCircles: () => [...spineClosed.keys()],
+    spineCatchUpAgain,
+    /** The gate a shell hands its governance binding (`bindCircleGovernance({ spineGate })`). */
+    spineGate,
+    spineActSubtype: SPINE_ACT_SUBTYPE,
     ownAddressRetireSubtype: OWN_ADDRESS_RETIRE_SUBTYPE,
     /** Send to one of this device's own siblings at its device address (the registry's device map). */
     sendToOwnDevice: (to, payload, o = {}) => sendToSibling(to, payload, o),
@@ -8998,7 +9492,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     myDeviceId: () => enrolledDevice?.deviceId ?? custody.deviceId ?? null,
     /** Where a message to a contact goes once their pair roster exists (`pairRoster.js`): `{ to, circleId, personKey }` or null. */
     pairRouteFor: (contactWebid) => pairRouteFor({ callSkill: (a, o, g) => callSkill(a, o, g), selfWebid: chatId.pubKey, contactWebid }),
-    claimPrimaryDevice: () => primaryDevice.claim(),
+    /** "Make this my main device": where direct messages land AND the point that signs the spine — the point only on a
+     *  device that holds the persona's circle root (one without it signs with its own key and cannot be the point). */
+    claimPrimaryDevice: async () => {
+      const primary = await primaryDevice.claim();
+      const point = personas.get(primaryId)?.circleRoot ? await spinePoint.claim() : { ok: false, reason: 'no-circle-root' };
+      return { ...primary, point };
+    },
+    spinePoint,
+    /** The point claim (`{deviceId, at}`) or null — the device that signs this person's spine statements. */
+    spinePointClaim: () => spinePoint.current?.() ?? null,
     personKeySync,
     /** My person-key chain `{ current, links }` — what a contact pulls after a rotation. */
     personKeyChain,

@@ -52,6 +52,11 @@ export const SEAMS = Object.freeze([
   // A SCREEN'S DATA IS A HEAD: Vandaag's blocks kept current by the circles' changes and the event log (`screenHead.js`),
   // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time
   // (a phone: calendar.listEvents ×6 + tasks.listOpen ×3 per Vandaag landing). The box paints no screen.
+  // A CHANGE HANDED TO THE MAIN DEVICE IS SAID AS SUCH. A device that is not the person's main device does not sign a
+  // role change itself; "is now an admin" would be said before it is true. And what waits over a day, or was given up on,
+  // is said on every shell — the box at startup, having no screen.
+  { id: 'role-change-forwarded-words', pattern: /roleChangeNoticeWords\(/, shells: ['web', 'mobile'], why: 'a forwarded role change read as done before the main device signed it' },
+  { id: 'own-spine-outbox-said', pattern: /'ownSpineOutbox'/, why: 'a change that waited days for the main device, or was dropped, would be said nowhere' },
   { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },
   // MIJ IS A HEAD TOO, and it hears the agent registry (a profile's facts are no circle's items): a shell that kept only
   // the circle and log subscriptions would show yesterday's name until the next act.
@@ -224,7 +229,7 @@ export const SEAMS = Object.freeze([
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

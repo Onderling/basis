@@ -27,6 +27,16 @@ export const PRIMARY_DEVICE_SUBTYPES = Object.freeze({
   request: 'primary-device-request',
 });
 
+/** THE POINT — the device that signs this person's spine statements (one address per persona per circle: every full
+ *  device holds the circle key, so only one may sign the chained lanes). The same claim shape and carry as the primary
+ *  device, its own record: the enrol claims the point alone (direct messages keep landing where they did); the person's
+ *  "make this my main device" tap sets both. */
+export const SPINE_POINT_VAULT_KEY = 'spine-point';
+export const SPINE_POINT_SUBTYPES = Object.freeze({
+  carry:   'spine-point-carry',
+  request: 'spine-point-request',
+});
+
 function claimOf(o) {
   if (!o || typeof o !== 'object') return null;
   if (typeof o.deviceId !== 'string' || !o.deviceId || !Number.isFinite(o.at)) return null;
@@ -46,10 +56,11 @@ export function claimSupersedes(next, cur) {
  * @param {string|null} a.myDeviceId   this device's id (the delegation record's); null on a device from before ids
  * @param {() => Promise<string[]>} a.siblings   the person's other proven device addresses
  * @param {(to: string, payload: object, opts?: object) => Promise<any>} a.sendToPeer   hold-forward send to a sibling
- * @param {(isMine: boolean) => any} [a.onChanged]   the host re-registers on the relays with the new flag
+ * @param {(isMine: boolean, prev: object|null) => any} [a.onChanged]   the host re-registers on the relays with the new flag
+ * @param {(claim: object|null, prev: object|null) => any} [a.onMoved]   the claim names another device (this one involved or not)
  * @param {() => number} [a.now]
  */
-export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, sendToPeer, onChanged = null, now = () => Date.now() } = {}) {
+export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, sendToPeer, onChanged = null, onMoved = null, now = () => Date.now(), vaultKey = PRIMARY_DEVICE_VAULT_KEY, subtypes = PRIMARY_DEVICE_SUBTYPES } = {}) {
   // the ONE sibling carry (siblingCarry.js) for the claim and the ask; an answer to one device is a reply
   const { carry } = makeSiblingCarry({ siblings: () => siblings(), sendToPeer, onWarn: () => {} });
   if (typeof siblings !== 'function') throw new Error('primaryDevice: a `siblings` lookup is required');
@@ -61,23 +72,29 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
     if (loaded) return claim;
     loaded = true;
     try {
-      const raw = await vault?.get?.(PRIMARY_DEVICE_VAULT_KEY);
+      const raw = await vault?.get?.(vaultKey);
       claim = claimOf(typeof raw === 'string' ? JSON.parse(raw) : raw);
     } catch { claim = null; }
     return claim;
   }
   async function store(next) {
     claim = next;
-    try { await vault?.set?.(PRIMARY_DEVICE_VAULT_KEY, JSON.stringify(next)); } catch { /* the carry still runs; the next boot asks */ }
+    try { await vault?.set?.(vaultKey, JSON.stringify(next)); } catch { /* the carry still runs; the next boot asks */ }
   }
   const isMine = () => !!claim && !!myDeviceId && claim.deviceId === myDeviceId;
-  const changed = (was) => { const now_ = isMine(); if (now_ !== was && typeof onChanged === 'function') { try { onChanged(now_); } catch { /* re-registration is best-effort */ } } };
+  // `prev`: the claim this one replaced — a host can tell a device that BECAME the choice from one that always was
+  const changed = (was, prev = null) => {
+    const now_ = isMine();
+    if (now_ !== was && typeof onChanged === 'function') { try { onChanged(now_, prev); } catch { /* re-registration is best-effort */ } }
+    // the claim names another device than before, whether or not this one is involved
+    if ((prev?.deviceId ?? null) !== (claim?.deviceId ?? null) && typeof onMoved === 'function') { try { onMoved(claim, prev); } catch { /* best-effort */ } }
+  };
   const isSibling = async (fromAddr) => {
     let addrs = [];
     try { addrs = (await siblings()) ?? []; } catch { return false; }
     return addrs.includes(fromAddr);
   };
-  const wire = (c) => ({ subtype: PRIMARY_DEVICE_SUBTYPES.carry, deviceId: c.deviceId, at: c.at });
+  const wire = (c) => ({ subtype: subtypes.carry, deviceId: c.deviceId, at: c.at });
 
   return {
     load,
@@ -90,9 +107,10 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
       await load();
       if (!myDeviceId) return { ok: false, reason: 'no-device-id' };
       const was = isMine();
+      const prev = claim;
       const next = { deviceId: myDeviceId, at: Math.max(now(), (claim?.at ?? 0) + 1) };
       await store(next);
-      changed(was);
+      changed(was, prev);
       let attempted = 0;
       // the ONE sibling carry; a sibling that misses it follows by request
       try { attempted = (await carry(wire(next))).attempted; } catch { /* no siblings reachable now; they ask on connect */ }
@@ -100,22 +118,23 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
     },
     /** A fresh device asks its siblings for the current claim. */
     async requestFromSiblings() {
-      const r = await carry({ subtype: PRIMARY_DEVICE_SUBTYPES.request }, { sendOpts: { holdKey: PRIMARY_DEVICE_SUBTYPES.request }, quiet: true });
+      const r = await carry({ subtype: subtypes.request }, { sendOpts: { holdKey: subtypes.request }, quiet: true });
       return { attempted: r.attempted };
     },
     handlers: {
-      [PRIMARY_DEVICE_SUBTYPES.carry]: async (fromAddr, payload) => {
-        if (payload?.subtype !== PRIMARY_DEVICE_SUBTYPES.carry) return;
+      [subtypes.carry]: async (fromAddr, payload) => {
+        if (payload?.subtype !== subtypes.carry) return;
         if (!(await isSibling(fromAddr))) return;                    // only a device of mine may say who is primary
         const next = claimOf(payload);
         await load();
         if (!claimSupersedes(next, claim)) return;
         const was = isMine();
+        const prev = claim;
         await store(next);
-        changed(was);
+        changed(was, prev);
       },
-      [PRIMARY_DEVICE_SUBTYPES.request]: async (fromAddr, payload) => {
-        if (payload?.subtype !== PRIMARY_DEVICE_SUBTYPES.request) return;
+      [subtypes.request]: async (fromAddr, payload) => {
+        if (payload?.subtype !== subtypes.request) return;
         if (!(await isSibling(fromAddr))) return;
         await load();
         if (!claim) return;                                          // nothing chosen: silence, not an empty claim

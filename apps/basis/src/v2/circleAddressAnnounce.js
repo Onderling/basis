@@ -132,6 +132,18 @@ export function ownAnnouncementFor({ agent, circleId, primary = false } = {}) {
  * @param {string[]} [a.circleIds]  defaults to every circle this device is in (`listMyCircles`)
  * @returns {Promise<{ circles: number, announced: number, failed: string[] }>}
  */
+/**
+ * The words for the "make this my main device" tap's result: its own line when this device could not also become the
+ * POINT (it holds no circle root — it signs with its own key, and a phrase ceremony on it hands it the root), else the
+ * usual count.
+ * @param {{announced?: number, device?: {point?: {ok?: boolean, reason?: string}}}|null} r  what `makeThisDevicePrimary` returned
+ * @returns {{key: string, params: object}}
+ */
+export function makePrimaryResultWords(r) {
+  if (r?.device?.point?.ok === false && r.device.point.reason === 'no-circle-root') return { key: 'circle.mydata.make_primary_no_point', params: { count: r?.announced ?? 0 } };
+  return { key: 'circle.mydata.make_primary_done', params: { count: r?.announced ?? 0 } };
+}
+
 export async function makeThisDevicePrimary({ agent, circleIds = null, logger = console } = {}) {
   if (!agent || typeof agent.callSkill !== 'function') return { circles: 0, announced: 0, failed: [] };
   let ids = Array.isArray(circleIds) ? circleIds : null;

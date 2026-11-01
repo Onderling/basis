@@ -31,6 +31,7 @@ export function renderCircleAdminPanel(container, {
   outboundCanonical = false,
   busy = false,
   notice = null,
+  outboxLine = null,       // changes handed to the main device: `{key, params}` from the shared `ownSpineOutboxLine`
   viewerWebid = null,
   t,
   onRemove,
@@ -67,6 +68,13 @@ export function renderCircleAdminPanel(container, {
     n.className = 'cc-admin__notice';
     n.textContent = notice;
     container.appendChild(n);
+  }
+  if (outboxLine?.key) {
+    const o = document.createElement('div');
+    o.className = 'cc-admin__notice';
+    o.dataset.outbox = 'true';
+    o.textContent = tr(outboxLine.key, outboxLine.params);
+    container.appendChild(o);
   }
 
   // THE SECTIONS ARE DECLARED (`screenSections.js`): each block opens its section by id (title from the declaration),

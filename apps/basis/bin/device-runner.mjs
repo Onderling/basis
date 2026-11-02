@@ -1407,12 +1407,13 @@ if (tgToken || inboxDoor.bridge) {
       if (payload?.launch && typeof payload.launch === 'object') {
         const l = payload.launch;
         const r = await screens.launched({ from, viewPubKey: l.k, nonce: l.n, initData: l.initData });
-        walkLog({ kind: 'screen-launch', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });
+        walkLog({ kind: 'screen-launch', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops?.length ?? 0 } : { reason: r.reason }) });
         return;
       }
       const offer = parsePairingOffer(payload?.offer);
       const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };
-      walkLog({ kind: 'screen-offer', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });
+      // an offer is granted, or (the usual way) waits for the person's code, or was declined — each logs what it is
+      walkLog({ kind: 'screen-offer', ok: r.ok, ...(!r.ok ? { reason: r.reason } : r.declined ? { declined: true } : { to: String(r.person).slice(-4), ...(r.pending ? { pending: true } : { ops: r.ops?.length ?? 0 }) }) });
     };
     walkLog({ kind: 'screens', exposed });
     // whether the grants lane folded after this boot: until it does, every screen token is refused as revoked (fail

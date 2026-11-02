@@ -239,11 +239,14 @@ const devicesKey = (sealSeed) => nacl.hash(new Uint8Array([...sealSeed, ...new T
  * Seal the offering device's records for an offer.
  * @param {Uint8Array} sealSeed  the recovery seal's seed (`root.deriveAgentSeed(RECOVERY_SEAL_LABEL)`, or the device's copy)
  * @param {Record<string, object>} records  persona id → this device's delegation record under it
+ * @param {Record<string, number>} [epochs]  persona id → its current circle-root epoch (what a new device is handed)
  * @returns {string|null}
  */
-export function sealOfferDevices(sealSeed, records = {}) {
+export function sealOfferDevices(sealSeed, records = {}, epochs = {}) {
   if (!(sealSeed instanceof Uint8Array) || sealSeed.length < 32) return null;
-  const plain = JSON.stringify(records && typeof records === 'object' ? records : {});
+  // the records, and each persona's circle-root EPOCH — sealed, not in the clear: in the clear it would tell anyone with a
+  // photo of the code how many full devices were ever revoked
+  const plain = JSON.stringify({ r: records && typeof records === 'object' ? records : {}, e: epochs && typeof epochs === 'object' ? epochs : {} });
   const padded = plain + ' '.repeat((SEALED_STEP - (new TextEncoder().encode(plain).length % SEALED_STEP)) % SEALED_STEP);
   const nonce = nacl.randomBytes(24);
   const box = nacl.secretbox(new TextEncoder().encode(padded), nonce, devicesKey(sealSeed));
@@ -259,15 +262,34 @@ export function sealOfferDevices(sealSeed, records = {}) {
  * @param {string} mnemonic
  * @returns {Record<string, object>}
  */
-export function openOfferDevices(uri, mnemonic) {
+/** The offer's sealed part, opened with the phrase: `{r, e}` or null. */
+function openOfferDevicesSealed(uri, mnemonic) {
   const parsed = typeof uri === 'string' ? parseEnrollOffer(uri) : uri;
-  if (!parsed?.ok || !parsed.devicesSealed) return {};
+  if (!parsed?.ok || !parsed.devicesSealed) return null;
   try {
     const root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim());
     const raw = bytesFrom(parsed.devicesSealed);
     const opened = nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), devicesKey(root.deriveAgentSeed(RECOVERY_SEAL_LABEL)));
-    if (!opened) return {};
-    const map = parseUntrustedJson(new TextDecoder().decode(opened));
+    if (!opened) return null;
+    const both = parseUntrustedJson(new TextDecoder().decode(opened));
+    return both && typeof both === 'object' && !Array.isArray(both) ? both : null;
+  } catch { return null; }
+}
+
+/**
+ * Each persona's circle-root epoch the offering device holds, opened with the phrase — `{}` when none. The new device is
+ * handed that epoch's root (the seed derives from the phrase; only the number travels).
+ * @returns {Record<string, number>}
+ */
+export function openOfferEpochs(uri, mnemonic) {
+  const e = openOfferDevicesSealed(uri, mnemonic)?.e;
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return {};
+  return Object.fromEntries(Object.entries(e).filter(([pid, n]) => (pid === 'default' || PERSONA_ID.test(pid)) && Number.isInteger(n) && n >= 0 && n < 1024));
+}
+
+export function openOfferDevices(uri, mnemonic) {
+  try {
+    const map = openOfferDevicesSealed(uri, mnemonic)?.r;
     if (!map || typeof map !== 'object' || Array.isArray(map)) return {};
     return Object.fromEntries(Object.entries(map).filter(([pid, r]) => (pid === 'default' || PERSONA_ID.test(pid)) && r && typeof r === 'object' && typeof r.pubKey === 'string'));
   } catch { return {}; }

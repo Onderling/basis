@@ -122,11 +122,11 @@ describe('the person key rotates in the revoke ceremony', () => {
     // the lost device: retired, never handed the new seed, still on v1
     await new Promise((res) => setTimeout(res, 500));
     expect(A3.agent.personKey()).toEqual(v1);
-    // The lost device is a FULL device: it presents the persona's one address, which stays on Bea's row — revoking it
-    // there would take the person out. What closes its reach is the full-device RE-KEY (a new epoch, a new address),
-    // which has its own test; until then it is the stated window, and the person key above is already beyond it.
-    expect(A3.agent.circleAddressFor(GROUP)).toBe(A.agent.circleAddressFor(GROUP));
-    expect((await rowFor(B, A.pubKey)).circleAddresses ?? [(await rowFor(B, A.pubKey)).circleAddress]).toContain(A.agent.circleAddressFor(GROUP));
+    // The lost device is a FULL device: it held the persona's circle root, so the ceremony RE-KEYS — the persona moves to
+    // a new address, which Bea's row carries; the lost device is left at the old one
+    expect(A3.agent.circleAddressFor(GROUP)).not.toBe(A.agent.circleAddressFor(GROUP));
+    expect(await until(async () => { const row = await rowFor(B, A.pubKey); return [row?.circleAddress, ...(row?.circleAddresses ?? [])].includes(A.agent.circleAddressFor(GROUP)) ? true : null; }, { timeout: 15000, step: 200 }),
+      'Bea\'s row does not carry the persona\'s new address').toBe(true);
   }, 60_000);
 
   it('the lost device cannot announce a key of its own — a person-key statement without the root reveal binds nowhere, not even on a sibling that shares its circle key', async () => {

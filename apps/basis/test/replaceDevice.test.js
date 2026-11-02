@@ -100,28 +100,35 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const r = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: phrase, circleIds: [GROUP] });
     expect(r.ok, r.error).toBe(true);
     expect(r.firstDeviceRetired, "the first phone is retired by derivation — its id derives from the root, so the new phone never needed its record").toBe(true);
-    // what it retires in the circle is the old phone's DEVICE-derived address (a device from before the circle root
-    // presented it) — never the persona's one address, which the new phone presents too; the re-key moves that one
-    expect(r.retiredIn.map((x) => x.address)).not.toContain(addrA);
-    expect(A2.agent.circleAddressFor(GROUP)).toBe(addrA);
-    // JOURNEY 1 — sealed history opens on the new phone: it holds the persona's circle key (the old phone's too), so the
-    // chain opens as it is — nothing needed bringing along.
-    await projectKeyEventsIntoStore({ rail: A2.agent.keyRail, store: A2.keyEventStore, circleId: GROUP });
-    expect(readSealed(A2, beforeEnv, GROUP), 'the new phone reads what was sealed before it').toBe(before);
+    // what the old phone held is the persona's circle root, so the ceremony RE-KEYS: the persona moves to the next epoch
+    // and presents a new address — the old one is retired, the group key rotated past it
+    expect(r.rekey?.ok, JSON.stringify(r.rekey)).toBe(true);
+    const addrNext = A2.agent.circleAddressFor(GROUP);
+    expect(addrNext, 'the new phone still presents the address the lost phone holds').not.toBe(addrA);
+    // JOURNEY 1 — sealed history opens on the new phone: what the old address could open was kept (the history sidecar)
+    // before the switch, so the past reads as it did
+    const { openAcrossKeyChain } = await import('@onderling/pod-client');
+    expect(openAcrossKeyChain(beforeEnv, await A2.agent.historyKeyChainFor(GROUP)), 'the new phone reads what was sealed before it').toBe(before);
 
-    // The member stays on Bram's roster with the persona's one address.
-    const bRow = await until(async () => rowFor(B, A.pubKey), { timeout: 15000, step: 100 });
-    expect([bRow.circleAddress, ...(bRow.circleAddresses ?? [])].filter(Boolean)).toContain(addrA);
+    // The member stays on Bram's roster — at the persona's NEW address; the old one is gone
+    expect(await until(async () => { const row = await rowFor(B, A.pubKey); const set = [row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean); return set.includes(addrNext) && !set.includes(addrA) ? true : null; }, { timeout: 15000, step: 100 }),
+      `Bram's row did not move: ${JSON.stringify(await rowFor(B, A.pubKey))}`).toBe(true);
 
-    // THE WINDOW, stated (the stable point §7): the old phone is a FULL device holding the persona's circle key, so a
-    // group-key rotation that keeps the person a recipient keeps the old phone one too — it can read what comes next
-    // until the full-device RE-KEY moves the persona to a new epoch (its own test shows the old phone cut off then).
-    // (no group-key rotation here: the old phone's key IS the persona's, so there is no recipient to drop — the re-key
-    // is what rotates past it)
+    // THE WINDOW CLOSES (the stable point §7): what comes next is sealed past the old address, so the lost phone — which
+    // holds only the old root — does not read it, and Bram does
     const after = `na de wissel ${Date.now().toString(36)}`;
+    // the new phone took the point from the lost one, so it caught up before it granted itself and rotated: wait for that
+    const { readKeyChain, currentGroupKey, makeOpener } = await import('@onderling/pod-client');
+    const canSeal = await until(async () => {
+      await projectKeyEventsIntoStore({ rail: A2.agent.keyRail, store: A2.keyEventStore, circleId: GROUP });
+      try { return currentGroupKey(readKeyChain(A2.keyEventStore.list(GROUP), { groupId: GROUP, opener: makeOpener(A2.agent.circleSealingKeyPairFor(GROUP).privateKey) })) ? true : null; } catch { return null; }
+    }, { timeout: 20000, step: 300 });
+    expect(canSeal, `the new phone holds no key to seal with — closed: ${JSON.stringify(A2.agent.spineClosedCircles?.())}, waiting: ${JSON.stringify(await A2.agent.spineOutboxWaiting?.())}`).toBe(true);
     const afterEnv = await postSealed({ admin: A2, members: [B, A], groupId: GROUP, text: after });
     await until(() => B.sealedContent.length >= 2);
     expect(readSealed(B, afterEnv, GROUP), 'Bram reads what comes next').toBe(after);
+    let lostRead = null; try { lostRead = readSealed(A, afterEnv, GROUP); } catch { lostRead = null; }
+    expect(lostRead, 'the lost phone read what came after the re-key').not.toBe(after);
 
     // The wrong phrase is refused; running it again is harmless.
     const wrong = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' });

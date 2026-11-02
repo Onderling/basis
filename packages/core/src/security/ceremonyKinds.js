@@ -28,5 +28,8 @@ export const isCeremonyKind = (kind) => CEREMONY_KINDS.has(kind);
  */
 export function ceremonyRevealFacts(body) {
   if (body?.kind === PERSON_KEY_KIND) return personKeyFacts(body.payload);
+  // an address-revoke that names where the retired address STOPPED (the hash of its last statement in its own author
+  // chain): the reveal covers that cut, so nobody can move it — the address binds exactly its chain up to it
+  if (body?.kind === ADDRESS_REVOKE_KIND && typeof body.payload?.upTo === 'string' && body.payload.upTo) return `upTo:${body.payload.upTo}`;
   return null;
 }

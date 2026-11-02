@@ -61,6 +61,7 @@ export function deriveRoster({
   // it), and the handle they go by there
   founderFacts = {},
   spineStatements = [],
+  ceremonyRetirements = [],
   // After the fold, its full result — the host uses `folded.superseded` to compact the lane (L121). Optional.
   onFolded = null,
   // The membership-rider cutover switch: TRUE when the statements come from the RAIL's verified read
@@ -337,8 +338,9 @@ export function deriveRoster({
   // that position keep binding to the retired address — revocation cuts the future, not the past. A
   // revocation whose position is unknown (the legacy store path) retires everything (deny-favouring).
   const revokedAddresses = new Map();   // webid → Map<address, atSeq|null> (their OWN revoked device addresses)
-  if (Array.isArray(spineStatements)) {
-    for (const s of spineStatements) {
+  const revokedUpTo = new Map();        // webid → Map<address, hash> (where a retired address stopped, when said)
+  {
+    for (const s of [...(Array.isArray(spineStatements) ? spineStatements : []), ...(Array.isArray(ceremonyRetirements) ? ceremonyRetirements : [])]) {
       if (s?.kind !== 'address-revoke') continue;
       if (typeof s.author !== 'string' || !s.author) continue;
       if (typeof s.subject !== 'string' || !s.subject) continue;
@@ -348,6 +350,13 @@ export function deriveRoster({
       const prev = map.get(s.subject);
       // the EARLIEST revocation position wins (a second revoke of the same address changes nothing)
       map.set(s.subject, prev === undefined ? at : (prev === null || at === null ? null : Math.min(prev, at)));
+      // WHERE THE ADDRESS STOPPED, when the retirement names it (a re-key): the hash of its last statement in its own
+      // author chain, covered by the root's reveal — the cut the binding verifiers use instead of the local position
+      if (typeof s.payload?.upTo === 'string' && s.payload.upTo) {
+        let cuts = revokedUpTo.get(s.author);
+        if (!cuts) revokedUpTo.set(s.author, (cuts = new Map()));
+        if (!cuts.has(s.subject)) cuts.set(s.subject, s.payload.upTo);
+      }
     }
   }
 
@@ -394,13 +403,18 @@ export function deriveRoster({
     // member stays reachable on the devices they still hold.
     const revoked = revokedAddresses.get(rec.webid);
     if (revoked?.size) {
-      const retired = addressSet.filter((a) => revoked.has(a)).map((a) => ({ address: a, atSeq: revoked.get(a) }));
+      const cuts = revokedUpTo.get(rec.webid);
+      const retiredOf = (a) => ({ address: a, atSeq: revoked.get(a), ...(cuts?.has(a) ? { upTo: cuts.get(a) } : {}) });
+      const retired = addressSet.filter((a) => revoked.has(a)).map(retiredOf);
       addressSet = addressSet.filter((a) => !revoked.has(a));
       if (primary && revoked.has(primary)) {
-        if (!retired.some((r) => r.address === primary)) retired.push({ address: primary, atSeq: revoked.get(primary) });
+        if (!retired.some((r) => r.address === primary)) retired.push(retiredOf(primary));
         if (addressSet.length) merged.circleAddress = addressSet[0];
         else delete merged.circleAddress;
       }
+      // …and every other address of theirs that a revocation names, though the row no longer lists it (a re-key's trail
+      // row moved to the new address): what it signed before it stopped still binds through this entry
+      for (const a of revoked.keys()) if (!retired.some((r) => r.address === a)) retired.push(retiredOf(a));
       if (retired.length) merged.retiredAddresses = retired;
     }
     // maxDevicesPerMember — the circle's per-member device ceiling. Deterministic on every fold:

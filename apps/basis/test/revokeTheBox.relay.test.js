@@ -237,7 +237,7 @@ describe('the box is revoked while it holds the address', () => {
     // The reloaded web app is a new agent instance: what it knows of Bea it re-read from the roster it
     // kept, and this failure says so rather than "no message" (the roster dump found the item store
     // that a reboot forgot, 2026-09-14).
-    await arrives(web, CIRCLE, 'na de intrekking', `Bea's message did not reach the reloaded web app — it binds Bea: ${!!web.agent.sa.agent.security.getPeerKey(bea.agent.circleAddressFor(CIRCLE))}; its roster: ${await rosterView(web)}; Bea's: ${await rosterView(bea)}`);
+    await arrives(web, CIRCLE, 'na de intrekking', `Bea's message did not reach the reloaded web app (at ${String(web.agent.circleAddressFor(CIRCLE)).slice(0, 8)}, web ${String(web.pubKey).slice(0, 8)}, bea ${String(bea.pubKey).slice(0, 8)}) — it binds Bea: ${!!web.agent.sa.agent.security.getPeerKey(bea.agent.circleAddressFor(CIRCLE))}; its roster: ${await rosterView(web)}; Bea's: ${await rosterView(bea)}`);
     // The box is not on Bea's row any more, so her fan never tries it. Checked AFTER the web app has
     // the message: both are one fan, so a box that was going to get it has it by now.
     await new Promise((res) => { setTimeout(res, 3000); });

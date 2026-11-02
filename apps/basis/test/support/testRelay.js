@@ -35,6 +35,15 @@ export async function startJourneyRelay(opts = {}) {
   return {
     url: `ws://127.0.0.1:${relay.port}`,
     external: false,
+    /** Every frame the relay RECEIVES from any socket, live and future, handed to `fn` (raw) — for asserting what the
+     *  relay can see. Returns a stop function. In-process relays only. */
+    tapFrames(fn) {
+      const attach = (s) => { const on = (raw) => { try { fn(raw); } catch { /* a tap never breaks the relay */ } }; s.on('message', on); return () => s.off('message', on); };
+      const offs = [...(relay.wss?.clients ?? [])].map(attach);
+      const onConn = (s) => { offs.push(attach(s)); };
+      relay.wss?.on('connection', onConn);
+      return () => { relay.wss?.off('connection', onConn); for (const off of offs) off(); };
+    },
     // the relay's own teardown is `stop` (it has no `close`): without it every relay a suite starts keeps its port
     close: async () => { try { await relay?.stop?.(); } catch { /* teardown is best-effort */ } },
   };

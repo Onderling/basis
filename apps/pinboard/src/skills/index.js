@@ -723,9 +723,12 @@ async function listGroupMembersCore(scope, a, ctx) {
   // (the rails' binding verifiers) folds TRAIL + display only — verifying a statement must never
   // recurse through the statement fold itself.
   const skipSpine = a?.spineless === true;
+  // the spineless read folds the CEREMONY retirements unless asked not to (the ceremony rule's own read): they bind by
+  // their root reveal against the plain trail, so folding them here recurses nowhere
+  const withRetirements = skipSpine && a?.withRetirements !== false;
   const selfSigner = scope.selfSigner ?? null;
   const project = (circleSignerFor || membershipRead || selfSigner || skipSpine)
-    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead, selfSigner, skipSpine }))
+    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead, selfSigner, skipSpine, withRetirements }))
     : projectCircleRoster;
   return listCircleMembers(
     {
@@ -754,7 +757,7 @@ async function listGroupMembersCore(scope, a, ctx) {
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
+export async function projectCircleRoster({ store, groupId, circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, withRetirements = false, observeFold = null } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
@@ -991,10 +994,16 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     return null;   // claimed binding unverifiable on this device → ignore (never trust, never corrupt)
   };
   let spineStatements = [];
+  let ceremonyRetirements = [];
   if (skipSpine) {
     // TRAIL + display only (the binding verifiers' read): no statement fold, no spine store —
     // the trail carries the address facts a verifier needs, and reading the statements here
-    // would recurse into the very verification that asked.
+    // would recurse into the very verification that asked. The one exception: the CEREMONY retirements (address-
+    // revoke, bound by the root's reveal against the plain trail's commitment — no recursion), so a retired address
+    // still binds what it signed before it stopped (a re-key retires the address a person's history was signed with).
+    if (withRetirements && typeof membershipRead?.ceremony === 'function') {
+      try { ceremonyRetirements = ((await membershipRead.ceremony(groupId))?.bodies ?? []).filter((b) => b?.kind === 'address-revoke'); } catch { ceremonyRetirements = []; }
+    }
   } else if (typeof membershipRead === 'function') {
     // THE RAIL (the membership rider): statements live on the DEVICE LOG's membership lane — the injected
     // reader returns VERIFIED bodies with the key↔ref binding already resolved. Two fold-side gates apply
@@ -1055,6 +1064,7 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     rulesVersion: latestRulesItem?.source?.version ?? latestRulesItem?.source?.rules?.version ?? null,
     // The signed spine deltas fold ON TOP of the trail head (the cutover model — no data migration).
     spineStatements,
+    ceremonyRetirements,
     // The fold's compaction verdict goes back to the rail (L121): only on the rail path, only when the fold names
     // something, fire-and-forget — a read never waits on a write.
     onFolded: (folded) => {

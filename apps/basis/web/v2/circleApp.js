@@ -962,6 +962,8 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
     const routes = [nknLib && 'nkn', CIRCLE_RELAY_URL && 'relay'].filter(Boolean).join(' + ');
     console.info(`[circleApp] peer transport connected (${routes}, routed) + rendezvous`);
     registerCirclePresence(agent);   // G13 — fire-and-forget; see the helper for why boot never waits
+    // a re-key moved this person's circle addresses: register the new ones (the ceremony waits for it)
+    agent.onCircleRootMoved?.(({ circleIds }) => registerCirclePresence(agent, circleIds));
   } catch (err) {
     console.warn('[circleApp] peer connect failed — circle chat is local-only:', err?.message ?? err);
   }

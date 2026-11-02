@@ -57,7 +57,11 @@ describe('spine statements only from the point', () => {
     };
   }, 240_000);
   const beaHeard = [];   // filled by the ingest recorder in beforeAll
-  afterAll(async () => { await teardown(A, B, C, A2); await relay?.close?.(); });
+  // every device's membership-fan line (where each copy of a statement went), kept for a failure to name the send side
+  const fanLines = [];
+  const consoleInfo = console.info.bind(console);
+  console.info = (...a) => { const t = a.map(String).join(' '); if (t.startsWith('[membership-fan]')) fanLines.push(t.slice(0, 300)); consoleInfo(...a); };
+  afterAll(async () => { console.info = consoleInfo; await teardown(A, B, C, A2); await relay?.close?.(); });
 
   it('the phone and the box change two roles at once: Bea sees both, and Anna is NOT disputed (no fork on the shared key)', async () => {
     expect(A2.agent.circleAddressFor(GROUP), 'one address for Anna: both devices sign with one key').toBe(A.agent.circleAddressFor(GROUP));
@@ -318,12 +322,13 @@ describe('spine statements only from the point', () => {
       expect(s2, `the box never signed — closed: ${JSON.stringify(A2.agent.spineClosedCircles())}`).toBeTruthy();
       expect(s2.body.parentHash, 'the box signed off its stale head: a fork on the shared key').toBe(s1);
       const beaSaw = await until(async () => ((await roleOnAt(B, B.pubKey)) === want2 ? true : null), { timeout: 20000, step: 200 });
+      const fanFor = (hash) => fanLines.filter((l) => l.includes(` ${String(hash).slice(0, 8)} `));
       // where it stopped, when it did: did the statement reach Bea at all, and if so what her fold made of it
       const why = async () => {
         const held = B.agent.membershipRail.storedStatements(GROUP) ?? [];
         const mineThere = held.filter((x) => x?.body?.author === s2.body.author).map((x) => `${x.body.hash.slice(0, 8)}<-${String(x.body.parentHash ?? '').slice(0, 8)}`);
         let disputed = null; try { disputed = [...((await B.agent.membershipRail.readVerified?.(GROUP))?.disputed ?? [])].map((r) => String(r).slice(0, 8)); } catch (e) { disputed = `err ${e.message}`; }
-        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), beaHeardLast: beaHeard.slice(-8), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
+        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), beaHeardLast: beaHeard.slice(-8), fanOfS2: fanFor(s2.body.hash), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
       };
       expect(beaSaw, `Bea never saw the box's change — ${beaSaw ? '' : await why()}`).toBe(true);
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);

@@ -116,6 +116,18 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     }
   });
 
+  it("W has its OWN point: its devices agree it is the phone, and the laptop hands W's spine acts to it instead of signing", async () => {
+    // the existing device claimed W's point when W's second device arrived; the laptop learns it on W's own lane
+    await laptop.agent.spinePoint.requestFromSiblings();
+    const phoneW = phone.agent.persona(w)?.enrolledDevice?.deviceId;
+    expect(phoneW, 'the phone has no device id under W').toBeTruthy();
+    expect(await until(() => (phone.agent.spinePoint.of(w)?.deviceId === phoneW && laptop.agent.spinePoint.of(w)?.deviceId === phoneW ? true : null), { timeout: 20000, step: 200 }),
+      `W's point: phone holds ${JSON.stringify(phone.agent.spinePoint.of(w))}, laptop ${JSON.stringify(laptop.agent.spinePoint.of(w))}, the phone is ${phoneW}`).toBe(true);
+    // two of W's full devices on one key: only W's point signs W's spine — the laptop forwards (a second signer would fork W)
+    expect(phone.agent.spineGate.isPoint(Y), 'the phone does not sign W\'s spine').toBe(true);
+    expect(laptop.agent.spineGate.isPoint(Y), 'the laptop signs W\'s spine beside the phone — a fork on W\'s key').toBe(false);
+  }, 60_000);
+
   it('W rotates to v2: the laptop adopts it, the lost device is carried nothing and keeps v1, Y folds v2 for W', async () => {
     const W = phone.agent.persona(w);
     const v1 = W.personKey.version;
@@ -130,6 +142,12 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     } finally { peer.sendTo = orig; }
     expect(r?.ok, JSON.stringify(r)).toBe(true);
     expect(r.personaKeyVersions?.[w], JSON.stringify(r)).toBe(v1 + 1);
+    // W RE-KEYS too (the lost device was a full device of W): the phone moves W to its next address in Y, the laptop takes
+    // W's next root over W's own lane, the lost device does not
+    expect(r.personaRekeys?.[w]?.ok, `W did not re-key: ${JSON.stringify(r.personaRekeys)}`).toBe(true);
+    const wNext = phone.agent.persona(w).circleAddressFor(Y);
+    expect(await until(() => (laptop.agent.persona(w).circleAddressFor(Y) === wNext ? true : null), { timeout: 20000, step: 200 }), 'the laptop did not take W\'s next root').toBe(true);
+    expect(lost.agent.persona(w).circleAddressFor(Y), 'the lost device took W\'s next root').not.toBe(wNext);
     expect(W.personKey.version).toBe(v1 + 1);
 
     // the surviving sibling of W adopts it

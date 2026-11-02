@@ -62,7 +62,7 @@ import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personW
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
-export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
+export default function CircleMyDataScreen({ selvesOn = null, callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
   eventLog = null,
   // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
   frequent = [], onClearFrequent = null,
@@ -281,10 +281,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   // "Make this device my primary contact address" (sync-policy §12): announce this device's address in every
   // circle with the primary flag, so others deliver here first. Said back with the count that took it.
   const makePrimary = useCallback(async () => {
-    const r = await makeThisDevicePrimary({ agent: agent ?? { callSkill } }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
+    const r = await makeThisDevicePrimary({ agent: agent ?? { callSkill }, personas: selvesOn }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
     const w = makePrimaryResultWords(r);
     Alert.alert(t('circle.mydata.make_primary'), t(w.key, w.params));
-  }, [agent, callSkill]);
+  }, [agent, callSkill, selvesOn]);
   const revealMnemonic = useCallback(async () => {
     // The OWNER-ROOT phrase (host `revealOwnerPhrase`, step 1b) — re-derives every
     // profile incl. the feedback pseudonym. Was pinboard `getMnemonicOnce` (wrong seed).

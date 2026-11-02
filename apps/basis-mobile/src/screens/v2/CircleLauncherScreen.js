@@ -2664,6 +2664,7 @@ export default function CircleLauncherScreen({
         openOp={pendingPinOpen} onOpenOpDone={() => setPendingPinOpen(null)}
         selfProfileId={profileIdOfCircle(selected?.id)}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
+        unreachableMembersOf={(cid) => Promise.resolve(bundle?.agent?.unreachableMembersOf?.(cid) ?? [])}
         circle={selected}
         deliveryStateMap={deliveryStateMap}
         registerCircleBotSink={registerCircleBotSink}
@@ -3135,6 +3136,8 @@ function CircleDetail({
   // Reads this circle's verified membership statements (one function, not the bundle). Absent → the
   // removal line still says something true, it just cannot name who did it.
   readMembershipStatements = null,
+  // The members this device has no address for past the re-tell window (one function, not the bundle): said on their row.
+  unreachableMembersOf = null,
   eventLog,
   circles = [],
   recipeStore = null, pagesBook = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
@@ -3265,6 +3268,7 @@ function CircleDetail({
   // for sender labels the moment it paints, not first when MEMBERS is opened.
   const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
   const [tabMembers, setTabMembers] = useState(null);
+  const [unreachable, setUnreachable] = useState(() => new Set());
   // The RAW rows the same load returns. `normalizeCircleMembers` is the member-list projection and
   // drops the acknowledgement flag; the caretaker notice is the one reader that needs it.
   const [rosterRows, setRosterRows] = useState(null);
@@ -3445,6 +3449,9 @@ function CircleDetail({
         mem = normalizeCircleMembers(res);
       } catch { /* keep empty */ }
       if (alive) { setTabMembers(mem); setRosterRows(raw); }
+      if (typeof unreachableMembersOf === 'function') {
+        try { const far = await unreachableMembersOf(circle.id); if (alive) setUnreachable(new Set(far ?? [])); } catch { /* the line is a courtesy */ }
+      }
       // The person-mute set, resolved to actor refs against this roster (web parity: the chat
       // projection HIDES these — muted messages land, unmute restores). Rides the same effect because
       // the key→ref resolution needs the roster; `membersReloadTick` refreshes both together.
@@ -4801,6 +4808,8 @@ function CircleDetail({
                         never a borrowed reason. web≡mobile. */}
                     {/* A BOT on the roster (a member that says it is a function) — said on its row. web≡mobile. */}
                     {m.bot ? <Text style={styles.memberRole} testID="member-bot" numberOfLines={1}>{t('circle.members_tab.bot')}</Text> : null}
+                    {/* NOT REACHABLE YET — no address for them here past the re-tell window; heals by itself. web≡mobile. */}
+                    {unreachable.has(m.id) ? <Text style={styles.memberRole} testID="member-not-reachable">{t('circle.membership.not_reachable', { name: revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).primary })}</Text> : null}
                     {m.role && m.role !== 'member' ? (
                       <View style={styles.memberRoleLine}>
                         <Text style={styles.memberRole} numberOfLines={1}>{t(`circle.admin.role.${m.role}`)}</Text>

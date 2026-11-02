@@ -390,6 +390,10 @@
       "text": "Verlaten — je hoofdapparaat is offline. De kring verdwijnt zodra het terug is.",
       "doc": "The same, when the main device is offline: the leave waits for it."
     },
+    "not_reachable": {
+      "text": "Je bereikt {{name}} nog niet. Wijzigingen komen aan zodra {{name}} of een ander lid weer online is.",
+      "doc": "On a member's row when this device has no address for them yet and a change in the circle has waited for them longer than the re-tell window. It heals by itself: their device re-announces on its next connect, another member re-introduces them, or their own catch-up pulls everything."
+    },
     "removed_mark": {
       "text": "verwijderd",
       "doc": "The mark on a circle tile an admin removed you from; the tile stays (read-only) until you close it."

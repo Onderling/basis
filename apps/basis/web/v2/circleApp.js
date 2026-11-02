@@ -7190,6 +7190,7 @@ function showCircle(id, circle, policy) {
   // G16 — the MEMBERS tab's trail-roster (canonical Member via normalizeCircleMembers).
   // null = not loaded yet → the tab shows its loading state; [] = loaded empty.
   let circleRoster = null;
+  let circleUnreachable = new Set();   // members this device has no address for past the re-tell window (their row says so)
   let circleMutedActors = new Set();   // the person-mute view filter's resolved actor refs (see loadRoster)
   let noticeboardPendingAttachment = null;   // { encoded, thumbnail, name } before posting
   let myWebid = null;   // fetched once, best-effort (whoAmI is a pinboard skill, not chat-manifested)
@@ -7326,6 +7327,7 @@ function showCircle(id, circle, policy) {
       rawRoster = Array.isArray(res?.members) ? res.members : [];
       circleRoster = normalizeCircleMembers(res);
     } catch { circleRoster = []; }
+    try { circleUnreachable = new Set((await circleHouseholdAgent?.unreachableMembersOf?.(id)) ?? []); } catch { circleUnreachable = new Set(); }
     tellCaretakerIfTheCircleBecameTheirs(rawRoster);
     tellIfIWasRemoved(rawRoster);   // …and the other direction: a circle that is no longer yours
     // The person-mute set, resolved to actor refs against this roster — the chat projection hides these
@@ -7713,6 +7715,7 @@ function showCircle(id, circle, policy) {
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,
+      unreachable: circleUnreachable,
       resolvePicture: circlePictureResolver(id, policy),
       // the ⋯ roster's op entries ask the one fold (`opAvailability`)
       availability: circleAvailabilityNow,

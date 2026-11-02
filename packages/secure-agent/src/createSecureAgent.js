@@ -321,12 +321,15 @@ export async function createSecureAgent(opts = {}) {
   // statement that reached a member's socket and vanished before their router cost two days to find).
   const receiveDrops = {};
   const receiveDropSaid = new Set();
+  const RECEIVE_DROP_SAID_MAX = 500;
   const noteDrop = (reason, env) => {
     receiveDrops[reason] = (receiveDrops[reason] ?? 0) + 1;
     const from = String(env?._from ?? '?');
     const key = `${reason}|${from}`;
     if (receiveDropSaid.has(key)) return;
     receiveDropSaid.add(key);
+    // bounded: a long-running device meets many senders (a Set iterates oldest first)
+    while (receiveDropSaid.size > RECEIVE_DROP_SAID_MAX) receiveDropSaid.delete(receiveDropSaid.values().next().value);
     if (typeof console !== 'undefined') {
       console.info(`[secure-agent] dropped an inbound envelope from ${from.slice(0, 12)}… (${reason}) — subtype ${env?.payload?.subtype ?? env?._p ?? '?'}; further drops of this kind from this sender are counted, not said`);
     }
@@ -343,7 +346,13 @@ export async function createSecureAgent(opts = {}) {
   });
   const gates = [muteBlockGate, boundGate, ...(userHelloGate ? [userHelloGate] : [])];
   const composedGate = async (env) => {
-    for (const g of gates) { if (!(await g(env))) return false; }
+    for (const g of gates) {
+      if (await g(env)) continue;
+      // the mute gate says its own drop; the first-contact limit and an app's own gate say theirs here
+      if (g === boundGate) noteDrop('first-contact-limited', env);
+      else if (g !== muteBlockGate) noteDrop('hello-gate', env);
+      return false;
+    }
     return true;
   };
   agent.setHelloGate(composedGate);

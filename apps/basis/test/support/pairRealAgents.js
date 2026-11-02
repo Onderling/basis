@@ -178,6 +178,10 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Opt-in (see `itemsLane` above): with a device log the factory builds the items rail + emitter, and
     // the publish valve routes every item write onto the signed lane instead of the unsigned mirror.
     ...(deviceLog ? { deviceLog } : {}),
+    // The person's address-fallback setting is OFF by default — as on every real device unless the person chose it. A
+    // walk that needs the opt-in path says so (`agentOpts: { allowAddressFallback: true }`); with the harness defaulting it
+    // ON, a walk proved the opt-in path and hid every case where the production default does not deliver.
+    allowAddressFallback: false,
     // Per-test agent options, threaded straight into the production factory. The one this exists
     // for today is `allowAddressFallback: false` — the per-user "rather undeliverable than routed
     // over my one global key" setting. A test that claims to prove per-circle addressing works

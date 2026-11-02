@@ -391,7 +391,7 @@
       "doc": "The same, when the main device is offline: the leave waits for it."
     },
     "not_reachable": {
-      "text": "{{name}} can't be reached from here yet — they get the circle's changes once they or another member is online.",
+      "text": "You cannot reach {{name}} yet. Changes arrive as soon as {{name}} or another member is online again.",
       "doc": "On a member's row when this device has no address for them yet and a change in the circle has waited for them longer than the re-tell window. It heals by itself: their device re-announces on its next connect, another member re-introduces them, or their own catch-up pulls everything."
     },
     "removed_mark": {

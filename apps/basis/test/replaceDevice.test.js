@@ -21,6 +21,10 @@ import { EventLog } from '../src/eventLog.js';
 import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
 
 const GROUP = 'circle-replace-walk';
+// THE BUS UNIT OF THE CEREMONY: this walk assembles the restored phone by hand over the in-process bus (no recovery-file
+// roster, no address→key binding, no connection points), so it opts into the address fallback — the opt-in path. The
+// production path, fallback off and a real restore over a relay, is walked in replaceAfterRestore.relay.test.js.
+const OPT_IN_FALLBACK = { allowAddressFallback: true };
 const rowFor = async (node, webid) => {
   const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
   return (res?.members ?? []).find((m) => m.webid === webid) ?? null;
@@ -33,8 +37,8 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
 
   it('retires the old phone everywhere, brings the sealed history along, and rotates the key past the old phone', async () => {
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { agentOpts: logOpts() }),
-      bootRealAgentNode('B', { agentOpts: logOpts() }),
+      bootRealAgentNode('A', { agentOpts: { ...logOpts(), ...OPT_IN_FALLBACK } }),
+      bootRealAgentNode('B', { agentOpts: { ...logOpts(), ...OPT_IN_FALLBACK } }),
     ]);
     await connectNodesOverBus([A, B]);
     await pairCircle(A, B, { groupId: GROUP, name: 'Replace walk', handle: 'bram' });
@@ -67,7 +71,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const enrolled = await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'nieuwe telefoon' });
     expect(enrolled.ok).toBe(true);
     await teardown(pre);
-    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, ...logOpts() } });
+    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, ...logOpts(), ...OPT_IN_FALLBACK } });
     await connectNodesOverBus([A, B, A2]);
     expect(A2.pubKey, 'one person: the same webid').toBe(A.pubKey);
     const addrA = A.agent.circleAddressFor(GROUP);

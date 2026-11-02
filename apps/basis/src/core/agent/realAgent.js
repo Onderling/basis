@@ -58,7 +58,8 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS } from '../../v2/membershipRail.js';
+import { makeLateRecipientRetell } from '../../v2/membershipLateRecipient.js'; // the membership rider — statements ride the device log
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
@@ -2945,6 +2946,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     return { circleId, version: event.version };
   };
   const keyEmitRef = { current: null };
+  /** Tell a circle's remembered statements to a member who arrived after the fan (bound with the membership rail below). */
+  const tellLateRecipientsRef = { current: null };
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
   const rotatesAwaitingRoot = [];   // rotations past this point's own address, until it takes the next root
   /** Rotate a circle's key past addresses of this person's that are gone, as the point: through the circle's key PRODUCER
@@ -5790,6 +5793,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (cid) rosterReads.invalidate(cid); else rosterReads.invalidateAll();
         if (fn === 'ingest' && r?.ok && !r.existed) {
           retellDeparture(cid, a[1], adminsBefore);
+          tellLateRecipients(cid);
           // An exit naming THIS DEVICE'S OWN SELF landed (an admin's evict; a sibling's leave when the lane brings it):
           // `foldedOut` asks the fold whether it holds — landing proves a signature, not authority — and if so the local
           // leave runs in the same tick: the circle's address off the relays, its authorize snapshot and member keys
@@ -5820,6 +5824,25 @@ export async function createRealHouseholdAgent(opts = {}) {
       const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
       return rows.filter((m) => m?.role === 'admin' && m?.webid).map((m) => m.webid);
     }
+    // A STATEMENT THIS DEVICE FANNED REACHES A MEMBER WHOSE ADDRESS LANDED LATER (membershipLateRecipient.js): the fan
+    // records whom each statement reached; a landed statement that grows the roster tells the remembered ones again.
+    const lateRecipients = makeLateRecipientRetell({
+      retell: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
+        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      }).then((r) => { console.info(`[membership-fan] ${statement.body.kind} ${String(statement.body.hash).slice(0, 8)} in ${String(circleId).slice(0, 8)}: retold to a member who arrived after the fan — sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`); return r; }),
+    });
+    // the current members' circle addresses on this device's roster (never this device's own)
+    async function rosterAddressesOf(circleId) {
+      const mine = circleAddressFor(circleId);
+      const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
+      return rows.flatMap((m) => (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress])).filter((x) => x && x !== mine);
+    }
+    function tellLateRecipients(circleId) {
+      if (!circleId || !lateRecipients.holds(circleId)) return;
+      rosterAddressesOf(circleId).then((addresses) => lateRecipients.rosterAddresses(circleId, addresses))
+        .catch(() => { /* best-effort: the catch-up remains */ });
+    }
+    tellLateRecipientsRef.current = (circleId) => tellLateRecipients(circleId);
     function retellDeparture(circleId, statement, adminsBefore = null) {
       if (!circleId || !isDeparture(statement) || !membershipEmit) return;
       const kind = statement.body.kind;
@@ -5838,8 +5861,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     const localMembershipEmit = makeMembershipEmitter({
       rail: membershipRail,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
-        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      fan: (circleId, statement) => rosterAddressesOf(circleId).then((known) => {
+        // remembered against the addresses known NOW, before the send: a member with no address yet can hold the fan in
+        // a fallback for seconds, and the address that lands meanwhile must still find this statement
+        lateRecipients.fanned(circleId, statement, known);
+        return callSkill('pinboard', 'broadcastCircleMembership', {
+          groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+        });
       }).then((r) => {
         // WHERE EACH COPY WENT, for every statement (membership statements are rare): delivered, held (counted as sent —
         // queued for the recipient's next presence, which may not come), or not at all. A member who never learns of a
@@ -7591,6 +7619,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runPinboard);
       const out = await runPinboard();
       rosterReads.afterWrite(realOpId);
+      // a write that may have grown a roster (an address announced, a seed recorded): a statement this device fanned
+      // before that member's address was known is told to them now (only circles with one remembered — cheap otherwise)
+      if (!isRosterRead(realOpId) && typeof realArgs?.groupId === 'string') tellLateRecipientsRef.current?.(realArgs.groupId);
       // A contact added, hidden or re-filed HERE reaches the person's other devices as its own-store row on the self's
       // own-devices lane (lib/ContactBook.js): no carry of its own here.
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij

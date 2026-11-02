@@ -2954,6 +2954,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   const keyEmitRef = { current: null };
   /** Tell a circle's remembered statements to a member who arrived after the fan (bound with the membership rail below). */
   const tellLateRecipientsRef = { current: null };
+  /** The members of a circle a fan had no address for, past the re-tell window (bound with the membership rail below). */
+  const unreachableMembersRef = { current: null };
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
   const rotatesAwaitingRoot = [];   // rotations past this point's own address, until it takes the next root
   /** Rotate a circle's key past addresses of this person's that are gone, as the point: through the circle's key PRODUCER
@@ -5910,6 +5912,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A STATEMENT THIS DEVICE FANNED REACHES A MEMBER WHOSE ADDRESS LANDED LATER (membershipLateRecipient.js): the fan
     // records whom each statement reached; a landed statement that grows the roster tells the remembered ones again.
     const lateRecipients = makeLateRecipientRetell({
+      // the window is the param's; a walk may shorten it to see the "not reachable yet" line without waiting minutes
+      ...(Number.isFinite(opts.lateRecipientWindowMs) ? { windowMs: opts.lateRecipientWindowMs } : {}),
       retell: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => { console.info(`[membership-fan] ${statement.body.kind} ${String(statement.body.hash).slice(0, 8)} in ${String(circleId).slice(0, 8)}: retold to a member who arrived after the fan — sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`); return r; }),
@@ -5926,6 +5930,22 @@ export async function createRealHouseholdAgent(opts = {}) {
         .catch(() => { /* best-effort: the catch-up remains */ });
     }
     tellLateRecipientsRef.current = (circleId) => tellLateRecipients(circleId);
+    // NOT REACHABLE YET (Frits, 2026-11-02): a current member the fan had no address for, still without one after the
+    // re-tell window, is said on their row — and said once in this device's log (the box has no row to paint)
+    const saidUnreachable = new Set();
+    unreachableMembersRef.current = async (circleId) => {
+      const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
+      const out = lateRecipients.unreachable(circleId, rows.map((m) => ({
+        webid: m?.webid, addresses: (Array.isArray(m?.circleAddresses) ? m.circleAddresses : [m?.circleAddress]).filter(Boolean),
+      })));
+      for (const w of out) {
+        const key = `${circleId}|${w}`;
+        if (saidUnreachable.has(key)) continue;
+        saidUnreachable.add(key);
+        console.info(`[membership-fan] a member of ${String(circleId).slice(0, 8)} (…${String(w).slice(-6)}) has no address here yet — they get the circle's changes once they or another member are online`);
+      }
+      return out;
+    };
     function retellDeparture(circleId, statement, adminsBefore = null) {
       if (!circleId || !isDeparture(statement) || !membershipEmit) return;
       const kind = statement.body.kind;
@@ -5956,6 +5976,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         // queued for the recipient's next presence, which may not come), or not at all. A member who never learns of a
         // statement is then delivery, not the fold — the line says which (a leave once reached the admin and never
         // the bystander while a hold counted as sent). Short suffixes only: an operator reads this log.
+        const noAddress = (r?.outcomes ?? []).filter((o) => o?.outcome === 'no-address').map((o) => o.webid);
+        lateRecipients.noAddress(circleId, noAddress);
+        // …and once the window has passed, this device looks again: a member still without an address is said in its log
+        // (every shell; the box has no row to paint) and on their row when a shell reads the roster
+        if (noAddress.length) {
+          const later = setTimeout(() => { unreachableMembersRef.current?.(circleId)?.catch?.(() => {}); }, lateRecipients.windowMs + 1_000);
+          later?.unref?.();
+        }
         const kind = statement?.body?.kind;
         const tail = (x) => String(x ?? '').slice(-6);
         const where = (r?.outcomes ?? []).map((o) => `…${tail(o.addr)}:${o.outcome}`).join(' ');
@@ -9769,6 +9797,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // that forgets it looks exactly like a shell whose relay is down. Both shells call it beside
     // their existing per-circle address registration.
     circleIdentityFor,
+    /** The current members of a circle this device has no address for, past the re-tell window: the shells say so on
+     *  their row ("not reachable yet"); empty when everyone is reachable. */
+    unreachableMembersOf: async (circleId) => (await unreachableMembersRef.current?.(circleId)) ?? [],
     // The membership rider's rail (null without opts.deviceLog) — the shells register the fan receiver +
     // the catch-up pair over THIS instance so both ends verify with the same declaration + binding rules.
     membershipRail,

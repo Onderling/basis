@@ -19,13 +19,16 @@ import { EventLog } from '../src/eventLog.js';
 
 const GROUP = 'late-recipient';
 const log = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
+const WINDOW_MS = 2_000;   // the re-tell window, shortened so the "not reachable yet" line can be seen
 const roleOf = async (node, webid) => (await readRoster(node, GROUP)).find((m) => m.webid === webid)?.role ?? null;
 
 describe('a statement fanned to a short roster', () => {
   let relay; let A; let B; let D;
   beforeAll(async () => {
     relay = await startJourneyRelay();
-    A = await bootRealAgentNode('anna', { agentOpts: log() });
+    // Anna's address-fallback setting is off: a member with no circle address is then reached NOWHERE (no canonical-key
+    // send) — the case the "not reachable yet" line is for
+    A = await bootRealAgentNode('anna', { agentOpts: { ...log(), lateRecipientWindowMs: WINDOW_MS, allowAddressFallback: false } });
     B = await bootRealAgentNode('bea', { agentOpts: log() });
     D = await bootRealAgentNode('dirk', { agentOpts: log() });
     await connectNodesOverRelay([A, B, D], { relayUrl: relay.url });
@@ -55,6 +58,10 @@ describe('a statement fanned to a short roster', () => {
       const mine = A.agent.circleAddressFor(GROUP);
       const s = await until(() => (A.agent.membershipRail.storedStatements(GROUP) ?? []).find((x) => x?.body?.author === mine && x.body.kind === 'role' && x.body.payload?.role === 'member') ?? null, { timeout: 10_000, step: 100 });
       expect(s, 'Anna signed nothing').toBeTruthy();
+      // no address (and the fallback off) → nothing is sent to him, and once the re-tell window has passed with still none,
+      // Anna's device names him as not reachable yet
+      expect(await until(async () => ((await A.agent.unreachableMembersOf(GROUP)).includes(D.pubKey) ? true : null), { timeout: WINDOW_MS + 8_000, step: 250 }),
+        `Dirk is not named unreachable on Anna's device: ${JSON.stringify(await A.agent.unreachableMembersOf(GROUP))}`).toBe(true);
       // Anna is back: she catches up from Bea, and Dirk's address lands on her roster
       A._routerRef.fn = annaPrior;
       await A.membershipCatchUp.requestCircle(GROUP, { callSkill: (...x) => A.agent.callSkill(...x) });
@@ -65,6 +72,7 @@ describe('a statement fanned to a short roster', () => {
       expect(annaKnows, `Anna never learned Dirk's address (…${String(dirkAddr).slice(-6)}, webid ${D.pubKey.slice(0, 6)}) — Anna's roster: ${JSON.stringify(await rows(A))}; Bea's: ${JSON.stringify(await rows(B))}; Anna's membership statements: ${(A.agent.membershipRail.storedStatements(GROUP) ?? []).length}, Bea's: ${(B.agent.membershipRail.storedStatements(GROUP) ?? []).length}`).toBe(true);
       const dirkHas = await until(() => ((D.agent.membershipRail.storedStatements(GROUP) ?? []).some((x) => x?.body?.hash === s.body.hash) ? true : null), { timeout: 20_000, step: 250 });
       expect(dirkHas, 'Dirk never received the statement Anna signed before his address reached her').toBe(true);
+      expect(await A.agent.unreachableMembersOf(GROUP), 'his address landed: the line goes').toEqual([]);
     } finally { A._routerRef.fn = annaPrior; D._routerRef.fn = dirkPrior; }
   }, 120_000);
 });

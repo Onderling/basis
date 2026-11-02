@@ -168,6 +168,8 @@ export function renderCircleView(container, {
   // opens the §2 card — a member row → their persona card, your own row → self-view;
   // the host routes by comparing `member.id` to `selfWebid`.
   members = null,
+  // the members this device has no address for past the re-tell window (a Set of ids), said on their row
+  unreachable = null,
   selfWebid = null,
   revealPolicy = 'pairwise',   // the circle's realName reveal rule; gates the member labels
   onMemberTap = null,
@@ -385,7 +387,7 @@ export function renderCircleView(container, {
     });
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
-    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture,
+    renderLedenTab(body, { members, unreachable, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture,
       // an admin invites from where the members are — the ⋯ menu's own `invite` act, not a second one
       onInvite: viewerIsAdmin && typeof more?.invite === 'function' ? () => more.invite() : null });
   } else if (effectiveTab !== 'conversation') {
@@ -708,7 +710,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  *
  * `members === null` → loading; `[]` → empty; otherwise the rows.
  */
-function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null, onInvite = null } = {}) {
+function renderLedenTab(body, { members = null, unreachable = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null, onInvite = null } = {}) {
   if (typeof onInvite === 'function') {
     const inv = document.createElement('button');
     inv.type = 'button';
@@ -797,6 +799,15 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
       botEl.dataset.memberBot = 'true';
       botEl.textContent = tr('circle.members_tab.bot');
       row.appendChild(botEl);
+    }
+    // NOT REACHABLE YET: this device has no address for them and a change in the circle has waited for them past the
+    // re-tell window — said in plain words; it heals by itself when they or another member are online
+    if (unreachable?.has?.(m.id)) {
+      const far = document.createElement('span');
+      far.className = 'circle-view__member-secondary circle-view__member-unreachable';
+      far.dataset.notReachable = 'true';
+      far.textContent = tr('circle.membership.not_reachable', { name: label.primary });
+      row.appendChild(far);
     }
 
     // WHO RUNS THE CIRCLE, and how they came to. The role badge is the same rule the admin panel

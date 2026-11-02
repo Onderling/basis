@@ -144,7 +144,7 @@ export function makePrimaryResultWords(r) {
   return { key: 'circle.mydata.make_primary_done', params: { count: r?.announced ?? 0 } };
 }
 
-export async function makeThisDevicePrimary({ agent, circleIds = null, logger = console } = {}) {
+export async function makeThisDevicePrimary({ agent, circleIds = null, personas = null, logger = console } = {}) {
   if (!agent || typeof agent.callSkill !== 'function') return { circles: 0, announced: 0, failed: [] };
   let ids = Array.isArray(circleIds) ? circleIds : null;
   if (!ids) {
@@ -162,7 +162,8 @@ export async function makeThisDevicePrimary({ agent, circleIds = null, logger = 
   // …and the DM half (sync-policy §12, L104 option b): this device becomes the PRIMARY DEVICE — the one that
   // registers the profile and person addresses as primary on every relay; the claim is carried to the siblings.
   let device = null;
-  try { device = (await agent.claimPrimaryDevice?.()) ?? null; } catch { device = null; }
+  // …and the POINT of each persona the person has on (the main device for those personas' circles)
+  try { device = (await agent.claimPrimaryDevice?.(Array.isArray(personas) && personas.length ? { personas } : undefined)) ?? null; } catch { device = null; }
   return { circles: ids.length, announced, failed, device };
 }
 

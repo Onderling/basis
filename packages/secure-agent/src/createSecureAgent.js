@@ -316,8 +316,23 @@ export async function createSecureAgent(opts = {}) {
   // would confirm to them that they reached you). Silent to them, not to us: every refusal bumps
   // this counter, so "their message never arrived" can be told apart from "the transport flaked".
   let mutedDrops = 0;
+  // EVERY DROP AT THE RECEIVE BOUNDARY SAYS WHY — once per reason and sender, and counted per reason (`securityStatus`).
+  // A drop is silent toward the sender by design; silent toward us it is indistinguishable from "never arrived" (a
+  // statement that reached a member's socket and vanished before their router cost two days to find).
+  const receiveDrops = {};
+  const receiveDropSaid = new Set();
+  const noteDrop = (reason, env) => {
+    receiveDrops[reason] = (receiveDrops[reason] ?? 0) + 1;
+    const from = String(env?._from ?? '?');
+    const key = `${reason}|${from}`;
+    if (receiveDropSaid.has(key)) return;
+    receiveDropSaid.add(key);
+    if (typeof console !== 'undefined') {
+      console.info(`[secure-agent] dropped an inbound envelope from ${from.slice(0, 12)}… (${reason}) — subtype ${env?.payload?.subtype ?? env?._p ?? '?'}; further drops of this kind from this sender are counted, not said`);
+    }
+  };
   const muteBlockGate = async (env) => {
-    if (await isPeerMuted(env?._from)) { mutedDrops += 1; return false; }
+    if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return false; }
     return true;
   };
   const rl = (opts.helloRateLimit && typeof opts.helloRateLimit === 'object') ? opts.helloRateLimit : {};
@@ -1296,7 +1311,7 @@ export async function createSecureAgent(opts = {}) {
       // drop envelopes from muted peers BEFORE any further
       // bookkeeping (no reciprocal HI, no onPeerMessage fire).
       // fanout the check across resolver-known aliases.
-      if (await isPeerMuted(env?._from)) { mutedDrops += 1; return; }
+      if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return; }
       // 5.7c — circle override enforcement runs AFTER mute (so muted
       // peers never reach the override layer) and BEFORE rate-limit /
       // reciprocal HI / onPeerMessage.  When the local user has
@@ -1304,12 +1319,12 @@ export async function createSecureAgent(opts = {}) {
       // peer is marked relation:'agent' in a circle that blocks agents,
       // the envelope is silently dropped.  Fails open if accessors
       // throw — never silently swallow inbound on a broken store.
-      if (await isInboundCircleBlocked(env)) return;
+      if (await isInboundCircleBlocked(env)) { noteDrop('circle-blocked', env); return; }
       // rate-limit drop.  Over-quota peers are silently
       // ignored at the receive boundary (no reciprocal HI either —
       // we don't want them to make us spam them in return).  The injected
       // exemption passes legitimate bursts (catch-up batches) untouched.
-      if (rateLimiter && !(rateLimitExempt?.(env)) && !rateLimiter.check(env?._from)) return;
+      if (rateLimiter && !(rateLimitExempt?.(env)) && !rateLimiter.check(env?._from)) { noteDrop('rate-limited', env); return; }
       // A greeting that passed every gate above: say so, the way the kernel's own hello handler
       // does (`peer`, same shape). The kernel never sees a HI on these transports — they hand
       // envelopes here, not to its dispatch — so without this nothing above the substrate learns
@@ -2552,6 +2567,7 @@ export async function createSecureAgent(opts = {}) {
       // mute state
       muteCount:       muteSet.size,
       mutedDrops,      // envelopes refused at the boundary because their sender is blocked
+      receiveDrops: { ...receiveDrops },   // every receive-boundary drop, per reason (muted · circle-blocked · rate-limited)
       mutedPeers:      muteSet.list(),
       muteIsPersistent: !!opts.muteListVaultKey,
       helloGateWired:  !!userHelloGate,

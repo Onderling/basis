@@ -111,7 +111,7 @@ describe('the key lane from the point, sealed', () => {
     // what comes next is sealed to the survivors — the box (the person) among them
     const env = await postSealed({ admin: A, members: [A2], groupId: CIRCLE, text: 'na de intrekking' });
     const opened = await until(() => { try { return readSealed(A2, env, CIRCLE) === 'na de intrekking' ? true : null; } catch { return null; } }, { timeout: 15000, step: 200 });
-    expect(opened, 'the box cannot read after its own ceremony').toBe(true);
+    expect(opened, `the box cannot read after its own ceremony — the phone at ${String(A.agent.circleAddressFor(CIRCLE)).slice(0, 8)}, the box at ${String(A2.agent.circleAddressFor(CIRCLE)).slice(0, 8)}; re-key ${JSON.stringify(r?.rekey)}`).toBe(true);
     // …and the claim itself: the REVOKED device's own key opens nothing that came after
     const { sealingKeyPairFromNetworkKey, readKeyChain, openAcrossKeyChain, open } = await import('@onderling/pod-client');
     const { deriveCircleSeed, b64encode } = await import('@onderling/core');

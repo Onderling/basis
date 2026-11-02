@@ -44,7 +44,8 @@ describe('a person connects a screen to the bot over the relay', () => {
   // grant, the point or the spine outbox — what a failed grant prints, so a red in CI names where the grant stopped
   const walkWhy = () => { try { return readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dataDir, f), 'utf8').split('\n')).filter((l) => /screen|grant|point|spine|primary|unrouted|token-refused|contact-turn|inbox|admission|door/.test(l)).slice(-25).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
   const heard = (node) => JSON.stringify((node?.received ?? []).map((m) => m.payload?.subtype ?? m.payload?.type ?? '?').slice(-15));
-  const walkTail = () => { try { const dir = path.join(dataDir, 'walks'); return readdirSync(dir).map((f) => readFileSync(path.join(dir, f), 'utf8')).join('').split('\n').filter((l) => /screen|unrouted/.test(l)).slice(-10).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
+  // the runner writes walk-log-*.jsonl in its data dir: the screen's, the grant's and the person's turns
+  const walkTail = () => { try { return readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).map((f) => readFileSync(path.join(dataDir, f), 'utf8')).join('').split('\n').filter((l) => /screen|unrouted|contact-turn|grant/.test(l)).slice(-12).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
 
   beforeAll(async () => {
     relay = await startJourneyRelay();
@@ -96,7 +97,11 @@ describe('a person connects a screen to the bot over the relay', () => {
     // nothing is granted until Ann says yes, privately, to the code the screen shows
     expect(await answerYes(ann, card.peerAddr, await screenCode(viewPubKey, link.nonce), () => botSaid(ann)), `no question with the code:\n${out.slice(-1500)}`).toBe(true);
     const grant = await until(async () => screen.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
-    expect(grant, `no grant reached the screen — the screen heard: ${heard(screen)}; the box's walk log:\n${walkWhy()}\n— its output:\n${out.slice(-1500)}`).toBeTruthy();
+    expect(grant, `no grant reached the screen — the screen heard: ${heard(screen)}; the bot last said to Ann: ${JSON.stringify((await botSaid(ann)).slice(-4))}; the box's walk log:\n${walkWhy()}\n— its output:\n${out.slice(-1500)}`).toBeTruthy();
+    // the offer that went pending (a question, not yet a grant) is logged as such — it once threw on the missing ops
+    expect(out, 'the box threw on a pending screen offer').not.toMatch(/screen-offer failed/);
+    const walks = (() => { try { return readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dataDir, f), 'utf8').split('\n')).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }); } catch { return []; } })();
+    expect(walks.some((e) => e?.kind === 'screen-offer' && e.ok === true && e.pending === true), 'no walk-log line for the pending offer').toBe(true);
     const accepted = acceptConnectionGrant(grant, { nonce: link.nonce, viewPubKey });
     expect(accepted.ok, JSON.stringify(accepted)).toBe(true);
     expect(accepted.issuer).toBe(link.botAddress);

@@ -36,3 +36,39 @@ describe('a statement told again to a member whose address landed after the fan'
     expect(told).toEqual([]);
   });
 });
+
+describe('a member the fan had no address for is unreachable once the window passes', () => {
+  it('no address at the send → not yet unreachable inside the window; past it, still none → unreachable; the address lands → reachable again', async () => {
+    let now = 1_000;
+    const r = makeLateRecipientRetell({ retell: async () => {}, now: () => now, windowMs: 60_000 });
+    r.noAddress('c1', ['dirk']);
+    const rows = (dirkAddrs) => [{ webid: 'bea', addresses: ['bea-addr'] }, { webid: 'dirk', addresses: dirkAddrs }];
+    expect(r.unreachable('c1', rows([]))).toEqual([]);
+    now += 61_000;
+    expect(r.unreachable('c1', rows([]))).toEqual(['dirk']);
+    expect(r.unreachable('c2', rows([])), 'another circle').toEqual([]);
+    expect(r.unreachable('c1', rows(['dirk-addr'])), 'his address landed').toEqual([]);
+    expect(r.unreachable('c1', rows([])), 'once reachable, forgotten').toEqual([]);
+  });
+  it('a member no longer on the roster is not reported', () => {
+    let now = 1_000;
+    const r = makeLateRecipientRetell({ retell: async () => {}, now: () => now, windowMs: 60_000 });
+    r.noAddress('c1', ['dirk']);
+    now += 61_000;
+    expect(r.unreachable('c1', [{ webid: 'bea', addresses: ['bea-addr'] }])).toEqual([]);
+  });
+});
+
+describe('a statement is kept while a member it missed still waits', () => {
+  it('past the window, a member still without an address: the statement is told when their address lands', async () => {
+    const told = [];
+    let now = 1_000;
+    const r = makeLateRecipientRetell({ retell: async (c, st) => { told.push(st.body.hash); }, now: () => now, windowMs: 60_000 });
+    r.fanned('c1', { body: { hash: 's1', kind: 'role' } }, ['bea-addr']);
+    r.noAddress('c1', ['dirk']);
+    now += 10 * 60_000;
+    expect(r.holds('c1'), 'kept while Dirk waits').toBe(true);
+    await r.rosterAddresses('c1', ['bea-addr', 'dirk-addr']);
+    expect(told).toEqual(['s1']);
+  });
+});

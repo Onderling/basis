@@ -167,6 +167,8 @@ export async function leaveCircleLocally({ agent = null, callSkill = null, circl
   catch (err) { res = { error: err?.message ?? 'leave-failed' }; }
   if (res?.error) { out.error = res.error; return out; }
   out.ok = true;
+  // handed to the person's main device to sign — the circle stays in the list until that leave lands back here
+  if (res?.forwarded === true) { out.forwarded = true; out.held = res.held === true; }
 
   try {
     out.unbound = forgetCircleAddressKeys({

@@ -382,6 +382,14 @@
       "text": "{{name}} is lid geworden van deze kring.",
       "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
     },
+    "leaving_note": {
+      "text": "Verlaten — dit wacht op je hoofdapparaat. De kring verdwijnt zodra dat apparaat het heeft ondertekend.",
+      "doc": "Said on a circle tile you just left from a device that is not your main device: the leave was handed to the main device to sign, and the tile goes when that signed leave lands here."
+    },
+    "leaving_note_held": {
+      "text": "Verlaten — je hoofdapparaat is offline. De kring verdwijnt zodra het terug is.",
+      "doc": "The same, when the main device is offline: the leave waits for it."
+    },
     "removed_mark": {
       "text": "verwijderd",
       "doc": "The mark on a circle tile an admin removed you from; the tile stays (read-only) until you close it."

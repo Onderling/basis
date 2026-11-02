@@ -250,6 +250,13 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     maker.page.once('dialog', (d) => d.accept());
     await thuis.click({ button: 'right' });
     await maker.page.locator('.circle-launcher__tile-menu-item[data-action="leave"]').click();
+    // the maker's tab is not the point: its leave is signed on the box and lands back — until then the tile says so
+    // one read of the DOM per poll: the tile can be repainted away between two locator calls
+    const tileState = () => maker.page.evaluate(() => {
+      const tile = [...document.querySelectorAll('.circle-tile')].find((e) => /Thuis/.test(e.textContent));
+      return !tile ? 'gone' : (tile.dataset.leaving ? 'marked' : 'untouched');
+    });
+    await expect.poll(tileState, { timeout: 5_000, message: 'right after the leave the Thuis tile must be marked or gone, never untouched' }).not.toBe('untouched');
     await expect.poll(() => maker.page.locator('.circle-tile', { hasText: /Thuis/ }).count(), { timeout: 20_000, message: 'the tile is gone on the maker' }).toBe(0);
     const boxLeft = await untilLog(dataDir, (e) => e.kind === 'circle-follow' && e.steps?.includes('left') && e.ok === true, 30_000);
     expect(boxLeft, `the box never followed the leave — circle-follow log: ${JSON.stringify(walkLog(dataDir).filter((e) => e.kind === 'circle-follow'))}`).toBeTruthy();

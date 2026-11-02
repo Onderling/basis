@@ -701,6 +701,9 @@ export default function ChatScreen({
           ],
           on: {
             govChange: govChanged,
+            // a landed membership change may be this person's own leave, signed on the main device: the launcher re-reads
+            // its circles (web parity — without it the left circle's tile stays until the next focus)
+            membershipChange: () => { onCirclesChanged?.(); },
             keyChange: (cid) => refreshCircleKeyEventsFromLane(bundle?.agent?.keyRail, cid).catch(() => {}),
             chatLanded: ({ msgId, circleId: cid, fromPeerAddr, source }) => {
               try { chatStoredReceipt?.({ msgId, circleId: cid, fromPeerAddr, source }); }

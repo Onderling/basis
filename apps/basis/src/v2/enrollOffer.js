@@ -29,6 +29,7 @@
  *                                              pull membership + governance catch-up from it
  */
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor, announceOwnCircleAddress } from './circleAddressAnnounce.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
@@ -40,6 +41,14 @@ import { RECOVERY_SEAL_LABEL } from '../core/agent/personaVault.js';
 const PERSONA_ID = /^p-[0-9a-f]{12}$/;
 
 /** The scheme. Distinct from `onderling-connect://` — see the header. */
+/**
+ * How long a new device waits for a sibling's roster seed before it says the circle is not complete. A FIRST contact
+ * to a sibling's device address can take most of ten seconds on a busy device (measured: the answer at 5.7 s, the
+ * parcel at 8.3 s), so ten was a race under load; the request is re-sent every 2.5 s meanwhile, so a sibling that is
+ * there costs no extra time — only one that is truly absent makes the enrol wait this long.
+ */
+const ENROL_SEED_WAIT_MS = param({ key: 'enrol.seedWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+
 export const ENROLL_SCHEME = 'onderling-enroll://';
 
 /** Where a scanned/pasted offer waits out the ceremony reload (plain storage — it is public data). */
@@ -538,8 +547,16 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     // at its DEVICE address (learned from the offer at the top of the consume), and nothing is announced or bound to it.
     const shared = !!ownAddress && c.address === ownAddress && c.member !== true;
     let sibling = c.address;
+    // who is asked for the roster seed: with a shared address EVERY live sibling of this persona, the device the offer was
+    // shown on first (the one the person is holding) — one silent sibling must not hold the whole enrol; first answer wins
+    let seedFrom = [c.address];
     if (shared) {
-      sibling = (await Promise.resolve(agent.ownDeviceAddressesOf?.(c.persona ?? 'default')).catch(() => []))?.[0] ?? null;
+      const devices = (await Promise.resolve(agent.ownDeviceAddressesOf?.(c.persona ?? 'default')).catch(() => [])) ?? [];
+      const profileId = agent.profileIdOf?.(c.id) ?? c.persona ?? 'default';
+      const offering = (Array.isArray(c.offeredBy) ? c.offeredBy : []).find((r) => r?.profileId === profileId)?.pubKey ?? null;
+      const mineHere = agent.ownDeviceAddress?.(c.persona ?? 'default') ?? null;
+      seedFrom = [...new Set([...(offering && devices.includes(offering) ? [offering] : []), ...devices])].filter((a) => a && a !== mineHere);
+      sibling = seedFrom[0] ?? null;
       if (!sibling) return { ...row, ok: false, error: 'no-sibling-device' };   // the offer named no device: the next boot asks again
     }
     if (!shared && me && typeof agent.registerPeerAddress === 'function') {
@@ -576,7 +593,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
         const replyTo = shared ? (agent.ownDeviceAddress?.(c.persona ?? 'default') ?? ownAddress) : ownAddress;
         const req = await agent.rosterSeed.buildRequest(c.id, replyTo);
         if (req) {
-          await sendPeerMessage(sibling, req, { ...send, circleId: c.id });
+          for (const to of seedFrom) { try { await sendPeerMessage(to, req, { ...send, circleId: c.id }); } catch { /* the next sibling, and the resend */ } }
           row.steps.push('seed-requested');
           // Wait for the SIBLING'S ADDRESS to be on my own row — the seed applied, and the sibling's
           // own announcement (it rides inside the parcel) recorded. That is the one fact the pulls
@@ -586,7 +603,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
           // content pull raced the seed and lost, one enrol in four (the box's walk).
           // RE-SEND the request while waiting: a single packet on a busy boot is exactly the
           // kind of loss the first-write-wins ingest makes free to retry.
-          const deadline = Date.now() + 10000;
+          const deadline = Date.now() + ENROL_SEED_WAIT_MS;
           let nextResend = Date.now() + 2500;
           let derived = false;
           while (Date.now() < deadline) {
@@ -602,7 +619,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
             } catch { /* keep waiting */ }
             if (Date.now() >= nextResend) {
               nextResend = Date.now() + 2500;
-              try { await sendPeerMessage(sibling, req, { ...send, circleId: c.id }); } catch { /* next tick */ }
+              for (const to of seedFrom) { try { await sendPeerMessage(to, req, { ...send, circleId: c.id }); } catch { /* next tick */ } }
             }
             await new Promise((resolve) => setTimeout(resolve, 250));
           }
@@ -720,7 +737,7 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
   let claimedDevice = false;   // the DM half of the primary contact address: once per consume
   for (const c of offer.circles) {
     const row = await consumeCircleEntry({ agent, callSkill, sendPeerMessage, registerCirclePresence, contentPulls },
-      { ...c, relays: offer.relays }, { claimPrimary: !claimedDevice });
+      { ...c, relays: offer.relays, offeredBy: offer.introduce ?? [] }, { claimPrimary: !claimedDevice });
     if (row.steps.includes('primary-device')) claimedDevice = true;
     if (!row.ok) allOk = false;
     report.push(row);

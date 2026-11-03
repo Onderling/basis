@@ -168,7 +168,8 @@ export async function loadPersonKey(vault) {
       try { const ps = b64decode(p.seed); if (Number.isInteger(p.version) && ps instanceof Uint8Array && ps.length === 32) previous.push({ version: p.version, seed: ps }); } catch { /* skip */ }
     }
     const linkKeyPub = (typeof o.linkKeyPub === 'string' && o.linkKeyPub) ? o.linkKeyPub : null;
-    return { version: o.version, seed, reveals, links, previous, linkKeyPub };
+    const selfReveal = (o.selfReveal && typeof o.selfReveal === 'object') ? o.selfReveal : null;
+    return { version: o.version, seed, reveals, links, previous, linkKeyPub, selfReveal };
   } catch { return null; }
 }
 
@@ -178,7 +179,7 @@ export async function loadPersonKey(vault) {
  * before link keys, on a device that then hears it from a sibling). A pub once there is never replaced. Returns
  * true when the entry changed.
  */
-export async function storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [], linkKeyPub = null }) {
+export async function storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [], linkKeyPub = null, selfReveal = null }) {
   if (!Number.isInteger(version) || version < 1 || !(seed instanceof Uint8Array) || seed.length !== 32) throw new Error('storePersonKey: {version, seed} required');
   const have = await loadPersonKey(vault);
   const pub = (typeof linkKeyPub === 'string' && linkKeyPub) ? linkKeyPub : null;
@@ -200,6 +201,8 @@ export async function storePersonKey(vault, { version, seed, reveals = {}, links
   for (const l of [...(have?.links ?? []), ...(Array.isArray(links) ? links : [])]) if (l && Number.isInteger(l.version)) allLinks.set(l.version, l);
   await vault.set(PERSON_KEY_VAULT_KEY, JSON.stringify({
     version, seed: b64encode(seed), reveals: reveals && typeof reveals === 'object' ? reveals : {},
+    // the ceremony's word for this version that names no circle: what hands the key to a sibling when the self is in none
+    selfReveal: selfReveal && typeof selfReveal === 'object' ? selfReveal : null,
     links: [...allLinks.values()].sort((a, b) => a.version - b.version),
     previous: [...keep.entries()].sort((a, b) => a[0] - b[0]).map(([v, sd]) => ({ version: v, seed: b64encode(sd) })),
     linkKeyPub: have?.linkKeyPub ?? pub,   // pinned once; a later write never replaces it

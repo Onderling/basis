@@ -1870,7 +1870,7 @@ Read the vault entry. Null when absent or malformed (an enrolled device from bef
 **Kind:** function · **Import:** `storePersonKey` from `'@onderling/core'`
 
 ```js
-async storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [], linkKeyPub = null })
+async storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [], linkKeyPub = null, selfReveal = null })
 ```
 
 Write the vault entry — only ever a HIGHER version than what is there (a ceremony never rolls a key back), with

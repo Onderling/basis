@@ -1010,6 +1010,17 @@ pretending to carry. Offline **hold-and-forward** exists today as a send *guaran
 {guarantee:'hold-forward'})` — a briefly-offline member has the message held and flushed on reconnect); a
 *dedicated* hold-and-forward port is forward work.
 
+**A refusal the sender cannot see is a known gap.** A receiver refuses a validly signed sender it has no roster row
+for *silently* — a stranger learns nothing — so the sender cannot tell that refusal from "offline". When the refused
+send opened with a handshake (the sender had not met the receiver), the handshake times out and the message is
+held: a hold sent from a *young* address of ours (one registered less than `secureAgent.youngAddressWindowMs` ago,
+whose introduction may not have reached every member yet) re-flushes on a short bounded back-off
+(`secureAgent.youngAddressRetryMs`), then waits for presence as any hold. When the sender *already knew* the
+receiver, no handshake goes first and the send reads **delivered**: nothing is held, and the message is **lost
+silently**. Re-sending such sends blindly is not safe — not every receiver drops a repeat by `msgId` — and the
+delivery receipt that would let a send stay held until confirmed exists only for chat messages, and only while the
+person keeps receipts on. Closing it needs an acknowledgement that every kind of send carries.
+
 **Two unrelated "hop"s — don't conflate them.** The **transport-hop** above (the `hop` rung) is peer-as-relay
 *routing*: forwarding a payload through an intermediary peer to reach a target. A **social match-hop** —
 relaying a skill query one degree further through a contact who allows it — would be *discovery* and would never

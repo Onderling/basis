@@ -625,6 +625,10 @@
         "text": "Couldn't reach some members",
         "doc": "δ.2 — permanent fan-out failure (e.g. a member has no published key); shown but NOT retryable (retry can't help)."
       },
+      "persona_waiting": {
+        "text": "Waiting — this persona has no connection yet; it goes out by itself once it has one",
+        "doc": "The circle belongs to one of your personas, which has no connection of its own to the circle's relay yet, so the message is HELD on this device (never sent under another identity). Not a failure: it goes out by itself once the persona has a connection, and the bubble then moves on."
+      },
       "persona_no_connection": {
         "text": "Not sent: this persona has no connection to the circle (tap to retry)",
         "doc": "The circle belongs to one of your personas and that persona has no connection of its own to the circle's relay right now, so the message did not leave (it is never sent under another identity). Retryable once the connection is back."

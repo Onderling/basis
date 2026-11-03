@@ -15,6 +15,7 @@ import { VaultMemory } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 import { broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
+import { makeGiveUpConsumers } from '../src/v2/deliveryGiveUp.js';
 import { startJourneyRelay } from './support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown, readRoster,
@@ -29,12 +30,14 @@ const rowOf = (roster, webid) => roster.find((m) => (m?.webid ?? m?.id) === webi
 
 describe('two personas of one device, seen by a co-member of both circles', () => {
   let relay; let dev; let cor; let B; let personaId;
+  // the device's delivery map, handed to its outbox the way both shells hand theirs (secureAgentOpts)
+  const deliveryMap = createDeliveryStateMap();
 
   beforeAll(async () => {
     relay = await startJourneyRelay();
     [dev, cor] = await Promise.all([
       // WITH a device log, as every shell boots — the membership rail (what a member says about themself) exists only then
-      bootRealAgentNode('dev', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), allowAddressFallback: false, deviceLog: new EventLog({ initial: [], muted: [] }) } }),
+      bootRealAgentNode('dev', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), allowAddressFallback: false, deviceLog: new EventLog({ initial: [], muted: [] }), secureAgentOpts: makeGiveUpConsumers({ deliveryMap }) } }),
       bootRealAgentNode('cor', { agentOpts: { allowAddressFallback: false, deviceLog: new EventLog({ initial: [], muted: [] }) } }),
     ]);
     await connectNodesOverRelay([dev, cor], { relayUrl: relay.url });
@@ -120,19 +123,29 @@ describe('two personas of one device, seen by a co-member of both circles', () =
     expect(landed.body.payload.authorRef).toBe(B.chatId.pubKey);
   }, 60_000);
 
-  it('B without a connection of its own: nothing leaves, and the bubble says why (retryable)', async () => {
+  it('B without a connection of its own: the message WAITS and the bubble says why; once B dials it goes out and the bubble moves on', async () => {
     await dev.agent.sa.relays.remove(relay.url, { identity: B.chatId.pubKey });
     expect(dev.agent.sa.relays.list({ identity: B.chatId.pubKey })).toEqual([]);
-    const map = createDeliveryStateMap();
+    const map = deliveryMap;
     const rawCallSkill = (app, op, args) => dev.agent.callSkill(app, op, args);
     const msgId = `m-${Date.now()}`;
     const ts = Date.now();
     await broadcastCircleFanOut({
       rawCallSkill, circleId: Y, msgId, text: 'hallo buren', ts, deliveryStateMap: map,
       // the chat rail's sign-the-appended-entry hook, as the shells hand it
-      signStatement: async (cid, id) => (await dev.chatRail.appendMessage(cid, { msgId: id, ts, text: 'hallo buren', actor: B.chatId.pubKey }))?.statement ?? null,
+      signStatement: async (cid, id) => (await dev.agent.chatRail.appendMessage(cid, { msgId: id, ts, text: 'hallo buren' }))?.statement ?? null,
     });
-    expect(map.get(msgId)).toBe('failed');
-    expect(map.reasonOf(msgId)).toBe('persona-no-connection');
+    const heardBefore = cor.chatRail.storedStatements(Y).filter((st) => st?.body?.payload?.text === 'hallo buren' && st?.body?.payload?.authorRef === B.chatId.pubKey).length;
+    expect(map.get(msgId), 'waiting, not failed').toBe('pending');
+    expect(map.reasonOf(msgId), 'and why: this persona has no connection yet').toBe('persona-waiting');
+    // B dials again — nobody retries by hand: the held message goes out by itself, on B's own socket
+    // B dials again the way the app dials a persona's connection (the binding registers its circle addresses on the new
+    // socket) — and nobody retries by hand: the held message goes out by itself, on B's own socket
+    expect((await dev.agent.callSkill('household', 'bindCirclePersona', { circleId: Y, personaId, relayUrl: relay.url })).ok).toBe(true);
+    await bindCircleAddresses([dev], Y);   // the shells' presence step: the circle addresses on the live sockets
+    const landed = await until(async () => cor.chatRail.storedStatements(Y).filter((st) => st?.body?.payload?.text === 'hallo buren' && st?.body?.payload?.authorRef === B.chatId.pubKey).length > heardBefore ? true : null, { timeout: 20_000, step: 200 });
+    expect(landed, 'the held message reached Cor, as B, once B had a connection').toBe(true);
+    expect(await until(() => (map.get(msgId) === 'maybe-received' ? true : null), { timeout: 5000, step: 100 }), 'the bubble left its wait').toBe(true);
+    expect(map.reasonOf(msgId)).toBe(null);
   }, 60_000);
 });

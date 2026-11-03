@@ -10,6 +10,10 @@
  * Both mean "this did not arrive". Only the first means "we never sent it", which is why they stay
  * distinct at the source even though they agree here — a retry path needs to know which happened.
  *
+ * And their twin, the good news: `onHeldSent` — a message the hold queue kept went out after all (a flush sent it).
+ * A bubble waiting on that hold ("this persona has no connection yet") moves on to `maybe-received`, the state any
+ * message that left this device rests in; without it, a wait would be shown for ever after the message had gone.
+ *
  * ── Why this is shared code and not two lines in each shell ──────────────────────────────────────────
  * It WAS two lines in one shell. Mobile consumed both hooks from 2026-07-31; web consumed neither, so on
  * web a message the system had given up on kept its optimistic state indefinitely. Nobody noticed because
@@ -24,6 +28,8 @@
 
 /** The state a given-up message lands in. Terminal, and the bubble already renders it with a retry. */
 const GAVE_UP = 'failed';
+/** The state a held message lands in once it has gone out: it left this device; nobody has told us more. */
+const LEFT = 'maybe-received';
 
 /**
  * Build the two give-up consumers over a delivery-state map.
@@ -31,7 +37,7 @@ const GAVE_UP = 'failed';
  * @param {object} a
  * @param {{set: (msgId: string, state: string) => void}} a.deliveryMap
  * @param {(message: string) => void} [a.onWarn]  defaults to console.warn
- * @returns {{onHoldDropped: Function, onUndelivered: Function}}
+ * @returns {{onHoldDropped: Function, onUndelivered: Function, onHeldSent: Function}}
  */
 export function makeGiveUpConsumers({ deliveryMap, onWarn = null } = {}) {
   const warn = typeof onWarn === 'function' ? onWarn : (m) => console.warn(m);
@@ -52,6 +58,12 @@ export function makeGiveUpConsumers({ deliveryMap, onWarn = null } = {}) {
       `[delivery] gave up on ${String(msgId)} → ${String(addr ?? '?').slice(0, 16)}… `
       + `(${reason}${Number.isFinite(ageMs) ? `, held ${Math.round(ageMs / 1000)}s` : ''})`,
     ),
+
+    /** It was held, and has now gone out. Only a message the map knows (a bubble) moves; a control send has none. */
+    onHeldSent: ({ msgId } = {}) => {
+      if (!msgId) return;
+      try { if (deliveryMap?.get?.(msgId) != null) deliveryMap.set(msgId, LEFT); } catch { /* the message went regardless */ }
+    },
 
     /** It left, waited at the relay, and the relay gave up. */
     onUndelivered: ({ msgId, reason } = {}) => giveUp(

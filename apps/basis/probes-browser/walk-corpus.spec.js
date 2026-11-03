@@ -10,7 +10,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { bootPeers, teardown, pair, toChat, sendChat, readBubbles, log,
-  gotoCircles, createCircle, openCircleMatching, joinFromInvite } from './peerHarness.js';
+  gotoCircles, createCircle, openCircleMatching, joinFromInvite } from '../test-browser/peerHarness.js';
 
 test.setTimeout(420_000);
 

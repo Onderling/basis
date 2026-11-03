@@ -16,7 +16,7 @@
  * Each step logs PASS / FAIL / BLOCKED + what was OBSERVED (quoted on-screen text).
  */
 import { test, expect } from '@playwright/test';
-import { createCircleViaWizard } from './helpers.js';
+import { createCircleViaWizard } from '../test-browser/helpers.js';
 
 // Screenshots land in Playwright's own output directory for this test — never a path from one
 // machine. (A hardcoded home directory here failed every run of this story in CI, 2026-09-13.)

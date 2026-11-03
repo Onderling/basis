@@ -13,7 +13,7 @@
 import { test } from '@playwright/test';
 import { bootCss, teardown as podTeardown, provisionAll, reachable } from '../../../scripts/css-harness.mjs';
 import { bootPeers, teardown, pair, toChat, sendChat, readBubbles, log,
-  gotoCircles, openCircleMatching } from './peerHarness.js';
+  gotoCircles, openCircleMatching } from '../test-browser/peerHarness.js';
 
 test.setTimeout(600_000);
 

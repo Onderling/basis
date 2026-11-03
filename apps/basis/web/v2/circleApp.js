@@ -409,6 +409,7 @@ import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBl
 import { localUserScreenStore, getActiveScreen, blockTypesShowingCircle } from '../../src/v2/userScreens.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../src/v2/vandaag.js';
 import { createScreenHead } from '../../src/v2/screenHead.js';
+import { watchCircleChanges } from '../../src/v2/headCircleWatch.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderVandaagCustomise } from './vandaagCustomise.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
@@ -3710,6 +3711,7 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  */
 async function circlesChangedUnderneath() {
   try { circlesCache = await loadLauncherCircles(); } catch { return; }
+  _vandaagHead?.invalidate();   // Vandaag reads over this list: a circle that came or went changes what it shows
   // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
   if (getActiveCircle() == null && _activeTab === 'circles') { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
 }
@@ -4237,7 +4239,12 @@ function vandaagHead() {
   if (_vandaagHead || typeof circleHouseholdAgent?.onCircleChanged !== 'function') return _vandaagHead;
   _vandaagHead = createScreenHead({
     materialize: () => materializeVandaag(),
-    subscribe: [(fn) => circleHouseholdAgent.onCircleChanged(fn), (fn) => eventLog.subscribe(fn)],
+    // a change in a circle the list does not hold yet (joined elsewhere, through an offer, by an op) re-reads the list first
+    subscribe: [watchCircleChanges({
+      onCircleChanged: (fn) => circleHouseholdAgent.onCircleChanged(fn),
+      knows: (cid) => (circlesCache ?? []).some((c) => c?.id === cid),
+      refresh: async () => { circlesCache = await loadLauncherCircles(); },
+    }), (fn) => eventLog.subscribe(fn)],
   });
   _vandaagHead.onUpdate((blocks) => { if (_activeTab === 'screens' && getActiveCircle() == null) paintVandaagBlocks(blocks); });
   return _vandaagHead;

@@ -140,7 +140,7 @@ export async function createBrowserPinboardAgent({
     reliableSend,   // host-injected hold-forward sender for circle chat fan-out (absent → chat.send fallback)
     circleDataMove, // Phase 2 G1/G2 — host-injected data-move resolver (absent → fan-out-full)
     podWrite,       // Phase 3 seam — real shared-pod writer (absent → pod-signal/pod-only degrade)
-    allowAddressFallback,  // per-user setting → the circle fan's address ladder (absent → allowed, unchanged)
+    allowAddressFallback,  // per-user setting → the circle fan's address ladder (absent → OFF: only the person turns it on)
     circleSignerFor,       // circle-scoped spine signing (absent → legacy global-identity signer, unchanged)
     membershipEmit,        // the membership rider's device-log emitter (absent → store-based, unchanged)
     membershipRead,        // the rider's verified reader for the roster fold

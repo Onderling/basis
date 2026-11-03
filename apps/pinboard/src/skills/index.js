@@ -89,7 +89,7 @@ import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAd
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
-import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
+import { resolveMemberAddress, makeFallbackReporter, ADDRESS_VIA } from '../lib/memberAddress.js';
 import { kindWakes, assigneesOf } from '@onderling/item-store';
 
 /** G13 — one reporter per process, deduping per (circle, member, reason) so the signal stays readable. */
@@ -551,7 +551,7 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  */
 async function _fanOutViaReliableSend({
   members, reliableSend, selfWebid, envelope, only = null, circleId = null, preferCircleAddress = false,
-  allowFallback = true,
+  allowFallback = false,
 }) {
   const list = await members.list();
   const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
@@ -565,13 +565,13 @@ async function _fanOutViaReliableSend({
     // every circle. `resolveMemberAddress` owns the ladder (circleAddress → pubKey → webid) so the two fan
     // paths cannot drift, and it REPORTS each fallback: that report is how we learn when step D (dropping
     // the fallback) is safe rather than a guess.
-    const { addr, addrs } = await resolveMemberAddress(m, {
+    const { addr, addrs, via } = await resolveMemberAddress(m, {
       circleId,
       preferCircleAddress,
       // Resolved per fan, not per boot: the user can flip the setting mid-session, and a send after the
       // flip must honour it. A `blocked` report (setting off, no circle address) still fires — it is the
       // only signal the setting is costing someone messages, and it is what drives the chat's offer.
-      allowFallback: typeof allowFallback === 'function' ? allowFallback() !== false : allowFallback !== false,
+      allowFallback: typeof allowFallback === 'function' ? allowFallback() === true : allowFallback === true,
       resolveByWebid: (w) => members.resolveByWebid(w),
       onFallback: _reportAddressFallback,
     });
@@ -579,14 +579,18 @@ async function _fanOutViaReliableSend({
     // A member can hold a SET of proven per-circle addresses (a second device, a restored profile) —
     // the fan tries them IN ORDER, primary first, and stops at the first address that takes the
     // envelope (delivered or held). Sequential on purpose: one member, one delivery, fewest points.
-    if (!targets.has(addr)) targets.set(addr, { webid, candidates: (addrs && addrs.length) ? addrs : [addr] });
+    // Reached at their GLOBAL key (the person chose the fallback): the send goes person to person — never as my circle
+    // address to their global key, which is neither a circle message nor a personal one, and which their reply in
+    // kind would make the circle refuse. The circle statement inside is still signed by the circle key.
+    const asPerson = via !== ADDRESS_VIA.CIRCLE;
+    if (!targets.has(addr)) targets.set(addr, { webid, candidates: (addrs && addrs.length) ? addrs : [addr], asPerson });
   }
   let sent = 0;
   const errors = unresolved.map((webid) => ({ webid, reason: 'recipient-pubkey-unknown' }));
   // what happened to each recipient — delivered, HELD (counted as sent: queued for their next presence), failed or
   // without an address — so a statement that must arrive can say where it went (a probe that names its branch)
   const outcomes = unresolved.map((webid) => ({ webid, outcome: 'no-address' }));
-  await Promise.all([...targets.values()].map(async ({ webid, candidates }) => {
+  await Promise.all([...targets.values()].map(async ({ webid, candidates, asPerson }) => {
     let failure = null;
     let last = null;
     for (const addr of candidates) {
@@ -594,7 +598,7 @@ async function _fanOutViaReliableSend({
         // Circle-scoped: this traffic belongs to `circleId`, and the host constrains it to that circle's
         // connection points. pinboard names the CIRCLE and nothing else — which transports exist, and which of
         // them the circle rides, are not its business. → plans/NOTE-circle-scoped-routing.md
-        const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward', circleId });
+        const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward', circleId, ...(asPerson ? { asPerson: true } : {}) });
         // held (offline → queued for hold-forward) AND delivered both count as sent; a send
         // that explicitly reports neither is the only genuine transient failure — try the member's
         // next proven address before giving up on them.
@@ -1294,7 +1298,7 @@ export function buildSkills({
   // when no per-circle address is known? OFF is the private default; the host threads the live setting as
   // a value or a function, because unlike `preferCircleAddress` (a deployment fact) this one changes at
   // runtime when the user flips the toggle — a boolean captured at boot would ignore every change after.
-  allowAddressFallback = true,
+  allowAddressFallback = false,
   chat,           // Phase 14: wireChat controller (chat.send / chat.detach)
   metrics,        // Phase 18: UsageMetrics; record() called from key handlers
   bundle,         // Phase 20: factory hands itself in for sign-in skills

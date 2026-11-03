@@ -18,6 +18,7 @@ import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../../../basis/src/v2/vandaag.js';
 import { createScreenHead } from '../../../../basis/src/v2/screenHead.js';
+import { watchCircleChanges } from '../../../../basis/src/v2/headCircleWatch.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
@@ -1331,7 +1332,12 @@ export default function CircleLauncherScreen({
     if (typeof agent?.onCircleChanged !== 'function') return undefined;
     const head = createScreenHead({
       materialize: () => materializeVandaagNow(),
-      subscribe: [(fn) => agent.onCircleChanged(fn), ...(typeof eventLog?.subscribe === 'function' ? [(fn) => eventLog.subscribe(fn)] : [])],
+      // a change in a circle the list does not hold yet (joined elsewhere, through an offer, by an op) re-reads the list first
+      subscribe: [watchCircleChanges({
+        onCircleChanged: (fn) => agent.onCircleChanged(fn),
+        knows: (cid) => (circlesRef.current || []).some((c) => c?.id === cid),
+        refresh: () => loadRef.current?.(),
+      }), ...(typeof eventLog?.subscribe === 'function' ? [(fn) => eventLog.subscribe(fn)] : [])],
     });
     const off = head.onUpdate((blocks) => {
       if (viewNow.current !== 'screens') return;
@@ -1457,6 +1463,9 @@ export default function CircleLauncherScreen({
   // Live circle ids for the provisioner's existence check without re-arming the boot effect.
   const circlesRef = useRef(circles);
   circlesRef.current = circles;
+  // Vandaag's head re-reads the circle list through this when a circle it does not know changes (headCircleWatch)
+  const loadRef = useRef(load);
+  loadRef.current = load;
   // Provision the default HELP circle (you + the Onderling-bot) ONCE, through the real mobile create path
   // (quickCreateCircle), mirroring web's maybeProvisionHelpCircle. Idempotent + first-run-guarded via the
   // shared provisionHelpCircle orchestrator; best-effort — a failure leaves the marker unset so it retries

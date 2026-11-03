@@ -922,7 +922,7 @@ export async function createSecureAgent(opts = {}) {
     if (step === 0 && youngEcho.has(key)) return;
     const timer = setTimeout(async () => {
       if (youngEcho.get(key) !== timer) return;   // a receipt cancelled it
-      try { await _sendWithFailover(addr, payload, { ...sendOpts, hold: false, guarantee: 'best-effort' }); } catch { /* a guess at when: never counted */ }
+      try { await resendHeld(addr, payload, sendOpts); } catch { /* a guess at when: never counted */ }
       if (youngEcho.get(key) !== timer) return;
       if (step + 1 < youngAddressRetryMs.length) scheduleYoungEcho(addr, payload, sendOpts, step + 1);
       else youngEcho.delete(key);
@@ -1219,6 +1219,24 @@ export async function createSecureAgent(opts = {}) {
     }
     return { flushed };
   }
+  /**
+   * Re-send a held (or echoed) message once, best-effort. A message sent AS a persona goes out on that persona's own
+   * sockets only — never through the general router, whose sockets would show the relay the two are one device — and a
+   * persona send that does not go out throws, so the caller re-holds it.
+   */
+  async function resendHeld(addr, payload, opts) {
+    const once = { ...opts, hold: false, guarantee: 'best-effort' };
+    const owner = (typeof opts?.personaOwner === 'string' && opts.personaOwner)
+      || (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
+    if (!owner) return _sendWithFailover(addr, payload, once);
+    const r = await sendAsPersona(addr, payload, once, owner);
+    if (r?.delivered === false) {
+      const err = new Error(`secure-agent: a persona's held message did not go out (${r.reason})`);
+      err.personaNoConnection = r.reason === 'persona-no-connection';
+      throw err;
+    }
+    return r;
+  }
   async function flushPending(addr, { countFailures = true } = {}) {
     sweepExpiredHolds();
     const q = pendingHold.get(addr);
@@ -1229,7 +1247,7 @@ export async function createSecureAgent(opts = {}) {
     for (const entry of entries) {
       const { payload, opts } = entry;
       try {
-        await _sendWithFailover(addr, payload, { ...opts, hold: false, guarantee: 'best-effort' });
+        await resendHeld(addr, payload, opts);
         clearDeliveryFailures(addr);
         flushed++;
       } catch (err) {
@@ -1237,7 +1255,8 @@ export async function createSecureAgent(opts = {}) {
         // Still unreachable → re-hold, unless this address has now failed often enough that re-holding
         // is just paying for it again later. Giving up is REPORTED, like every other drop.
         // A young-address re-flush is a guess at WHEN, not evidence the address is dead: it never counts.
-        if (countFailures && recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
+        // …nor is a persona that has no socket of its own yet: that is ours to fix, not the peer's silence.
+        if (countFailures && !err?.personaNoConnection && recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
         else enqueueHold(addr, payload, opts);
       }
     }
@@ -2288,7 +2307,12 @@ export async function createSecureAgent(opts = {}) {
     const sockets = [...personaTransports.entries()]
       .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)));
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
-    if (!sockets.length) return { held: false, delivered: false, msgId, reason: 'persona-no-connection', persona: owner };
+    // Not sendable now: held on hold-forward, exactly as the general persona's send would be — and every flush re-sends
+    // it through `resendHeld`, which keeps it on this persona's own sockets.
+    // The owner rides in the held entry: a restored outbox can flush before the personas register again, and a held
+    // message whose owner is unknown at that moment must still never leave on the general persona's sockets.
+    const holdOr = (r) => (wantsHold(opts) ? enqueueHold(addr, payload, { ...opts, personaOwner: owner }, r.reason) : r);
+    if (!sockets.length) return holdOr({ held: false, delivered: false, msgId, reason: 'persona-no-connection', persona: owner });
     let last = null;
     for (const [key, e] of sockets) {
       try {
@@ -2300,7 +2324,7 @@ export async function createSecureAgent(opts = {}) {
         last = { held: false, delivered: false, msgId, reason: 'persona-unreachable', persona: owner, error: err?.message ?? String(err) };
       }
     }
-    return last;
+    return holdOr(last);
   }
 
   async function _sendWithFailover(addr, payload, opts = {}) {

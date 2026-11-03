@@ -476,7 +476,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     String(state.rotationDays),
     (v) => { state.rotationDays = Math.max(1, Math.min(365, parseInt(v, 10) || 30)); },
     { type: 'number',
-      hint: 'How often the circle-wide encryption key rotates. 30 d default suits most circles; drop lower for higher-sensitivity groups. (Invite expiry is configured separately in Governance.)' });
+      hint: t('circle.wizard.create.rotation_days_hint') });
 
   container.appendChild(wrap);
   renderActions(container, doc, [

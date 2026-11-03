@@ -131,6 +131,8 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
   it('W rotates to v2: the laptop adopts it, the lost device is carried nothing and keeps v1, Y folds v2 for W', async () => {
     const W = phone.agent.persona(w);
     const v1 = W.personKey.version;
+    const wOldPerson = W.personIdentity.pubKey;   // W's person address at v1: after the rotation no socket may hold it
+    const generalOldPerson = phone.agent.personAddress();   // …and the general persona's, which the revoke rotates too
     const lostWAddrs = new Set([lost.agent.persona(w)?.circleAddressFor?.(Y), lost.agent.persona(w)?.chatId?.pubKey].filter(Boolean));
     const carried = [];
     const peer = phone.agent.sa.peer;
@@ -154,6 +156,19 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     const laptopW = laptop.agent.persona(w);
     expect(await until(async () => (laptopW.personKey?.version === v1 + 1 ? true : null), { timeout: 20_000, step: 200 }), `the laptop's W holds ${laptopW.personKey?.version}`).toBe(true);
     expect(laptopW.personIdentity.pubKey).toBe(W.personIdentity.pubKey);
+    // the OLD person address is off every relay socket of both devices: kept, it is re-registered on every connect with
+    // a proof its retired key can no longer give (the relay refuses it — a refused proof per connect)
+    const generalRotated = phone.agent.personAddress() !== generalOldPerson;
+    for (const [name, node] of [['phone', phone], ['laptop', laptop]]) {
+      // The general persona's key is checked on the phone, the device that rotated it: the carry to the laptop
+      // goes by the device registry, which in this harness is each device's own (see the header).
+      for (const [what, addr] of [["W's", wOldPerson], ['the general persona\'s', generalRotated && node === phone ? generalOldPerson : null]]) {
+        if (!addr) continue;
+        const held = (node.agent.sa.relays?.list?.() ?? []).filter((rl) => (rl.port?.addresses ?? []).includes(addr)).length;
+        expect(held, `the ${name} still registers ${what} old person address on ${held} relay socket(s)`).toBe(0);
+      }
+    }
+    expect(generalRotated, 'the revoke did not rotate the general persona\'s person key — this check proves nothing for it').toBe(true);
     // the carry reached none of the lost device's W addresses, and it keeps v1
     expect(carried.filter((to) => lostWAddrs.has(to)), 'nothing carried to the lost device').toEqual([]);
     expect(lost.agent.persona(w).personKey.version).toBe(v1);

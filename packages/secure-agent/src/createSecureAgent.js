@@ -2754,6 +2754,11 @@ export async function createSecureAgent(opts = {}) {
     forgetSelfIdentity(address) {
       selfOwners.delete(address);
       selfAddressBornAt.delete(address);
+      // A forgotten address (a rotated-away person key) must leave every socket too: left registered, each
+      // reconnect re-presents it to the relay with a proof this device can no longer sign — a refused
+      // registration per connect for an address nobody should reach here any more.
+      const sockets = [relayTransport, ...extraTransports.values(), ...[...personaTransports.values()].map((p) => p.tx)];
+      for (const t of sockets) { try { t?.removeAddress?.(address); } catch { /* best-effort */ } }
       if (typeof agent.security?.removeSelfIdentity !== 'function') return false;
       return agent.security.removeSelfIdentity(address);
     },

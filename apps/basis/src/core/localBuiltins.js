@@ -322,6 +322,8 @@ async function whoami(_args, { podAuth, t }) {
     return { ok: false, signedIn: false, webid: null, message: t('whoami.unavailable') };
   }
   const sess = podAuth.getCurrentSession();
+  // a sign-in that came back and failed says why, beside `signedIn: false` (null when there is nothing to say)
+  const signInError = !sess && typeof podAuth.lastSignInError === 'function' ? podAuth.lastSignInError() : null;
   if (sess) {
     return {
       ok: true,
@@ -336,7 +338,7 @@ async function whoami(_args, { podAuth, t }) {
   // false (CORS, ID-token mismatch, redirect-URL drift, etc).
   if (typeof podAuth.getRawSessionInfo === 'function') {
     const raw = podAuth.getRawSessionInfo();
-    if (!raw.sessionExists) return { ok: true, signedIn: false, webid: null, message: t('whoami.not_signed_in') };
+    if (!raw.sessionExists) return { ok: true, signedIn: false, webid: null, signInError, message: t('whoami.not_signed_in') };
     const lines = ['Not signed in.  Diagnostic state:'];
     lines.push(`  sessionExists: ${raw.sessionExists}`);
     lines.push(`  isLoggedIn:    ${raw.isLoggedIn}`);
@@ -346,9 +348,9 @@ async function whoami(_args, { podAuth, t }) {
     lines.push('If you JUST returned from the issuer + this says isLoggedIn:');
     lines.push('false: the redirect-back round-trip didn\'t complete.');
     lines.push('Check DevTools console for [podAuth] errors; retry /signin.');
-    return { ok: true, signedIn: false, webid: raw.webId ?? null, message: lines.join('\n') };
+    return { ok: true, signedIn: false, webid: raw.webId ?? null, signInError, message: lines.join('\n') };
   }
-  return { ok: true, signedIn: false, webid: null, message: t('whoami.not_signed_in') };
+  return { ok: true, signedIn: false, webid: null, signInError, message: t('whoami.not_signed_in') };
 }
 
 /**

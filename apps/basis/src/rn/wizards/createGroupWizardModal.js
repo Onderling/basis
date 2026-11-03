@@ -390,6 +390,7 @@ export default function CreateGroupWizardModal({
                 />
                 <Field
                   label={t('circle.wizard.create.rotation_days')}
+                  hint={t('circle.wizard.create.rotation_days_hint')}
                   value={String(state.rotationDays)}
                   onChangeText={(v) => setState((s) => ({ ...s, rotationDays: Number(v) || 30 }))}
                   placeholder="30"

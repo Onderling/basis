@@ -192,8 +192,12 @@ describe('a holder that is closing', () => {
     await settle();
     await dm(2);
     expect(received(box), 'the DM sent while the holder was closing did not reach the open standby').toEqual([2]);
-    box.close();
+    // the old socket's close finally lands: it no longer holds the address, so it must not take it from the box
     phone.terminate?.();
+    await settle();
+    await dm(3);
+    expect(received(box), 'the late close of the old holder demoted the standby that took over').toEqual([2, 3]);
+    box.close();
   });
 });
 

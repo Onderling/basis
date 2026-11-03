@@ -52,6 +52,8 @@ const PER_FRAME_REFUSALS = new Set(['SENDER_NOT_REGISTERED', 'OVER_RATE', 'OVER_
 // Parameter register (#36) — reconnect backoff ceiling + push-ack timeout (scope:device, kind:internal).
 const MAX_BACKOFF_MS = param({ key: 'transports.maxBackoffMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 const PUSH_ACK_TIMEOUT_MS = param({ key: 'transports.pushAckTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5_000 });
+// A send AS an address waits for that address's bind on this socket; past this it is said, with why the bind was lost.
+const BIND_WAIT_WARN_MS = param({ key: 'transports.bindWaitWarnMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
 
 /**
  * WebSocket relay-server `Transport`: registers this agent's address with the relay, which
@@ -86,6 +88,8 @@ export class RelayTransport extends Transport {
   #proofsInFlight    = new Map();
   /** Aliases the relay has ACKED on THIS socket — what an awaited `addAddress` promises. Cleared with every new socket. */
   #bound             = new Set();
+  /** address → why (and when) it last left `#bound` — what a send that then waits for it can say. */
+  #unboundWhy        = new Map();
   #primaryDevice = () => false;
   #primaryAcked = false;
   /** What this node serves the relay's seat (its own address only), sent on its own register frame. */
@@ -193,7 +197,7 @@ export class RelayTransport extends Transport {
     if (opts?.primary === true) this.#standbyFlags.delete(address);
     this.#primaryFlags.set(address, opts?.primary === true);
     if (!this.connected) return;      // replayed by `_rebindAddresses()` on the next connect
-    this.#bound.delete(address);      // a rebind (the flag moved) waits for the relay's fresh ack
+    if (this.#bound.delete(address)) this.#unboundWhy.set(address, { why: 'flag-moved', at: Date.now() });   // a rebind (the flag moved) waits for the relay's fresh ack
     this.#sendRegister(address, opts?.primary === true);
     await this.#awaitBound(address);
   }
@@ -210,7 +214,7 @@ export class RelayTransport extends Transport {
     if (isPrimary === true) this.#standbyFlags.delete(this.address);
     this.#primaryDevice = () => isPrimary === true;
     if (!this.connected) return { ok: true, pending: true };
-    this.#bound.delete(this.address);
+    if (this.#bound.delete(this.address)) this.#unboundWhy.set(this.address, { why: 'primary-moved', at: Date.now() });
     this.#sendRegister(this.address, isPrimary === true);
     try { await this.#awaitBound(this.address); return { ok: true }; }
     catch (err) { return { ok: false, reason: err?.message ?? 'bind-failed' }; }
@@ -255,7 +259,7 @@ export class RelayTransport extends Transport {
     this.#proved.delete(address);
     this.#proofsInFlight.delete(address);
     this.#asked.delete(address);
-    this.#bound.delete(address);
+    if (this.#bound.delete(address)) this.#unboundWhy.set(address, { why: 'removed', at: Date.now() });
   }
 
   /** True when the WebSocket is open and registered with the relay. */
@@ -323,7 +327,14 @@ export class RelayTransport extends Transport {
     // relay refused it as an unregistered sender — silently for the sender (the enrol walk, 2026-09-16).
     const from = envelope?._from;
     if (typeof from === 'string' && from !== this.address && this.#signers.has(from) && !this.#bound.has(from)) {
+      const t0 = Date.now();
       await this.#ensureBound(from);
+      const waited = Date.now() - t0;
+      if (waited > BIND_WAIT_WARN_MS) {
+        const lost = this.#unboundWhy.get(from);
+        console.warn(`[relay] a send as ${from.slice(0, 8)}… waited ${waited} ms for its bind on this socket`
+          + (lost ? ` (unbound by ${lost.why} ${t0 - lost.at} ms before the send)` : ' (never bound on this socket)'));
+      }
     }
     const frame = { type: 'send', to, envelope };
     if (envelope._topic) frame.topic = envelope._topic;
@@ -522,6 +533,7 @@ export class RelayTransport extends Transport {
       this.#asked.clear();
       this.#proved.clear();
       this.#proofsInFlight.clear();
+      for (const a of this.#bound) this.#unboundWhy.set(a, { why: 'reconnect', at: Date.now() });
       this.#bound.clear();
       this.#primaryAcked = false;
       this.#sendRegister(this.address, this.#primaryDevice() === true);

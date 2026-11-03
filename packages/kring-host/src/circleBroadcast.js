@@ -136,9 +136,17 @@ export const PERMANENT_FANOUT_REASONS = new Set(['recipient-pubkey-unknown']);
  *   'undeliverable' — every recipient error is permanent (retry can't help) — NOT retryable.
  * @returns {'sent'|'failed'|'undeliverable'}
  */
+/** Every recipient HELD because this circle's persona has no connection of its own: not offline for a moment — it may
+ *  never go out until the person gives that persona a connection point. A wait the person can act on, said as such. */
+const heldForPersonaConnection = (r) => {
+  const outcomes = Array.isArray(r?.outcomes) ? r.outcomes : [];
+  return outcomes.length > 0 && outcomes.every((o) => o?.outcome === 'held:persona-no-connection');
+};
+
 export function classifyFanOut(r) {
   if (r?.error) return 'failed';                 // chat-unavailable / members-unavailable → transient
   const errors = Array.isArray(r?.errors) ? r.errors : [];
+  if (errors.length === 0 && heldForPersonaConnection(r)) return 'pending';   // still here; goes out once it can
   // A clean fan-out means the send left this device — not that it arrived. Decision 1 (2026-07-29): that
   // is `maybe-received`, because we asked for nothing we are willing to show and heard nothing back. The
   // retired `sent` said the same thing in a word that reads like success.
@@ -156,6 +164,7 @@ export function classifyFanOut(r) {
 export function fanOutReason(r) {
   if (r?.error) return null;
   const errors = Array.isArray(r?.errors) ? r.errors : [];
+  if (errors.length === 0 && heldForPersonaConnection(r)) return 'persona-waiting';
   if (errors.length === 0) return null;
   const first = errors[0]?.reason;
   return typeof first === 'string' && first && errors.every((e) => e?.reason === first) ? first : null;

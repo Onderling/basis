@@ -43,6 +43,21 @@ describe('spine statements only from the point', () => {
     await A2.agent.sendPeerMessage(A.agent.ownDeviceAddress('default'), req, { circleId: GROUP });
     expect(await until(async () => (((await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).some((m) => m.webid === C.pubKey) ? true : null), { timeout: 20000, step: 100 }),
       'the box never got the roster').toBe(true);
+    // THE RELAY'S VIEW of what is addressed to Bea in the circle (envelope _from/_to/_p are plaintext at the relay)
+    const beaAddr = B.agent.circleAddressFor(GROUP);
+    relay.tapBoth?.((raw, sock, dir) => {
+      let m = null; try { m = JSON.parse(String(raw)); } catch { return; }
+      // the relay's own decisions: every error frame it sends (a sender refused, a rate or quota cap), and who registers
+      // the shared address and Bea's (which socket is the phone, the box, Bea)
+      if (dir === 'out' && m?.type === 'error') { relayToBea.push(`out#${sock}:error:${m.message ?? '?'}@${Date.now() % 100000}`); return; }
+      if (dir === 'in' && m?.type === 'register' && (m.address === beaAddr || m.address === A.agent.circleAddressFor(GROUP))) {
+        relayToBea.push(`in#${sock}:register:${String(m.address).slice(0, 6)}${m.primary ? ':primary' : ''}${m.standby ? ':standby' : ''}@${Date.now() % 100000}`);
+        return;
+      }
+      const env = m?.envelope;
+      if (!env || env._to !== beaAddr) return;
+      relayToBea.push(`${dir}#${sock}:${m.type}:${String(env._from ?? '').slice(0, 6)}:${env._p ?? '?'}@${Date.now() % 100000}`);
+    });
     for (const node of [B, A2]) {
       const on = makeMembershipPeerHandler({ rail: node.agent.membershipRail });
       const prior = node._routerRef.fn;
@@ -64,6 +79,7 @@ describe('spine statements only from the point', () => {
   // every device's membership-fan line (where each copy of a statement went), kept for a failure to name the send side
   const fanLines = [];
   const beaRouter = [];   // membership broadcasts that reached Bea's router (hash<sender)
+  const relayToBea = [];  // every relay frame whose envelope is for Bea's circle address: socket, direction, from, _p
   const refusals = [];    // the security layer's refusals during the walk (every node; a failure filters for the case)
   const consoleInfo = console.info.bind(console);
   console.info = (...a) => { const t = a.map(String).join(' '); if (t.startsWith('[membership-fan]')) fanLines.push(t.slice(0, 300)); if (/refused|SENDER_NOT_AUTHORIZED/.test(t)) refusals.push(t.slice(0, 220)); consoleInfo(...a); };
@@ -336,7 +352,7 @@ describe('spine statements only from the point', () => {
         const held = B.agent.membershipRail.storedStatements(GROUP) ?? [];
         const mineThere = held.filter((x) => x?.body?.author === s2.body.author).map((x) => `${x.body.hash.slice(0, 8)}<-${String(x.body.parentHash ?? '').slice(0, 8)}`);
         let disputed = null; try { disputed = [...((await B.agent.membershipRail.readVerified?.(GROUP))?.disputed ?? [])].map((r) => String(r).slice(0, 8)); } catch (e) { disputed = `err ${e.message}`; }
-        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), beaHeardLast: beaHeard.slice(-8), fanOfS2: fanFor(s2.body.hash), beaRouterHasS2: beaRouter.some((x) => x.startsWith(String(s2.body.hash).slice(0, 8))), beaRouterLast: beaRouter.slice(-6), refusalsLast: refusals.slice(-4), whoIs: { bea: String(B.agent.circleAddressFor(GROUP)).slice(-6), cor: String(C.agent.circleAddressFor(GROUP)).slice(-6), anna: String(A.agent.circleAddressFor(GROUP)).slice(-6) }, boxRoster: (((await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members) ?? []).map((m) => `${String(m.webid).slice(0, 6)}:${(m.circleAddresses ?? [m.circleAddress]).filter(Boolean).map((a) => String(a).slice(-6)).join('/')}`), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
+        return JSON.stringify({ s2: `${s2.body.hash.slice(0, 8)}<-${String(s2.body.parentHash).slice(0, 8)}`, author: String(s2.body.author).slice(0, 8), beaHoldsS2: held.some((x) => x?.body?.hash === s2.body.hash), beaHoldsS1: held.some((x) => x?.body?.hash === s1), beaChainOfThatAuthor: mineThere, disputed, beaRole: await roleOnAt(B, B.pubKey), beaHeardLast: beaHeard.slice(-8), fanOfS2: fanFor(s2.body.hash), relayToBeaLast: relayToBea.slice(-20), beaRouterHasS2: beaRouter.some((x) => x.startsWith(String(s2.body.hash).slice(0, 8))), beaRouterLast: beaRouter.slice(-6), refusalsLast: refusals.slice(-4), whoIs: { bea: String(B.agent.circleAddressFor(GROUP)).slice(-6), cor: String(C.agent.circleAddressFor(GROUP)).slice(-6), anna: String(A.agent.circleAddressFor(GROUP)).slice(-6) }, boxRoster: (((await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members) ?? []).map((m) => `${String(m.webid).slice(0, 6)}:${(m.circleAddresses ?? [m.circleAddress]).filter(Boolean).map((a) => String(a).slice(-6)).join('/')}`), boxAddr: String(A2.agent.circleAddressFor(GROUP)).slice(0, 8), phoneAddr: String(A.agent.circleAddressFor(GROUP)).slice(0, 8) });
       };
       expect(beaSaw, `Bea never saw the box's change — ${beaSaw ? '' : await why()}`).toBe(true);
       expect([...(await B.agent.membershipRail.readVerified(GROUP)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);

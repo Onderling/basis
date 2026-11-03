@@ -135,3 +135,57 @@ describe('the primary registration', () => {
     phone.close(); other.close();
   });
 });
+
+describe('a plain registration that takes an address from a LIVE holder keeps that holder standing by', () => {
+  let relay; let url; let bea;
+  beforeEach(async () => {
+    relay = await startRelay({ port: 0 });
+    url = `ws://127.0.0.1:${relay.port}`;
+    bea = await openClient(url);
+    send(bea, { type: 'register', address: BEA });
+    await waitFor(() => bea.messages.some((m) => m.type === 'registered'));
+  });
+  afterEach(async () => { bea.close(); await (relay.stop?.() ?? relay.close?.()); });
+  const dm = async (n) => { send(bea, { type: 'send', to: ANNA, envelope: { subtype: 'dm', n } }); await settle(); };
+
+  it('two plain registrations of one shared address: the later takes it, and when it closes the earlier gets the next DM live', async () => {
+    const box = await openClient(url); send(box, { type: 'register', address: ANNA });
+    await waitFor(() => box.messages.some((m) => m.type === 'registered'));
+    const phone = await openClient(url); send(phone, { type: 'register', address: ANNA });
+    await waitFor(() => phone.messages.some((m) => m.type === 'registered'));
+    await dm(1);
+    expect(received(phone), 'the last plain registration holds it, as before').toEqual([1]);
+    expect(received(box)).toEqual([]);
+    // the phone goes away — the box registered this address and is live: it is the address's, not a queue's
+    phone.close(); await settle();
+    await dm(2);
+    expect(received(box), 'the displaced live holder took the address back').toEqual([2]);
+    box.close();
+  });
+});
+
+describe('the standby set per address is bounded', () => {
+  it('nine plain registrations in turn: only the eight most recent stand by — the oldest is not promoted', async () => {
+    const relay = await startRelay({ port: 0 });
+    const url = `ws://127.0.0.1:${relay.port}`;
+    const bea = await openClient(url); send(bea, { type: 'register', address: BEA });
+    await waitFor(() => bea.messages.some((m) => m.type === 'registered'));
+    const socks = [];
+    for (let i = 0; i < 10; i++) {
+      const c = await openClient(url); send(c, { type: 'register', address: ANNA });
+      await waitFor(() => c.messages.some((m) => m.type === 'registered'));
+      socks.push(c);
+    }
+    // socks[9] holds; socks[1..8] stand by; socks[0] fell out of the cap. Close every holder in turn, newest first.
+    const got = [];
+    for (let k = 9; k >= 1; k--) {
+      socks[k].close(); await settle();
+      send(bea, { type: 'send', to: ANNA, envelope: { subtype: 'dm', n: k } }); await settle();
+      got.push(socks.findIndex((c) => received(c).includes(k)));
+    }
+    expect(got.slice(0, 8), 'each close falls to the next most recent standby').toEqual([8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(got[8], 'the ninth standby was capped out: nobody holds it live').toBe(-1);
+    for (const c of socks) c.close(); bea.close();
+    await (relay.stop?.() ?? relay.close?.());
+  });
+});

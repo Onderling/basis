@@ -19,7 +19,7 @@ async function until(pred, { timeout = 1200, step = 20 } = {}) {
   return pred();
 }
 
-async function aNewAddressNotYetFolded({ foldAfterMs, agentOpts = {} }) {
+async function aNewAddressNotYetFolded({ foldAfterMs, agentOpts = {}, annaKnowsBram = false }) {
   // Anna's new phone has not met Bram yet either: its first send opens with a HI, which Bram refuses until the fold
   const bus = new InternalBus();
   const received = [];
@@ -39,6 +39,8 @@ async function aNewAddressNotYetFolded({ foldAfterMs, agentOpts = {} }) {
   bram.registerSelfIdentity(bramAddress, bramInCircle);
   await annaTx.addAddress(annaAddress);
   await bramTx.addAddress(bramAddress);
+  // …or it has (restored from a backup): then no HI goes first, and Bram's refusal is invisible to the send
+  if (annaKnowsBram) anna.registerPeerAddress(bramAddress, bram.identity.pubKey, { signingKey: bramInCircle.pubKey });
   // the introduction of Anna's new address folds at Bram only after a while: until then he neither knows the address
   // nor has her circle key on the roster
   const foldedAt = Date.now() + foldAfterMs;
@@ -77,6 +79,26 @@ describe('a send from a young address that the receiver has not folded yet', () 
     await anna.peer.sendTo(bramAddress, { subtype: 'circle', text: 'hoi', msgId: 'm1' }, { ...FAST, sendAs: annaAddress, guarantee: 'hold-forward' });
     await new Promise((res) => setTimeout(res, 5000));
     expect(anna.heldFor(bramAddress), 'the message is still held after the back-off').toBe(1);
+    await anna.shutdown(); await bram.shutdown();
+  });
+
+  it("when the sender already knows the receiver, the send reads 'delivered' — and is re-sent on the same back-off, so it arrives after the fold", { timeout: 20_000 }, async () => {
+    const { anna, bram, received, annaAddress, bramAddress } = await aNewAddressNotYetFolded({ foldAfterMs: 1000, agentOpts: YOUNG, annaKnowsBram: true });
+    const r = await anna.peer.sendTo(bramAddress, { subtype: 'circle', text: 'hoi', msgId: 'm1' }, { ...FAST, sendAs: annaAddress, guarantee: 'hold-forward' });
+    expect(r.delivered, 'the refusal is silent: the transport says delivered').toBe(true);
+    expect(await until(() => received.some((m) => m.payload?.text === 'hoi'), { timeout: 6000, step: 50 }), 'the message was lost').toBe(true);
+    await anna.shutdown(); await bram.shutdown();
+  });
+
+  it('the echo stops at a receipt, and is never made for a payload without a msgId', { timeout: 20_000 }, async () => {
+    const { anna, bram, received, annaAddress, bramAddress } = await aNewAddressNotYetFolded({ foldAfterMs: 0, agentOpts: YOUNG, annaKnowsBram: true });
+    await anna.peer.sendTo(bramAddress, { subtype: 'circle', text: 'hoi', msgId: 'm1' }, { ...FAST, sendAs: annaAddress, guarantee: 'hold-forward' });
+    await until(() => received.length > 0, { timeout: 2000 });
+    anna.removeHeld({ addr: bramAddress, msgId: 'm1' });   // the receipt
+    await anna.peer.sendTo(bramAddress, { subtype: 'circle', text: 'no-id' }, { ...FAST, sendAs: annaAddress, guarantee: 'hold-forward' });
+    await new Promise((res) => setTimeout(res, 3500));
+    expect(received.filter((m) => m.payload?.text === 'hoi').length, 'no echo after the receipt').toBe(1);
+    expect(received.filter((m) => m.payload?.text === 'no-id').length, 'nothing without a msgId to dedupe on is echoed').toBe(1);
     await anna.shutdown(); await bram.shutdown();
   });
 });

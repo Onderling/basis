@@ -911,6 +911,32 @@ export async function createSecureAgent(opts = {}) {
   const selfAddressBornAt = new Map();   // self address → when it was first registered here
   const youngReflush = new Map();        // peer address → { step, timer } while its back-off runs
   const isYoungSelfAddress = (a) => typeof a === 'string' && selfAddressBornAt.has(a) && Date.now() - selfAddressBornAt.get(a) < youngAddressWindowMs;
+  // THE ECHO: a send AS a young address that the transport called delivered may still have been refused, silently, by a
+  // receiver that has not folded the address yet — nothing is held, so nothing would ever re-send it. So it is re-sent
+  // on the same back-off, best-effort, and the receiver drops the repeats by msgId. Stops at a receipt (`removeHeld`).
+  const youngEcho = new Map();           // `${addr}|${msgId}` → timer
+  function scheduleYoungEcho(addr, payload, sendOpts, step = 0) {
+    const msgId = payload?.msgId ?? payload?.id ?? null;
+    if (typeof msgId !== 'string' || !msgId || step >= youngAddressRetryMs.length) return;
+    const key = `${addr}|${msgId}`;
+    if (step === 0 && youngEcho.has(key)) return;
+    const timer = setTimeout(async () => {
+      if (youngEcho.get(key) !== timer) return;   // a receipt cancelled it
+      try { await _sendWithFailover(addr, payload, { ...sendOpts, hold: false, guarantee: 'best-effort' }); } catch { /* a guess at when: never counted */ }
+      if (youngEcho.get(key) !== timer) return;
+      if (step + 1 < youngAddressRetryMs.length) scheduleYoungEcho(addr, payload, sendOpts, step + 1);
+      else youngEcho.delete(key);
+    }, youngAddressRetryMs[step]);
+    timer.unref?.();
+    youngEcho.set(key, timer);
+  }
+  function cancelYoungEcho(addr, msgId) {
+    for (const a2 of [addr, ...addressesOfIdentity(addr)]) {
+      const key = `${a2}|${msgId}`;
+      const t = youngEcho.get(key);
+      if (t) { clearTimeout(t); youngEcho.delete(key); }
+    }
+  }
   /** One back-off step for a peer's hold: re-flush it without counting a failure; next step while it is still held. */
   function scheduleYoungReflush(addr) {
     const state = youngReflush.get(addr) ?? { step: 0, timer: null };
@@ -1149,6 +1175,7 @@ export async function createSecureAgent(opts = {}) {
    */
   function removeHeld({ addr, msgId } = {}) {
     if (typeof addr !== 'string' || !addr || typeof msgId !== 'string' || !msgId) return 0;
+    cancelYoungEcho(addr, msgId);
     let removed = 0;
     for (const a2 of addressesOfIdentity(addr)) {
       const q = pendingHold.get(a2);
@@ -2175,6 +2202,7 @@ export async function createSecureAgent(opts = {}) {
         const result = await _sendWithHandshakeRetry(addr, payload, opts);
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
         clearDeliveryFailures(addr);          // it answered — not a dead address
+        if (isYoungSelfAddress(opts?.sendAs)) scheduleYoungEcho(addr, payload, opts);
         return { held: false, delivered: true, msgId, result };
       } catch (err) {
         if (isApplicationError(err)) throw err;
@@ -2656,6 +2684,8 @@ export async function createSecureAgent(opts = {}) {
   async function shutdown() {
     for (const st of youngReflush.values()) if (st.timer) clearTimeout(st.timer);
     youngReflush.clear();
+    for (const t of youngEcho.values()) clearTimeout(t);
+    youngEcho.clear();
     for (const [, tx] of extraTransports) { try { await tx.disconnect?.(); } catch { /* defensive */ } }
     extraTransports.clear();
     for (const [, e] of personaTransports) { try { await e.tx.disconnect?.(); } catch { /* defensive */ } }

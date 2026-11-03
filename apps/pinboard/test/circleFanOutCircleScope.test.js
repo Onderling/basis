@@ -27,14 +27,15 @@ const CO       = 'pk-co-member';    // a member of the circle under test
 const ADMIN    = 'pk-admin';        // the circle's founder, as a JOINER sees them (confirmedBy only)
 
 /** A bundle whose reliable sender (the fan choke) records the addresses it is handed. */
-async function buildBundle({ members, sends }) {
+async function buildBundle({ members, sends, sendOpts = null, allowAddressFallback = undefined }) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
   const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'circle-b', localActor: ME, peers: [] },
     members,
-    reliableSend: async (addr) => { sends.push(addr); return { held: false, delivered: true }; },
+    reliableSend: async (addr, _env, opts) => { sends.push(addr); sendOpts?.push(opts ?? {}); return { held: false, delivered: true }; },
+    ...(allowAddressFallback === undefined ? {} : { allowAddressFallback }),
   });
   await bundle.offeringMatch.start();
   return bundle;
@@ -98,27 +99,50 @@ describe('circle fan-out — recipients are the circle roster, not the global Me
     const r = await callSkill(bundle.agent, 'broadcastCircleChatStatement',
       { groupId: 'circle-b', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-2', ts: 1 });
 
-    // No per-circle address is knowable for the founder (the joiner's trail never carries one), so this
-    // rides the webid rung of the address ladder — the admin's canonical address, which IS routable.
-    expect(sends).toEqual([ADMIN]);
-    expect(r.attempted).toBe(1);
-    expect(r.errors).toEqual([]);
+    // No per-circle address is knowable for the founder (the joiner's trail never carries one): with the address
+    // fallback OFF — the default, unless the person chose it — nothing goes to the admin's global key.
+    expect(sends).toEqual([]);
+    expect(r.errors.map((e) => e.webid)).toEqual([ADMIN]);
   });
 
-  it('a circle with NO trail keeps the legacy full-MemberMap fan (back-compat)', async () => {
+  it('…with the person\'s fallback ON it rides the webid rung — and goes AS THE PERSON, never as the circle address', async () => {
     const sends = [];
+    const sendOpts = [];
     const bundle = await buildBundle({
-      sends,
-      members: [
-        { webid: ME, role: 'admin',  pubKey: ME },
-        { webid: CO, role: 'member', pubKey: CO },
-      ],
+      sends, sendOpts, allowAddressFallback: true,
+      members: [{ webid: ME, role: 'admin', pubKey: ME }, { webid: CO, role: 'member', pubKey: CO, circleAddress: 'addr-co-in-b' }],
     });
+    await bundle.itemStore.addItems([
+      redemption({ groupId: 'circle-b', redeemedBy: ME, confirmedBy: ADMIN, channel: 'peer' }),
+      redemption({ groupId: 'circle-b', redeemedBy: CO, signingPublicKey: CO, circleAddress: 'addr-co-in-b' }),
+    ], { actor: ME });
+    await callSkill(bundle.agent, 'broadcastCircleChatStatement',
+      { groupId: 'circle-b', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-p', ts: 1 });
+    const byAddr = Object.fromEntries(sends.map((a, i) => [a, sendOpts[i]]));
+    expect(Object.keys(byAddr).sort()).toEqual([ADMIN, 'addr-co-in-b'].sort());
+    expect(byAddr[ADMIN].asPerson, 'the global key is reached person to person').toBe(true);
+    expect(byAddr['addr-co-in-b'].asPerson, 'a circle address is reached as the circle').toBeUndefined();
+  });
 
-    const r = await callSkill(bundle.agent, 'broadcastCircleChatStatement',
-      { groupId: 'seeded-circle', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-3', ts: 1 });
-
-    expect(sends).toEqual([CO]);
-    expect(r.attempted).toBe(1);
+  it('a circle with NO trail keeps the legacy full-MemberMap fan (back-compat) — over the global keys, so only with the person\'s fallback ON, and as the person', async () => {
+    const run = async (allowAddressFallback) => {
+      const sends = []; const sendOpts = [];
+      const bundle = await buildBundle({
+        sends, sendOpts, allowAddressFallback,
+        members: [
+          { webid: ME, role: 'admin',  pubKey: ME },
+          { webid: CO, role: 'member', pubKey: CO },
+        ],
+      });
+      const r = await callSkill(bundle.agent, 'broadcastCircleChatStatement',
+        { groupId: 'seeded-circle', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-3', ts: 1 });
+      return { sends, sendOpts, r };
+    };
+    const on = await run(true);
+    expect(on.sends).toEqual([CO]);
+    expect(on.r.attempted).toBe(1);
+    expect(on.sendOpts[0].asPerson).toBe(true);
+    const off = await run(undefined);   // the default: the person did not choose the fallback
+    expect(off.sends).toEqual([]);
   });
 });

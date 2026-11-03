@@ -50,7 +50,7 @@ export const ADDRESS_VIA = Object.freeze({
  */
 export async function resolveMemberAddress(member, {
   circleId = null, resolveByWebid = null, onFallback = null, preferCircleAddress = false,
-  allowFallback = true,
+  allowFallback = false,   // OFF unless the person chose it: the global key lets a relay link a member's circles
 } = {}) {
   const m = member && typeof member === 'object' ? member : null;
   const webid = typeof member === 'string' ? member : (m?.webid ?? m?.webId ?? null);

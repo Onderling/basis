@@ -34,6 +34,9 @@ async function buildBundle(capture) {
     ],
     // Host-injected hold-forward sender: capture the (addr, envelope) the fan emits.
     reliableSend: async (addr, envelope) => { capture.push({ addr, envelope }); return { delivered: true }; },
+    // these members carry no per-circle address: reaching them at all takes the person's fallback (default OFF) —
+    // this file is about the envelope's wake flag, not the address ladder
+    allowAddressFallback: true,
   });
 }
 

@@ -17,7 +17,8 @@ import { resolveMemberAddress, makeFallbackReporter, ADDRESS_VIA } from '../src/
  * on it, and step B covers `RelayTransport` only — `InternalTransport`/`NknTransport` have no aliases yet.
  * These cases pass the flag explicitly, which is what the shipped caller will do once B is complete.
  */
-const ON = { preferCircleAddress: true };
+// the ladder as the person who CHOSE the fallback walks it (the default is off: see the 'allowFallback' cases below)
+const ON = { preferCircleAddress: true, allowFallback: true };
 
 const CIRCLE = 'oosterpoort';
 const WEBID = 'https://id.example/bram';

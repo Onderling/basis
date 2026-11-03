@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 66
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 67
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -18,6 +18,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `asked-frits` | — | the open-questions table matches the `? Needs Frits` markers it projects |
 | `box-runner` | — | the box runner (deploy/box) stays a working thing, not a script that rotted |
 | `branch-hygiene` | — | the trunk and the release branch move by MERGE, not by commits typed on them |
+| `browser-specs-assert` | — | every spec in apps/basis/test-browser/ asserts something |
 | `callskill-literals` | — | a literal `callSkill('group', 'op')` must name an op some manifest declares |
 | `carrying` | — | the carrying index held to the code (`carrying.mjs`): every server route and store is declared with |
 | `chat-hints-localised` | — | every op the household assistant can be asked for has a Dutch hint |

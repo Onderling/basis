@@ -49,7 +49,7 @@ describe('spine statements only from the point', () => {
       let m = null; try { m = JSON.parse(String(raw)); } catch { return; }
       // the relay's own decisions: every error frame it sends (a sender refused, a rate or quota cap), and who registers
       // the shared address and Bea's (which socket is the phone, the box, Bea)
-      if (dir === 'out' && m?.type === 'error') { relayToBea.push(`out#${sock}:error:${m.message ?? '?'}@${Date.now() % 100000}`); return; }
+      if (dir === 'out' && m?.type === 'error') { relayToBea.push(`out#${sock}:error:${m.message ?? '?'}${m.address ? ':' + String(m.address).slice(0, 6) : ''}@${Date.now() % 100000}`); return; }
       if (dir === 'in' && m?.type === 'register' && (m.address === beaAddr || m.address === A.agent.circleAddressFor(GROUP))) {
         relayToBea.push(`in#${sock}:register:${String(m.address).slice(0, 6)}${m.primary ? ':primary' : ''}${m.standby ? ':standby' : ''}@${Date.now() % 100000}`);
         return;

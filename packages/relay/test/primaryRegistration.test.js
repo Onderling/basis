@@ -164,6 +164,39 @@ describe('a plain registration that takes an address from a LIVE holder keeps th
   });
 });
 
+describe('a holder that is closing', () => {
+  let relay; let url; let bea;
+  beforeEach(async () => {
+    relay = await startRelay({ port: 0 });
+    url = `ws://127.0.0.1:${relay.port}`;
+    bea = await openClient(url);
+    send(bea, { type: 'register', address: BEA });
+    await waitFor(() => bea.messages.some((m) => m.type === 'registered'));
+  });
+  afterEach(async () => { bea.close(); await (relay.stop?.() ?? relay.close?.()); });
+  const dm = async (n) => { send(bea, { type: 'send', to: ANNA, envelope: { subtype: 'dm', n } }); await settle(); };
+
+  // The phone says goodbye but the close has not finished: the relay's socket for it is CLOSING, not gone. A DM in that
+  // window must reach the box that stands by for the same address — not a hold queue that nothing drains, because the
+  // box, already registered, never registers again.
+  it('a DM while the live holder is CLOSING goes to the open standby, not to a queue', async () => {
+    const box = await openClient(url); send(box, { type: 'register', address: ANNA });
+    await waitFor(() => box.messages.some((m) => m.type === 'registered'));
+    const phone = await openClient(url); send(phone, { type: 'register', address: ANNA, primary: true });
+    await waitFor(() => phone.messages.some((m) => m.type === 'registered'));
+    await dm(1);
+    expect(received(phone), 'the primary holds it while it is open').toEqual([1]);
+    // the phone starts its close and never reads the relay's reply: the relay's side stays CLOSING
+    phone.close();
+    phone._socket?.pause?.();
+    await settle();
+    await dm(2);
+    expect(received(box), 'the DM sent while the holder was closing did not reach the open standby').toEqual([2]);
+    box.close();
+    phone.terminate?.();
+  });
+});
+
 describe('the standby set per address is bounded', () => {
   it('nine plain registrations in turn: only the eight most recent stand by — the oldest is not promoted', async () => {
     const relay = await startRelay({ port: 0 });

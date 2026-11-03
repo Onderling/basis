@@ -220,6 +220,9 @@ function isApplicationError(err) {
 // A self address is YOUNG this long after it is first registered (its introduction may not have reached every member),
 // and a send held from it re-flushes at each of these delays before falling back to the presence flush.
 const YOUNG_ADDRESS_WINDOW_MS = param({ key: 'secureAgent.youngAddressWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+// A peer heard within this window who then does not answer is a socket that moved (one of their devices took over), not
+// a person who left: a send held for them re-flushes on the same back-off.
+const RECENTLY_HEARD_WINDOW_MS = param({ key: 'secureAgent.recentlyHeardWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: Object.freeze([2_000, 5_000, 10_000]) });
 
 export async function createSecureAgent(opts = {}) {
@@ -909,6 +912,22 @@ export async function createSecureAgent(opts = {}) {
   /** The back-off for a hold sent from a young address: one re-flush per step, then only presence flushes it. */
   const youngAddressRetryMs = Array.isArray(opts.youngAddressRetryMs) ? opts.youngAddressRetryMs : YOUNG_ADDRESS_RETRY_MS;
   const selfAddressBornAt = new Map();   // self address → when it was first registered here
+  const recentlyHeardWindowMs = Number.isFinite(opts.recentlyHeardWindowMs) ? opts.recentlyHeardWindowMs : RECENTLY_HEARD_WINDOW_MS;
+  const peerHeardAt = new Map();         // peer address → when an envelope from it last arrived (bounded)
+  const noteHeard = (a) => {
+    if (typeof a !== 'string' || !a) return;
+    peerHeardAt.delete(a); peerHeardAt.set(a, Date.now());
+    while (peerHeardAt.size > 2048) peerHeardAt.delete(peerHeardAt.keys().next().value);
+  };
+  /** Did this peer — any address of theirs — speak to me within the window? */
+  const heardRecently = (addr) => {
+    const now = Date.now();
+    for (const a of [addr, ...addressesOfIdentity(addr)]) {
+      const at = peerHeardAt.get(a);
+      if (at && now - at < recentlyHeardWindowMs) return true;
+    }
+    return false;
+  };
   const youngReflush = new Map();        // peer address → { step, timer } while its back-off runs
   const isYoungSelfAddress = (a) => typeof a === 'string' && selfAddressBornAt.has(a) && Date.now() - selfAddressBornAt.get(a) < youngAddressWindowMs;
   /** One back-off step for a peer's hold: re-flush it without counting a failure; next step while it is still held. */
@@ -1063,7 +1082,9 @@ export async function createSecureAgent(opts = {}) {
     // Sent AS one of our addresses that is still young: the receiver may simply not have folded its introduction yet,
     // and refuses it silently (indistinguishable from offline). That fold is usually seconds away and no presence
     // signal will announce it — so this hold also re-flushes on the short back-off, then waits for presence as any hold.
-    if (isYoungSelfAddress(sendOpts?.sendAs)) scheduleYoungReflush(addr);
+    // …and the same for a peer heard moments ago who now does not answer: their socket moved (another device of theirs
+    // took the address), and the device that holds it now has no reason to announce itself to me.
+    if (isYoungSelfAddress(sendOpts?.sendAs) || heardRecently(addr)) scheduleYoungReflush(addr);
     return { held: true, delivered: false, deduped: false, msgId, pending: q.size, reason };
   }
 
@@ -1561,6 +1582,7 @@ export async function createSecureAgent(opts = {}) {
       // (their reconnect HI, or any message) proves they are reachable now, so
       // flush anything we were holding for them. Fire-and-forget: re-hold on a
       // still-failing send is handled inside flushPending.
+      noteHeard(env._from);
       // The gate asks about the PEER, not one address of them: with per-circle addressing the hold sits
       // under the address we sent to, while presence arrives on the address they speak from.
       if (hasHoldForIdentity(env._from)) {

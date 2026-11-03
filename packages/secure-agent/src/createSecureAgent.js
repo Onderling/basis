@@ -1247,6 +1247,8 @@ export async function createSecureAgent(opts = {}) {
   // The receiving half of façade chunking (peerChunking.js): reassembles a chunked payload and hands
   // the whole to the SAME onPeerMessage fan, so the app cannot tell a chunked arrival from a plain one.
   const reassembleChunk = makeChunkReassembler({
+    // a transfer given up on is a receive-boundary drop like any other: said once per reason and sender, counted
+    onDrop: (reason, env) => noteDrop(reason, env),
     onPayload: (whole, env) => {
       if (typeof onPeerMessageFn !== 'function') return;
       try {

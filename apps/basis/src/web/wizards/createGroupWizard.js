@@ -445,6 +445,11 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
 
 function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerender) {
   const wrap = makeBody(doc, t('circle.wizard.create.step_tech'), t('circle.wizard.create.step_tech_intro'));
+  // A pod storage choice needs the pod's address before the review. The field writes state without a re-render (a
+  // re-render would take the cursor out of it), so the review button is refreshed from the field instead — drawn once,
+  // it stayed disabled after an address was typed.
+  const needsUri = () => state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid';
+  const uriOk    = () => !needsUri() || /^https?:\/\//.test(String(state.groupPodUri ?? '').trim());
 
   appendRadioField(wrap, doc, t('circle.wizard.create.storage'), state.storagePolicy, STORAGE_POLICIES,
     (v) => { Object.assign(state, setStoragePolicy(state, v)); rerender(); }, { consequenceGroup: 'storagePolicy' });
@@ -452,7 +457,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
   // Conditional pod URI field for centralised/hybrid.
   if (state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') {
     appendField(wrap, doc, t('circle.wizard.create.pod_uri'), 'groupPodUri',
-      state.groupPodUri, (v) => { state.groupPodUri = v; },
+      state.groupPodUri, (v) => { state.groupPodUri = v; refreshActionsLocal(container, uriOk); },
       { placeholder: 'https://group-pod.example/onderling/circle/',
         hint: t('circle.wizard.create.pod_uri_hint'), monospace: true });
     // NKN+pod circle (J-NP3) — the CREATE half of the disclosure shown at both ends: choosing a shared
@@ -471,16 +476,13 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     String(state.rotationDays),
     (v) => { state.rotationDays = Math.max(1, Math.min(365, parseInt(v, 10) || 30)); },
     { type: 'number',
-      hint: 'How often the circle-wide encryption key rotates. 30 d default suits most circles; drop lower for higher-sensitivity groups. (Invite expiry is configured separately in Governance.)' });
-
-  const needsUri = (state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid');
-  const uriOk    = !needsUri || /^https?:\/\//.test(state.groupPodUri.trim());
+      hint: t('circle.wizard.create.rotation_days_hint') });
 
   container.appendChild(wrap);
   renderActions(container, doc, [
     { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
     { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
-    { label: t('circle.wizard.create.review_button'),  onClick: onNext, kind: 'primary', disabled: !uriOk },
+    { label: t('circle.wizard.create.review_button'),  onClick: onNext, kind: 'primary', disabled: !uriOk(), validate: 'pod-uri' },
   ]);
 }
 

@@ -8139,6 +8139,10 @@
         "text": "Sleutel verversen na (dagen, 1-365)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
+      "rotation_days_hint": {
+        "text": "Hoe vaak de sleutel van de hele kring wordt vervangen. 30 dagen past bij de meeste kringen; kies minder voor een gevoeligere groep. (Hoe lang een uitnodiging geldig is, stel je apart in bij Bestuur.)",
+        "doc": "Create wizard, the key-rotation field's hint."
+      },
       "offering_remove": {
         "text": "Weghalen",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."

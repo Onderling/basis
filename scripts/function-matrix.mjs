@@ -57,6 +57,8 @@ export const FUNCTIONS = Object.freeze([
   // Today no person can MAKE a central-pod or pod-only circle on any shell (the wizard sets no storage; a change after
   // creation is refused) — the scope is Frits's call (L571). ⓘ 'hybrid' is in circleDataPolicy's table but is not one of
   // the three types Frits named: outside the tested set, no cell.
+  // web: apps/basis/test-browser/walk-circle-types-pod.spec.js walks all three through the wizard; normal is green, the
+  // two pod types are fixme until a web pod sign-in can complete — so the cell stays red until they are green too.
   { id: 'circle-types', name: 'Circle types (normal, central pod, pod-only)', cells: { web: null, mobile: null, box: null } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {
     web: P('apps/basis/test-browser/circle-view-bot.spec.js'),

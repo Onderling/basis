@@ -35,6 +35,25 @@ export async function startJourneyRelay(opts = {}) {
   return {
     url: `ws://127.0.0.1:${relay.port}`,
     external: false,
+    /** Every frame in BOTH directions — what the relay receives from a socket ('in') and what it sends to one ('out') —
+     *  handed to `fn(raw, socketNo, dir)`, sockets numbered as they connect. For telling "never reached the relay" from
+     *  "the relay forwarded it" from "it went to another socket". Returns a stop function. In-process relays only. */
+    tapBoth(fn) {
+      const ids = new WeakMap(); let n = 0;
+      const attach = (s) => {
+        if (!ids.has(s)) ids.set(s, ++n);
+        const no = ids.get(s);
+        const onIn = (raw) => { try { fn(raw, no, 'in'); } catch { /* a tap never breaks the relay */ } };
+        s.on('message', onIn);
+        const send = s.send.bind(s);
+        s.send = (raw, ...rest) => { try { fn(raw, no, 'out'); } catch { /* a tap never breaks the relay */ } return send(raw, ...rest); };
+        return () => { s.off('message', onIn); s.send = send; };
+      };
+      const offs = [...(relay.wss?.clients ?? [])].map(attach);
+      const onConn = (s) => { offs.push(attach(s)); };
+      relay.wss?.on('connection', onConn);
+      return () => { relay.wss?.off('connection', onConn); for (const off of offs) off(); };
+    },
     /** Every frame the relay RECEIVES from any socket, live and future, handed to `fn` (raw) — for asserting what the
      *  relay can see. Returns a stop function. In-process relays only. */
     tapFrames(fn) {

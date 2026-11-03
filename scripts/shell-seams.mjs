@@ -232,6 +232,10 @@ export const SEAMS = Object.freeze([
   // turns each into the bubble's state. Without it a given-up message keeps looking fine, and a "waiting" bubble keeps
   // waiting after the message has gone. The box paints no bubbles: it has no delivery map to move.
   { id: 'delivery-outcomes-reach-the-bubble', pattern: /makeGiveUpConsumers\(/, shells: ['web', 'mobile'], why: 'a message given up on, or held and then sent, must change its bubble — else it looks fine, or waits for ever' },
+  // A HEAD HEARS OF A CIRCLE IT DOES NOT KNOW YET: Vandaag re-reads over the shell's circle list, so a change in a circle
+  // that list does not hold (joined on another device, through an offer, made by an op) re-reads the list first
+  // (`headCircleWatch.js`). Without it the new circle's items stayed off Vandaag until a reload. The box paints no Vandaag.
+  { id: 'head-hears-new-circles', pattern: /watchCircleChanges\(/, shells: ['web', 'mobile'], why: 'a circle that arrives while Vandaag is shown keeps its items off the page until a reload' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */

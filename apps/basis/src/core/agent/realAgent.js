@@ -104,6 +104,7 @@ import {
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY, PERSON_KEY_SELF_REVEAL } from '../../v2/personKeySync.js';
+import { circleSendRoute } from '../../v2/circleSendRoute.js';
 import { createPrimaryDeviceChoice, SPINE_POINT_VAULT_KEY, SPINE_POINT_SUBTYPES } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
@@ -374,10 +375,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     return cache.get(key);
   };
   /** The user's address-fallback setting, read LIVE (the host hands a getter) — every send asks, and so
-   *  does the re-drive of messages that were held under the previous answer. */
+   *  does the re-drive of messages that were held under the previous answer. OFF unless the person chose it: a
+   *  composition that hands nothing (the box) must not reach members at their global key, which lets a relay link
+   *  their circles — so only an explicit true turns it on. */
   const addressFallbackOn = () => (typeof opts.allowAddressFallback === 'function'
-    ? opts.allowAddressFallback() !== false
-    : opts.allowAddressFallback !== false);
+    ? opts.allowAddressFallback() === true
+    : opts.allowAddressFallback === true);
   // Part G household — REAL `apps/household` store.  `chores`-as-an-array is
   // gone; all household state now lives in this `ItemStore`-backed store
   // (shopping/errand/repair/schedule items + tasks + contacts).
@@ -6232,6 +6235,32 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch { return []; }
   };
 
+  /** Speak as the PERSON key of the circle's self (the general persona's, or the persona the circle belongs to) — never
+   *  its chat key, never a circle address: one path for an own-device first request and for a circle member reached
+   *  at their global key under the person's fallback. A self without a person key does not speak (`no-person-key`). */
+  async function speakAsPerson(targetAddress, payload, opts) {
+    const { asPerson, circleId: forCircle, ...rest } = opts;   // eslint-disable-line no-unused-vars
+    const cid = typeof forCircle === 'string' && forCircle ? forCircle : (typeof payload?.circleId === 'string' && payload.circleId ? payload.circleId : null);
+    const self = cid ? personaOf(cid) : persona;
+    const noKey = { held: false, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: 'no-person-key' };
+    if (self !== persona) {
+      // a persona's person address goes on the PERSONA's own sockets only — a socket holding two selves' addresses
+      // would link them at the relay — signed by the persona's person key, right before its first send
+      const [binding] = ownAddressBindingsFor(cid);
+      if (!binding) return noKey;
+      for (const rl of relaysFor(cid) ?? []) {
+        try { await rl.port?.addAddress?.(binding.address, { sign: binding.sign, primary: false }); } catch (err) { console.warn(`[person-key] a persona's relay socket did not take its person address: ${err?.message ?? err}`); }
+      }
+      return sendCircleScoped(targetAddress, payload, { ...rest, sendAs: binding.address });
+    }
+    const pa = personAddress();
+    if (!pa) return noKey;
+    // The relay refuses a frame from an address this socket has not registered — and tells only the relay's
+    // log, the sender still sees "delivered". So the person address is (re)registered right before the first
+    // person-speaking send, whatever a shell's boot order (found on the runner's enrol walk, 2026-09-16).
+    await registerPersonAddressOnRelays();
+    return sendCircleScoped(targetAddress, payload, { ...rest, sendAs: pa });
+  }
   async function sendCircleScoped(to, envelope, sendOpts = {}) {
     // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
     // The app owns points; the transport layer owns transports; neither learns the other's vocabulary.
@@ -6239,7 +6268,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // would rather be undeliverable than route a circle over a transport that cannot carry per-circle
     // addressing, because that silently strips member-level unlinkability. With it ON, an NKN circle
     // works on terms the user accepted. → plans/NOTE-circle-scoped-routing.md
-    const { circleId, ...rest } = sendOpts;
+    const { circleId, asPerson = false, ...rest } = sendOpts;
     if (circleId == null) {
       // No circle — a direct message, a receipt, a redeem. Until 2026-09-08 that meant "whatever relay this
       // device happens to be on", which was fine when there was only one. With several, a DM to someone I
@@ -6265,6 +6294,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     const points = opts.circlePointsFor?.(circleId) ?? [];
     const fallbackOn = addressFallbackOn();
+    // A circle member reached at their GLOBAL key (only ever with the person's fallback on): person to person — as my
+    // PERSON key, the circle's self's — never as my circle address to their global key, a mix that is neither and that
+    // the circle refuses. With the fallback off nothing goes: the mix never leaves either way.
+    const route = circleSendRoute({ asPerson, fallbackOn });
+    if (route === 'refuse') return { held: false, delivered: false, reason: 'no-eligible-route' };
+    if (route === 'person') return speakAsPerson(to, envelope, { guarantee: 'hold-forward', ...rest, circleId });
     // Decision 4 — sign this circle's traffic as this circle's identity, not as the person.
     // `sendAs` is an ADDRESS of ours; the key behind it never leaves the SecurityLayer, and the
     // transport layer below never learns that a circle was involved. Installing here as well as at
@@ -6408,9 +6443,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // is reached at, `reliableSend` decides which transports may carry it. Until now only the
     // second was wired, so "fallback off" narrowed the transport while the fan still chose the
     // member's one global key — the setting was half-applied, in the half that leaks. Absent →
-    // undefined → the skills' own `true` default, i.e. no behaviour change for a host that
-    // passes nothing.
-    allowAddressFallback: opts.allowAddressFallback,
+    // The ONE answer, live: the person's setting as this agent reads it (OFF unless they chose it) — never the raw
+    // option, which a composition that hands nothing (the box) would leave to a lower layer's own default.
+    allowAddressFallback: addressFallbackOn,
     label:      'PinboardAgent(cc)',
   }) });
   pinboardAgentRef.current = pinboardAgent;   // the raw contact-book reads above may run from here on
@@ -9559,29 +9594,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ONE path for every self: the person key of the circle's self — the general persona's, or the persona the circle
       // belongs to (`circleId`, else the payload's). A self without a person key does not speak at all (`no-person-key`):
       // never its chat key, which a circle refuses once that self has proved a per-circle address there.
-      if (opts?.asPerson) {
-        const { asPerson, circleId: forCircle, ...rest } = opts;   // eslint-disable-line no-unused-vars
-        const cid = typeof forCircle === 'string' && forCircle ? forCircle : (typeof payload?.circleId === 'string' && payload.circleId ? payload.circleId : null);
-        const self = cid ? personaOf(cid) : persona;
-        const noKey = { held: false, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: 'no-person-key' };
-        if (self !== persona) {
-          // a persona's person address goes on the PERSONA's own sockets only — a socket holding two selves' addresses
-          // would link them at the relay — signed by the persona's person key, right before its first send
-          const [binding] = ownAddressBindingsFor(cid);
-          if (!binding) return noKey;
-          for (const rl of relaysFor(cid) ?? []) {
-            try { await rl.port?.addAddress?.(binding.address, { sign: binding.sign, primary: false }); } catch (err) { console.warn(`[person-key] a persona's relay socket did not take its person address: ${err?.message ?? err}`); }
-          }
-          return sendCircleScoped(targetAddress, payload, { ...rest, sendAs: binding.address });
-        }
-        const pa = personAddress();
-        if (!pa) return noKey;
-        // The relay refuses a frame from an address this socket has not registered — and tells only the relay's
-        // log, the sender still sees "delivered". So the person address is (re)registered right before the first
-        // person-speaking send, whatever a shell's boot order (found on the runner's enrol walk, 2026-09-16).
-        await registerPersonAddressOnRelays();
-        return sendCircleScoped(targetAddress, payload, { ...rest, sendAs: pa });
-      }
+      if (opts?.asPerson) return speakAsPerson(targetAddress, payload, opts);
       return sendCircleScoped(targetAddress, payload, opts);
     },
     /** The current person key's wire address (b64 pubKey), or null. */

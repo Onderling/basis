@@ -18,7 +18,7 @@ import { isKeylessContact } from '@onderling/item-types';
  *   - `bundle`                host bundle (`reliableSend`, `podWrite`,
  *                             `circleDataMove`).
  *   - `preferCircleAddress`   route to each member's per-circle address.
- *   - `allowAddressFallback`  may a send fall back to the member's global key
+ *   - `allowAddressFallback`  may a send fall back to the member's global key — OFF unless handed true
  *                             (boolean OR a function read per-fan).
  *
  *   - `projectCircleRoster`   the per-circle membership projection (shared with
@@ -40,7 +40,7 @@ export function createCircleFanOut({
   metrics,
   bundle,
   preferCircleAddress = false,
-  allowAddressFallback = true,
+  allowAddressFallback = false,   // OFF unless the person chose it (the host hands its live answer)
   projectCircleRoster,
   fanOutViaReliableSend,
   fanOutToMembers,

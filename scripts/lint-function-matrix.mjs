@@ -25,9 +25,13 @@ export function judgeCell(cell, { root = ROOT } = {}) {
   if (typeof cell.file !== 'string' || !cell.file) return { state: 'red', why: 'a story without a file' };
   const abs = path.join(root, cell.file);
   if (!existsSync(abs)) return { state: 'red', why: `named story is gone: ${cell.file}` };
-  if (typeof cell.test === 'string' && cell.test && !readFileSync(abs, 'utf8').includes(cell.test)) {
+  const src = readFileSync(abs, 'utf8');
+  if (typeof cell.test === 'string' && cell.test && !src.includes(cell.test)) {
     return { state: 'red', why: `no test "${cell.test}" in ${cell.file}` };
   }
+  // A walk that only LOGS what it found (PASS / FINDING) passes whatever happened — a probe that cannot fail proves
+  // nothing (walk-pod passed for months while logging that no circle could be pointed at a pod).
+  if (!/\bexpect\s*[.(]|\bassert\s*[.(]|\bthrow\s+new\s+\w*Error\b/.test(src)) return { state: 'red', why: `the story asserts nothing (it cannot fail): ${cell.file}` };
   return { state: 'green', why: cell.file, proposed: cell.proposed === true };
 }
 

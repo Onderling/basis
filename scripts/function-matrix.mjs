@@ -29,7 +29,7 @@ const BOX_NO_SCREEN = NA('the box paints no screen: this function is a person\'s
 export const FUNCTIONS = Object.freeze([
   // ── alpha one's ten (Frits 2026-10-30) ───────────────────────────────────────────────────────────────────────────
   { id: 'messaging', name: 'Messaging (circle chat, contact threads)', cells: {
-    web: P('apps/basis/test-browser/twopeer.spec.js'),
+    web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'fan-out — a message from A appears in B chat' }   // named by Fable 2026-11-03,
     mobile: null,   // circleChatParity is a parity test, not a story on the phone
     box: P('apps/basis/test/botJoinsCircle.relay.test.js'),
   } },
@@ -49,11 +49,14 @@ export const FUNCTIONS = Object.freeze([
     box: null,      // REQUIRED: a box enrolled with persona W keeps W's circle as W, never the general persona
   } },
   { id: 'pod-sync', name: 'Syncing through a pod', cells: {
-    web: P('apps/basis/test-browser/walk-pod.spec.js'),
+    web: null,      // walk-pod only LOGS its findings and passes regardless — no proof (and no person can make a pod circle yet, L571)
     mobile: null,   // circlePods is a unit
     box: NA('the box holds circles by relay and catch-up; its registry mirror is covered under restore and devices'),
   } },
-  // REQUIRED on all three: a normal and a pod-only circle on each; the central pod on web (the CSS-gated test)
+  // REQUIRED on all three: a normal and a pod-only circle on each; the central pod on web (the CSS-gated test).
+  // Today no person can MAKE a central-pod or pod-only circle on any shell (the wizard sets no storage; a change after
+  // creation is refused) — the scope is Frits's call (L571). ⓘ 'hybrid' is in circleDataPolicy's table but is not one of
+  // the three types Frits named: outside the tested set, no cell.
   { id: 'circle-types', name: 'Circle types (normal, central pod, pod-only)', cells: { web: null, mobile: null, box: null } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {
     web: P('apps/basis/test-browser/circle-view-bot.spec.js'),
@@ -64,7 +67,7 @@ export const FUNCTIONS = Object.freeze([
   // the social match-hop is not built — architecture.md, Reachability)
   { id: 'hopping', name: 'Hopping', cells: { web: null, mobile: null, box: null } },
   { id: 'task-sharing', name: 'Task sharing', cells: {
-    web: null,      // REQUIRED: a claimed task crossing two browsers
+    web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'task-handoff — A adds a task, B claims it' }   // named by Fable 2026-11-03,
     mobile: P('apps/basis-mobile/test/multiCircleSeparation.test.js'),
     box: P('apps/basis/test/choresOnTheBox.relay.test.js'),
   } },

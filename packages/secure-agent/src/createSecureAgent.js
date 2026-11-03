@@ -56,6 +56,9 @@ import {
   invokeAgentSkill,
   Parts,
   forgetHello,
+  param,
+  PARAM_SCOPE,
+  PARAM_KIND,
 } from '@onderling/core';
 import {
   NknTransport,
@@ -214,6 +217,11 @@ function isApplicationError(err) {
  *   },
  * }>}
  */
+// A self address is YOUNG this long after it is first registered (its introduction may not have reached every member),
+// and a send held from it re-flushes at each of these delays before falling back to the presence flush.
+const YOUNG_ADDRESS_WINDOW_MS = param({ key: 'secureAgent.youngAddressWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: Object.freeze([2_000, 5_000, 10_000]) });
+
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now
   // vs what they're asking for that will activate in a future slice.
@@ -895,6 +903,29 @@ export async function createSecureAgent(opts = {}) {
   /** Consecutive failed delivery attempts to one address before we stop attempting (0 = never stop). */
   const holdMaxDeliveryFailures = Number.isFinite(opts.holdMaxDeliveryFailures)
     ? opts.holdMaxDeliveryFailures : 3;
+  /** How long one of our own addresses counts as YOUNG after it is first registered: a receiver may not have folded its
+   *  introduction yet, and refuses it silently — so a send held from it is re-flushed on a back-off (below). */
+  const youngAddressWindowMs = Number.isFinite(opts.youngAddressWindowMs) ? opts.youngAddressWindowMs : YOUNG_ADDRESS_WINDOW_MS;
+  /** The back-off for a hold sent from a young address: one re-flush per step, then only presence flushes it. */
+  const youngAddressRetryMs = Array.isArray(opts.youngAddressRetryMs) ? opts.youngAddressRetryMs : YOUNG_ADDRESS_RETRY_MS;
+  const selfAddressBornAt = new Map();   // self address → when it was first registered here
+  const youngReflush = new Map();        // peer address → { step, timer } while its back-off runs
+  const isYoungSelfAddress = (a) => typeof a === 'string' && selfAddressBornAt.has(a) && Date.now() - selfAddressBornAt.get(a) < youngAddressWindowMs;
+  /** One back-off step for a peer's hold: re-flush it without counting a failure; next step while it is still held. */
+  function scheduleYoungReflush(addr) {
+    const state = youngReflush.get(addr) ?? { step: 0, timer: null };
+    if (state.timer || state.flushing || state.step >= youngAddressRetryMs.length) return;
+    youngReflush.set(addr, state);
+    state.timer = setTimeout(async () => {
+      state.timer = null;
+      state.step += 1;
+      state.flushing = true;
+      try { await flushPending(addr, { countFailures: false }); } catch { /* re-held inside */ } finally { state.flushing = false; }
+      if (!(pendingHold.get(addr)?.size)) { youngReflush.delete(addr); return; }
+      if (state.step < youngAddressRetryMs.length) scheduleYoungReflush(addr);
+    }, youngAddressRetryMs[state.step]);
+    state.timer.unref?.();
+  }
   /** How long a persisted dead-address verdict holds across restarts (0 = not restored). A presence signal clears it at once. */
   const holdDeadTtlMs = Number.isFinite(opts.holdDeadTtlMs) ? opts.holdDeadTtlMs : 6 * 60 * 60 * 1000;
   /**
@@ -1026,6 +1057,10 @@ export async function createSecureAgent(opts = {}) {
       console.info(`[secure-agent] peer ${String(addr).slice(0, 16)}… unreachable — holding message (${q.size} queued)`);
     }
     persistHolds();     // durable: a restart must not lose what the caller was told is held
+    // Sent AS one of our addresses that is still young: the receiver may simply not have folded its introduction yet,
+    // and refuses it silently (indistinguishable from offline). That fold is usually seconds away and no presence
+    // signal will announce it — so this hold also re-flushes on the short back-off, then waits for presence as any hold.
+    if (isYoungSelfAddress(sendOpts?.sendAs)) scheduleYoungReflush(addr);
     return { held: true, delivered: false, deduped: false, msgId, pending: q.size, reason };
   }
 
@@ -1157,7 +1192,7 @@ export async function createSecureAgent(opts = {}) {
     }
     return { flushed };
   }
-  async function flushPending(addr) {
+  async function flushPending(addr, { countFailures = true } = {}) {
     sweepExpiredHolds();
     const q = pendingHold.get(addr);
     if (!q || q.size === 0) return { flushed: 0 };
@@ -1174,7 +1209,8 @@ export async function createSecureAgent(opts = {}) {
         if (isApplicationError(err)) continue;   // unfixable by resend → drop
         // Still unreachable → re-hold, unless this address has now failed often enough that re-holding
         // is just paying for it again later. Giving up is REPORTED, like every other drop.
-        if (recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
+        // A young-address re-flush is a guess at WHEN, not evidence the address is dead: it never counts.
+        if (countFailures && recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
         else enqueueHold(addr, payload, opts);
       }
     }
@@ -2618,6 +2654,8 @@ export async function createSecureAgent(opts = {}) {
    * Close the peer transport + stop the in-process agent.
    */
   async function shutdown() {
+    for (const st of youngReflush.values()) if (st.timer) clearTimeout(st.timer);
+    youngReflush.clear();
     for (const [, tx] of extraTransports) { try { await tx.disconnect?.(); } catch { /* defensive */ } }
     extraTransports.clear();
     for (const [, e] of personaTransports) { try { await e.tx.disconnect?.(); } catch { /* defensive */ } }
@@ -2708,12 +2746,14 @@ export async function createSecureAgent(opts = {}) {
         return false;
       }
       if (owner && owner !== identity.pubKey) selfOwners.set(address, owner); else selfOwners.delete(address);
+      if (!selfAddressBornAt.has(address)) selfAddressBornAt.set(address, Date.now());
       return agent.security.addSelfIdentity(address, selfIdentity);
     },
 
     /** Stop speaking as the identity at `address` — the circle was left. Idempotent. */
     forgetSelfIdentity(address) {
       selfOwners.delete(address);
+      selfAddressBornAt.delete(address);
       // A forgotten address (a rotated-away person key) must leave every socket too: left registered, each
       // reconnect re-presents it to the relay with a proof this device can no longer sign — a refused
       // registration per connect for an address nobody should reach here any more.

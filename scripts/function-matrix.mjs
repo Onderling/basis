@@ -29,7 +29,7 @@ const BOX_NO_SCREEN = NA('the box paints no screen: this function is a person\'s
 export const FUNCTIONS = Object.freeze([
   // ── alpha one's ten (Frits 2026-10-30) ───────────────────────────────────────────────────────────────────────────
   { id: 'messaging', name: 'Messaging (circle chat, contact threads)', cells: {
-    web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'fan-out — a message from A appears in B chat' }   // named by Fable 2026-11-03,
+    web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'fan-out — a message from A appears in B chat' },   // named by Fable 2026-11-03
     mobile: null,   // circleChatParity is a parity test, not a story on the phone
     box: P('apps/basis/test/botJoinsCircle.relay.test.js'),
   } },
@@ -67,7 +67,7 @@ export const FUNCTIONS = Object.freeze([
   // the social match-hop is not built — architecture.md, Reachability)
   { id: 'hopping', name: 'Hopping', cells: { web: null, mobile: null, box: null } },
   { id: 'task-sharing', name: 'Task sharing', cells: {
-    web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'task-handoff — A adds a task, B claims it' }   // named by Fable 2026-11-03,
+    web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'task-handoff — A adds a task, B claims it' },   // named by Fable 2026-11-03
     mobile: P('apps/basis-mobile/test/multiCircleSeparation.test.js'),
     box: P('apps/basis/test/choresOnTheBox.relay.test.js'),
   } },

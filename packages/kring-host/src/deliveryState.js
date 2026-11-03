@@ -49,6 +49,8 @@ export const DELIVERY = Object.freeze({
 
 /** The terminal negatives. Not on the ladder: they are where a message stopped, not how far it got. */
 export const DELIVERY_TERMINAL = Object.freeze([DELIVERY.FAILED, DELIVERY.UNDELIVERABLE]);
+/** The states a reason may sit beside: a failure, and a wait the person can act on. */
+const REASON_STATES = Object.freeze([...DELIVERY_TERMINAL, DELIVERY.PENDING]);
 
 /** Ordered weakest → strongest. The order IS the semantics; see rule 1. */
 export const DELIVERY_ORDER = Object.freeze([
@@ -117,8 +119,9 @@ export function advanceDelivery(current, next) {
 export function createDeliveryStateMap() {
   /** @type {Map<string, Exclude<DeliveryState, null>>} */
   const map = new Map();
-  // WHY a send failed, when the fan knew (`fanOutReason`) — beside the state, never a state of its own, and only beside
-  // a failure: a state that moves on (a retry's `pending`, a later receipt) drops it.
+  // WHY a send failed or waits, when the fan knew (`fanOutReason`) — beside the state, never a state of its own, and only
+  // beside a failure or a wait (`pending`: held here for a reason the person can act on); a state that moves on (a retry,
+  // the held message going out, a receipt) drops it.
   /** @type {Map<string, string>} */
   const reasons = new Map();
   /** @type {Set<(msgId: string, state: DeliveryState) => void>} */
@@ -149,13 +152,13 @@ export function createDeliveryStateMap() {
       // the ladder, so it cannot drift from the vocabulary again.
       const current = map.get(msgId);
       const next = advanceDelivery(current, state);
-      if (DELIVERY_TERMINAL.includes(next) && typeof reason === 'string' && reason) reasons.set(msgId, reason);
+      if (REASON_STATES.includes(next) && typeof reason === 'string' && reason) reasons.set(msgId, reason);
       else if (next !== current) reasons.delete(msgId);
       if (next === current) return;
       map.set(msgId, next);
       notify(msgId, next);
     },
-    /** The reason beside a failed/undeliverable state, or null. */
+    /** The reason beside a failed/undeliverable/pending state, or null. */
     reasonOf(msgId) {
       return (typeof msgId === 'string' && reasons.get(msgId)) || null;
     },

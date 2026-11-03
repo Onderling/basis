@@ -936,6 +936,9 @@ export async function createSecureAgent(opts = {}) {
    * is to never drop one silently.
    */
   const onHoldDropped = typeof opts.onHoldDropped === 'function' ? opts.onHoldDropped : null;
+  /** A HELD message went out after all (a flush sent it) — the twin of `onHoldDropped`: what lets a "waiting" bubble move on.
+   *  `{ addr, msgId }`; never fired for a send that went out the first time (that one was never held). */
+  const onHeldSent = typeof opts.onHeldSent === 'function' ? opts.onHeldSent : null;
   /**
    * The RELAY gave up on a message we had already handed it — the far-end twin of `onHoldDropped`.
    *
@@ -1210,6 +1213,16 @@ export async function createSecureAgent(opts = {}) {
     }
     return r;
   }
+  /** A persona's connection came up, or took a circle address: re-send what is held AS that persona (nothing counted —
+   *  it is our connection that changed, not the peer's silence). */
+  async function flushHeldOf(owner) {
+    let flushed = 0;
+    for (const [addr, q] of [...pendingHold]) {
+      if (![...q.values()].some((e) => e?.opts?.personaOwner === owner)) continue;
+      flushed += (await flushPending(addr, { countFailures: false })).flushed;
+    }
+    return { flushed };
+  }
   async function flushPending(addr, { countFailures = true } = {}) {
     sweepExpiredHolds();
     const q = pendingHold.get(addr);
@@ -1223,6 +1236,8 @@ export async function createSecureAgent(opts = {}) {
         await resendHeld(addr, payload, opts);
         clearDeliveryFailures(addr);
         flushed++;
+        const sentId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+        try { onHeldSent?.({ addr, msgId: sentId }); } catch { /* a report never breaks the flush */ }
       } catch (err) {
         if (isApplicationError(err)) continue;   // unfixable by resend → drop
         // Still unreachable → re-hold, unless this address has now failed often enough that re-holding
@@ -1846,7 +1861,13 @@ export async function createSecureAgent(opts = {}) {
         get addresses()       { return tx?.addresses ?? []; },
         /** For a diagnosis line: the addresses this socket asked the relay for, and which it acked. */
         get registrations()   { return tx?.registrations ?? null; },
-        addAddress:    (a, o) => (tx ? tx.addAddress(a, o) : Promise.resolve({ ok: false, reason: 'not-connected' })),
+        addAddress:    (a, o) => (tx
+          ? Promise.resolve(tx.addAddress(a, o)).then((r) => {
+            // a persona's circle address on its own socket: what it held for that circle can go out now, signed as it
+            if (r?.ok !== false && socketIdentity && socketIdentity.pubKey !== identity.pubKey) flushHeldOf(socketIdentity.pubKey).catch(() => {});
+            return r;
+          })
+          : Promise.resolve({ ok: false, reason: 'not-connected' })),
         removeAddress: (a) => { try { tx?.removeAddress(a); } catch { /* best-effort */ } },
       },
     };
@@ -1896,6 +1917,9 @@ export async function createSecureAgent(opts = {}) {
       onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
     });
     makeReceiveHandler(tx);                 // inbound for the persona lands in this one agent
+    // what the persona could not send while it had no socket goes out now, on this socket (`resendHeld` keeps a
+    // persona's held message on that persona's sockets) — as the primary socket's connect does for the default's
+    tx.on?.('connect', () => { flushHeldOf(socketIdentity.pubKey).catch(() => { /* re-hold handled inside */ }); });
     await tx.connect();
     personaTransports.set(key, { url, identity: socketIdentity, tx });
     if (auditAutoLog) audit('relay.add.persona', url);
@@ -2276,8 +2300,12 @@ export async function createSecureAgent(opts = {}) {
   async function sendAsPersona(addr, payload, opts, owner) {
     if (await isPeerMuted(addr)) throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
     const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points) : null;
+    // A send AS one of the persona's circle addresses goes out only on a socket that holds that address: on one that does
+    // not, the relay would see the persona's own key speak into the circle (and the circle refuses it). None yet → held.
+    const speaksAs = typeof opts?.sendAs === 'string' && opts.sendAs !== owner ? opts.sendAs : null;
     const sockets = [...personaTransports.entries()]
-      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)));
+      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)))
+      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs));
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     // Not sendable now: held on hold-forward, exactly as the general persona's send would be — and every flush re-sends
     // it through `resendHeld`, which keeps it on this persona's own sockets.

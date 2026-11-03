@@ -11,7 +11,7 @@ import { startRelay } from '@onderling/relay';
 import { createSecureAgent } from '../src/createSecureAgent.js';
 
 const FAST = { firstSendTimeoutMs: 2500, retryDelays: [] };
-const agent = (onPeerMessage) => createSecureAgent({ vault: new VaultMemory(), onPeerMessage, warnOnInsecure: false, relayReadyTimeoutMs: 3000 });
+const agent = (onPeerMessage, extra = {}) => createSecureAgent({ vault: new VaultMemory(), onPeerMessage, warnOnInsecure: false, relayReadyTimeoutMs: 3000, ...extra });
 async function until(pred, { timeout = 5000, step = 20 } = {}) {
   const start = Date.now();
   while (Date.now() - start < timeout) { const v = pred(); if (v) return v; await new Promise((r) => setTimeout(r, step)); }
@@ -23,7 +23,8 @@ describe("a persona's send is held, and flushed only as the persona", () => {
     const R = await startRelay({ port: 0, log: false });
     const url = `ws://127.0.0.1:${R.port}`;
     const received = [];
-    const anna = await agent();
+    const sentAfterHold = [];
+    const anna = await agent(undefined, { onHeldSent: (e) => sentAfterHold.push(e) });
     const bram = await agent((m) => received.push(m));
     const persona = await AgentIdentity.generate(new VaultMemory());
     try {
@@ -40,6 +41,7 @@ describe("a persona's send is held, and flushed only as the persona", () => {
       await anna.flushHeld();
       await new Promise((res) => setTimeout(res, 800));
       expect(received.filter((m) => m.payload?.text === 'as the persona'), 'it left on another identity\'s socket').toEqual([]);
+      expect(sentAfterHold, 'a flush that sent nothing reports nothing').toEqual([]);
       expect(anna.heldFor(bram.identity.pubKey), 'and it is still held').toBe(1);
 
       // the persona dials; the next flush sends it, as the persona
@@ -49,6 +51,9 @@ describe("a persona's send is held, and flushed only as the persona", () => {
       expect(got, 'it arrived').toBeTruthy();
       expect(got.from, 'as the persona').toBe(persona.pubKey);
       expect(anna.heldFor(bram.identity.pubKey)).toBe(0);
+      // …and the outbox SAYS it went: what lets the bubble move on from waiting
+      expect(sentAfterHold.map((e) => e.msgId), 'the held message going out was reported').toEqual(['p1']);
+      expect(sentAfterHold[0].addr).toBe(bram.identity.pubKey);
     } finally {
       await anna.shutdown(); await bram.shutdown(); await R.close?.();
     }

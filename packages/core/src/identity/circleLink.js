@@ -45,11 +45,12 @@ export function signCircleLinkFromSeed(derivationSeed, circleId, groupId, addres
 /**
  * Verify a presented linkage: the proof must be a signature over the challenge by the private
  * key behind `address`. Deny-by-default — anything missing or malformed is `false`.
- * @param {{groupId:string, address:string, proof:string}} a
+ * @param {{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}} a
+ *   `verifySignature` — the pure signature check, default `AgentIdentity.verify`; a caller that re-derives passes a memo
  * @returns {boolean}
  */
-export function verifyCircleLink({ groupId, address, proof } = {}) {
+export function verifyCircleLink({ groupId, address, proof, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = {}) {
   if (!groupId || typeof address !== 'string' || !address || typeof proof !== 'string' || !proof) return false;
-  try { return AgentIdentity.verify(circleLinkMessage(groupId, address), proof, address); }
+  try { return verifySignature(circleLinkMessage(groupId, address), proof, address) === true; }
   catch { return false; }
 }

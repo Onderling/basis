@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, createSignatureMemo } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -130,8 +130,12 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    */
   /** verifySpine THROWS on structurally-garbage input (e.g. a wrong-size signature) — a malicious peer must
    *  get a refusal, never an exception, so every verify on the receive path goes through this wrapper. */
+  // Verify-on-read verifies each distinct signed statement ONCE per rail: the memo keeps only the pure signature check
+  // (keyed by the statement's exact bytes, so a tampered stored statement misses and is refused); the chain, kind,
+  // circle and every binding below are re-decided on every read.
+  const signatures = createSignatureMemo();
   const safeVerify = (statement, circleId) => {
-    try { return verifySpine(statement, { expectedCircleId: circleId }); }
+    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature: signatures.verify }); }
     catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
   };
 

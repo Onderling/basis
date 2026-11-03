@@ -576,3 +576,22 @@ describe('a PROVEN function profile (L389): from the statement that admitted it,
     expect(roster.find((m) => m.webid === founder.pubKey)?.provenKind).toBe('function');
   });
 });
+
+describe('a roster derived again and again checks each member\'s link signature once', () => {
+  it('N derivations of the same facts verify the founder\'s link ONCE; a wrong proof is still refused every time', async () => {
+    const { vi } = await import('vitest');
+    const seed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('founder');
+    const addr = deriveCircleAddress(seed, 'g-memo');
+    const proof = signCircleLinkFromSeed(seed, 'g-memo', 'g-memo', addr);
+    const facts = { founderWebids: ['A'], founderFacts: { A: { groupId: 'g-memo', circleAddress: addr, circleAddressProof: proof } } };
+    const spy = vi.spyOn(AgentIdentity, 'verify');
+    try {
+      for (let i = 0; i < 6; i++) expect(deriveRoster(facts).find((m) => m.webid === 'A').circleAddress).toBe(addr);
+      expect(spy.mock.calls.length, 'six derivations, one link: one signature check').toBe(1);
+      // a proof for another circle is never remembered as good: refused on every derivation
+      const otherProof = signCircleLinkFromSeed(seed, 'g-memo', 'g-other', addr);
+      const bad = { founderWebids: ['A'], founderFacts: { A: { groupId: 'g-memo', circleAddress: addr, circleAddressProof: otherProof } } };
+      for (let i = 0; i < 3; i++) expect(deriveRoster(bad).find((m) => m.webid === 'A').circleAddress ?? null).toBe(null);
+    } finally { spy.mockRestore(); }
+  });
+});

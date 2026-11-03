@@ -1406,7 +1406,7 @@ the redeem seam so a joiner can prove control of the address they present.
 **Kind:** function · **Import:** `verifyCircleLink` from `'@onderling/core'`
 
 ```js
-verifyCircleLink({ groupId, address, proof } = {})
+verifyCircleLink({ groupId, address, proof, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
 ```
 
 Verify a presented linkage: the proof must be a signature over the challenge by the private
@@ -1414,7 +1414,7 @@ key behind `address`. Deny-by-default — anything missing or malformed is `fals
 
 **Parameters**
 
-- `a` `{groupId:string, address:string, proof:string}`
+- `a` `{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}` — `verifySignature` — the pure signature check, default `AgentIdentity.verify`; a caller that re-derives passes a memo
 
 **Returns:** `boolean`
 
@@ -4070,6 +4070,27 @@ Read the credential off an envelope. One accessor so the field name appears in o
 
 **Returns:** `string|null`
 
+## `src/security/signatureMemo.js`
+
+### `createSignatureMemo`
+
+**Kind:** function · **Import:** `createSignatureMemo` from `'@onderling/core'`
+
+```js
+createSignatureMemo({ max = SIGNATURE_MEMO_MAX, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
+```
+
+Build a memo over the pure signature check: `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
+check that passed once for exactly those bytes, that signature and that key is answered from memory.
+
+**Parameters**
+
+- `[o]` `object`
+- `[o.max]` `number` — most remembered checks
+- `[o.verify]` `(msg: string, sig: string, pubKey: string) => boolean` — the real check (default AgentIdentity.verify)
+
+**Returns:** `{ verify: (msg: string, sig: string, pubKey: string) => boolean, readonly size: number }`
+
 ## `src/security/spineAppender.js`
 
 ### `SPINE_STATEMENT_ITEM`
@@ -4157,6 +4178,7 @@ it) — that is the fold's deny-wins decision.
 - `[opts]` `object`
 - `[opts.expectedCircleId]` `string` — if given, `body.circleId` must match
 - `[opts.expectedKind]` `string` — if given, `body.kind` must match
+- `[opts.verifySignature]` `(msg: string, sig: string, pubKey: string) => boolean` — the pure signature check — default `AgentIdentity.verify`; a caller that re-reads the same statements passes a memo (`createSignatureMemo`)
 
 **Returns:** `{ ok: true, body: object } | { ok: false, reason: string }`
 

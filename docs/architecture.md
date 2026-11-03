@@ -1299,6 +1299,9 @@ statements are **signed and chained** (each carries its author's per-circle sign
 causal dependencies), and ingest verifies before anything lands — the signature itself, that the signed
 kind matches the declared kind, and that the signing key belongs to the roster member it claims to be.
 Nothing a peer sends is trusted for *being sent*; it is trusted for *verifying*.
+Verify-on-read verifies each distinct signed statement once per process; what binds is re-decided every read. Only the
+pure signature check is remembered (`createSignatureMemo`, keyed by the exact signed bytes, so a statement changed after
+it was checked is checked again); whose key it is, whether it is still bound, retired or revoked, is decided afresh.
 
 **The lanes.** Four kinds of circle state ride the same rail with per-lane semantics: **membership**
 (catch-up is pull-everything, because completeness is the point of a roster), **governance** (proposals

@@ -1,4 +1,9 @@
-import { foldRoster, verifyCircleLink, foldPersonKeys } from '@onderling/core';
+import { foldRoster, verifyCircleLink, foldPersonKeys, createSignatureMemo } from '@onderling/core';
+
+// A roster is derived again on every read; each member's link signature is checked ONCE per process. The memo keeps only
+// the pure check, keyed by the exact signed bytes — whether the address is still the member's, still proven for THIS
+// circle, still not retired, is decided again on every derivation.
+const linkSignatures = createSignatureMemo();
 import { hasHumanRules } from '@onderling/circles';
 
 /**
@@ -103,7 +108,7 @@ export function deriveRoster({
   const addProvenAddress = (webid, groupId, address, proof) => {
     if (typeof webid !== 'string' || !webid) return;
     if (typeof address !== 'string' || !address) return;
-    if (!verifyCircleLink({ groupId, address, proof })) return;   // unproven ⇒ refused, never stored
+    if (!verifyCircleLink({ groupId, address, proof, verifySignature: linkSignatures.verify })) return;   // unproven ⇒ refused, never stored
     let set = provenAddresses.get(webid);
     if (!set) provenAddresses.set(webid, (set = new Set()));
     set.add(address);
@@ -197,7 +202,7 @@ export function deriveRoster({
   for (const w of founderWebids ?? []) {
     // the founder's per-circle address, from their creation statement, through the same proof gate a joiner's passes
     const fa = founderFacts?.[w];
-    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof });
+    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof, verifySignature: linkSignatures.verify });
     upsert(w, 'admin', {
       ...(proven ? { circleAddress: fa.circleAddress, circleAddressProof: fa.circleAddressProof } : {}),
       ...(typeof fa?.handle === 'string' && fa.handle ? { handle: fa.handle } : {}),

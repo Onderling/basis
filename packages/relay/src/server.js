@@ -182,6 +182,8 @@ const DEFAULT_PORT             = 8787;
 // Parameter register (#36) — offline queue TTL + per-bucket cap (scope:device, kind:internal).
 const DEFAULT_QUEUE_TTL        = param({ key: 'relay.queueTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60_000 });  // 24 h — same as the app's hold queue
 const DEFAULT_QUEUE_CAP        = param({ key: 'relay.queueCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
+// Most sockets standing by for ONE address (a person's devices): the oldest leaves first, so no socket can grow the set.
+const STANDBY_CAP_PER_ADDRESS  = param({ key: 'relay.standbyCapPerAddress', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 // Topic-aware queueing (Phase 7 step 4) caps each (addr, topic) bucket at
 // `queueCap`; the per-address global cap is a safety valve so a publisher
 // flooding many distinct topics can't memory-DoS the relay. Default is
@@ -473,30 +475,45 @@ export async function startRelay(opts = {}) {
   // holder. Without it, 'last plain registration wins' let a device that had just been told another is the primary
   // take the address back in the moment before that other's primary registration was proven. The proof is required
   // for it exactly as for any registration.
+  /** Stand `sock` by for `address`: the newest at the young end, the oldest out past the cap. */
+  const standBy = (address, sock) => {
+    if (!standbyOf.has(address)) standbyOf.set(address, new Set());
+    const set = standbyOf.get(address);
+    set.delete(sock); set.add(sock);
+    while (set.size > STANDBY_CAP_PER_ADDRESS) set.delete(set.values().next().value);
+  };
   const takeAddress = (address, socket, primary, standby = false) => {
     const holder = primaryOf.get(address);
+    // A socket that takes this address FROM another live socket leaves that one standing by: it registered the address
+    // (the person's other device — a shared circle address, the profile address) and is still here, so when the new
+    // holder goes the address falls back to it, live, instead of to a queue for the device that left.
+    const displaced = clients.get(address);
+    const keepDisplaced = () => {
+      if (!displaced || displaced === socket || displaced.readyState !== 1) return;
+      standBy(address, displaced);
+    };
     if (standby && !primary) {
       if (holder === socket) primaryOf.delete(address);   // stepping down from primary: plain from here
       const holding = clients.get(address);
       if (holding && holding !== socket && holding.readyState === 1) {
-        if (!standbyOf.has(address)) standbyOf.set(address, new Set());
-        standbyOf.get(address).add(socket);
+        standBy(address, socket);
         return 'standby';
       }
     }
     if (primary) {
       primaryOf.set(address, socket);
+      keepDisplaced();
       standbyOf.get(address)?.delete(socket);
       return 'primary';
     }
     if (holder === socket) primaryOf.delete(address);   // stepping down: plain again
     const live = primaryOf.get(address);
     if (live && live !== socket && live.readyState === 1) {
-      if (!standbyOf.has(address)) standbyOf.set(address, new Set());
-      standbyOf.get(address).add(socket);
+      standBy(address, socket);
       return 'standby';
     }
     if (live && live.readyState !== 1) primaryOf.delete(address);
+    keepDisplaced();
     standbyOf.get(address)?.delete(socket);
     return 'holder';
   };

@@ -65,10 +65,21 @@ async function bootPhone(vaults, relayUrl) {
 
 describe('the alpha feedback path — a fresh install reaches the maker, and the maker answers', () => {
   let relay; let relayUrl; let dataDir; let env; let vaults; let phone; let box; let person; let card;
+  // THE RELAY'S VIEW, for the phone-off leg's failure message: every register, its ack, every error and close, and every
+  // frame the relay forwards (to whom, on which socket) — the walk's relay is in-process, so it runs this tree's relay
+  const relayLog = [];
+  const at = () => Date.now() % 100000;
 
   beforeAll(async () => {
     relay = await startJourneyRelay();
     relayUrl = relay.url;
+    relay.tapBoth?.((raw, sock, dir) => {
+      let m = null; try { m = JSON.parse(String(raw)); } catch { return; }
+      if (dir === 'in' && m?.type === 'register') relayLog.push(`in#${sock}:register:${String(m.address).slice(0, 6)}${m.primary ? ':primary' : ''}${m.standby ? ':standby' : ''}@${at()}`);
+      else if (dir === 'out' && (m?.type === 'registered' || m?.type === 'error')) relayLog.push(`out#${sock}:${m.type}${m.message ? `:${m.message}` : ''}:${String(m.address ?? '').slice(0, 6)}@${at()}`);
+      else if (dir === 'out' && m?.type === 'message') relayLog.push(`out#${sock}:message:${String(m.envelope?._from ?? '').slice(0, 6)}→${String(m.envelope?._to ?? '').slice(0, 6)}:${m.envelope?._p ?? '?'}@${at()}`);
+    });
+    relay.wss?.on?.('connection', (s) => s.on('close', () => relayLog.push(`close@${at()}`)));
     dataDir = mkdtempSync(path.join(tmpdir(), 'basis-feedback-box-'));
     env = { PATH: process.env.PATH, HOME: dataDir, ONDERLING_RELAY_URL: relayUrl, BASIS_VAULT_PASSPHRASE: 'test-only-passphrase' };
     // What the phone keeps across a reboot: its vaults and its item store (IndexedDB in the shell; a
@@ -153,7 +164,9 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
 
   it('with the phone OFF, the box still takes the feedback, and the phone has it when it comes back', async () => {
     const fritsPubKey = phone.pubKey;
+    const phoneDown = { frits: String(fritsPubKey).slice(0, 6), phoneDevice: String(phone.agent.ownDeviceAddress?.('default') ?? '').slice(0, 6), at: at() };
     await teardown(phone);
+    phoneDown.downAt = at();
     phone = null;
 
     await person.contactThreadChannel.sendTurn({
@@ -161,7 +174,11 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     }).sent;
     // The box takes it — nothing else of Frits' is on the wire.
     const onBox = await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'nog iets: de tekst is Engels') ?? null, { timeout: 30_000, step: 500 });
-    expect(onBox, `the box did not take the feedback with the phone off:\n${box.out.slice(-1200)}`).toBeTruthy();
+    expect(onBox, `the box did not take the feedback with the phone off — ${JSON.stringify({
+      ...phoneDown, relayInProcess: relay.external === false,
+      relayLast: relayLog.slice(-60),
+      boxLines: box.out.split('\n').filter((l) => /contact|turn|refused|dropped|fallback|holding|unreachable|outbound HI|recv envelope|registered|standby/.test(l)).slice(-40),
+    })}`).toBeTruthy();
 
     // The phone comes back: the same vaults, the relay, its circle — and the two kicks every shell fires on
     // connect (the grants and known-peers pulls to its siblings), which are also the box's first sign of it.

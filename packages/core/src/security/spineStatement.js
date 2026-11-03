@@ -106,10 +106,12 @@ export function signSpine(identity, { kind, circleId, subject, payload, parent =
  * @param {object} [opts]
  * @param {string} [opts.expectedCircleId]  if given, `body.circleId` must match
  * @param {string} [opts.expectedKind]      if given, `body.kind` must match
+ * @param {(msg: string, sig: string, pubKey: string) => boolean} [opts.verifySignature]  the pure signature check —
+ *   default `AgentIdentity.verify`; a caller that re-reads the same statements passes a memo (`createSignatureMemo`)
  * @returns {{ ok: true, body: object } | { ok: false, reason: string }}
  */
 export function verifySpine(statement, opts = {}) {
-  const { expectedCircleId, expectedKind } = opts;
+  const { expectedCircleId, expectedKind, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = opts;
   if (!statement || typeof statement !== 'object') return { ok: false, reason: 'malformed statement' };
   const { body, sig } = statement;
   if (typeof sig !== 'string' || !sig)   return { ok: false, reason: 'missing signature' };
@@ -131,6 +133,6 @@ export function verifySpine(statement, opts = {}) {
     return { ok: false, reason: 'bad chain hash' };
   }
   // The signature must verify against the claimed circle-scoped author over the exact body.
-  if (!AgentIdentity.verify(canonicalize(body), sig, body.author)) return { ok: false, reason: 'bad signature' };
+  if (!verifySignature(canonicalize(body), sig, body.author)) return { ok: false, reason: 'bad signature' };
   return { ok: true, body };
 }

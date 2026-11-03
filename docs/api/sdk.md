@@ -81,6 +81,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `createNearbyPeerSource` | function | [`core.md`](core.md#createnearbypeersource) |
 | `createNonceWindow` | function | [`core.md`](core.md#createnoncewindow) |
 | `createSenderBinding` | function | [`core.md`](core.md#createsenderbinding) |
+| `createSignatureMemo` | function | [`core.md`](core.md#createsignaturememo) |
 | `createSpineAppender` | function | [`core.md`](core.md#createspineappender) |
 | `DataPart` | function | [`core.md`](core.md#datapart) |
 | `DataSource` | class | [`core.md`](core.md#datasource) |

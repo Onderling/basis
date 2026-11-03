@@ -227,6 +227,11 @@ export const SEAMS = Object.freeze([
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
   { id: 'ask-matches', pattern: /askMatchChoices\(/, shells: ['web', 'mobile'], why: 'matches under my own ask come from released offerings only, and only the asker sees them' },
   { id: 'contact-person-seal', pattern: /sealFor:\s*agent\.contactSeal\?\.sealFor/, why: 'a contact turn — the bot\'s replies included — is readable only with the contact\'s current person key, never by a device they revoked' },
+  // WHAT HAPPENED TO A MESSAGE, SAID ON ITS BUBBLE: the outbox reports a held message given up on (`onHoldDropped`), a
+  // relay that gave up (`onUndelivered`) and a held message that went out after all (`onHeldSent`); one shared builder
+  // turns each into the bubble's state. Without it a given-up message keeps looking fine, and a "waiting" bubble keeps
+  // waiting after the message has gone. The box paints no bubbles: it has no delivery map to move.
+  { id: 'delivery-outcomes-reach-the-bubble', pattern: /makeGiveUpConsumers\(/, shells: ['web', 'mobile'], why: 'a message given up on, or held and then sent, must change its bubble — else it looks fine, or waits for ever' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */

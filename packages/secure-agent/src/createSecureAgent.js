@@ -2283,7 +2283,7 @@ export async function createSecureAgent(opts = {}) {
     // it through `resendHeld`, which keeps it on this persona's own sockets.
     // The owner rides in the held entry: a restored outbox can flush before the personas register again, and a held
     // message whose owner is unknown at that moment must still never leave on the general persona's sockets.
-    const holdOr = (r) => (wantsHold(opts) ? enqueueHold(addr, payload, { ...opts, personaOwner: owner }, r.reason) : r);
+    const holdOr = (r) => (wantsHold(opts) ? { ...enqueueHold(addr, payload, { ...opts, personaOwner: owner }, r.reason), persona: owner } : r);
     if (!sockets.length) return holdOr({ held: false, delivered: false, msgId, reason: 'persona-no-connection', persona: owner });
     let last = null;
     for (const [key, e] of sockets) {

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 66
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 67
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -32,6 +32,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `doc-refs` | — | Fitness function for the task #66 file-org model |
 | `duplicate-vocab` | — | a shared VOCABULARY is defined in exactly ONE place |
 | `entry-kinds-complete` | — | every entry kind declares all four BINDING cells from the vocabularies, the unknown |
+| `function-matrix` | — | alpha one's sixteen functions × web · mobile · box, green where a story proves the cell |
 | `hardcoded-strings` | — | CLAIM: every word a person reads on a shipping surface comes from a locale |
 | `host-tick` | — | a host has ONE clock. Nothing in the basis app code keeps an interval of its own |
 | `hosts-literals` | — | every host an app's code names in a URL literal is in that app's manifest `hosts` |

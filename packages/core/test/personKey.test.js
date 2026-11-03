@@ -135,7 +135,7 @@ describe('the vault entry keeps the chain, the older seeds and the link key\'s P
     expect(await storePersonKey(vault, { version: 1, seed: v1, linkKeyPub: 'OTHER' }), 'a pinned pub is never replaced').toBe(false);
     expect((await loadPersonKey(vault)).linkKeyPub).toBe(linkKeyPub);
     const raw = JSON.parse(await vault.get('person-key'));
-    expect(Object.keys(raw).sort()).toEqual(['linkKeyPub', 'links', 'previous', 'reveals', 'seed', 'version']);
+    expect(Object.keys(raw).sort()).toEqual(['linkKeyPub', 'links', 'previous', 'reveals', 'seed', 'selfReveal', 'version']);
     expect(raw.linkKeyPub).toBe(linkKeyPub);
   });
 });

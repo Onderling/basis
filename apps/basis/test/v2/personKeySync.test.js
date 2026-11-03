@@ -4,7 +4,7 @@
  * commitment, and is stored monotonically. The sender's address decides nothing.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY, PERSON_KEY_CATCHUP_SUBTYPES } from '../../src/v2/personKeySync.js';
+import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY, PERSON_KEY_CATCHUP_SUBTYPES, PERSON_KEY_SELF_REVEAL } from '../../src/v2/personKeySync.js';
 import { b64encode, Bootstrap, ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, derivePersonKeySeed, personKeyPubKeyB64, personKeyFacts } from '@onderling/core';
 
 const root = Bootstrap.create().bootstrap;
@@ -18,7 +18,7 @@ const keyAt = (version, circles = ['k1', 'k2'], secret = root.secret) => {
   return { version, seed, reveals };
 };
 const SIBS = ['addr:box', 'addr:laptop'];
-const rig = ({ current = keyAt(2), siblings = SIBS, circles = ['k1', 'k2'] } = {}) => {
+const rig = ({ current = keyAt(2), siblings = SIBS, circles = ['k1', 'k2'], authority = rootPub } = {}) => {
   const sent = [];
   const stored = [];
   const store = vi.fn(async (k) => { const ok = !stored.length || stored.at(-1).version < k.version; if (ok) stored.push(k); return ok; });
@@ -27,6 +27,7 @@ const rig = ({ current = keyAt(2), siblings = SIBS, circles = ['k1', 'k2'] } = {
     siblings: async () => siblings, sendToPeer: async (to, payload, opts) => { sent.push({ to, payload, opts }); return { delivered: true }; },
     current: () => current, store, selfPubKey: ME,
     ownCommitmentFor: (c) => (circles.includes(c) ? ceremonyCommitment(rootPub, c) : null),
+    ownAuthorityPubKey: () => authority,
     onRefused: (reason, from) => refused.push([reason, from]),
   });
   return { sync, sent, stored, refused, store };
@@ -85,6 +86,47 @@ describe('landing — the root decides, not the address', () => {
     await sync.handlers[PERSON_KEY_CARRY]('addr:box', { subtype: PERSON_KEY_CARRY, subject: ME, version: 3, seed: 'junk', reveals: good.reveals });
     expect(stored).toEqual([]);
     expect(refused.map((r) => r[0])).toEqual(['malformed', 'no-root-reveal', 'no-root-reveal', 'no-root-reveal', 'no-root-reveal', 'malformed']);
+  });
+});
+
+describe('a self in no circle — the self reveal', () => {
+  // the ceremony's word for a version, naming the person instead of a circle
+  const selfKeyAt = (version, { secret = root.secret, kind = PERSON_KEY_SELF_REVEAL, shippedSeedVersion = version } = {}) => {
+    const facts = personKeyFacts({ version, pubKey: personKeyPubKeyB64(derivePersonKeySeed(profile, version)) });
+    const seed = derivePersonKeySeed(profile, shippedSeedVersion);   // what travels: a swap ships a seed the reveal does not cover
+    return { version, seed, reveals: {}, selfReveal: signCeremonyReveal(secret, { circleId: ME, kind, subject: ME, authorRef: ME, facts }) };
+  };
+  const selfWire = (k) => ({ ...wire(k), selfReveal: k.selfReveal });
+
+  it('a key with only a self reveal is carried, and lands from a live sibling at a higher version', async () => {
+    const { sync, sent } = rig({ current: selfKeyAt(2), circles: [] });
+    expect((await sync.carryCurrent()).attempted).toBe(2);
+    expect(sent[0].payload.selfReveal).toEqual(selfKeyAt(2).selfReveal);
+    const { sync: rx, stored, refused } = rig({ current: selfKeyAt(1), circles: [] });
+    await rx.handlers[PERSON_KEY_CARRY]('addr:laptop', sent[0].payload);
+    expect(refused).toEqual([]);
+    expect(stored.map((k) => k.version)).toEqual([2]);
+    expect(stored[0].selfReveal).toEqual(selfKeyAt(2).selfReveal);
+  });
+  it('refused: from an address that is no live sibling, at a version not above mine, without my authority to check against', async () => {
+    const { sync, stored, refused } = rig({ current: selfKeyAt(2), circles: [] });
+    await sync.handlers[PERSON_KEY_CARRY]('addr:stranger', selfWire(selfKeyAt(3)));
+    await sync.handlers[PERSON_KEY_CARRY]('addr:box', selfWire(selfKeyAt(2)));
+    expect(stored).toEqual([]);
+    expect(refused.map(([r]) => r)).toEqual(['not-a-sibling', 'not-newer']);
+    const blind = rig({ current: selfKeyAt(1), circles: [], authority: null });
+    await blind.sync.handlers[PERSON_KEY_CARRY]('addr:box', selfWire(selfKeyAt(2)));
+    expect(blind.stored).toEqual([]);
+    expect(blind.refused.map(([r]) => r)).toEqual(['no-root-reveal']);
+  });
+  it("refused: another authority's self reveal, a circle reveal passed off as a self reveal, a swapped seed — even from a sibling", async () => {
+    const other = Bootstrap.create().bootstrap;
+    const { sync, stored, refused } = rig({ current: selfKeyAt(1), circles: [] });
+    await sync.handlers[PERSON_KEY_CARRY]('addr:box', selfWire(selfKeyAt(2, { secret: other.secret })));
+    await sync.handlers[PERSON_KEY_CARRY]('addr:box', selfWire(selfKeyAt(2, { kind: PERSON_KEY_CARRY })));
+    await sync.handlers[PERSON_KEY_CARRY]('addr:box', selfWire(selfKeyAt(2, { shippedSeedVersion: 7 })));
+    expect(stored).toEqual([]);
+    expect(refused.map(([r]) => r)).toEqual(['no-root-reveal', 'no-root-reveal', 'no-root-reveal']);
   });
 });
 

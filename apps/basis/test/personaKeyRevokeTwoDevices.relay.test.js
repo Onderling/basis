@@ -96,6 +96,12 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     const registry = phone.agent.agentsRegistry();
     const entry = await registry.lookup(w);
     await registry.register({ ...entry, properties: setDeviceDelegation(entry.properties ?? {}, wWire, wRecord) });
+    // …and the laptop's LIVE record under the general persona, so the general key's hand-over has its sibling too
+    const laptopWire = laptop.agent.persona('default').enrolledDevice.deviceId;
+    const laptopRecord = (await laptop.agent.deviceRecordsOf('default'))?.[laptopWire];
+    expect(laptopRecord, 'the laptop has its own record under the general persona').toBeTruthy();
+    const general = await registry.lookup('default');
+    await registry.register({ ...general, properties: setDeviceDelegation(general.properties ?? {}, laptopWire, laptopRecord) });
   }, 360_000);
 
   afterAll(async () => { await teardown(phone, laptop, lost); await relay?.close?.(); });
@@ -160,9 +166,8 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     // a proof its retired key can no longer give (the relay refuses it — a refused proof per connect)
     const generalRotated = phone.agent.personAddress() !== generalOldPerson;
     for (const [name, node] of [['phone', phone], ['laptop', laptop]]) {
-      // The general persona's key is checked on the phone, the device that rotated it: the carry to the laptop
-      // goes by the device registry, which in this harness is each device's own (see the header).
-      for (const [what, addr] of [["W's", wOldPerson], ['the general persona\'s', generalRotated && node === phone ? generalOldPerson : null]]) {
+      expect(await until(() => (node.agent.personAddress() !== generalOldPerson ? true : null), { timeout: 20_000, step: 200 }), `the ${name} never took the general persona's next person key`).toBe(true);
+      for (const [what, addr] of [["W's", wOldPerson], ['the general persona\'s', generalOldPerson]]) {
         if (!addr) continue;
         const held = (node.agent.sa.relays?.list?.() ?? []).filter((rl) => (rl.port?.addresses ?? []).includes(addr)).length;
         expect(held, `the ${name} still registers ${what} old person address on ${held} relay socket(s)`).toBe(0);

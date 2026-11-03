@@ -103,7 +103,7 @@ import {
 // of them — the grants lane's fan, pointed at conversation instead of authority.
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
-import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
+import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY, PERSON_KEY_SELF_REVEAL } from '../../v2/personKeySync.js';
 import { createPrimaryDeviceChoice, SPINE_POINT_VAULT_KEY, SPINE_POINT_SUBTYPES } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
@@ -3178,6 +3178,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     selfPubKey: chatId.pubKey,
     // My own commitment per circle, from the root's PUBLIC key every device of mine holds — no roster read.
     ownCommitmentFor: (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null),
+    ownAuthorityPubKey: () => authorityPubKeyB64 ?? null,
     onLanded: ({ version }) => console.info(`[person-key] version ${version} arrived from one of my devices`),
     onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
   });
@@ -3209,6 +3210,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       store: (k) => adoptPersonaKey(pid, rt, k),
       selfPubKey: rt.chatId.pubKey,
       ownCommitmentFor: (circleId) => (rt.authorityPubKeyB64 ? ceremonyCommitment(rt.authorityPubKeyB64, circleId) : null),
+      ownAuthorityPubKey: () => rt.authorityPubKeyB64 ?? null,
       onLanded: ({ version }) => console.info(`[person-key] a persona's version ${version} arrived from one of its devices`),
       onRefused: (reason, from) => console.warn(`[person-key] refused a persona's hand-over from ${String(from).slice(0, 12)}… (${reason})`),
     });
@@ -4510,6 +4512,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (holdsGeneral) try {
         const nextVersion = (persona.personKey?.version ?? 0) + 1;
         const profileSeedNow = root.deriveAgentSeed('default');
+        const generalAuthority = root.deriveProfileAuthority('default');
         const nextSeed = derivePersonKeySeed(profileSeedNow, nextVersion);
         const pubKey = personKeyPubKeyB64(nextSeed);
         // The link key: derived here, used once, dropped — its public half is what every device of mine keeps.
@@ -4520,7 +4523,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // sibling that asks later gets the same proof.
         const reveals = {};
         for (const circleId of circleIds) {
-          reveals[circleId] = signCeremonyReveal(root.deriveProfileAuthority('default'), {
+          reveals[circleId] = signCeremonyReveal(generalAuthority, {
             circleId, kind: PERSON_KEY_CARRY, subject: chatId.pubKey, authorRef: chatId.pubKey,
             facts: personKeyFacts({ version: nextVersion, pubKey }),
           });
@@ -4531,14 +4534,19 @@ export async function createRealHouseholdAgent(opts = {}) {
         const link = persona.personKey ? signPersonKeyLink(linkSeed, { version: nextVersion, pubKey, prevVersion: persona.personKey.version }) : null;
         // The seed being retired rides along explicitly: a root-custody device derived v1 at boot and never stored it.
         const previous = persona.personKey ? [...(persona.personKey.previous ?? []), { version: persona.personKey.version, seed: persona.personKey.seed }] : [];
-        if (await storePersonKey(persona.vault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub })) {
-          await adoptPersonKey((await loadPersonKey(persona.vault)) ?? { version: nextVersion, seed: nextSeed, reveals, linkKeyPub });
+        // …and the reveal that names no circle: a sibling takes the key from it when the general persona is in none
+        const selfReveal = signCeremonyReveal(generalAuthority, {
+          circleId: chatId.pubKey, kind: PERSON_KEY_SELF_REVEAL, subject: chatId.pubKey, authorRef: chatId.pubKey,
+          facts: personKeyFacts({ version: nextVersion, pubKey }),
+        });
+        if (await storePersonKey(persona.vault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub, selfReveal })) {
+          await adoptPersonKey((await loadPersonKey(persona.vault)) ?? { version: nextVersion, seed: nextSeed, reveals, linkKeyPub, selfReveal });
         }
         personKeyVersion = nextVersion;
         if (typeof membershipEmit === 'function') {
           for (const circleId of circleIds) {
             try {
-              const reveal = signCeremonyReveal(root.deriveProfileAuthority('default'), {
+              const reveal = signCeremonyReveal(generalAuthority, {
                 circleId, kind: PERSON_KEY_KIND, subject: chatId.pubKey, authorRef: chatId.pubKey,
                 facts: personKeyFacts({ version: nextVersion, pubKey }),
               });
@@ -4625,7 +4633,8 @@ export async function createRealHouseholdAgent(opts = {}) {
                 }
                 const link = rt.personKey ? signPersonKeyLink(linkSeed, { version: nextVersion, pubKey, prevVersion: rt.personKey.version }) : null;
                 const previous = rt.personKey ? [...(rt.personKey.previous ?? []), { version: rt.personKey.version, seed: rt.personKey.seed }] : [];
-                await adoptPersonaKey(pid, rt, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub });
+                const selfReveal = signCeremonyReveal(authority, { circleId: self, kind: PERSON_KEY_SELF_REVEAL, subject: self, authorRef: self, facts: personKeyFacts({ version: nextVersion, pubKey }) });
+                await adoptPersonaKey(pid, rt, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub, selfReveal });
                 personaKeyVersions[pid] = nextVersion;
                 // announced in THIS persona's circles only, root-revealed by the persona's own authority
                 if (typeof membershipEmit === 'function') {

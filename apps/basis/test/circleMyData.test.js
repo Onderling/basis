@@ -24,6 +24,15 @@ describe('renderCircleMyData', () => {
     expect(connection.some((v) => v.includes('Onderling') && v.includes('wss://relay.example'))).toBe(true);
   });
 
+  it('a sign-in that came back failed says so, with its reason; a plain local-only state does not', () => {
+    const failed = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, t, podStatus: { signedIn: false, signInError: 'Client registration failed.' }, onSignIn: () => {} });
+    const line = failed.querySelector('.cc-mydata__signin-failed');
+    expect(line?.textContent).toBe('circle.mydata.pod_sign_in_failed (Client registration failed.)');
+    expect(failed.querySelector('.cc-mydata__signin'), 'the sign-in button stays, to try again').toBeTruthy();
+    const plain = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, t, podStatus: { signedIn: false }, onSignIn: () => {} });
+    expect(plain.querySelector('.cc-mydata__signin-failed')).toBeNull();
+  });
+
   it('shows a sign-in button when local-only + wires it to onSignIn', () => {
     const onSignIn = vi.fn();
     const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, t, podStatus: { signedIn: false }, onSignIn });

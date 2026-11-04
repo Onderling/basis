@@ -8,7 +8,8 @@
  * signed statement under the same message id, so every receiver that already holds it dedupes. A statement is kept for
  * the window, and beyond it while a member the fan had no address for still waits; otherwise the catch-up reconciles.
  *
- * Pure: the caller hands the retell (its broadcast) and reports the roster's addresses when the roster changes.
+ * Pure: the caller hands the retell (its broadcast) and reports the roster's addresses when the roster changes. A statement
+ * of another lane (an item, a chat line) is remembered with its own retell — its lane's broadcast — beside the default one.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
@@ -69,10 +70,12 @@ export function makeLateRecipientRetell({ retell, now = Date.now, windowMs = LAT
     },
     /** Whether any statement of this circle is still remembered (so the caller reads the roster only then). */
     holds(circleId) { return prune(circleId).length > 0; },
-    fanned(circleId, statement, reached = []) {
+    fanned(circleId, statement, reached = [], ownRetell = null) {
       if (typeof circleId !== 'string' || !circleId || !statement?.body?.hash) return;
       const list = prune(circleId);
-      list.push({ statement, reached: new Set((reached ?? []).filter(Boolean)), at: now() });
+      // a retell passes the fan again: the statement is remembered once, with whom its first fan reached
+      if (list.some((e) => e.statement?.body?.hash === statement.body.hash)) return;
+      list.push({ statement, reached: new Set((reached ?? []).filter(Boolean)), at: now(), ...(typeof ownRetell === 'function' ? { retell: ownRetell } : {}) });
       byCircle.set(circleId, list);
     },
     /** The roster's member addresses now; every remembered statement is told again to the circle if one is new to it. */
@@ -82,7 +85,7 @@ export function makeLateRecipientRetell({ retell, now = Date.now, windowMs = LAT
         const fresh = (addresses ?? []).filter((a) => a && !e.reached.has(a));
         if (!fresh.length) continue;
         for (const a of fresh) e.reached.add(a);
-        try { await retell(circleId, e.statement); told += 1; } catch { /* the catch-up remains */ }
+        try { await (e.retell ?? retell)(circleId, e.statement); told += 1; } catch { /* the catch-up remains */ }
       }
       return told;
     },

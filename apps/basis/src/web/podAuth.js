@@ -113,8 +113,29 @@ export async function startSignIn({ issuer, redirectUrl, clientName } = {}) {
  * @returns {Promise<{ webid: string, isLoggedIn: boolean, fetch: typeof fetch } | null>}
  */
 export async function handleRedirect({ restorePreviousSession = true } = {}) {
-  await authImpl.handleIncomingRedirect({ restorePreviousSession });
+  // The library reports a failed redirect (a refused token exchange, a client it would not re-register) as an `error`
+  // EVENT on the session and resolves as if nothing happened; kept here so the screens can say why, not just "local".
+  signInError = null;
+  const session = authImpl.getDefaultSession?.();
+  const said = (v) => (v == null ? '' : String(v?.message ?? v));
+  const onError = (code, description) => { signInError = [description, code].map(said).find(Boolean) || 'sign-in failed'; };
+  try { session?.events?.on?.('error', onError); } catch { /* a session without events: only throws are seen */ }
+  try {
+    await authImpl.handleIncomingRedirect({ restorePreviousSession });
+  } catch (err) {
+    signInError = err?.message ?? String(err);
+    throw err;
+  } finally {
+    try { session?.events?.off?.('error', onError); } catch { /* listener stays; it only writes this module's note */ }
+  }
   return getCurrentSession();
+}
+
+let signInError = null;
+
+/** Why the last redirect did not sign in (the library's words), or null — read by `whoami`. */
+export function lastSignInError() {
+  return signInError;
 }
 
 /**

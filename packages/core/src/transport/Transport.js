@@ -79,6 +79,9 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 // protocol timing). Caller-overridable via the `timeout` arg. `param()` returns each default unchanged.
 const ACK_TIMEOUT = param({ key: 'transport.ackTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10_000 });  // ms
 const REQ_TIMEOUT = param({ key: 'transport.reqTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });  // ms
+// How long a send asked to go out AS one of our addresses waits for that address to be bound on this transport (the
+// moment after a create or a join, before the presence step binds it) — then it is refused, never sent as the primary.
+const ALIAS_WAIT = param({ key: 'transport.aliasWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });  // ms
 
 /**
  * Abstract transport base class — the port a wire adapter implements. Subclasses
@@ -96,6 +99,9 @@ export class Transport extends Emitter {
    * caller gave us to prove it is theirs: address → `{ sign }` (see `addAddress`).
    */
   #aliases = new Map();
+
+  /** address → resolvers of sends waiting for that address to be added (see `#senderFor`). */
+  #aliasWaiters = new Map();
 
   /** Nearby step A — what this transport is actually doing about discovery. */
   #discoverability = DISCOVERABILITY.OFF;
@@ -184,6 +190,8 @@ export class Transport extends Emitter {
       return { ok: true };
     }
     this.#aliases.set(address, { sign: opts?.sign ?? null, primary: opts?.primary === true });
+    const waiting = this.#aliasWaiters.get(address);
+    if (waiting) { this.#aliasWaiters.delete(address); for (const go of waiting) go(); }
     try { await this._bindAddress(address, this.#aliases.get(address)); } catch (err) {
       // Keep it in the set: a bind can fail because we are offline, and the replay on reconnect is
       // precisely what should fix that. Report so a caller is not told it worked.
@@ -414,13 +422,48 @@ export class Transport extends Emitter {
     }
     return this.#address;
   }
+  /**
+   * WHICH of our addresses a send goes out as — never a substitute. Asked to send as an address this transport does
+   * not hold, the send WAITS for that address to be added (the moment after a create or a join, before the presence
+   * step binds a new circle address here), and is then REFUSED if it still is not. It never goes out as the primary
+   * instead: a frame from someone's main address to a circle address hands every relay on the path the link a circle
+   * address exists to withhold, and it was the one swap the address-fallback rule had not reached (measured: eleven such
+   * frames in every create-and-join). An address that is not ours at all is refused with its own reason.
+   *
+   * Synchronous when the address is held (the ordinary case adds no tick to a send); a promise only when it waits.
+   *
+   * @param {string|null|undefined} claimed
+   * @returns {string|Promise<string>} the address to stamp as `_from`
+   */
+  #senderFor(claimed) {
+    const asked = typeof claimed === 'string' && claimed ? claimed : null;
+    if (!asked || asked === this.#address || this.#aliases.has(asked)) return asked ?? this.#address;
+    return this.#waitForAddress(asked);
+  }
+
+  async #waitForAddress(asked) {
+    await new Promise((resolve) => {
+      const timer = setTimeout(() => { done(); resolve(); }, ALIAS_WAIT);
+      const go = () => { clearTimeout(timer); resolve(); };
+      const done = () => { const list = this.#aliasWaiters.get(asked); if (list) { list.delete(go); if (!list.size) this.#aliasWaiters.delete(asked); } };
+      if (!this.#aliasWaiters.has(asked)) this.#aliasWaiters.set(asked, new Set());
+      this.#aliasWaiters.get(asked).add(go);
+    });
+    if (this.#aliases.has(asked)) return asked;
+    if (typeof console !== 'undefined') {
+      console.warn(`[transport] refused to send as "${String(asked).slice(0, 8)}…": this transport does not hold that address — never sent as the primary instead`);
+    }
+    throw Object.assign(new Error('address-not-held'), { code: 'ADDRESS_NOT_HELD' });
+  }
+
 
   /**
    * OW — fire-and-forget. No reply expected.
    * `opts.from` — send AS one of our extra addresses (see `#ownAddress`).
    */
   async sendOneWay(to, payload, opts = {}) {
-    await this._send(to, mkEnvelope(P.OW, this.#ownAddress(opts?.from), to, payload));
+    const from = this.#senderFor(opts?.from);
+    await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload));
   }
 
   /**
@@ -432,7 +475,8 @@ export class Transport extends Emitter {
    * `sendOneWay(to, payload)` for transports that don't use the hint.
    */
   async publishOneWay(to, topic, payload, opts = {}) {
-    await this._send(to, mkEnvelope(P.OW, this.#ownAddress(opts?.from), to, payload, { topic }));
+    const from = this.#senderFor(opts?.from);
+    await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload, { topic }));
   }
 
   /**
@@ -440,7 +484,8 @@ export class Transport extends Emitter {
    * Resolves with the AK envelope on success, rejects on timeout.
    */
   async sendAck(to, payload, timeout = ACK_TIMEOUT, opts = {}) {
-    const env = mkEnvelope(P.AS, this.#ownAddress(opts?.from), to, payload);
+    const from = this.#senderFor(opts?.from);
+    const env = mkEnvelope(P.AS, typeof from === 'string' ? from : await from, to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
 
@@ -449,7 +494,8 @@ export class Transport extends Emitter {
    * Resolves with the RS envelope on success, rejects on timeout.
    */
   async request(to, payload, timeout = REQ_TIMEOUT, opts = {}) {
-    const env = mkEnvelope(P.RQ, this.#ownAddress(opts?.from), to, payload);
+    const from = this.#senderFor(opts?.from);
+    const env = mkEnvelope(P.RQ, typeof from === 'string' ? from : await from, to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
 
@@ -457,7 +503,8 @@ export class Transport extends Emitter {
    * RS — send a reply to a previous RQ.
    */
   async respond(to, replyToId, payload, opts = {}) {
-    await this._send(to, mkEnvelope(P.RS, this.#ownAddress(opts?.from), to, payload, { re: replyToId }));
+    const from = this.#senderFor(opts?.from);
+    await this._send(to, mkEnvelope(P.RS, typeof from === 'string' ? from : await from, to, payload, { re: replyToId }));
   }
 
   /**
@@ -479,10 +526,12 @@ export class Transport extends Emitter {
     // credit a canonical-address reply to the alias it dialled) would have worked too and would have handed
     // them exactly the circle-address → identity link the design withholds.
     //
-    // Unknown addresses fall back to the primary rather than throwing: `_to` on an inbound envelope is
-    // attacker-influenced, and a bad value must not let someone make us claim an address that is not ours.
-    // The validation itself is `#ownAddress`, shared with every other primitive so there is one rule.
-    const from = this.#ownAddress(opts.from);
+    // An address this transport does not hold is never swapped for the primary: the send waits for it to be bound,
+    // then is refused (`#senderFor`, the one rule every sending primitive shares). `_to` on an inbound envelope is
+    // attacker-influenced; a bad value can at worst make an answer wait and fail, never claim an address that is not
+    // ours and never speak as the primary to it.
+    const held = this.#senderFor(opts.from);
+    const from = typeof held === 'string' ? held : await held;
     // `opts.re` — the `_id` of the HI this one ANSWERS.
     //
     // An earlier version of the reciprocal-HI fix invented a `reply: true` field in the payload to mark an

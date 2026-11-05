@@ -1458,7 +1458,8 @@ export async function createSecureAgent(opts = {}) {
           // Answer AS the address they dialled (G13). Without `from`, the reply carries our canonical
           // address, the peer files our key under that, and it keeps waiting for a key under the alias it
           // sent to — so a handshake to a per-circle address never completes. `Transport.sendHello`
-          // validates the claim against our own addresses and falls back to the primary.
+          // validates the claim against our own addresses: one it does not hold waits to be bound, then is refused —
+          // never answered as the primary.
           // Decision 4 — answer with the key that BELONGS to the address they dialled. They
           // dialled a per-circle address; replying with our canonical pubKey would hand them (and
           // the relay, in cleartext, via `_to`) the link between that address and the identity the

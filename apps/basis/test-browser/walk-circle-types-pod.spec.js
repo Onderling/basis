@@ -126,8 +126,8 @@ async function createWithStorage(page, name, { storage, podUri = null, handle = 
 
 const CASES = [
   { type: 'normal', storage: 'none', port: null, signA: false, signB: false, branch: 'fan-out' },
-  { type: 'central pod', storage: 'shared', port: 3056, signA: true, signB: false, branch: 'pod', blocked: 'a web pod sign-in against a CSS pod cannot complete until the browser auth library reads a never-expiring client registration as never-expiring' },
-  { type: 'pod-only', storage: 'personal', port: 3057, signA: true, signB: true, branch: 'pod', blocked: 'a web pod sign-in against a CSS pod cannot complete until the browser auth library reads a never-expiring client registration as never-expiring' },
+  { type: 'central pod', storage: 'shared', port: 3056, signA: true, signB: false, branch: 'pod', blocked: 'the pod-circle message does not reach the other member yet: the reader needs a signed-in session the circle grants (central pod) or its own pod and the cross-pod grants (pod-only) — its own investigation' },
+  { type: 'pod-only', storage: 'personal', port: 3057, signA: true, signB: true, branch: 'pod', blocked: 'the pod-circle message does not reach the other member yet: the reader needs a signed-in session the circle grants (central pod) or its own pod and the cross-pod grants (pod-only) — its own investigation' },
   // today's behaviour, kept until a pod-less 'shared' circle is made as a normal one (then this case is removed)
   { type: 'a pod type without a pod session', storage: 'shared', port: 3058, signA: false, signB: false, branch: 'degraded' },
 ];

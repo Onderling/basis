@@ -1214,18 +1214,18 @@ packages:
   '@flatten-js/interval-tree@1.1.4':
     resolution: {integrity: sha512-o4emRDDvGdkwX18BSVSXH8q27qAL7Z2WDHSN75C8xyRSE4A8UOkig0mWSGoT5M5KaTHZxoLmalFwOTQmbRusUg==}
 
-  '@inrupt/oidc-client-ext@2.5.0':
-    resolution: {integrity: sha512-Pr89aEk0zWTghET6bAFvF75x3LL9X7Mj2aaum28DIfvMDoAgihJnc6O5UoTox3/0+r7bvz0JkhlQM7a8Gn4hig==}
+  '@inrupt/oidc-client-ext@3.1.1':
+    resolution: {integrity: sha512-vftKD2u5nufZTFkdUDMS3Uxj5xNQwArP11OFaALFkq6/3RwCAhe3lwOv8hNzL7Scv98T+KbAErBM0TwGGrS69g==}
 
   '@inrupt/oidc-client@1.11.6':
     resolution: {integrity: sha512-1rCTk1T6pdm/7gKozutZutk7jwmYBADlnkGGoI5ypke099NOCa5KFXjkQpbjsps0PRkKZ+0EaR70XN5+xqmViA==}
 
-  '@inrupt/solid-client-authn-browser@2.5.0':
-    resolution: {integrity: sha512-ftY1UCgTDkjcvfmQKBI8QRcxvRo84Os0tSDRjlUYPKS+dj0Qq6s4WbBenj6j7tsi0TlkCMw8jeGruL6ePdtI1Q==}
+  '@inrupt/solid-client-authn-browser@3.1.1':
+    resolution: {integrity: sha512-Wd7TREmvdhTp+Sk88ei3hlg54sG1fNqkkPkuS+2tDBkcsXaViRQAEugVyh5pWRkd1xSFKrEzftb7UYEG4mJ0CQ==}
 
-  '@inrupt/solid-client-authn-core@2.5.0':
-    resolution: {integrity: sha512-S02hizURW3IL4d03Cn1xZTz25KqZdmS7qYfkOb/UHwPcy+VA7G8Um1xeDByqu7Bva2yPjNk5iCrKKUMmGb56mA==}
-    engines: {node: ^18.0.0 || ^20.0.0 || ^22.0.0}
+  '@inrupt/solid-client-authn-core@3.1.1':
+    resolution: {integrity: sha512-1oDSQCh/pVtPlTyvLQ2uwHo+hpLJF7izg82tjB+Ge8jqGYwkQyId0BrfncpCk//uJXxgRIcfAQp2MhXYbZo80Q==}
+    engines: {node: ^20.0.0 || ^22.0.0}
 
   '@inrupt/solid-client-authn-core@4.0.0':
     resolution: {integrity: sha512-q4iur4TxEkhk9XaGAvyRP/+MjU1oBv2xlBdGE+uoXmDHAnIqUN71zZjCWZfZlyQFRETgH3OfZ9tPrNSDIPA/wg==}
@@ -6711,10 +6711,10 @@ snapshots:
 
   '@flatten-js/interval-tree@1.1.4': {}
 
-  '@inrupt/oidc-client-ext@2.5.0':
+  '@inrupt/oidc-client-ext@3.1.1':
     dependencies:
       '@inrupt/oidc-client': 1.11.6
-      '@inrupt/solid-client-authn-core': 2.5.0
+      '@inrupt/solid-client-authn-core': 3.1.1
       jose: 5.10.0
       uuid: 11.1.1
 
@@ -6726,15 +6726,15 @@ snapshots:
       crypto-js: 4.2.0
       serialize-javascript: 4.0.0
 
-  '@inrupt/solid-client-authn-browser@2.5.0':
+  '@inrupt/solid-client-authn-browser@3.1.1':
     dependencies:
-      '@inrupt/oidc-client-ext': 2.5.0
-      '@inrupt/solid-client-authn-core': 2.5.0
+      '@inrupt/oidc-client-ext': 3.1.1
+      '@inrupt/solid-client-authn-core': 3.1.1
       events: 3.3.0
       jose: 5.10.0
       uuid: 11.1.1
 
-  '@inrupt/solid-client-authn-core@2.5.0':
+  '@inrupt/solid-client-authn-core@3.1.1':
     dependencies:
       events: 3.3.0
       jose: 5.10.0
@@ -7007,7 +7007,7 @@ snapshots:
   '@onderling-app/basis@file:../basis':
     dependencies:
       '@inrupt/solid-client': 3.0.0
-      '@inrupt/solid-client-authn-browser': 2.5.0
+      '@inrupt/solid-client-authn-browser': 3.1.1
       '@onderling-app/agents': link:../agents
       '@onderling-app/calendar': link:../calendar
       '@onderling-app/folio': link:../folio

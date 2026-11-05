@@ -57,7 +57,7 @@
     "@onderling/notifier": "workspace:*",
     "@onderling/notify-envelope": "workspace:*",
     "@inrupt/solid-client": "^3.0.0",
-    "@inrupt/solid-client-authn-browser": "^2.4.0",
+    "@inrupt/solid-client-authn-browser": "^3.1.1",
     "@onderling-app/agents": "workspace:*",
     "@onderling-app/calendar": "workspace:*",
     "@onderling-app/folio": "workspace:*",

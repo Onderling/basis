@@ -40,6 +40,8 @@
  * Flags: --data-dir · --lang · --walk-log · --walk-log-turns off|redacted|full (default off) · --show-offer (print an add-a-device offer and exit) ·
  *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual) ·
  *        --persona <name|id> (with --enrol, repeatable: the person's personas this box holds) · --no-general
+ *        Prefer the pick --enrol offers on a terminal over --persona: a persona's name typed on the command line stays in
+ *        the shell's history and shows in the host's process list, and a name can say more than the person meant to.
  *
  * The recovery phrase is NEVER read from the environment or a file here. A device is enrolled by a
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the

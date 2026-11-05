@@ -96,6 +96,12 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     const registry = phone.agent.agentsRegistry();
     const entry = await registry.lookup(w);
     await registry.register({ ...entry, properties: setDeviceDelegation(entry.properties ?? {}, wWire, wRecord) });
+    // …and the laptop's LIVE record under the general persona, so the general key's hand-over has its sibling too
+    const laptopWire = laptop.agent.persona('default').enrolledDevice.deviceId;
+    const laptopRecord = (await laptop.agent.deviceRecordsOf('default'))?.[laptopWire];
+    expect(laptopRecord, 'the laptop has its own record under the general persona').toBeTruthy();
+    const general = await registry.lookup('default');
+    await registry.register({ ...general, properties: setDeviceDelegation(general.properties ?? {}, laptopWire, laptopRecord) });
   }, 360_000);
 
   afterAll(async () => { await teardown(phone, laptop, lost); await relay?.close?.(); });
@@ -116,9 +122,23 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     }
   });
 
+  it("W has its OWN point: its devices agree it is the phone, and the laptop hands W's spine acts to it instead of signing", async () => {
+    // the existing device claimed W's point when W's second device arrived; the laptop learns it on W's own lane
+    await laptop.agent.spinePoint.requestFromSiblings();
+    const phoneW = phone.agent.persona(w)?.enrolledDevice?.deviceId;
+    expect(phoneW, 'the phone has no device id under W').toBeTruthy();
+    expect(await until(() => (phone.agent.spinePoint.of(w)?.deviceId === phoneW && laptop.agent.spinePoint.of(w)?.deviceId === phoneW ? true : null), { timeout: 20000, step: 200 }),
+      `W's point: phone holds ${JSON.stringify(phone.agent.spinePoint.of(w))}, laptop ${JSON.stringify(laptop.agent.spinePoint.of(w))}, the phone is ${phoneW}`).toBe(true);
+    // two of W's full devices on one key: only W's point signs W's spine — the laptop forwards (a second signer would fork W)
+    expect(phone.agent.spineGate.isPoint(Y), 'the phone does not sign W\'s spine').toBe(true);
+    expect(laptop.agent.spineGate.isPoint(Y), 'the laptop signs W\'s spine beside the phone — a fork on W\'s key').toBe(false);
+  }, 60_000);
+
   it('W rotates to v2: the laptop adopts it, the lost device is carried nothing and keeps v1, Y folds v2 for W', async () => {
     const W = phone.agent.persona(w);
     const v1 = W.personKey.version;
+    const wOldPerson = W.personIdentity.pubKey;   // W's person address at v1: after the rotation no socket may hold it
+    const generalOldPerson = phone.agent.personAddress();   // …and the general persona's, which the revoke rotates too
     const lostWAddrs = new Set([lost.agent.persona(w)?.circleAddressFor?.(Y), lost.agent.persona(w)?.chatId?.pubKey].filter(Boolean));
     const carried = [];
     const peer = phone.agent.sa.peer;
@@ -130,12 +150,30 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     } finally { peer.sendTo = orig; }
     expect(r?.ok, JSON.stringify(r)).toBe(true);
     expect(r.personaKeyVersions?.[w], JSON.stringify(r)).toBe(v1 + 1);
+    // W RE-KEYS too (the lost device was a full device of W): the phone moves W to its next address in Y, the laptop takes
+    // W's next root over W's own lane, the lost device does not
+    expect(r.personaRekeys?.[w]?.ok, `W did not re-key: ${JSON.stringify(r.personaRekeys)}`).toBe(true);
+    const wNext = phone.agent.persona(w).circleAddressFor(Y);
+    expect(await until(() => (laptop.agent.persona(w).circleAddressFor(Y) === wNext ? true : null), { timeout: 20000, step: 200 }), 'the laptop did not take W\'s next root').toBe(true);
+    expect(lost.agent.persona(w).circleAddressFor(Y), 'the lost device took W\'s next root').not.toBe(wNext);
     expect(W.personKey.version).toBe(v1 + 1);
 
     // the surviving sibling of W adopts it
     const laptopW = laptop.agent.persona(w);
     expect(await until(async () => (laptopW.personKey?.version === v1 + 1 ? true : null), { timeout: 20_000, step: 200 }), `the laptop's W holds ${laptopW.personKey?.version}`).toBe(true);
     expect(laptopW.personIdentity.pubKey).toBe(W.personIdentity.pubKey);
+    // the OLD person address is off every relay socket of both devices: kept, it is re-registered on every connect with
+    // a proof its retired key can no longer give (the relay refuses it — a refused proof per connect)
+    const generalRotated = phone.agent.personAddress() !== generalOldPerson;
+    for (const [name, node] of [['phone', phone], ['laptop', laptop]]) {
+      expect(await until(() => (node.agent.personAddress() !== generalOldPerson ? true : null), { timeout: 20_000, step: 200 }), `the ${name} never took the general persona's next person key`).toBe(true);
+      for (const [what, addr] of [["W's", wOldPerson], ['the general persona\'s', generalOldPerson]]) {
+        if (!addr) continue;
+        const held = (node.agent.sa.relays?.list?.() ?? []).filter((rl) => (rl.port?.addresses ?? []).includes(addr)).length;
+        expect(held, `the ${name} still registers ${what} old person address on ${held} relay socket(s)`).toBe(0);
+      }
+    }
+    expect(generalRotated, 'the revoke did not rotate the general persona\'s person key — this check proves nothing for it').toBe(true);
     // the carry reached none of the lost device's W addresses, and it keeps v1
     expect(carried.filter((to) => lostWAddrs.has(to)), 'nothing carried to the lost device').toEqual([]);
     expect(lost.agent.persona(w).personKey.version).toBe(v1);

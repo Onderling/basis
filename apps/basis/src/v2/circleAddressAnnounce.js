@@ -132,7 +132,19 @@ export function ownAnnouncementFor({ agent, circleId, primary = false } = {}) {
  * @param {string[]} [a.circleIds]  defaults to every circle this device is in (`listMyCircles`)
  * @returns {Promise<{ circles: number, announced: number, failed: string[] }>}
  */
-export async function makeThisDevicePrimary({ agent, circleIds = null, logger = console } = {}) {
+/**
+ * The words for the "make this my main device" tap's result: its own line when this device could not also become the
+ * POINT (it holds no circle root — it signs with its own key, and a phrase ceremony on it hands it the root), else the
+ * usual count.
+ * @param {{announced?: number, device?: {point?: {ok?: boolean, reason?: string}}}|null} r  what `makeThisDevicePrimary` returned
+ * @returns {{key: string, params: object}}
+ */
+export function makePrimaryResultWords(r) {
+  if (r?.device?.point?.ok === false && r.device.point.reason === 'no-circle-root') return { key: 'circle.mydata.make_primary_no_point', params: { count: r?.announced ?? 0 } };
+  return { key: 'circle.mydata.make_primary_done', params: { count: r?.announced ?? 0 } };
+}
+
+export async function makeThisDevicePrimary({ agent, circleIds = null, personas = null, logger = console } = {}) {
   if (!agent || typeof agent.callSkill !== 'function') return { circles: 0, announced: 0, failed: [] };
   let ids = Array.isArray(circleIds) ? circleIds : null;
   if (!ids) {
@@ -150,7 +162,8 @@ export async function makeThisDevicePrimary({ agent, circleIds = null, logger = 
   // …and the DM half (sync-policy §12, L104 option b): this device becomes the PRIMARY DEVICE — the one that
   // registers the profile and person addresses as primary on every relay; the claim is carried to the siblings.
   let device = null;
-  try { device = (await agent.claimPrimaryDevice?.()) ?? null; } catch { device = null; }
+  // …and the POINT of each persona the person has on (the main device for those personas' circles)
+  try { device = (await agent.claimPrimaryDevice?.(Array.isArray(personas) && personas.length ? { personas } : undefined)) ?? null; } catch { device = null; }
   return { circles: ids.length, announced, failed, device };
 }
 
@@ -459,9 +472,8 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
           catch (err) { logger?.warn?.('[circle-address] sealed-audience grant failed', err?.message ?? err); }
         }
       }
-      // A DEVICE OF MINE just appeared (the enrolled boot announcing itself): it knows nobody yet —
-      // hand it everyone this device knows (the bindings, and the own-devices rows), at the address it just proved.
-      // This is the moment a new sibling exists, and the only one both facts are in hand.
+      // A DEVICE OF MINE just appeared in this circle. Handing it what this device knows (the bindings, the own-devices
+      // rows) happens where its RECORD is learned (the device map), at its device address — not here, at a circle address.
       const me = agent?.identity?.chat?.pubKey ?? null;
       const ownHere = (() => { try { return agent?.circleAddressFor?.(circleId) ?? null; } catch { return null; } })();
       // …and INTRODUCE it to the circle. A fresh device's own announcement cannot reach the other
@@ -475,11 +487,6 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
       let introduced = 0;
       for (const one of proven) {
         if (!me || one.memberWebid !== me || one.circleAddress === ownHere) continue;
-        try { await agent?.knownPeersSync?.pushTo?.(one.circleAddress); }
-        catch (err) { logger?.warn?.('[circle-address] could not hand a new device of mine who I know', err?.message ?? err); }
-        // …and my own-devices rows (the contact book among them), on each own lane it holds
-        try { await agent?.ownStoreSync?.pushTo?.(one.circleAddress); }
-        catch (err) { logger?.warn?.('[circle-address] could not hand a new device of mine my own-devices rows', err?.message ?? err); }
         try {
           const r = await agent?.callSkill?.('pinboard', 'broadcastCircleAddresses', { groupId: circleId, announcements: [one] });
           if (r && !r.error) introduced += 1;

@@ -901,9 +901,11 @@ turn to their other devices. It is enrolled from the owner's other device — fo
 (`--enrol`, once: that device's offer pasted, the phrase typed with echo off and never written; the next
 start consumes the offer the way a shell consumes a scanned one); the other direction, the box created
 first and handing its offer out (`--show-offer`), waits on a registry the box and the web app share (the
-pod mirror), because a circle created on one device reaches a sibling only that way. What it does not do is follow a
-circle's traffic live: the circle fan delivers to one address per member and never to the sender's own other
-devices, so the box holds a circle by catch-up at connect. With a Telegram token present the same process also answers there — that is the
+pod mirror), because a circle created on one device reaches a sibling only that way. It follows a circle's traffic
+live the way every device of the person does: the circle fan delivers to one address per member, and the device that
+received a statement carries the original, signed, on to its own siblings (the one sibling carry, `circleLanes.js`
+`carryLandedStatement`), where it is verified as if it came from the circle — a sibling is a carrier, never an
+authority. With a Telegram token present the same process also answers there — that is the
 **Telegram shell** (`apps/basis/src/telegram/runner.js`), where a
 `MessagingBridge` turn goes through the same compilers (`parseInput → resolveDispatch → runDispatch → renderReply`)
 and, for free text, the circle composer's engine (`createCircleDispatch` with the deterministic gate); a button
@@ -1007,6 +1009,17 @@ rung resolves only when a peer-as-relay bridge resolver is wired, else it report
 pretending to carry. Offline **hold-and-forward** exists today as a send *guarantee* (`sendTo(…,
 {guarantee:'hold-forward'})` — a briefly-offline member has the message held and flushed on reconnect); a
 *dedicated* hold-and-forward port is forward work.
+
+**A refusal the sender cannot see is a known gap.** A receiver refuses a validly signed sender it has no roster row
+for *silently* — a stranger learns nothing — so the sender cannot tell that refusal from "offline". When the refused
+send opened with a handshake (the sender had not met the receiver), the handshake times out and the message is
+held: a hold sent from a *young* address of ours (one registered less than `secureAgent.youngAddressWindowMs` ago,
+whose introduction may not have reached every member yet) re-flushes on a short bounded back-off
+(`secureAgent.youngAddressRetryMs`), then waits for presence as any hold. When the sender *already knew* the
+receiver, no handshake goes first and the send reads **delivered**: nothing is held, and the message is **lost
+silently**. Re-sending such sends blindly is not safe — not every receiver drops a repeat by `msgId` — and the
+delivery receipt that would let a send stay held until confirmed exists only for chat messages, and only while the
+person keeps receipts on. Closing it needs an acknowledgement that every kind of send carries.
 
 **Two unrelated "hop"s — don't conflate them.** The **transport-hop** above (the `hop` rung) is peer-as-relay
 *routing*: forwarding a payload through an intermediary peer to reach a target. A **social match-hop** —
@@ -1112,7 +1125,8 @@ the two differ by design:
 
 Two consequences worth stating rather than discovering. Unlinkability is **between circles, not between
 your own devices within one circle** — co-members can see how many devices you run, which is the price of
-each one being separately revocable. And a device's addresses **change** when it migrates derivation roots
+each one being separately revocable. (Decided 2026-10-31 to change, and being built: one address per persona per
+circle — the "stable point" — with the device count hidden; this paragraph describes the running code until it lands.) And a device's addresses **change** when it migrates derivation roots
 at enrollment, which is why that ceremony ends with a per-circle re-announce that lands the new addresses
 in every roster's set.
 
@@ -1129,19 +1143,23 @@ get to look like several by owning several devices, and the app will not manufac
 `root → profile → per-circle address` (decisions 2026-07-14), so two profiles are **two people on the wire**:
 different chat identities, different per-circle addresses, nothing a co-member can join up — unlinkable by
 default, linkable only by the person's choice. "Persona" is the user-facing word for a profile you present.
-**What runs today is narrower than the derivation allows, and that is a stated gap:** every device
-instantiates the **default** profile only (`deriveAgentSeed('default')`), derives its per-circle addresses from
-it, and records every membership under it; a persona chosen at a join changes only the *release* that rides
-(the disclosure lens). Running a second profile as its own person on the wire — its own chat identity, device
-delegation, pair circles — is designed and derivable, not built. Four properties follow from the design, and the
-first, third and fourth are in the code; the second's identity half is not:
+**Every persona runs as its own person on the wire.** The agent starts a runtime (`personaRuntime.js`) for every
+persona the registry holds: under root custody each derives from the resident root; a delegated device runs only
+the personas a ceremony handed it. Each has its own chat identity, person key, device delegation and per-circle
+addresses; a circle recorded under a persona takes its keys from that persona, and the persona's person address is
+registered only on that persona's own relay sockets (a socket holding two selves' addresses would link them at the
+relay). A persona also issues its grants as itself (2026-10-31): each held self keeps its own grant set on its own
+lane, a capability token is signed by the self that grants it, and an act that issues names its self — the screen
+asks, the single self is preselected, and with several selves and none named the act is refused, never defaulted to
+the general persona, because a grant issued by the default would let its holder link the persona to it. Four properties
+follow from the design, and all four are in the code:
 
 - **Own or inherit.** A profile is an open property graph; every property is `own` or `inherit` from the
   default profile (`profileProperties.resolveProperty`). A persona overrides its label, its key and its
   disclosure and inherits the rest — settings, relay, storage — so making one is cheap and nothing migrates.
 - **A circle is joined AS one profile.** The join records the persona (`joinGroupState.setPersona`; `null`
-  is the protective default, "join minimally") and releases what that persona discloses there; in the design
-  the circle's address for you derives from that profile's seed — today from the default's — and the roster
+  is the protective default, "join minimally") and releases what that persona discloses there; the
+  circle's address for you derives from that profile's seed, and the roster
   row's `said` group — handle, displayName, the face — is that profile's name *in that
   circle*, carried by `member-props` on the membership lane. Handle uniqueness is per circle, at the fold;
   there is no global handle, on purpose. (The picker's logic is shared; painting it is on the persona brief.)
@@ -1281,6 +1299,9 @@ statements are **signed and chained** (each carries its author's per-circle sign
 causal dependencies), and ingest verifies before anything lands — the signature itself, that the signed
 kind matches the declared kind, and that the signing key belongs to the roster member it claims to be.
 Nothing a peer sends is trusted for *being sent*; it is trusted for *verifying*.
+Verify-on-read verifies each distinct signed statement once per process; what binds is re-decided every read. Only the
+pure signature check is remembered (`createSignatureMemo`, keyed by the exact signed bytes, so a statement changed after
+it was checked is checked again); whose key it is, whether it is still bound, retired or revoked, is decided afresh.
 
 **The lanes.** Four kinds of circle state ride the same rail with per-lane semantics: **membership**
 (catch-up is pull-everything, because completeness is the point of a roster), **governance** (proposals
@@ -1304,9 +1325,9 @@ what they signed before it stands, so the members an admin admitted earlier are 
 that was stolen later (decided 2026-09-25). Compositions without the log rail keep a strengthen-only fallback (drop or
 demote, never admit) — safe, and honestly weaker. A founder is never evictable. A join signed by someone other than its subject — an admin confirming a remote joiner — stands
 on that author's authority at its causal depth: an admin before the depth, a member before it, and not demoted
-in it, the same test an evict answers to; a self-signed join stands on its redemption row. An author caught
-equivocating (two statements off one parent) is discounted with everything they ever signed, admissions
-included.
+in it, the same test an evict answers to; a self-signed join stands on its redemption row. A fork is counted per
+SIGNING KEY, never per person: a member's devices each sign with their own key and are separate chains, so two
+devices writing at once is not equivocation (2026-09-25).
 
 **Mute hides, eviction refuses.** Muting a person is a view-time filter at the one projection every chat
 surface reads: their messages still land on the log (an append-only record never silently discards), and
@@ -1359,7 +1380,12 @@ hands over only the seal; until then its mirrors stay local, and the export and 
 The person's OWN scope (their device map, their own appointments, the planned book) rides one lane per self the device
 holds — each row the lane of the self that wrote it, carried as that self to that self's devices only, sealed to the
 recovery seal; the device map's row is on every held self's lane, so a device that shares only one persona with a lost
-one can still revoke it under every self (the ceremony reads the lost device's internal id there). What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
+one can still revoke it under every self (the ceremony reads the lost device's internal id there). The person's own
+devices find and reach each other through that device map, never through a circle (2026-10-31): each self's device
+address is its delegation key on that device — one per (self, device), registered only on that self's relay sockets
+and on no roster — and a device that learns a record hands the map to that self's other devices, so three devices
+without a pod still meet. A receiver keeps a record only when that self's authority binds it, and a revocation
+travels as the authority's signed statement, which wins over any live record whatever arrives first. What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
 names the circle's self, and the restore bootstrap announces a device only in the circles of a self it runs.
 
 **Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding
@@ -1587,9 +1613,10 @@ knows); what comes back is chunked and receiver-limited, and above a threshold t
 "there are N messages (~X MB), download?" — with the thresholds as tunable params and the allowance
 remembered per peer and circle. Membership is the exception: rosters always pull everything.
 
-**Stated gaps, on purpose.** Per-circle *keys* are unlinkable today, but roster and fan-out still ride
-the profile's webid — so a co-member who is also your direct contact **can** link the two identities;
-the per-circle transport/rendezvous cutover that closes this is designed, tracked, and not built.
+**Stated gaps, on purpose.** Per-circle *keys* and fan-out addresses are unlinkable today, but a roster row
+is still keyed by the member's chat identity (the profile's webid) — so a co-member who is also your direct contact
+under the same persona **can** link the two; a different persona per context is today's answer, and keying the row
+by something per-circle is designed, tracked, and not built.
 Similarly, NKN's addressing cannot alias, so an NKN-carried circle currently trades member-level
 unlinkability for that transport. Writing these down here is the contract that they are gaps, not
 choices.

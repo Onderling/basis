@@ -42,6 +42,7 @@ import {
 } from '@onderling/pod-client';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { VaultMemory } from '@onderling/vault';
+import { setDeviceDelegation } from '@onderling/agent-registry';
 import { makeKeyEventLogSink } from '@onderling/kring-host/keyEventLogSink';
 
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
@@ -177,6 +178,10 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Opt-in (see `itemsLane` above): with a device log the factory builds the items rail + emitter, and
     // the publish valve routes every item write onto the signed lane instead of the unsigned mirror.
     ...(deviceLog ? { deviceLog } : {}),
+    // The person's address-fallback setting is OFF by default — as on every real device unless the person chose it. A
+    // walk that needs the opt-in path says so (`agentOpts: { allowAddressFallback: true }`); with the harness defaulting it
+    // ON, a walk proved the opt-in path and hid every case where the production default does not deliver.
+    allowAddressFallback: false,
     // Per-test agent options, threaded straight into the production factory. The one this exists
     // for today is `allowAddressFallback: false` — the per-user "rather undeliverable than routed
     // over my one global key" setting. A test that claims to prove per-circle addressing works
@@ -323,9 +328,16 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // The membership lane's catch-up pair (registered below when the node has the rail), exposed on the node so a
   // walk can run the pull a fresh joiner makes (`requestCircle`) instead of replaying the admin's spine by hand.
   const membershipCatchUp = agent.membershipRail
-    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES })
+    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES, onBatchFrom: (cid) => agent.spineBatchArrived?.(cid) })
     : null;
   pairSeams.membershipCatchUp = membershipCatchUp;
+  // a new point catches up first — the same registration the shared lane table makes (own devices, then members)
+  if (membershipCatchUp) {
+    agent.setSpineCatchUp?.(async (circleId, { own = [] } = {}) => {
+      for (const a of own) { try { await membershipCatchUp.requestFrom(a, circleId); } catch { /* next */ } }
+      try { await membershipCatchUp.requestCircle(circleId, { callSkill: (...x) => agent.callSkill(...x) }); } catch { /* next */ }
+    });
+  }
   pairSeams.bindSelf = (circleId) => bindCircleAddresses([nodeRef.current], circleId);
   const nodeRef = { current: null };
   const handlers = {
@@ -427,6 +439,12 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
       [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,
     } : {}),
+    // The person's device map between their own devices — the same registration the shared lane table makes.
+    ...(agent.ownDeviceRecordsHandler ? { [agent.ownDeviceRecordsSubtype]: agent.ownDeviceRecordsHandler } : {}),
+    ...(agent.ownAddressRetireHandler ? { [agent.ownAddressRetireSubtype]: agent.ownAddressRetireHandler } : {}),
+    ...(agent.spineActHandler ? { [agent.spineActSubtype]: agent.spineActHandler } : {}),
+    ...(agent.circleRootHandler ? { [agent.circleRootSubtype]: agent.circleRootHandler } : {}),
+    ...(agent.spineAckHandler ? { [agent.spineAckSubtype]: agent.spineAckHandler } : {}),
     // The roster seed (pod-less enroll S1) — the same registration both shells make.
     ...(agent.rosterSeed ? {
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
@@ -439,6 +457,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ...(agent.personKeySync?.handlers ?? {}),
     ...(agent.profileFactsSync?.handlers ?? {}),
     ...(agent.primaryDevice?.handlers ?? {}),
+    ...(agent.spinePoint?.handlers ?? {}),
     // Siblings follow a circle — the join AND the leave (2026-09-21/22), the same entries the lane table spreads.
     ...(agent.circleFollowSync?.handlers ?? {}),
     // A household bot's identity-link statement → a contact row (the lane table's entry, every shell).
@@ -483,6 +502,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
+  // a re-key moved this persona's circle addresses: register them as the shells do
+  agent.onCircleRootMoved?.(async ({ circleIds }) => { await bindCircleAddresses([node], circleIds); });
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });
@@ -872,6 +893,26 @@ export async function readRoster(node, groupId) {
 }
 
 /** Best-effort shutdown of the underlying secure-mesh agents. */
+/**
+ * Put each device's delegation record into the other devices' registries, under a self — what the registry mirror on
+ * the person's pod does (or the enrol offer's roster seed, pod-less). The person's devices find each other in that
+ * device map and reach each other at their device addresses; a harness that enrols without either has to stand in.
+ * @param {object[]} nodes  devices of one person (booted)
+ * @param {string} [profileId='default']  the self whose device map is shared
+ */
+export async function shareDeviceRecords(nodes, profileId = 'default') {
+  const recs = nodes.map((n) => n.agent.persona(profileId)?.enrolledDevice ?? null);
+  for (const [i, node] of nodes.entries()) {
+    const registry = node.agent.agentsRegistry();
+    for (const [j, dev] of recs.entries()) {
+      if (i === j || !dev?.record || !dev.deviceId) continue;
+      const entry = await registry.lookup(profileId);
+      if (!entry) continue;
+      await registry.register({ ...entry, properties: setDeviceDelegation(entry.properties ?? {}, dev.deviceId, dev.record) });
+    }
+  }
+}
+
 export async function teardown(...nodes) {
   for (const n of nodes) { try { LIVE_NODES.delete(n); } catch { /* */ } }
   // what every shell does when it goes away (the box on stop, web on pagehide, mobile on background): the saves still

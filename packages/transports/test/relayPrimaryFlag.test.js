@@ -23,7 +23,7 @@ function stubRelay() {
     ws.on('message', (raw) => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
       if (msg.type === 'register') {
-        state.frames.push({ address: msg.address, primary: msg.primary === true });
+        state.frames.push({ address: msg.address, primary: msg.primary === true, ...(msg.standby === true ? { standby: true } : {}) });
         const nonce = newAddressChallenge(); open.set(nonce, msg.address);
         ws.send(JSON.stringify({ type: 'challenge', address: msg.address, nonce }));
         return;
@@ -81,5 +81,25 @@ describe('the primary flag', () => {
     const n = relay.frames.length;
     expect((await transport.addAddress(person.pubKey, { sign, primary: true })).ok).toBe(true);
     expect(relay.frames.length).toBe(n);
+  });
+
+  it('a device stepping down re-registers as STANDBY (never grabs the address from the new primary); a device that never was primary registers plainly', async () => {
+    relay = stubRelay();
+    const identity = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
+    const person = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
+    let connects = 0;
+    transport = new RelayTransport({ relayUrl: relay.url, identity, primaryDevice: () => true });
+    transport.on('connect', () => { connects += 1; });
+    await transport.connect(); await waitFor(() => connects === 1);
+    const sign = (m) => person.sign(m);
+    expect((await transport.addAddress(person.pubKey, { sign, primary: true })).ok).toBe(true);
+    // the person made ANOTHER device primary: this one steps down on both addresses
+    expect((await transport.addAddress(person.pubKey, { sign, primary: false })).ok).toBe(true);
+    expect(relay.frames.at(-1)).toEqual({ address: person.pubKey, primary: false, standby: true });
+    expect((await transport.setPrimaryDevice(false)).ok).toBe(true);
+    expect(relay.frames.at(-1)).toEqual({ address: identity.pubKey, primary: false, standby: true });
+    // made primary again: the flag is the primary one, no standby
+    expect((await transport.setPrimaryDevice(true)).ok).toBe(true);
+    expect(relay.frames.at(-1)).toEqual({ address: identity.pubKey, primary: true });
   });
 });

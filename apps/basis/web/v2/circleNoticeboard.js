@@ -18,6 +18,7 @@ import { buildAttachControl } from './attachControl.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { NOTICEBOARD_INTENTS } from '../../src/v2/circlePinboardScope.js';
 import { renderOfferingMatches } from './circleOfferingMatches.js';
+import { closeRemovedButton } from './closeRemovedButton.js';
 
 const INTENTS = NOTICEBOARD_INTENTS;
 
@@ -37,6 +38,9 @@ export function renderCircleNoticeboard(container, {
   // pipeline above; `onAttachCommand(entry)` dispatches every other entry (host →
   // callSkill/dispatchReady, params gathered via the form machinery).
   attachMenu = [],
+  // a circle an admin removed this person from: this note (and the close) stand where the composer would
+  readOnlyNote = null,
+  onCloseRemoved = null,
   attachFileOpId = 'embed-file',
   onAttachCommand,
   onClearAttach,            // () => void
@@ -133,7 +137,16 @@ export function renderCircleNoticeboard(container, {
     const dueAt = due?.value ? Date.parse(due.value) : undefined;
     if (typeof onPost === 'function') onPost({ intent, text, ...(Number.isFinite(dueAt) ? { dueAt } : {}) });
   });
-  container.appendChild(composer);
+  if (readOnlyNote) {
+    const note = document.createElement('div');
+    note.className = 'circle-view__composer-disabled';
+    note.setAttribute('role', 'note');
+    note.textContent = readOnlyNote;
+    if (typeof onCloseRemoved === 'function') note.appendChild(closeRemovedButton(tr, onCloseRemoved));
+    container.appendChild(note);
+  } else {
+    container.appendChild(composer);
+  }
 
   if (busy) {
     const b = document.createElement('div');

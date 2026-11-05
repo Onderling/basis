@@ -14,7 +14,17 @@ describe('the reason beside a failed state', () => {
     expect(fanOutReason({ errors: [] })).toBe(null);
     expect(fanOutReason({ error: 'chat-unavailable' })).toBe(null);
   });
-  it('the map keeps a reason only beside failed/undeliverable, and drops it when the state moves on', () => {
+  it('a fan whose every recipient was HELD because the persona has no connection of its own: waiting, and why', () => {
+    const held = { errors: [], outcomes: [{ webid: 'a', outcome: 'held:persona-no-connection' }, { webid: 'b', outcome: 'held:persona-no-connection' }] };
+    expect(classifyFanOut(held)).toBe('pending');
+    expect(fanOutReason(held)).toBe('persona-waiting');
+    // one recipient went out, or held for another reason: the ordinary answer
+    const mixed = { errors: [], outcomes: [{ webid: 'a', outcome: 'held:persona-no-connection' }, { webid: 'b', outcome: 'delivered' }] };
+    expect(classifyFanOut(mixed)).toBe('maybe-received');
+    expect(fanOutReason(mixed)).toBe(null);
+    expect(classifyFanOut({ errors: [], outcomes: [{ webid: 'a', outcome: 'held' }] })).toBe('maybe-received');
+  });
+  it('the map keeps a reason only beside failed/undeliverable/pending, and drops it when the state moves on', () => {
     const m = createDeliveryStateMap();
     m.set('m1', 'pending');
     m.set('m1', 'failed', { reason: 'persona-no-connection' });
@@ -24,6 +34,15 @@ describe('the reason beside a failed state', () => {
     expect(m.reasonOf('m1')).toBe(null);
     m.set('m2', 'maybe-received', { reason: 'persona-no-connection' });
     expect(m.reasonOf('m2')).toBe(null);
+    // …and beside a WAIT: held here for a reason the person can act on — dropped the moment it moves on
+    m.set('m4', 'pending');
+    m.set('m4', 'pending', { reason: 'persona-waiting' });
+    expect(m.reasonOf('m4')).toBe('persona-waiting');
+    m.set('m4', 'maybe-received');    // the held message went out
+    expect(m.reasonOf('m4')).toBe(null);
+    m.set('m5', 'pending', { reason: 'persona-waiting' });
+    m.set('m5', 'stored');            // a receipt
+    expect(m.reasonOf('m5')).toBe(null);
     m.set('m3', 'failed', { reason: 'x' }); m.clear('m3');
     expect(m.reasonOf('m3')).toBe(null);
   });

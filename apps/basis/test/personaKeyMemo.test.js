@@ -36,14 +36,14 @@ describe('the persona runtime memoises its own derivations', () => {
     for (let i = 0; i < 20; i += 1) expect(p.circleAddressFor('c-1')).toBe(first);
     expect(p.circleAddressFor('c-2')).not.toBe(first);
     expect(counts.address).toBe(2);
-    expect(first).toBe(core.deriveCircleAddress(p.deviceDerivationSeed, 'c-1'));
+    expect(first).toBe(core.deriveCircleAddress(p.circleSeed, 'c-1'));
   });
 
   it('two runtimes never share an entry: each derives its own', async () => {
     const a = await runtime(core.Bootstrap.create().bootstrap);
     const b = await runtime(core.Bootstrap.create().bootstrap);
     expect(a.circleAddressFor('c-1')).not.toBe(b.circleAddressFor('c-1'));
-    expect(b.circleAddressFor('c-1')).toBe(core.deriveCircleAddress(b.deviceDerivationSeed, 'c-1'));
+    expect(b.circleAddressFor('c-1')).toBe(core.deriveCircleAddress(b.circleSeed, 'c-1'));
   });
 
   it('the person key pubKey is derived once per key record, and a rotation derives afresh', async () => {

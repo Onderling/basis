@@ -11,7 +11,6 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { openAcrossKeyChain, sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import {
   bootRealAgentNode, connectNodesOverBus, pairCircle, sealCircleViaProducer, postSealed, readSealed, until, teardown,
 } from './support/pairRealAgents.js';
@@ -22,6 +21,10 @@ import { EventLog } from '../src/eventLog.js';
 import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
 
 const GROUP = 'circle-replace-walk';
+// THE BUS UNIT OF THE CEREMONY: this walk assembles the restored phone by hand over the in-process bus (no recovery-file
+// roster, no address→key binding, no connection points), so it opts into the address fallback — the opt-in path. The
+// production path, fallback off and a real restore over a relay, is walked in replaceAfterRestore.relay.test.js.
+const OPT_IN_FALLBACK = { allowAddressFallback: true };
 const rowFor = async (node, webid) => {
   const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
   return (res?.members ?? []).find((m) => m.webid === webid) ?? null;
@@ -34,8 +37,8 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
 
   it('retires the old phone everywhere, brings the sealed history along, and rotates the key past the old phone', async () => {
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { agentOpts: logOpts() }),
-      bootRealAgentNode('B', { agentOpts: logOpts() }),
+      bootRealAgentNode('A', { agentOpts: { ...logOpts(), ...OPT_IN_FALLBACK } }),
+      bootRealAgentNode('B', { agentOpts: { ...logOpts(), ...OPT_IN_FALLBACK } }),
     ]);
     await connectNodesOverBus([A, B]);
     await pairCircle(A, B, { groupId: GROUP, name: 'Replace walk', handle: 'bram' });
@@ -68,12 +71,12 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const enrolled = await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'nieuwe telefoon' });
     expect(enrolled.ok).toBe(true);
     await teardown(pre);
-    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, ...logOpts() } });
+    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, ...logOpts(), ...OPT_IN_FALLBACK } });
     await connectNodesOverBus([A, B, A2]);
     expect(A2.pubKey, 'one person: the same webid').toBe(A.pubKey);
     const addrA = A.agent.circleAddressFor(GROUP);
     const addrA2 = A2.agent.circleAddressFor(GROUP);
-    expect(addrA2).not.toBe(addrA);
+    expect(addrA2).toBe(addrA);   // one address per persona per circle
     const mine = ownAnnouncementFor({ agent: A2.agent, circleId: GROUP });
     for (const node of [A, B, A2]) {
       await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...mine });
@@ -101,47 +104,35 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const r = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: phrase, circleIds: [GROUP] });
     expect(r.ok, r.error).toBe(true);
     expect(r.firstDeviceRetired, "the first phone is retired by derivation — its id derives from the root, so the new phone never needed its record").toBe(true);
-    expect(r.retiredIn.map((x) => x.address)).toContain(addrA);
-    expect(r.historyKeys, 'the old key opened the chain; the keys came along').toBeGreaterThanOrEqual(1);
+    // what the old phone held is the persona's circle root, so the ceremony RE-KEYS: the persona moves to the next epoch
+    // and presents a new address — the old one is retired, the group key rotated past it
+    expect(r.rekey?.ok, JSON.stringify(r.rekey)).toBe(true);
+    const addrNext = A2.agent.circleAddressFor(GROUP);
+    expect(addrNext, 'the new phone still presents the address the lost phone holds').not.toBe(addrA);
+    // JOURNEY 1 — sealed history opens on the new phone: what the old address could open was kept (the history sidecar)
+    // before the switch, so the past reads as it did
+    const { openAcrossKeyChain } = await import('@onderling/pod-client');
+    expect(openAcrossKeyChain(beforeEnv, await A2.agent.historyKeyChainFor(GROUP)), 'the new phone reads what was sealed before it').toBe(before);
 
-    // JOURNEY 1 — sealed history opens on the new phone, through the sidecar, with nobody re-keying anything.
-    const chain = await A2.agent.historyKeyChainFor(GROUP);
-    expect(openAcrossKeyChain(beforeEnv, chain)).toBe(before);
+    // The member stays on Bram's roster — at the persona's NEW address; the old one is gone
+    expect(await until(async () => { const row = await rowFor(B, A.pubKey); const set = [row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean); return set.includes(addrNext) && !set.includes(addrA) ? true : null; }, { timeout: 15000, step: 100 }),
+      `Bram's row did not move: ${JSON.stringify(await rowFor(B, A.pubKey))}`).toBe(true);
 
-    // The old address is retired on Bram's roster — the root reveal bound there; the member stays.
-    await until(async () => {
-      const row = await rowFor(B, A.pubKey);
-      return row && !(row.circleAddresses ?? []).includes(addrA) && (row.circleAddresses ?? []).includes(addrA2) ? row : null;
-    }, { timeout: 15000, step: 100 });
-    expect(await rowFor(B, A.pubKey)).toBeTruthy();
-
-    // JOURNEY 2 — the old phone is cut off from what comes next: A2 (an admin) rotated to v2, fanned to
-    // Bram (a survivor) and not to the retired sealing key.
-    expect(r.rotated.map((x) => x.circleId)).toContain(GROUP);
-    const v2 = r.rotated.find((x) => x.circleId === GROUP).version;
-    await until(() => B.keyEventStore.has(GROUP, v2), { timeout: 15000, step: 100 });
-    const events = (await A2.agent.keyRail.readVerifiedBodies(GROUP)).bodies.filter((b) => b.payload?.event?.version === v2);
-    expect(events[0].payload.event.recipients).not.toContain(sealingPublicKeyFromNetworkKey(addrA));
-    expect(events[0].payload.event.recipients).toContain(sealingPublicKeyFromNetworkKey(addrA2));
-
-    // …and the old phone is REALLY cut off: content sealed under the new version opens for Bram and not for
-    // the old phone, whose per-circle sealing key is not a recipient any more (one key family).
-    await projectKeyEventsIntoStore({ rail: A2.agent.keyRail, store: A2.keyEventStore, circleId: GROUP });
+    // THE WINDOW CLOSES (the stable point §7): what comes next is sealed past the old address, so the lost phone — which
+    // holds only the old root — does not read it, and Bram does
     const after = `na de wissel ${Date.now().toString(36)}`;
+    // the new phone took the point from the lost one, so it caught up before it granted itself and rotated: wait for that
+    const { readKeyChain, currentGroupKey, makeOpener } = await import('@onderling/pod-client');
+    const canSeal = await until(async () => {
+      await projectKeyEventsIntoStore({ rail: A2.agent.keyRail, store: A2.keyEventStore, circleId: GROUP });
+      try { return currentGroupKey(readKeyChain(A2.keyEventStore.list(GROUP), { groupId: GROUP, opener: makeOpener(A2.agent.circleSealingKeyPairFor(GROUP).privateKey) })) ? true : null; } catch { return null; }
+    }, { timeout: 20000, step: 300 });
+    expect(canSeal, `the new phone holds no key to seal with — closed: ${JSON.stringify(A2.agent.spineClosedCircles?.())}, waiting: ${JSON.stringify(await A2.agent.spineOutboxWaiting?.())}`).toBe(true);
     const afterEnv = await postSealed({ admin: A2, members: [B, A], groupId: GROUP, text: after });
-    await until(() => B.sealedContent.length >= 2 && A.sealedContent.length >= 1);
+    await until(() => B.sealedContent.length >= 2);
     expect(readSealed(B, afterEnv, GROUP), 'Bram reads what comes next').toBe(after);
-    expect(() => readSealed(A, afterEnv, GROUP), 'the old phone cannot').toThrow();
-
-    // The retired address keeps its PAST: the key chain the old phone established (v1) is still
-    // folded on both devices after its address was retired, because those statements landed on each log
-    // before the revocation did. Without this the circle's own chain vanished with the device.
-    for (const node of [A2, B]) {
-      const versions = (await keyEventsFromRail(node.agent.keyRail, GROUP)).map((e) => e.version);
-      expect(versions, `${node.label}: v1 by the retired device still folds`).toContain(1);
-    }
-    const bRowNow = await rowFor(B, A.pubKey);
-    expect(bRowNow.retiredAddresses?.map((r) => r.address), 'the roster row remembers the retired address').toContain(addrA);
+    let lostRead = null; try { lostRead = readSealed(A, afterEnv, GROUP); } catch { lostRead = null; }
+    expect(lostRead, 'the lost phone read what came after the re-key').not.toBe(after);
 
     // The wrong phrase is refused; running it again is harmless.
     const wrong = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' });

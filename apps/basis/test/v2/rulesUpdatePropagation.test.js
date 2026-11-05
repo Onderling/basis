@@ -77,10 +77,10 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
     await bindCircleAddresses([A, B], CIRCLE);
     await Promise.all([A, B].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: CIRCLE })));
 
-    // This harness invite carries no rules payload, so B starts with NO local doc (the shells'
-    // wizard forwards the doc at join) — which makes the arrival below unambiguous: whatever
-    // version B ends up holding came over the PEER LANE.
-    expect(await currentVersionOn(B)).toBe(0);
+    // B holds the doc the invite carried (v1) and, since the admin's signed join rides back on the redeem reply, folds it
+    // at once — so B starts on v1. Anything past v1 can only have come over the PEER LANE, which keeps the arrival
+    // below unambiguous.
+    expect(await currentVersionOn(B), 'B folds the admin\'s join at once: the version its invite carried').toBe(1);
 
     // The admin raises the rules to v2. The doc + version now RIDE THE FAN — no pod anywhere.
     const edited = await A.agent.callSkill('pinboard', 'editGroupRules', {

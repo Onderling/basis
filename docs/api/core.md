@@ -1116,6 +1116,26 @@ Verify a declared commitment against the (proven) circle address that declared i
 
 ## `src/identity/circleAddress.js`
 
+### `deriveCircleRoot`
+
+**Kind:** function · **Import:** `deriveCircleRoot` from `'@onderling/core'`
+
+```js
+deriveCircleRoot(profileSeed, epoch = 0)
+```
+
+A persona's CIRCLE ROOT at an epoch: the derivation root of every per-circle key the persona presents. One-way from
+the persona's seed (holding it gives no authority), the same on every FULL device of the persona (the phrase
+re-derives it; a device enrolled without the phrase is handed it), so a co-member sees one member, one address. A
+re-key moves the persona to the next epoch, and with it every per-circle key.
+
+**Parameters**
+
+- `profileSeed` `Uint8Array` — the persona's 32-byte seed (`ownerRoot.deriveAgentSeed(profileId)`)
+- `[epoch=0]` `number` — a non-negative integer
+
+**Returns:** `Uint8Array` — 32-byte seed, to pass as the `derivationSeed` below
+
 ### `deriveCircleSeed`
 
 **Kind:** function · **Import:** `deriveCircleSeed` from `'@onderling/core'`
@@ -1386,7 +1406,7 @@ the redeem seam so a joiner can prove control of the address they present.
 **Kind:** function · **Import:** `verifyCircleLink` from `'@onderling/core'`
 
 ```js
-verifyCircleLink({ groupId, address, proof } = {})
+verifyCircleLink({ groupId, address, proof, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
 ```
 
 Verify a presented linkage: the proof must be a signature over the challenge by the private
@@ -1394,7 +1414,7 @@ key behind `address`. Deny-by-default — anything missing or malformed is `fals
 
 **Parameters**
 
-- `a` `{groupId:string, address:string, proof:string}`
+- `a` `{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}` — `verifySignature` — the pure signature check, default `AgentIdentity.verify`; a caller that re-derives passes a memo
 
 **Returns:** `boolean`
 
@@ -1850,7 +1870,7 @@ Read the vault entry. Null when absent or malformed (an enrolled device from bef
 **Kind:** function · **Import:** `storePersonKey` from `'@onderling/core'`
 
 ```js
-async storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [], linkKeyPub = null })
+async storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [], linkKeyPub = null, selfReveal = null })
 ```
 
 Write the vault entry — only ever a HIGHER version than what is there (a ceremony never rolls a key back), with
@@ -2974,6 +2994,25 @@ Native-only — A2A peers receive a 'requires-native-transport' error.
 
 ## `src/protocol/taskExchange.js`
 
+### `tokenAgentKeyFor`
+
+**Kind:** function · **Import:** `tokenAgentKeyFor` from `'@onderling/core'`
+
+```js
+tokenAgentKeyFor(agent, addressed)
+```
+
+The key a presented token must be FOR: the self the call was addressed to, when that is one of this agent's own
+selves (a persona's own address — a persona issues its grants as itself), else the agent's own key. Never another
+self's: a token Werk issued is honoured only on a call sent to Werk.
+
+**Parameters**
+
+- `agent` `object` — the receiving agent (its `pubKey`, its `security.selfIdentityFor`)
+- `addressed` `string|null` — the address the call was sent to (the envelope's `_to`)
+
+**Returns:** `string`
+
 ### `invokeAgentSkill`
 
 **Kind:** function · **Import:** `invokeAgentSkill` from `'@onderling/core'`
@@ -4031,6 +4070,27 @@ Read the credential off an envelope. One accessor so the field name appears in o
 
 **Returns:** `string|null`
 
+## `src/security/signatureMemo.js`
+
+### `createSignatureMemo`
+
+**Kind:** function · **Import:** `createSignatureMemo` from `'@onderling/core'`
+
+```js
+createSignatureMemo({ max = SIGNATURE_MEMO_MAX, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
+```
+
+Build a memo over the pure signature check: `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
+check that passed once for exactly those bytes, that signature and that key is answered from memory.
+
+**Parameters**
+
+- `[o]` `object`
+- `[o.max]` `number` — most remembered checks
+- `[o.verify]` `(msg: string, sig: string, pubKey: string) => boolean` — the real check (default AgentIdentity.verify)
+
+**Returns:** `{ verify: (msg: string, sig: string, pubKey: string) => boolean, readonly size: number }`
+
 ## `src/security/spineAppender.js`
 
 ### `SPINE_STATEMENT_ITEM`
@@ -4118,6 +4178,7 @@ it) — that is the fold's deny-wins decision.
 - `[opts]` `object`
 - `[opts.expectedCircleId]` `string` — if given, `body.circleId` must match
 - `[opts.expectedKind]` `string` — if given, `body.kind` must match
+- `[opts.verifySignature]` `(msg: string, sig: string, pubKey: string) => boolean` — the pure signature check — default `AgentIdentity.verify`; a caller that re-reads the same statements passes a memo (`createSignatureMemo`)
 
 **Returns:** `{ ok: true, body: object } | { ok: false, reason: string }`
 

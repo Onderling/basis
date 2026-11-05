@@ -89,7 +89,7 @@ import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAd
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
-import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
+import { resolveMemberAddress, makeFallbackReporter, ADDRESS_VIA } from '../lib/memberAddress.js';
 import { kindWakes, assigneesOf } from '@onderling/item-store';
 
 /** G13 — one reporter per process, deduping per (circle, member, reason) so the signal stays readable. */
@@ -111,7 +111,6 @@ import { findNearDuplicate } from '../lib/dupCheck.js';
 import { deriveRoster } from '../lib/deriveRoster.js';
 // B4 — who has LEFT or been REMOVED from ONE circle. The rule lives in one place so the roster
 // projection, the fan-out roster and the legacy MemberMap fallback cannot disagree about who is in.
-import { readCircleExits, isExited, collectCircleExits, CIRCLE_EXIT_TYPES } from '../lib/circleExits.js';
 // B5 — how many people ONE invite may admit: circle ceiling → per-invite choice → system cap,
 // enforced at redemption on the side that issues the membership.
 import {
@@ -481,8 +480,8 @@ async function revokePodAccess(controlAgent, { webId, force = false, policy = 'g
   // stopped fan-out in the circle they were removed from AND erased them everywhere else: removing
   // someone from one circle severed the relationship in every circle you shared with them. Fan-out
   // no longer reads that cache for membership anyway — it reads the per-circle trail projection
-  // (`projectCircleRoster`), which now honours `group-removal`/`group-leave` for THAT circle
-  // (`../lib/circleExits.js`). So the coupling is kept and the collateral is gone.
+  // (`projectCircleRoster`), which folds the circle's own `leave`/`evict` statements for THAT circle.
+  // So the coupling is kept and the collateral is gone.
   return result;
 }
 
@@ -552,7 +551,7 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  */
 async function _fanOutViaReliableSend({
   members, reliableSend, selfWebid, envelope, only = null, circleId = null, preferCircleAddress = false,
-  allowFallback = true,
+  allowFallback = false,
 }) {
   const list = await members.list();
   const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
@@ -566,13 +565,13 @@ async function _fanOutViaReliableSend({
     // every circle. `resolveMemberAddress` owns the ladder (circleAddress → pubKey → webid) so the two fan
     // paths cannot drift, and it REPORTS each fallback: that report is how we learn when step D (dropping
     // the fallback) is safe rather than a guess.
-    const { addr, addrs } = await resolveMemberAddress(m, {
+    const { addr, addrs, via } = await resolveMemberAddress(m, {
       circleId,
       preferCircleAddress,
       // Resolved per fan, not per boot: the user can flip the setting mid-session, and a send after the
       // flip must honour it. A `blocked` report (setting off, no circle address) still fires — it is the
       // only signal the setting is costing someone messages, and it is what drives the chat's offer.
-      allowFallback: typeof allowFallback === 'function' ? allowFallback() !== false : allowFallback !== false,
+      allowFallback: typeof allowFallback === 'function' ? allowFallback() === true : allowFallback === true,
       resolveByWebid: (w) => members.resolveByWebid(w),
       onFallback: _reportAddressFallback,
     });
@@ -580,14 +579,18 @@ async function _fanOutViaReliableSend({
     // A member can hold a SET of proven per-circle addresses (a second device, a restored profile) —
     // the fan tries them IN ORDER, primary first, and stops at the first address that takes the
     // envelope (delivered or held). Sequential on purpose: one member, one delivery, fewest points.
-    if (!targets.has(addr)) targets.set(addr, { webid, candidates: (addrs && addrs.length) ? addrs : [addr] });
+    // Reached at their GLOBAL key (the person chose the fallback): the send goes person to person — never as my circle
+    // address to their global key, which is neither a circle message nor a personal one, and which their reply in
+    // kind would make the circle refuse. The circle statement inside is still signed by the circle key.
+    const asPerson = via !== ADDRESS_VIA.CIRCLE;
+    if (!targets.has(addr)) targets.set(addr, { webid, candidates: (addrs && addrs.length) ? addrs : [addr], asPerson });
   }
   let sent = 0;
   const errors = unresolved.map((webid) => ({ webid, reason: 'recipient-pubkey-unknown' }));
   // what happened to each recipient — delivered, HELD (counted as sent: queued for their next presence), failed or
   // without an address — so a statement that must arrive can say where it went (a probe that names its branch)
   const outcomes = unresolved.map((webid) => ({ webid, outcome: 'no-address' }));
-  await Promise.all([...targets.values()].map(async ({ webid, candidates }) => {
+  await Promise.all([...targets.values()].map(async ({ webid, candidates, asPerson }) => {
     let failure = null;
     let last = null;
     for (const addr of candidates) {
@@ -595,7 +598,7 @@ async function _fanOutViaReliableSend({
         // Circle-scoped: this traffic belongs to `circleId`, and the host constrains it to that circle's
         // connection points. pinboard names the CIRCLE and nothing else — which transports exist, and which of
         // them the circle rides, are not its business. → plans/NOTE-circle-scoped-routing.md
-        const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward', circleId });
+        const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward', circleId, ...(asPerson ? { asPerson: true } : {}) });
         // held (offline → queued for hold-forward) AND delivered both count as sent; a send
         // that explicitly reports neither is the only genuine transient failure — try the member's
         // next proven address before giving up on them.
@@ -724,13 +727,16 @@ async function listGroupMembersCore(scope, a, ctx) {
   // (the rails' binding verifiers) folds TRAIL + display only — verifying a statement must never
   // recurse through the statement fold itself.
   const skipSpine = a?.spineless === true;
+  // the spineless read folds the CEREMONY retirements unless asked not to (the ceremony rule's own read): they bind by
+  // their root reveal against the plain trail, so folding them here recurses nowhere
+  const withRetirements = skipSpine && a?.withRetirements !== false;
   const selfSigner = scope.selfSigner ?? null;
   const project = (circleSignerFor || membershipRead || selfSigner || skipSpine)
-    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead, selfSigner, skipSpine }))
+    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead, selfSigner, skipSpine, withRetirements }))
     : projectCircleRoster;
   return listCircleMembers(
     {
-      store, members, projectCircleRoster: project, readCircleExits, isExited,
+      store, members, projectCircleRoster: project,
       rosterCallerIsForeign, gateRosterReplyForPeer,
     },
     { a, from: ctx?.from ?? null, localActor: scope.localActorIn ? scope.localActorIn(a?.groupId ?? groupId) : localActor, groupId },
@@ -755,7 +761,7 @@ async function listGroupMembersCore(scope, a, ctx) {
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
+export async function projectCircleRoster({ store, groupId, circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, withRetirements = false, observeFold = null } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
@@ -992,10 +998,16 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     return null;   // claimed binding unverifiable on this device → ignore (never trust, never corrupt)
   };
   let spineStatements = [];
+  let ceremonyRetirements = [];
   if (skipSpine) {
     // TRAIL + display only (the binding verifiers' read): no statement fold, no spine store —
     // the trail carries the address facts a verifier needs, and reading the statements here
-    // would recurse into the very verification that asked.
+    // would recurse into the very verification that asked. The one exception: the CEREMONY retirements (address-
+    // revoke, bound by the root's reveal against the plain trail's commitment — no recursion), so a retired address
+    // still binds what it signed before it stopped (a re-key retires the address a person's history was signed with).
+    if (withRetirements && typeof membershipRead?.ceremony === 'function') {
+      try { ceremonyRetirements = ((await membershipRead.ceremony(groupId))?.bodies ?? []).filter((b) => b?.kind === 'address-revoke'); } catch { ceremonyRetirements = []; }
+    }
   } else if (typeof membershipRead === 'function') {
     // THE RAIL (the membership rider): statements live on the DEVICE LOG's membership lane — the injected
     // reader returns VERIFIED bodies with the key↔ref binding already resolved. Two fold-side gates apply
@@ -1054,11 +1066,9 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     // The CURRENT rules version (monotonic integer: createGroupV2 starts at 1, updateGroupRules
     // increments). The fold's rules gate derives its valid set {1..current} from it.
     rulesVersion: latestRulesItem?.source?.version ?? latestRulesItem?.source?.rules?.version ?? null,
-    // A removal/leave recorded for THIS circle drops the member from THIS circle only. The
-    // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
-    exits: await readCircleExits({ store, groupId }),
     // The signed spine deltas fold ON TOP of the trail head (the cutover model — no data migration).
     spineStatements,
+    ceremonyRetirements,
     // The fold's compaction verdict goes back to the rail (L121): only on the rail path, only when the fold names
     // something, fire-and-forget — a read never waits on a write.
     onFolded: (folded) => {
@@ -1255,6 +1265,9 @@ export function buildSkills({
   // rail's VERIFIED bodies for the roster fold. Absent → the legacy store-based spine path, unchanged.
   membershipEmit,
   membershipRead,
+  // Let go of ONE circle's content on this device (host-injected `(circleId) => Promise<{ok}>`): its store's rows and its
+  // device-log entries, beneath the store. Closing a circle you were removed from uses it. Absent → nothing to forget.
+  forgetCircleContent = null,
   // The person key this device announces on a join or create (host-injected `() => {version, pubKey} | null`).
   currentPersonKey = null,
   // THE PERSON'S OWN PROFILE (handle, display name, availability, place) — lib/selfProfile.js; the host injects it over
@@ -1285,7 +1298,7 @@ export function buildSkills({
   // when no per-circle address is known? OFF is the private default; the host threads the live setting as
   // a value or a function, because unlike `preferCircleAddress` (a deployment fact) this one changes at
   // runtime when the user flips the toggle — a boolean captured at boot would ignore every change after.
-  allowAddressFallback = true,
+  allowAddressFallback = false,
   chat,           // Phase 14: wireChat controller (chat.send / chat.detach)
   metrics,        // Phase 18: UsageMetrics; record() called from key handlers
   bundle,         // Phase 20: factory hands itself in for sign-in skills
@@ -1372,8 +1385,8 @@ export function buildSkills({
   };
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
   // a member; else the membership lane's last exit for them, in the fold's own order (`lastExit`: their leave, or an
-  // admin's evict); else, for a circle from before the lane, the exit items' latest (`exits.kinds`). Left → may join
-  // again on an invite they hold; removed → needs a new one. Null when nothing can say.
+  // admin's evict). Left → may join again on an invite they hold; removed → needs a new one. Null when nothing can
+  // say.
   const verdictWithRoster = () => (args) => inviteRedemptionVerdict({
     ...args,
     memberStatus: async (gid, webid) => {
@@ -1385,7 +1398,7 @@ export function buildSkills({
       if (!Array.isArray(rows)) return null;
       if (rows.some((m) => (m?.webid ?? m?.id) === webid)) return 'member';
       const onLane = folded?.lastExit?.[webid];
-      const last = onLane ?? (await readCircleExits({ store: scope.store, groupId: gid })).kinds?.get(webid) ?? null;
+      const last = onLane ?? null;
       if (last === 'evict') return 'removed';
       if (last === 'leave') return 'left';
       return null;
@@ -1407,8 +1420,8 @@ export function buildSkills({
   // rides (roster-fan, transport choice, the pod data-move branch, delivery-state
   // accounting, the `{sent, attempted, errors}` contract) — now lives in
   // `@onderling/circles`. Pinboard wires it ONCE here with its deps + the helpers it
-  // shares with the roster skills (`projectCircleRoster`/`readCircleExits`/`isExited`,
-  // injected because they are NOT owned by the fan) and its two private fan helpers
+  // shares with the roster skills (`projectCircleRoster`, injected because it is NOT owned by the fan) and its two
+  // private fan helpers
   // (`_fanOutViaReliableSend`/`_fanOutToMembers`, which close over the member-address
   // resolver, so they stay in pinboard and are injected). `toWireRefEnvelope` is injected
   // rather than imported into the package so the package needs no item-store dep.
@@ -1419,7 +1432,6 @@ export function buildSkills({
     projectCircleRoster: ((circleSignerFor || membershipRead)
       ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead }))
       : projectCircleRoster),
-    readCircleExits, isExited,
     fanOutViaReliableSend: _fanOutViaReliableSend,
     fanOutToMembers: _fanOutToMembers,
     toWireRefEnvelope,
@@ -2632,6 +2644,14 @@ export function buildSkills({
         },
         visibility: 'household',
       }], { actor: from });
+      // THE ADMIN'S JOIN, carried on the reply: a joiner who LEFT or was removed holds its own exit on its lane and no
+      // longer hears the circle's fan, so without this its fold keeps saying "out" after a redeem the admin accepted. It
+      // lands through this device's membership rail — the same gate a fanned statement passes (the admin's address is
+      // proven on the row written just above) — and the fold re-admits causally: a join after the exit.
+      let rejoined = null;
+      if (a.joinStatement?.body && a.joinStatement?.sig && typeof membershipRead?.ingest === 'function') {
+        try { rejoined = !!(await membershipRead.ingest(a.groupId, a.joinStatement))?.ok; } catch { rejoined = false; }
+      }
       // 2026-05-24 — also persist the rules locally so /group-rules
       // works on the joiner side after join.  Caller (basis's
       // join-group wizard) reads `rules` from the invite URL payload
@@ -2662,6 +2682,8 @@ export function buildSkills({
         redemptionId: item.id,
         groupId:      a.groupId,
         validUntil:   a.expiresAt ?? null,
+        // whether the admin's join landed here (null: none came with the reply)
+        rejoined,
         _sync:        simulateSync(),
       };
     }, {
@@ -2900,16 +2922,12 @@ export function buildSkills({
      */
     defineSkill('listMyCircles', async ({ from }) => {
       const ids = new Set();
-      /** groupId → my latest join there, so an exit can be compared against it (B4). */
-      const myJoinedAt = new Map();
       const redemptions = await store.listOpen({ type: 'membership-redemption' });
       for (const it of redemptions) {
         if (it?.source?.redeemedBy !== from) continue;
         const gid = it?.source?.groupId;
         if (typeof gid !== 'string' || !gid) continue;
         ids.add(gid);
-        const at = typeof it.source.redeemedAt === 'number' ? it.source.redeemedAt : 0;
-        if (at > (myJoinedAt.get(gid) ?? 0)) myJoinedAt.set(gid, at);
       }
       const rules = await store.listOpen({ type: 'group-rules' });
       /**
@@ -2930,32 +2948,73 @@ export function buildSkills({
         if (it?.addedBy !== from) continue;
         ids.add(gid);
       }
-      // B4 — a circle I have LEFT (or been removed from, where that item reached this device) is not
-      // one of "my circles". This is not cosmetic: this list drives `primeCircleSecurity` and the
-      // relay's per-circle address registration, so without the filter the next boot would re-record
-      // the authorize snapshot for a circle I left and re-register its address on the relay —
-      // silently undoing both halves of the leave, one restart later.
-      const exitItems = [];
-      for (const type of CIRCLE_EXIT_TYPES) {
-        try { exitItems.push(...(await store.listOpen({ type })) ?? []); } catch { /* absent ⇒ none */ }
-      }
+      // A circle I have LEFT (or been removed from) is not one of "my circles" — and the membership lane's fold is what
+      // says so: my own `leave` (or an admin's `evict`) as my last word there, and me not on the folded roster. My own
+      // leave is a statement in this device's own log, so it folds offline, at boot, with nothing else to read; a leave
+      // made on a sibling arrives by the lane's catch-up. This is not cosmetic: this list drives `primeCircleSecurity`
+      // and the relay's per-circle address registration, so a circle wrongly listed is one re-registered on the relay.
       const left = [];
+      // …and one an admin REMOVED me from: out of "my circles" too (its security half — the address off the relays, the
+      // keys unbound — ran when the evict folded), but a person's shells still show it, marked and read-only, until they
+      // close it (which forgets the circle's rows here). A box lists `circles` only.
+      const removed = [];
       for (const gid of [...ids]) {
-        const exits = collectCircleExits({ items: exitItems, groupId: gid });
-        if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) { ids.delete(gid); left.push(gid); }
+        let folded = null;
+        let rows = null;
+        try {
+          rows = await projectCircleRoster({
+            store: scope.store, groupId: gid, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
+            selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
+          });
+        } catch { rows = null; }
+        const exit = folded?.lastExit?.[from];
+        const onRoster = Array.isArray(rows) && rows.some((m) => (m?.webid ?? m?.id) === from);
+        if ((exit === 'leave' || exit === 'evict') && !onRoster) { ids.delete(gid); (exit === 'evict' ? removed : left).push(gid); }
       }
       return {
         circles: [...ids],
         // Names alongside the ids, so a shell never has to show an identifier where a name belongs.
         names: Object.fromEntries([...ids].filter((g) => names.has(g)).map((g) => [g, names.get(g)])),
-        // …and the circles this device has LEFT (or been removed from) — what a sibling that slept through the leave
-        // is told on connect, so it leaves too (2026-09-22).
+        // …the circles this device's person LEFT — what a sibling that slept through the leave is told on connect…
         left,
+        // …and the ones an admin removed them from, with their names: shown read-only until the person closes them.
+        removed: removed.map((g) => ({ id: g, name: names.get(g) ?? null })),
         _sync: simulateSync(),
       };
     }, {
       description: 'List the circle groupIds the calling actor is a member or admin of, with the names people gave them.',
       visibility:  'authenticated',
+    }),
+    /**
+     * CLOSE a circle an admin removed me from. Refused unless the fold says so (my last word there is an `evict` and I
+     * am off its roster) — never a way to drop a circle I am in. Forgets what this device held of it (the store's rows,
+     * the device-log entries) and the rows here that listed it, so it is in neither list and a restart keeps it gone.
+     * All of it local, beneath the stores: no member hears of it.
+     */
+    defineSkill('dismissRemovedCircle', async ({ parts, from }) => {
+      const groupId = dataArgs(parts)?.groupId;
+      if (typeof groupId !== 'string' || !groupId) return { ok: false, error: 'missing-groupId' };
+      let folded = null;
+      let rows = null;
+      try {
+        rows = await projectCircleRoster({
+          store: scope.store, groupId, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
+          selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
+        });
+      } catch { rows = null; }
+      const onRoster = Array.isArray(rows) && rows.some((m) => (m?.webid ?? m?.id) === from);
+      if (folded?.lastExit?.[from] !== 'evict' || onRoster) return { ok: false, error: 'not-removed' };
+      const listing = [
+        ...(await store.listOpen({ type: 'membership-redemption' })),
+        ...(await store.listOpen({ type: 'group-rules' })),
+      ].filter((it) => it?.source?.groupId === groupId);
+      if (listing.length === 0) return { ok: false, error: 'not-removed' };   // already closed here
+      const forgot = typeof forgetCircleContent === 'function' ? await forgetCircleContent(groupId) : null;
+      const dropped = await store.removeItems(listing.map((it) => it.id), { actor: localActor });
+      return { ok: true, rows: forgot?.rows ?? 0, entries: forgot?.entries ?? 0, listed: dropped.length };
+    }, {
+      description: 'Close a circle an admin removed you from: forget what this device held of it. Refused for a circle you are in.',
+      visibility:  'private',
     }),
 
     /**
@@ -3017,7 +3076,7 @@ export function buildSkills({
       // parsed args + carrier context.
       return listCircleRoster(
         {
-          store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync,
+          store, rosterCallerIsForeign, simulateSync,
           // The SAME folded projection every other authority answer here reads, spine and all — so
           // "am I still in this circle" gets the same answer at this door as at every other.
           projectCircleRoster: ({ groupId: gid }) => projectCircleRoster({
@@ -3839,7 +3898,9 @@ export function buildSkills({
         payload: { role: a.role }, actor: from,
       });
       if (!res) return { error: 'not-signed' };   // no per-circle signer → nothing lands unsigned
-      return { ok: true, groupId: _groupId, memberWebid: a.memberWebid, role: a.role, _sync: simulateSync() };
+      // handed to the person's main device to sign (`held`: it is offline) — not applied yet, and the screen says so
+      const handed = res.forwarded === true ? { forwarded: true, held: res.held === true, ...(res.waitingCatchUp === true ? { waitingCatchUp: true } : {}) } : {};
+      return { ok: true, groupId: _groupId, memberWebid: a.memberWebid, role: a.role, ...handed, _sync: simulateSync() };
     }, {
       description: 'Admin-only: promote a member to admin or demote an admin to member; the roster fold on every device is the gate.',
       visibility:  'authenticated',

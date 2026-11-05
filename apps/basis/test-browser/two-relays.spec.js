@@ -20,6 +20,13 @@ const R2 = process.env.PEER_TEST_RELAY_2 || '';
 test.skip(!R1 || !R2, 'needs PEER_TEST_RELAY and PEER_TEST_RELAY_2');
 
 const relaysOf = (page) => page.evaluate(() => (window.onderlingRelays ? window.onderlingRelays() : []));
+/** The first circle's roster as this page holds it: role + the addresses on each row (shortened), for a failure line. */
+const rosterRowsOf = (page) => page.evaluate(async () => {
+  const circles = (await window.onderlingCall('pinboard', 'listMyCircles', {}))?.circles ?? [];
+  const id = circles.map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id)).find(Boolean);
+  const r = id ? await window.onderlingCall('pinboard', 'listGroupMembers', { groupId: id }) : null;
+  return (r?.members ?? []).map((m) => ({ role: m.role, addrs: [m.circleAddress, ...(m.circleAddresses ?? [])].filter(Boolean).map((x) => String(x).slice(0, 10)) }));
+}).catch((e) => ({ error: String(e?.message ?? e) }));
 
 /**
  * Send in the open circle, and SAY WHICH BRANCH failed when it cannot. A bare `sendChat` timing out on the
@@ -129,8 +136,16 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
     // Both sides are still standing in a contact thread from the DM leg — this step is about the kring.
     await reopenCircle(A.page, /twee.?relays/i); await toChat(A.page);
     await sendInCircle(A.page, 'na de herstart');
-    expect(await waitForBubble(B.page, 'na de herstart')).toBe(true);
-    log('STEP5 after reload', 'PASS', 'extra relay redialled from the connection point; message arrived');
+    const arrived = await waitForBubble(B.page, 'na de herstart');
+    // When it does not arrive, say WHERE it stopped (it failed twice in one CI run and never locally): each side's
+    // relays and the roster row it holds for the other — a stale address on A's row for B, or B's circle address not
+    // (yet) bound on the relay A sends through, are different bugs.
+    const seen = arrived ? null : {
+      relaysA: await relaysOf(A.page), relaysB: await relaysOf(B.page),
+      rosterOnA: await rosterRowsOf(A.page), rosterOnB: await rosterRowsOf(B.page),
+    };
+    expect(arrived, `A's message after B's reload never reached B — ${JSON.stringify(seen)}`).toBe(true);
+    log('STEP5 after reload', 'PASS', `extra relay redialled from the connection point; message arrived; B holds ${JSON.stringify(seen ?? await relaysOf(B.page))}`);
   } finally {
     await teardown([A, B]);
   }

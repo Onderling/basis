@@ -16,6 +16,10 @@ import { PERSON_KEY_VAULT_KEY } from '@onderling/core';
 
 /** Where a device keeps its delegation blob (the seed it derives per-circle keys from, its record, its label). */
 export const DEVICE_DELEGATION_VAULT_KEY = 'device-delegation-seed';
+/** The persona's CIRCLE ROOT on this device (`{epoch, seed}`, JSON): the root of every per-circle key it presents, the
+ *  same on every full device of the persona. A device with the root derives it and keeps the epoch here; a device
+ *  enrolled without the root is handed it at its ceremony. */
+export const CIRCLE_ROOT_VAULT_KEY = 'circle-root';
 /** Which personas this device was HANDED at its ceremony (a JSON list of ids, in the default's slot): a delegated device
  *  runs exactly these besides the default — it holds no root to derive any other. */
 export const HELD_PERSONAS_VAULT_KEY = 'held-personas';
@@ -29,7 +33,7 @@ export const RECOVERY_SEAL_VAULT_KEY = 'recovery-seal-seed';
 export const RECOVERY_SEAL_LABEL = 'recovery-seal';
 
 /** The chat vault entries that belong to ONE persona. */
-export const PERSONA_SLOT_KEYS = Object.freeze(new Set(['agent-privkey', PERSON_KEY_VAULT_KEY, DEVICE_DELEGATION_VAULT_KEY]));
+export const PERSONA_SLOT_KEYS = Object.freeze(new Set(['agent-privkey', PERSON_KEY_VAULT_KEY, DEVICE_DELEGATION_VAULT_KEY, CIRCLE_ROOT_VAULT_KEY]));
 
 /**
  * The vault as one persona sees it.

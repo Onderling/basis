@@ -59,19 +59,15 @@ describe('Pinboard V1 — exportMyData', () => {
 });
 
 describe('Pinboard V1 — leaveGroup', () => {
-  it('records a kind:"group-leave" marker (no deletion by default)', async () => {
+  it('a leave writes no exit row (the lane\'s leave statement is its record) and deletes nothing by default', async () => {
     const bundle = await buildAgent();
     await callSkill(bundle.agent, 'postRequest',
       { text: 'paint', kind: 'ask', expectClaims: 0, timeoutMs: 1 }, ANNE);
 
     const r = await callSkill(bundle.agent, 'leaveGroup', { groupId: 'oosterpoort' }, ANNE);
-    expect(r.leaveMarkerId).toBeTruthy();
+    expect(r.error).toBeUndefined();
     expect(r.deletedItems).toBe(0);
-
-    const marker = await bundle.itemStore.getById(r.leaveMarkerId);
-    expect(marker.type).toBe('group-leave');
-    expect(marker.source.groupId).toBe('oosterpoort');
-    expect(marker.source.leftBy).toBe(ANNE);
+    expect((await bundle.itemStore.listOpen({ type: 'group-leave' })) ?? []).toEqual([]);
 
     // The original ask is still there.
     const open = await callSkill(bundle.agent, 'listOpenRequests', { kind: 'ask' }, ANNE);

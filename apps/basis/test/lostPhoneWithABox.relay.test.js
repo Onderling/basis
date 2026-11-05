@@ -180,13 +180,9 @@ describe('the phone is lost, and there is a box', () => {
     box = await enrolBox(dataDir, { ...env, HOME: dataDir, ONDERLING_PRIMARY_DEVICE: '1' }, offer.uri, phrase);
     // The new phone learns the re-enrolled box's address — its own row grows again.
     const mine = newPhone.agent.circleAddressFor(CIRCLE);
-    const grown = await until(async () => {
-      const rr = await newPhone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
-      const me = (rr?.members ?? []).find((m) => m.webid === newPhone.pubKey);
-      const others = (me?.circleAddresses ?? []).filter((a) => a !== mine);
-      return others.length ? others : null;
-    }, { timeout: 30_000, step: 250 });
-    expect(grown, 'the new phone never learned the re-enrolled box\'s address').toBeTruthy();
+    // the new phone learns the re-enrolled box in its device map (one address per persona per circle: not on the roster)
+    const grown = await until(async () => { const d = await newPhone.agent.ownDeviceAddressesOf('default'); return d.length ? d : null; }, { timeout: 30_000, step: 250 });
+    expect(grown, 'the new phone never learned the re-enrolled box in its device map').toBeTruthy();
 
     // A person writes to Frits — the same card, the same profile address — and the box takes it,
     // and hands it to the new phone.

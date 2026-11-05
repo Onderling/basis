@@ -44,9 +44,11 @@ describe('no default relay', () => {
 });
 
 describe('the browser tests are hermetic', () => {
-  it('no browser under test can resolve any host but this machine (both projects)', () => {
+  it('no browser under test can resolve any host but this machine (every project)', () => {
     const cfg = read('../../playwright.config.js');
     expect(cfg).toMatch(/MAP \* ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127\.0\.0\.1/);
-    expect(cfg.match(/launchOptions: HERMETIC_LAUNCH/g)?.length ?? 0).toBe(2);
+    const projects = cfg.match(/^\s+name: '[a-z-]+',$/gm)?.length ?? 0;
+    expect(projects, 'the config declares its projects').toBeGreaterThanOrEqual(2);
+    expect(cfg.match(/launchOptions: HERMETIC_LAUNCH/g)?.length ?? 0, 'every project launches hermetic').toBe(projects);
   });
 });

@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, createSignatureMemo } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -130,8 +130,12 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    */
   /** verifySpine THROWS on structurally-garbage input (e.g. a wrong-size signature) — a malicious peer must
    *  get a refusal, never an exception, so every verify on the receive path goes through this wrapper. */
+  // Verify-on-read verifies each distinct signed statement ONCE per rail: the memo keeps only the pure signature check
+  // (keyed by the statement's exact bytes, so a tampered stored statement misses and is refused); the chain, kind,
+  // circle and every binding below are re-decided on every read.
+  const signatures = createSignatureMemo();
   const safeVerify = (statement, circleId) => {
-    try { return verifySpine(statement, { expectedCircleId: circleId }); }
+    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature: signatures.verify }); }
     catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
   };
 
@@ -150,7 +154,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     if (!declaredKinds.includes(v.body.kind)) return { ok: false, reason: `undeclared kind: ${v.body.kind}` };
     const ref = v.body.payload?.authorRef;
     if (typeof ref !== 'string' || !ref) return { ok: false, reason: 'missing authorRef' };
-    if (!(await bindingOk(v.body.author, ref, circleId, v.body.kind, v.body.payload, v.body.subject))) return { ok: false, reason: 'unverifiable key-ref binding' };
+    if (!(await bindingOk(v.body.author, ref, circleId, v.body.kind, v.body.payload, v.body.subject, null, v.body.hash))) return { ok: false, reason: 'unverifiable key-ref binding' };
     return { ok: true, body: v.body };
   }
   async function ingestOne(circleId, statement) {
@@ -165,14 +169,20 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   }
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */
-  async function bindingOk(author, ref, circleId, kind = null, payload = null, subject = null, atSeq = null) {
+  async function bindingOk(author, ref, circleId, kind = null, payload = null, subject = null, atSeq = null, hash = null) {
+    // Self-binding: a statement signed with this device's own circle key, as its own self. Never enough for a CEREMONY
+    // kind — that binds only by the root's reveal (the binding verifier's rule), and a person's full devices share one
+    // circle key, so "signed with my key" includes a lost device of mine; the verifier is told it is OWN, so it checks
+    // the reveal against this self's own commitment (a device holds no row for itself where it founded the circle).
+    let own = false;
     try {
       const mine = await signerFor(circleId);
       const myId = mine?.identity ?? mine;
-      if (myId?.pubKey === author) return (mine?.ref ?? myId.pubKey) === ref;
-    } catch { /* fall through to the foreign resolver */ }
+      own = myId?.pubKey === author && (mine?.ref ?? myId.pubKey) === ref;
+    } catch { own = false; }
+    if (own && !isCeremonyKind(kind)) return true;
     if (typeof verifyBinding === 'function') {
-      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq })); } catch { return false; }
+      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq, hash, own })); } catch { return false; }
     }
     return false;   // no resolver → only self-signed statements fold (honest single-device degrade)
   }
@@ -199,7 +209,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (typeof ref !== 'string' || !ref) continue;
       const actor = b.payload.voter ?? b.payload.by ?? null;
       if (actor !== null && actor !== ref) continue;              // acting-as-someone-else → drop
-      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject, atSeq))) continue;  // unverifiable binding → drop
+      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject, atSeq, b.hash))) continue;  // unverifiable binding → drop
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);
@@ -219,7 +229,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    * key↔ref binding — and the AUTHOR IS RESOLVED TO ITS REF, because those folds' authority rules
    * (founders, self-authored leave, admin evict) live in ref space. Returns the disputed ref set alongside.
    */
-  async function readVerifiedBodies(circleId) {
+  async function readVerifiedBodies(circleId, { kinds = null } = {}) {
     const bodies = [];
     const seenByAuthorParent = new Map();
     const disputed = new Set();
@@ -240,6 +250,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (!v.ok) continue;
       const b = v.body;
       if (!declaredKinds.includes(b.kind)) continue;
+      if (Array.isArray(kinds) && !kinds.includes(b.kind)) continue;   // a narrowed read (the ceremony retirements alone)
       const ref = b.payload?.authorRef;
       if (typeof ref !== 'string' || !ref) continue;
       // The read side verifies with the SAME kind-aware rule as ingest (decided 2026-08-20): what
@@ -247,7 +258,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       // stricter signer (membership's ceremony rule) is held to it on every re-read too. The one
       // thing a re-read knows that ingest did not: WHEN this statement landed here (`atSeq`), so an
       // address retired since then still binds for what it signed before the retirement landed.
-      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject, atSeq))) continue;
+      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject, atSeq, b.hash))) continue;
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);

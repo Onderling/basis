@@ -122,10 +122,14 @@ describe('the person key rotates in the revoke ceremony', () => {
     // the lost device: retired, never handed the new seed, still on v1
     await new Promise((res) => setTimeout(res, 500));
     expect(A3.agent.personKey()).toEqual(v1);
-    expect((await rowFor(B, A.pubKey)).circleAddresses ?? []).not.toContain(A3.agent.circleAddressFor(GROUP));
+    // The lost device is a FULL device: it held the persona's circle root, so the ceremony RE-KEYS — the persona moves to
+    // a new address, which Bea's row carries; the lost device is left at the old one
+    expect(A3.agent.circleAddressFor(GROUP)).not.toBe(A.agent.circleAddressFor(GROUP));
+    expect(await until(async () => { const row = await rowFor(B, A.pubKey); return [row?.circleAddress, ...(row?.circleAddresses ?? [])].includes(A.agent.circleAddressFor(GROUP)) ? true : null; }, { timeout: 15000, step: 200 }),
+      'Bea\'s row does not carry the persona\'s new address').toBe(true);
   }, 60_000);
 
-  it('the lost device cannot announce a key of its own — a person-key statement without the root reveal binds nowhere', async () => {
+  it('the lost device cannot announce a key of its own — a person-key statement without the root reveal binds nowhere, not even on a sibling that shares its circle key', async () => {
     const forged = await A3.agent.membershipRail.append(GROUP, { kind: PERSON_KEY_KIND, subject: A.pubKey, payload: { version: 3, pubKey: 'THIEF' }, actor: A.pubKey });
     if (forged?.statement) {
       await B.agent.membershipRail.ingest(GROUP, forged.statement).catch(() => {});

@@ -2,6 +2,12 @@
 
 import { translatorOr } from '../locales/translatorOr.js';
 import { replyLine } from './replyLine.js';
+
+/** An op that answers a refusal with a code of its own (it did not throw): the codes with a sentence of their own. */
+const OP_REFUSAL_KEYS = Object.freeze({
+  'self-required': 'circle.errors.self_required',
+  'no-such-persona': 'circle.errors.no_such_persona',
+});
 //
 // The circle stream renders plain chat bubbles (no rich cards), so a dispatched command surfaces as a
 // one-line confirmation; the real effect (task added/completed, …) propagates through the substrate to
@@ -28,6 +34,11 @@ export function circleReplyText(reply, { verb, t } = {}) {
   const p = (p0 && typeof p0 === 'object' && p0.via === 'generic' && p0.result && typeof p0.result === 'object')
     ? p0.result
     : p0;
+  // A result that says it FAILED (`ok: false` / `granted: false` with a code) is worded as a failure — never as "done":
+  // a known code in its own sentence, any other with the failed line and the code.
+  if (p && typeof p === 'object' && (p.ok === false || p.granted === false) && typeof p.error === 'string' && p.error) {
+    return OP_REFUSAL_KEYS[p.error] ? tr(OP_REFUSAL_KEYS[p.error]) : tr('circle.bot.failed', { msg: p.error });
+  }
   // An op of the families the household bot words (`replyLine`): the same line here as on the bot — web, mobile and
   // the box read one table. Any other op keeps the bubble below.
   const line = reply?.opId ? replyLine(p, { opId: reply.opId, t: tr }) : null;

@@ -16,15 +16,24 @@
  * The sibling-address gate would have been weaker AND racy: the same ceremony retires addresses, and a survivor's
  * roster may fold that retire before its gate has read the hand-over's sender (measured 2026-09-16).
  *
+ * A SELF IN NO CIRCLE has no commitment to verify a circle reveal against, and still rotates at a revoke (its old key is
+ * the one the lost device holds). Its hand-over carries a SELF reveal instead: the same authority's signature over
+ * (this kind, the person, version, the key), its commitment taken over the person instead of a circle — and since
+ * every device of the self holds that authority's public key, the reveal proves the ceremony but not the carrier.
+ * So this path is narrower than the circle path: it is taken only from a live sibling, and only for a version
+ * above the one held.
+ *
  * A landed key is stored through the monotonic vault write (a lower version never lands) and takes effect at
  * once. A sibling offline during the ceremony gets it by hold-forward, or asks on connect
  * (`requestFromSiblings`, the same connect-time kick the grants lane and the known-peers sync have); the answer
  * carries the same reveals, kept beside the key.
  */
 import { makeSiblingCarry } from './siblingCarry.js';
-import { b64encode, b64decode, verifyCeremonyReveal, personKeyFacts, personKeyPubKeyB64 } from '@onderling/core';
+import { b64encode, b64decode, verifyCeremonyReveal, ceremonyCommitment, personKeyFacts, personKeyPubKeyB64 } from '@onderling/core';
 
 export const PERSON_KEY_CARRY = 'device-person-key';
+/** The kind a self reveal signs — distinct from the circle reveal's, so neither can stand in for the other. */
+export const PERSON_KEY_SELF_REVEAL = 'device-person-key-self';
 export const PERSON_KEY_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-person-key-request' });
 
 /**
@@ -37,10 +46,11 @@ export const PERSON_KEY_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-pers
  *   monotonic write; true when it landed
  * @param {string} a.selfPubKey  the person (the profile's chat pubKey — the subject every reveal names)
  * @param {(circleId: string) => (string|null)} a.ownCommitmentFor  this person's ceremony commitment in a circle
+ * @param {() => (string|null)} [a.ownAuthorityPubKey]  this self's authority public key (b64): what a self reveal verifies against
  * @param {(info: { from: string, version: number }) => void} [a.onLanded]
  * @param {(reason: string, from: string) => void} [a.onRefused]
  */
-export function createPersonKeySync({ siblings, sendToPeer, current, store, selfPubKey, ownCommitmentFor, onLanded = null, onRefused = null } = {}) {
+export function createPersonKeySync({ siblings, sendToPeer, current, store, selfPubKey, ownCommitmentFor, ownAuthorityPubKey = () => null, onLanded = null, onRefused = null } = {}) {
   if (typeof siblings !== 'function') throw new Error('personKeySync: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('personKeySync: `sendToPeer` is required');
   if (typeof current !== 'function') throw new Error('personKeySync: `current` is required');
@@ -55,11 +65,13 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
     try { addrs = (await siblings()) ?? []; } catch { return false; }
     return addrs.includes(fromAddr);
   }
-  const wireOf = (k) => (k && k.reveals && Object.keys(k.reveals).length
+  const hasSelfReveal = (k) => !!(k?.selfReveal && typeof k.selfReveal === 'object');
+  const wireOf = (k) => (k && ((k.reveals && Object.keys(k.reveals).length) || hasSelfReveal(k))
     ? {
       // the SELF this key is: a device holds several (the general persona and its personas), each with its own key —
       // the receiver routes by it and admits only under that self's own commitment (`routePersonKeySync`)
-      subtype: PERSON_KEY_CARRY, subject: selfPubKey, version: k.version, seed: b64encode(k.seed), reveals: k.reveals,
+      subtype: PERSON_KEY_CARRY, subject: selfPubKey, version: k.version, seed: b64encode(k.seed), reveals: k.reveals ?? {},
+      ...(hasSelfReveal(k) ? { selfReveal: k.selfReveal } : {}),
       // the chain and the older seeds ride along: a survivor answers a contact's pull, and opens what was sealed to an older version
       links: Array.isArray(k.links) ? k.links : [],
       previous: (Array.isArray(k.previous) ? k.previous : []).map((p) => ({ version: p.version, seed: b64encode(p.seed) })),
@@ -69,7 +81,9 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
     : null);
   const parse = (payload) => {
     if (!Number.isInteger(payload?.version) || payload.version < 1 || typeof payload?.seed !== 'string') return null;
-    if (!payload.reveals || typeof payload.reveals !== 'object') return null;
+    const reveals = payload.reveals && typeof payload.reveals === 'object' ? payload.reveals : {};
+    const selfReveal = payload.selfReveal && typeof payload.selfReveal === 'object' ? payload.selfReveal : null;
+    if (!Object.keys(reveals).length && !selfReveal) return null;
     let seed = null;
     try { seed = b64decode(payload.seed); } catch { return null; }
     if (!(seed instanceof Uint8Array) || seed.length !== 32) return null;
@@ -78,7 +92,8 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
       try { const ps = b64decode(p.seed); if (Number.isInteger(p.version) && ps instanceof Uint8Array && ps.length === 32) previous.push({ version: p.version, seed: ps }); } catch { /* skip */ }
     }
     return {
-      version: payload.version, seed, reveals: payload.reveals, links: Array.isArray(payload.links) ? payload.links : [], previous,
+      version: payload.version, seed, reveals, links: Array.isArray(payload.links) ? payload.links : [], previous,
+      ...(selfReveal ? { selfReveal } : {}),
       ...(typeof payload.linkKeyPub === 'string' && payload.linkKeyPub ? { linkKeyPub: payload.linkKeyPub } : {}),
     };
   };
@@ -94,6 +109,19 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
       if (verifyCeremonyReveal(reveal, { circleId, kind: PERSON_KEY_CARRY, subject: selfPubKey, authorRef: selfPubKey, commitment, facts })) return true;
     }
     return false;
+  };
+  /** The self reveal verifies against this self's own authority, over the person instead of a circle. */
+  const selfSpoke = (k) => {
+    if (!k.selfReveal) return false;
+    let authority = null;
+    try { authority = ownAuthorityPubKey(); } catch { authority = null; }
+    if (typeof authority !== 'string' || !authority) return false;
+    let pubKey = null;
+    try { pubKey = personKeyPubKeyB64(k.seed); } catch { return false; }
+    return verifyCeremonyReveal(k.selfReveal, {
+      circleId: selfPubKey, kind: PERSON_KEY_SELF_REVEAL, subject: selfPubKey, authorRef: selfPubKey,
+      commitment: ceremonyCommitment(authority, selfPubKey), facts: personKeyFacts({ version: k.version, pubKey }),
+    });
   };
 
   return {
@@ -120,7 +148,11 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
         if (payload.subject !== selfPubKey) { refuse('another-self', fromAddr); return; }
         const k = parse(payload);
         if (!k) { refuse('malformed', fromAddr); return; }
-        if (!rootSpoke(k)) { refuse('no-root-reveal', fromAddr); return; }
+        if (!rootSpoke(k)) {
+          if (!selfSpoke(k)) { refuse('no-root-reveal', fromAddr); return; }
+          if (!((current()?.version ?? 0) < k.version)) { refuse('not-newer', fromAddr); return; }
+          if (!(await fromOwnDevice(fromAddr))) { refuse('not-a-sibling', fromAddr); return; }
+        }
         let landed = false;
         try { landed = await store(k); } catch { refuse('store-failed', fromAddr); return; }
         if (landed) { try { onLanded?.({ from: fromAddr, version: k.version }); } catch { /* observability never throws */ } }

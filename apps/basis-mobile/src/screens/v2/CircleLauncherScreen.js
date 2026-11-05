@@ -18,6 +18,7 @@ import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../../../basis/src/v2/vandaag.js';
 import { createScreenHead } from '../../../../basis/src/v2/screenHead.js';
+import { watchCircleChanges } from '../../../../basis/src/v2/headCircleWatch.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
@@ -43,13 +44,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subscribeToNetworkChange as subscribeAppState, combineSources } from '@onderling/react-native';
 import { createPersonClock } from '../../../../basis/src/v2/personClock.js';
 import {
-  loadCircles, circleSourcesFromAgent, makeResolvingCallSkill,
+  loadCircles, loadRemovedCircles, withLeavingMarks, circleSourcesFromAgent, makeResolvingCallSkill,
   loadCircleItems, quickCreateCircle, setActiveCircle, normalizeCircleMembers,
   circleFilesFromListFiles,
   // 1:1-bot chat gate — the assistant-header strip shows ONLY in a genuine 1:1-with-a-bot chat.
   oneToOneBotLabel,
   // per-circle feature-flag consumption.
-  isFeatureEnabled,
+  isFeatureEnabled, composerGate,
   // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   // per-circle activity preview + unread badge.
@@ -568,9 +569,14 @@ export default function CircleLauncherScreen({
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [circles, setCircles] = useState([]);
+  // the circles an admin removed this person from: marked, read-only tiles until closed — never in `circles`, which
+  // sharing, invites and presence read
+  const [removedCircles, setRemovedCircles] = useState([]);
   // the boot timeline's last steps: the launcher mounted, and the first time it had circles read from the agent
   useEffect(() => { bootMark('launcher.mount', { bundle: !!bundle }); }, []);
   const circlesMarked = useRef(false);
+  // circles left here whose leave the main device has not signed yet (id → { held }): the tile says so (web parity)
+  const leavingCircles = useRef(new Map());
   // The persona the Me tab's pointers open (the general one — there is no circle context here).
   const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -961,7 +967,8 @@ export default function CircleLauncherScreen({
   const selvesOn = useMemo(() => (heldSelves.length ? activeSelves(screensBook ?? {}, heldSelves) : ['default']), [screensBook, heldSelves]);
   const profileIdOfCircle = useCallback((cid) => { try { return bundle?.agent?.profileIdOf?.(cid) ?? 'default'; } catch { return 'default'; } }, [bundle]);
   /** The circles of the selves ticked in the header (all of them with one self). */
-  const circlesShown = useMemo(() => (heldSelves.length > 1 ? circlesInSet(circles, selvesOn, profileIdOfCircle) : circles), [circles, heldSelves, selvesOn, profileIdOfCircle]);
+  // a circle being left is marked at render time (web parity), so a load that started before the mark cannot drop it
+  const circlesShown = useMemo(() => withLeavingMarks(heldSelves.length > 1 ? circlesInSet(circles, selvesOn, profileIdOfCircle) : circles, leavingCircles.current), [circles, heldSelves, selvesOn, profileIdOfCircle]);
   // with one self the avatar is the person's editor; with several it is the switcher
   const openMyEditor = useCallback(() => {
     if (heldSelves.length > 1) { setSwitcherOpen(true); return; }
@@ -988,6 +995,7 @@ export default function CircleLauncherScreen({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
         myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
         circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
+        spineGate: bundle?.agent?.spineGate ?? null,   // spine acts only from the point
       });
       await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason });
     } catch { /* best-effort */ }
@@ -1324,7 +1332,12 @@ export default function CircleLauncherScreen({
     if (typeof agent?.onCircleChanged !== 'function') return undefined;
     const head = createScreenHead({
       materialize: () => materializeVandaagNow(),
-      subscribe: [(fn) => agent.onCircleChanged(fn), ...(typeof eventLog?.subscribe === 'function' ? [(fn) => eventLog.subscribe(fn)] : [])],
+      // a change in a circle the list does not hold yet (joined elsewhere, through an offer, by an op) re-reads the list first
+      subscribe: [watchCircleChanges({
+        onCircleChanged: (fn) => agent.onCircleChanged(fn),
+        knows: (cid) => (circlesRef.current || []).some((c) => c?.id === cid),
+        refresh: () => loadRef.current?.(),
+      }), ...(typeof eventLog?.subscribe === 'function' ? [(fn) => eventLog.subscribe(fn)] : [])],
     });
     const off = head.onUpdate((blocks) => {
       if (viewNow.current !== 'screens') return;
@@ -1335,7 +1348,24 @@ export default function CircleLauncherScreen({
     return () => { off(); head.dispose(); if (vandaagHead.current === head) vandaagHead.current = null; };
   }, [bundle, eventLog, materializeVandaagNow]);
   // the circles-with-news block counts what is not yet seen, and the marks live in AsyncStorage, not in a store
-  useEffect(() => { vandaagHead.current?.invalidate(); }, [seenAt]);
+  useEffect(() => { vandaagHead.current?.invalidate(); mijHead?.invalidate(); }, [seenAt]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // MIJ'S HEAD (web parity): Me's blocks kept current by the circles' items, the event log and the agent registry (a
+  // profile's facts are the registry's); CircleProfileScreen lands on it with its own reader. Only a TAB landing reads
+  // the head as it is (`mijByTab`): every other way into Mij follows an act and reads again.
+  const [mijHead, setMijHead] = useState(null);
+  const mijByTab = useRef(false);
+  useEffect(() => {
+    const agent = bundle?.agent;
+    if (typeof agent?.onCircleChanged !== 'function') return undefined;
+    const head = createScreenHead({ subscribe: [
+      (fn) => agent.onCircleChanged(fn),
+      ...(typeof eventLog?.subscribe === 'function' ? [(fn) => eventLog.subscribe(fn)] : []),
+      ...(typeof agent.onRegistryChanged === 'function' ? [(fn) => agent.onRegistryChanged(fn)] : []),
+    ] });
+    setMijHead(head);
+    return () => { head.dispose(); setMijHead((h) => (h === head ? null : h)); };
+  }, [bundle, eventLog]);
+  useEffect(() => { if (view !== 'profile') mijHead?.hide(); }, [view, mijHead]);
   useEffect(() => {
     if (view !== 'screens') {
       vandaagHead.current?.hide();   // not shown: a change waits for the next landing
@@ -1414,6 +1444,7 @@ export default function CircleLauncherScreen({
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);
+      setRemovedCircles(await loadRemovedCircles(sources));
       if (!circlesMarked.current) { circlesMarked.current = true; bootMark('launcher.circles', { n: _l.length }); }
       // G13 — feed the bundle's per-circle relay registration fresh ids (fire-and-forget, self-catching).
       bundle?.registerCirclePresence?.(_l.map((c) => c?.id).filter(Boolean));
@@ -1432,6 +1463,9 @@ export default function CircleLauncherScreen({
   // Live circle ids for the provisioner's existence check without re-arming the boot effect.
   const circlesRef = useRef(circles);
   circlesRef.current = circles;
+  // Vandaag's head re-reads the circle list through this when a circle it does not know changes (headCircleWatch)
+  const loadRef = useRef(load);
+  loadRef.current = load;
   // Provision the default HELP circle (you + the Onderling-bot) ONCE, through the real mobile create path
   // (quickCreateCircle), mirroring web's maybeProvisionHelpCircle. Idempotent + first-run-guarded via the
   // shared provisionHelpCircle orchestrator; best-effort — a failure leaves the marker unset so it retries
@@ -1718,7 +1752,7 @@ export default function CircleLauncherScreen({
             // address de-registration at all, which web has had since J-R4.
             if (typeof bundle?.callSkill === 'function') {
               try {
-                await leaveCircleLocally({
+                const left = await leaveCircleLocally({
                   agent: bundle.agent, callSkill: bundle.callSkill,
                   circleId: cid,
                   unregister: () => unregisterCircleAddressesOnRelays({
@@ -1726,6 +1760,7 @@ export default function CircleLauncherScreen({
                     circleAddressFor: (id) => bundle.agent?.circleAddressFor?.(id) ?? null,
                   }),
                 });
+                if (left?.forwarded) leavingCircles.current.set(cid, { held: left.held === true });
               } catch (err) {
                 console.warn('[circleLauncher] leaveGroup failed:', err?.message ?? err);
               }
@@ -1810,7 +1845,7 @@ export default function CircleLauncherScreen({
     else if (id === 'circles') { setActiveCircle(null); setSelected(null); setView('list'); }
     else if (id === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
     else if (id === 'contacten') { setContactThread(null); setView('contacten'); }
-    else if (id === 'mij') setView('profile');   // S2 — Mij is now the profile
+    else if (id === 'mij') { mijByTab.current = true; setView('profile'); }   // S2 — Mij is now the profile
     // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
     AsyncStorage.setItem(LAST_TAB_STORAGE_KEY, id).catch(() => {});
   };
@@ -2192,7 +2227,7 @@ export default function CircleLauncherScreen({
             </Pressable>
             {/* the "+" is the floating button on every tab now (WithTabBar) */}
           </View>
-          <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
               onMore={expandedBlockId ? null : setExpandedBlockId}
               onAction={(a) => {
@@ -2233,7 +2268,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} head={mijHead} landedByTab={mijByTab} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -2295,9 +2330,9 @@ export default function CircleLauncherScreen({
   // My data, and a settings group's screen: ONE element with every section's handlers — a group passes `only`,
   // `groupTitle` and its own back (the gear's home), and paints just its declared sections.
   const myDataScreen = (extra = {}) => (
-    <CircleMyDataScreen frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+    <CircleMyDataScreen selvesOn={selvesOn} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
-          personClock={personClockRef.current} {...extra} />
+          personClock={personClockRef.current} selfSet={{ held: heldSelves, on: selvesOn }} {...extra} />
   );
   // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {
@@ -2395,6 +2430,7 @@ export default function CircleLauncherScreen({
       <CircleGovernanceScreen
         callSkill={bundle?.callSkill}
         circleIdentityFor={bundle?.agent?.circleIdentityFor ?? null}
+        spineGate={bundle?.agent?.spineGate ?? null}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         eventLog={eventLog}
         getPolicy={(cid) => policyStore.get(cid)}
@@ -2625,10 +2661,19 @@ export default function CircleLauncherScreen({
       <>
       <CircleDetail
         pagesBook={screensBook}
+        onCloseRemoved={async () => {
+          const id = selected?.id;
+          if (!id) return;
+          const r = await bundle?.callSkill?.('pinboard', 'dismissRemovedCircle', { groupId: id }).catch((err) => ({ ok: false, error: err?.message }));
+          if (r?.ok !== true) { console.warn('[circle] closing a removed circle failed:', r?.error ?? r); return; }
+          setRemovedCircles((rs) => rs.filter((c) => c.id !== id));
+          closeCircle();
+        }}
         onPinEntry={(e) => { if (selected?.id) runScreenOp('screen-pin', { kind: 'bookmark', circleId: selected.id, appOrigin: e.appOrigin, opId: e.opId }); }}
         openOp={pendingPinOpen} onOpenOpDone={() => setPendingPinOpen(null)}
         selfProfileId={profileIdOfCircle(selected?.id)}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
+        unreachableMembersOf={(cid) => Promise.resolve(bundle?.agent?.unreachableMembersOf?.(cid) ?? [])}
         circle={selected}
         deliveryStateMap={deliveryStateMap}
         registerCircleBotSink={registerCircleBotSink}
@@ -2781,6 +2826,12 @@ export default function CircleLauncherScreen({
                 pinnedMap, mutedMap, onOpenMenu: openTileMenu,
               }, styles)
             )}
+            {/* a circle an admin removed this person from: kept, marked, read-only, until they close it from inside */}
+            {removedCircles.map((c) => (
+              <View key={`removed-${c.id}`} testID={`circle-launcher-removed-${c.id}`}>
+                <LauncherTile circle={c} onOpen={openCircle} />
+              </View>
+            ))}
             {/* OPBERGEN — the fold: put away (every device) and not on this device (the kring opt-out), each saying which */}
             {bySight.folded.length > 0 ? (
               <View testID="circle-launcher-sight-fold">
@@ -3002,13 +3053,17 @@ function renderLauncherGroups(circles, {
 function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted = false, onOpen, onLongPress, onProposals = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const subtitle = (preview && preview.subtitle)
-    ? preview.subtitle
-    : (c.memberCount != null ? t('circle.members', { count: c.memberCount }) : null);
+  const subtitle = c.removed
+    ? t('circle.membership.removed_note')
+    : c.leaving
+      ? t(c.leaving.held ? 'circle.membership.leaving_note_held' : 'circle.membership.leaving_note')
+    : (preview && preview.subtitle)
+      ? preview.subtitle
+      : (c.memberCount != null ? t('circle.members', { count: c.memberCount }) : null);
   const unread = preview?.unread ?? 0;
   return (
     <Pressable
-      style={[styles.tile, isPinned && styles.tilePinned]}
+      style={[styles.tile, isPinned && styles.tilePinned, c.removed && styles.tileRemoved]}
       accessibilityRole="button"
       onPress={() => onOpen(c)}
       onLongPress={typeof onLongPress === 'function' ? () => onLongPress(c) : undefined}
@@ -3017,9 +3072,10 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
       <View style={styles.tileBody}>
         <Text style={styles.tileName}>{c.name}</Text>
         {subtitle ? (
-          <Text style={styles.tileMeta} numberOfLines={1}>{subtitle}</Text>
+          <Text style={styles.tileMeta} numberOfLines={c.removed ? 3 : 1}>{subtitle}</Text>
         ) : null}
       </View>
+      {c.removed ? <Text style={styles.tileRemovedMark} testID={`circle-tile-removed-${c.id}`}>{t('circle.membership.removed_mark')}</Text> : null}
       {unread > 0 ? (
         <View
           style={styles.tileUnread}
@@ -3089,6 +3145,8 @@ function CircleDetail({
   // Reads this circle's verified membership statements (one function, not the bundle). Absent → the
   // removal line still says something true, it just cannot name who did it.
   readMembershipStatements = null,
+  // The members this device has no address for past the re-tell window (one function, not the bundle): said on their row.
+  unreachableMembersOf = null,
   eventLog,
   circles = [],
   recipeStore = null, pagesBook = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
@@ -3098,6 +3156,8 @@ function CircleDetail({
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost, onReportMessage,
   // A reply to a post persists into (and opens) the poster's contact thread — the launcher owns both.
   contactChannel = null, notePeer = null, identityOf = null, onOpenContact = null,
+  // a circle an admin removed this person from: the close (`dismissRemovedCircle`), offered where the composers were
+  onCloseRemoved = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -3217,6 +3277,7 @@ function CircleDetail({
   // for sender labels the moment it paints, not first when MEMBERS is opened.
   const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
   const [tabMembers, setTabMembers] = useState(null);
+  const [unreachable, setUnreachable] = useState(() => new Set());
   // The RAW rows the same load returns. `normalizeCircleMembers` is the member-list projection and
   // drops the acknowledgement flag; the caretaker notice is the one reader that needs it.
   const [rosterRows, setRosterRows] = useState(null);
@@ -3352,7 +3413,9 @@ function CircleDetail({
     () => composerCommands.suggest(composerText), [composerCommands, composerText],
   );
   // Permission gate (classic shell's `allowCommands` analog): chat disabled for this circle ⇒ read-only.
-  const canPost = isFeatureEnabled(policy, 'chat');
+  // the shared gate: chat off, or a circle an admin removed me from (read-only, with the close)
+  const gate = composerGate(policy, circle);
+  const canPost = gate.canPost;
   // per-circle bottom tabs derived from policy.features.
   const tabs = useMemo(() => buildCircleTabs(policy, t), [policy]);
   const [activeTab, setActiveTab] = useState(DEFAULT_CIRCLE_TAB);
@@ -3395,6 +3458,9 @@ function CircleDetail({
         mem = normalizeCircleMembers(res);
       } catch { /* keep empty */ }
       if (alive) { setTabMembers(mem); setRosterRows(raw); }
+      if (typeof unreachableMembersOf === 'function') {
+        try { const far = await unreachableMembersOf(circle.id); if (alive) setUnreachable(new Set(far ?? [])); } catch { /* the line is a courtesy */ }
+      }
       // The person-mute set, resolved to actor refs against this roster (web parity: the chat
       // projection HIDES these — muted messages land, unmute restores). Rides the same effect because
       // the key→ref resolution needs the roster; `membersReloadTick` refreshes both together.
@@ -4666,6 +4732,7 @@ function CircleDetail({
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see pinboardCall above).
           <CircleNoticeboard callSkill={pinboardCall} onPinboardEvent={onPinboardEvent} refreshKey={tabRetap} media={circleMedia} selfProfileId={selfProfileId}
+            readOnlyNote={gate.canClose ? t(gate.noteKey) : null} onCloseRemoved={gate.canClose ? onCloseRemoved : null}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}
@@ -4750,6 +4817,8 @@ function CircleDetail({
                         never a borrowed reason. web≡mobile. */}
                     {/* A BOT on the roster (a member that says it is a function) — said on its row. web≡mobile. */}
                     {m.bot ? <Text style={styles.memberRole} testID="member-bot" numberOfLines={1}>{t('circle.members_tab.bot')}</Text> : null}
+                    {/* NOT REACHABLE YET — no address for them here past the re-tell window; heals by itself. web≡mobile. */}
+                    {unreachable.has(m.id) ? <Text style={styles.memberRole} testID="member-not-reachable">{t('circle.membership.not_reachable', { name: revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).primary })}</Text> : null}
                     {m.role && m.role !== 'member' ? (
                       <View style={styles.memberRoleLine}>
                         <Text style={styles.memberRole} numberOfLines={1}>{t(`circle.admin.role.${m.role}`)}</Text>
@@ -4863,7 +4932,7 @@ function CircleDetail({
             </View>
             {listScreenData?.shape === 'record' ? (
               /* a record-shaped DETAIL screen (read-only key→value, web parity). */
-              <ScrollView>
+              <ScrollView keyboardShouldPersistTaps="handled">
                 <CircleRecordScreen record={listScreenData.record} activity={listScreenData.activity ?? null} />
               </ScrollView>
             ) : listScreenData ? (
@@ -4896,7 +4965,7 @@ function CircleDetail({
                   : undefined}
               />
             ) : (
-              <ScrollView ref={panelScrollRef}>
+              <ScrollView keyboardShouldPersistTaps="handled" ref={panelScrollRef}>
                 <View ref={panelContentRef} collapsable={false}>
                   <CircleScreenView blocks={panelBlocks} highlightRef={screenPanel?.highlightRef}
                     highlightRowRef={highlightRowRef} onHighlightLayout={scrollPanelToHighlight}
@@ -4964,9 +5033,14 @@ function CircleDetail({
       {viewMode !== 'screen' && activeTab === 'noticeboard' ? null
       : viewMode !== 'screen' && !canPost ? (
         /* Permission gate — chat disabled for this circle; read-only note in place of the composer. */
-        <Text style={styles.composerDisabled} testID="circle-detail-composer-disabled">
-          {t('circle.view.chat_disabled')}
-        </Text>
+        <View>
+          <Text style={styles.composerDisabled} testID="circle-detail-composer-disabled">
+            {t(gate.noteKey ?? 'circle.view.chat_disabled')}
+          </Text>
+          {gate.canClose && typeof onCloseRemoved === 'function' ? (
+            <Btn variant="primary" testID="close-removed-circle" label={t('circle.membership.removed_close')} onPress={onCloseRemoved} />
+          ) : null}
+        </View>
       ) : viewMode !== 'screen' ? (
       <>
         {/* Slash-command auto-suggest — sits above the composer, mirrors the web dropdown. Tap a row
@@ -5512,7 +5586,7 @@ function ConnectionPointsScreen({
       {points.length === 0 ? (
         <Text style={styles.muted}>{t('circle.nearbyScreen.points_empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
           {points.map((point) => (
             <View key={point.url} style={styles.row} testID={`point-${point.url}`}>
               <Text style={styles.rowName}>{point.url}</Text>
@@ -6267,7 +6341,7 @@ function MyThingsScreen({ files = [], onBack }) {
       {files.length === 0 ? (
         <Text style={styles.muted}>{t('circle.folio.my_things_empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
           {files.map((file) => (
             <View key={file.id} style={styles.row} testID={`mythings-row-${file.id}`}>
               <Text style={styles.rowName}>{file.name}</Text>
@@ -6324,6 +6398,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   tileBody:   { flex: 1, minWidth: 0 },
   tileName:   { fontSize: 14, fontWeight: '600', color: theme.color.ink },
   tileMeta:   { fontSize: 11, color: theme.color.inkSoft, marginTop: 2 },
+  tileRemoved: { opacity: 0.75 },
+  tileRemovedMark: { fontSize: 12, color: theme.color.inkSoft, borderWidth: 1, borderColor: theme.color.inkSoft, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   // unread badge on the tile.
   tileUnread: {
     minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11,

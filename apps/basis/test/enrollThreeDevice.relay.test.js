@@ -70,7 +70,7 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
     expect(A2.pubKey).toBe(A.pubKey);                       // ONE member…
     const addrA  = A.agent.circleAddressFor(GROUP);
     const addrA2 = A2.agent.circleAddressFor(GROUP);
-    expect(addrA2).not.toBe(addrA);                         // …with per-DEVICE circle addresses
+    expect(addrA2).toBe(addrA);                             // …with ONE address per circle (the persona's)
 
     // ── A′ reaches the world: relay + circle binding (production boot acts). The circle id and
     //    B's address are handed over — the registry/QR-offer's role, not this walk's subject. ──

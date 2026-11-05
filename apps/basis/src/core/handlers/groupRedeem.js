@@ -119,6 +119,9 @@ export function makeHandleGroupRedeemRequest({
           ? await ownDisplayFor(groupId)
           : await ownDisplayInCircle(groupId, { callSkill, circleAddressFor });
         if (typeof display === 'string' && display) reply.confirmedByDisplay = display;
+        // …and the join this admin just signed for them: a joiner who left no longer hears the circle's fan, so the
+        // statement that lets its own fold count it in again rides back with the answer (the joiner's rail verifies it).
+        if (result.joinStatement?.body && result.joinStatement?.sig) reply.joinStatement = result.joinStatement;
       }
     } catch (err) {
       reply = { error: err?.message ?? String(err) };

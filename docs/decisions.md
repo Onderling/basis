@@ -1266,3 +1266,26 @@ open question (the person, the admins, the group).
 
 **Where.** `packages/core/src/security/rosterFold.js` (`equivocators` returns the fork siblings; `forkAt` / the
 removal in the depth loop); spec in `test/rosterFold.test.js`.
+
+## 2026-10-31 — The stable point: one address per persona per circle, spine statements only from the point (Frits)
+
+A member's devices used to hold a circle address each, so co-members saw a device count, a revoke re-keyed the circle,
+and two devices signing at once forked the member's chain. Rulings. (1) **One address per persona per circle.** The
+per-circle key derives from the persona's circle root (root → persona → circle, epoched), not from a device seed; every
+FULL device of the persona (a phone, a companion) holds it, a LIGHT device (a web login, a borrowed laptop) does not
+and works through the point. Co-members see one member, one address. (2) **The point.** One device per persona signs
+the circle's SPINE statements (membership, role, key, governance): the companion if there is one, otherwise the device
+the person chose as main; the first device writes itself as point when a second enrols, and the "main device" tap moves
+it. The point is its own record, apart from the primary contact address. A device without the circle root cannot be the
+point. (3) **Spine statements only from the point.** The other devices hand the ACT (kind, subject, payload — never key
+material, never an identity of their own choosing) to the point over the own-devices lane; the point signs it as the
+member, on its own head, and fans it. Chat and items stay any-device (they are not chained). An act waits for an
+offline point and is re-sent for seven days on connect and when the point moves; the point remembers an act id for the
+same seven days, so a re-send is signed once. Past seven days the act is dropped and the person is told it was not sent.
+A double sign after a forgotten id is accepted as the cheaper failure: the acts settle the same applied twice, on one key
+and one head. (4) **Revoke.** A light device: stop its fan, drop its delegation, no re-key. A full device: the ceremony
+re-keys (only the remaining full devices get the new epoch).
+
+**This is a convention, not an enforcement** (the enforceability test): a STOLEN full device that ignores rule (3) can
+fork the shared key on purpose. By the fork rule (2026-09-25) the person then loses standing from that depth and is told
+— the same as a stolen per-device key before this — and the re-key plus an admin's re-admit is the way back.

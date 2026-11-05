@@ -6,10 +6,8 @@
  */
 import { expect } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
 import { startJourneyRelay } from './testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown } from './pairRealAgents.js';
-import { ownAnnouncementFor } from '../../src/v2/circleAddressAnnounce.js';
+import { bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown, shareDeviceRecords } from './pairRealAgents.js';
 import { EventLog } from '../../src/eventLog.js';
 
 // The enrolling device's first words to its sibling speak as the PERSON (its per-circle address is on nobody's roster yet).
@@ -37,26 +35,12 @@ export async function bootAnnaTwoDevices({ group, agentOpts = {} }) {
   await connectNodesOverRelay([A2], { relayUrl });
   await bindCircleAddresses([A2], group);
 
-  const announce = async (from, to) => {
-    await from.agent.sendPeerMessage(to.agent.circleAddressFor(group), {
-      type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: group,
-      msgId: `announce-${from.label}-${to.label}`, ts: Date.now(),
-      announcements: [ownAnnouncementFor({ agent: from.agent, circleId: group })],
-    }, SEND);
-  };
-  await announce(A2, A);
-  await announce(A, A2);
-  await announce(A2, B);
-  const knows = (node, webid, otherAddr) => until(async () => {
-    const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: group });
-    const row = (res?.members ?? []).find((m) => m.webid === webid);
-    return row?.circleAddresses?.includes(otherAddr) ? row : null;
-  }, { timeout: 20000, step: 100 });
-  expect(await knows(A, A.pubKey, A2.agent.circleAddressFor(group)), 'the phone never learned its sibling\'s address').toBeTruthy();
-  expect(await knows(A2, A.pubKey, A.agent.circleAddressFor(group)), 'the always-on device never learned the phone\'s address').toBeTruthy();
-
-  const seedRequest = await A2.agent.rosterSeed.buildRequest(group, A2.agent.circleAddressFor(group));
-  await A2.agent.sendPeerMessage(A.agent.circleAddressFor(group), seedRequest, SEND);
+  // ONE ADDRESS PER PERSONA PER CIRCLE: Anna's two devices share the circle address, so they meet through the device map
+  // (what an enrol offer introduces), and the roster seed is asked of the phone at its DEVICE address.
+  expect(A2.agent.circleAddressFor(group), 'one address for Anna in the circle').toBe(A.agent.circleAddressFor(group));
+  await shareDeviceRecords([A, A2], 'default');
+  const seedRequest = await A2.agent.rosterSeed.buildRequest(group, A2.agent.ownDeviceAddress('default'));
+  await A2.agent.sendPeerMessage(A.agent.ownDeviceAddress('default'), seedRequest, { circleId: group });
   expect(await until(async () => {
     const res = await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: group });
     return (res?.members ?? []).some((m) => m.webid === B.pubKey) ? true : null;

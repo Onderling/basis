@@ -84,10 +84,10 @@ describe('the custody cutover — delegation boots without the root', () => {
     // The "reload": the delegation boot opens the RESEALED vaults and keeps the identity.
     const dev2 = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault, rootKeyStore, chatVault });
     expect((await dev2.callSkill('household', 'revealOwnerPhrase', {}))?.error).toBe('phrase-not-stored');
-    // Since 2026-09-16 a root device mints its own delegation at FIRST BOOT and derives per-circle from it
-    // from the start, so the cutover keeps the derivation root and the address stays the same — no
-    // re-announce, no window in which the device speaks from an address nobody holds.
+    // The cutover keeps the derivation root (a root device mints its own delegation at first boot); what moves the
+    // address is the ceremony itself: a revoke re-keys the persona to its next circle root, so the device presents
+    // the next epoch's address from here on.
     expect(typeof dev2.circleAddressFor('circle-m')).toBe('string');
-    expect(dev2.circleAddressFor('circle-m')).toBe(addrBefore);
+    expect(dev2.circleAddressFor('circle-m')).not.toBe(addrBefore);
   }, 120_000);
 });

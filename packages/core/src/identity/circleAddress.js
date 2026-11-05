@@ -33,6 +33,25 @@ const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every per-circle address).
 const _CIRCLE_ADDR_SALT = new TextEncoder().encode('onderling-circle-addr-v1');
 const _CIRCLE_ID_SALT   = new TextEncoder().encode('onderling-circle-id-v1');
+const _CIRCLE_ROOT_SALT = new TextEncoder().encode('onderling-circle-root-v1');
+
+/**
+ * A persona's CIRCLE ROOT at an epoch: the derivation root of every per-circle key the persona presents. One-way from
+ * the persona's seed (holding it gives no authority), the same on every FULL device of the persona (the phrase
+ * re-derives it; a device enrolled without the phrase is handed it), so a co-member sees one member, one address. A
+ * re-key moves the persona to the next epoch, and with it every per-circle key.
+ * @param {Uint8Array} profileSeed  the persona's 32-byte seed (`ownerRoot.deriveAgentSeed(profileId)`)
+ * @param {number} [epoch=0]  a non-negative integer
+ * @returns {Uint8Array} 32-byte seed, to pass as the `derivationSeed` below
+ */
+export function deriveCircleRoot(profileSeed, epoch = 0) {
+  if (!(profileSeed instanceof Uint8Array) || profileSeed.length !== 32) {
+    throw new Error('deriveCircleRoot: profileSeed must be a 32-byte Uint8Array');
+  }
+  if (!Number.isInteger(epoch) || epoch < 0) throw new Error('deriveCircleRoot: epoch must be a non-negative integer');
+  const info = new TextEncoder().encode(`${HKDF_INFO_NS}circle-root:${epoch}`);
+  return hkdf(sha256, profileSeed, _CIRCLE_ROOT_SALT, info, 32);
+}
 
 /**
  * Derive a distinct 32-byte per-circle Ed25519 seed from a profile seed.

@@ -39,6 +39,8 @@ export const DELIVERY_LABELS = Object.freeze({
 export const DELIVERY_REASON_LABELS = Object.freeze({
   // the circle's persona has no connection of its own to send on — retrying helps once it has one again
   'persona-no-connection': 'circle.chat.delivery.persona_no_connection',
+  // …or the message is HELD for that reason (a hold-forward send): waiting, not failed — it goes out by itself
+  'persona-waiting': 'circle.chat.delivery.persona_waiting',
 });
 
 /**

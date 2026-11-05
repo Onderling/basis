@@ -57,7 +57,7 @@ describe('a circle left on one device is left on the person\'s others', () => {
     const storage = memStorage();
     expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('A2-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('A2-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'tablet' })).ok).toBe(true);
     await teardown(pre);
@@ -77,12 +77,9 @@ describe('a circle left on one device is left on the person\'s others', () => {
     if (!consumed.cleared) consumed = await consume();
     expect(consumed.cleared, JSON.stringify(consumed)).toBe(true);
     expect(await myCircles(A2)).toEqual(expect.arrayContaining([X, Y, Z]));
-    // the siblings know each other (A's row holds A2's address) before the carry is asked to reach A2
-    const known = await until(async () => {
-      const r = await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: X });
-      return (r?.members ?? []).find((m) => m.webid === A.pubKey)?.circleAddresses?.includes(A2.agent.circleAddressFor(X)) ? true : null;
-    }, { timeout: 15000, step: 100 });
-    expect(known).toBe(true);
+    // the siblings know each other (A's device map holds A2's device) before the carry is asked to reach A2
+    const known = await until(async () => ((await A.agent.ownDeviceAddressesOf('default')).includes(A2.agent.ownDeviceAddress('default')) ? true : null), { timeout: 15000, step: 100 });
+    expect(known, 'the phone never learned the enrolled device in its device map').toBe(true);
 
     // ── A LEAVES X — the shells' shared op ──────────────────────────────────────────────────────────
     const left = await leaveCircleLocally({ agent: A.agent, callSkill: (app, op, args) => A.agent.callSkill(app, op, args), circleId: X });
@@ -107,6 +104,13 @@ describe('a circle left on one device is left on the person\'s others', () => {
   }, 300_000);   // the enrol corridor over three circles, then the leave + the follow — heavy, and heavier on a loaded runner
 
   it('the offline half: A2 is dark while A leaves Y; on connect A2 asks its siblings and leaves Y too', async () => {
+    // A relay that records what comes off it: A2's per-circle address for Y must leave the relay with the circle
+    const removed = [];
+    const recordingRelay = { url: 'ws://recording.example', port: { removeAddress: (addr) => { removed.push(addr); } } };
+    const yAddress = A2.agent.circleAddressFor?.(Y) ?? null;
+    const sa = A2.agent.sa;
+    const relaysBefore = sa.relays;
+    sa.relays = { ...(relaysBefore ?? {}), list: () => [...(relaysBefore?.list?.() ?? []), recordingRelay] };
     const live = A2._routerRef.fn;
     A2._routerRef.fn = () => undefined;   // dark: inbound dropped, as for a phone that is off
     const left = await leaveCircleLocally({ agent: A.agent, callSkill: (app, op, args) => A.agent.callSkill(app, op, args), circleId: Y });
@@ -118,6 +122,8 @@ describe('a circle left on one device is left on the person\'s others', () => {
     const followed = await until(async () => ((await myCircles(A2)).includes(Y) ? null : true), { timeout: 20000, step: 250 });
     expect(followed, 'A2 never left Y after asking its siblings').toBe(true);
     expect(await registryHas(A2, Y)).toBe(false);
+    expect(yAddress, 'A2 had a per-circle address for Y').toBeTruthy();
+    expect(removed, 'A2\'s address for Y came off the relay when it followed the leave').toContain(yAddress);
     expect(await myCircles(A2), 'Z stays on both').toContain(Z);
     expect(leavesOnLane(B, Y, A.pubKey), 'one leave in Y too').toBe(1);
   }, 120_000);

@@ -56,6 +56,19 @@ const AsyncGeneratorFunction = Object.getPrototypeOf(async function* () {}).cons
  * @param {object|undefined} skill
  * @param {Function} [agf]  the AsyncGeneratorFunction constructor (injectable for tests)
  */
+/**
+ * The key a presented token must be FOR: the self the call was addressed to, when that is one of this agent's own
+ * selves (a persona's own address — a persona issues its grants as itself), else the agent's own key. Never another
+ * self's: a token Werk issued is honoured only on a call sent to Werk.
+ * @param {object} agent        the receiving agent (its `pubKey`, its `security.selfIdentityFor`)
+ * @param {string|null} addressed  the address the call was sent to (the envelope's `_to`)
+ * @returns {string}
+ */
+export function tokenAgentKeyFor(agent, addressed) {
+  if (typeof addressed === 'string' && addressed && addressed !== agent.pubKey && agent.security?.selfIdentityFor?.(addressed)) return addressed;
+  return agent.pubKey;
+}
+
 export function _isStreamingSkill(skill, agf = AsyncGeneratorFunction) {
   if (!skill) return false;
   if (skill.streaming === true) return true;
@@ -505,7 +518,7 @@ export async function runGatedSkill(agent, {
         skillId,
         action:      'call',
         token,
-        agentPubKey: agent.pubKey,
+        agentPubKey: tokenAgentKeyFor(agent, envelope?._to),
       });
     } catch (err) {
       return { status: 'failed', error: err.message, parts: [] };

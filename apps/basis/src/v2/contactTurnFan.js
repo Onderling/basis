@@ -83,6 +83,44 @@ export function contactTurnToWire(turn) {
     ...(file ? { file } : {}),
     // The turn that brought a hidden contact back (L106) says so on every device — the marker is painted from it.
     ...(turn.returned === true ? { returned: true } : {}),
+    // A person's MESSAGE (never a bot's reply) says so, with what the door decides on: the receiving sibling, when it
+    // is the person's primary, answers it as if it had come direct.
+    ...(turn.message === true ? { message: true } : {}),
+    ...(turn.message === true && typeof turn.admission === 'string' && turn.admission ? { admission: turn.admission } : {}),
+    ...(turn.message === true && turn.auth && typeof turn.auth === 'object' ? { auth: turn.auth } : {}),
+  };
+}
+
+/**
+ * Land a turn carried from a sibling the way a direct one lands: stored (`apply`), logged, and — a person's message,
+ * on the device that is the person's primary — handed to the door. Only the primary answers: a turn that landed on
+ * one box is carried to every sibling, and two boxes must not both answer it. A reply, an outbound turn or a
+ * duplicate is stored (or not) and goes no further.
+ *
+ * @param {object} a
+ * @param {(wire: object) => Promise<{ contactId: string, deduped?: boolean }>} a.apply  the channel's `applyOwnDeviceTurn`
+ * @param {() => boolean} a.isPrimary  this device is the person's primary for direct messages
+ * @param {(turn: object) => any} [a.feed]  the door (a bot's inbox), as the direct path feeds it
+ * @param {(entry: object) => any} [a.log]
+ * @returns {(wire: object) => Promise<object|null>}
+ */
+export function makeCarriedTurnLanding({ apply, isPrimary, feed = null, log = null } = {}) {
+  if (typeof apply !== 'function') throw new Error('makeCarriedTurnLanding: `apply` is required');
+  if (typeof isPrimary !== 'function') throw new Error('makeCarriedTurnLanding: `isPrimary` is required');
+  return async function landCarriedTurn(wire) {
+    const r = await apply(wire);
+    if (!r || r.deduped || wire?.direction !== TURN_DIRECTIONS.in) return r ?? null;
+    try { log?.({ kind: 'contact-turn', from: String(wire.fromAddr ?? '').slice(0, 12), text: wire.text, carried: true }); } catch { /* the log is not the product */ }
+    let primary = false;
+    try { primary = isPrimary() === true; } catch { primary = false; }
+    if (wire.message === true && primary && typeof feed === 'function') {
+      feed({
+        contactId: r.contactId, fromAddr: wire.fromAddr, text: wire.text, messageId: wire.messageId,
+        ...(typeof wire.admission === 'string' ? { admission: wire.admission } : {}),
+        ...(wire.auth && typeof wire.auth === 'object' ? { auth: wire.auth } : {}),
+      });
+    }
+    return r;
   };
 }
 

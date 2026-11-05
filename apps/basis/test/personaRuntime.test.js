@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { Bootstrap, deriveDeviceSeed, deriveCircleAddress, ceremonyCommitment, authorityPubKeyB64Of } from '@onderling/core';
+import { Bootstrap, deriveDeviceSeed, deriveCircleAddress, deriveCircleRoot, ceremonyCommitment, authorityPubKeyB64Of } from '@onderling/core';
 import { createPersonaRuntime } from '../src/core/agent/personaRuntime.js';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 
@@ -22,7 +22,9 @@ describe('createPersonaRuntime — one persona\'s keys, named once (N = 1)', () 
     expect(p.profileId).toBe('default');
     expect(p.enrolledDevice?.deviceId).toMatch(/^d-[0-9a-f]{32}$/);
     const seed = deriveDeviceSeed(root.deriveAgentSeed('default'), p.enrolledDevice.deviceId);
-    expect(p.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(seed, CIRCLE));
+    expect(p.deviceDerivationSeed).toEqual(seed);
+    // the per-circle keys are the persona's: from its circle root, not from this device's seed
+    expect(p.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(deriveCircleRoot(root.deriveAgentSeed('default'), 0), CIRCLE));
     expect(p.authorityPubKeyB64).toBe(authorityPubKeyB64Of(root.deriveProfileAuthority('default')));
     expect(p.ceremonyCommitmentFor(CIRCLE)).toBe(ceremonyCommitment(p.authorityPubKeyB64, CIRCLE));
     expect((await p.circleIdentityFor(CIRCLE)).pubKey).toBe(p.circleAddressFor(CIRCLE));

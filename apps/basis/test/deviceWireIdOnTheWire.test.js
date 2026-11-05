@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
 import { VaultMemory, VaultEncrypted } from '@onderling/vault';
 import {
-  Bootstrap, deriveDeviceSeed, deviceDelegationPubKey, deriveCircleAddress, signDeviceDelegation, b64encode,
+  Bootstrap, deriveDeviceSeed, deviceDelegationPubKey, deriveCircleAddress, deriveCircleRoot, signDeviceDelegation, b64encode,
   firstDeviceIdFor, verifyDeviceDelegation,
 } from '@onderling/core';
 import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
@@ -36,7 +36,8 @@ describe('the wire device id', () => {
     expect(rec.deviceId).not.toBe(firstDeviceIdFor(root));
     const seed = deriveDeviceSeed(root.deriveAgentSeed('default'), rec.deviceId);
     expect(rec.pubKey).toBe(deviceDelegationPubKey(seed));
-    expect(dev.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(seed, CIRCLE));
+    // the per-circle address is the PERSONA's (its circle root), not the device's
+    expect(dev.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(deriveCircleRoot(root.deriveAgentSeed('default'), 0), CIRCLE));
   }, 60_000);
 
   it('an enrolled device\'s record names a wire id, and the phrase + that id reproduce its seed', async () => {
@@ -47,8 +48,10 @@ describe('the wire device id', () => {
     expect(en.ok).toBe(true);
     expect(en.deviceId).toMatch(WIRE);
     const dev2 = await boot(v2);
-    const seed = deriveDeviceSeed(Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), en.deviceId);
-    expect(dev2.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(seed, CIRCLE));
+    // the phrase reproduces the device's seed (its delegation key) and the persona's one circle address
+    const pSeed = Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default');
+    expect(dev2.persona('default').enrolledDevice.record.pubKey).toBe(deviceDelegationPubKey(deriveDeviceSeed(pSeed, en.deviceId)));
+    expect(dev2.circleAddressFor(CIRCLE)).toBe(deriveCircleAddress(deriveCircleRoot(pSeed, 0), CIRCLE));
   }, 60_000);
 
   it('a stored record signed by the root is re-signed by the authority at boot — same id, same key, same address', async () => {

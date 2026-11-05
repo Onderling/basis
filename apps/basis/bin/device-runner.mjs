@@ -64,6 +64,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { makeCarriedTurnLanding } from '../src/v2/contactTurnFan.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
 import { createIdentityLink, createLinkTombstones, linkedCompanionSkill } from '../src/v2/botIdentityLink.js';
@@ -126,7 +127,7 @@ import { boxStores } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
-import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
@@ -379,6 +380,11 @@ const walkLog = (entry) => { try { appendFileSync(walkLogFile, scrubSecrets(JSON
 // public by design: holding it grants nothing, because enrolling still takes the phrase.
 async function printEnrollOffer() {
   const built = await callSkill('household', 'buildEnrollOffer', relayUrl ? { relayUrl } : {}).catch((e) => ({ error: String(e?.message ?? e) }));
+  if (built?.error === 'no-recovery-seal') {
+    console.log('device-runner: this device cannot introduce a new one — it was added before the recovery seal existed.');
+    console.log('  Run a phrase ceremony on it once (--enroll with the recovery phrase), then show the offer again.');
+    return;
+  }
   if (!built?.ok || !built.uri) {
     console.log(`device-runner: no offer to show yet — ${built?.reason ?? built?.error ?? 'this device is in no circles'}.`);
     console.log('  An offer names the circles a new device should pick up. Join or create one first.');
@@ -585,7 +591,14 @@ if (relayUrl) {
         console.log(`device-runner: catching up ${count} message(s) in ${String(circleId).slice(0, 12)}… (~${(approxBytes / 1e6).toFixed(1)} MB)`);
         Promise.resolve(allow()).catch(() => {});
       },
-      ownDeviceTurn: (wire) => contactChannel.applyOwnDeviceTurn(wire).catch(() => {}),
+      // a turn carried from a sibling lands as a direct one does: logged, and a person's message answered — here, when
+      // this box is the person's primary (the profile address can land on the phone for a moment; the person is not dropped)
+      ownDeviceTurn: makeCarriedTurnLanding({
+        apply: (wire) => contactChannel.applyOwnDeviceTurn(wire),
+        isPrimary: () => agent.primaryDevice?.isMine?.() === true,
+        feed: (t) => inboxDoor.feed(t),
+        log: walkLog,
+      }),
       // A circle message landed. Nothing to paint — but said in the log, because "did the circle reach
       // this device" is the one question an operator (and the walk) has.
       chatLanded: ({ msgId, circleId, source }) => {
@@ -761,9 +774,10 @@ if (relayUrl) {
   // address alone: a circle's fan to its per-circle address went to a relay that had never heard of
   // it, and "a full member of your circles" was true of the lanes and false of the wire.
   const registerCirclePresence = async (extraCircleIds = []) => {
-    let ids = [];
-    try { ids = ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean); } catch { ids = []; }
-    const circleIds = [...new Set([...ids, ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : [])])];
+    let mine = null;
+    try { mine = await callSkill('pinboard', 'listMyCircles', {}); } catch { mine = null; }
+    // …minus a circle the fold says was left or removed (the one shared filter every shell asks)
+    const circleIds = presenceCircleIds(mine, mine?.circles, extraCircleIds);
     if (circleIds.length === 0) return;
     await primeCircleSecurity({ agent, circleIds }).catch((err) => console.warn('device-runner: circle security priming failed:', err?.message ?? err));
     if (!agent.relay?.supportsAliases) return;
@@ -795,6 +809,8 @@ if (relayUrl) {
     walkLog({ kind: 'presence', circles: circleIds.length, rosters });
   };
   await registerCirclePresence();
+  // a re-key moved this person's circle addresses: register the new ones (the ceremony waits for it)
+  agent.onCircleRootMoved?.(({ circleIds }) => registerCirclePresence(circleIds));
 
   // The stashed offer (from `--enrol`, or a re-try from an earlier start): consumed exactly as both
   // shells consume a scanned one — registry record, presence, the roster seed from the sibling, the
@@ -828,6 +844,7 @@ if (relayUrl) {
         const r = await makeThisDevicePrimary({ agent, logger: console });
         walkLog({ kind: 'primary-device', circles: r.circles, announced: r.announced, claimed: r.device?.ok === true, personAddress: String(agent.personAddress?.() ?? '').slice(0, 12), profile: String(agent.pubKey ?? '').slice(0, 12) });
         console.log(`device-runner: this device is the primary contact address (${r.announced}/${r.circles} circle(s) told; the relays re-registered).`);
+        if (r.device?.point?.ok === false) console.log('device-runner: it cannot sign the circle changes yet (no circle root): run a phrase ceremony on it once.');
       } catch (err) { console.warn('device-runner: could not claim the primary contact address:', err?.message ?? err); }
     }
   });
@@ -839,6 +856,16 @@ if (relayUrl) {
   walkLog({ kind: 'lanes', ...live });
   const dark = Object.entries(live).filter(([, on]) => !on).map(([k]) => k);
   if (dark.length) console.warn(`device-runner: no rail for ${dark.join(', ')} — this device will not converge on ${dark.length === 1 ? 'that lane' : 'those lanes'}`);
+
+  // Changes this box handed the main device and has not seen signed: the panel line the shells paint, said at startup
+  // (the box has no screen). Counts only.
+  callSkill('household', 'ownSpineOutbox', {}).then((s) => {
+    if (!s?.ok) return;
+    walkLog({ kind: 'own-spine-outbox', waiting: s.waiting, overDay: s.overDay, unsent: s.unsent, maybeLost: s.maybeLost });
+    if (s.maybeLost > 0) console.warn(`device-runner: ${s.maybeLost} change(s) may not have come through — sent to the previous main device and never confirmed; check them.`);
+    else if (s.unsent > 0) console.warn(`device-runner: ${s.unsent} change(s) were not sent — the main device was unreachable for too long; make them again.`);
+    else if (s.overDay > 0) console.log(`device-runner: ${s.overDay} change(s) have waited over a day for the main device.`);
+  }).catch(() => {});
 
   // The reconnect kicks: pull what arrived while this device was down, on every lane that has one.
   const kick = (cu, label, ms) => {
@@ -1380,12 +1407,13 @@ if (tgToken || inboxDoor.bridge) {
       if (payload?.launch && typeof payload.launch === 'object') {
         const l = payload.launch;
         const r = await screens.launched({ from, viewPubKey: l.k, nonce: l.n, initData: l.initData });
-        walkLog({ kind: 'screen-launch', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });
+        walkLog({ kind: 'screen-launch', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops?.length ?? 0 } : { reason: r.reason }) });
         return;
       }
       const offer = parsePairingOffer(payload?.offer);
       const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };
-      walkLog({ kind: 'screen-offer', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });
+      // an offer is granted, or (the usual way) waits for the person's code, or was declined — each logs what it is
+      walkLog({ kind: 'screen-offer', ok: r.ok, ...(!r.ok ? { reason: r.reason } : r.declined ? { declined: true } : { to: String(r.person).slice(-4), ...(r.pending ? { pending: true } : { ops: r.ops?.length ?? 0 }) }) });
     };
     walkLog({ kind: 'screens', exposed });
     // whether the grants lane folded after this boot: until it does, every screen token is refused as revoked (fail

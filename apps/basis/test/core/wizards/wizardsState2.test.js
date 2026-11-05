@@ -297,6 +297,7 @@ describe('joinGroupState', () => {
     state.invite = { kind: 'membershipCode', groupId: 'b1', code: 'c1' };
     state.handle = 'anne';
     const callSkill = vi.fn()
+      .mockResolvedValueOnce({ ok: true })   // bindCirclePersona — the one-self-per-circle gate
       .mockResolvedValueOnce({ ok: true })                       // setMyHandle
       .mockResolvedValueOnce({ ok: true });                      // redeemMembershipCode
     const { result } = await JG.finalSubmit({ state, callSkill });
@@ -310,6 +311,7 @@ describe('joinGroupState', () => {
     state.invite = { kind: 'membershipCode', groupId: 'b1', code: 'c1', adminPeerAddr: 'NKN-ADMIN', rules: { purpose: 'P' } };
     state.handle = 'anne';
     const callSkill = vi.fn()
+      .mockResolvedValueOnce({ ok: true })   // bindCirclePersona — the one-self-per-circle gate
       .mockResolvedValueOnce({ ok: true })                                  // setMyHandle
       .mockResolvedValueOnce({ error: 'invalid-or-expired-code' })          // redeemMembershipCode
       .mockResolvedValueOnce({ ok: true });                                 // recordRemoteRedemption
@@ -318,7 +320,7 @@ describe('joinGroupState', () => {
     expect(sendPeerRedeem).toHaveBeenCalled();
     expect(result.message).toMatch(/peer-bridge/);
     // recordRemoteRedemption should have been called with the rules.
-    expect(callSkill.mock.calls[2][2].rules).toEqual({ purpose: 'P' });
+    expect(callSkill.mock.calls.find((c) => c[1] === 'recordRemoteRedemption')[2].rules).toEqual({ purpose: 'P' });
   });
 
   // This test used to assert the legacy-invite chain (gate → handle → redeemInvite) and passed by
@@ -404,6 +406,7 @@ describe('joinGroupState', () => {
     JG.buildJoinConsent({ state, sources: consentSources });
     JG.setConsentDecline(state, 'tasks complete task', true);
     const callSkill = vi.fn()
+      .mockResolvedValueOnce({ ok: true })   // bindCirclePersona — the one-self-per-circle gate
       .mockResolvedValueOnce({ ok: true })   // setMyHandle
       .mockResolvedValueOnce({ ok: true });  // redeemMembershipCode
     const { result } = await JG.finalSubmit({ state, callSkill });

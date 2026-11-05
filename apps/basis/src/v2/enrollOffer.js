@@ -29,16 +29,26 @@
  *                                              pull membership + governance catch-up from it
  */
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor, announceOwnCircleAddress } from './circleAddressAnnounce.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
 import nacl from 'tweetnacl';
-import { parseUntrustedJson, Bootstrap } from '@onderling/core';
+import { parseUntrustedJson, Bootstrap, verifyDeviceDelegation, authorityPubKeyB64Of } from '@onderling/core';
+import { RECOVERY_SEAL_LABEL } from '../core/agent/personaVault.js';
 
 /** A persona's id (a minted label, never a name). */
 const PERSONA_ID = /^p-[0-9a-f]{12}$/;
 
 /** The scheme. Distinct from `onderling-connect://` — see the header. */
+/**
+ * How long a new device waits for a sibling's roster seed before it says the circle is not complete. A FIRST contact
+ * to a sibling's device address can take most of ten seconds on a busy device (measured: the answer at 5.7 s, the
+ * parcel at 8.3 s), so ten was a race under load; the request is re-sent every 2.5 s meanwhile, so a sibling that is
+ * there costs no extra time — only one that is truly absent makes the enrol wait this long.
+ */
+const ENROL_SEED_WAIT_MS = param({ key: 'enrol.seedWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+
 export const ENROLL_SCHEME = 'onderling-enroll://';
 
 /** Where a scanned/pasted offer waits out the ceremony reload (plain storage — it is public data). */
@@ -71,7 +81,7 @@ const b64url = {
  *   per-circle address (the sibling target).
  * @returns {string} an `onderling-enroll://…` URI
  */
-export function encodeEnrollOffer({ relays = [], circles = [], personasSealed = null } = {}) {
+export function encodeEnrollOffer({ relays = [], circles = [], personasSealed = null, devicesSealed = null, introduce = null } = {}) {
   const c = (Array.isArray(circles) ? circles : [])
     .filter((x) => x && typeof x.id === 'string' && x.id && typeof x.address === 'string' && x.address)
     .map((x) => ({
@@ -92,7 +102,13 @@ export function encodeEnrollOffer({ relays = [], circles = [], personasSealed = 
   // a person whose circles are all under personas offers none in the clear: the sealed part carries them
   if (c.length === 0 && !hasSealed) throw new Error('encodeEnrollOffer: at least one circle with an address is required');
   const r = (Array.isArray(relays) ? relays : []).filter((u) => typeof u === 'string' && u);
-  return ENROLL_SCHEME + b64url.encode({ v: 1, ...(r.length ? { r } : {}), c, ...(typeof personasSealed === 'string' && personasSealed ? { p: personasSealed } : {}) });
+  return ENROLL_SCHEME + b64url.encode({
+    v: 1, ...(r.length ? { r } : {}), c,
+    ...(typeof personasSealed === 'string' && personasSealed ? { p: personasSealed } : {}),
+    ...(typeof devicesSealed === 'string' && devicesSealed ? { d: devicesSealed } : {}),
+    // `i` — the offering device's records, opened and verified at the ceremony. Only ever on the NEW device's own stash.
+    ...(Array.isArray(introduce) && introduce.length ? { i: introduce } : {}),
+  });
 }
 
 /**
@@ -120,7 +136,12 @@ export function parseEnrollOffer(uri) {
     }));
   if (circles.length === 0 && !(typeof body.p === 'string' && body.p)) return { ok: false, reason: 'incomplete' };
   const relays = (Array.isArray(body.r) ? body.r : []).filter((u) => typeof u === 'string' && u);
-  return { ok: true, relays, circles, personasSealed: typeof body.p === 'string' && body.p ? body.p : null };
+  return {
+    ok: true, relays, circles,
+    personasSealed: typeof body.p === 'string' && body.p ? body.p : null,
+    devicesSealed: typeof body.d === 'string' && body.d ? body.d : null,
+    introduce: (Array.isArray(body.i) ? body.i : []).filter((r) => r && typeof r === 'object' && typeof r.pubKey === 'string' && typeof r.profileId === 'string'),
+  };
 }
 
 /** The enrol op's param the shells paint as the persona PICKER (checkboxes from `openOfferPersonas`), never a text field. */
@@ -202,6 +223,110 @@ export function sealOfferPersonas(root, personas = []) {
   const out = new Uint8Array(nonce.length + box.length);
   out.set(nonce); out.set(box, nonce.length);
   return bytesB64(out);
+}
+
+/**
+ * The words a shell shows for an offer that could not be built: its own line for a device without the recovery seal
+ * (it cannot introduce a new device — a phrase ceremony on it leaves one), the general line for the rest.
+ * @param {{ok?: boolean, error?: string}|null} built  what `buildEnrollOffer` returned
+ * @returns {string}  a locale key
+ */
+export function enrollOfferErrorKey(built) {
+  return built?.error === 'no-recovery-seal' ? 'circle.enroll.offer_no_seal' : 'circle.enroll.offer_error';
+}
+
+/* ── The offering device, sealed to the phrase ──────────────────────────────────────────────────
+ * After the switch to one address per persona per circle, the new device and the one showing the offer share every
+ * circle address: nothing in a circle introduces them. So the offer carries the offering device's DELEGATION RECORD per
+ * persona it holds (its device address there, signed by the persona's authority). A device address is on no roster, so
+ * it rides SEALED, to a key from the RECOVERY SEAL: every phrase ceremony leaves the seal on every device (root or
+ * delegated — either can offer), and the phrase typed on the new device re-derives it. Padded like the personas. */
+const DEVICES_LABEL = 'enroll-devices';
+const devicesKey = (sealSeed) => nacl.hash(new Uint8Array([...sealSeed, ...new TextEncoder().encode(DEVICES_LABEL)])).slice(0, 32);
+
+/**
+ * Seal the offering device's records for an offer.
+ * @param {Uint8Array} sealSeed  the recovery seal's seed (`root.deriveAgentSeed(RECOVERY_SEAL_LABEL)`, or the device's copy)
+ * @param {Record<string, object>} records  persona id → this device's delegation record under it
+ * @param {Record<string, number>} [epochs]  persona id → its current circle-root epoch (what a new device is handed)
+ * @returns {string|null}
+ */
+export function sealOfferDevices(sealSeed, records = {}, epochs = {}) {
+  if (!(sealSeed instanceof Uint8Array) || sealSeed.length < 32) return null;
+  // the records, and each persona's circle-root EPOCH — sealed, not in the clear: in the clear it would tell anyone with a
+  // photo of the code how many full devices were ever revoked
+  const plain = JSON.stringify({ r: records && typeof records === 'object' ? records : {}, e: epochs && typeof epochs === 'object' ? epochs : {} });
+  const padded = plain + ' '.repeat((SEALED_STEP - (new TextEncoder().encode(plain).length % SEALED_STEP)) % SEALED_STEP);
+  const nonce = nacl.randomBytes(24);
+  const box = nacl.secretbox(new TextEncoder().encode(padded), nonce, devicesKey(sealSeed));
+  const out = new Uint8Array(nonce.length + box.length);
+  out.set(nonce); out.set(box, nonce.length);
+  return bytesB64(out);
+}
+
+/**
+ * The offering device's records, opened with the phrase — `{}` when the offer carries none or the phrase is not the one
+ * it was sealed to. Unverified here: the ceremony verifies each under the persona's authority before it keeps one.
+ * @param {string|object} uri  the offer, or the offer as `parseEnrollOffer` returns it
+ * @param {string} mnemonic
+ * @returns {Record<string, object>}
+ */
+/** The offer's sealed part, opened with the phrase: `{r, e}` or null. */
+function openOfferDevicesSealed(uri, mnemonic) {
+  const parsed = typeof uri === 'string' ? parseEnrollOffer(uri) : uri;
+  if (!parsed?.ok || !parsed.devicesSealed) return null;
+  try {
+    const root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim());
+    const raw = bytesFrom(parsed.devicesSealed);
+    const opened = nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), devicesKey(root.deriveAgentSeed(RECOVERY_SEAL_LABEL)));
+    if (!opened) return null;
+    const both = parseUntrustedJson(new TextDecoder().decode(opened));
+    return both && typeof both === 'object' && !Array.isArray(both) ? both : null;
+  } catch { return null; }
+}
+
+/**
+ * Each persona's circle-root epoch the offering device holds, opened with the phrase — `{}` when none. The new device is
+ * handed that epoch's root (the seed derives from the phrase; only the number travels).
+ * @returns {Record<string, number>}
+ */
+export function openOfferEpochs(uri, mnemonic) {
+  const e = openOfferDevicesSealed(uri, mnemonic)?.e;
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return {};
+  return Object.fromEntries(Object.entries(e).filter(([pid, n]) => (pid === 'default' || PERSONA_ID.test(pid)) && Number.isInteger(n) && n >= 0 && n < 1024));
+}
+
+export function openOfferDevices(uri, mnemonic) {
+  try {
+    const map = openOfferDevicesSealed(uri, mnemonic)?.r;
+    if (!map || typeof map !== 'object' || Array.isArray(map)) return {};
+    return Object.fromEntries(Object.entries(map).filter(([pid, r]) => (pid === 'default' || PERSONA_ID.test(pid)) && r && typeof r === 'object' && typeof r.pubKey === 'string'));
+  } catch { return {}; }
+}
+
+/**
+ * The offering device's records this NEW device keeps, at its ceremony (the phrase in hand): opened from the offer, and
+ * each kept only if it is signed by the AUTHORITY of a persona this device now holds — the phrase derives each authority,
+ * so a record the offer could not have come by honestly is dropped here.
+ * @param {string|object} uri  the offer
+ * @param {string} mnemonic
+ * @param {string[]} held  the personas this device holds after the ceremony ('default' included when it does)
+ * @returns {object[]}  the records to introduce this device to, at its first boot
+ */
+export function offeredDevicesFor(uri, mnemonic, held = []) {
+  const opened = openOfferDevices(uri, mnemonic);
+  if (!Object.keys(opened).length) return [];
+  let root;
+  try { root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim()); } catch { return []; }
+  const out = [];
+  for (const pid of new Set(Array.isArray(held) ? held : [])) {
+    const rec = opened[pid];
+    if (!rec || rec.profileId !== pid || rec.revoked === true) continue;
+    try {
+      if (verifyDeviceDelegation(rec) && rec.by === authorityPubKeyB64Of(root.deriveProfileAuthority(pid))) out.push(rec);
+    } catch { /* not this person's: not kept */ }
+  }
+  return out;
 }
 
 /**
@@ -301,12 +426,21 @@ export function enrollOfferFromLink(hrefOrHash) {
  * mobile — both shapes work; results are awaited). Plain storage on purpose: the offer is public
  * data, and the sealed vaults are re-keyed mid-ceremony — exactly the wrong home for it. */
 
-export async function stashEnrollOffer(storage, uriOrLink) {
+export async function stashEnrollOffer(storage, uriOrLink, { keepIntroduce = false } = {}) {
   // One paste box takes anything: the raw `onderling-enroll://` code OR the clickable link form.
   const parsed = enrollOfferFromLink(uriOrLink);
   if (!parsed.ok) return parsed;
-  await storage.setItem(ENROLL_OFFER_STORAGE_KEY, parsed.uri);
-  return parsed;
+  // The introduction (`i`) is the CEREMONY's to write — opened and verified with the phrase in hand. A scanned or pasted
+  // offer never carries one into the stash: it would name devices to wait on from whoever made the code.
+  let uri = parsed.uri;
+  if (!keepIntroduce) {
+    const inner = parseEnrollOffer(uri);
+    if (inner.ok && inner.introduce?.length) {
+      uri = encodeEnrollOffer({ relays: inner.relays, circles: inner.circles, personasSealed: inner.personasSealed, devicesSealed: inner.devicesSealed });
+    }
+  }
+  await storage.setItem(ENROLL_OFFER_STORAGE_KEY, uri);
+  return uri === parsed.uri ? parsed : { ...parsed, uri };
 }
 
 /**
@@ -409,7 +543,23 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     // maps to whichever registered last: this device, as often as not, greeting itself while the
     // send waited out its five seconds and was held (2026-09-14).
     const me = asPersona ?? agent.identity?.chat?.pubKey ?? null;
-    if (me && typeof agent.registerPeerAddress === 'function') {
+    // ONE ADDRESS PER PERSONA PER CIRCLE: when the offer's sibling address is this device's own, the sibling is reached
+    // at its DEVICE address (learned from the offer at the top of the consume), and nothing is announced or bound to it.
+    const shared = !!ownAddress && c.address === ownAddress && c.member !== true;
+    let sibling = c.address;
+    // who is asked for the roster seed: with a shared address EVERY live sibling of this persona, the device the offer was
+    // shown on first (the one the person is holding) — one silent sibling must not hold the whole enrol; first answer wins
+    let seedFrom = [c.address];
+    if (shared) {
+      const devices = (await Promise.resolve(agent.ownDeviceAddressesOf?.(c.persona ?? 'default')).catch(() => [])) ?? [];
+      const profileId = agent.profileIdOf?.(c.id) ?? c.persona ?? 'default';
+      const offering = (Array.isArray(c.offeredBy) ? c.offeredBy : []).find((r) => r?.profileId === profileId)?.pubKey ?? null;
+      const mineHere = agent.ownDeviceAddress?.(c.persona ?? 'default') ?? null;
+      seedFrom = [...new Set([...(offering && devices.includes(offering) ? [offering] : []), ...devices])].filter((a) => a && a !== mineHere);
+      sibling = seedFrom[0] ?? null;
+      if (!sibling) return { ...row, ok: false, error: 'no-sibling-device' };   // the offer named no device: the next boot asks again
+    }
+    if (!shared && me && typeof agent.registerPeerAddress === 'function') {
       try { agent.registerPeerAddress(c.address, me, { signingKey: c.address }); } catch { /* the greeting still works when the relay maps our way */ }
     }
     // 3 — announce our fresh per-circle address to the sibling (the proven-set growth) — BEFORE the
@@ -417,10 +567,10 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     // seed reply needs that key: sent before it was bound, the reply opened with a greeting that the
     // relay handed to whichever device of ours held the profile address, and came ten seconds late.
     // A MEMBER entry (the file's bootstrap) announces to every member the file named.
-    const targets = [c.address, ...(Array.isArray(c.others) ? c.others : [])];
+    const targets = [sibling, ...(Array.isArray(c.others) ? c.others : [])];
     const mine = ownAnnouncementFor({ agent, circleId: c.id });
     if (mine) {
-      for (const to of targets) {
+      for (const to of shared ? targets.slice(1) : targets) {
         await sendPeerMessage(to, {
           type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
           msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
@@ -439,9 +589,11 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     // bootstrap — brought the roster in the file, so there is nothing to ask for here.
     if (agent.rosterSeed && ownAddress && c.member !== true) {
       try {
-        const req = await agent.rosterSeed.buildRequest(c.id, ownAddress);
+        // the answer comes to this device's own address — its DEVICE address when the circle address is shared
+        const replyTo = shared ? (agent.ownDeviceAddress?.(c.persona ?? 'default') ?? ownAddress) : ownAddress;
+        const req = await agent.rosterSeed.buildRequest(c.id, replyTo);
         if (req) {
-          await sendPeerMessage(c.address, req, send);
+          for (const to of seedFrom) { try { await sendPeerMessage(to, req, { ...send, circleId: c.id }); } catch { /* the next sibling, and the resend */ } }
           row.steps.push('seed-requested');
           // Wait for the SIBLING'S ADDRESS to be on my own row — the seed applied, and the sibling's
           // own announcement (it rides inside the parcel) recorded. That is the one fact the pulls
@@ -451,7 +603,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
           // content pull raced the seed and lost, one enrol in four (the box's walk).
           // RE-SEND the request while waiting: a single packet on a busy boot is exactly the
           // kind of loss the first-write-wins ingest makes free to retry.
-          const deadline = Date.now() + 10000;
+          const deadline = Date.now() + ENROL_SEED_WAIT_MS;
           let nextResend = Date.now() + 2500;
           let derived = false;
           while (Date.now() < deadline) {
@@ -467,7 +619,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
             } catch { /* keep waiting */ }
             if (Date.now() >= nextResend) {
               nextResend = Date.now() + 2500;
-              try { await sendPeerMessage(c.address, req, send); } catch { /* next tick */ }
+              for (const to of seedFrom) { try { await sendPeerMessage(to, req, { ...send, circleId: c.id }); } catch { /* next tick */ } }
             }
             await new Promise((resolve) => setTimeout(resolve, 250));
           }
@@ -574,13 +726,18 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
   }
   const offer = await pendingEnrollOffer(storage);
   if (!offer) return { consumed: false, reason: 'nothing-pending' };
+  // the device the offer was shown on (verified at the ceremony): learned first — with one address per persona per
+  // circle this device shares every circle address with it, and reaches it at its device address
+  if (offer.introduce?.length && typeof agent.learnOfferedDevices === 'function') {
+    try { await agent.learnOfferedDevices(offer.introduce); } catch { /* the next boot learns them again */ }
+  }
 
   const report = [];
   let allOk = true;
   let claimedDevice = false;   // the DM half of the primary contact address: once per consume
   for (const c of offer.circles) {
     const row = await consumeCircleEntry({ agent, callSkill, sendPeerMessage, registerCirclePresence, contentPulls },
-      { ...c, relays: offer.relays }, { claimPrimary: !claimedDevice });
+      { ...c, relays: offer.relays, offeredBy: offer.introduce ?? [] }, { claimPrimary: !claimedDevice });
     if (row.steps.includes('primary-device')) claimedDevice = true;
     if (!row.ok) allOk = false;
     report.push(row);

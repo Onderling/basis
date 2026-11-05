@@ -100,7 +100,7 @@ export function connectionSectionChoices({ circles = [] } = {}) {
  * @param {string} [a.label]
  * @returns {object|null} args for `callSkill('household','grantSurface', …)`
  */
-export function compileConnectionGrant({ viewPubKey, ops = [], sections = [], label = null } = {}) {
+export function compileConnectionGrant({ viewPubKey, ops = [], sections = [], label = null, persona = null } = {}) {
   const pickedOps = [...new Set(ops.filter((o) => typeof o === 'string' && o))];
   const circles = sections.filter((s) => typeof s === 'string' && s && s !== DEVICE_SECTION);
   const device = sections.includes(DEVICE_SECTION);
@@ -112,7 +112,27 @@ export function compileConnectionGrant({ viewPubKey, ops = [], sections = [], la
     // (a remote control that cannot read), so it is expressed as `reads: null` rather than refused.
     reads: (circles.length || device) ? { circles, device } : null,
     ...(label ? { label } : {}),
+    // the self that issues it (a persona issues its grants as itself); absent on a device with one self
+    ...(typeof persona === 'string' && persona ? { persona } : {}),
   };
+}
+
+/**
+ * WHICH SELF A SCREEN IS PAIRED FOR. A persona issues its grants as itself, so on a device holding more than one self the
+ * pairing form asks — with the self active on Mij (the one ticked in the switcher) preselected — and the grant names it;
+ * with one self there is nothing to ask. Never a silent default: with several selves and none active, nothing is
+ * preselected and the form waits for a choice.
+ *
+ * @param {object} a
+ * @param {Array<{id: string, name?: string|null}>} [a.held]  this device's selves (`personasHere`)
+ * @param {string[]} [a.on]  the selves ticked in the switcher
+ * @returns {{ required: boolean, options: Array<{id: string, name: string|null}>, preset: string|null }}
+ */
+export function connectionSelfChoice({ held = [], on = [] } = {}) {
+  const options = (Array.isArray(held) ? held : []).filter((p) => typeof p?.id === 'string' && p.id).map((p) => ({ id: p.id, name: p.name ?? null }));
+  if (options.length <= 1) return { required: false, options, preset: options[0]?.id ?? null };
+  const active = Array.isArray(on) && on.length === 1 && options.some((o) => o.id === on[0]) ? on[0] : null;
+  return { required: true, options, preset: active };
 }
 
 /**

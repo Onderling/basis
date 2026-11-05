@@ -131,7 +131,7 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  *   `opts.to` NARROWS the recipient set — the report channel passes the circle's admin refs, so a report
  *   never lands on the device of the person it is about.
  */
-export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null }) {
+export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, spineGate = null }) {
   // Governance rides the RAIL, period: signed, circle-scoped, receiver-verified. The unsigned legacy
   // path was deleted with the cutover (one chained-statement primitive remains — signSpine); a composition
   // without a per-circle signer is a wiring bug, surfaced here rather than as silently-unsigned governance.
@@ -147,7 +147,14 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   // L3: hash-chain each event to its author's previous head before it lands, so equivocation
   // (two events by one author from the same parent) is detectable across replicas. A STABLE
   // entry id (from the chain hash) lets the local copy + any fanned/received copy collapse.
+  // SPINE STATEMENTS ONLY FROM THE POINT: on a device of the person that is not the point, the act goes to the point (the
+  // agent's gate), which signs it on its own head — this device signs nothing on the chained governance lane.
+  const viaPoint = (channel, circleId, event) => (spineGate && typeof spineGate.isPoint === 'function' && !spineGate.isPoint(circleId)
+    ? spineGate.forward({ lane: 'governance', channel, circleId, event })
+    : null);
   const appendGovernanceEvent = async (circleId, event) => {
+    const forwarded = await viaPoint('governance', circleId, event);
+    if (forwarded) return forwarded;
     // THE RAIL: the event becomes a SIGNED chained statement — kind = the event verb, subject = the
     // proposalId, everything else rides the signed payload. The fan carries the STATEMENT; receivers
     // verify before it lands (circleLogReceiver → the rail's ingest).
@@ -194,6 +201,8 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   // person who filed it (`reportReaders`, the same rule the catch-up serve applies). Everyone else, the reported
   // person first, never receives it.
   const appendReportEvent = async (circleId, event) => {
+    const forwarded = await viaPoint('report', circleId, event);
+    if (forwarded) return forwarded;
     const filing = event?.event === REPORT_EVENT.REPORT;
     const res = await rail.append(circleId, filing
       ? { kind: REPORT_FILE_KIND, subject: event.reportId, payload: { targetType: event.targetType, targetRef: event.targetRef ?? null, targetLabel: event.targetLabel ?? null, reason: event.reason ?? '', by: event.by, at: event.at ?? 0 } }
@@ -208,7 +217,9 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     isAdmin: iAmAdmin,
   });
 
-  return { ...governance, reports, rail };
+  // `appendGovernanceEvent` / `appendReportEvent`: what the POINT runs for a sibling's forwarded act (the same signing,
+  // fan and report readers as an act of its own)
+  return { ...governance, reports, rail, appendGovernanceEvent, appendReportEvent };
 }
 
 /**

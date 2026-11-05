@@ -36,7 +36,7 @@ export { AgentIdentity }      from './identity/AgentIdentity.js';
 export { parseUntrustedJson, UNSAFE_JSON_KEYS } from './security/untrustedJson.js';
 export { Bootstrap, deriveVaultAtRestKeyFrom } from './identity/Bootstrap.js';
 // identity step 3 — per-circle addresses (unlinkability layer)
-export { deriveCircleSeed, deriveCircleAddress, circleIdentity, deriveCircleId } from './identity/circleAddress.js';
+export { deriveCircleSeed, deriveCircleAddress, circleIdentity, deriveCircleId, deriveCircleRoot } from './identity/circleAddress.js';
 export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircleLink } from './identity/circleLink.js';
 // The per-device derivation root + the root-signed delegation record (add-a-device):
 // owner root → profile seed → DEVICE seed → per-circle seed; each device presents distinct addresses.
@@ -193,7 +193,8 @@ export { generateTunnelKey,
 export {
   ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
   signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
-} from './identity/ceremonyCommitment.js';   // who may retire a device address: the owner root, at a ceremony
+} from './identity/ceremonyCommitment.js';
+export { createSignatureMemo } from './security/signatureMemo.js';   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
 export { CEREMONY_KINDS, ADDRESS_REVOKE_KIND, isCeremonyKind, ceremonyRevealFacts } from './security/ceremonyKinds.js';   // the kinds only the root may make, and what each reveal covers
 export { PERSON_KEY_KIND, personKeyFacts, isSelfPersonKeyStatement, foldPersonKeys } from './security/personKeyFold.js';
 export { PERSON_KEY_VAULT_KEY, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, signWithPersonKey, personKeyAnnouncement, loadPersonKey, storePersonKey, signPersonKeyLink, verifyPersonKeyChain, personKeyLinkMessage, sealToPersonKey, openFromPersonKey } from './identity/personKey.js';   // the rotating person key: derivation, the sealed-vault entry, the announcement shape   // the person's current (rotating) key per circle — the person-key head
@@ -206,7 +207,7 @@ export { ping }                                           from './protocol/ping.
 export { sendMessage, handleMessage }                     from './protocol/messaging.js';
 export { sendHello, handleHello, forgetHello }            from './protocol/hello.js';
 export { requestSkills, handleSkillDiscovery }            from './protocol/skillDiscovery.js';
-export { invokeAgentSkill, handleTaskRequest, handleTaskOneWay } from './protocol/taskExchange.js';
+export { invokeAgentSkill, handleTaskRequest, handleTaskOneWay, tokenAgentKeyFor } from './protocol/taskExchange.js';
 export { subscribe, unsubscribe, publish, handlePubSub, setSubscribeAuthorizer, dropSubscriber }
   from './protocol/pubSub.js';
 export {

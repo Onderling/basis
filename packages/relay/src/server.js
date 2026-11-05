@@ -182,6 +182,8 @@ const DEFAULT_PORT             = 8787;
 // Parameter register (#36) — offline queue TTL + per-bucket cap (scope:device, kind:internal).
 const DEFAULT_QUEUE_TTL        = param({ key: 'relay.queueTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60_000 });  // 24 h — same as the app's hold queue
 const DEFAULT_QUEUE_CAP        = param({ key: 'relay.queueCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
+// Most sockets standing by for ONE address (a person's devices): the oldest leaves first, so no socket can grow the set.
+const STANDBY_CAP_PER_ADDRESS  = param({ key: 'relay.standbyCapPerAddress', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 // Topic-aware queueing (Phase 7 step 4) caps each (addr, topic) bucket at
 // `queueCap`; the per-address global cap is a safety valve so a publisher
 // flooding many distinct topics can't memory-DoS the relay. Default is
@@ -468,32 +470,87 @@ export async function startRelay(opts = {}) {
   const standbyOf = new Map();     // address → Set<socket> registered plainly while a primary held it
   // Decides the ROLE only; the routing-table write (`clients.set`) stays at the one acceptance line in the
   // register-proof branch, where the circle-blind fitness test reads it.
-  const takeAddress = (address, socket, primary) => {
+  // A STANDBY registration (a device stepping down from primary) only ever makes a registration WEAKER: it takes the
+  // address when no live socket holds it, and otherwise stands by behind whoever does — it never displaces a live
+  // holder. Without it, 'last plain registration wins' let a device that had just been told another is the primary
+  // take the address back in the moment before that other's primary registration was proven. The proof is required
+  // for it exactly as for any registration.
+  /** Stand `sock` by for `address`: the newest at the young end, the oldest out past the cap. */
+  const standBy = (address, sock) => {
+    if (!standbyOf.has(address)) standbyOf.set(address, new Set());
+    const set = standbyOf.get(address);
+    set.delete(sock); set.add(sock);
+    while (set.size > STANDBY_CAP_PER_ADDRESS) set.delete(set.values().next().value);
+  };
+  const takeAddress = (address, socket, primary, standby = false) => {
     const holder = primaryOf.get(address);
+    // A socket that takes this address FROM another live socket leaves that one standing by: it registered the address
+    // (the person's other device — a shared circle address, the profile address) and is still here, so when the new
+    // holder goes the address falls back to it, live, instead of to a queue for the device that left.
+    const displaced = clients.get(address);
+    const keepDisplaced = () => {
+      if (!displaced || displaced === socket || displaced.readyState !== 1) return;
+      standBy(address, displaced);
+    };
+    if (standby && !primary) {
+      if (holder === socket) primaryOf.delete(address);   // stepping down from primary: plain from here
+      const holding = clients.get(address);
+      if (holding && holding !== socket && holding.readyState === 1) {
+        standBy(address, socket);
+        return 'standby';
+      }
+    }
     if (primary) {
       primaryOf.set(address, socket);
+      keepDisplaced();
       standbyOf.get(address)?.delete(socket);
       return 'primary';
     }
     if (holder === socket) primaryOf.delete(address);   // stepping down: plain again
     const live = primaryOf.get(address);
     if (live && live !== socket && live.readyState === 1) {
-      if (!standbyOf.has(address)) standbyOf.set(address, new Set());
-      standbyOf.get(address).add(socket);
+      standBy(address, socket);
       return 'standby';
     }
     if (live && live.readyState !== 1) primaryOf.delete(address);
+    keepDisplaced();
     standbyOf.get(address)?.delete(socket);
     return 'holder';
+  };
+  /**
+   * The address falls to its most recent OPEN standby, live — the person's other device, not a hold queue — and what
+   * was queued for the address while nobody open held it goes there now: the standby proved the address when it
+   * registered, and it will not register again (the register path is the only other drain).
+   */
+  const promoteStandby = (address) => {
+    const next = [...(standbyOf.get(address) ?? [])].reverse().find((s) => s.readyState === 1);
+    if (!next) return null;
+    standbyOf.get(address).delete(next);
+    clients.set(address, next);
+    forwardQueue.drain(address, next, {
+      onEach: (envelope) => logHop({ kind: 'send-queued', from: '?', to: address, envelope }),
+    });
+    return next;
   };
   const releaseAddress = (address, socket) => {
     if (primaryOf.get(address) === socket) primaryOf.delete(address);
     standbyOf.get(address)?.delete(socket);
     if (clients.get(address) !== socket) return;
     clients.delete(address);
-    // the address falls to a standby, live — the person's other device, not a hold queue
-    const next = [...(standbyOf.get(address) ?? [])].reverse().find((s) => s.readyState === 1);
-    if (next) { standbyOf.get(address).delete(next); clients.set(address, next); }
+    promoteStandby(address);
+  };
+  /**
+   * Who a frame for `address` goes to: its live holder when that socket is OPEN. A holder that is CLOSING (its device
+   * said goodbye; the relay has not seen the close yet) is not one — its open standby takes the address now instead of
+   * the frame waiting in a queue for a close event that drains nothing.
+   */
+  const holderOf = (address) => {
+    const live = clients.get(address) ?? null;
+    if (!live || live.readyState === 1) return live;
+    const next = promoteStandby(address);
+    if (!next) return live;
+    if (primaryOf.get(address) === live) primaryOf.delete(address);
+    return next;
   };
   /**
    * Hold-and-forward for offline recipients — the single relay forward owner
@@ -597,7 +654,7 @@ export async function startRelay(opts = {}) {
 
   const deliverOrEnqueue = (to, envelope, topic) =>
     forwardQueue.deliverOrEnqueue(to, envelope, {
-      socket: clients.get(to) ?? null,
+      socket: holderOf(to),
       topic,
       // Per-message wake-gate: an envelope stamped `noWake` (routine governance
       // votes/resolves, reports — the sender consulted `governanceWakeHint`) is
@@ -659,6 +716,7 @@ export async function startRelay(opts = {}) {
     let registeredAddress = null;
     const registeredAddresses = new Set();
     const pendingPrimary = new Map();   // address → the `primary` flag its register frame carried, read at proof time
+    const pendingStandby = new Map();   // address → the `standby` flag (a device stepping down), read at proof time
     const pendingServes = new Map();    // address → whether its register frame said it serves links (`serves: ['feed']`), read at proof time
     /**
      * nonce → { address, expiresAt, meterGroupId } — challenges this socket has been issued and
@@ -762,6 +820,7 @@ export async function startRelay(opts = {}) {
       if (msg.type === 'register') {
         const { address, groupProof } = msg;
         pendingPrimary.set(address, msg.primary === true);
+        pendingStandby.set(address, msg.standby === true);
         pendingServes.set(address, Array.isArray(msg.serves) && msg.serves.includes('feed'));
         if (!address) {
           socket.send(JSON.stringify({ type: 'error', message: 'Missing address' }));
@@ -871,8 +930,8 @@ export async function startRelay(opts = {}) {
 
         if (registeredAddress === null) registeredAddress = address;   // first one is the socket's own
         registeredAddresses.add(address);
-        const role = takeAddress(address, socket, pendingPrimary.get(address) === true);
-        if (role === 'standby') logLine(`[relay] standby     ${shortId(address)} (a primary holds it)`);
+        const role = takeAddress(address, socket, pendingPrimary.get(address) === true, pendingStandby.get(address) === true);
+        if (role === 'standby') logLine(`[relay] standby     ${shortId(address)} (another socket holds it)`);
         else clients.set(address, socket);
         // The seat may ask this address only if it said so itself, here, on the socket that just proved its key.
         if (pendingServes.get(address) === true) feedNodes.set(address, socket);
@@ -952,7 +1011,7 @@ export async function startRelay(opts = {}) {
           }
         }
 
-        const online = clients.get(to);
+        const online = holderOf(to);
         if (online && online.readyState === 1) {
           logLine(`[relay] ${shortId(registeredAddress)} → ${shortId(to)}  _p=${envelope._p ?? '?'}${topic ? ` topic=${topic}` : ''}`);
           // Q-Smoke.4 (locked 2026-04-29): per-hop verbose log + plaintext-leak

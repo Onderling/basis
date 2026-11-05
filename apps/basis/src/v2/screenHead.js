@@ -25,12 +25,13 @@ export const SCREEN_HEAD_DEBOUNCE_MS = param({ key: 'vandaag.headDebounceMs', sc
 
 /**
  * @param {object} a
- * @param {(key: string) => Promise<any>} a.materialize  read the screen for this key (the shell's materializeScreen call)
+ * @param {(key: string) => Promise<any>} [a.materialize]  read the screen for this key (the shell's materializeScreen call);
+ *   a screen that builds its reader per mount hands it to `land` instead
  * @param {Array<(fn: Function) => (() => void)>} [a.subscribe]  each returns its unsubscribe; any call marks the head stale
  * @param {number} [a.debounceMs]
  */
 export function createScreenHead({ materialize, subscribe = [], debounceMs = SCREEN_HEAD_DEBOUNCE_MS }) {
-  if (typeof materialize !== 'function') throw new TypeError('screenHead: materialize required');
+  let reader = typeof materialize === 'function' ? materialize : null;
   let key = null;
   let blocks;
   let fresh = false;
@@ -43,7 +44,8 @@ export function createScreenHead({ materialize, subscribe = [], debounceMs = SCR
     if (inFlight && inFlight.key === k) return inFlight.promise;
     const promise = (async () => {
       try {
-        const out = await materialize(k);
+        if (!reader) throw new TypeError('screenHead: no reader (pass materialize, or land(key, reader))');
+        const out = await reader(k);
         if (key === k) { blocks = out; fresh = true; }
         return out;
       } finally {
@@ -76,8 +78,10 @@ export function createScreenHead({ materialize, subscribe = [], debounceMs = SCR
     .filter((u) => typeof u === 'function');
 
   return {
-    /** The screen is shown with this key: what the head holds when it is fresh for it, else one read. */
-    async land(k) {
+    /** The screen is shown with this key: what the head holds when it is fresh for it, else one read. `reader` (optional)
+     *  replaces the head's reader from here on — a screen that is mounted anew per landing brings its own. */
+    async land(k, reader_ = null) {
+      if (typeof reader_ === 'function') reader = reader_;
       shown = true;
       if (k !== key) { key = k; fresh = false; blocks = undefined; }
       if (fresh) return blocks;

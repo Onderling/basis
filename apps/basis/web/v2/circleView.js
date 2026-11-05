@@ -46,6 +46,7 @@ import { renderMandateLegibility } from './mandatePicker.js';
 import { renderToDom } from '../../src/web/domAdapter.js';
 import { renderCircleScreen } from './circleScreen.js';
 import { renderCircleNoticeboard } from './circleNoticeboard.js';
+import { closeRemovedButton } from './closeRemovedButton.js';
 import { buildAttachControl } from './attachControl.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { pickRowText } from '../../src/v2/rowText.js';
@@ -133,6 +134,10 @@ export function renderCircleView(container, {
   // the composer is read-only — `canPost=false` renders a disabled note instead of the input. The host
   // computes it from `isFeatureEnabled(policy, 'chat')`.
   canPost = true,
+  // …and what is said in its place (`composerGate`'s note key; default: chat is off). `onCloseRemoved` is set only for a
+  // circle an admin removed this person from: the note then offers the close, and the noticeboard is read-only too.
+  composerNoteKey = null,
+  onCloseRemoved = null,
   // Multi-field inline form (web↔mobile parity with mobile's `MultiFieldFormBubble`). When a circle
   // dispatch trips `needsForm` with 2+ missing params, the host sets `pendingForm` to the
   // `PendingFormFollowUp` (shared `src/v2/followUp.js` `beginFormFollowUp`) and the composer renders an
@@ -163,6 +168,8 @@ export function renderCircleView(container, {
   // opens the §2 card — a member row → their persona card, your own row → self-view;
   // the host routes by comparing `member.id` to `selfWebid`.
   members = null,
+  // the members this device has no address for past the re-tell window (a Set of ids), said on their row
+  unreachable = null,
   selfWebid = null,
   revealPolicy = 'pairwise',   // the circle's realName reveal rule; gates the member labels
   onMemberTap = null,
@@ -366,6 +373,9 @@ export function renderCircleView(container, {
       onClearAttach:    noticeboard.onClearAttach,
       onViewAttachment: noticeboard.onViewAttachment,
       onEmbedOpen,
+      // a circle an admin removed this person from: the board reads, it does not post
+      readOnlyNote: typeof onCloseRemoved === 'function' ? tr(composerNoteKey ?? 'circle.membership.removed_note') : null,
+      onCloseRemoved,
     });
   } else if (effectiveTab === 'tasks') {
     // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the
@@ -377,7 +387,7 @@ export function renderCircleView(container, {
     });
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
-    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture,
+    renderLedenTab(body, { members, unreachable, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture,
       // an admin invites from where the members are — the ⋯ menu's own `invite` act, not a second one
       onInvite: viewerIsAdmin && typeof more?.invite === 'function' ? () => more.invite() : null });
   } else if (effectiveTab !== 'conversation') {
@@ -461,7 +471,8 @@ export function renderCircleView(container, {
     const note = document.createElement('div');
     note.className = 'circle-view__composer-disabled';
     note.setAttribute('role', 'note');
-    note.textContent = tr('circle.view.chat_disabled');
+    note.textContent = tr(composerNoteKey ?? 'circle.view.chat_disabled');
+    if (typeof onCloseRemoved === 'function') note.appendChild(closeRemovedButton(tr, onCloseRemoved));
     container.appendChild(note);
   } else if (typeof onSend === 'function' && viewMode !== 'screen') {
     const form = document.createElement('form');
@@ -699,7 +710,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  *
  * `members === null` → loading; `[]` → empty; otherwise the rows.
  */
-function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null, onInvite = null } = {}) {
+function renderLedenTab(body, { members = null, unreachable = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null, onInvite = null } = {}) {
   if (typeof onInvite === 'function') {
     const inv = document.createElement('button');
     inv.type = 'button';
@@ -788,6 +799,15 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
       botEl.dataset.memberBot = 'true';
       botEl.textContent = tr('circle.members_tab.bot');
       row.appendChild(botEl);
+    }
+    // NOT REACHABLE YET: this device has no address for them and a change in the circle has waited for them past the
+    // re-tell window — said in plain words; it heals by itself when they or another member are online
+    if (unreachable?.has?.(m.id)) {
+      const far = document.createElement('span');
+      far.className = 'circle-view__member-secondary circle-view__member-unreachable';
+      far.dataset.notReachable = 'true';
+      far.textContent = tr('circle.membership.not_reachable', { name: label.primary });
+      row.appendChild(far);
     }
 
     // WHO RUNS THE CIRCLE, and how they came to. The role badge is the same rule the admin panel
@@ -1372,3 +1392,4 @@ function buildChatFilterStrip(model, onChatFilter, tr) {
   strip.appendChild(note);
   return strip;
 }
+

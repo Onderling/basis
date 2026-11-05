@@ -255,7 +255,9 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
     /** The full gate (signature + declared kind + key↔ref binding), then the head apply. */
     async ingest(circleId, statement) {
       const res = await base.ingest(circleId, statement);
-      if (res?.ok) {
+      // a statement this log already holds was applied when it first landed: applying it again would put back what a
+      // later statement removed (a sibling re-carrying an old snapshot after the delete)
+      if (res?.ok && !res.existed) {
         try { await applyToHead(circleId, statement.body); }
         catch { /* the entry landed; the head converges on the next snapshot/catch-up */ }
       }

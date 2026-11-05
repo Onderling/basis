@@ -29,7 +29,7 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
             <Text style={styles.title}>{t('circle.vandaag.customise_title')}</Text>
             <Btn variant="primary" label={t('circle.vandaag.done')} onPress={onClose} testID="customise-done" />
           </View>
-          <ScrollView>
+          <ScrollView keyboardShouldPersistTaps="handled">
             {/* the sheet's DECLARED sections (`screenSections.js`), in order, each by its id (= testID) */}
             {sectionsOf('vandaagCustomise').map((d) => {
               const PAINT = {

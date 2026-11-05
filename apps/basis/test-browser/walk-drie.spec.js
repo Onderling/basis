@@ -306,12 +306,43 @@ test('de wandeling met drie — A maakt, B is de basis, C komt en gaat', async (
     };
     const onB = await seenOnBoard(B);
     note('6 · B ziet het prikbordbericht', onB === true ? 'PASS' : onB === null ? 'BLOCKED' : 'FAIL', onB === null ? 'geen Prikbord-tab op B' : '');
-    const onC = await seenOnBoard(C);
+    // C was removed: the circle is no longer one of C's circles (shown as removed, read-only) — nothing to open as a member
+    const cGone = ((await C.page.evaluate(() => window.onderlingCall('pinboard', 'listMyCircles', {})))?.removed ?? []).length > 0;
+    const onC = cGone ? null : await seenOnBoard(C);
     note('6 · C ziet NIETS', onC === false || onC === null ? 'PASS' : 'FAIL', onC === null ? 'C heeft geen Prikbord meer (verwijderd)' : onC ? 'C zag het bericht — de verwijdering hield niet' : 'niets bij C');
     await shotAll(all, '6-prikbord');
 
     // ── 7 · Tot slot, de controle ─────────────────────────────────────────────────────────────
-    for (const p of all) await openWalk(p.page);
+    // C was removed: the circle is out of C's circles (its address off the relays, its keys unbound) and listed as
+    // removed — what a person's shells show read-only until they close it. C does not open it as a member any more.
+    for (const p of [A, B]) await openWalk(p.page);
+    const cMine = await C.page.evaluate(() => window.onderlingCall('pinboard', 'listMyCircles', {}));
+    const cRemoved = (cMine?.removed ?? []).map((r) => r?.id);
+    const cStillIn = (cMine?.circles ?? []).length > 0 && (cMine?.circles ?? []).some((id) => cRemoved.includes(id));
+    note('7 · C: de kring staat als verwijderd', cRemoved.length > 0 && !cStillIn ? 'PASS' : 'FAIL',
+      `circles ${JSON.stringify(cMine?.circles ?? [])} · removed ${JSON.stringify(cRemoved)}`);
+    // …and C's launcher keeps it as a MARKED tile; opened, it reads but does not post; closing takes it away for good
+    await gotoCircles(C.page);
+    const cTile = C.page.locator('.circle-tile.is-removed').filter({ hasText: RE });
+    const marked = (await cTile.count()) > 0;
+    note('7 · C: de tegel staat er, gemarkeerd', marked ? 'PASS' : 'FAIL', marked ? (await cTile.first().innerText()).replace(/\s+/g, ' ').slice(0, 120) : 'geen gemarkeerde tegel');
+    if (marked) {
+      await cTile.first().click();
+      await C.page.waitForTimeout(1500);
+      const composers = await C.page.locator('form.circle-view__composer, form.cc-noticeboard__composer').count();
+      const closeBtn = C.page.locator('[data-testid="close-removed-circle"]');
+      note('7 · C: alleen lezen, met sluiten', composers === 0 && (await closeBtn.count()) > 0 ? 'PASS' : 'FAIL', `composers ${composers} · sluiten ${await closeBtn.count()}`);
+      if (await closeBtn.count()) {
+        await closeBtn.first().click();
+        await C.page.waitForTimeout(1500);
+        await C.page.reload();
+        await C.page.waitForTimeout(4000);
+        await gotoCircles(C.page);
+        const after = await C.page.evaluate(() => window.onderlingCall('pinboard', 'listMyCircles', {}));
+        const gone = (await C.page.locator('.circle-tile.is-removed').count()) === 0 && (after?.removed ?? []).length === 0;
+        note('7 · C: gesloten, en na herladen weg', gone ? 'PASS' : 'FAIL', `removed ${JSON.stringify((after?.removed ?? []).map((r) => r?.id))}`);
+      }
+    }
     await sendChat(B.page, "zijn we nog met z'n tweeën?");
     await sees(A, "zijn we nog met z'n tweeën?", '7');
     await C.page.waitForTimeout(6000);

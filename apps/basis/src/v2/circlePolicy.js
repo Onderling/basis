@@ -545,3 +545,19 @@ export function shouldPushNotify(override, kind) {
   if (kind === 'proposal') return o.push.onProposal;
   return false;
 }
+
+/**
+ * Whether the person can write in this circle, and what is shown in the composer's place when not — one answer for
+ * every shell. A circle an admin removed them from is read-only (its security half ran; a line would not land) and
+ * offers the close; a circle with chat switched off says so.
+ *
+ * @param {object|null} policy   the circle's policy
+ * @param {{removed?: boolean}|null} circle  the launcher's row
+ * @returns {{ canPost: boolean, noteKey: string|null, canClose: boolean }}
+ */
+export function composerGate(policy, circle) {
+  if (circle?.removed === true) return { canPost: false, noteKey: 'circle.membership.removed_note', canClose: true };
+  return isFeatureEnabled(policy, 'chat')
+    ? { canPost: true, noteKey: null, canClose: false }
+    : { canPost: false, noteKey: 'circle.view.chat_disabled', canClose: false };
+}

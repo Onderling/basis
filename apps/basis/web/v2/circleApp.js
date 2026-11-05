@@ -122,7 +122,7 @@ import { renderConfirmDialog } from './confirmDialog.js';
 import { renderRelayQuestionDialog } from './relayQuestionDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -190,7 +190,7 @@ import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
 import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsHome.js';
-import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
+import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant, connectionSelfChoice } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
   createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
@@ -234,7 +234,7 @@ import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, open
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
@@ -362,9 +362,9 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
-  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, announceOwnCircleAddress,
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, makePrimaryResultWords, announceOwnCircleAddress,
 } from '../../src/v2/circleAddressAnnounce.js';
-import { isFeatureEnabled, defaultViewModeFromPolicy } from '../../src/v2/circlePolicy.js';
+import { isFeatureEnabled, defaultViewModeFromPolicy, composerGate } from '../../src/v2/circlePolicy.js';
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
 import { buildTaskRows } from '../../src/v2/taskRows.js';
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions block.
@@ -409,6 +409,7 @@ import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBl
 import { localUserScreenStore, getActiveScreen, blockTypesShowingCircle } from '../../src/v2/userScreens.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../src/v2/vandaag.js';
 import { createScreenHead } from '../../src/v2/screenHead.js';
+import { watchCircleChanges } from '../../src/v2/headCircleWatch.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderVandaagCustomise } from './vandaagCustomise.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
@@ -787,7 +788,7 @@ import { renderRulesEditor } from './circleRulesEditor.js';
 // per circle store at construction time; snapshots every save into
 // `cc.versions.<storeName>.<circleId>`.  Invisible to the UI in γ.2;
 // γ.3 will surface the history.
-import { loadCircles } from '../../src/v2/circleModel.js';
+import { loadCircles, loadRemovedCircles, withLeavingMarks } from '../../src/v2/circleModel.js';
 import { circleSourcesFromAgent, makeResolvingCallSkill } from '../../src/v2/circleSources.js';
 import { loadCircleItems } from '../../src/v2/circleContent.js';
 import { DEFAULT_CIRCLE_RAG_MIN_SCORE } from '../../src/v2/circleRetriever.js';
@@ -840,7 +841,7 @@ import { renderCircleLauncher } from './circleLauncher.js';
 import { renderCircleTabBar, hideCircleTabBar } from './circleTabBar.js';
 import { renderCircleSettings } from './circleSettings.js';
 import { renderCircleOverride } from './circleOverride.js';
-import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../../src/v2/circleSecurityPriming.js';
 import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 // The SHARED security-status report — the same function mobile reaches through the builtins table.
 import { securityStatus } from '../../src/core/localBuiltins.js';
@@ -962,6 +963,8 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
     const routes = [nknLib && 'nkn', CIRCLE_RELAY_URL && 'relay'].filter(Boolean).join(' + ');
     console.info(`[circleApp] peer transport connected (${routes}, routed) + rendezvous`);
     registerCirclePresence(agent);   // G13 — fire-and-forget; see the helper for why boot never waits
+    // a re-key moved this person's circle addresses: register the new ones (the ceremony waits for it)
+    agent.onCircleRootMoved?.(({ circleIds }) => registerCirclePresence(agent, circleIds));
   } catch (err) {
     console.warn('[circleApp] peer connect failed — circle chat is local-only:', err?.message ?? err);
   }
@@ -1002,16 +1005,10 @@ async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   // door refused that as "a member's canonical identity" — Frits' phone → Wilfred, 2026-09-21, three times, nothing
   // fanned. Mobile (`liveCircleIds`) and the box asked the substrate all along; the union keeps a circle the
   // substrate has not caught up on yet (a just-joined one arrives as `extraCircleIds`).
-  let held = [];
-  try {
-    held = ((await agent?.callSkill?.('pinboard', 'listMyCircles', {}))?.circles ?? [])
-      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-  } catch { held = []; }
-  const circleIds = [...new Set([
-    ...held,
-    ...circlesCache.map((c) => c?.id).filter(Boolean),
-    ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
-  ])];
+  // …minus a circle the fold says was left or removed (the shared filter: kept from the cache, it went back onto the relay)
+  let mine = null;
+  try { mine = await agent?.callSkill?.('pinboard', 'listMyCircles', {}); } catch { mine = null; }
+  const circleIds = presenceCircleIds(mine, mine?.circles, circlesCache, extraCircleIds);
   // Decisions 4 + 1 — the per-circle SIGNING identity AND the roster snapshot that authorizes senders,
   // for EVERY circle, before (and independently of) the relay scoping below. One shared primer, called
   // identically by mobile (`agentBundle.js`). Note it asks the SUBSTRATE rather than trusting the ids
@@ -1422,6 +1419,17 @@ const applyIncomingReceipt = makeReceiptReceiver({
 let rootEl = null;
 let tabBarEl = null;
 let circlesCache = [];
+// the circles an admin removed this person from: the launcher's marked, read-only tiles only — no other reader
+let removedCirclesCache = [];
+/** Both launcher lists, read together: the circles the person is in, and the removed ones kept until closed. */
+// Circles left on this device whose leave was handed to the main device to sign (id → { held }): marked on the tile
+// until the signed leave lands back and the circle drops out of the list.
+const leavingCircles = new Map();
+async function loadLauncherCircles() {
+  const [mine, removed] = await Promise.all([loadCircles(sources), loadRemovedCircles(sources).catch(() => [])]);
+  removedCirclesCache = removed;
+  return mine;
+}
 // CONNECTIONS — the last `listSurfaceGrants` read, kept so the Mij list paints without awaiting.
 // A cache, never an authority: the grants live in the agent's durable registry and the door reads
 // THAT, so a stale cache can only ever show a stale list, never permit a stale action.
@@ -1775,7 +1783,13 @@ let circleAvailabilityNow = null;
 if (typeof window !== 'undefined') {
   /** The relays this device is on — the primary and the ones its circles ride (an e2e/debug seam). */
   window.onderlingRelays = () => {
-    try { return (_peerAgent?.relays?.list?.() ?? []).map((r) => ({ url: r.url, primary: r.primary, connected: r.connected })); }
+    try {
+      return (_peerAgent?.relays?.list?.() ?? []).map((r) => {
+        const reg = r.port?.registrations ?? r.transport?.registrations ?? null;
+        const short = (a) => String(a).slice(0, 10);
+        return { url: r.url, primary: r.primary, connected: r.connected, ...(reg ? { asked: reg.asked.map(short), acked: reg.acked.map(short) } : {}) };
+      });
+    }
     catch { return []; }
   };
   /** @param {object[]} [items] the rows in front of the walker, if it is looking at a list. */
@@ -2899,11 +2913,21 @@ function feedbackScreenState() {
   return { inCircle: !!getActiveCircle(), screen: _activeTab };
 }
 let _contactUnread = {};           // the last computed unread map (contactId → {unread, lastTs}); the bar reads its sum
+// A screen behind a tab (a settings group, a sub-screen) hides the tab bar: the tab's head is not shown any more, so a
+// change it hears waits for the next landing instead of painting the tab over the screen that is open.
+function hideTabBar() {
+  _vandaagHead?.hide();
+  _mijHead?.hide();
+  _mijShown += 1;
+  hideCircleTabBar(tabBarEl);
+}
+
 function showTabBar(active) {
   // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
   // it must not repaint the thread over whatever is showing.
   _activeContactThread = null;
   if (active !== 'screens') _vandaagHead?.hide();   // Vandaag is not shown: a change waits for the next landing
+  if (active !== 'mij') _mijHead?.hide();
   _activeTab = active;
   renderCircleTabBar(tabBarEl, {
     active, t,
@@ -2911,7 +2935,7 @@ function showTabBar(active) {
     onCircles: showLauncher,
     onNearby: showNearby,
     onContacts: showContacts,
-    onMij: showMij,
+    onMij: showMijTab,
     badges: { contacten: totalUnread(_contactUnread) },
   });
   // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
@@ -3316,7 +3340,7 @@ async function addBotFromInput(input) {
 // the contact-thread channel (sa.peer → mdns/relay/nkn); the async reply lands
 // via `onContactReply` (registered in the peer router) and re-renders here.
 async function showContactThread(contactId, { draft = '' } = {}) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
 
   let row = null;
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
@@ -3587,6 +3611,7 @@ function writeSeenAt(map) {
   try { window.localStorage.setItem(SEEN_AT_KEY, JSON.stringify(map)); }
   catch { /* quota / disabled */ }
   _vandaagHead?.invalidate();   // Vandaag's "circles with news" counts what is not yet seen
+  _mijHead?.invalidate();       // …and Mij's unread reading
 }
 // …and on LEAVING a circle too: what happened while you were inside is not news on the launcher (one rule, both shells).
 subscribeActiveCircle(seenOnLeave((id) => writeSeenAt(bumpSeenAt(readSeenAt(), id))));
@@ -3685,7 +3710,8 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  * enrolled device showed none of its circles until a reload (found 2026-09-24 by the own-devices browser walk).
  */
 async function circlesChangedUnderneath() {
-  try { circlesCache = await loadCircles(sources); } catch { return; }
+  try { circlesCache = await loadLauncherCircles(); } catch { return; }
+  _vandaagHead?.invalidate();   // Vandaag reads over this list: a circle that came or went changes what it shows
   // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
   if (getActiveCircle() == null && _activeTab === 'circles') { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
 }
@@ -3701,7 +3727,10 @@ function paintLauncher() {
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
-    circles: tileCircles(circlesShown()),   // the circles of the selves ticked in the header; the help circle's door is in Contacten
+    // the circles of the selves ticked in the header; the help circle's door is in Contacten. A circle being left is
+    // marked at PAINT time, so a reload that started before the mark was set cannot paint it away
+    circles: tileCircles(withLeavingMarks(circlesShown(), leavingCircles)),
+    removedCircles: removedCirclesCache,
     previews,
     proposals: launcherProposals,
     pinnedMap: launcherPinnedMap,
@@ -3787,7 +3816,7 @@ async function onLeaveCircle(id, circle) {
   // Passed in as the shell's own step: it needs a transport handle, the one thing that genuinely
   // differs per shell.
   try {
-    await leaveCircleLocally({
+    const left = await leaveCircleLocally({
       agent: _peerAgent, callSkill: rawCallSkill,
       circleId: id,
       unregister: () => unregisterCircleAddressesOnRelays({
@@ -3795,10 +3824,11 @@ async function onLeaveCircle(id, circle) {
         circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
       }),
     });
+    if (left?.forwarded) leavingCircles.set(id, { held: left.held === true });
   } catch (err) {
     console.warn('[circleApp] leaveGroup failed:', err?.message ?? err);
   }
-  try { circlesCache = await loadCircles(sources); }
+  try { circlesCache = await loadLauncherCircles(); }
   catch { /* keep cache */ }
   // Drop the pin if the circle is gone — the map otherwise keeps a
   // dangling key that the partition would happily filter out anyway,
@@ -3889,7 +3919,7 @@ function connectedRelayUrls() {
 }
 
 function showConnectionPoints() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const store = getConnectionPoints();
   let removing = null;
   let addError = null;
@@ -4170,7 +4200,7 @@ function handleNearbyAction(action, row) {
 // active user webid stays null on web today; the substrate falls back to
 // "anything without an owner" which matches the V0 single-user state.
 async function showMyThings() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let files = [];
   const rerender = () => renderCircleMyThings(rootEl, {
     files, t, onBack: showLauncher,
@@ -4209,7 +4239,12 @@ function vandaagHead() {
   if (_vandaagHead || typeof circleHouseholdAgent?.onCircleChanged !== 'function') return _vandaagHead;
   _vandaagHead = createScreenHead({
     materialize: () => materializeVandaag(),
-    subscribe: [(fn) => circleHouseholdAgent.onCircleChanged(fn), (fn) => eventLog.subscribe(fn)],
+    // a change in a circle the list does not hold yet (joined elsewhere, through an offer, by an op) re-reads the list first
+    subscribe: [watchCircleChanges({
+      onCircleChanged: (fn) => circleHouseholdAgent.onCircleChanged(fn),
+      knows: (cid) => (circlesCache ?? []).some((c) => c?.id === cid),
+      refresh: async () => { circlesCache = await loadLauncherCircles(); },
+    }), (fn) => eventLog.subscribe(fn)],
   });
   _vandaagHead.onUpdate((blocks) => { if (_activeTab === 'screens' && getActiveCircle() == null) paintVandaagBlocks(blocks); });
   return _vandaagHead;
@@ -4370,6 +4405,7 @@ function shellGovernance({ myWebid = '' } = {}) {
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;
@@ -4578,8 +4614,30 @@ function onScreenAction(action) {
 // person's agents and devices, one door to My data, Advanced behind the developer switch. The identity fields and
 // the location are in the person's own editor (the identity line's "Edit" → openAboutMePanel); the overview is on
 // Vandaag; the other doors are behind My data.
-async function showMij() {
+// MIJ'S HEAD (`screenHead.js`): Me's blocks as last read for its key, kept current by the circles' items, the event log
+// and the agent registry (a profile's facts are the registry's, no circle's) — a tab landing on a fresh head reads nothing.
+let _mijHead = null;
+let _mijShown = 0;   // bumped whenever a screen replaces the tab's own: a read that finishes after it paints nothing
+let _mijPaint = null;
+const _mijReads = { landings: 0, materializes: 0, ops: 0 };
+if (typeof window !== 'undefined') window.onderlingMijReads = _mijReads;
+function mijHead() {
+  if (_mijHead || typeof circleHouseholdAgent?.onCircleChanged !== 'function') return _mijHead;
+  _mijHead = createScreenHead({ subscribe: [
+    (fn) => circleHouseholdAgent.onCircleChanged(fn),
+    (fn) => eventLog.subscribe(fn),
+    (fn) => circleHouseholdAgent.onRegistryChanged?.(fn) ?? (() => {}),
+  ] });
+  _mijHead.onUpdate((blocks) => { if (_activeTab === 'mij') _mijPaint?.(blocks); });
+  return _mijHead;
+}
+
+/** Mij from its tab: the one way in that reads the head as it is. */
+function showMijTab() { return showMij({ landing: true }); }
+
+async function showMij({ landing = false } = {}) {
   showTabBar('mij');
+  const shownAt = _mijShown;
   // The Advanced screen is a developer tool (raw parameter keys): offered only when the developer switch is on.
   let developer = false;
   try { developer = (await circleHouseholdAgent?.callSkill?.('params', 'get-param', { key: DEVELOPER_PARAM_KEY }))?.value === true; } catch { /* off */ }
@@ -4611,8 +4669,10 @@ async function showMij() {
   const mijSelf = oneSelf && oneSelf !== 'default'
     ? { id: oneSelf, name: _selfSet.held.find((p) => p.id === oneSelf)?.name ?? null, deviceId: circleHouseholdAgent?.persona?.(oneSelf)?.enrolledDevice?.deviceId ?? null }
     : null;
-  blocks = await mijScreenBlocks({ hostOps: {
-    callSkill: rawCallSkill, eventLog, circles: circlesShown(), ...(mijSelf ? { mijSelf } : {}),
+  _mijPaint = (b) => { blocks = b; rerender(); };
+  const counted = (...a) => { _mijReads.ops += 1; return rawCallSkill(...a); };
+  const readMij = async () => { _mijReads.materializes += 1; return mijScreenBlocks({ hostOps: {
+    callSkill: counted, eventLog, circles: circlesShown(), ...(mijSelf ? { mijSelf } : {}),
     seenAt: readSeenAt(), myRefs: unreadMyRefs, selfIn: mySelfIn,
     availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
@@ -4625,15 +4685,21 @@ async function showMij() {
     pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),
     // what was shared with the person: a chip on Mij (once a door on My data)
     sharedWithMeCount: async () => (await sharedWithMeStore.list()).length,
-  } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
-  if (_activeTab === 'mij') rerender();
+  } }); };
+  // a tab landing reads the head; every other way into Mij follows an act (an edit, a sub-screen's back) and reads again
+  const head = mijHead();
+  if (head && !landing) head.invalidate();
+  const key = JSON.stringify({ circles: circlesShown().map((c) => c?.id).filter(Boolean).sort(), selves: [...(_selfSet.on ?? [])].sort(), self: mijSelf?.id ?? null });
+  _mijReads.landings += 1;
+  blocks = await (head ? head.land(key, readMij) : readMij()).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
+  if (_activeTab === 'mij' && shownAt === _mijShown) rerender();
 }
 
 // Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card pinboard makes
 // (`getContactShareQr` — webid, key, name, the address I am written to, my relay), painted three ways. The LINK is
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
 async function showShareMyContact() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const { payload, link, qr } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
   renderShareMyContact(rootEl, { payload, link, qr, t, onBack: showMij });
 }
@@ -4652,7 +4718,7 @@ async function showShareMyContact() {
 // identity is available the opener is null and `onOpen` stays DENY-SAFE (a row tap is a no-op,
 // never ciphertext), exactly as the mobile SharedWithMeScreen degrades.
 async function showSharedWithMe() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let received = [];
   try { received = await sharedWithMeStore.list(); } catch { received = []; }
   // Project the raw store entries through the SHARED selector (newest-first, row shape) — the
@@ -4675,7 +4741,7 @@ async function showSharedWithMe() {
  * offers the only undo there is.
  */
 async function showBlocked() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const paint = async (loading) => {
     let peers = [];
     let members = [];
@@ -4703,7 +4769,7 @@ async function showBlocked() {
 
 /** This device's log as the person may copy it (codes + numbers only); nothing is sent from here. */
 function showLogReport() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
   renderLogReport(rootEl, { text, n, t, onBack: () => showMyData({ group: 'my-data' }) });   // its door is in Mijn gegevens
 }
@@ -4718,7 +4784,7 @@ function showLogReport() {
  * surface-less opId lands here automatically; nothing can be invisible by omission.
  */
 async function showAdvanced() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   const ops = advancedOpRows({ manifests: Object.values(circleManifestsByOrigin) });
   let params = [];
   try { params = (await rawCallSkill('params', 'list-user-params', {}))?.params ?? []; } catch { /* register absent → ops only */ }
@@ -4856,7 +4922,9 @@ async function showMyData(opts) {
   // a ceremony or wizard that closes comes back to the screen it was opened from
   const again = () => showMyData(opts);
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
-  hideCircleTabBar(tabBarEl);
+  // the selves this device holds now (a persona made since the last refresh): the pairing form asks which one a screen is for
+  try { await refreshSelfSet(); } catch { /* the set as held stands */ }
+  hideTabBar();
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
   let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
@@ -4883,8 +4951,8 @@ async function showMyData(opts) {
   // "Make this device my primary contact address": announce this device's address in every circle with the
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
-    const r = await makeThisDevicePrimary({ agent: _peerAgent }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
-    try { window.alert(t('circle.mydata.make_primary_done', { count: r.announced })); } catch { /* headless */ }
+    const r = await makeThisDevicePrimary({ agent: _peerAgent, personas: _selfSet.on }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
+    try { const w = makePrimaryResultWords(r); window.alert(t(w.key, w.params)); } catch { /* headless */ }
   };
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
@@ -5003,10 +5071,12 @@ async function showMyData(opts) {
       // dispatch catalogue can never disagree about what an op is.
       ops: connectionOpChoices({ manifests: connectionManifestSources() }),
       sections: connectionSectionChoices({ circles: circleListForConnections() }),
+      // which self the screen is for (a persona issues its grants as itself): the switcher's set
+      self: connectionSelfChoice({ held: _selfSet.held, on: _selfSet.on }),
     },
     parseConnectionOffer: parsePairingOffer,
-    onPairConnection: async ({ viewPubKey, nonce, label, ops, sections }) => {
-      const args = compileConnectionGrant({ viewPubKey, ops, sections, label });
+    onPairConnection: async ({ viewPubKey, nonce, label, ops, sections, persona }) => {
+      const args = compileConnectionGrant({ viewPubKey, ops, sections, label, persona });
       if (!args) return;                      // a pick that grants nothing creates nothing
       try { await circleHouseholdAgent.callSkill('household', 'grantSurface', { ...args, ...(nonce ? { nonce } : {}) }); }
       catch { /* the list re-reads; a failure leaves no half-connection */ }
@@ -5119,6 +5189,8 @@ async function showMyData(opts) {
   if (sess?.signedIn && sess.webid) {
     podStatus = { signedIn: true, webid: sess.webid };
     if (circleRealPodRouting?.podRoot) dataLocation = { ...dataLocation, podRoot: circleRealPodRouting.podRoot };
+  } else if (sess?.signInError) {
+    podStatus = { ...podStatus, signedIn: false, signInError: sess.signInError };   // the last sign-in came back failed
   }
   privacy = Array.isArray(priv?.sections) ? priv.sections : [];
   metrics = (met?.snapshot && typeof met.snapshot === 'object') ? met.snapshot : {};
@@ -5127,7 +5199,7 @@ async function showMyData(opts) {
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
 function showSettingsHome() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   renderSettingsHome(rootEl, {
     t, onBack: showMij,
     onOpenGroup: (id) => showMyData({ group: id }),
@@ -5145,7 +5217,7 @@ function showSettingsHome() {
 
 /** "Per kring": the person's circles, each opening that circle's own settings screen (a door, never a copy). */
 function showSettingsCircleChooser() {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   renderCircleSettingsChooser(rootEl, {
     t, onBack: showSettingsHome,
     circles: (circlesCache ?? []).map((c) => ({ id: c.id, name: c.name ?? '' })),
@@ -5306,7 +5378,7 @@ async function showJoinCircle(inviteArg) {
         catch { /* best-effort — a failed prefs write must not break the join */ }
       }
       // (The joined circle's connection point is recorded in `circleOnJoined`, before presence and the pull.)
-      try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* */ }
+      try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* */ }
     },
   });
 }
@@ -5863,7 +5935,7 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
     const built = await rawCallSkill('household', 'buildEnrollOffer', { relayUrl: CIRCLE_RELAY_URL || undefined }).catch(() => null);
     if (!built?.ok || !built.uri) {
       const err = document.createElement('p');
-      err.textContent = t('circle.enroll.offer_error');
+      err.textContent = t(enrollOfferErrorKey(built));
       card.append(err, back);
       return;
     }
@@ -6772,7 +6844,7 @@ async function maybeProvisionHelpCircle() {
       bot: onderlingBotMember(t('circle.onboarding.help_name')),
     });
     if (r.provisioned) {
-      try { circlesCache = await loadCircles(sources); } catch { /* keep current cache */ }
+      try { circlesCache = await loadLauncherCircles(); } catch { /* keep current cache */ }
     }
   } catch (err) {
     console.warn('[circleApp] help-circle provisioning failed', err?.message ?? err);
@@ -6843,7 +6915,7 @@ function openCreateCircleWizard() {
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
       // the founder's first policy (the wizard wrote it locally) goes on the lane, so a joiner catches it up
       if (gid) circlePolicyLane.state(gid).catch(() => {});
-      try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
+      try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
     },
   });
 }
@@ -6928,7 +7000,7 @@ async function runHelpLlm(id, query) {
 let _openOverride = {};   // the open circle's member override (my private per-circle choices), read at open
 
 async function showDetail(id) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   setActiveCircle(id);
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
   // so items added here fan out to them. Member-only + deduped; safe to call often.
@@ -6940,7 +7012,7 @@ async function showDetail(id) {
   // bump the seenAt marker so the next launcher render clears
   // this circle's unread badge.
   writeSeenAt(bumpSeenAt(readSeenAt(), id));
-  const circle = circlesCache.find((c) => c.id === id) || { id };
+  const circle = circlesCache.find((c) => c.id === id) || removedCirclesCache.find((c) => c.id === id) || { id };
   // no chat-shell auto-route anymore. Every circle opens the
   // circle view; v2 §1 says chat IS the circle view (CONVERSATION tab).  The
   // CONVERSATION render lands in.
@@ -7127,6 +7199,7 @@ function showCircle(id, circle, policy) {
   // G16 — the MEMBERS tab's trail-roster (canonical Member via normalizeCircleMembers).
   // null = not loaded yet → the tab shows its loading state; [] = loaded empty.
   let circleRoster = null;
+  let circleUnreachable = new Set();   // members this device has no address for past the re-tell window (their row says so)
   let circleMutedActors = new Set();   // the person-mute view filter's resolved actor refs (see loadRoster)
   let noticeboardPendingAttachment = null;   // { encoded, thumbnail, name } before posting
   let myWebid = null;   // fetched once, best-effort (whoAmI is a pinboard skill, not chat-manifested)
@@ -7263,6 +7336,7 @@ function showCircle(id, circle, policy) {
       rawRoster = Array.isArray(res?.members) ? res.members : [];
       circleRoster = normalizeCircleMembers(res);
     } catch { circleRoster = []; }
+    try { circleUnreachable = new Set((await circleHouseholdAgent?.unreachableMembersOf?.(id)) ?? []); } catch { circleUnreachable = new Set(); }
     tellCaretakerIfTheCircleBecameTheirs(rawRoster);
     tellIfIWasRemoved(rawRoster);   // …and the other direction: a circle that is no longer yours
     // The person-mute set, resolved to actor refs against this roster — the chat projection hides these
@@ -7650,6 +7724,7 @@ function showCircle(id, circle, policy) {
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,
+      unreachable: circleUnreachable,
       resolvePicture: circlePictureResolver(id, policy),
       // the ⋯ roster's op entries ask the one fold (`opAvailability`)
       availability: circleAvailabilityNow,
@@ -7686,8 +7761,16 @@ function showCircle(id, circle, policy) {
       // Composer affordances (classic-shell parity): slash-suggest off the merged catalogue + bash history.
       catalogue: circleCatalogue,
       history: circleInputHistory,
-      // Permission gate — chat disabled for this circle ⇒ read-only composer (classic `allowCommands` analog).
-      canPost: isFeatureEnabled(policy, 'chat'),
+      // Permission gate (the shared `composerGate`): chat off, or a circle an admin removed me from ⇒ a read-only note in
+      // the composer's place; the removed one offers the close (`dismissRemovedCircle`, then back to the launcher).
+      canPost: composerGate(policy, circle).canPost,
+      composerNoteKey: composerGate(policy, circle).noteKey,
+      onCloseRemoved: composerGate(policy, circle).canClose ? async () => {
+        const r = await rawCallSkill('pinboard', 'dismissRemovedCircle', { groupId: id }).catch((err) => ({ ok: false, error: err?.message }));
+        if (r?.ok !== true) { console.warn('[circle] closing a removed circle failed:', r?.error ?? r); return; }
+        removedCirclesCache = removedCirclesCache.filter((c) => c.id !== id);
+        showLauncher();
+      } : null,
       // media — the sealed attach affordance + the chip's opener. Both null until the
       // circle's media composition resolves (and forever for p0/p1 — sealed-only).
       onAttachMedia: circleMedia ? circleAttachMedia : null,
@@ -8134,7 +8217,7 @@ function showSkills(id) {
 // id; each mutation persists via recipeStore.update then refreshes the
 // in-memory copy + the screen screenBlocks for whatever circle is open.
 function showRecipeEditor(circleId) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let book = { recipes: [], activeId: null };
   let mode = 'book';
   let editingRecipeId = null;
@@ -8540,6 +8623,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
   });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
   catch { return { ok: false }; }
@@ -8557,6 +8641,7 @@ async function showGovernance(id) {
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
+    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;
@@ -8683,21 +8768,24 @@ async function showOverride(id) {
 // group admin panel (member roster + role changes + remove + announcements). Reached from
 // the circle `⋯` menu. Ops are admin-gated server-side; a refusal surfaces a notice.
 async function showAdmin(id) {
-  hideCircleTabBar(tabBarEl);
+  hideTabBar();
   let members = [];
   let muted = [];
   let outboundShares = [];          // objective L — this circle's outbound canonical shares (Stop-sharing rows)
   let outboundCanonical = false;    // circle-level posture gate: only a `canonical` circle can revoke in place
   let busy = false;
   let notice = null;
+  let outboxLine = null;            // changes handed to the main device: over a day, or not sent
   let myWebid = '';                 // whose row is mine — the role control is offered to an admin only
 
   async function load() {
-    const [mem, mut, who] = await Promise.all([
+    const [mem, mut, who, outbox] = await Promise.all([
       rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }).catch(() => null),
       rawCallSkill('pinboard', 'listMutedPeers', {}).catch(() => null),
       rawCallSkill('pinboard', 'whoAmI', {}).catch(() => null),
+      rawCallSkill('household', 'ownSpineOutbox', {}).catch(() => null),
     ]);
+    outboxLine = ownSpineOutboxLine(outbox);
     myWebid = who?.webid ?? who?.webId ?? '';
     members = Array.isArray(mem?.members) ? mem.members : [];
     muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
@@ -8712,7 +8800,7 @@ async function showAdmin(id) {
     rerender();
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
-    members, muted, outboundShares, outboundCanonical, busy, notice, t,
+    members, muted, outboundShares, outboundCanonical, busy, notice, outboxLine, t,
     resolvePicture: circlePictureResolver(id),
     viewerWebid: mySelfIn(id) ?? myWebid,
     onBack: () => showDetail(id),
@@ -8735,7 +8823,7 @@ async function showAdmin(id) {
             const r = await rawCallSkill('pinboard', 'setMemberRole', {
               groupId: id, memberWebid: m.webid, role: control.role,
             });
-            notice = r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name });
+            notice = t(roleChangeNoticeWords(r, control).key, { name });
           } catch { notice = t('circle.admin.refused'); }
           busy = false; await load();
         },
@@ -9077,6 +9165,7 @@ async function boot() {
   let podSession = null;
   try {
     podSession = (await podAuth.handleRedirect().catch(() => null)) || podAuth.getCurrentSession?.();
+    if (!podSession && podAuth.lastSignInError?.()) console.warn(`[podAuth] the pod sign-in did not complete: ${podAuth.lastSignInError()}`);
     const podRoot = podSession ? await discoverPodRoot(podSession).catch(() => null) : null;
     circleRealPodRouting = realPodRouting(podSession, { PodClient, SolidOidcAuth, podRoot });
     // embed-ref resolution reads the user's own private-pod items with this fetch.
@@ -9431,7 +9520,9 @@ async function boot() {
         on: {
           govChange: govChanged,
           keyChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
-          membershipChange: (cid) => { pullRosterForCircle({ circleId: cid }).catch(() => { /* best-effort */ }); },
+          // …and the circles list: a leave made on a device that is not the point is signed there and lands back here
+          // seconds after the launcher re-read, so the left circle's tile would stay until a reload
+          membershipChange: (cid) => { pullRosterForCircle({ circleId: cid }).catch(() => { /* best-effort */ }); circlesChangedUnderneath().catch(() => {}); },
           chatLanded: ({ msgId, circleId: cid, fromPeerAddr, source }) => onCircleStored({ msgId, circleId: cid, fromPeerAddr, source }),
           chatChange: (cid) => { if (cid === _circleRender?.circleId) { try { _circleRender?.rerender?.(); } catch { /* the entry landed either way */ } } },
           // Above the auto-allow ceiling the person gets the real question, as a circle bubble here.
@@ -9776,7 +9867,7 @@ async function boot() {
   }
 
   try {
-    circlesCache = await loadCircles(sources);
+    circlesCache = await loadLauncherCircles();
     registerCirclePresence();   // G13 — the connect-time call may have run before circles were known
     refreshAgentActors();       // P1.7 — populate the people/agents axis (best-effort, non-blocking)
   } catch (err) {

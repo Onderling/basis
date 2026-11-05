@@ -28,6 +28,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VaultMemory } from '@onderling/vault';
+import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { EventLog } from '../src/eventLog.js';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, until, teardown } from './support/pairRealAgents.js';
@@ -74,7 +75,9 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     // file here). A reboot that forgot its rosters would not know its own box.
     vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), pinboardPersistDb: { path: path.join(dataDir, 'phone-pinboard-state.json') },
       // the circles' own stores are durable on a device, as on every shell: the roster trail lives there
-      householdPersistDb: { path: path.join(dataDir, 'phone-household-state.json') } };
+      householdPersistDb: { path: path.join(dataDir, 'phone-household-state.json') },
+      // …and its agent registry (every shell persists it): the device map is where it knows its own box from
+      registryBackend: createMemoryBackend() };
 
     // ── Frits' phone: his account, one circle (the sibling rail rides circles), on the relay. ──────
     phone = await bootPhone(vaults, relayUrl);

@@ -23,6 +23,13 @@ describe('tombstones are monotone', () => {
     expect(out.agents.map((a) => a.agentId)).toEqual(['default']);
     expect(out.agents[0].properties.deviceDelegations.value.d9).toEqual({ pubKey: 'k9', revoked: true });
   });
+  it('the signed revocation goes with the flag (else the tombstone never travels on the device-map carry)', () => {
+    const rv = { profileId: 'default', deviceId: 'd1', by: 'auth', sig: 'rv' };
+    const live = unionTombstones(body([agent('default', { d1: { pubKey: 'k1' } })]), body([agent('default', { d1: { pubKey: 'k1', revoked: true, revocation: rv } })]));
+    expect(live.agents[0].properties.deviceDelegations.value.d1.revocation, 'onto a live record').toEqual(rv);
+    const bare = unionTombstones(body([agent('default', { d1: { pubKey: 'k1', revoked: true } })]), body([agent('default', { d1: { pubKey: 'k1', revoked: true, revocation: rv } })]));
+    expect(bare.agents[0].properties.deviceDelegations.value.d1.revocation, 'onto a tombstone that lacked it').toEqual(rv);
+  });
   it('nothing to carry → the same body (no needless write)', () => {
     const mine = body([agent('default', { d1: { pubKey: 'k1' } })]);
     expect(unionTombstones(mine, body([agent('default', { d1: { pubKey: 'k1' } })]))).toBe(mine);

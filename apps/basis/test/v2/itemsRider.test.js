@@ -105,6 +105,28 @@ describe('the items lane — snapshots on the device log, heads causally merged'
     expect(ada.eventLog.entries).toHaveLength(3);                       // the contact snapshot joined the lane
   });
 
+  it('a statement delivered AGAIN is not applied again: a re-carried old snapshot never brings back what was removed', async () => {
+    const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:bo', role: 'member' }];
+    const wire = [];
+    const ada = await device('webid:ada', rosterAll, wire);
+    const bo  = await device('webid:bo',  rosterAll, wire);
+    const [task] = await addTasks(ada.store, [{ text: 'water the plants' }], { actor: 'webid:ada' });
+    await settle();
+    const snapshot = wire[0]?.statement;
+    expect(snapshot?.body?.kind).toBe('snapshot');
+    await pump(wire, [ada, bo]);
+    expect((await bo.store.get(task.id))?.text).toBe('water the plants');
+    // ada removes it; the remove reaches bo
+    await ada.store.delete(task.id, { by: 'webid:ada' });
+    await settle();
+    await pump(wire, [ada, bo]);
+    expect(await bo.store.get(task.id), 'removed on bo').toBeFalsy();
+    // a sibling re-carries the OLD snapshot (it landed there earlier): bo already holds it, and must not apply it again
+    await bo.receiver(null, { subtype: ITEMS_BROADCAST, circleId: CIRCLE, event: snapshot });
+    await settle();
+    expect(await bo.store.get(task.id), 'still removed after the old snapshot came again').toBeFalsy();
+  });
+
   it('a ROSTER row never rides this lane: not served in a catch-up, and refused if a peer snapshots one (2026-09-13)', async () => {
     // Two devices of one person each hold "the person's row" with a different primary (a device never
     // records its own address; it records its siblings' by announce). Carried as a items-lane snapshot,

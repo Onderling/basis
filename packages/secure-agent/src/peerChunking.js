@@ -79,8 +79,11 @@ export function chunkPayloadForRoute(payload, maxEnvelopeBytes, { transferId = n
  * buffer forever); eviction is lazily swept on arrival, so an idle agent holds no timers.
  */
 export function makeChunkReassembler({
-  onPayload, ttlMs = 120_000, maxTransfers = 32, maxTransferChars = 24 * 1024 * 1024,
+  onPayload, onDrop = null, ttlMs = 120_000, maxTransfers = 32, maxTransferChars = 24 * 1024 * 1024,
 } = {}) {
+  // every transfer this gives up on SAYS WHY (the caller logs it once per reason and sender): a chunked frame that reached
+  // the socket and was swallowed here, without a line, looked exactly like one that never arrived
+  const drop = (reason, env) => { try { onDrop?.(reason, env); } catch { /* the report never breaks the receive path */ } };
   const inflight = new Map();   // `${from} ${transferId}` → {chunks: string[], size, touched}
   const sweep = (now) => {
     for (const [k, v] of inflight) {
@@ -96,7 +99,7 @@ export function makeChunkReassembler({
     const key = `${env._from} ${p.transferId}`;
     let entry = inflight.get(key);
     if (!entry) {
-      if (inflight.size >= maxTransfers) return true;   // over budget: swallow rather than grow unbounded
+      if (inflight.size >= maxTransfers) { drop('chunk-over-budget', env); return true; }   // over budget: swallow rather than grow unbounded
       entry = { chunks: [], size: 0, touched: now };
       inflight.set(key, entry);
     }
@@ -106,7 +109,7 @@ export function makeChunkReassembler({
       // A sender streaming endless non-final chunks must not grow this buffer without bound — a photo
       // fits comfortably under the cap; past it the whole transfer is dropped, never truncated.
       entry.size += data.length;
-      if (entry.size > maxTransferChars) { inflight.delete(key); return true; }
+      if (entry.size > maxTransferChars) { inflight.delete(key); drop('chunk-too-large', env); return true; }
       entry.chunks[p.seq] = data;
     }
     if (p.final) {
@@ -114,12 +117,12 @@ export function makeChunkReassembler({
       // A gap means a lost chunk — drop the transfer rather than deliver a mutilated payload
       // (envelopeSize.js: refuse, never truncate).
       for (let i = 0; i < entry.chunks.length; i += 1) {
-        if (typeof entry.chunks[i] !== 'string') return true;
+        if (typeof entry.chunks[i] !== 'string') { drop('chunk-gap', env); return true; }
       }
       const joined = entry.chunks.join('');
       if (p.meta?.encoding === 'json') {
         let whole = null;
-        try { whole = parseUntrustedJson(joined); } catch { return true; }   // unparseable → refused, not delivered
+        try { whole = parseUntrustedJson(joined); } catch { drop('chunk-unparseable', env); return true; }   // unparseable → refused, not delivered
         try { onPayload(whole, env); } catch { /* the app's problem, not the wire's */ }
         return true;
       }

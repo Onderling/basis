@@ -23,7 +23,8 @@ const setup = () => {
     } });
   return { ops, stores };
 };
-const when = '2026-11-03T13:00:00.000Z';
+// a day from now, whenever the suite runs: a fixed date became the past on its own day and the upcoming list emptied
+const when = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
 describe('the writer per circle', () => {
   it('an rsvp in a pair circle is the circle self\'s; elsewhere the general one', async () => {

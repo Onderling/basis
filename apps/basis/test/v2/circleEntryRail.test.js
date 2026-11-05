@@ -257,3 +257,35 @@ describe('the rail — compact (tombstones on the fold\'s word)', () => {
     expect((await rail.readVerified(CIRCLE)).events.some((e) => e.hash === h1)).toBe(false);
   });
 });
+
+describe('verify-on-read verifies each distinct signed statement once per rail; what binds is re-decided every read', () => {
+  it('reading the same lane N times checks each statement\'s signature ONCE', async () => {
+    const { vi } = await import('vitest');
+    const log = fakeEventLog();
+    const alice = await member('webid:alice');
+    const rail = railFor(log, alice);
+    await rail.append(CIRCLE, { kind: 'propose', subject: 'p1', payload: { action: 'changeRule', by: alice.ref } });
+    await rail.append(CIRCLE, { kind: 'vote', subject: 'p1', payload: { voter: alice.ref, choice: 'yes' } });
+    const spy = vi.spyOn(AgentIdentity, 'verify');
+    try {
+      for (let i = 0; i < 5; i++) {
+        expect((await rail.readVerified(CIRCLE)).events).toHaveLength(2);
+        await rail.readVerifiedBodies(CIRCLE);
+      }
+      expect(spy.mock.calls.length, 'two statements, ten reads: two signature checks at most').toBeLessThanOrEqual(2);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('a stored statement tampered AFTER it was memoised is refused on the next read (the memo is keyed by content)', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice');
+    const rail = railFor(log, alice);
+    await rail.append(CIRCLE, { kind: 'propose', subject: 'p1', payload: { action: 'changeRule', by: alice.ref } });
+    expect((await rail.readVerified(CIRCLE)).events).toHaveLength(1);   // verified, and memoised
+    // flip one character of the stored signature: the chain hash still recomputes, only the signature can catch it
+    const stored = log.entries.find((e) => e?.payload?.sig);   // the stored entry's payload IS the statement
+    const sig = stored.payload.sig;
+    stored.payload = { ...stored.payload, sig: (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1) };
+    expect((await rail.readVerified(CIRCLE)).events, 'the tampered statement verifies afresh and is refused').toHaveLength(0);
+  });
+});

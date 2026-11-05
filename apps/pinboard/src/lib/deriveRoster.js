@@ -1,6 +1,10 @@
-import { foldRoster, verifyCircleLink, foldPersonKeys } from '@onderling/core';
+import { foldRoster, verifyCircleLink, foldPersonKeys, createSignatureMemo } from '@onderling/core';
+
+// A roster is derived again on every read; each member's link signature is checked ONCE per process. The memo keeps only
+// the pure check, keyed by the exact signed bytes — whether the address is still the member's, still proven for THIS
+// circle, still not retired, is decided again on every derivation.
+const linkSignatures = createSignatureMemo();
 import { hasHumanRules } from '@onderling/circles';
-import { isExited } from './circleExits.js';
 
 /**
  * deriveRoster — project a circle's membership FROM the durable, signed
@@ -34,11 +38,9 @@ import { isExited } from './circleExits.js';
  * Nothing outside the circle's record is joined in: no display cache, no contact
  * book. A row is the trail, the spine, and what the member said about themselves.
  *
- * B4 (2026-08-02) — EXITS are part of the projection, per circle. A `group-removal` or
- * `group-leave` for THIS circle drops the member from THIS circle's roster and nothing else: the
- * trail is already circle-scoped, so removing someone here cannot touch a circle you share with them
- * elsewhere. An exit only counts while it is LATER than the member's most recent join, so a re-join
- * re-admits them rather than removal being permanent and unappealable. → `circleExits.js`.
+ * EXITS are part of the projection, per circle: a `leave` (self-signed) or an `evict` (an admin's) on THIS
+ * circle's membership lane drops the member from THIS circle's roster and nothing else, folded in causal order,
+ * so a re-join after it re-admits them rather than removal being permanent and unappealable.
  *
  * @param {object} o
  * @param {Array<object>} [o.redemptions]         `membership-redemption` items for ONE group.
@@ -46,7 +48,6 @@ import { isExited } from './circleExits.js';
  * @param {Object<string, {groupId:string, circleAddress?:string, circleAddressProof?:string, handle?:string}>} [o.founderFacts]
  *   founder → what their own creation statement says: their per-circle address (verified here, like a joiner's) and
  *   the handle they go by.
- * @param {Map<string, number>} [o.exits]         webid → latest exit ts (`collectCircleExits`).
  * @param {Array<object>} [o.spineStatements]     VERIFIED spine statement bodies (join/leave/evict/role) for
  *   THIS circle. When present, they are folded DENY-WINS on top of the trail-derived head — the spine may only
  *   STRENGTHEN it (drop a member, promote to admin), never re-admit or invent one (the safe cutover — see
@@ -64,14 +65,14 @@ export function deriveRoster({
   // says: the founder's instance of the member address statement (a founder never redeems, so no trail row carries
   // it), and the handle they go by there
   founderFacts = {},
-  exits = null,
   spineStatements = [],
+  ceremonyRetirements = [],
   // After the fold, its full result — the host uses `folded.superseded` to compact the lane (L121). Optional.
   onFolded = null,
   // The membership-rider cutover switch: TRUE when the statements come from the RAIL's verified read
   // (bindings resolved against real per-circle keys) — the fold is then AUTHORITATIVE and the wall-clock
   // exit rule retires. FALSE (legacy store path / compositions where author==ref is the global-identity
-  // convention) keeps the pre-rider semantics: wall-clock exits + the strengthen-only spine overlay.
+  // convention) keeps the pre-rider semantics: the strengthen-only spine overlay.
   foldAuthoritative = false,
   // The circle's `group-rules` blob (latest, or null). Read for `maxDevicesPerMember` — the
   // per-member device ceiling, a CIRCLE policy ("some circles disallow multiple devices"),
@@ -107,7 +108,7 @@ export function deriveRoster({
   const addProvenAddress = (webid, groupId, address, proof) => {
     if (typeof webid !== 'string' || !webid) return;
     if (typeof address !== 'string' || !address) return;
-    if (!verifyCircleLink({ groupId, address, proof })) return;   // unproven ⇒ refused, never stored
+    if (!verifyCircleLink({ groupId, address, proof, verifySignature: linkSignatures.verify })) return;   // unproven ⇒ refused, never stored
     let set = provenAddresses.get(webid);
     if (!set) provenAddresses.set(webid, (set = new Set()));
     set.add(address);
@@ -201,7 +202,7 @@ export function deriveRoster({
   for (const w of founderWebids ?? []) {
     // the founder's per-circle address, from their creation statement, through the same proof gate a joiner's passes
     const fa = founderFacts?.[w];
-    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof });
+    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof, verifySignature: linkSignatures.verify });
     upsert(w, 'admin', {
       ...(proven ? { circleAddress: fa.circleAddress, circleAddressProof: fa.circleAddressProof } : {}),
       ...(typeof fa?.handle === 'string' && fa.handle ? { handle: fa.handle } : {}),
@@ -209,16 +210,9 @@ export function deriveRoster({
     if (proven) addProvenAddress(w, fa.groupId, fa.circleAddress, fa.circleAddressProof);
   }
 
-  // B4 — the wall-clock exit drop. LEGACY PATH ONLY: with verified spine statements present the causal
-  // fold below is AUTHORITATIVE and the wall-clock comparison retires (two skewed devices must agree on
-  // who-is-in; `exitAt >= joinedAt` cannot give that — the deps-chain can). A circle with no statements
-  // (pre-rail, or a composition without the rail) keeps the old rule unchanged.
+  // With verified spine statements present the causal fold below is AUTHORITATIVE; a leave and a removal are
+  // statements it folds (deny-wins), the only record of either.
   const authoritative = foldAuthoritative && Array.isArray(spineStatements) && spineStatements.length > 0;
-  if (!authoritative && exits instanceof Map && exits.size > 0) {
-    for (const webid of [...roster.keys()]) {
-      if (isExited(exits, webid, joinedAt.get(webid) ?? 0)) roster.delete(webid);
-    }
-  }
 
   // ── The CAUSAL FOLD is AUTHORITATIVE (the membership rider cutover) ──────────────────────────────────
   // No data migration (the record decision for membership): the trail-derived roster above is the
@@ -349,8 +343,9 @@ export function deriveRoster({
   // that position keep binding to the retired address — revocation cuts the future, not the past. A
   // revocation whose position is unknown (the legacy store path) retires everything (deny-favouring).
   const revokedAddresses = new Map();   // webid → Map<address, atSeq|null> (their OWN revoked device addresses)
-  if (Array.isArray(spineStatements)) {
-    for (const s of spineStatements) {
+  const revokedUpTo = new Map();        // webid → Map<address, hash> (where a retired address stopped, when said)
+  {
+    for (const s of [...(Array.isArray(spineStatements) ? spineStatements : []), ...(Array.isArray(ceremonyRetirements) ? ceremonyRetirements : [])]) {
       if (s?.kind !== 'address-revoke') continue;
       if (typeof s.author !== 'string' || !s.author) continue;
       if (typeof s.subject !== 'string' || !s.subject) continue;
@@ -360,6 +355,13 @@ export function deriveRoster({
       const prev = map.get(s.subject);
       // the EARLIEST revocation position wins (a second revoke of the same address changes nothing)
       map.set(s.subject, prev === undefined ? at : (prev === null || at === null ? null : Math.min(prev, at)));
+      // WHERE THE ADDRESS STOPPED, when the retirement names it (a re-key): the hash of its last statement in its own
+      // author chain, covered by the root's reveal — the cut the binding verifiers use instead of the local position
+      if (typeof s.payload?.upTo === 'string' && s.payload.upTo) {
+        let cuts = revokedUpTo.get(s.author);
+        if (!cuts) revokedUpTo.set(s.author, (cuts = new Map()));
+        if (!cuts.has(s.subject)) cuts.set(s.subject, s.payload.upTo);
+      }
     }
   }
 
@@ -406,13 +408,18 @@ export function deriveRoster({
     // member stays reachable on the devices they still hold.
     const revoked = revokedAddresses.get(rec.webid);
     if (revoked?.size) {
-      const retired = addressSet.filter((a) => revoked.has(a)).map((a) => ({ address: a, atSeq: revoked.get(a) }));
+      const cuts = revokedUpTo.get(rec.webid);
+      const retiredOf = (a) => ({ address: a, atSeq: revoked.get(a), ...(cuts?.has(a) ? { upTo: cuts.get(a) } : {}) });
+      const retired = addressSet.filter((a) => revoked.has(a)).map(retiredOf);
       addressSet = addressSet.filter((a) => !revoked.has(a));
       if (primary && revoked.has(primary)) {
-        if (!retired.some((r) => r.address === primary)) retired.push({ address: primary, atSeq: revoked.get(primary) });
+        if (!retired.some((r) => r.address === primary)) retired.push(retiredOf(primary));
         if (addressSet.length) merged.circleAddress = addressSet[0];
         else delete merged.circleAddress;
       }
+      // …and every other address of theirs that a revocation names, though the row no longer lists it (a re-key's trail
+      // row moved to the new address): what it signed before it stopped still binds through this entry
+      for (const a of revoked.keys()) if (!retired.some((r) => r.address === a)) retired.push(retiredOf(a));
       if (retired.length) merged.retiredAddresses = retired;
     }
     // maxDevicesPerMember — the circle's per-member device ceiling. Deterministic on every fold:

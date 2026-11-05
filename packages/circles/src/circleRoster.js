@@ -10,9 +10,8 @@
  * is injected instead, keeping the package dep surface minimal, exactly as the
  * fan-out core injects `toWireRefEnvelope` rather than depending on item-store).
  *
- * The shared helpers `readCircleExits`/`isExited` (pinboard's `lib/circleExits.js`)
- * and `rosterCallerIsForeign` (pinboard's `lib/rosterAccessGate.js`) are used by many
- * skills — including ones that stay in pinboard — so they are INJECTED here rather than
+ * The shared helper `rosterCallerIsForeign` (pinboard's `lib/rosterAccessGate.js`) is used by many
+ * skills — including ones that stay in pinboard — so it is INJECTED here rather than
  * moved, keeping the package's dependency surface minimal and avoiding a
  * bidirectional pinboard↔package coupling.
  */
@@ -40,8 +39,6 @@
  *
  * @param {object} deps
  * @param {object} deps.store                 the circle's ItemStore.
- * @param {Function} deps.readCircleExits      the circle's exit-set reader (shared — injected).
- * @param {Function} deps.isExited             the exit predicate (shared — injected).
  * @param {Function} deps.rosterCallerIsForeign the local/foreign caller discriminator (shared — injected).
  * @param {Function} deps.simulateSync          the `_sync` shape producer.
  * @param {object} args
@@ -51,7 +48,7 @@
  * @returns {Promise<object>} `{ groupId, members:[{addr, role}], _sync }` | `{ error }` | `{ groupId, members:[], reason }`.
  */
 export async function listCircleRoster(
-  { store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync, projectCircleRoster = null },
+  { store, rosterCallerIsForeign, simulateSync, projectCircleRoster = null },
   { a, from, localActor },
 ) {
   if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
@@ -69,9 +66,6 @@ export async function listCircleRoster(
     });
     if (!isMember) return { groupId: a.groupId, members: [], reason: 'not-a-member' };
   }
-  // The same per-circle exit rule the roster projection uses. Without it, household-sync
-  // pairing keeps re-adding a removed member as a peer for this circle on every circle-open.
-  const exits = await readCircleExits({ store, groupId: a.groupId });
 
   // ── A CIRCLE YOU ARE NO LONGER IN ANSWERS YOU LIKE ONE YOU NEVER JOINED ──────────────────────
   // Once the circle's own record says this device's person left or was removed, this device stops
@@ -84,9 +78,6 @@ export async function listCircleRoster(
   // admin who removed them — from a projection it had no part in any more (F-011). Delivering the
   // eviction fixed the other half: they now know. This is what knowing should change.
   //
-  // `joinedAt: 0` deliberately: an exit recorded at ANY time closes the read. The wall-clock
-  // comparison the member list uses exists to place an exit against a RE-join; a caller asking
-  // about their own standing has no such ambiguity to resolve.
   // Read from the FOLD, not from the exit items: the typed `group-removal` row is written on the
   // admin's device, while the person it removed learns it as a signed statement on their membership
   // lane. Asking the items here would answer "no exit" on the one device that most needs a yes.
@@ -130,23 +121,16 @@ export async function listCircleRoster(
     return { groupId: a.groupId, members, _sync: simulateSync() };
   }
 
-  const joinedAt = new Map();
-  for (const it of forGroup) {
-    const w = it?.source?.redeemedBy;
-    const at = typeof it?.source?.redeemedAt === 'number' ? it.source.redeemedAt : 0;
-    if (w && at > (joinedAt.get(w) ?? 0)) joinedAt.set(w, at);
-  }
   const seen = new Map();   // addr → role
   for (const it of forGroup) {
     const src = it.source ?? {};
     // `redeemedBy` is a joiner (the actor who presented the code).
-    if (src.redeemedBy && src.redeemedBy !== from && !isExited(exits, src.redeemedBy, joinedAt.get(src.redeemedBy) ?? 0)) {
+    if (src.redeemedBy && src.redeemedBy !== from) {
       if (!seen.has(src.redeemedBy)) seen.set(src.redeemedBy, 'member');
     }
     // `confirmedBy` is the admin's address as recorded on the
     // joiner side (peer-bridge channel only).
-    if (src.confirmedBy && src.confirmedBy !== from && src.channel === 'peer'
-      && !isExited(exits, src.confirmedBy, 0)) {
+    if (src.confirmedBy && src.confirmedBy !== from && src.channel === 'peer') {
       seen.set(src.confirmedBy, 'admin');
     }
   }
@@ -177,8 +161,7 @@ export async function listCircleRoster(
  *      allowlist (gate 1) is the release rule for a foreign member.
  *
  * Pure DI lift out of pinboard's `listGroupMembersCore` — behaviour and wire strings are
- * byte-identical. The per-circle membership PROJECTION (`projectCircleRoster`), the
- * shared exit helpers (`readCircleExits`/`isExited`), and the foreign-caller + allowlist
+ * byte-identical. The per-circle membership PROJECTION (`projectCircleRoster`) and the foreign-caller + allowlist
  * gate helpers (`rosterCallerIsForeign`/`gateRosterReplyForPeer`) are INJECTED — the same
  * helpers stay in pinboard for skills that do not move (and the gate has pinboard + basis test
  * consumers by path), so injecting keeps the package's dependency surface minimal and
@@ -188,8 +171,6 @@ export async function listCircleRoster(
  * @param {object} deps.store                   the circle's ItemStore.
  * @param {object} deps.members                 the MemberMap.
  * @param {Function} deps.projectCircleRoster    the per-circle membership projection (shared — injected).
- * @param {Function} deps.readCircleExits        the circle's exit-set reader (shared — injected).
- * @param {Function} deps.isExited               the exit predicate (shared — injected).
  * @param {Function} deps.rosterCallerIsForeign  the local/foreign caller discriminator (shared — injected).
  * @param {Function} deps.gateRosterReplyForPeer the peer allowlist gate (shared — injected).
  * @param {object} args
@@ -200,7 +181,7 @@ export async function listCircleRoster(
  * @returns {Promise<object>} `{ groupId, members:[...] }` | `{ members:[] }` | `{ groupId, members:[], reason }`.
  */
 export async function listCircleMembers(
-  { store, members, projectCircleRoster, readCircleExits, isExited, rosterCallerIsForeign, gateRosterReplyForPeer },
+  { store, members, projectCircleRoster, rosterCallerIsForeign, gateRosterReplyForPeer },
   { a, from, localActor, groupId },
 ) {
   const _groupId = a.groupId ?? groupId;

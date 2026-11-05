@@ -33,7 +33,7 @@ const RETRY_REFUSED_MS = 2000;
  *   known peer, and every statement is a SIGNED fact the receiver re-verifies; the residual exposure is the
  *   proposal/vote metadata itself, the same the live fan already carries). Wire a roster check to narrow.
  */
-export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null, extraStatementsFor = null, narrowServe = null, selfWebid = null, allowGlobal = null } = {}) {
+export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null, extraStatementsFor = null, narrowServe = null, selfWebid = null, allowGlobal = null, onBatchFrom = null } = {}) {
   // Lane-parametrized: the governance pair by default; a second lane (membership) passes its own pair —
   // one mechanism, per-lane wire names. (Content lanes don't use this — they ride the windowed
   // `frontierReplay`; pull-all is for the small deny-wins lanes where completeness is the point.)
@@ -106,6 +106,11 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
     }
     if (landed > 0 && typeof onChange === 'function') {
       try { onChange(circleId); } catch { /* re-render is best-effort */ }
+    }
+    // a batch ARRIVED and was ingested, whatever it added: this device now holds what that source holds for the circle
+    // (a new point waits for this before it signs — it may already have held all of it)
+    if (typeof onBatchFrom === 'function') {
+      try { onBatchFrom(circleId, _fromPeerAddr); } catch { /* the listener never breaks ingest */ }
     }
     return { landed, refused: refused.length };
   }

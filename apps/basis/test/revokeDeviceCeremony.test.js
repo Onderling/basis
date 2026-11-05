@@ -126,7 +126,12 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     expect(r.known, 'A never held the revoked device\'s record').toBe(false);
     expect(r.circles).toBeGreaterThanOrEqual(1);
     expect(r.revokedIn.map((x) => x.circleId)).toContain(GROUP);
-    expect(r.revokedIn.find((x) => x.circleId === GROUP).address).toBe(addrA2);
+    // what is retired first is the address the revoked device's OWN seed derives (a device from before the circle root
+    // presents it); then the persona RE-KEYS: the revoked device held its circle root, so the persona moves to the next
+    // epoch and the remaining devices present the new address
+    expect(r.revokedIn.find((x) => x.circleId === GROUP).address).not.toBe(addrA2);
+    expect(r.rekey?.ok, JSON.stringify(r.rekey)).toBe(true);
+    expect(A.agent.circleAddressFor(GROUP)).not.toBe(addrA2);
 
     // The registry tombstone — the durable subject revocation acts on.
     const props = (await A.agent.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {};
@@ -134,26 +139,23 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     expect(rec?.revoked).toBe(true);
 
     expect(r.migrated, 'a second ceremony before the reload must not migrate the device again').toBeUndefined();
-    // A's OWN fold retires the thief's address at once; A's own address stays (it was the device's from its
-    // first boot, and the cutover kept it).
+    // The thief's device was a FULL device: it presented the persona's one address. The re-key moved the persona past
+    // it — every row carries the NEW address, and the old one (which the thief's device still holds) is gone.
+    expect(addrA2).toBe(addrA);
+    const addrNext = A.agent.circleAddressFor(GROUP);
+    const live = (row) => [row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean);
     const aRow = await rowFor(A, A.pubKey);
-    expect(aRow?.circleAddresses ?? []).not.toContain(addrA2);
-    expect(aRow?.circleAddresses).toContain(addrA);
-    expect(aRow?.circleAddress).toBe(addrA);
-    // …and B's follows over the wire, through the production ingest + fold.
-    await until(async () => {
-      const row = await rowFor(B, A.pubKey);
-      return row && !(row.circleAddresses ?? []).includes(addrA2) ? row : null;
-    }, { timeout: 15000, step: 100 });
-    // the MEMBER stays, on both ends — and B really retired the address (a null from `until` must not pass)
-    expect(await rowFor(A, A.pubKey)).toBeTruthy();
-    const bRowAfter = await rowFor(B, A.pubKey);
-    expect(bRowAfter).toBeTruthy();
-    expect(bRowAfter.circleAddresses ?? [], 'B retired the revoked address').not.toContain(addrA2);
+    expect(live(aRow)).toContain(addrNext);
+    expect(live(aRow)).not.toContain(addrA);
+    // …and on B the member stays — at the new address
+    expect(await until(async () => { const row = await rowFor(B, A.pubKey); return live(row).includes(addrNext) && !live(row).includes(addrA) ? true : null; }, { timeout: 15000, step: 100 }),
+      `the member did not move on B: ${JSON.stringify(await rowFor(B, A.pubKey))}`).toBe(true);
 
-    // idempotent: revoking again is still ok (the tombstone already stands)
+    // idempotent: revoking again is still ok (the tombstone already stands) — and does not re-key a second time
     const again = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
     expect(again.ok).toBe(true);
+    expect(again.rekey ?? null, 'a second ceremony for the same device re-keyed again').toBeNull();
+    expect(A.agent.circleAddressFor(GROUP)).toBe(addrNext);
 
     // ── THE FLOOR IS GONE (2026-09-16): the SHARED profile key — the one signature the stolen device still
     //    holds — never binds on the grants lane, in peacetime or after a theft. There is no marker to close
@@ -207,10 +209,10 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const banned = rotations.filter((r) => r.groupId === GROUP);
     expect(banned.length, 'the ceremony banned nothing in this circle').toBeGreaterThanOrEqual(1);
     expect(banned.every((r) => r.policy === 'ban')).toBe(true);
-    expect(
-      banned.map((r) => r.publicKey),
-      "the stolen device's sealing key was never banned — the island can still be re-admitted by a pod fetch",
-    ).toContain(sealingPublicKeyFromNetworkKey(addrA2));
+    // the bans: the stolen device's DEVICE-derived sealing key (a device from before the circle root sealed with it), and —
+    // the re-key — the persona's OLD sealing key, which the stolen full device holds; never the persona's new one
+    expect(banned.map((r) => r.publicKey), 'the re-key did not ban the persona\'s old sealing key').toContain(sealingPublicKeyFromNetworkKey(addrA2));
+    expect(banned.map((r) => r.publicKey), 'the persona\'s NEW sealing key was banned').not.toContain(sealingPublicKeyFromNetworkKey(A.agent.circleAddressFor(GROUP)));
     expect(
       banned.map((r) => r.publicKey),
       'the SURVIVING device was banned from its own circle',

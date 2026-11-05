@@ -21,6 +21,10 @@
 /** A seam: what it is, why every shell needs it, and the text that proves a shell composes it. `shells` narrows a
  *  seam to the shells it applies to (a view seam has no meaning on the box) — with the reason beside it. */
 export const SEAMS = Object.freeze([
+  // PRESENCE ONLY WHERE THE PERSON STILL IS: every shell registers its per-circle addresses on the relay from a union
+  // of lists (the substrate's, a cached one, a just-joined circle); a circle the fold says was left or removed is taken
+  // out by one shared filter. Web and mobile kept a cached list that put a left circle back on the next socket.
+  { id: 'presence-drops-left-circles', pattern: /presenceCircleIds\(/, why: 'a circle the person left or was removed from must never be re-registered on the relay — its address would take traffic again' },
   // A freshly enrolled device forgets what its THROWAWAY self wrote. Every shell boots unenrolled first, writes
   // content under an identity of its own, and the ceremony then replaces that identity and its content key. The
   // box swept its own named paths from 2026-09-14; web and mobile did not, and nothing failed — which is exactly
@@ -36,15 +40,30 @@ export const SEAMS = Object.freeze([
   // A card handed to the install at build goes into its contacts the way a scanned card does: the alpha's feedback
   // contact on web and mobile. The box had it for a household bot's companion until the bot's admin could hand the
   // companion over from their app (the identity link's `identity-link.companion`); a box is handed nothing at boot.
-  // ONE MEMBER PER PERSONA: two personas of one person cannot be told apart on the wire, so only the person's own
-  // device can warn before a second persona of theirs joins a circle it is already in. The join wizard's shared state
-  // decides (`secondPersonaWarning`); the shell hands it which persona the device holds each circle as. Only the
-  // person's shells run the join wizard.
-  { id: 'second-persona-join-warning', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the join cannot see that the person is already in the circle as another persona, and makes a second member silently' },
+  // ONE SELF PER CIRCLE ON A DEVICE: two personas of one person cannot be told apart on the wire, so only the person's
+  // own device can refuse a second persona of theirs joining a circle it is already in (the device's bind refuses too).
+  // The join wizard's shared state decides (`secondPersonaRefusal`) before anything is sent; the shell hands it which
+  // persona the device holds each circle as. Only the person's shells run the join wizard.
+  // WHICH SELF A SCREEN IS PAIRED FOR: a persona issues its grants as itself, so on a device holding several selves the
+  // pairing form asks (the active self preselected) — the shared decision is `connectionSelfChoice`. The box pairs no
+  // screen through a form.
+  { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
+  { id: 'second-persona-join-refusal', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the wizard cannot say before the submit that the person is already in the circle as another persona' },
   // A SCREEN'S DATA IS A HEAD: Vandaag's blocks kept current by the circles' changes and the event log (`screenHead.js`),
   // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time
   // (a phone: calendar.listEvents ×6 + tasks.listOpen ×3 per Vandaag landing). The box paints no screen.
+  // A CHANGE HANDED TO THE MAIN DEVICE IS SAID AS SUCH. A device that is not the person's main device does not sign a
+  // role change itself; "is now an admin" would be said before it is true. And what waits over a day, or was given up on,
+  // is said on every shell — the box at startup, having no screen.
+  // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
+  // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
+  { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
+  { id: 'role-change-forwarded-words', pattern: /roleChangeNoticeWords\(/, shells: ['web', 'mobile'], why: 'a forwarded role change read as done before the main device signed it' },
+  { id: 'own-spine-outbox-said', pattern: /'ownSpineOutbox'/, why: 'a change that waited days for the main device, or was dropped, would be said nowhere' },
   { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },
+  // MIJ IS A HEAD TOO, and it hears the agent registry (a profile's facts are no circle's items): a shell that kept only
+  // the circle and log subscriptions would show yesterday's name until the next act.
+  { id: 'mij-head-hears-registry', pattern: /onRegistryChanged/, shells: ['web', 'mobile'], why: 'Mij would miss a profile fact changed by a sibling while it is shown' },
   { id: 'seeded-contact', pattern: /seedContactCard\(/, shells: ['web', 'mobile'], why: 'a card the install is handed is a contact on every person\'s shell, through the one scanned-card path' },
   // A turn to a household bot the person's identity is linked to (`/koppel`) carries a statement from THIS device over
   // exactly that turn: the bot takes it as the person only by that, so a device they revoke stops speaking as them. A
@@ -208,12 +227,21 @@ export const SEAMS = Object.freeze([
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
   { id: 'ask-matches', pattern: /askMatchChoices\(/, shells: ['web', 'mobile'], why: 'matches under my own ask come from released offerings only, and only the asker sees them' },
   { id: 'contact-person-seal', pattern: /sealFor:\s*agent\.contactSeal\?\.sealFor/, why: 'a contact turn — the bot\'s replies included — is readable only with the contact\'s current person key, never by a device they revoked' },
+  // WHAT HAPPENED TO A MESSAGE, SAID ON ITS BUBBLE: the outbox reports a held message given up on (`onHoldDropped`), a
+  // relay that gave up (`onUndelivered`) and a held message that went out after all (`onHeldSent`); one shared builder
+  // turns each into the bubble's state. Without it a given-up message keeps looking fine, and a "waiting" bubble keeps
+  // waiting after the message has gone. The box paints no bubbles: it has no delivery map to move.
+  { id: 'delivery-outcomes-reach-the-bubble', pattern: /makeGiveUpConsumers\(/, shells: ['web', 'mobile'], why: 'a message given up on, or held and then sent, must change its bubble — else it looks fine, or waits for ever' },
+  // A HEAD HEARS OF A CIRCLE IT DOES NOT KNOW YET: Vandaag re-reads over the shell's circle list, so a change in a circle
+  // that list does not hold (joined on another device, through an offer, made by an op) re-reads the list first
+  // (`headCircleWatch.js`). Without it the new circle's items stayed off Vandaag until a reload. The box paints no Vandaag.
+  { id: 'head-hears-new-circles', pattern: /watchCircleChanges\(/, shells: ['web', 'mobile'], why: 'a circle that arrives while Vandaag is shown keeps its items off the page until a reload' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

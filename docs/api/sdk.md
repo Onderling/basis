@@ -81,6 +81,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `createNearbyPeerSource` | function | [`core.md`](core.md#createnearbypeersource) |
 | `createNonceWindow` | function | [`core.md`](core.md#createnoncewindow) |
 | `createSenderBinding` | function | [`core.md`](core.md#createsenderbinding) |
+| `createSignatureMemo` | function | [`core.md`](core.md#createsignaturememo) |
 | `createSpineAppender` | function | [`core.md`](core.md#createspineappender) |
 | `DataPart` | function | [`core.md`](core.md#datapart) |
 | `DataSource` | class | [`core.md`](core.md#datasource) |
@@ -92,6 +93,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `defineSkill` | function | [`core.md`](core.md#defineskill) |
 | `deriveCircleAddress` | function | [`core.md`](core.md#derivecircleaddress) |
 | `deriveCircleId` | function | [`core.md`](core.md#derivecircleid) |
+| `deriveCircleRoot` | function | [`core.md`](core.md#derivecircleroot) |
 | `deriveCircleSeed` | function | [`core.md`](core.md#derivecircleseed) |
 | `deriveDeviceSeed` | function | [`core.md`](core.md#derivedeviceseed) |
 | `derivePersonKeySeed` | function | [`core.md`](core.md#derivepersonkeyseed) |
@@ -286,6 +288,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `TIER_LEVEL` | constant | [`core.md`](core.md#tier_level) |
 | `tierForRouteVia` | function | [`core.md`](core.md#tierforroutevia) |
 | `tierForTransport` | function | [`core.md`](core.md#tierfortransport) |
+| `tokenAgentKeyFor` | function | [`core.md`](core.md#tokenagentkeyfor) |
 | `tokenGate` | function | [`core.md`](core.md#tokengate) |
 | `TokenRegistry` | class | [`core.md`](core.md#tokenregistry) |
 | `Transport` | class | [`core.md`](core.md#transport) |

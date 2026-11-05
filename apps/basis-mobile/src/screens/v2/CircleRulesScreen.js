@@ -117,7 +117,7 @@ export default function CircleRulesScreen({
         </View>
         <Text style={styles.title}>{t('circle.rules.title')}</Text>
 
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
           {RULES_QUESTIONS.map((q) => (
             <View key={q.key} style={styles.field}>
               <Text style={styles.q}>{t(`circle.rules.q.${q.key}`)}{q.required ? ' *' : ''}</Text>

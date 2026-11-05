@@ -96,3 +96,32 @@ describe('the web create wizard', () => {
     expect(el.querySelector('.cc-wizard-review')).toBeNull();
   });
 });
+
+describe('the web create wizard — a circle with its own pod', () => {
+  it('typing the pod address enables the review: the button follows the field, not the moment the step was drawn', async () => {
+    const { el } = boot();
+    typeName(el, 'Straat');
+    const fold = el.querySelector('[data-role=advanced]');
+    fold.open = true;
+    fold.dispatchEvent(new Event('toggle'));
+    // walk to the step that asks where the circle's content lives
+    for (let i = 0; i < 6 && !el.querySelector('input[type=radio][value=shared]'); i += 1) {
+      await vi.waitFor(() => expect(el.querySelector('.cc-wizard-btn-primary').disabled).toBe(false));
+      el.querySelector('.cc-wizard-btn-primary').click();
+    }
+    const shared = el.querySelector('input[type=radio][value=shared]');
+    expect(shared, 'the wizard never asked where the content lives').toBeTruthy();
+    shared.click();
+    const podField = () => [...el.querySelectorAll('.cc-wizard-field')].find((f) => f.textContent.includes('circle.wizard.create.pod_uri'))?.querySelector('input');
+    await vi.waitFor(() => expect(podField(), 'choosing a shared pod asks for its address').toBeTruthy());
+    const uri = podField();
+    const reviewBtn = () => [...el.querySelectorAll('.cc-wizard-btn-primary')].pop();
+    expect(reviewBtn().disabled, 'no address yet: the review waits').toBe(true);
+    uri.value = 'https://pod.example/straat/';
+    uri.dispatchEvent(new Event('input'));
+    expect(reviewBtn().disabled, 'an address typed, and the review is still disabled').toBe(false);
+    uri.value = 'not an address';
+    uri.dispatchEvent(new Event('input'));
+    expect(reviewBtn().disabled, 'a non-address must keep the review disabled').toBe(true);
+  });
+});

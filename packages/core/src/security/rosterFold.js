@@ -180,19 +180,23 @@ function depthOf(stmts) {
  *   which caretakers have SIGNED for their own appointment (`caretakerAcknowledged`: ref → seed hash).
  */
 export function foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {} } = {}) {
-  const stmts = (Array.isArray(statements) ? statements : []).filter(
-    (s) => s && typeof s === 'object' && MEMBERSHIP_KINDS.has(s.kind)
+  const shaped = (Array.isArray(statements) ? statements : []).filter(
+    (s) => s && typeof s === 'object'
       && typeof s.author === 'string' && typeof s.subject === 'string' && typeof s.hash === 'string',
   );
+  const stmts = shaped.filter((s) => MEMBERSHIP_KINDS.has(s.kind));
 
   // FROM THE FORK ONWARD (Frits 2026-09-25, L131). A fork proves the key can no longer be trusted — almost always a
   // stolen key — from the fork on; it does not undo what the key did before. So the author's statements at or past
   // the fork's causal depth are discounted, those before it stand (the people an admin admitted in March do not fall
   // off every roster in September), and the fork itself acts as a REMOVAL of the author at that depth (below). It
   // used to discount every statement the author ever signed. Depth is measured over ALL statements, so where the fork
-  // sits does not depend on what is dropped; with no fork this is the same depth as before.
+  // sits does not depend on what is dropped; with no fork this is the same depth as before. ALL means every
+  // statement handed in, not only the membership kinds: a role change whose parent is an address revocation
+  // or a person-key announcement comes after what that parent came after. Taken over the membership kinds
+  // alone, such a parent counted as missing, the change sat at depth 0, and the promotion it undid won.
   const forks = equivocators(stmts);
-  const depth = depthOf(stmts);
+  const depth = depthOf(shaped);
   const forkAt = new Map();      // author → the causal depth of their fork (the shallowest forked sibling)
   const forkSeed = new Map();    // author → the fork's smallest sibling hash: the same name for the removal everywhere
   for (const [author, hashes] of forks) {

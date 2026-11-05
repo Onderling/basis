@@ -214,9 +214,9 @@
           "text": "Only what this persona discloses in this circle is shared — nothing on first join. Adjust later under Me → personas.",
           "doc": "Join wizard — persona disclosure hint."
         },
-        "second_warning": {
-          "text": "You are already in this circle as {{persona}}. Joining as another persona makes you two members here, and the others cannot see that both are you.",
-          "doc": "Join wizard — a warning when this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One member per persona: only the person's own device can tell."
+        "already_in": {
+          "text": "You are already here as {{persona}} — joining as another persona can be done from another device.",
+          "doc": "Join wizard — refused: this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One self per circle on a device; two personas in one circle need two devices."
         }
       },
       "reveal": {
@@ -381,6 +381,30 @@
     "someone_joined": {
       "text": "{{name}} joined this circle.",
       "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
+    },
+    "leaving_note": {
+      "text": "Left — this waits for your main device. The circle goes once that device has signed it.",
+      "doc": "Said on a circle tile you just left from a device that is not your main device: the leave was handed to the main device to sign, and the tile goes when that signed leave lands here."
+    },
+    "leaving_note_held": {
+      "text": "Left — your main device is offline. The circle goes once it is back.",
+      "doc": "The same, when the main device is offline: the leave waits for it."
+    },
+    "not_reachable": {
+      "text": "You cannot reach {{name}} yet. Changes arrive as soon as {{name}} or another member is online again.",
+      "doc": "On a member's row when this device has no address for them yet and a change in the circle has waited for them longer than the re-tell window. It heals by itself: their device re-announces on its next connect, another member re-introduces them, or their own catch-up pulls everything."
+    },
+    "removed_mark": {
+      "text": "removed",
+      "doc": "The mark on a circle tile an admin removed you from; the tile stays (read-only) until you close it."
+    },
+    "removed_note": {
+      "text": "You were taken out of this circle. You can still read what you had; closing takes the circle away.",
+      "doc": "Said on the tile and in place of the composer of a circle an admin removed you from: you are out, what you had stays readable, and closing takes the circle away from this device."
+    },
+    "removed_close": {
+      "text": "Close",
+      "doc": "The button that closes a circle you were removed from: forgets what this device held of it."
     }
   },
   "members_tab": {
@@ -600,6 +624,10 @@
       "undeliverable": {
         "text": "Couldn't reach some members",
         "doc": "δ.2 — permanent fan-out failure (e.g. a member has no published key); shown but NOT retryable (retry can't help)."
+      },
+      "persona_waiting": {
+        "text": "Waiting — this persona has no connection yet; it goes out by itself once it has one",
+        "doc": "The circle belongs to one of your personas, which has no connection of its own to the circle's relay yet, so the message is HELD on this device (never sent under another identity). Not a failure: it goes out by itself once the persona has a connection, and the bubble then moves on."
       },
       "persona_no_connection": {
         "text": "Not sent: this persona has no connection to the circle (tap to retry)",
@@ -6790,6 +6818,10 @@
       "text": "Make this device my primary contact address",
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
     },
+    "make_primary_no_point": {
+      "text": "Direct messages now land on this device ({{count}} circles told). It cannot sign your circle changes yet: type your recovery phrase on it once (Settings → Devices & keys).",
+      "doc": "After the main-device tap on a device without the circle root: direct messages land here, but it cannot be the point that signs the spine."
+    },
     "make_primary_done": {
       "text": "This device is now your primary contact address in {{count}} circles",
       "doc": "After the tap: how many circles took the choice (count)."
@@ -6818,6 +6850,14 @@
     "connection_device_section": {
       "text": "device settings",
       "doc": "The non-circle section: your own settings."
+    },
+    "connection_as_self": {
+      "text": "For",
+      "doc": "Pairing a screen — the label beside the choice of which of the person's selves the screen is for (a persona issues its grants as itself)."
+    },
+    "connection_pick_self": {
+      "text": "Choose who this screen is for",
+      "doc": "Pairing a screen — the empty choice, and the line shown when none is chosen on a device holding more than one self."
     },
     "connection_add": {
       "text": "Connect a device",
@@ -6932,6 +6972,20 @@
         "doc": "Confirm body when the last admin is also the only member. There is nobody to hand to, so the fold keeps the demotion from standing at all — said plainly here instead of a handover that cannot happen."
       }
     },
+    "outbox": {
+      "over_day": {
+        "text": "{{count}} change(s) have waited more than a day for your main device. They take effect once it is back online.",
+        "doc": "Admin panel line: changes this device handed the person's main device to sign have waited over a day (it is offline). Not lost; they still go."
+      },
+      "maybe_lost": {
+        "text": "{{count}} change(s) may not have come through: they were sent to your previous main device and never confirmed. Check them and make them again where needed.",
+        "doc": "Admin panel line: this device became the person's main device while changes it had handed the previous main device were never confirmed. Nobody can sign them now and whether they landed cannot be told, so the person checks."
+      },
+      "unsent": {
+        "text": "{{count}} change(s) were not sent: your main device was unreachable for too long. Make them again from here or from your main device.",
+        "doc": "Admin panel line: changes this device handed the main device were dropped — it was unreachable for the whole window (7 days). They will not land."
+      }
+    },
     "role_notice": {
       "promoted": {
         "text": "{{name}} is now an admin of this circle.",
@@ -6948,6 +7002,18 @@
       "no_one_else": {
         "text": "{{name}} is still an admin: there is nobody else in this circle to take over.",
         "doc": "Panel notice when the demotion could not stand — the circle would have been left with nobody to run it."
+      },
+      "forwarded": {
+        "text": "Sent to your main device. The change takes effect once it has signed it.",
+        "doc": "Panel notice when this device is not the person's main device: the role change was handed to the main device, which signs it. Not yet applied."
+      },
+      "waiting_catch_up": {
+        "text": "Waiting until your device has caught up with the circle. The change takes effect after that.",
+        "doc": "Panel notice when this device has just become the person's main device and first catches up with the circle (so its first change chains on the newest one, no fork). The change waits until then."
+      },
+      "forwarded_held": {
+        "text": "Your main device is offline. The change waits for it and takes effect once it is back.",
+        "doc": "Panel notice when the role change was handed to the main device while that device is offline: it is held for it."
       }
     },
     "announce": {
@@ -7705,6 +7771,14 @@
     }
   },
   "errors": {
+    "self_required": {
+      "text": "This device holds more than one persona — say which one this is for.",
+      "doc": "An op that issues as one of the person's selves (a grant, an install with grants) refused: the device holds more than one self and none was named."
+    },
+    "no_such_persona": {
+      "text": "That persona is not on this device.",
+      "doc": "An op named a persona this device does not hold."
+    },
     "invalid_handle": {
       "handle-taken": "That name is already taken in this circle. Pick another.",
       "handle-taken_hint": "If you restored this device, the circle may still hold your previous name — pick a new one, or ask an admin to remove the old entry."
@@ -7789,6 +7863,7 @@
     "offer_title": "Add-device code",
     "offer_hint": "Scan or paste this code on the new device, then type the recovery phrase there. The code is not a secret — the phrase stays the only key.",
     "offer_error": "Could not build the code (this device is not in any circle yet).",
+    "offer_no_seal": "This device cannot show a code yet: it was added before the recovery seal existed. Type your recovery phrase on it once (Settings → Devices & keys), then try again.",
     "offer_paste_label": "Code from your current device (optional)",
     "personas_title": "Which personas does this device get?",
     "personas_hint": "Only what you tick comes to this device. A device you trust less is better given less.",
@@ -8057,6 +8132,10 @@
       "rotation_days": {
         "text": "Rotate the key after (days, 1-365)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "rotation_days_hint": {
+        "text": "How often the circle-wide encryption key rotates. 30 days suits most circles; choose fewer for a more sensitive group. (Invite expiry is set separately, under Governance.)",
+        "doc": "Create wizard, the key-rotation field's hint."
       },
       "offering_remove": {
         "text": "Remove",

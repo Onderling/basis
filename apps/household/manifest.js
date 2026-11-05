@@ -79,6 +79,7 @@ export const householdManifest = {
     'list-companion-grants': 'read',
     'grant-companion': 'write',
     'read-companion-grants': 'read',
+    'read-own-spine-outbox': 'read',
     'revoke-companion-grant': 'write',
     'reveal-owner-phrase': 'write',
     'restore-owner-phrase': 'write',
@@ -384,6 +385,14 @@ export const householdManifest = {
         { name: 'mnemonic',  kind: 'secret', required: true },
         { name: 'personaId', kind: 'string', required: true },
       ],
+      surfaces: {},
+    },
+    {
+      id:   'ownSpineOutbox', visibility: 'private', group: 'device',
+      verb: 'read-own-spine-outbox',
+      // WHAT THIS DEVICE HANDED THE MAIN DEVICE AND HAS NOT SEEN SIGNED — counts only: still waiting, waiting over a day,
+      // and given up on (not sent: the main device was unreachable for the whole window). The admin panel's one line.
+      params: [],
       surfaces: {},
     },
     {

@@ -45,11 +45,12 @@ describe('finalSubmit as a persona', () => {
     expect(calls.find((c) => c.op === 'setProfileCircleMembership')).toBeUndefined();
   });
 
-  it('without a persona, or as the default: nothing is bound, the membership is the default\'s', async () => {
+  it('without a persona, or as the default: no persona is bound (the gate is asked with none), the membership is the default\'s', async () => {
     for (const persona of [null, 'default']) {
       const { callSkill, calls } = harness();
       await finalSubmit({ state: stateFor(persona), callSkill, circleAddressFor: () => 'addr-d' });
-      expect(calls.find((c) => c.op === 'bindCirclePersona')).toBeUndefined();
+      // the one-self-per-circle gate is asked for the general persona — never a persona bound
+      expect(calls.filter((c) => c.op === 'bindCirclePersona').map((c) => c.args?.personaId ?? null)).toEqual([null]);
       expect(calls.find((c) => c.op === 'setProfileCircleMembership').args).toMatchObject({ id: 'default' });
     }
   });

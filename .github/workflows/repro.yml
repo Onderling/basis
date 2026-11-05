@@ -1,0 +1,61 @@
+# A CAPTURE TOOL FOR AN INTERMITTENT THAT ONLY REDS ON CI. Run by hand: the basis suite N times on one runner
+# (CI's own shape — the boot-serial relay walks beside the parallel project), stopping at the first red of the named
+# test and printing its failure message and the receive-boundary drop lines. Never on a push or a PR: it is a probe,
+# not a gate, and a red here is evidence for a ledger row, not a verdict on the branch.
+name: repro
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: 'how many times to run the basis suite (stops at the first red of the named test)'
+        default: '4'
+      test:
+        description: 'the failure message to stop on (a substring of the assertion)'
+        default: "Bea never saw the box's change"
+
+env:
+  STORE_PATH: ~/.pnpm-store
+
+jobs:
+  basis-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install (root workspace)
+        run: pnpm install --frozen-lockfile
+      - name: Relink workspace
+        run: node scripts/relink-workspace.mjs
+      - name: Rebuild native bindings (better-sqlite3)
+        run: npm rebuild better-sqlite3 --prefix packages/relay
+      - name: The basis suite, until the named test reds
+        env:
+          RUNS: ${{ inputs.runs }}
+          NEEDLE: ${{ inputs.test }}
+        run: |
+          for i in $(seq 1 "$RUNS"); do
+            npm test --prefix apps/basis > run.log 2>&1 || true
+            if grep -qF "$NEEDLE" run.log; then
+              echo "::notice::captured on run $i"
+              grep -aF "$NEEDLE" run.log | head -1 | cut -c1-20000
+              cp run.log captured.log
+              grep -a "dropped an inbound envelope" run.log | sort | uniq -c | head -20
+              exit 0
+            fi
+            echo "run $i: $(grep -aE '^ *Test Files' run.log | head -1)"
+          done
+          echo "::notice::no capture in $RUNS runs"
+      # the whole run's log when it captured — the failure line alone is cut, and the box's own lines are in here
+      - name: Keep the captured run's log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captured-run-log
+          path: captured.log
+          if-no-files-found: ignore

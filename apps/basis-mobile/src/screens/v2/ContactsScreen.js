@@ -175,7 +175,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
           {blockedDoor}
         </>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
           {shown.map((c) => rowFor(c))}
           {hidden.length > 0 ? (
             <Pressable style={styles.fold} onPress={() => setFoldOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: foldOpen }} testID="contacts-hidden-fold">

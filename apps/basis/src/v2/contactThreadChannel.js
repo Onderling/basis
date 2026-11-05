@@ -164,6 +164,7 @@ export function createContactThreadChannel({
    */
   async function fanOwn(turn) {
     if (typeof fanToOwnDevices !== 'function') return;
+    if (turn?.direction === 'in') Object.assign(turn, takeHeardAsMessage(turn.fromAddr, turn.messageId));
     try { await fanToOwnDevices(turn); }
     catch (err) {
       if (typeof console !== 'undefined') {
@@ -171,6 +172,24 @@ export function createContactThreadChannel({
       }
     }
   }
+
+  // WHAT A TURN ARRIVED AS, for the carry. A sibling that is the person's primary answers a person's MESSAGE carried
+  // to it the way it answers one that came direct — and must never answer a bot's REPLY. The shells land both through
+  // `persistInbound` with the same picked fields, so the handler notes here which arrived as a message (and the door's
+  // admission code and linked-person proof beside it), and the fan takes the note with the turn. Bounded: a note
+  // whose turn never landed ages out.
+  const heardAsMessage = new Map();
+  const noteHeardAsMessage = (fromAddr, messageId, extra) => {
+    if (typeof messageId !== 'string' || !messageId) return;
+    heardAsMessage.set(`${fromAddr}\n${messageId}`, extra);
+    while (heardAsMessage.size > 200) heardAsMessage.delete(heardAsMessage.keys().next().value);
+  };
+  const takeHeardAsMessage = (fromAddr, messageId) => {
+    const key = `${fromAddr}\n${messageId}`;
+    const extra = heardAsMessage.get(key);
+    heardAsMessage.delete(key);
+    return extra ? { message: true, ...extra } : {};
+  };
 
   // The shared addressed-send core (C3). `sendTurn` now routes through this
   // instead of a bare ephemeral peer-send: it still sends over the injected
@@ -453,6 +472,9 @@ export function createContactThreadChannel({
       itemId:  res?.itemId ?? null,
       text, messageId, replyTo, ts, buttons, file, fromAddr, peerAddr,
       ...(res?.returned === true ? { returned: true } : {}),
+      ...(!outbound && wire.message === true ? { message: true } : {}),
+      ...(!outbound && wire.message === true && typeof wire.admission === 'string' ? { admission: wire.admission } : {}),
+      ...(!outbound && wire.message === true && wire.auth && typeof wire.auth === 'object' ? { auth: wire.auth } : {}),
     };
   }
 
@@ -567,6 +589,7 @@ export function createContactThreadChannel({
         if (pairRequest && typeof pair.onRequest === 'function') { Promise.resolve(pair.onRequest(fromAddr, { name: payload.displayName ?? null })).then((r) => (r ? answerPairRequest(fromAddr, payload.threadId, r) : null)).catch(() => {}); }
       }
       if (!text && !Array.isArray(payload.buttons) && (pairInvite || pairRequest)) return;   // roster material only: nothing to show
+      if (subtype === subtypes.out) noteHeardAsMessage(fromAddr, payload.messageId, { ...(admission ? { admission } : {}), ...(auth ? { auth } : {}) });
       cb({
         fromAddr,
         // THE PERSON behind the sender address — the thread's key (Frits 2026-09-03: threads are keyed by identity).

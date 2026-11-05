@@ -31,6 +31,18 @@ describe('both give-ups land on a state the person can act on', () => {
     expect(String(warn.mock.calls[0][0])).toMatch(/held 90s/);
   });
 
+  it('a HELD message that went out after all leaves its wait: maybe-received, never stuck on "waiting"', async () => {
+    const { createDeliveryStateMap } = await import('@onderling/kring-host/deliveryState');
+    const map = createDeliveryStateMap();
+    map.set('m3', 'pending', { reason: 'persona-waiting' });
+    makeGiveUpConsumers({ deliveryMap: map, onWarn: () => {} }).onHeldSent({ msgId: 'm3', addr: 'AAAAbbbbCCCCdddd' });
+    expect(map.get('m3')).toBe('maybe-received');
+    expect(map.reasonOf('m3'), 'the wait\'s reason is gone with the wait').toBe(null);
+    // a message the map never knew (a control send, no bubble) is left alone
+    makeGiveUpConsumers({ deliveryMap: map, onWarn: () => {} }).onHeldSent({ msgId: 'nobody', addr: 'x' });
+    expect(map.get('nobody')).toBe(null);
+  });
+
   it('a relay give-up marks the message failed', () => {
     const m = mapSpy();
     const warn = vi.fn();

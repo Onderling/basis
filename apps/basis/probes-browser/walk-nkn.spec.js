@@ -8,7 +8,7 @@
  * run, so "untested" is not a place to leave it.
  */
 import { test } from '@playwright/test';
-import { bootPeers, teardown, log, gotoCircles, createCircle, openCircleMatching } from './peerHarness.js';
+import { bootPeers, teardown, log, gotoCircles, createCircle, openCircleMatching } from '../test-browser/peerHarness.js';
 
 test.setTimeout(420_000);
 

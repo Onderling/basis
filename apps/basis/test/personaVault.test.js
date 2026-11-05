@@ -8,8 +8,8 @@ import { VaultMemory } from '@onderling/vault';
 import { personaVault, PERSONA_SLOT_KEYS } from '../src/core/agent/personaVault.js';
 
 describe('personaVault', () => {
-  it('names the three persona slots', () => {
-    expect([...PERSONA_SLOT_KEYS].sort()).toEqual(['agent-privkey', 'device-delegation-seed', 'person-key']);
+  it('names the four persona slots — the circle root is one of them', () => {
+    expect([...PERSONA_SLOT_KEYS].sort()).toEqual(['agent-privkey', 'circle-root', 'device-delegation-seed', 'person-key']);
   });
   it('the default persona reads and writes the bare names', async () => {
     const v = new VaultMemory();

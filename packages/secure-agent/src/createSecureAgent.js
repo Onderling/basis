@@ -56,6 +56,9 @@ import {
   invokeAgentSkill,
   Parts,
   forgetHello,
+  param,
+  PARAM_SCOPE,
+  PARAM_KIND,
 } from '@onderling/core';
 import {
   NknTransport,
@@ -214,6 +217,11 @@ function isApplicationError(err) {
  *   },
  * }>}
  */
+// A self address is YOUNG this long after it is first registered (its introduction may not have reached every member),
+// and a send held from it re-flushes at each of these delays before falling back to the presence flush.
+const YOUNG_ADDRESS_WINDOW_MS = param({ key: 'secureAgent.youngAddressWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: Object.freeze([2_000, 5_000, 10_000]) });
+
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now
   // vs what they're asking for that will activate in a future slice.
@@ -316,8 +324,26 @@ export async function createSecureAgent(opts = {}) {
   // would confirm to them that they reached you). Silent to them, not to us: every refusal bumps
   // this counter, so "their message never arrived" can be told apart from "the transport flaked".
   let mutedDrops = 0;
+  // EVERY DROP AT THE RECEIVE BOUNDARY SAYS WHY — once per reason and sender, and counted per reason (`securityStatus`).
+  // A drop is silent toward the sender by design; silent toward us it is indistinguishable from "never arrived" (a
+  // statement that reached a member's socket and vanished before their router cost two days to find).
+  const receiveDrops = {};
+  const receiveDropSaid = new Set();
+  const RECEIVE_DROP_SAID_MAX = 500;
+  const noteDrop = (reason, env) => {
+    receiveDrops[reason] = (receiveDrops[reason] ?? 0) + 1;
+    const from = String(env?._from ?? '?');
+    const key = `${reason}|${from}`;
+    if (receiveDropSaid.has(key)) return;
+    receiveDropSaid.add(key);
+    // bounded: a long-running device meets many senders (a Set iterates oldest first)
+    while (receiveDropSaid.size > RECEIVE_DROP_SAID_MAX) receiveDropSaid.delete(receiveDropSaid.values().next().value);
+    if (typeof console !== 'undefined') {
+      console.info(`[secure-agent] dropped an inbound envelope from ${from.slice(0, 12)}… (${reason}) — subtype ${env?.payload?.subtype ?? env?._p ?? '?'}; further drops of this kind from this sender are counted, not said`);
+    }
+  };
   const muteBlockGate = async (env) => {
-    if (await isPeerMuted(env?._from)) { mutedDrops += 1; return false; }
+    if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return false; }
     return true;
   };
   const rl = (opts.helloRateLimit && typeof opts.helloRateLimit === 'object') ? opts.helloRateLimit : {};
@@ -328,7 +354,13 @@ export async function createSecureAgent(opts = {}) {
   });
   const gates = [muteBlockGate, boundGate, ...(userHelloGate ? [userHelloGate] : [])];
   const composedGate = async (env) => {
-    for (const g of gates) { if (!(await g(env))) return false; }
+    for (const g of gates) {
+      if (await g(env)) continue;
+      // the mute gate says its own drop; the first-contact limit and an app's own gate say theirs here
+      if (g === boundGate) noteDrop('first-contact-limited', env);
+      else if (g !== muteBlockGate) noteDrop('hello-gate', env);
+      return false;
+    }
     return true;
   };
   agent.setHelloGate(composedGate);
@@ -871,6 +903,29 @@ export async function createSecureAgent(opts = {}) {
   /** Consecutive failed delivery attempts to one address before we stop attempting (0 = never stop). */
   const holdMaxDeliveryFailures = Number.isFinite(opts.holdMaxDeliveryFailures)
     ? opts.holdMaxDeliveryFailures : 3;
+  /** How long one of our own addresses counts as YOUNG after it is first registered: a receiver may not have folded its
+   *  introduction yet, and refuses it silently — so a send held from it is re-flushed on a back-off (below). */
+  const youngAddressWindowMs = Number.isFinite(opts.youngAddressWindowMs) ? opts.youngAddressWindowMs : YOUNG_ADDRESS_WINDOW_MS;
+  /** The back-off for a hold sent from a young address: one re-flush per step, then only presence flushes it. */
+  const youngAddressRetryMs = Array.isArray(opts.youngAddressRetryMs) ? opts.youngAddressRetryMs : YOUNG_ADDRESS_RETRY_MS;
+  const selfAddressBornAt = new Map();   // self address → when it was first registered here
+  const youngReflush = new Map();        // peer address → { step, timer } while its back-off runs
+  const isYoungSelfAddress = (a) => typeof a === 'string' && selfAddressBornAt.has(a) && Date.now() - selfAddressBornAt.get(a) < youngAddressWindowMs;
+  /** One back-off step for a peer's hold: re-flush it without counting a failure; next step while it is still held. */
+  function scheduleYoungReflush(addr) {
+    const state = youngReflush.get(addr) ?? { step: 0, timer: null };
+    if (state.timer || state.flushing || state.step >= youngAddressRetryMs.length) return;
+    youngReflush.set(addr, state);
+    state.timer = setTimeout(async () => {
+      state.timer = null;
+      state.step += 1;
+      state.flushing = true;
+      try { await flushPending(addr, { countFailures: false }); } catch { /* re-held inside */ } finally { state.flushing = false; }
+      if (!(pendingHold.get(addr)?.size)) { youngReflush.delete(addr); return; }
+      if (state.step < youngAddressRetryMs.length) scheduleYoungReflush(addr);
+    }, youngAddressRetryMs[state.step]);
+    state.timer.unref?.();
+  }
   /** How long a persisted dead-address verdict holds across restarts (0 = not restored). A presence signal clears it at once. */
   const holdDeadTtlMs = Number.isFinite(opts.holdDeadTtlMs) ? opts.holdDeadTtlMs : 6 * 60 * 60 * 1000;
   /**
@@ -881,6 +936,9 @@ export async function createSecureAgent(opts = {}) {
    * is to never drop one silently.
    */
   const onHoldDropped = typeof opts.onHoldDropped === 'function' ? opts.onHoldDropped : null;
+  /** A HELD message went out after all (a flush sent it) — the twin of `onHoldDropped`: what lets a "waiting" bubble move on.
+   *  `{ addr, msgId }`; never fired for a send that went out the first time (that one was never held). */
+  const onHeldSent = typeof opts.onHeldSent === 'function' ? opts.onHeldSent : null;
   /**
    * The RELAY gave up on a message we had already handed it — the far-end twin of `onHoldDropped`.
    *
@@ -1002,6 +1060,10 @@ export async function createSecureAgent(opts = {}) {
       console.info(`[secure-agent] peer ${String(addr).slice(0, 16)}… unreachable — holding message (${q.size} queued)`);
     }
     persistHolds();     // durable: a restart must not lose what the caller was told is held
+    // Sent AS one of our addresses that is still young: the receiver may simply not have folded its introduction yet,
+    // and refuses it silently (indistinguishable from offline). That fold is usually seconds away and no presence
+    // signal will announce it — so this hold also re-flushes on the short back-off, then waits for presence as any hold.
+    if (isYoungSelfAddress(sendOpts?.sendAs)) scheduleYoungReflush(addr);
     return { held: true, delivered: false, deduped: false, msgId, pending: q.size, reason };
   }
 
@@ -1133,7 +1195,35 @@ export async function createSecureAgent(opts = {}) {
     }
     return { flushed };
   }
-  async function flushPending(addr) {
+  /**
+   * Re-send a held message once, best-effort. A message sent AS a persona goes out on that persona's own
+   * sockets only — never through the general router, whose sockets would show the relay the two are one device — and a
+   * persona send that does not go out throws, so the caller re-holds it.
+   */
+  async function resendHeld(addr, payload, opts) {
+    const once = { ...opts, hold: false, guarantee: 'best-effort' };
+    const owner = (typeof opts?.personaOwner === 'string' && opts.personaOwner)
+      || (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
+    if (!owner) return _sendWithFailover(addr, payload, once);
+    const r = await sendAsPersona(addr, payload, once, owner);
+    if (r?.delivered === false) {
+      const err = new Error(`secure-agent: a persona's held message did not go out (${r.reason})`);
+      err.personaNoConnection = r.reason === 'persona-no-connection';
+      throw err;
+    }
+    return r;
+  }
+  /** A persona's connection came up, or took a circle address: re-send what is held AS that persona (nothing counted —
+   *  it is our connection that changed, not the peer's silence). */
+  async function flushHeldOf(owner) {
+    let flushed = 0;
+    for (const [addr, q] of [...pendingHold]) {
+      if (![...q.values()].some((e) => e?.opts?.personaOwner === owner)) continue;
+      flushed += (await flushPending(addr, { countFailures: false })).flushed;
+    }
+    return { flushed };
+  }
+  async function flushPending(addr, { countFailures = true } = {}) {
     sweepExpiredHolds();
     const q = pendingHold.get(addr);
     if (!q || q.size === 0) return { flushed: 0 };
@@ -1143,14 +1233,18 @@ export async function createSecureAgent(opts = {}) {
     for (const entry of entries) {
       const { payload, opts } = entry;
       try {
-        await _sendWithFailover(addr, payload, { ...opts, hold: false, guarantee: 'best-effort' });
+        await resendHeld(addr, payload, opts);
         clearDeliveryFailures(addr);
         flushed++;
+        const sentId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+        try { onHeldSent?.({ addr, msgId: sentId }); } catch { /* a report never breaks the flush */ }
       } catch (err) {
         if (isApplicationError(err)) continue;   // unfixable by resend → drop
         // Still unreachable → re-hold, unless this address has now failed often enough that re-holding
         // is just paying for it again later. Giving up is REPORTED, like every other drop.
-        if (recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
+        // A young-address re-flush is a guess at WHEN, not evidence the address is dead: it never counts.
+        // …nor is a persona that has no socket of its own yet: that is ours to fix, not the peer's silence.
+        if (countFailures && !err?.personaNoConnection && recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
         else enqueueHold(addr, payload, opts);
       }
     }
@@ -1223,6 +1317,8 @@ export async function createSecureAgent(opts = {}) {
   // The receiving half of façade chunking (peerChunking.js): reassembles a chunked payload and hands
   // the whole to the SAME onPeerMessage fan, so the app cannot tell a chunked arrival from a plain one.
   const reassembleChunk = makeChunkReassembler({
+    // a transfer given up on is a receive-boundary drop like any other: said once per reason and sender, counted
+    onDrop: (reason, env) => noteDrop(reason, env),
     onPayload: (whole, env) => {
       if (typeof onPeerMessageFn !== 'function') return;
       try {
@@ -1296,7 +1392,7 @@ export async function createSecureAgent(opts = {}) {
       // drop envelopes from muted peers BEFORE any further
       // bookkeeping (no reciprocal HI, no onPeerMessage fire).
       // fanout the check across resolver-known aliases.
-      if (await isPeerMuted(env?._from)) { mutedDrops += 1; return; }
+      if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return; }
       // 5.7c — circle override enforcement runs AFTER mute (so muted
       // peers never reach the override layer) and BEFORE rate-limit /
       // reciprocal HI / onPeerMessage.  When the local user has
@@ -1304,12 +1400,12 @@ export async function createSecureAgent(opts = {}) {
       // peer is marked relation:'agent' in a circle that blocks agents,
       // the envelope is silently dropped.  Fails open if accessors
       // throw — never silently swallow inbound on a broken store.
-      if (await isInboundCircleBlocked(env)) return;
+      if (await isInboundCircleBlocked(env)) { noteDrop('circle-blocked', env); return; }
       // rate-limit drop.  Over-quota peers are silently
       // ignored at the receive boundary (no reciprocal HI either —
       // we don't want them to make us spam them in return).  The injected
       // exemption passes legitimate bursts (catch-up batches) untouched.
-      if (rateLimiter && !(rateLimitExempt?.(env)) && !rateLimiter.check(env?._from)) return;
+      if (rateLimiter && !(rateLimitExempt?.(env)) && !rateLimiter.check(env?._from)) { noteDrop('rate-limited', env); return; }
       // A greeting that passed every gate above: say so, the way the kernel's own hello handler
       // does (`peer`, same shape). The kernel never sees a HI on these transports — they hand
       // envelopes here, not to its dispatch — so without this nothing above the substrate learns
@@ -1763,7 +1859,15 @@ export async function createSecureAgent(opts = {}) {
       port: {
         get supportsAliases() { return tx?.supportsAliases ?? false; },
         get addresses()       { return tx?.addresses ?? []; },
-        addAddress:    (a, o) => (tx ? tx.addAddress(a, o) : Promise.resolve({ ok: false, reason: 'not-connected' })),
+        /** For a diagnosis line: the addresses this socket asked the relay for, and which it acked. */
+        get registrations()   { return tx?.registrations ?? null; },
+        addAddress:    (a, o) => (tx
+          ? Promise.resolve(tx.addAddress(a, o)).then((r) => {
+            // a persona's circle address on its own socket: what it held for that circle can go out now, signed as it
+            if (r?.ok !== false && socketIdentity && socketIdentity.pubKey !== identity.pubKey) flushHeldOf(socketIdentity.pubKey).catch(() => {});
+            return r;
+          })
+          : Promise.resolve({ ok: false, reason: 'not-connected' })),
         removeAddress: (a) => { try { tx?.removeAddress(a); } catch { /* best-effort */ } },
       },
     };
@@ -1813,6 +1917,9 @@ export async function createSecureAgent(opts = {}) {
       onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
     });
     makeReceiveHandler(tx);                 // inbound for the persona lands in this one agent
+    // what the persona could not send while it had no socket goes out now, on this socket (`resendHeld` keeps a
+    // persona's held message on that persona's sockets) — as the primary socket's connect does for the default's
+    tx.on?.('connect', () => { flushHeldOf(socketIdentity.pubKey).catch(() => { /* re-hold handled inside */ }); });
     await tx.connect();
     personaTransports.set(key, { url, identity: socketIdentity, tx });
     if (auditAutoLog) audit('relay.add.persona', url);
@@ -2193,10 +2300,19 @@ export async function createSecureAgent(opts = {}) {
   async function sendAsPersona(addr, payload, opts, owner) {
     if (await isPeerMuted(addr)) throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
     const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points) : null;
+    // A send AS one of the persona's circle addresses goes out only on a socket that holds that address: on one that does
+    // not, the relay would see the persona's own key speak into the circle (and the circle refuses it). None yet → held.
+    const speaksAs = typeof opts?.sendAs === 'string' && opts.sendAs !== owner ? opts.sendAs : null;
     const sockets = [...personaTransports.entries()]
-      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)));
+      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)))
+      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs));
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
-    if (!sockets.length) return { held: false, delivered: false, msgId, reason: 'persona-no-connection', persona: owner };
+    // Not sendable now: held on hold-forward, exactly as the general persona's send would be — and every flush re-sends
+    // it through `resendHeld`, which keeps it on this persona's own sockets.
+    // The owner rides in the held entry: a restored outbox can flush before the personas register again, and a held
+    // message whose owner is unknown at that moment must still never leave on the general persona's sockets.
+    const holdOr = (r) => (wantsHold(opts) ? { ...enqueueHold(addr, payload, { ...opts, personaOwner: owner }, r.reason), persona: owner } : r);
+    if (!sockets.length) return holdOr({ held: false, delivered: false, msgId, reason: 'persona-no-connection', persona: owner });
     let last = null;
     for (const [key, e] of sockets) {
       try {
@@ -2208,7 +2324,7 @@ export async function createSecureAgent(opts = {}) {
         last = { held: false, delivered: false, msgId, reason: 'persona-unreachable', persona: owner, error: err?.message ?? String(err) };
       }
     }
-    return last;
+    return holdOr(last);
   }
 
   async function _sendWithFailover(addr, payload, opts = {}) {
@@ -2550,6 +2666,7 @@ export async function createSecureAgent(opts = {}) {
       // mute state
       muteCount:       muteSet.size,
       mutedDrops,      // envelopes refused at the boundary because their sender is blocked
+      receiveDrops: { ...receiveDrops },   // every receive-boundary drop, per reason (muted · circle-blocked · rate-limited)
       mutedPeers:      muteSet.list(),
       muteIsPersistent: !!opts.muteListVaultKey,
       helloGateWired:  !!userHelloGate,
@@ -2589,6 +2706,8 @@ export async function createSecureAgent(opts = {}) {
    * Close the peer transport + stop the in-process agent.
    */
   async function shutdown() {
+    for (const st of youngReflush.values()) if (st.timer) clearTimeout(st.timer);
+    youngReflush.clear();
     for (const [, tx] of extraTransports) { try { await tx.disconnect?.(); } catch { /* defensive */ } }
     extraTransports.clear();
     for (const [, e] of personaTransports) { try { await e.tx.disconnect?.(); } catch { /* defensive */ } }
@@ -2679,12 +2798,19 @@ export async function createSecureAgent(opts = {}) {
         return false;
       }
       if (owner && owner !== identity.pubKey) selfOwners.set(address, owner); else selfOwners.delete(address);
+      if (!selfAddressBornAt.has(address)) selfAddressBornAt.set(address, Date.now());
       return agent.security.addSelfIdentity(address, selfIdentity);
     },
 
     /** Stop speaking as the identity at `address` — the circle was left. Idempotent. */
     forgetSelfIdentity(address) {
       selfOwners.delete(address);
+      selfAddressBornAt.delete(address);
+      // A forgotten address (a rotated-away person key) must leave every socket too: left registered, each
+      // reconnect re-presents it to the relay with a proof this device can no longer sign — a refused
+      // registration per connect for an address nobody should reach here any more.
+      const sockets = [relayTransport, ...extraTransports.values(), ...[...personaTransports.values()].map((p) => p.tx)];
+      for (const t of sockets) { try { t?.removeAddress?.(address); } catch { /* best-effort */ } }
       if (typeof agent.security?.removeSelfIdentity !== 'function') return false;
       return agent.security.removeSelfIdentity(address);
     },

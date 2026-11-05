@@ -8,6 +8,7 @@
  * `callSkill` (the same already-wired pinboard ops). Shows the shared circle's posts
  * (one pinboard agent today); per-circle scoping arrives with the pod foundation.
  */
+import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet, Image, Modal } from 'react-native';
 import { t } from '../../core/localisation.js';
@@ -41,7 +42,9 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
   // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
   // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
   // still loading) → no byline rather than a wire address.
-  members = null, viewerId = null, revealPolicy = 'pairwise' }) {
+  members = null, viewerId = null, revealPolicy = 'pairwise',
+  // a circle an admin removed this person from: this note (and the close) stand where the composer would
+  readOnlyNote = null, onCloseRemoved = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [posts, setPosts] = useState([]);
@@ -232,6 +235,14 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
 
   return (
     <View style={styles.wrap} testID="circle-noticeboard">
+      {readOnlyNote ? (
+        <View testID="nb-read-only">
+          <Text style={styles.readOnlyNote}>{readOnlyNote}</Text>
+          {typeof onCloseRemoved === 'function' ? (
+            <Btn variant="primary" testID="nb-close-removed" label={t('circle.membership.removed_close')} onPress={onCloseRemoved} />
+          ) : null}
+        </View>
+      ) : (<>
       <View style={styles.intents}>
         {INTENTS.map((it) => (
           <Pressable key={it} style={[styles.intent, it === intent && styles.intentActive]} onPress={() => setIntent(it)} testID={`nb-intent-${it}`}>
@@ -268,6 +279,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
           <TextInput style={styles.dueInput} value={dueText} onChangeText={setDueText} placeholder="YYYY-MM-DD" placeholderTextColor={theme.color.inkSoft} autoCapitalize="none" testID="nb-due" />
         </View>
       )}
+      </>)}
       {busy && <Text style={styles.busy}>{t('circle.noticeboard.posting')}</Text>}
       {error && <Text style={styles.error}>{t('circle.noticeboard.post_failed')}</Text>}
 
@@ -380,6 +392,7 @@ const makeStyles = (theme) => StyleSheet.create({
   intentText: { fontSize: 13, fontWeight: '600', color: theme.color.inkSoft },
   intentTextActive: { color: theme.color.white },
   composerRow: { flexDirection: 'row', gap: 8 },
+  readOnlyNote: { fontSize: 13, color: theme.color.inkSoft, marginBottom: 8 },
   input: { flex: 1, fontSize: 14, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
   post: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.accent, justifyContent: 'center' },
   postText: { fontSize: 14, fontWeight: '600', color: theme.color.white },

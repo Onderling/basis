@@ -52,6 +52,8 @@ const PER_FRAME_REFUSALS = new Set(['SENDER_NOT_REGISTERED', 'OVER_RATE', 'OVER_
 // Parameter register (#36) — reconnect backoff ceiling + push-ack timeout (scope:device, kind:internal).
 const MAX_BACKOFF_MS = param({ key: 'transports.maxBackoffMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 const PUSH_ACK_TIMEOUT_MS = param({ key: 'transports.pushAckTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5_000 });
+// A send AS an address waits for that address's bind on this socket; past this it is said, with why the bind was lost.
+const BIND_WAIT_WARN_MS = param({ key: 'transports.bindWaitWarnMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
 
 /**
  * WebSocket relay-server `Transport`: registers this agent's address with the relay, which
@@ -82,14 +84,20 @@ export class RelayTransport extends Transport {
    */
   #asked             = new Set();
   #proved            = new Set();
+  /** address → proofs sent on THIS socket whose `registered` ack has not come yet (each ack spends one). */
+  #proofsInFlight    = new Map();
   /** Aliases the relay has ACKED on THIS socket — what an awaited `addAddress` promises. Cleared with every new socket. */
   #bound             = new Set();
+  /** address → why (and when) it last left `#bound` — what a send that then waits for it can say. */
+  #unboundWhy        = new Map();
   #primaryDevice = () => false;
   #primaryAcked = false;
   /** What this node serves the relay's seat (its own address only), sent on its own register frame. */
   #serves = [];
   /** alias address → `primary: true` when it registers as the primary (from `addAddress`). */
   #primaryFlags = new Map();
+  /** address → true once this device stepped DOWN from primary for it: it then registers as a standby (never takes a held address). */
+  #standbyFlags = new Map();
   /** alias address → the caller's `sign(message)` (from `addAddress`). The primary uses `identity`. */
   #signers           = new Map();
   /** Set once this relay has failed the audit — we do not reconnect to it, and say why. */
@@ -140,6 +148,10 @@ export class RelayTransport extends Transport {
    *  comparing THIS against the scope's points — with more than one relay up, a transport that cannot say
    *  which relay it is would be eligible for every circle (2026-09-08). */
   get url() { return this.#relayUrl; }
+  /** What this socket holds, for a diagnosis line: the addresses it asked the relay for, and which of them the relay acked. */
+  get registrations() {
+    return { asked: [this.address, ...this.#signers.keys()].filter(Boolean), acked: [...this.#bound] };
+  }
 
   /**
    * `addAddress` means "the relay agrees this address is ours ON THIS SOCKET" — for every caller, not only the
@@ -180,9 +192,12 @@ export class RelayTransport extends Transport {
         + 'prove possession to the relay');
     }
     this.#signers.set(address, opts.sign);
+    // stepping DOWN (it was this device's primary and is no longer): from here it registers as a standby
+    if (this.#primaryFlags.get(address) === true && opts?.primary !== true) this.#standbyFlags.set(address, true);
+    if (opts?.primary === true) this.#standbyFlags.delete(address);
     this.#primaryFlags.set(address, opts?.primary === true);
     if (!this.connected) return;      // replayed by `_rebindAddresses()` on the next connect
-    this.#bound.delete(address);      // a rebind (the flag moved) waits for the relay's fresh ack
+    if (this.#bound.delete(address)) this.#unboundWhy.set(address, { why: 'flag-moved', at: Date.now() });   // a rebind (the flag moved) waits for the relay's fresh ack
     this.#sendRegister(address, opts?.primary === true);
     await this.#awaitBound(address);
   }
@@ -192,9 +207,14 @@ export class RelayTransport extends Transport {
    * reconnect would read it anyway). Aliases keep their own flag (`addAddress(address, { sign, primary })`).
    */
   async setPrimaryDevice(isPrimary) {
+    // stepping DOWN (this socket held the person's address as primary and another device is now chosen): register as a
+    // STANDBY from here on — take the address only if no live socket holds it. A plain registration would take it back
+    // from the new primary in the moment before that one's primary registration is proven (the relay's last-plain rule).
+    if (isPrimary !== true && this.#primaryDevice() === true) this.#standbyFlags.set(this.address, true);
+    if (isPrimary === true) this.#standbyFlags.delete(this.address);
     this.#primaryDevice = () => isPrimary === true;
     if (!this.connected) return { ok: true, pending: true };
-    this.#bound.delete(this.address);
+    if (this.#bound.delete(this.address)) this.#unboundWhy.set(this.address, { why: 'primary-moved', at: Date.now() });
     this.#sendRegister(this.address, isPrimary === true);
     try { await this.#awaitBound(this.address); return { ok: true }; }
     catch (err) { return { ok: false, reason: err?.message ?? 'bind-failed' }; }
@@ -237,8 +257,9 @@ export class RelayTransport extends Transport {
   _unbindAddress(address) {
     this.#signers.delete(address);
     this.#proved.delete(address);
+    this.#proofsInFlight.delete(address);
     this.#asked.delete(address);
-    this.#bound.delete(address);
+    if (this.#bound.delete(address)) this.#unboundWhy.set(address, { why: 'removed', at: Date.now() });
   }
 
   /** True when the WebSocket is open and registered with the relay. */
@@ -306,7 +327,14 @@ export class RelayTransport extends Transport {
     // relay refused it as an unregistered sender — silently for the sender (the enrol walk, 2026-09-16).
     const from = envelope?._from;
     if (typeof from === 'string' && from !== this.address && this.#signers.has(from) && !this.#bound.has(from)) {
+      const t0 = Date.now();
       await this.#ensureBound(from);
+      const waited = Date.now() - t0;
+      if (waited > BIND_WAIT_WARN_MS) {
+        const lost = this.#unboundWhy.get(from);
+        console.warn(`[relay] a send as ${from.slice(0, 8)}… waited ${waited} ms for its bind on this socket`
+          + (lost ? ` (unbound by ${lost.why} ${t0 - lost.at} ms before the send)` : ' (never bound on this socket)'));
+      }
     }
     const frame = { type: 'send', to, envelope };
     if (envelope._topic) frame.topic = envelope._topic;
@@ -353,10 +381,10 @@ export class RelayTransport extends Transport {
   /** Ask to register `address`; the relay answers with a challenge, never with a registration. */
   #sendRegister(address, primary = false) {
     this.#asked.add(address);
-    this.#proved.delete(address);
     // `serves` rides only the socket's OWN address — an alias never opts the node into anything
     const serves = address === this.address && this.#serves.length ? { serves: this.#serves } : {};
-    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}), ...serves }));
+    const standby = !primary && this.#standbyFlags.get(address) === true ? { standby: true } : {};
+    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}), ...standby, ...serves }));
   }
 
   /** Sign the relay's nonce for `address` and send the proof. Silent about addresses we never asked for. */
@@ -376,6 +404,7 @@ export class RelayTransport extends Transport {
       return;
     }
     this.#proved.add(address);
+    this.#proofsInFlight.set(address, (this.#proofsInFlight.get(address) ?? 0) + 1);
     if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'register-proof', address, nonce, proof }));
   }
 
@@ -503,6 +532,8 @@ export class RelayTransport extends Transport {
       // one.
       this.#asked.clear();
       this.#proved.clear();
+      this.#proofsInFlight.clear();
+      for (const a of this.#bound) this.#unboundWhy.set(a, { why: 'reconnect', at: Date.now() });
       this.#bound.clear();
       this.#primaryAcked = false;
       this.#sendRegister(this.address, this.#primaryDevice() === true);
@@ -527,10 +558,15 @@ export class RelayTransport extends Transport {
         // The audit. `address` is absent on a relay old enough not to say which registration it is
         // acking — which is also a relay old enough not to have challenged us, so it fails here.
         const address = msg.address ?? this.address;
-        if (!this.#proved.has(address)) {
+        // Each ack answers ONE proof this socket sent for that address — a re-registration in flight (a moved primary
+        // flag, a boot re-announce: several of a person's devices hold one circle address now) never un-proves the
+        // earlier one, and an ack with no proof outstanding is still the relay that did not demand one.
+        const outstanding = this.#proofsInFlight.get(address) ?? 0;
+        if (!this.#proved.has(address) || outstanding < 1) {
           this.#failUnprovenRelay(address);
           return;
         }
+        this.#proofsInFlight.set(address, outstanding - 1);
         // An alias landed: release whoever is awaiting `addAddress` for it. The connect promise
         // belongs to the primary, so an alias never resolves that one.
         this.#bound.add(address);

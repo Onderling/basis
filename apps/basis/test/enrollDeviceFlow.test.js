@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { verifyFlows, createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import {
-  Bootstrap, deriveCircleAddress, deriveDeviceSeed, deviceDelegationPubKey, verifyDeviceDelegation,
+  Bootstrap, deriveCircleAddress, deriveCircleRoot, deriveDeviceSeed, deviceDelegationPubKey, verifyDeviceDelegation,
 } from '@onderling/core';
 import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
@@ -82,12 +82,14 @@ describe('the enroll-device flow (declared → verified → run → the boot cut
     // ── The "reload": device 2 boots again on the same vaults — the enrolled boot. ──
     const dev2b = await boot(v2);
     const addr2 = dev2b.circleAddressFor(CIRCLE);
-    // The collision fix, live: same phrase, same circle, DISTINCT address per device…
-    expect(addr2).not.toBe(addr1);
+    // Same phrase, same circle: the SAME address on both devices — the persona's one address there, from its circle
+    // root (handed at the ceremony); the throwaway self's address before the ceremony is gone.
+    expect(addr2).toBe(addr1);
     expect(addr2).not.toBe(preEnrollAddr);
-    // …and exactly the delegation-derived one (the full chain, recomputed from the phrase).
     const profileSeed = Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default');
-    expect(addr2).toBe(deriveCircleAddress(deriveDeviceSeed(profileSeed, deviceId), CIRCLE));
+    expect(addr2).toBe(deriveCircleAddress(deriveCircleRoot(profileSeed, 0), CIRCLE));
+    // …while the DEVICE stays its own: its delegation key is from its own seed (the device map tells them apart)
+    expect(dev2b.persona('default').enrolledDevice.record.pubKey).toBe(deviceDelegationPubKey(deriveDeviceSeed(profileSeed, deviceId)));
 
     // The delegation record self-healed onto the registry, root-signed, label kept.
     const props = (await dev2b.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {};

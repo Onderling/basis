@@ -214,9 +214,9 @@
           "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld — niets bij een eerste keer. Later aanpassen kan bij Mij → persona's.",
           "doc": "Join wizard — persona disclosure hint."
         },
-        "second_warning": {
-          "text": "Je bent al lid van deze kring als {{persona}}. Doe je mee als een andere persona, dan ben je hier twee leden, en de anderen kunnen niet zien dat het allebei jij bent.",
-          "doc": "Join wizard — a warning when this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One member per persona: only the person's own device can tell."
+        "already_in": {
+          "text": "Je bent hier al als {{persona}} — met een andere persona kan dat vanaf een ander apparaat.",
+          "doc": "Join wizard — refused: this device is already in the circle as another of the person's personas ({{persona}} = that persona's label). One self per circle on a device; two personas in one circle need two devices."
         }
       },
       "reveal": {
@@ -381,6 +381,30 @@
     "someone_joined": {
       "text": "{{name}} is lid geworden van deze kring.",
       "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
+    },
+    "leaving_note": {
+      "text": "Verlaten — dit wacht op je hoofdapparaat. De kring verdwijnt zodra dat apparaat het heeft ondertekend.",
+      "doc": "Said on a circle tile you just left from a device that is not your main device: the leave was handed to the main device to sign, and the tile goes when that signed leave lands here."
+    },
+    "leaving_note_held": {
+      "text": "Verlaten — je hoofdapparaat is offline. De kring verdwijnt zodra het terug is.",
+      "doc": "The same, when the main device is offline: the leave waits for it."
+    },
+    "not_reachable": {
+      "text": "Je bereikt {{name}} nog niet. Wijzigingen komen aan zodra {{name}} of een ander lid weer online is.",
+      "doc": "On a member's row when this device has no address for them yet and a change in the circle has waited for them longer than the re-tell window. It heals by itself: their device re-announces on its next connect, another member re-introduces them, or their own catch-up pulls everything."
+    },
+    "removed_mark": {
+      "text": "verwijderd",
+      "doc": "The mark on a circle tile an admin removed you from; the tile stays (read-only) until you close it."
+    },
+    "removed_note": {
+      "text": "Je bent uit deze kring gehaald. Je kunt nog lezen wat je had; sluiten haalt de kring weg.",
+      "doc": "Said on the tile and in place of the composer of a circle an admin removed you from: you are out, what you had stays readable, and closing takes the circle away from this device."
+    },
+    "removed_close": {
+      "text": "Sluiten",
+      "doc": "The button that closes a circle you were removed from: forgets what this device held of it."
     }
   },
   "members_tab": {
@@ -600,6 +624,10 @@
       "undeliverable": {
         "text": "Kon sommige leden niet bereiken",
         "doc": "δ.2 — permanent fan-out failure (e.g. a member has no published key); shown but NOT retryable (retry can't help)."
+      },
+      "persona_waiting": {
+        "text": "Wacht — deze persona heeft nog geen verbinding; het gaat vanzelf zodra ze er een heeft",
+        "doc": "The circle belongs to one of your personas, which has no connection of its own to the circle's relay yet, so the message is HELD on this device (never sent under another identity). Not a failure: it goes out by itself once the persona has a connection, and the bubble then moves on."
       },
       "persona_no_connection": {
         "text": "Niet verstuurd: deze persona heeft geen verbinding met de kring (tik om opnieuw te proberen)",
@@ -6795,6 +6823,10 @@
       "text": "Dit apparaat als eerste contactadres",
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
     },
+    "make_primary_no_point": {
+      "text": "Directe berichten komen nu op dit apparaat binnen ({{count}} kringen ingelicht). Het kan je kringwijzigingen nog niet ondertekenen: typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels).",
+      "doc": "After the main-device tap on a device without the circle root: direct messages land here, but it cannot be the point that signs the spine."
+    },
     "make_primary_done": {
       "text": "Dit apparaat is nu je eerste contactadres in {{count}} kringen",
       "doc": "After the tap: how many circles took the choice (count)."
@@ -6823,6 +6855,14 @@
     "connection_device_section": {
       "text": "apparaatinstellingen",
       "doc": "De niet-circle sectie: je eigen instellingen."
+    },
+    "connection_as_self": {
+      "text": "Voor",
+      "doc": "Pairing a screen — the label beside the choice of which of the person's selves the screen is for (a persona issues its grants as itself)."
+    },
+    "connection_pick_self": {
+      "text": "Kies voor wie dit scherm is",
+      "doc": "Pairing a screen — the empty choice, and the line shown when none is chosen on a device holding more than one self."
     },
     "connection_add": {
       "text": "Apparaat koppelen",
@@ -6938,6 +6978,20 @@
         "doc": "Confirm body when the last admin is also the only member. There is nobody to hand to, so the fold keeps the demotion from standing at all — said plainly here instead of a handover that cannot happen."
       }
     },
+    "outbox": {
+      "over_day": {
+        "text": "{{count}} wijziging(en) wachten al langer dan een dag op je hoofdapparaat. Ze gelden zodra het weer online is.",
+        "doc": "Admin panel line: changes this device handed the person's main device to sign have waited over a day (it is offline). Not lost; they still go."
+      },
+      "maybe_lost": {
+        "text": "{{count}} wijziging(en) zijn misschien niet doorgekomen — controleer en doe ze opnieuw.",
+        "doc": "Admin panel line: this device became the person's main device while changes it had handed the previous main device were never confirmed. Nobody can sign them now and whether they landed cannot be told, so the person checks."
+      },
+      "unsent": {
+        "text": "{{count}} wijziging(en) niet verstuurd — je hoofdapparaat was te lang onbereikbaar. Doe ze opnieuw, hier of op je hoofdapparaat.",
+        "doc": "Admin panel line: changes this device handed the main device were dropped — it was unreachable for the whole window (7 days). They will not land."
+      }
+    },
     "role_notice": {
       "promoted": {
         "text": "{{name}} is nu beheerder van deze kring.",
@@ -6954,6 +7008,18 @@
       "no_one_else": {
         "text": "{{name}} is nog steeds beheerder: er is niemand anders in deze kring om het over te nemen.",
         "doc": "Panel notice when the demotion could not stand — the circle would have been left with nobody to run it."
+      },
+      "forwarded": {
+        "text": "Doorgestuurd naar je hoofdapparaat. De wijziging geldt zodra dat apparaat haar heeft ondertekend.",
+        "doc": "Panel notice when this device is not the person's main device: the role change was handed to the main device, which signs it. Not yet applied."
+      },
+      "waiting_catch_up": {
+        "text": "Wacht tot je apparaat is bijgewerkt. Daarna geldt de wijziging.",
+        "doc": "Panel notice when this device has just become the person's main device and first catches up with the circle (so its first change chains on the newest one, no fork). The change waits until then."
+      },
+      "forwarded_held": {
+        "text": "Je hoofdapparaat is offline. De wijziging wacht erop en geldt zodra het terug is.",
+        "doc": "Panel notice when the role change was handed to the main device while that device is offline: it is held for it."
       }
     },
     "announce": {
@@ -7711,6 +7777,14 @@
     }
   },
   "errors": {
+    "self_required": {
+      "text": "Dit apparaat heeft meer dan één persona — zeg als wie je dit doet.",
+      "doc": "An op that issues as one of the person's selves (a grant, an install with grants) refused: the device holds more than one self and none was named."
+    },
+    "no_such_persona": {
+      "text": "Die persona is niet op dit apparaat.",
+      "doc": "An op named a persona this device does not hold."
+    },
     "invalid_handle": {
       "handle-taken": "Die naam is al bezet in deze kring. Kies een andere.",
       "handle-taken_hint": "Als je dit apparaat hersteld hebt, houdt de kring je vorige naam misschien nog vast — kies een nieuwe, of vraag een beheerder de oude te verwijderen."
@@ -7795,6 +7869,7 @@
     "offer_title": "Toevoeg-code",
     "offer_hint": "Scan of plak deze code op het nieuwe apparaat en typ daar de herstelzin. De code is geen geheim — de herstelzin blijft de enige sleutel.",
     "offer_error": "Code maken lukte niet (dit apparaat zit nog in geen enkele kring).",
+    "offer_no_seal": "Dit apparaat kan nog geen code tonen: het is toegevoegd voordat het herstelzegel bestond. Typ er één keer je herstelzin op (Instellingen → Apparaten & sleutels) en probeer het dan opnieuw.",
     "offer_paste_label": "Code van je huidige apparaat (optioneel)",
     "personas_title": "Welke persona's krijgt dit apparaat?",
     "personas_hint": "Alleen wat je aanvinkt komt op dit apparaat. Een apparaat dat minder vertrouwd is, geef je er beter minder.",
@@ -8063,6 +8138,10 @@
       "rotation_days": {
         "text": "Sleutel verversen na (dagen, 1-365)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "rotation_days_hint": {
+        "text": "Hoe vaak de sleutel van de hele kring wordt vervangen. 30 dagen past bij de meeste kringen; kies minder voor een gevoeligere groep. (Hoe lang een uitnodiging geldig is, stel je apart in bij Bestuur.)",
+        "doc": "Create wizard, the key-rotation field's hint."
       },
       "offering_remove": {
         "text": "Weghalen",

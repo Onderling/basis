@@ -10,7 +10,7 @@
  * · `POLICY_NEVER` (withheld outright) · `NOT_FOUND` (no such op). A test that only knew "it threw"
  * could not tell a revoked grant from a typo.
  */
-import { DataPart } from '@onderling/core';
+import { DataPart, tokenAgentKeyFor } from '@onderling/core';
 
 /**
  * @param {object} agent   the owner's handle from `createRealHouseholdAgent`
@@ -19,12 +19,14 @@ import { DataPart } from '@onderling/core';
  * @param {string} a.opId          `app.opId`, e.g. 'params.set-param'
  * @param {object} [a.args]
  * @param {object} [a.token]       the CapabilityToken JSON the grant handed over
+ * @param {string} [a.addressedTo] the address the connection calls (a persona's, for a grant it issued) — the door
+ *   binds the token to it as the wire handler does (`tokenAgentKeyFor`); default the owner's own key
  * @returns {Promise<{ok:true, result:*}|{ok:false, code:string}>}
  */
-export async function actAsConnection(agent, { callerPubKey, opId, args = {}, token = null }) {
+export async function actAsConnection(agent, { callerPubKey, opId, args = {}, token = null, addressedTo = null }) {
   const owner = agent.sa.agent;
   try {
-    await owner.policyEngine.checkInbound({ peerPubKey: callerPubKey, skillId: opId, token });
+    await owner.policyEngine.checkInbound({ peerPubKey: callerPubKey, skillId: opId, token, agentPubKey: tokenAgentKeyFor(owner, addressedTo) });
   } catch (e) {
     return { ok: false, code: e?.code ?? 'DENIED' };
   }

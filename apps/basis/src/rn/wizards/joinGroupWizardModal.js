@@ -19,7 +19,7 @@ import {
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
   personaLabel,
-  secondPersonaWarning,
+  secondPersonaRefusal, submitErrorText,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 
@@ -248,12 +248,12 @@ export default function JoinGroupWizardModal({
                     ]}
                   />
                 ) : null}
-                {/* ONE MEMBER PER PERSONA — this device is already in the circle as another of the person's personas */}
+                {/* ONE SELF PER CIRCLE ON A DEVICE — this device is already in the circle as another of the person's personas */}
                 {(() => {
-                  const second = secondPersonaWarning(state);
+                  const second = secondPersonaRefusal(state);
                   if (!second) return null;
                   const held = (state.personas ?? []).find((p) => p.id === second.personaId) ?? { id: second.personaId };
-                  return <ErrorBanner message={t('circle.join.wizard.persona.second_warning', { persona: personaLabel(held, t) })} />;
+                  return <ErrorBanner message={t('circle.join.wizard.persona.already_in', { persona: personaLabel(held, t) })} />;
                 })()}
                 {/* Reveal level (§1.6) — how much of your persona this circle sees. You pick it
                     (default = your resolved usual level, else the fallback); adjustable down to
@@ -284,7 +284,7 @@ export default function JoinGroupWizardModal({
                 {/* A typed failure carries a locale KEY; an untyped one a raw substrate string. Rendering
                     only the second meant the two failures that bothered to type themselves — the admin
                     being offline, and a handle already taken — showed nothing at all (J-NP2, 2026-07-30). */}
-                <ErrorBanner message={state.submitErrorKey ? t(state.submitErrorKey) : state.submitError} />
+                <ErrorBanner message={submitErrorText(state, t)} />
                 <Submitting visible={state.submitting} label={t(joinSubmitLabelKey(state))} />
               </Body>
             )}

@@ -48,6 +48,8 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'household.restoreStatus', 'household.restoreSource', 'household.restoreIntent',
   'household.listReceivablePersonas', 'household.receivePersonas',
   'household.listPersonasHere', 'household.pausePersona', 'household.resumePersona', 'household.removePersonaHere', 'household.setNearbyLevel',
+  // what this device handed the person's main device and has not seen signed — the device's own pending changes
+  'household.ownSpineOutbox',
   // …and what that node lets another agent do there: granting it, or reading its choices, has THIS device sign a
   // statement for the person's node — a peer must not get the person's device to sign for it.
   'household.grantCompanion',

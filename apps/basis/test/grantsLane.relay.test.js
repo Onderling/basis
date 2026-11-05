@@ -10,7 +10,7 @@ import { VaultMemory } from '@onderling/vault';
 import { AgentIdentity, CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
 import { startJourneyRelay } from './support/testRelay.js';
 import {
-  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown,
+  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown, shareDeviceRecords,
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { actAsConnection, trustForGrant } from './support/actAsConnection.js';
@@ -72,6 +72,10 @@ describe('grants lane over a real relay — paired on the phone, revoked for the
       return (r?.circleAddresses?.includes(addrL)) ? r : null;
     }, { timeout: 20000, step: 100 });
     expect(row, 'P never learned L\'s proven address over the relay').toBeTruthy();
+    // …and each holds the other in its device map (the registry mirror's job; the offer's roster seed pod-less), and
+    // registers its device address on the relay beside the person address
+    await shareDeviceRecords([P, L]);
+    await bindCircleAddresses([P, L], GROUP);
   }, 180_000);
 
   afterAll(async () => {

@@ -1592,6 +1592,8 @@ walkLog({ kind: 'host-tick', jobs: hostTick.names() });
 const card = await callSkill('pinboard', 'getContactShareQr', {}).catch(() => null);
 // `clock`: the zone the household's times are read and shown in (the role's TZ; a bare container is UTC).
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
+// what other agents' task requests reach on this node (ids only), so a walk — or an operator — reads it from the box
+walkLog({ kind: 'peer-callable', accepts: agent.peer?.acceptsSkillCalls === true, skills: agent.peer?.callableSkills?.() ?? [] });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

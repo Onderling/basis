@@ -54,6 +54,7 @@ describe('4b — the history layer is not reachable by delegation', () => {
     const bot = await AgentIdentity.generate(new VaultMemory());
     const trust = new TrustRegistry(new VaultMemory());
     await trust.setTier(bot.pubKey, 'authenticated');     // a delegated bot is NOT 'trusted'
+    await trust.setTier(owner.pubKey, 'trusted');         // the token's issuer: a VALID grant, so the tier is what stops it
 
     const engine = new PolicyEngine({
       trustRegistry: trust,
@@ -69,9 +70,15 @@ describe('4b — the history layer is not reachable by delegation', () => {
 
     // Assert the SPECIFIC denial. A bare `.toThrow()` would also pass on a broken harness — which is
     // exactly how this test first went green while `skillRegistry` was undefined.
+    // The token is judged FIRST and holds here — so this refusal is the TIER's: a valid wildcard grant does not lift a
+    // delegated caller to a trusted op.
     await expect(engine.checkInbound({
-      peerPubKey: bot.pubKey, skillId: 'restoreDataVersion', token: wildcard,
+      peerPubKey: bot.pubKey, skillId: 'restoreDataVersion', token: wildcard.toJSON(),
     })).rejects.toMatchObject({ code: 'INSUFFICIENT_TIER' });
+    // …and a token that does not hold is refused as a token, never passed on to the tier.
+    await expect(engine.checkInbound({
+      peerPubKey: bot.pubKey, skillId: 'restoreDataVersion', token: { ...wildcard.toJSON(), sig: 'AAAA' },
+    })).rejects.toMatchObject({ code: 'INVALID_TOKEN' });
   });
 
   it('…and the same bot IS allowed a normal authenticated op, so the refusal is the tier, not the setup', async () => {

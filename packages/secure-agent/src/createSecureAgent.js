@@ -646,6 +646,8 @@ export async function createSecureAgent(opts = {}) {
       actorResolver: peOpts.actorResolver ?? null,
       // told of every refused presented token (a log's way in, never a gate): see PolicyEngine
       onDenied:      peOpts.onDenied      ?? null,
+      // whether the host knows an unrecorded wire caller (own devices, shared circles, contacts): absent → as before
+      isKnown:       peOpts.isKnown       ?? null,
     });
     // ATTACH it to the agent — without this the engine is built + exposed as
     // `sa.policy` but `agent.policyEngine` stays null, so `runGatedSkill` never
@@ -2872,6 +2874,9 @@ export async function createSecureAgent(opts = {}) {
       invoke:  invokePeer,
       /** The skills other agents' task requests reach here (`acceptPeerSkillCalls`); [] when the route is off. */
       callableSkills: () => (peerSkillCalls ? peerSkillCalls.reachableSkills() : []),
+      /** Whether other agents' task requests are taken at all (the composition's `acceptPeerSkillCalls`). Off → a call
+       *  from another agent is never answered; a walk reads this rather than inferring it from silence. */
+      acceptsSkillCalls: Boolean(peerSkillCalls),
       get status()  { return peerState.status;  },
       get address() { return peerState.address; },
       get error()   { return peerState.error;   },

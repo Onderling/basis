@@ -929,6 +929,10 @@ export async function teardown(...nodes) {
  * on the sender's own log (`chatRail.appendMessage`), then fan the STATEMENT through the real pinboard core
  * (`broadcastCircleChatStatement` → transport / pod routing per the circle's policy). The drop-in
  * replacement for the deleted plain-envelope `broadcastCircleMessage` in every journey test.
+ *
+ * NOT the whole production send: it skips the carry to the sender's OWN other devices (that lives in the agent's
+ * `chatEmit`). A test whose receiver is one of the sender's own devices — an enrolled box, a second phone — sends with
+ * `node.agent.chatEmit(circleId, { msgId, ts, text })`, or the line never reaches it (2026-11-05).
  */
 export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now(), card } = {}) {
   const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, card });

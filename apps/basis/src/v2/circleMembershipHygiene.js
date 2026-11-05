@@ -188,3 +188,25 @@ export async function leaveCircleLocally({ agent = null, callSkill = null, circl
   }
   return out;
 }
+
+/**
+ * Is this device still in a circle, by the roster it holds? The question a device asks when a membership change lands
+ * for a circle it joined (the household bot's box forgets a circle it was removed from).
+ *
+ * @param {object} a
+ * @param {Array<object>|null} a.members  the derived roster's rows (`listGroupMembers`), or null when it could not be read
+ * @param {string|null} a.me              this device's per-circle address in the circle
+ * @param {string|null} a.selfRef         this device's member ref in the circle (its circle self)
+ * @returns {{ in: boolean, reason: string }}
+ */
+export function stillInCircle({ members, me = null, selfRef } = {}) {
+  if (!selfRef) return { in: true, reason: 'no-self' };
+  if (!Array.isArray(members)) return { in: true, reason: 'roster-unread' };
+  if (!members.length) return { in: true, reason: 'empty-roster' };
+  // MY ROW, by my circle self — the fold's own verdict (an evict removes the row). Whether my address has landed on it
+  // yet is a separate fact: a row without it is "not yet listed" (re-announce), never "removed".
+  const row = members.find((m) => (m?.webid ?? m?.ref) === selfRef);
+  if (!row) return { in: false, reason: 'not-on-roster' };
+  const addressed = !me || row.circleAddress === me || (row.circleAddresses ?? []).includes(me);
+  return { in: true, reason: addressed ? 'still-listed' : 'not-yet-addressed' };
+}

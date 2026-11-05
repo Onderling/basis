@@ -143,6 +143,21 @@ export function createCircleDoors({ roster, botRef, botHandle, setDoorCaller, cl
   const seen = new Set();
   const SEEN_MAX = 1000;
   const say = (e) => { try { log?.(e); } catch { /* a log never breaks a turn */ } };
+  // A LINE THE DOOR PASSES OVER SAYS WHY — once per reason and circle, then only counted: a bot that silently ignores a
+  // member cannot be told apart from one that never got the line (a just-joined circle misread as removed cost a day).
+  const passedSaid = new Set();
+  const passedCount = {};
+  const PASSED_SAID_MAX = 500;
+  const passed = (reason, circleId) => {
+    passedCount[reason] = (passedCount[reason] ?? 0) + 1;
+    const key = `${reason}|${circleId ?? ''}`;
+    if (!passedSaid.has(key)) {
+      passedSaid.add(key);
+      while (passedSaid.size > PASSED_SAID_MAX) passedSaid.delete(passedSaid.values().next().value);
+      say({ kind: 'circle-line-passed', reason, circleId: String(circleId ?? '').slice(0, 12) });
+    }
+    return false;
+  };
   const clearCaller = async (caller) => { try { await clearDoorCaller?.(caller); } catch { /* the next turn tiers afresh */ } };
 
   async function doorFor(circleId) {
@@ -164,21 +179,21 @@ export function createCircleDoors({ roster, botRef, botHandle, setDoorCaller, cl
      * @returns {Promise<boolean>} whether it went to the door
      */
     async landed({ circleId, msgId, authorRef, text, ts = null, displayName = null }) {
-      if (!circleId || !authorRef || typeof text !== 'string' || !text.trim()) return false;
-      if (authorRef === botRef(circleId)) return false;
-      if (typeof ts === 'number' && now() - ts > answerWithinMs) return false;
+      if (!circleId || !authorRef || typeof text !== 'string' || !text.trim()) return passed('no-text', circleId);
+      if (authorRef === botRef(circleId)) return passed('own-line', circleId);
+      if (typeof ts === 'number' && now() - ts > answerWithinMs) return passed('too-old', circleId);
       const names = botNamesFor(await botHandle(circleId));
-      if (!namesTheBotMember(text, names)) return false;
+      if (!namesTheBotMember(text, names)) return passed('not-named', circleId);
       const key = `${circleId}:${msgId}`;
       if (msgId) {
-        if (seen.has(key)) return false;
+        if (seen.has(key)) return passed('seen', circleId);
         seen.add(key);
         if (seen.size > SEEN_MAX) seen.delete(seen.values().next().value);
       }
       const member = ((await roster(circleId)) ?? []).find((m) => m?.webid === authorRef);
-      if (!member) return false;
+      if (!member) return passed('not-on-roster', circleId);
       const role = doorRoleForRosterRole(member.role);
-      if (!role) return false;
+      if (!role) return passed('no-role', circleId);
       const caller = circleCallerId(circleId, authorRef);
       await setDoorCaller(caller, role);
       const d = await doorFor(circleId);

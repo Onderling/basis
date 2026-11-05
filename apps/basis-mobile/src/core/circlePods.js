@@ -35,7 +35,7 @@ import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basi
 import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
-import { realPodRouting, circleRootFor, recordedCirclePodUri } from '../../../basis/src/v2/circleRealPod.js';
+import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
 import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
 import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.js';
 // the SHARED cross-circle SHARE logic + the platform-neutral enforcement assembly.
@@ -273,12 +273,15 @@ async function buildCirclePod(circleId, policy) {
   try {
     let sealingKeyPair = null;   // the device's per-circle sealing keypair (one key family — web parity)
     try { sealingKeyPair = _keyEventWiring?.circleSealingKeyPairFor?.(circleId) ?? null; } catch { sealingKeyPair = null; }
+    const ownsRoot = !routing || ownsCircleRoot({ podRoot: routing.podRoot, circleRootUri });
     producer = await createCirclePodProducer({
       circleId, storagePosture: policy?.storagePosture ?? 'p0', vault: circleVault,
       generateKeypair: podGenerateKeypair, sealingKeyPair,
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
       circleRootUri,
-      sharing,
+      // only the pod that holds the circle's root takes access rules from this device (web parity)
+      sharing: ownsRoot ? sharing : undefined,
+      ownsRoot,
       // G11 — no-pod key distribution: rotations fan as log key-events (web parity, see makeCircleKeyEventLog).
       keyEventLog: makeCircleKeyEventLog(circleId),
     });

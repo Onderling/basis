@@ -146,6 +146,8 @@ for (const c of CASES) {
     const [A, B] = peers;
     const sendLog = [];
     A.page.on('console', (m) => { const t = m.text(); if (t.includes('[broadcastToCircle]')) sendLog.push(t); });
+    const refusedRules = [];   // a member's device writing the founder's access rules, refused by the pod
+    B.page.on('console', (m) => { const t = m.text(); if (/writing \.acr for .* failed \[403\]/.test(t)) refusedRules.push(t.slice(0, 200)); });
     try {
       let accounts = null;
       const tag = `ct${c.port ?? 'none'}`;
@@ -188,6 +190,7 @@ for (const c of CASES) {
       await expect.poll(async () => (await readBubbles(B.page)).some((t) => t.includes(text)),
         { timeout: 60_000, intervals: [2500], message: `the other member reads the message in a ${c.type} circle` }).toBe(true);
 
+      if (c.type === 'central pod') expect(refusedRules, 'the member\'s device tried to write the founder\'s access rules').toEqual([]);
       const degraded = sendLog.filter((l) => /degrading to fan-out-full/.test(l));
       if (c.branch === 'fan-out') {
         expect(degraded, `a normal circle must not talk about a pod:\n${sendLog.join('\n')}`).toEqual([]);

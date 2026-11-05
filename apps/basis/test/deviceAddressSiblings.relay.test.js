@@ -105,8 +105,12 @@ describe('my own devices reach each other at their device address', () => {
 
     // AFTER A REVOKE, the revoked device is no sibling: an own write does not travel to its device address
     const boxWire = box.agent.persona('default').enrolledDevice?.deviceId;
+    // the wire gate knows an own device by its address — until it is retired, when it is a stranger like any other key
+    expect(await phone.agent.isKnownPeer(boxDevice), 'the phone knows its sibling device on the wire').toBe(true);
     const revoked = await phone.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: boxWire });
     expect(revoked?.ok, JSON.stringify(revoked)).toBe(true);
+    expect(await until(async () => ((await phone.agent.isKnownPeer(boxDevice)) === false ? true : null), { timeout: 10_000, step: 250 }),
+      'a retired device is a stranger to the wire gate').toBe(true);
     const afterRevoke = relayLines.length;
     await own.put({ type: 'note', id: 'note:after-revoke', body: 'na het intrekken' }, { by: 'test' });
     await new Promise((r) => setTimeout(r, 2500));

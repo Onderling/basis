@@ -4764,6 +4764,18 @@
       "text": "Link again: type /start <code> in the app (the admin gives the code, as always).",
       "doc": "Told once to a person admitted at the bot's inbox before their app signed its turns: they re-link with a fresh code."
     },
+    "admission_too_large": {
+      "text": "That message is too long for a first message here. Please keep it shorter.",
+      "doc": "Said once to a stranger at a function profile's inbox whose first message is over the stranger size limit (16 KB). Never names them."
+    },
+    "admission_over_budget": {
+      "text": "You have sent several messages without an answer yet. Please wait for a reply before writing again.",
+      "doc": "Said once to a stranger at a function profile's inbox who has used the per-sender budget (3 turns a day until answered). Never names them."
+    },
+    "admission_busy": {
+      "text": "It is busy here right now. Please try again in an hour.",
+      "doc": "Said once to a stranger at a function profile's inbox when all strangers together reached the hourly ceiling. Never names them."
+    },
     "admission_needs_code": {
       "text": "To talk to this assistant you need a code from its administrator. Then send: /start <code>",
       "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."

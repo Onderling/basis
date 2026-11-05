@@ -9303,6 +9303,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // not make it an enrolled device: the runner's `--enrol` and the add-a-device flows still apply to it.
     isEnrolledDevice: () => !!enrolledDevice && enrolledDevice.selfMinted !== true,
 
+    /** Whether this device knows a wire key (own devices, shared circles, contacts) — the wire gate's question, asked
+     *  by a door too (a function profile's inbox lets a known peer past its stranger budgets). */
+    isKnownPeer: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
     // Cross-peer state (delegates to sa.peer).  Same surface main.js
     // already consumes: peer.address / peer.status / peer.error.
     peer: sa.peer,

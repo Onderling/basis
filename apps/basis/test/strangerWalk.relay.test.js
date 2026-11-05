@@ -21,9 +21,13 @@ import { DataPart } from '@onderling/core';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
 import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
+import { addBoxCard } from './support/addBoxCard.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
+/** every file under a directory, read as text — what the box keeps on disk */
+const everythingUnder = (dir) => readdirSync(dir, { recursive: true, withFileTypes: true }).filter((d) => d.isFile())
+  .map((d) => { try { return readFileSync(path.join(d.parentPath ?? d.path, d.name), 'utf8'); } catch { return ''; } }).join('\n');
 const walkLog = (dir) => readdirSync(dir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dir, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)));
 const WAIT = 20_000;
 
@@ -62,7 +66,7 @@ describe('a stranger on the wire', () => {
     child.stderr.on('data', (b) => { out += String(b); });
     const up = await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 });
     expect(up, `the runner never came up:\n${out.slice(-1500)}`).toBe(true);
-    stranger = await bootRealAgentNode('stranger');
+    stranger = await bootRealAgentNode('stranger', { contactChannel: true });
     person = await bootRealAgentNode('person');
     await connectNodesOverRelay([stranger, person], { relayUrl: relay.url });
   }, 180_000);
@@ -117,5 +121,20 @@ describe('a stranger on the wire', () => {
     const r = await attempt(stranger, person.pubKey, 'reachable-peers');
     console.info(`[stranger walk] a stranger's call to a person's device: ${JSON.stringify(r)}`);
     expect(r.outcome, JSON.stringify(r)).toBe('no-answer');
+  }, 120_000);
+
+  it('a stranger turned away at the bot inbox leaves nothing on the box: no turn, no text, no marker', async () => {
+    const card = cardFrom(out);
+    await addBoxCard(stranger, out);
+    const TEXT = 'GEHEIM-STRANGER-ZIN-7f3a';
+    await stranger.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text: TEXT }).sent;
+    // the box tells them once that they need a code — the turn crossed and was decided
+    const told = await until(async () => ((await stranger.contactThreadChannel.rehydrateAll()).some((t) => t.origin === 'bot') ? true : null), { timeout: 30_000, step: 500 });
+    expect(told, `the box never answered the stranger:\n${out.slice(-1500)}`).toBe(true);
+    await new Promise((r) => { setTimeout(r, 1500); });   // let whatever the box writes reach the disk
+    expect(everythingUnder(dataDir).includes(TEXT), 'the refused stranger\'s words are on the box').toBe(false);
+    const counted = walkLog(dataDir).filter((e) => e.kind === 'stranger-refused');
+    expect(counted.map((e) => e.reason)).toContain('needs-code');
+    for (const e of counted) expect(Object.keys(e).sort().filter((k) => !['kind', 'reason', 'ts', 'at'].includes(k)), JSON.stringify(e)).toEqual([]);
   }, 120_000);
 });

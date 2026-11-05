@@ -686,7 +686,8 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
     let named = Promise.resolve(false);
     const handle = String(state.handle ?? '').trim();
     if (state.needsHandle && isValidHandle(handle)) {
-      named = withinMs(Promise.resolve().then(() => callSkill('pinboard', 'setMyHandle', { handle })), releaseTimeoutMs)
+      // named by the new circle, so a circle made AS a persona names the persona and never renames the default self
+      named = withinMs(Promise.resolve().then(() => callSkill('pinboard', 'setMyHandle', { handle, groupId: result.groupId })), releaseTimeoutMs)
         .then((r) => !r?.error)
         .catch((err) => {
           if (typeof console !== 'undefined') console.warn(`[create] the founder's handle was not set (Me → handle sets it): ${err?.message ?? err}`);

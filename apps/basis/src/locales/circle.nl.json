@@ -3232,11 +3232,11 @@
     },
     "delivery_fallback_on": {
       "text": "Kring-adressen als we ze kennen, anders je hoofdadres",
-      "doc": "Identical to the off-state on purpose — see that key."
+      "doc": "Shown when the person's address-fallback setting is ON: says what then happens."
     },
     "delivery_fallback_off": {
-      "text": "Kring-adressen als we ze kennen, anders je hoofdadres",
-      "doc": "Says what HAPPENS, not what a setting is. Until the stored setting reaches the send path the two states are identical, so both keys carry the same sentence rather than one of them lying."
+      "text": "Alleen kring-adressen. Wie je kring-adres nog niet hebt, wordt niet bereikt — je hoofdadres wordt niet gebruikt.",
+      "doc": "Shown when the setting is OFF (the default): says what then happens — a member whose circle address is unknown is not reached, rather than reached over the main address."
     },
     "delivery_fallback_toggle_on": {
       "text": "Terugval niet meer toestaan",
@@ -3623,8 +3623,8 @@
       "doc": "Empty-skills footer."
     },
     "delivery_fallback_note": {
-      "text": "Iemand bereiken van wie je het kring-adres nog niet hebt, gebruikt je hoofdadres. Een relay die jullie allebei gebruiken kan dan zien dat die kringen bij één persoon horen. Dit per kring kunnen kiezen komt nog; nu gebeurt het altijd.",
-      "doc": "The consequence, stated where it is incurred. Replaces the toggle: a control that changes nothing is a stronger false claim than a sentence, so the button is gone until the setting is wired."
+      "text": "Staat de terugval aan, dan gebruikt een bericht aan iemand van wie je het kring-adres nog niet hebt je hoofdadres. Een relay die jullie allebei gebruiken kan dan zien dat die kringen bij één persoon horen. De instelling geldt voor al je kringen tegelijk.",
+      "doc": "The consequence of turning the fallback on, stated where the setting is shown. The setting is one for all circles (per circle was judged too technical)."
     },
     "answer_placeholder": {
       "text": "Je antwoord",

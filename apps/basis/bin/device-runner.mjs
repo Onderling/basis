@@ -1264,15 +1264,24 @@ if (tgToken || inboxDoor.bridge) {
     handle: async () => botCircleHandle(tgBridge?.botUsername ?? null, (await botUsers.list()).find((u) => u.role === 'admin')?.displayName ?? null),
   }) : null;
   botCirclesRef.ref = botCircles;
+  // a circle line the box passes over before the door says why — once per reason and circle, like the door's own
+  const linePassedSaid = new Set();
+  const noteLinePassed = (reason, circleId) => {
+    const key = `${reason}|${circleId}`;
+    if (linePassedSaid.has(key) || linePassedSaid.size > 500) return;
+    linePassedSaid.add(key);
+    walkLog({ kind: 'circle-line-passed', reason, circleId: String(circleId).slice(0, 12) });
+    console.info(`device-runner: a circle line in ${String(circleId).slice(0, 12)}… was passed over (${reason}); further ones are not said`);
+  };
   if (botCircles && circleDoors) {
     // a member gone from a circle's roster leaves the host gate (the circle door tiered them)
     circleSeams.rosterChanged = (circleId) => circleDoors.rosterChanged(circleId).catch(() => {});
     // a circle message landed: read from the log (the rail verified its author), fed when it is a joined circle's
     circleSeams.landed = async ({ msgId, circleId }) => {
       try {
-        if (!(await botCircles.isJoined(circleId))) return;
+        if (!(await botCircles.isJoined(circleId))) { noteLinePassed('not-joined', circleId); return; }
         const e = deviceLog.query({}).find((x) => x?.id === msgId && x?.type === 'chat-message');
-        if (!e) return;
+        if (!e) { noteLinePassed('not-in-log', circleId); return; }
         await circleDoors.landed({ circleId, msgId, authorRef: e.actor, text: e.payload?.text, ts: e.ts });
       } catch (err) { console.warn(`device-runner: a circle line was not handled: ${err?.message ?? err}`); }
     };

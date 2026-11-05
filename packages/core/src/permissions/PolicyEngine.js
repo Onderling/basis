@@ -267,6 +267,8 @@ export class PolicyEngine {
     // A presented capability token is judged FIRST, fully (signature · expiry · agent binding · subject==caller · skill
     // scope · issuer-trust · revocation). One that fails is refused here and never falls back to the caller's tier;
     // one that holds is the caller's record for this call.
+    // (So with a token, a skill this agent does not have meets the token's scope check before the unknown-skill refusal:
+    // either way the call is refused, only the reason differs.)
     if (token) await this.#verifyOrRefuse(token, { skillId, peerPubKey, myPubKey });
 
     // The tier half, shared with a door's in-process caller. A wire caller with no trust row is judged by the host's

@@ -2957,6 +2957,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   const keyEmitRef = { current: null };
   /** Tell a circle's remembered statements to a member who arrived after the fan (bound with the membership rail below). */
   const tellLateRecipientsRef = { current: null };
+  // remember a content-lane fan against the addresses known now, with its lane's own retell (bound with the rail below)
+  const rememberFanRef = { current: null };
+  const LATE_TOLD_FANS = new Set(['broadcastCircleItems', 'broadcastCircleChatStatement']);
   /** The members of a circle a fan had no address for, past the re-tell window (bound with the membership rail below). */
   const unreachableMembersRef = { current: null };
   /** The point runs a sibling's KEY act: a current member only (its own roster fold), never a key the act brought. */
@@ -5942,6 +5945,13 @@ export async function createRealHouseholdAgent(opts = {}) {
         .catch(() => { /* best-effort: the catch-up remains */ });
     }
     tellLateRecipientsRef.current = (circleId) => tellLateRecipients(circleId);
+    // THE CONTENT LANES TOO: with the address-fallback setting off, a member whose circle address this device does not
+    // hold yet is reached nowhere — not held — so an item or a chat line fanned in that moment never reached them (the
+    // household bot writing in a circle it had just joined). Each is remembered like a membership statement and told
+    // again, by its own lane's broadcast as the circle, when that member's address lands; never at the global key.
+    rememberFanRef.current = (circleId, statement, retell) => rosterAddressesOf(circleId)
+      .then((known) => lateRecipients.fanned(circleId, statement, known, retell))
+      .catch(() => { /* remembering is best-effort: the member's own catch-up remains */ });
     // NOT REACHABLE YET (Frits, 2026-11-02): a current member the fan had no address for, still without one after the
     // re-tell window, is said on their row — and said once in this device's log (the box has no row to paint)
     const saidUnreachable = new Set();
@@ -7772,6 +7782,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the verifier per statement — see rosterReadCache.js); any other pinboard op may have changed a
       // roster and clears it.
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runPinboard);
+      // A CONTENT FAN (an item, a chat line) is remembered against the addresses known now, before it goes — every shell's
+      // send passes here (the web composer's fan-out, the box's bot, the lanes' emitters) — and told again, by the same op
+      // as the circle, when a member it could not reach yet has an address (`tellLateRecipients` below)
+      if (LATE_TOLD_FANS.has(realOpId) && typeof realArgs?.groupId === 'string' && realArgs?.event?.body?.hash) {
+        await rememberFanRef.current?.(realArgs.groupId, realArgs.event, (cid, st) => callSkill('pinboard', realOpId, { ...realArgs, groupId: cid, event: st, ts: Date.now() }));
+      }
       const out = await runPinboard();
       rosterReads.afterWrite(realOpId);
       // a write that may have grown a roster (an address announced, a seed recorded): a statement this device fanned

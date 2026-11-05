@@ -72,3 +72,17 @@ describe('a statement is kept while a member it missed still waits', () => {
     expect(told).toEqual(['s1']);
   });
 });
+
+describe('the memory is bounded per circle', () => {
+  it('a chatty circle fanning hundreds of lines keeps only the newest 200 — the oldest are told again by nobody, and nothing grows', async () => {
+    let t = 0;
+    const told = [];
+    const late = makeLateRecipientRetell({ retell: async (cid, st) => { told.push(st.body.hash); }, now: () => t });
+    for (let i = 0; i < 350; i += 1) late.fanned('c', { body: { hash: `h${i}` } }, ['a1'], async (cid, st) => { told.push(st.body.hash); });
+    // a new address: everything still remembered is told again — no more than the cap
+    const n = await late.rosterAddresses('c', ['a1', 'a2']);
+    expect(n).toBe(200);
+    expect(told[0], 'the oldest kept is the 151st fanned').toBe('h150');
+    expect(told.at(-1)).toBe('h349');
+  });
+});

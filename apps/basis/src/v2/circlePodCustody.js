@@ -49,7 +49,9 @@ export function createCirclePodCustody({ ensureCirclePod, policyFor, sealStrateg
     const strategy = await sealStrategyFor(circleId, policy);        // live group-key {seal,open}; null for p0/p1 or no key
     // circleRootUri is the deterministic root of this circle's pod area — the group-key resource lives at
     // `${circleRootUri}/.keys/group.json`. Exposed so a caller can record that POINTER as restore-data.
-    return { backend: podStorageBackend(prod.podClient), sealed, strategy, circleRootUri: prod.circleRootUri ?? null };
+    // the rows live in the CIRCLE's container (on a central-pod circle, another person's pod): based there, a founder
+    // writes inside the container it granted and a member reads the same place, each with their own session
+    return { backend: podStorageBackend(prod.podClient, { base: prod.circleRootUri ?? null }), sealed, strategy, circleRootUri: prod.circleRootUri ?? null };
   }
 
   /** Send-path data-move branch for a circle (`policy.pod` → 'fan-out-full' | 'pod-signal' | 'pod-only'). */

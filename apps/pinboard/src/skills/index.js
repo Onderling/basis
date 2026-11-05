@@ -444,12 +444,12 @@ async function _findLatestActiveCode(store, groupId) {
 // Household sealed-pod membership hooks. Best-effort + gated: no-op without a control-agent (instances
 // that don't run a sealed pod) or without the joiner's sealing public key. A failure here never breaks
 // the membership audit — key management is recoverable, the redemption record is the source of truth.
-async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics }) {
+async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null }) {
   if (!controlAgent || !sealingPublicKey || !webId) return;
   // Forward groupId so a per-circle control-agent ROUTER can route the grant to the right
   // circle's producer (basis runs one pinboard agent + N per-circle control agents). A
   // single (non-routing) control agent simply ignores the extra field.
-  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId }); }
+  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}) }); }
   catch { metrics?.record?.('control-agent-grant-failed'); }
 }
 async function revokePodAccess(controlAgent, { webId, force = false, policy = 'graceful', groupId, metrics }) {

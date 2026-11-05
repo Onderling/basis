@@ -184,6 +184,11 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
     podSees.className = 'cc-wizard-pod-disclosure';
     podSees.textContent = t('circle.nearbyScreen.point_pod_host_sees');
     wrap.appendChild(podSees);
+    // where the joiner's pod WebID goes (the admitting admin, for the read grant) and what a joiner without one gets
+    const podWebIdTo = doc.createElement('p');
+    podWebIdTo.className = 'cc-wizard-pod-disclosure';
+    podWebIdTo.textContent = t('circle.nearbyScreen.join_pod_webid_to_admin');
+    wrap.appendChild(podWebIdTo);
   }
 
   // 5.5b — when the invite carries a v2 structured rules doc, render

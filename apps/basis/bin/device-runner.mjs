@@ -664,6 +664,8 @@ if (relayUrl) {
     // this device's per-circle address on the redeem path, proven with its own key (source circle == the circle joined)
     circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+    // the box holds no pod session, so a pod-backed circle's redeem names no pod WebID: it joins without a pod grant
+    podWebId: () => null,
   });
   // After a join: presence in the new circle (the per-circle address on the relay, the announce) and the lanes'
   // catch-up — `registerCirclePresence` is defined below and runs at connect; a join later re-runs it for the one circle.

@@ -17,8 +17,16 @@ import { generateGroupKey } from './envelope.js';
 
 function normalizeMember(m) {
   if (!m || !m.webId || !m.publicKey) throw new Error('control-agent: member needs { webId, publicKey }');
-  return { webId: String(m.webId), publicKey: String(m.publicKey), role: m.role === 'admin' ? 'admin' : 'member' };
+  const out = { webId: String(m.webId), publicKey: String(m.publicKey), role: m.role === 'admin' ? 'admin' : 'member' };
+  // podAgent: the Solid WebID the member's pod session signs in as. The roster ref (webId) names the member and
+  // keys the group-key wrap; it is not an identity any pod session holds, so a read grant to it opens nothing.
+  // When the member said their pod WebID, the ACL grant goes to it instead. It stays here, in this agent's state.
+  if (typeof m.podAgent === 'string' && /^https?:\/\//.test(m.podAgent.trim())) out.podAgent = m.podAgent.trim();
+  return out;
 }
+
+/** The identity the ACL grant names for a member: their pod WebID when known, else the roster ref (today's). */
+const aclAgentOf = (m) => m.podAgent ?? m.webId;
 
 /**
  * Create the household control-agent: applies pod ACL grant/revoke AND group-key rotation together
@@ -36,8 +44,11 @@ function normalizeMember(m) {
  *   establishment/grant/rotation ALSO emits the versioned key AS a log key-event (self-distributing, no-pod).
  *   The pod key resource is still written (defence-in-depth); the LOG is the source. Absent → pod-only, unchanged.
  * @param {string} [a.groupId]                                    circle id stamped onto emitted key-events.
+ * @param {Record<string,string>} [a.podAgents]                   roster ref → pod WebID, as the host saved it
+ *   (local to this device, never on the roster). A member re-added without one (a reload's roster seed) gets
+ *   the saved one back, so a later removal revokes the identity the grant actually named.
  */
-export function createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null }) {
+export function createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {} }) {
   if (!sharing || typeof sharing.grant !== 'function' || typeof sharing.revoke !== 'function') {
     throw new Error('createControlAgent: sharing with grant/revoke required');
   }
@@ -47,7 +58,9 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
   if (!controllerKey || !controllerKey.publicKey || !controllerKey.privateKey) {
     throw new Error('createControlAgent: controllerKey { publicKey, privateKey } required');
   }
-  let members = roster.map(normalizeMember);
+  const savedPodAgents = { ...(podAgents ?? {}) };
+  const withSavedPodAgent = (m) => (m.podAgent || !savedPodAgents[m.webId]) ? m : normalizeMember({ ...m, podAgent: savedPodAgents[m.webId] });
+  let members = roster.map(normalizeMember).map(withSavedPodAgent);
   const recipientsWithController = (pubs) => [...new Set([...pubs, controllerKey.publicKey])];
 
   /** Emit the just-written key RESOURCE as a log key-event too, so the SAME versioned key self-distributes with
@@ -82,20 +95,30 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
 
   return {
     members: () => members.slice(),
+    /** roster ref → pod WebID for every member who gave one: what the host saves locally (never on the roster). */
+    podAgents: () => Object.fromEntries(members.filter((x) => x.podAgent).map((x) => [x.webId, x.podAgent])),
     bootstrap,
 
     /** Join: grant ACL + add the member to the group key (O(1) re-wrap, or bootstrap the first key). */
-    async addMember({ webId, publicKey, role = 'member' }) {
-      const m = normalizeMember({ webId, publicKey, role });
+    async addMember({ webId, publicKey, role = 'member', podAgent = null }) {
+      const m = normalizeMember({ webId, publicKey, role, podAgent });
       // Idempotent: a member already holding the group key (same sealing public key) is a
       // no-op — no re-grant, no re-wrap, no roster duplication. Re-wrapping the SAME key to
       // the SAME recipient set would be harmless (same version, same group key) but would
       // duplicate the roster entry and churn the resource; skipping keeps "provision only
       // when the member set actually changed".
-      if (members.some((x) => x.publicKey === m.publicKey)) {
+      const known = members.find((x) => x.publicKey === m.publicKey);
+      if (known) {
+        // the one change an existing member can bring: the pod WebID their read grant should name
+        if (m.podAgent && known.podAgent !== m.podAgent) {
+          await sharing.grant({ containerUri, agent: m.podAgent, modes });
+          if (known.podAgent) await sharing.revoke({ containerUri, agent: known.podAgent, modes });
+          members = members.map((x) => (x === known ? { ...x, podAgent: m.podAgent } : x));
+        }
         return { keyResource: await keyStore.read(), members: members.slice() };
       }
-      await sharing.grant({ containerUri, agent: m.webId, modes });
+      const mm = withSavedPodAgent(m);
+      await sharing.grant({ containerUri, agent: aclAgentOf(mm), modes });
       const cur = await keyStore.read();
       const currentPubs = recipientsWithController(members.map((x) => x.publicKey));
       const next = cur
@@ -103,7 +126,7 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
         : buildGroupKeyResource({ version: 1, groupKey: generateGroupKey(), recipients: [...currentPubs, m.publicKey] });
       await keyStore.write(next);
       await emitKeyEvent(next);   // the new roster's key-event — the added member is now a recipient in the log too
-      members = [...members, m];
+      members = [...members, mm];
       return { keyResource: next, members: members.slice() };
     },
 
@@ -174,7 +197,8 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
       if (!force && target.role === 'admin' && adminCount <= 1) {
         throw new Error('control-agent: cannot remove the last admin (≥1-admin invariant)');
       }
-      await sharing.revoke({ containerUri, agent: target.webId, modes });
+      await sharing.revoke({ containerUri, agent: aclAgentOf(target), modes });
+      delete savedPodAgents[target.webId];
       const remaining = members.filter((x) => x.webId !== target.webId);
       const cur = await keyStore.read();
       // Rotate to EVERY CURRENT KEY-HOLDER minus the departing member — not to the roster alone.

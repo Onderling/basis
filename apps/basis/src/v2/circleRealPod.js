@@ -54,3 +54,44 @@ export function realPodRouting(session, { PodClient, SolidOidcAuth, circlesPath 
     circleRootUri: (circleId) => `${podRoot}${circlesPath}/${circleId}`,
   };
 }
+
+/**
+ * Where a circle's pod data lives — one answer for every member and both shells. A CENTRAL-POD (shared / hybrid)
+ * circle lives at the address it was given (the founder's storage policy; a joiner's pod connection point from the
+ * invite): the founder and every joiner read and write THAT, each with their own session under the grants the circle
+ * writes per member. With no recorded address there is no root — never quietly the member's own pod, which is how a
+ * central-pod circle used to share nothing (each member wrote and read its own pod). A POD-ONLY (personal) circle keeps
+ * each member's own pod.
+ *
+ * @param {object} a
+ * @param {string} a.pod                  the circle's storage posture name ('none' | 'personal' | 'shared' | 'hybrid')
+ * @param {string|null} [a.recordedPodUri] the circle's recorded pod address
+ * @param {string|null} [a.ownCircleRoot] this member's own pod root for the circle (`routing.circleRootUri(id)`)
+ * @returns {string|null}
+ */
+export function circleRootFor({ pod, recordedPodUri = null, ownCircleRoot = null } = {}) {
+  if (pod === 'shared' || pod === 'hybrid') {
+    if (typeof recordedPodUri !== 'string' || !/^https?:\/\//.test(recordedPodUri.trim())) return null;
+    return recordedPodUri.trim().replace(/\/+$/, '');
+  }
+  return ownCircleRoot ?? null;
+}
+
+/**
+ * The address a circle was given, as this device holds it: the founder's own storage policy, else the pod connection
+ * point a joiner recorded from the invite. Null when neither is known.
+ *
+ * @param {{ callSkill: Function, points?: { pointsFor: (id: string) => Array<{kind: string, url: string}> }|null, circleId: string }} a
+ * @returns {Promise<string|null>}
+ */
+export async function recordedCirclePodUri({ callSkill, points = null, circleId } = {}) {
+  try {
+    const r = await callSkill?.('pinboard', 'getCircleStoragePolicy', { groupId: circleId });
+    if (typeof r?.groupPodUri === 'string' && r.groupPodUri) return r.groupPodUri;
+  } catch { /* the joiner's point below */ }
+  try {
+    const p = (points?.pointsFor?.(circleId) ?? []).find((x) => x?.kind === 'pod' && typeof x?.url === 'string' && x.url);
+    if (p) return p.url;
+  } catch { /* none known */ }
+  return null;
+}

@@ -127,6 +127,12 @@ export async function createCirclePodProducer({
   // Result: a sealed circle's group key survives a reload, so previously-sealed content
   // (the posts live in the durable pinboard store) stays decryptable. Use a durable vault
   // (VaultIndexedDB on web, VaultAsyncStorage on mobile) for cross-session durability.
+  // The pod WebIDs members gave at redemption (roster ref → WebID): kept on THIS device only, never on the roster or
+  // the pod, so the next boot's roster seed grants and later revokes the identity a member's pod session holds.
+  const podAgentsVaultKey = `${groupKeyPrefix}:pod-agents:${circleId}`;
+  let savedPodAgents = {};
+  try { const raw = await vault.get(podAgentsVaultKey); if (raw) savedPodAgents = JSON.parse(raw) ?? {}; } catch { savedPodAgents = {}; }
+
   const savedRes = await vault.get(groupKeyVaultKey);
   if (savedRes) {
     try { await podClient.write(keyResourceUri, savedRes, { contentType: 'application/json' }); } catch { /* fresh-bootstrap below */ }
@@ -140,7 +146,7 @@ export async function createCirclePodProducer({
   const controlAgent = createCircleControlAgent({
     circleId, storagePosture, podClient,
     sharing: sharing ?? memorySharing(),
-    controllerKey, circleRootUri: root, roster: fullRoster,
+    controllerKey, circleRootUri: root, roster: fullRoster, podAgents: savedPodAgents,
     // No-pod distribution: the control agent fans every versioned key AS a log key-event through this
     // sink (rotation on remove → fanned to the REMAINING members only, backward secrecy). Absent → pod-only.
     keyEventLog,
@@ -153,6 +159,7 @@ export async function createCirclePodProducer({
       const body = typeof r === 'string' ? r : r?.content;
       if (body != null) await vault.set(groupKeyVaultKey, typeof body === 'object' ? JSON.stringify(body) : String(body));
     } catch { /* best-effort */ }
+    try { if (controlAgent?.podAgents) await vault.set(podAgentsVaultKey, JSON.stringify(controlAgent.podAgents())); } catch { /* best-effort */ }
   }
 
   if (bootstrap && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
@@ -192,9 +199,9 @@ export function createCircleControlAgentRouter(getProducer) {
     }
   };
   return {
-    async addMember({ webId, publicKey, role, groupId }) {
+    async addMember({ webId, publicKey, role, groupId, podAgent = null }) {
       if (!webId || !publicKey) return;
-      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role }), `granting ${webId}`);
+      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role, podAgent }), `granting ${webId}`);
     },
     async removeMember({ webId, force, policy, groupId }) {
       if (!webId) return;

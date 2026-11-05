@@ -35,7 +35,8 @@ import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basi
 import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
-import { realPodRouting } from '../../../basis/src/v2/circleRealPod.js';
+import { realPodRouting, circleRootFor, recordedCirclePodUri } from '../../../basis/src/v2/circleRealPod.js';
+import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
 import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.js';
 // the SHARED cross-circle SHARE logic + the platform-neutral enforcement assembly.
 // Mobile calls the SAME builder + ops as web (circleApp.js) — invariant #1/#2, no mobile fork.
@@ -204,6 +205,9 @@ function sessionShape() {
   return { webid: s.webid, isLoggedIn: true, fetch };
 }
 
+/** The WebID the signed-in pod session holds (or null): what a pod-backed circle's read grant has to name. */
+export function getCirclePodWebId() { return sessionShape()?.webid ?? null; }
+
 /** The active real-pod routing from the signed-in session (or null → pseudo-pod). */
 export function getActiveRealPodRouting() {
   const shaped = sessionShape();
@@ -253,6 +257,19 @@ async function buildCirclePod(circleId, policy) {
   const sharing = (routing && shaped)
     ? createCirclePodSharing({ fetch: shaped.fetch, ownerWebId: shaped.webid })
     : undefined;
+  // where the circle's pod data lives — one answer for every member (circleRootFor, web parity): a central-pod circle's
+  // own address, never this member's own pod; with none recorded there is no producer, and the send degrades honestly
+  let circleRootUri;
+  if (routing) {
+    let points = null;
+    try { if (asyncStorageRef) points = createConnectionPoints({ initial: await asyncStorageConnectionPointsIo(asyncStorageRef).load(), save: () => {} }); } catch { points = null; }
+    const recorded = await recordedCirclePodUri({ callSkill: _keyEventWiring?.callSkill, points, circleId });
+    circleRootUri = circleRootFor({ pod: policy?.pod, recordedPodUri: recorded, ownCircleRoot: routing.circleRootUri(circleId) });
+    if (!circleRootUri) {
+      if (typeof console !== 'undefined') console.warn(`[circlePods] circle ${String(circleId).slice(0, 12)}… is a central-pod circle with no recorded pod address — not using any pod`);
+      return null;   // not cached: the address can still arrive (a joiner's recorded point), as on web
+    }
+  }
   try {
     let sealingKeyPair = null;   // the device's per-circle sealing keypair (one key family — web parity)
     try { sealingKeyPair = _keyEventWiring?.circleSealingKeyPairFor?.(circleId) ?? null; } catch { sealingKeyPair = null; }
@@ -260,7 +277,7 @@ async function buildCirclePod(circleId, policy) {
       circleId, storagePosture: policy?.storagePosture ?? 'p0', vault: circleVault,
       generateKeypair: podGenerateKeypair, sealingKeyPair,
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
-      circleRootUri: routing ? routing.circleRootUri(circleId) : undefined,
+      circleRootUri,
       sharing,
       // G11 — no-pod key distribution: rotations fan as log key-events (web parity, see makeCircleKeyEventLog).
       keyEventLog: makeCircleKeyEventLog(circleId),

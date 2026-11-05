@@ -1108,6 +1108,8 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
           code:        inv.code,
           // Over the relay the invite names — the one the dial above put this device on (2026-09-08).
           ...(typeof inv.relayUrl === 'string' && inv.relayUrl ? { relayUrl: inv.relayUrl } : {}),
+          // a pod-backed circle: the sender adds this device's pod WebID for the admin's read grant
+          ...(inv.podBacked === true ? { podBacked: true } : {}),
           shareCard:   !!state.shareAddress,
           peerDisplay: state.handle,
           ...personaArg,

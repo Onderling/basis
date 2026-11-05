@@ -236,6 +236,9 @@ export const SEAMS = Object.freeze([
   // that list does not hold (joined on another device, through an offer, made by an op) re-reads the list first
   // (`headCircleWatch.js`). Without it the new circle's items stayed off Vandaag until a reload. The box paints no Vandaag.
   { id: 'head-hears-new-circles', pattern: /watchCircleChanges\(/, shells: ['web', 'mobile'], why: 'a circle that arrives while Vandaag is shown keeps its items off the page until a reload' },
+  // A pod-backed circle's read grant names the WebID the joiner's pod session signs in as; the redeem is where the joiner
+  // says it. Every shell hands the redeem sender how to read it — the box hands `() => null`, it holds no pod session.
+  { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */

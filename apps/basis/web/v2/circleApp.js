@@ -43,7 +43,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
+  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -2136,10 +2136,18 @@ async function buildCirclePod(circleId, policy) {
     // The device's per-circle sealing keypair (the address key's image) — one key family, see the producer.
     let sealingKeyPair = null;
     try { sealingKeyPair = _peerAgent?.circleSealingKeyPairFor?.(circleId) ?? null; } catch { sealingKeyPair = null; }
+    // where the circle's pod data lives — one answer for every member (circleRootFor): a central-pod circle's own
+    // address, never this member's own pod; with none recorded there is no producer, and the send degrades honestly
+    let circleRootUri;
+    if (routing) {
+      const recorded = await recordedCirclePodUri({ callSkill: rawCallSkill, points: getConnectionPoints(), circleId });
+      circleRootUri = circleRootFor({ pod: policy?.pod, recordedPodUri: recorded, ownCircleRoot: routing.circleRootUri(circleId) });
+      if (!circleRootUri) { console.warn(`[circleApp] circle ${String(circleId).slice(0, 12)}… is a central-pod circle with no recorded pod address — not using any pod`); return null; }
+    }
     const producer = await createCirclePodProducer({
       circleId, storagePosture, vault: circleVault, generateKeypair: podGenerateKeypair, sealingKeyPair,
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
-      circleRootUri: routing ? routing.circleRootUri(circleId) : undefined,
+      circleRootUri,
       sharing, keyEventLog,
     });
     circlePods.set(circleId, producer);
@@ -9382,6 +9390,8 @@ async function boot() {
       // …and PROVE it: a fresh per-circle address is signed with its own key (source circle == the
       // circle being joined), so the admin records it instead of dropping it as unproven.
       signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+      // a pod-backed circle's redeem tells the admitting admin which pod WebID to grant
+      podWebId: () => circleOwnerWebId,
     });
     // when signed in, route pinboard's items to the user's REAL pod (parity with
     // folio/calendar; reuses pinboard's already-built pod-routing write-through). Best-effort.

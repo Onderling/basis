@@ -31,24 +31,30 @@ import { StorageBackend } from '@onderling/core';
  * @param {object} [opts]
  * @param {(err:any)=>boolean} [opts.isNotFound]  classify a read error as "absent" → get() returns null.
  *   Defaults to `err?.code === 'NOT_FOUND'` (the PodClient / mapSourceCode convention).
+ * @param {string} [opts.base]  the container relative refs live under (a circle's root, which may be on another
+ *   person's pod). Absent → refs resolve against the client's own pod root, as before. `list` hands refs back
+ *   relative to it, so a ref read from a listing is the same ref a writer fanned.
  * @returns {StorageBackend}
  */
-export function podStorageBackend(podClient, { isNotFound } = {}) {
+export function podStorageBackend(podClient, { isNotFound, base = null } = {}) {
   if (!podClient || typeof podClient.read !== 'function' || typeof podClient.write !== 'function' || typeof podClient.list !== 'function') {
     throw new Error('podStorageBackend: a PodClient with read/write/list is required');
   }
   const absent = typeof isNotFound === 'function' ? isNotFound : (err) => err?.code === 'NOT_FOUND';
+  const root = (typeof base === 'string' && /^https?:\/\//.test(base)) ? base.replace(/\/*$/, '/') : null;
+  const at = (ref) => (!root || /^[a-z][a-z0-9+.-]*:\/\//i.test(String(ref)) ? String(ref) : `${root}${String(ref).replace(/^\/+/, '')}`);
+  const back = (uri) => (root && typeof uri === 'string' && uri.startsWith(root) ? uri.slice(root.length) : uri);
 
   class PodStorageBackend extends StorageBackend {
     async put(ref, ciphertext) {
       // The body is the opaque ciphertext envelope — stringified defensively (a caller may hand a plain
       // string or a JSON-serialised tagged envelope; either way the pod stores exactly these bytes).
-      await podClient.write(ref, String(ciphertext));
+      await podClient.write(at(ref), String(ciphertext));
     }
 
     async get(ref) {
       try {
-        const res = await podClient.read(ref, { decode: 'string' });
+        const res = await podClient.read(at(ref), { decode: 'string' });
         // A PodClient read returns `{ content, ... }`; a bare-string client returns the string directly.
         const content = res && typeof res === 'object' && 'content' in res ? res.content : res;
         return content == null ? null : String(content);
@@ -59,9 +65,9 @@ export function podStorageBackend(podClient, { isNotFound } = {}) {
     }
 
     async list(prefix = '') {
-      const entries = await podClient.list(prefix);
+      const entries = await podClient.list(at(prefix));
       // PodClient.list yields `[{ uri, ... }]`; a simpler client may yield bare ref strings.
-      return (Array.isArray(entries) ? entries : []).map((e) => (e && typeof e === 'object' ? e.uri : e)).filter(Boolean);
+      return (Array.isArray(entries) ? entries : []).map((e) => back(e && typeof e === 'object' ? e.uri : e)).filter(Boolean);
     }
   }
 

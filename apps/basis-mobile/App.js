@@ -68,7 +68,7 @@ import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeCircleRecipePendingStoreRN } from './src/core/circleRecipePendingStorageRN.js';
-import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, getCirclePodFetch, getActiveRealPodRouting } from './src/core/circlePods.js';
+import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, getCirclePodFetch, getActiveRealPodRouting, getCirclePodWebId } from './src/core/circlePods.js';
 import { discoverPodRoot } from '../basis/src/web/podStorage.js';
 // γ-next.rules — per-circle pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
@@ -535,6 +535,7 @@ export default function App() {
           // (pod-signal); catch-up range-queries→opens it. A no-pod circle keeps fan-out-full unchanged.
           pinboardCircleDataMove: circleSendDataMove,
           pinboardPodWrite:       circlePodWrite,
+          podWebId: getCirclePodWebId,   // a pod-backed circle's redeem names this device's pod WebID to the admin
           // G11 — the no-pod key-event fan's transport (a REMOVE → rotation fans the new key to the
           // remaining members). The bundle injects its peer sender + skill dispatch at boot.
           setKeyEventWiring: setCircleKeyEventWiring,

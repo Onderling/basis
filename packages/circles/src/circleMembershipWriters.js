@@ -54,6 +54,15 @@ function boundElsewhere(codeItem, redeemer) {
   return typeof bound === 'string' && bound !== '' && bound !== redeemer;
 }
 
+/**
+ * The pod WebID a joiner said their pod session signs in as, for the read grant on a pod-backed circle. It goes to the
+ * grant ONLY: never into the redemption item, the roster or the spine — those reach every member, the WebID does not.
+ */
+function podAgentOf(a) {
+  const w = a?.podWebId;
+  return (typeof w === 'string' && /^https?:\/\/\S+$/.test(w.trim())) ? w.trim() : null;
+}
+
 /** ONE sealing key family: a member's group key is wrapped to the ed2curve image of their PROVEN per-circle
  *  address. A joiner-supplied key still wins when present; otherwise it is derived from the verified address
  *  (an unproven address grants nothing — deny-by-default holds here too). */
@@ -203,7 +212,7 @@ export async function redeemMembershipCode({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: from, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics });
+  await grantKey({ webId: from, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a) });
   // ALSO record this JOIN on the circle's membership spine — the durable, per-author SIGNED log the roster
   // folds deterministically (identical on every device, no wall-clock). This is a same-device redeem, so the
   // acting device IS the joiner: the injected emitter signs `join` with the joiner's own identity (author =
@@ -320,7 +329,7 @@ export async function verifyMembershipCodeForPeer({
         });
       } catch { /* best-effort, exactly as on the first redeem */ }
     }
-    await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics });
+    await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a) });
     return {
       redemptionId: limit.already.id,
       codeId:       valid.id,
@@ -395,7 +404,7 @@ export async function verifyMembershipCodeForPeer({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics });
+  await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a) });
   // ALSO record this JOIN on the circle's membership spine (as `redeemMembershipCode` does). This is the
   // ADMIN's device confirming a REMOTE joiner, who is not here to sign — so the ADMIN signs `join` with their
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority

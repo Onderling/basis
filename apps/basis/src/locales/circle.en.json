@@ -3201,6 +3201,10 @@
       "text": "The pod host can see who is in this circle.",
       "doc": "The pod-host disclosure (NKN+pod circle). Shown at CREATE and at JOIN — Frits: visible both times, never a footnote."
     },
+    "join_pod_webid_to_admin": {
+      "text": "Signed in to a pod? Then your pod address goes to the admin of this circle, so you can read the circle's pod. Without a pod sign-in you still join, but you cannot read what the circle keeps in its pod.",
+      "doc": "At JOIN of a pod-backed circle, under the pod-host disclosure: who receives the joiner's pod WebID (only the admitting admin, for the pod read grant) and what happens without a pod sign-in."
+    },
     "join_no_admin": {
       "text": "No admin is online right now — try again later. The invitation stays valid.",
       "doc": "The no-admin-online notice at join (J-NP2). Without it this failure is indistinguishable from a broken invite, and nobody retries."

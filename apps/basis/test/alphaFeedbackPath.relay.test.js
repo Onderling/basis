@@ -167,20 +167,52 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
   it('with the phone OFF, the box still takes the feedback, and the phone has it when it comes back', async () => {
     const fritsPubKey = phone.pubKey;
     const phoneDown = { frits: String(fritsPubKey).slice(0, 6), phoneDevice: String(phone.agent.ownDeviceAddress?.('default') ?? '').slice(0, 6), at: at() };
+    // THE SENDER'S VIEW, for this leg's failure message: the route the person's app takes for the turn (which address it
+    // sends to, with what, and what the send answered) and the person's own secure-agent lines while it runs. A frame
+    // that never reached the relay is the sender's to explain, and this is where it would show.
+    const senderLog = [];
+    const realSend = person.agent.sendPeerMessage;
+    person.agent.sendPeerMessage = async (addr, payload, opts) => {
+      const tag = `${String(addr).slice(0, 6)}:${payload?.subtype ?? payload?.type ?? '?'}${opts ? `:opts=${Object.keys(opts).join('+')}` : ''}`;
+      senderLog.push(`send>${tag}@${at()}`);
+      try {
+        const r = await (opts ? realSend.call(person.agent, addr, payload, opts) : realSend.call(person.agent, addr, payload));
+        senderLog.push(`send<${tag}:${JSON.stringify(r ?? null).slice(0, 160)}@${at()}`);
+        return r;
+      } catch (e) { senderLog.push(`send!${tag}:${String(e?.message ?? e).slice(0, 160)}@${at()}`); throw e; }
+    };
+    const consoleWas = {};
+    for (const k of ['info', 'warn', 'debug', 'log']) {
+      consoleWas[k] = console[k];
+      console[k] = (...a) => {
+        const line = a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ');
+        if (/secure-agent|relay|route|hold|refus|back-?off|proof|HI\b/i.test(line)) senderLog.push(`log:${line.slice(0, 200)}@${at()}`);
+        return consoleWas[k](...a);
+      };
+    }
     await teardown(phone);
     phoneDown.downAt = at();
     phone = null;
 
-    await person.contactThreadChannel.sendTurn({
-      peerAddr: fritsPubKey, threadId: fritsPubKey, text: 'nog iets: de tekst is Engels', messageId: 'fb-2',
-    }).sent;
+    let sentOutcome = 'pending';
+    try {
+      const r = await person.contactThreadChannel.sendTurn({
+        peerAddr: fritsPubKey, threadId: fritsPubKey, text: 'nog iets: de tekst is Engels', messageId: 'fb-2',
+      }).sent;
+      sentOutcome = `resolved:${JSON.stringify(r ?? null).slice(0, 160)}@${at()}`;
+    } catch (e) { sentOutcome = `threw:${String(e?.message ?? e).slice(0, 160)}@${at()}`; }
+    senderLog.push(`sendTurn ${sentOutcome}`);
     // The box takes it — nothing else of Frits' is on the wire.
     const onBox = await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'nog iets: de tekst is Engels') ?? null, { timeout: 30_000, step: 500 });
     expect(onBox, `the box did not take the feedback with the phone off — ${JSON.stringify({
       ...phoneDown, relayInProcess: relay.external === false,
+      // the sender first: it is short, and a CI log line is cut at about 4 KB
+      senderLog: senderLog.slice(-40),
       relayLast: relayLog.slice(-140),
       boxLines: box.out.split('\n').filter((l) => /contact|turn|refused|dropped|fallback|holding|unreachable|outbound HI|recv envelope|registered|standby/.test(l)).slice(-40),
     })}`).toBeTruthy();
+    for (const [k, f] of Object.entries(consoleWas)) console[k] = f;
+    person.agent.sendPeerMessage = realSend;
 
     // The phone comes back: the same vaults, the relay, its circle — and the two kicks every shell fires on
     // connect (the grants and known-peers pulls to its siblings), which are also the box's first sign of it.

@@ -22,7 +22,7 @@
 // mobile's RN wizard can reuse them.
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES,
-  STORAGE_POLICIES, KEY_ROTATION_MODES,
+  STORAGE_POLICIES, storageChoices, KEY_ROTATION_MODES,
   REVIEW_STEP, nextCreateStep, prevCreateStep, createStepDots, setAdvanced, withCreateDefaults, purposeOrDefault,
   REVEAL_POLICIES, setRevealPolicy, revealPolicyLabelKey,
   initialState, slugify, isValidSlug, labelOf,
@@ -80,9 +80,11 @@ async function persistCreatedCirclePolicy(groupId, state) {
  */
 
 export function renderCreateGroupWizard(opts) {
-  const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr, shareFounderRelease } = opts;
+  const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr, shareFounderRelease, podConnected } = opts;
 
   const state = initialState();
+  // what the host knows: no connected pod → the radio offers only a normal circle, and the create makes one
+  if (typeof podConnected === 'boolean') state.podConnected = podConnected;
 
   // The circle's identity, derived ONCE at mount from the founder — never from the name, and never
   // from what a person types. See the note where the id field used to be. Derived here rather than in
@@ -451,7 +453,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
   const needsUri = () => state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid';
   const uriOk    = () => !needsUri() || /^https?:\/\//.test(String(state.groupPodUri ?? '').trim());
 
-  appendRadioField(wrap, doc, t('circle.wizard.create.storage'), state.storagePolicy, STORAGE_POLICIES,
+  appendRadioField(wrap, doc, t('circle.wizard.create.storage'), state.storagePolicy, storageChoices(state),
     (v) => { Object.assign(state, setStoragePolicy(state, v)); rerender(); }, { consequenceGroup: 'storagePolicy' });
 
   // Conditional pod URI field for centralised/hybrid.

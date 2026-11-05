@@ -187,6 +187,28 @@ export function pickPrimary(state) { return state.withDefault ? 'default' : (sta
 /** What the picker hands the enrol ceremony. */
 export function enrolPickArgs(state) { return { [ENROL_PERSONAS_PARAM]: [...state.personas], [ENROL_GENERAL_PARAM]: state.withDefault }; }
 
+/**
+ * The picker for a shell with no checkboxes (the box's command line): personas named by id or by name (any case), the
+ * general persona unless left out. Same model: a device holds at least one self, so leaving the general persona out with
+ * nothing else picked is refused. A name the offer does not hold is reported, never guessed.
+ * @param {Array<{id: string, name: string|null}>} listed  `openOfferPersonas`
+ * @param {string[]} names
+ * @param {{withDefault?: boolean}} [o]
+ * @returns {{state: {withDefault: boolean, personas: string[]}, unknown: string[], refused?: 'last-self'}}
+ */
+export function pickByNames(listed = [], names = [], { withDefault = true } = {}) {
+  const personas = [];
+  const unknown = [];
+  for (const n of names) {
+    const want = String(n ?? '').trim();
+    const hit = listed.find((p) => p.id === want || (typeof p.name === 'string' && p.name.toLowerCase() === want.toLowerCase()));
+    if (!hit) unknown.push(want);
+    else if (!personas.includes(hit.id)) personas.push(hit.id);
+  }
+  if (!withDefault && personas.length === 0) return { state: { withDefault: true, personas: [] }, unknown, refused: 'last-self' };
+  return { state: { withDefault, personas }, unknown };
+}
+
 /* ── The personas, sealed to the phrase ────────────────────────────────────────────────────────
  * The offer is public by design, so the person's personas never ride it in the clear — a list of them in one offer
  * would tell anyone who sees it that they are one person. It carries them SEALED to a key the PHRASE derives

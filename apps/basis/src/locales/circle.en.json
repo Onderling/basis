@@ -3227,11 +3227,11 @@
     },
     "delivery_fallback_on": {
       "text": "Per-circle addresses when we know them, your main address when we don't",
-      "doc": "Identical to the off-state on purpose — see that key."
+      "doc": "Shown when the person's address-fallback setting is ON: says what then happens."
     },
     "delivery_fallback_off": {
-      "text": "Per-circle addresses when we know them, your main address when we don't",
-      "doc": "Says what HAPPENS, not what a setting is. Until the stored setting reaches the send path the two states are identical, so both keys carry the same sentence rather than one of them lying."
+      "text": "Per-circle addresses only. Someone whose circle address you don't have yet is not reached — your main address is not used.",
+      "doc": "Shown when the setting is OFF (the default): says what then happens — a member whose circle address is unknown is not reached, rather than reached over the main address."
     },
     "delivery_fallback_toggle_on": {
       "text": "Stop allowing fallback",
@@ -3618,8 +3618,8 @@
       "doc": "Footer when no skills are published."
     },
     "delivery_fallback_note": {
-      "text": "Reaching someone whose per-circle address you don't have yet uses your main address, so a relay you both use can tell those circles belong to one person. Choosing this per circle is coming; for now it always happens.",
-      "doc": "The consequence, stated where it is incurred. Replaces the toggle: a control that changes nothing is a stronger false claim than a sentence, so the button is gone until the setting is wired."
+      "text": "With the fallback on, reaching someone whose per-circle address you don't have yet uses your main address, so a relay you both use can tell those circles belong to one person. The setting counts for all your circles at once.",
+      "doc": "The consequence of turning the fallback on, stated where the setting is shown. The setting is one for all circles (per circle was judged too technical)."
     },
     "answer_placeholder": {
       "text": "Your answer",

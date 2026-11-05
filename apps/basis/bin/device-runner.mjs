@@ -73,7 +73,7 @@ import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
 import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { joinCircleFromInvite } from '../src/v2/circleInvite.js';
-import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
+import { leaveCircleLocally, stillInCircle } from '../src/v2/circleMembershipHygiene.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
 import { createBoxAlert } from '../src/v2/boxAlert.js';
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
@@ -707,10 +707,10 @@ if (relayUrl) {
     const me = agent.circleAddressFor?.(circleId) ?? null;
     const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
     const members = Array.isArray(roster?.members) ? roster.members : null;
-    if (!me) return say('no-own-address', true);
-    if (!members?.length) return say(roster ? 'empty-roster' : 'roster-unread', true);
-    const listed = members.some((m) => m?.circleAddress === me || (m?.circleAddresses ?? []).includes(me));
-    return say(listed ? 'still-listed' : 'not-listed', listed);
+    // the fold's verdict, shared: my ROW by my circle self — an evict removes it; my address not on it yet is not a removal
+    const v = stillInCircle({ members, me, selfRef: agent.circleSelf?.(circleId)?.webid ?? agent.identity?.chat?.pubKey ?? null });
+    if (v.reason === 'not-yet-addressed') announceCircleAddresses({ agent, circleIds: [circleId] }).catch(() => { /* the next connect announces */ });
+    return say(v.reason, v.in);
   };
 
   const router = makePeerRouter({

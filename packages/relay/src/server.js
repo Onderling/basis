@@ -517,14 +517,40 @@ export async function startRelay(opts = {}) {
     standbyOf.get(address)?.delete(socket);
     return 'holder';
   };
+  /**
+   * The address falls to its most recent OPEN standby, live — the person's other device, not a hold queue — and what
+   * was queued for the address while nobody open held it goes there now: the standby proved the address when it
+   * registered, and it will not register again (the register path is the only other drain).
+   */
+  const promoteStandby = (address) => {
+    const next = [...(standbyOf.get(address) ?? [])].reverse().find((s) => s.readyState === 1);
+    if (!next) return null;
+    standbyOf.get(address).delete(next);
+    clients.set(address, next);
+    forwardQueue.drain(address, next, {
+      onEach: (envelope) => logHop({ kind: 'send-queued', from: '?', to: address, envelope }),
+    });
+    return next;
+  };
   const releaseAddress = (address, socket) => {
     if (primaryOf.get(address) === socket) primaryOf.delete(address);
     standbyOf.get(address)?.delete(socket);
     if (clients.get(address) !== socket) return;
     clients.delete(address);
-    // the address falls to a standby, live — the person's other device, not a hold queue
-    const next = [...(standbyOf.get(address) ?? [])].reverse().find((s) => s.readyState === 1);
-    if (next) { standbyOf.get(address).delete(next); clients.set(address, next); }
+    promoteStandby(address);
+  };
+  /**
+   * Who a frame for `address` goes to: its live holder when that socket is OPEN. A holder that is CLOSING (its device
+   * said goodbye; the relay has not seen the close yet) is not one — its open standby takes the address now instead of
+   * the frame waiting in a queue for a close event that drains nothing.
+   */
+  const holderOf = (address) => {
+    const live = clients.get(address) ?? null;
+    if (!live || live.readyState === 1) return live;
+    const next = promoteStandby(address);
+    if (!next) return live;
+    if (primaryOf.get(address) === live) primaryOf.delete(address);
+    return next;
   };
   /**
    * Hold-and-forward for offline recipients — the single relay forward owner
@@ -628,7 +654,7 @@ export async function startRelay(opts = {}) {
 
   const deliverOrEnqueue = (to, envelope, topic) =>
     forwardQueue.deliverOrEnqueue(to, envelope, {
-      socket: clients.get(to) ?? null,
+      socket: holderOf(to),
       topic,
       // Per-message wake-gate: an envelope stamped `noWake` (routine governance
       // votes/resolves, reports — the sender consulted `governanceWakeHint`) is
@@ -985,7 +1011,7 @@ export async function startRelay(opts = {}) {
           }
         }
 
-        const online = clients.get(to);
+        const online = holderOf(to);
         if (online && online.readyState === 1) {
           logLine(`[relay] ${shortId(registeredAddress)} → ${shortId(to)}  _p=${envelope._p ?? '?'}${topic ? ` topic=${topic}` : ''}`);
           // Q-Smoke.4 (locked 2026-04-29): per-hop verbose log + plaintext-leak

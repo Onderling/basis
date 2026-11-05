@@ -353,7 +353,7 @@ describe('the forward decision is circle-blind', () => {
   const send = frameBranch('send', 'register-push-token');
 
   it('where a message goes is decided with no circle knowledge in scope', () => {
-    const routing = send.indexOf('const online = clients.get(to);');
+    const routing = send.indexOf('const online = holderOf(to);');
     expect(routing).toBeGreaterThan(-1);
     const afterRouting = send.slice(routing);
     const leftovers = afterRouting.split('\n').map(normalise).filter(l => l && TOKEN_RE.test(l));

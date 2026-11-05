@@ -5189,6 +5189,8 @@ async function showMyData(opts) {
   if (sess?.signedIn && sess.webid) {
     podStatus = { signedIn: true, webid: sess.webid };
     if (circleRealPodRouting?.podRoot) dataLocation = { ...dataLocation, podRoot: circleRealPodRouting.podRoot };
+  } else if (sess?.signInError) {
+    podStatus = { ...podStatus, signedIn: false, signInError: sess.signInError };   // the last sign-in came back failed
   }
   privacy = Array.isArray(priv?.sections) ? priv.sections : [];
   metrics = (met?.snapshot && typeof met.snapshot === 'object') ? met.snapshot : {};
@@ -9163,6 +9165,7 @@ async function boot() {
   let podSession = null;
   try {
     podSession = (await podAuth.handleRedirect().catch(() => null)) || podAuth.getCurrentSession?.();
+    if (!podSession && podAuth.lastSignInError?.()) console.warn(`[podAuth] the pod sign-in did not complete: ${podAuth.lastSignInError()}`);
     const podRoot = podSession ? await discoverPodRoot(podSession).catch(() => null) : null;
     circleRealPodRouting = realPodRouting(podSession, { PodClient, SolidOidcAuth, podRoot });
     // embed-ref resolution reads the user's own private-pod items with this fetch.

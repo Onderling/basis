@@ -8133,6 +8133,10 @@
         "text": "Rotate the key after (days, 1-365)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
+      "rotation_days_hint": {
+        "text": "How often the circle-wide encryption key rotates. 30 days suits most circles; choose fewer for a more sensitive group. (Invite expiry is set separately, under Governance.)",
+        "doc": "Create wizard, the key-rotation field's hint."
+      },
       "offering_remove": {
         "text": "Remove",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."

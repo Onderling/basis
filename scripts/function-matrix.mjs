@@ -57,15 +57,23 @@ export const FUNCTIONS = Object.freeze([
   // Today no person can MAKE a central-pod or pod-only circle on any shell (the wizard sets no storage; a change after
   // creation is refused) — the scope is Frits's call (L571). ⓘ 'hybrid' is in circleDataPolicy's table but is not one of
   // the three types Frits named: outside the tested set, no cell.
+  // web: apps/basis/test-browser/walk-circle-types-pod.spec.js walks all three through the wizard; normal is green, the
+  // two pod types are fixme until a web pod sign-in can complete — so the cell stays red until they are green too.
   { id: 'circle-types', name: 'Circle types (normal, central pod, pod-only)', cells: { web: null, mobile: null, box: null } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {
     web: P('apps/basis/test-browser/circle-view-bot.spec.js'),
     mobile: null,   // REQUIRED: the assistant on the phone
     box: P('apps/basis/test/botReplyLines.box.test.js'),
   } },
-  // red on every shell until Frits says what he means by hopping (Fable asked; walk-transports is a transport walk, and
-  // the social match-hop is not built — architecture.md, Reachability)
-  { id: 'hopping', name: 'Hopping', cells: { web: null, mobile: null, box: null } },
+  // hopping = a member carries for a member (Frits 2026-11-03). Its EVENTUAL half is the catch-up: a member only the
+  // LAN reaches pulls a statement from the member who reaches both. The story's LAN is a second relay standing in for
+  // mDNS, and it boots the shared agent composition rather than a browser or the device-runner — named for web and box
+  // by Fable 2026-11-03 on that basis. The mobile cell is an mDNS story on the phones (later). The LIVE push is not built.
+  { id: 'hopping', name: 'Hopping', cells: {
+    web: { file: 'apps/basis/test/lanCatchUpCarriesAStatement.relay.test.js', test: 'holds his statement after her catch-up with Anna' },
+    mobile: null,
+    box: { file: 'apps/basis/test/lanCatchUpCarriesAStatement.relay.test.js', test: 'holds his statement after her catch-up with Anna' },
+  } },
   { id: 'task-sharing', name: 'Task sharing', cells: {
     web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'task-handoff — A adds a task, B claims it' },   // named by Fable 2026-11-03
     mobile: P('apps/basis-mobile/test/multiCircleSeparation.test.js'),

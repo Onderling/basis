@@ -1020,6 +1020,13 @@ export function renderCircleMyData(container, {
         ? tr('circle.mydata.pod_signed_in', { webid: podStatus.webid ?? '' })
         : tr('circle.mydata.pod_local');
       storage.appendChild(kv(tr('circle.mydata.pod'), status));
+      // a sign-in that came back failed says so here, where the person looks for it — with the reason it gave
+      if (!podStatus.signedIn && podStatus.signInError) {
+        const failed = document.createElement('p');
+        failed.className = 'cc-mydata__hint cc-mydata__signin-failed';
+        failed.textContent = `${tr('circle.mydata.pod_sign_in_failed')} (${podStatus.signInError})`;
+        storage.appendChild(failed);
+      }
       // With no pod, say what that COSTS — here, where the state is shown, not at the moment someone tries to
       // leave with their things. A wipe-and-restore walk (2026-08-02) proved the phrase brings back the
       // identity and no circles; learning that while switching devices is learning it too late to act on.

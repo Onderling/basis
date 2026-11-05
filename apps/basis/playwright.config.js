@@ -113,6 +113,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: BASE_URL, launchOptions: HERMETIC_LAUNCH },
     },
     {
+      // PROBES (apps/basis/probes-browser/): walks that report what they found (PASS / FINDING) and assert nothing, so
+      // they cannot fail — run by hand, never counted as the suite (CI lists test-browser/ only, scripts/browser-shard.mjs)
+      name: 'probes',
+      testDir: './probes-browser',
+      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL, launchOptions: HERMETIC_LAUNCH },
+    },
+    {
       name: 'no-relay',
       testIgnore: RELAY_SPECS,
       use: { ...devices['Desktop Chrome'], baseURL: NO_RELAY_BASE_URL, launchOptions: HERMETIC_LAUNCH },

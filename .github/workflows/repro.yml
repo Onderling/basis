@@ -43,10 +43,19 @@ jobs:
             npm test --prefix apps/basis > run.log 2>&1 || true
             if grep -qF "$NEEDLE" run.log; then
               echo "::notice::captured on run $i"
-              grep -aF "$NEEDLE" run.log | head -1 | cut -c1-3000
+              grep -aF "$NEEDLE" run.log | head -1 | cut -c1-20000
+              cp run.log captured.log
               grep -a "dropped an inbound envelope" run.log | sort | uniq -c | head -20
               exit 0
             fi
             echo "run $i: $(grep -aE '^ *Test Files' run.log | head -1)"
           done
           echo "::notice::no capture in $RUNS runs"
+      # the whole run's log when it captured — the failure line alone is cut, and the box's own lines are in here
+      - name: Keep the captured run's log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captured-run-log
+          path: captured.log
+          if-no-files-found: ignore

@@ -227,7 +227,7 @@ import { loadPersonaAvatar } from '../../../../basis/src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../../../basis/src/v2/personaSet.js';
 import PersonaSwitcherModal from './PersonaSwitcherModal.js';
 import FaceView from './FaceView.js';
-import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource, outboundSharesForAdmin, revokeOutboundForMember, unshareItemFromCircle } from '../../core/circlePods.js';
+import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, getCirclePodWebId, setCircleContactsSource, outboundSharesForAdmin, revokeOutboundForMember, unshareItemFromCircle } from '../../core/circlePods.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
 import { buildCircleLlmProviders } from '../../../../basis/src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDispatch.js';
@@ -2963,6 +2963,7 @@ export default function CircleLauncherScreen({
           }}
           // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
           shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
+          podConnected={!!getCirclePodWebId()}   // no pod session → the new circle is a normal one
           onClose={() => setCreating(false)}
           onDispatched={(r) => {
             setCreating(false);

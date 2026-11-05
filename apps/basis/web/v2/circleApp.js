@@ -6921,6 +6921,7 @@ function openCreateCircleWizard() {
   if (typeof rawCallSkill !== 'function') { globalThis.alert?.(t('circle.create_unavailable')); return; }
   mountMyDataWizard(renderCreateGroupWizard, {
     getMyPeerAddr: () => circleHouseholdAgent?.householdSelfAddr ?? null,
+    podConnected: !!circleOwnerWebId,   // no pod session → the circle is made a normal one
     // the persona the founder picked says what it discloses in the new circle
     shareFounderRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
     onDispatched: async (reply) => {

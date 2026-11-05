@@ -196,6 +196,16 @@ export function setKind(state, kind) {
   return { ...next, storagePolicy, pod: storagePolicy };
 }
 
+/**
+ * The storage choices the radio offers. Without a connected pod there is one: a normal circle. A pod type made with no
+ * pod only degraded to fan-out with a warning, so it is not offered until the person has connected a pod. `podConnected`
+ * is what the host knows; a state that never says (a programmatic create) gets every choice, as before.
+ * @param {{ podConnected?: boolean }} state
+ */
+export function storageChoices(state) {
+  return state?.podConnected === false ? STORAGE_POLICIES.filter((o) => o.id === 'none') : STORAGE_POLICIES;
+}
+
 /** The person's storage choice — sets both names of the one fact and marks the axis as theirs. */
 export function setStoragePolicy(state, value) {
   return markAxisTouched({ ...state, storagePolicy: value, pod: value }, 'pod');
@@ -596,6 +606,12 @@ export function encodeInviteUri(payload) {
 export async function finalSubmit({ state, callSkill, shareRelease = null, releaseTimeoutMs = RELEASE_TIMEOUT_MS }) {
   state.submitting  = true;
   state.submitError = null;
+  // no connected pod → a normal circle, whatever a template or an earlier step left in the storage choice
+  if (state.podConnected === false) {
+    state.storagePolicy = 'none';
+    state.pod = 'none';
+    delete state.groupPodUri;
+  }
   // FOUNDING AS A PERSONA: the circle is bound to the persona before the create, as a join binds before its redeem —
   // so the founding statements, the address and the circle's "me" are the persona's from the first byte.
   const asPersona = typeof state.persona === 'string' && state.persona && state.persona !== DEFAULT_PERSONA ? state.persona : null;

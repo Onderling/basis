@@ -56,6 +56,18 @@ export function realPodRouting(session, { PodClient, SolidOidcAuth, circlesPath 
 }
 
 /**
+ * Does this device's pod hold the circle's root? Only then can it write the circle's access rules: on a central-pod
+ * circle every other member reads and writes there under the owner's grants, and an attempt of theirs is refused.
+ * @param {{ podRoot?: string|null, circleRootUri?: string|null }} a
+ * @returns {boolean}
+ */
+export function ownsCircleRoot({ podRoot = null, circleRootUri = null } = {}) {
+  if (typeof podRoot !== 'string' || !podRoot || typeof circleRootUri !== 'string' || !circleRootUri) return false;
+  const base = podRoot.endsWith('/') ? podRoot : `${podRoot}/`;
+  return `${circleRootUri.replace(/\/+$/, '')}/`.startsWith(base);
+}
+
+/**
  * Where a circle's pod data lives — one answer for every member and both shells. A CENTRAL-POD (shared / hybrid)
  * circle lives at the address it was given (the founder's storage policy; a joiner's pod connection point from the
  * invite): the founder and every joiner read and write THAT, each with their own session under the grants the circle

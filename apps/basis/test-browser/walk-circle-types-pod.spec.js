@@ -84,7 +84,7 @@ async function podResourceCount(page, root) {
 }
 
 /** The create wizard, with the storage radio set; returns the new circle's id. */
-async function createWithStorage(page, name, { storage, podUri = null, handle = 'anna' }) {
+async function createWithStorage(page, name, { storage, podUri = null, handle = 'anna', offered = null }) {
   const before = new Set(await myCircles(page));
   await gotoCircles(page);
   await page.locator('.circle-launcher__new').click();
@@ -96,6 +96,11 @@ async function createWithStorage(page, name, { storage, podUri = null, handle = 
   await page.waitForTimeout(500);
   let picked = false;
   for (let step = 0; step < 12; step += 1) {
+    if (Array.isArray(offered)) {
+      for (const v of await page.locator('input[type="radio"]:visible').evaluateAll((els) => els.map((e) => e.value))) {
+        if (['none', 'personal', 'shared', 'hybrid'].includes(v) && !offered.includes(v)) offered.push(v);
+      }
+    }
     const radio = page.locator(`input[type="radio"][value="${storage}"]:visible`);
     if (!picked && await radio.count()) {
       await radio.first().click({ force: true });
@@ -128,8 +133,8 @@ const CASES = [
   { type: 'normal', storage: 'none', port: null, signA: false, signB: false, branch: 'fan-out' },
   { type: 'central pod', storage: 'shared', port: 3056, signA: true, signB: true, branch: 'pod', },
   { type: 'pod-only', storage: 'personal', port: 3057, signA: true, signB: true, branch: 'pod', blocked: 'the pod-circle message does not reach the other member yet: the reader needs a signed-in session the circle grants (central pod) or its own pod and the cross-pod grants (pod-only) — its own investigation' },
-  // today's behaviour, kept until a pod-less 'shared' circle is made as a normal one (then this case is removed)
-  { type: 'a pod type without a pod session', storage: 'shared', port: 3058, signA: false, signB: false, branch: 'degraded' },
+  // without a pod session the wizard offers no pod type: the circle is made a normal one and says nothing about pods
+  { type: 'no pod session', storage: 'none', port: null, signA: false, signB: false, branch: 'fan-out', onlyNone: true },
 ];
 
 for (const c of CASES) {
@@ -141,6 +146,8 @@ for (const c of CASES) {
     const [A, B] = peers;
     const sendLog = [];
     A.page.on('console', (m) => { const t = m.text(); if (t.includes('[broadcastToCircle]')) sendLog.push(t); });
+    const refusedRules = [];   // a member's device writing the founder's access rules, refused by the pod
+    B.page.on('console', (m) => { const t = m.text(); if (/writing \.acr for .* failed \[403\]/.test(t)) refusedRules.push(t.slice(0, 200)); });
     try {
       let accounts = null;
       const tag = `ct${c.port ?? 'none'}`;
@@ -154,7 +161,9 @@ for (const c of CASES) {
 
       const name = `Kring ${c.storage} ${c.port ?? 'los'}`;
       const podUri = c.storage === 'shared' ? `${accounts.owner.podRoot}circles/${c.port}/` : null;
-      const gid = await createWithStorage(A.page, name, { storage: c.storage, podUri });
+      const offered = [];
+      const gid = await createWithStorage(A.page, name, { storage: c.storage, podUri, offered });
+      if (c.onlyNone) expect(offered, 'without a pod session the wizard offers only a normal circle').toEqual(['none']);
       expect((await call(A.page, 'pinboard', 'getCircleStoragePolicy', { groupId: gid }))?.policy, 'the circle has the type the radio gave it').toBe(c.storage);
 
       // the launcher reads its list after the boot: reload, then wait for the new circle's tile before opening it
@@ -181,11 +190,10 @@ for (const c of CASES) {
       await expect.poll(async () => (await readBubbles(B.page)).some((t) => t.includes(text)),
         { timeout: 60_000, intervals: [2500], message: `the other member reads the message in a ${c.type} circle` }).toBe(true);
 
+      if (c.type === 'central pod') expect(refusedRules, 'the member\'s device tried to write the founder\'s access rules').toEqual([]);
       const degraded = sendLog.filter((l) => /degrading to fan-out-full/.test(l));
       if (c.branch === 'fan-out') {
         expect(degraded, `a normal circle must not talk about a pod:\n${sendLog.join('\n')}`).toEqual([]);
-      } else if (c.branch === 'degraded') {
-        expect(degraded.length, `a pod type with no pod session must say it degraded:\n${sendLog.join('\n')}`).toBeGreaterThan(0);
       } else {
         expect(degraded, `the ${c.type} send degraded instead of using the pod`).toEqual([]);
         const podAfter = await podResourceCount(A.page, accounts.owner.podRoot);

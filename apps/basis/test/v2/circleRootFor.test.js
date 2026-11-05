@@ -23,3 +23,13 @@ describe('a circle pod root, for every member', () => {
     expect(circleRootFor({ pod: 'personal', recordedPodUri: 'https://ann.example/x', ownCircleRoot: own })).toBe(own);
   });
 });
+
+describe('ownsCircleRoot', () => {
+  it('true only when the circle root sits on this device\'s pod', async () => {
+    const { ownsCircleRoot } = await import('../../src/v2/circleRealPod.js');
+    expect(ownsCircleRoot({ podRoot: 'https://ann.pod/', circleRootUri: 'https://ann.pod/circles/c1' })).toBe(true);
+    expect(ownsCircleRoot({ podRoot: 'https://bo.pod/', circleRootUri: 'https://ann.pod/circles/c1' })).toBe(false);
+    expect(ownsCircleRoot({ podRoot: 'https://ann.pod/x', circleRootUri: 'https://ann.pod/xy/c1' })).toBe(false);
+    expect(ownsCircleRoot({ podRoot: null, circleRootUri: 'https://ann.pod/c1' })).toBe(false);
+  });
+});

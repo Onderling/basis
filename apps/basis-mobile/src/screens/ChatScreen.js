@@ -82,7 +82,7 @@ import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin
                                from '../../../basis/src/v2/circleAddressAnnounce.js';
 // G11 — no-pod group-key rotation, RECEIVE side: record an inbound key-event into the local per-circle
 // log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
-import { refreshCircleKeyEventsFromLane } from '../core/circlePods.js';
+import { refreshCircleKeyEventsFromLane, getCirclePodWebId } from '../core/circlePods.js';
 // ε.4 — negotiated catch-up protocol substrate.
 import { makeHandleCalendarRsvp }
                                from '../../../basis/src/core/handlers/calendarRsvp.js';
@@ -1769,6 +1769,8 @@ export default function ChatScreen({
             // by CreateGroupWizardModal; other wizards ignore it.
             persistPolicy={(groupId, patch) => policyStoreRef.current?.update(groupId, patch)}
             // …and says the founding persona's release on the new circle. Only CreateGroupWizardModal reads it.
+            // no pod session → the new circle is a normal one (only CreateGroupWizardModal reads it)
+            podConnected={!!getCirclePodWebId()}
             shareFounderRelease={bootState.kind === 'ready'
               ? (cid, personaId) => bootState.bundle.shareCircleRelease?.(cid, personaId)
               : undefined}

@@ -41,6 +41,9 @@ function memorySharing() {
  * @param {(circleId:string) => {read:Function, write:Function}} [deps.makePodClient]  REQUIRED for p2/p3.
  * @param {{grant:Function, revoke:Function}} [deps.sharing]  ACL (defaults to a memory no-op).
  * @param {boolean} [deps.bootstrap=true]  bootstrap the control agent's key resource immediately.
+ * @param {boolean} [deps.ownsRoot=true]   this device's pod holds the circle root. False on a member's device in a
+ *   central-pod circle: the root is the founder's, so the producer never writes the key resource there at boot (no
+ *   restore of its vault copy over the pod's, no first key) — it reads what the owner wrote.
  * @param {{ append: (event:object) => any }} [deps.keyEventLog]  optional no-pod distribution sink — passed
  *   through to the control agent so every establish/grant/rotation ALSO fans the versioned key AS a log
  *   key-event to the then-current members (self-distributing with no pod). Absent → pod-only, unchanged.
@@ -57,6 +60,7 @@ export async function createCirclePodProducer({
   circleRootUri,
   sharing,
   bootstrap = true,
+  ownsRoot = true,
   keyEventLog = null,
   sealingKeyPair = null,
   controllerKeyPrefix = 'cc.circle-controller-key',
@@ -134,7 +138,7 @@ export async function createCirclePodProducer({
   try { const raw = await vault.get(podAgentsVaultKey); if (raw) savedPodAgents = JSON.parse(raw) ?? {}; } catch { savedPodAgents = {}; }
 
   const savedRes = await vault.get(groupKeyVaultKey);
-  if (savedRes) {
+  if (savedRes && ownsRoot) {
     try { await podClient.write(keyResourceUri, savedRes, { contentType: 'application/json' }); } catch { /* fresh-bootstrap below */ }
   }
 
@@ -162,7 +166,7 @@ export async function createCirclePodProducer({
     try { if (controlAgent?.podAgents) await vault.set(podAgentsVaultKey, JSON.stringify(controlAgent.podAgents())); } catch { /* best-effort */ }
   }
 
-  if (bootstrap && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
+  if (bootstrap && ownsRoot && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
   return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey };
 }

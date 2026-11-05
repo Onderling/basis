@@ -43,7 +43,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, seedCircleRoster,
+  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -2144,11 +2144,16 @@ async function buildCirclePod(circleId, policy) {
       circleRootUri = circleRootFor({ pod: policy?.pod, recordedPodUri: recorded, ownCircleRoot: routing.circleRootUri(circleId) });
       if (!circleRootUri) { console.warn(`[circleApp] circle ${String(circleId).slice(0, 12)}… is a central-pod circle with no recorded pod address — not using any pod`); return null; }
     }
+    const ownsRoot = !routing || ownsCircleRoot({ podRoot: routing.podRoot, circleRootUri });
     const producer = await createCirclePodProducer({
       circleId, storagePosture, vault: circleVault, generateKeypair: podGenerateKeypair, sealingKeyPair,
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
       circleRootUri,
-      sharing, keyEventLog,
+      // only the pod that holds the circle's root takes access rules from this device: on a central-pod circle a
+      // member's own device would try the founder's pod and be refused
+      sharing: ownsRoot ? sharing : undefined,
+      ownsRoot,
+      keyEventLog,
     });
     circlePods.set(circleId, producer);
     return producer;
@@ -6916,6 +6921,7 @@ function openCreateCircleWizard() {
   if (typeof rawCallSkill !== 'function') { globalThis.alert?.(t('circle.create_unavailable')); return; }
   mountMyDataWizard(renderCreateGroupWizard, {
     getMyPeerAddr: () => circleHouseholdAgent?.householdSelfAddr ?? null,
+    podConnected: !!circleOwnerWebId,   // no pod session → the circle is made a normal one
     // the persona the founder picked says what it discloses in the new circle
     shareFounderRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
     onDispatched: async (reply) => {

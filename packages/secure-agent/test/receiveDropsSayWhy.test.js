@@ -28,7 +28,9 @@ describe('a dropped inbound envelope says why', () => {
     await new Promise((r) => setTimeout(r, 300));
     const said = lines.filter((l) => /dropped an inbound envelope/.test(l) && /rate-limited/.test(l));
     expect(said, `no line for the rate-limited drops: ${JSON.stringify(lines.slice(-6))}`).toHaveLength(1);
-    expect(said[0]).toContain(sender.identity.pubKey.slice(0, 12));
+    // an operator log names a sender by a short suffix, never a near-identifying prefix of their address
+    expect(said[0]).toContain(`…${sender.identity.pubKey.slice(-6)}`);
+    expect(said[0]).not.toContain(sender.identity.pubKey.slice(0, 12));
     expect(receiver.securityStatus?.().receiveDrops?.['rate-limited'] ?? 0).toBeGreaterThan(0);
     await sender.shutdown();
     await receiver.shutdown();

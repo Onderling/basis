@@ -16,7 +16,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 
 import {
-  ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
+  ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES, storageChoices,
   KEY_ROTATION_MODES,
   REVIEW_STEP, nextCreateStep, prevCreateStep, createStepDots, setAdvanced, withCreateDefaults, purposeOrDefault,
   REVEAL_POLICIES, setRevealPolicy, revealPolicyLabelKey,
@@ -60,9 +60,11 @@ export default function CreateGroupWizardModal({
   // Optional: (circleId, personaId) => Promise — says the founding persona's release on the new circle (the
   // shell's seam; web's `shareFounderRelease`). Absent ⇒ nothing is released, as before.
   shareFounderRelease,
+  // what the host knows: no connected pod → the radio offers only a normal circle, and the create makes one (web parity)
+  podConnected,
 }) {
   const styles = useMemo(() => sheetStyles(theme), [theme]);
-  const [state, setState] = useState(() => initialState());
+  const [state, setState] = useState(() => (typeof podConnected === 'boolean' ? { ...initialState(), podConnected } : initialState()));
   // Which persona founds the circle: the join wizard's list, read once. The default stays chosen meanwhile.
   useEffect(() => {
     let active = true;
@@ -418,7 +420,7 @@ export default function CreateGroupWizardModal({
                 <RadioGroup
                   label={t('circle.wizard.create.storage')}
                   value={state.storagePolicy}
-                  options={attachConsequences('storagePolicy', STORAGE_POLICIES, t)}
+                  options={attachConsequences('storagePolicy', storageChoices(state), t)}
                   onChange={(v) => setState((s) => setStoragePolicy(s, v))}
                   consequenceLabel={t('common.consequences')}
                 />

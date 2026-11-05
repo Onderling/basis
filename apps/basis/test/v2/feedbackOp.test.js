@@ -5,6 +5,9 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
+
+// the contact is already in the book (added by the person's yes earlier): the door opens the thread at once
+const inBook = async (app, op) => (op === 'listContacts' ? { contacts: [{ webid: 'https://id.example/onderling' }] } : {});
 import { basisManifest } from '../../manifest.js';
 import { encodeContactCard } from '../../../pinboard/src/lib/contactCard.js';
 
@@ -22,7 +25,7 @@ describe('the feedback op', () => {
 
   it('opens the contact\'s thread with the prefill; sends nothing', async () => {
     const openFeedback = vi.fn();
-    const ops = createLocalBuiltins({ t, openFeedback, feedbackCard: CARD, appVersion: 'v0.1.74-alpha',
+    const ops = createLocalBuiltins({ t, openFeedback, feedbackCard: CARD, appVersion: 'v0.1.74-alpha', callSkill: inBook,
       currentScreen: () => ({ screen: 'settingsGroup', settingsGroup: 'display' }) });
     const r = await ops.feedback({});
     expect(r.ok).toBe(true);
@@ -31,7 +34,7 @@ describe('the feedback op', () => {
 
   it('inside a circle the prefill says "circle", never the circle\'s name — not even when an arg carries it', async () => {
     const openFeedback = vi.fn();
-    const ops = createLocalBuiltins({ t, openFeedback, feedbackCard: CARD, appVersion: 'v0.1.74-alpha',
+    const ops = createLocalBuiltins({ t, openFeedback, feedbackCard: CARD, appVersion: 'v0.1.74-alpha', callSkill: inBook,
       currentScreen: () => ({ inCircle: true, screen: 'Huize Zwartkruid-7731' }) });
     await ops.feedback({ screen: 'Huize Zwartkruid-7731' });
     const { draft } = openFeedback.mock.calls[0][0];

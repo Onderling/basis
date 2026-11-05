@@ -68,7 +68,6 @@ import { makeCircleGovernancePeerHandler } from '../../../basis/src/v2/circleLog
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer, consumeCircleEntry } from '../../../basis/src/v2/enrollOffer.js';
-import { seedContactCard }    from '../../../basis/src/v2/seededContact.js';
 import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
@@ -813,14 +812,8 @@ export default function ChatScreen({
           }).catch(() => { /* retried next launch — the stash only clears on full success */ });
           setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);
         }
-        // The shipped contact, once per launch (web parity): added through the scanned-card path if the
-        // build-time card is set and the person is not in the book yet.
-        if (bundle?.callSkill && !globalThis.__onderlingSeededContactKicked) {
-          globalThis.__onderlingSeededContactKicked = true;
-          seedContactCard({ payload: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD, callSkill: bundle.callSkill })
-            .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
-            .catch(() => { /* an install without it is not an error state */ });
-        }
+        // The build's feedback contact is OFFERED at the feedback door, never added here (web parity): a boot adds
+        // nobody to the book.
         if (itemsCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
           globalThis.__onderlingTaskCatchUpKicked = true;
           setTimeout(() => { itemsCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);

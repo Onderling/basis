@@ -245,7 +245,6 @@ import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
-import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { foldGovernance } from '../../src/v2/governanceLog.js';
@@ -910,6 +909,8 @@ function mountBasisOpsOnAgent(agent) {
     openFilePicker: webFilePicker,
     // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
     openFeedback: ({ webid, draft }) => { showContactThread(webid, { draft }).catch(() => {}); },
+    // adding the feedback contact is the person's own tap: the offer says who receives what, and only yes adds it
+    confirmFeedbackOffer: async ({ title, line }) => globalThis.confirm(`${title}\n\n${line}`) === true,
     feedbackCard: SEEDED_CONTACT_CARD,
     appVersion: APP_VERSION,
     currentScreen: () => feedbackScreenState(),
@@ -9832,11 +9833,7 @@ async function boot() {
         agent.bootstrapFromStashedOffer();
         itemsCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
-        // The shipped contact, once: added through the scanned-card path if the card is set and the
-        // person is not in the book yet.
-        seedContactCard({ payload: SEEDED_CONTACT_CARD, callSkill: rawCallSkill })
-          .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
-          .catch(() => { /* an install without it is not an error state */ });
+        // The build's feedback contact is OFFERED at the feedback door, never added here: a boot adds nobody to the book.
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {

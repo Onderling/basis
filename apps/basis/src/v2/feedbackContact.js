@@ -1,6 +1,7 @@
 /**
- * The feedback contact — writing to Onderling about the app. The build carries a contact card (the alpha's feedback
- * persona on an always-on device, seeded into every fresh install; `seededContact.js`); the feedback door opens that
+ * The feedback contact — writing to Onderling about the app. The build carries a contact card (the maker's Feedback
+ * persona on an always-on device). It is OFFERED at the feedback door, never added at boot: the person's own tap adds it
+ * (`seedContactCard`, the scanned-card path), after one line saying who receives what; the feedback door opens that
  * contact's thread with a short prefill naming the screen and the build, and the person writes and sends it
  * themselves. Nothing is collected or sent on its own: no device id, no log, no auto-send. On a bot door (Telegram)
  * the person has no app contact, so the bot answers with the card's link to add — nothing is forwarded.

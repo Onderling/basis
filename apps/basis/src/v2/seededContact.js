@@ -1,5 +1,7 @@
 /**
- * seededContact — a contact the app ships with, so a person has someone to write to on day one.
+ * seededContact — a contact card the app ships with. Since 2026-11-03 (Frits) it is OFFERED, not seeded: the feedback door
+ * calls `seedContactCard` on the person's own tap, and no shell calls it at boot (a removed contact stays removed).
+ * The history below is how it began.
  *
  * The alpha's feedback path (Frits, 2026-09-09): feedback goes to Frits himself — his own account, on an
  * always-on device, added as an ordinary CONTACT in every fresh install. Not a bot, not a form: a person

@@ -73,7 +73,7 @@ import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
 import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { joinCircleFromInvite } from '../src/v2/circleInvite.js';
-import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
+import { leaveCircleLocally, stillInCircle } from '../src/v2/circleMembershipHygiene.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
 import { createBoxAlert } from '../src/v2/boxAlert.js';
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
@@ -707,10 +707,10 @@ if (relayUrl) {
     const me = agent.circleAddressFor?.(circleId) ?? null;
     const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
     const members = Array.isArray(roster?.members) ? roster.members : null;
-    if (!me) return say('no-own-address', true);
-    if (!members?.length) return say(roster ? 'empty-roster' : 'roster-unread', true);
-    const listed = members.some((m) => m?.circleAddress === me || (m?.circleAddresses ?? []).includes(me));
-    return say(listed ? 'still-listed' : 'not-listed', listed);
+    // the fold's verdict, shared: my ROW by my circle self — an evict removes it; my address not on it yet is not a removal
+    const v = stillInCircle({ members, me, selfRef: agent.circleSelf?.(circleId)?.webid ?? agent.identity?.chat?.pubKey ?? null });
+    if (v.reason === 'not-yet-addressed') announceCircleAddresses({ agent, circleIds: [circleId] }).catch(() => { /* the next connect announces */ });
+    return say(v.reason, v.in);
   };
 
   const router = makePeerRouter({
@@ -1264,15 +1264,24 @@ if (tgToken || inboxDoor.bridge) {
     handle: async () => botCircleHandle(tgBridge?.botUsername ?? null, (await botUsers.list()).find((u) => u.role === 'admin')?.displayName ?? null),
   }) : null;
   botCirclesRef.ref = botCircles;
+  // a circle line the box passes over before the door says why — once per reason and circle, like the door's own
+  const linePassedSaid = new Set();
+  const noteLinePassed = (reason, circleId) => {
+    const key = `${reason}|${circleId}`;
+    if (linePassedSaid.has(key) || linePassedSaid.size > 500) return;
+    linePassedSaid.add(key);
+    walkLog({ kind: 'circle-line-passed', reason, circleId: String(circleId).slice(0, 12) });
+    console.info(`device-runner: a circle line in ${String(circleId).slice(0, 12)}… was passed over (${reason}); further ones are not said`);
+  };
   if (botCircles && circleDoors) {
     // a member gone from a circle's roster leaves the host gate (the circle door tiered them)
     circleSeams.rosterChanged = (circleId) => circleDoors.rosterChanged(circleId).catch(() => {});
     // a circle message landed: read from the log (the rail verified its author), fed when it is a joined circle's
     circleSeams.landed = async ({ msgId, circleId }) => {
       try {
-        if (!(await botCircles.isJoined(circleId))) return;
+        if (!(await botCircles.isJoined(circleId))) { noteLinePassed('not-joined', circleId); return; }
         const e = deviceLog.query({}).find((x) => x?.id === msgId && x?.type === 'chat-message');
-        if (!e) return;
+        if (!e) { noteLinePassed('not-in-log', circleId); return; }
         await circleDoors.landed({ circleId, msgId, authorRef: e.actor, text: e.payload?.text, ts: e.ts });
       } catch (err) { console.warn(`device-runner: a circle line was not handled: ${err?.message ?? err}`); }
     };

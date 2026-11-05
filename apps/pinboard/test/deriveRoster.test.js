@@ -569,6 +569,30 @@ describe('a PROVEN function profile (L389): from the statement that admitted it,
     });
     expect(roster.find((m) => m.webid === bot.pubKey)?.provenKind).toBe('function');
     expect(roster.find((m) => m.webid === person.pubKey)?.provenKind).toBeUndefined();
+    // the LABEL rides with the admission too: a member's roster says 'bot' from the join, not only once the bot's own
+    // member-props reach it — and a person's self-said word proves nothing, so its row gets no label from here
+    expect(roster.find((m) => m.webid === bot.pubKey)?.kind, 'the proven bot has no label until its own word arrives').toBe('function');
+    expect(roster.find((m) => m.webid === person.pubKey)?.kind).toBeUndefined();
+  });
+  it("the admitting admin's word WINS over a member's own: a proven bot stays a bot, a self-said 'function' labels nobody", async () => {
+    const founder = await AgentIdentity.generate(new VaultMemory());
+    const bot = await AgentIdentity.generate(new VaultMemory());
+    const person = await AgentIdentity.generate(new VaultMemory());
+    const botJoin = signSpine(founder, { kind: 'join', circleId: 'g1', subject: bot.pubKey, payload: { kind: 'function' } }).body;
+    const personJoin = signSpine(person, { kind: 'join', circleId: 'g1', subject: person.pubKey, payload: {} }).body;
+    // each says something else about itself, on the lane
+    const botSays = signSpine(bot, { kind: 'member-props', circleId: 'g1', subject: bot.pubKey, parent: botJoin.hash, payload: { authorRef: bot.pubKey, kind: 'person' } }).body;
+    const personSays = signSpine(person, { kind: 'member-props', circleId: 'g1', subject: person.pubKey, parent: personJoin.hash, payload: { authorRef: person.pubKey, kind: 'function' } }).body;
+    const roster = deriveRoster({
+      redemptions: [
+        redemption({ redeemedBy: bot.pubKey, signingPublicKey: bot.pubKey }),
+        redemption({ redeemedBy: person.pubKey, signingPublicKey: person.pubKey }),
+      ],
+      founderWebids: [founder.pubKey], foldAuthoritative: true,
+      spineStatements: [botJoin, personJoin, botSays, personSays],
+    });
+    expect(roster.find((m) => m.webid === bot.pubKey)?.kind, 'a bot un-botted itself by its own word').toBe('function');
+    expect(roster.find((m) => m.webid === person.pubKey)?.kind, "a person's self-said 'function' labelled them a bot").toBeUndefined();
   });
   it("a founder whose own creation said so is a proven function profile", async () => {
     const founder = await AgentIdentity.generate(new VaultMemory());

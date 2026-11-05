@@ -820,6 +820,14 @@
     }
   },
   "feedback": {
+    "offer_title": {
+      "text": "Feedback geven? Voeg Feedback toe",
+      "doc": "The feedback door's offer when the Feedback contact is not in the book yet: adding it is the person's own tap."
+    },
+    "offer_line": {
+      "text": "Je bericht gaat naar de Feedback-assistent van de maker, op een apparaat van de maker zelf. Je contactkaart gaat mee, zodat de maker je kan antwoorden.",
+      "doc": "Under the offer: who receives what \u2014 the message and the person's contact card, to the maker's Feedback assistant. Said before the add, never after."
+    },
     "no_contact": {
       "text": "Deze versie van de app heeft geen feedbackcontact. Meld het aan wie je de app gaf — dat is precies het soort ding dat we willen weten.",
       "doc": "The feedback door when the build carries no feedback contact card: says so, honestly (testers report the gap)."

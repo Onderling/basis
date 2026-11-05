@@ -190,7 +190,17 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
         return consoleWas[k](...a);
       };
     }
+    // OFF means off: the phone's sockets are closed AT THE RELAY before anyone writes to it. A shutdown starts each close
+    // and returns; until the relay has processed it, the phone's socket still holds Frits's addresses and a frame for
+    // them can be handed to a phone that will never read it (the walk's intermittent red: the turn went to the closing
+    // phone, the relay said delivered, the box never saw it).
+    const clientsBefore = relay.wss?.clients?.size ?? null;
+    const phoneSockets = (phone.agent.sa?.relays?.list?.() ?? []).length;
     await teardown(phone);
+    if (clientsBefore != null && phoneSockets > 0) {
+      const closed = await until(() => ((relay.wss?.clients?.size ?? 0) <= clientsBefore - phoneSockets ? true : null), { timeout: 10_000, step: 25 });
+      expect(closed, 'the phone\'s sockets never closed at the relay').toBe(true);
+    }
     phoneDown.downAt = at();
     phone = null;
 

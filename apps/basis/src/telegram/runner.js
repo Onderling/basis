@@ -525,8 +525,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // Who is asking: the person, not the chat (a group chat holds several). No admission, no turn.
     let caller = null;
     if (typeof admit === 'function') {
-      let r = null;
-      try {
+      // A host that decided admission before keeping the turn hands its decision here: the door's admission ran once,
+      // there, and a code is never consumed twice.
+      let r = msg?.preAdmission ?? null;
+      if (!r) try {
         r = await admit({
           channel: msg?.channel ?? 'telegram', uid: String(msg?.sender?.bridgeUid || chatId),
           displayName: msg?.sender?.displayName ?? null, text,
@@ -547,7 +549,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       if (r && typeof r === 'object' && r.refused) {
         // A door that tells a stranger once (the bot's inbox): "you need a code" the first time, kept on their row, then
         // silence. A message that carried a code is told why it failed, every time: that is a new question.
-        if (msg?.refuseOnce && threads && r.id && (r.refused === 'needs-code' || r.refused === 'relink')) {
+        // (a host's pre-admission already told them once — in memory, never on a row)
+        if (msg?.refuseOnce && !msg?.preAdmission && threads && r.id && (r.refused === 'needs-code' || r.refused === 'relink')) {
           if (threads.refused(r.id)) return;
           threads.markRefused(r.id);
         }

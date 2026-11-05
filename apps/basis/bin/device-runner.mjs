@@ -67,6 +67,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { createInboundAdmission } from '../src/v2/inboundAdmission.js';
 import { makeCarriedTurnLanding } from '../src/v2/contactTurnFan.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
@@ -498,6 +499,9 @@ if (values.enrol) { process.exit(await enrolOnce()); }
 let contactChannel = null;
 // The bot's inbox door (a function profile only), late-bound: the contact channel is composed below, the door after it.
 let inboxDoor = { bridge: null, feed: () => false };
+// A function profile's inbox decides who gets in BEFORE it keeps a turn (createInboundAdmission): set once the door's
+// admission exists; until then (and on a person's node) turns land as before.
+let inboundAdmit = null;
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 // A household bot's circles (`/kring`): the join, the leave and "am I still in it" need the wire, composed below; the
 // door that answers `/kring` comes after. A removal the membership lane folds reaches the bot's record through `removed`.
@@ -672,11 +676,22 @@ if (relayUrl) {
   // A person's MESSAGE (never a bot's reply: two bots must not answer each other) lands in the inbox like any other,
   // and on a function profile's node it then goes to the assistant.
   const landMessage = (m) => {
-    const landed = landTurn(m);
-    Promise.resolve(landed).then((r) => {
-      if (r?.deduped) return;
-      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId, ...(m.auth ? { auth: m.auth } : {}) });
-    }).catch(() => {});
+    const contactId = agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr;
+    const toDoor = (extra = {}) => inboxDoor.feed({ contactId, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId, ...(m.auth ? { auth: m.auth } : {}), ...extra });
+    if (!inboundAdmit) {
+      Promise.resolve(landTurn(m)).then((r) => { if (!r?.deduped) toDoor(); }).catch(() => {});
+      return;
+    }
+    // Decided first, kept after: a stranger turned away leaves nothing here — told the reason once, then silence.
+    (async () => {
+      let linked = null;
+      if (m.auth) { try { linked = linkedTurn.verify?.({ auth: m.auth, text: m.text, messageId: m.messageId }) ?? null; } catch { linked = null; } }
+      const d = await inboundAdmit({ contactId, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId,
+        ...(linked?.ok === true && typeof linked.root === 'string' ? { linkedRoot: linked.root } : {}) });
+      if (!d.admitted) { if (d.tell) toDoor({ preAdmission: { refused: d.reason } }); return; }
+      const r = await landTurn(m);
+      if (!r?.deduped) toDoor({ preAdmission: d.result });
+    })().catch(() => {});
   };
 
   // The redeem pair (the join's wire), as both shells wire it — here for the pair roster: the box founds or joins
@@ -1035,6 +1050,17 @@ if (tgToken || inboxDoor.bridge) {
   // Everyone in the book is in the gate from the start: the reminder tick and the Sunday overview act AS a person, and
   // after a restart nobody has written yet. A book the gate cannot take is said, not fatal (the door still tiers on the
   // next message).
+  // the inbox's own admission, decided before a turn is kept — a function profile's inbox only (a person's book is theirs)
+  if (botInstall) {
+    inboundAdmit = createInboundAdmission({
+      admit: doorAdmit,
+      isKnown: (key) => agent.isKnownPeer?.(key) ?? false,
+      // someone the door already admitted (a code, a bootstrap id, a linked root) is a household member, never a stranger
+      held: async (contactId, { linkedRoot } = {}) => bootstrapUids.includes(contactId)
+        || Boolean(await botUsers.find?.('web', contactId, linkedRoot ? { linkedRoot } : {})),
+      count: (e) => walkLog(e),   // kind + reason, never who
+    });
+  }
   const inGate = await doorAdmit.atStart().catch((e) => { console.warn(`device-runner: could not put the bot's people in the gate at start: ${e?.message ?? e}`); return null; });
   walkLog({ kind: 'gate-at-start', people: inGate });
   // The household's rows moved to its own circle id on this boot (once, the first boot of the version that gave it one)

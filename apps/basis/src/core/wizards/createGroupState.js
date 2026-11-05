@@ -27,6 +27,7 @@ export { OFFERING_AXES };
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
 import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat } from '../../v2/circleTemplates.js';
+import { CIRCLE_POLICY_ENUMS, CIRCLE_FEATURES } from '../../v2/circlePolicy.js';
 import { INVITE_CEILING_FALLBACK } from '@onderling-app/pinboard/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
@@ -209,6 +210,35 @@ export function storageChoices(state) {
 /** The person's storage choice — sets both names of the one fact and marks the axis as theirs. */
 export function setStoragePolicy(state, value) {
   return markAxisTouched({ ...state, storagePolicy: value, pod: value }, 'pod');
+}
+
+/* ─── Every axis the person's to change (a preset is a starting point) ─────── */
+
+/** The LLM tool's choices — every value of the policy axis, worded by the settings screen's own keys. */
+export const LLM_TOOL_CHOICES = Object.freeze(CIRCLE_POLICY_ENUMS.llmTool.map((id) => Object.freeze({ id, labelKey: `circle.settings.opt.${id}` })));
+/** Whether agents may join — every value of the policy axis. */
+export const AGENTS_CHOICES = Object.freeze(CIRCLE_POLICY_ENUMS.agents.map((id) => Object.freeze({ id, labelKey: `circle.settings.opt.${id}` })));
+/** Every feature a circle can have — one switch each. */
+export const FEATURE_CHOICES = Object.freeze(CIRCLE_FEATURES.map((id) => Object.freeze({ id, labelKey: `circle.settings.feat.${id}` })));
+
+/** The person's LLM-tool choice (a value outside the axis is ignored). Survives a later switch of kind. */
+export function setLlmTool(state, value) {
+  return CIRCLE_POLICY_ENUMS.llmTool.includes(value) ? markAxisTouched({ ...state, llmTool: value }, 'llmTool') : state;
+}
+/** The person's agents choice. */
+export function setAgents(state, value) {
+  return CIRCLE_POLICY_ENUMS.agents.includes(value) ? markAxisTouched({ ...state, agents: value }, 'agents') : state;
+}
+/** Whether policy changes need the admins' agreement. */
+export function setConsensus(state, on) {
+  return markAxisTouched({ ...state, consensusRequired: on === true }, 'consensusRequired');
+}
+/** One feature on or off (chat keeps its own setter: its advice reads it). */
+export function setFeature(state, name, on) {
+  if (!CIRCLE_FEATURES.includes(name)) return state;
+  if (name === 'chat') return setChatEnabled(state, on);
+  const s = state && typeof state === 'object' ? state : {};
+  return markAxisTouched({ ...s, features: { ...(s.features && typeof s.features === 'object' ? s.features : {}), [name]: on === true } }, `features.${name}`);
 }
 
 /* ─── N1 — neighbourhood size + chat advice ─────────────────────────────── */

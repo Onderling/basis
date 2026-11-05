@@ -84,10 +84,11 @@ describe('secure-agent send failover (Phase-2 · Piece-1 — C1 + G4)', () => {
     // failover drove the shared router's onTransportFailure for the peer+relay.
     expect(spy).toHaveBeenCalledWith(PEER, 'relay');
     expect(sa.agent.routing.fallbackTable.isDegraded(PEER, 'relay')).toBe(true);
-    // nkn carried the resend — and did NOT re-do the HI (helloedPeers already set).
+    // nkn carried the resend — after introducing us ON NKN: a hello is per route (the peer on another route has
+    // never seen us introduced there; a hello over the relay says nothing about nkn).
     expect(nkn.sends.length).toBe(1);
     expect(nkn.sends[0].payload).toEqual({ type: 'p2p-chat', body: 'hi' });
-    expect(nkn.hellos.length).toBe(0);
+    expect(nkn.hellos.length).toBe(1);
 
     spy.mockRestore();
     await sa.shutdown();
@@ -144,11 +145,10 @@ describe('secure-agent send failover (Phase-2 · Piece-1 — C1 + G4)', () => {
 
     // Each distinct transport tried exactly once (the tried-set stops the
     // loop when the router has no fresh tier), both degraded, then error.
-    // HI is sent once (attempt 1); the nkn resend skips the re-HI because
-    // helloedPeers was already set — so both being DEGRADED is the proof
-    // both were attempted.
+    // A hello per route: one on the relay (attempt 1), one on nkn (the resend introduces us there first); both
+    // being DEGRADED is the proof both were attempted.
     expect(relay.hellos.length).toBe(1);
-    expect(nkn.hellos.length).toBe(0);
+    expect(nkn.hellos.length).toBe(1);
     expect(sa.agent.routing.fallbackTable.isDegraded(PEER, 'relay')).toBe(true);
     expect(sa.agent.routing.fallbackTable.isDegraded(PEER, 'nkn')).toBe(true);
 

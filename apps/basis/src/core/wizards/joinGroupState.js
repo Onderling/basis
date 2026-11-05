@@ -1053,7 +1053,11 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     // Path A — membershipCode. The join handle becomes the person's handle — unless the caller said it is for this
     // circle's row only (`profileHandle: false`: the pair roster's derived placeholder for a person without one).
     if (state.profileHandle !== false) {
-      const handle = await callSkill('pinboard', 'setMyHandle', { handle: state.handle });
+      // Named by its circle, so the handle lands on the self this circle is bound to. A join AS a persona must never
+      // touch the default self: without the circle the call acts as the general self, renaming it — and the default's
+      // name then reaches every circle the default is in, tying the persona to it there. (No circle = the Mij path,
+      // renaming the general self on purpose.)
+      const handle = await callSkill('pinboard', 'setMyHandle', { handle: state.handle, groupId: inv.groupId });
       if (handle?.reason === 'handle-taken') throw handleTakenError();
       if (handle?.ok === false || handle?.error) {
         throw new Error(handle.error ?? "Couldn't set handle.");

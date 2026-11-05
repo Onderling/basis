@@ -77,6 +77,8 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
       let m = null; try { m = JSON.parse(String(raw)); } catch { return; }
       if (dir === 'in' && m?.type === 'register') relayLog.push(`in#${sock}:register:${String(m.address).slice(0, 6)}${m.primary ? ':primary' : ''}${m.standby ? ':standby' : ''}@${at()}`);
       else if (dir === 'out' && (m?.type === 'registered' || m?.type === 'error')) relayLog.push(`out#${sock}:${m.type}${m.message ? `:${m.message}` : ''}:${String(m.address ?? '').slice(0, 6)}@${at()}`);
+      // what a client SENT the relay too — a frame that came in and never went out is the relay's to explain
+      else if (dir === 'in' && m?.type === 'send') relayLog.push(`in#${sock}:send:${String(m.envelope?._from ?? '').slice(0, 6)}→${String(m.envelope?._to ?? m.to ?? '').slice(0, 6)}:${m.envelope?._p ?? '?'}@${at()}`);
       else if (dir === 'out' && m?.type === 'message') relayLog.push(`out#${sock}:message:${String(m.envelope?._from ?? '').slice(0, 6)}→${String(m.envelope?._to ?? '').slice(0, 6)}:${m.envelope?._p ?? '?'}@${at()}`);
     });
     relay.wss?.on?.('connection', (s) => s.on('close', () => relayLog.push(`close@${at()}`)));
@@ -176,7 +178,7 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     const onBox = await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'nog iets: de tekst is Engels') ?? null, { timeout: 30_000, step: 500 });
     expect(onBox, `the box did not take the feedback with the phone off — ${JSON.stringify({
       ...phoneDown, relayInProcess: relay.external === false,
-      relayLast: relayLog.slice(-60),
+      relayLast: relayLog.slice(-140),
       boxLines: box.out.split('\n').filter((l) => /contact|turn|refused|dropped|fallback|holding|unreachable|outbound HI|recv envelope|registered|standby/.test(l)).slice(-40),
     })}`).toBeTruthy();
 

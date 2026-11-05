@@ -75,7 +75,7 @@ export function createContactDoorBridge({ sendTurn, linkedRootOf = null }) {
      * @param {{contactId: string, fromAddr: string, text: string, admission?: string, displayName?: string, messageId?: string, auth?: object}} msg
      * @returns {boolean} whether it went to the door
      */
-    feed({ contactId, fromAddr, text, admission, displayName = null, messageId, auth = null } = {}) {
+    feed({ contactId, fromAddr, text, admission, displayName = null, messageId, auth = null, preAdmission = null } = {}) {
       if (typeof handler !== 'function' || !contactId || !fromAddr || typeof text !== 'string' || !text.trim()) return false;
       if (messageId) {
         if (seen.has(messageId)) return false;
@@ -91,6 +91,8 @@ export function createContactDoorBridge({ sendTurn, linkedRootOf = null }) {
         ...(typeof admission === 'string' && admission ? { admission } : {}),
         ...(linked?.ok === true && typeof linked.root === 'string' ? { linkedRoot: linked.root } : {}),
         refuseOnce: true,
+        // the host decided who gets in BEFORE it kept anything (a function profile's inbox): the door says that decision
+        ...(preAdmission ? { preAdmission } : {}),
         slash: false,   // a contact turn is words: this door has no commands to point at
         buttons: false, // …and no buttons: a confirm is asked and answered in words
         sender: { bridgeUid: contactId, displayName },

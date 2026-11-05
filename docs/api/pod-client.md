@@ -690,7 +690,7 @@ exactly as `createControlAgent` injects it:
 **Kind:** function · **Import:** `createControlAgent` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
 
 ```js
-createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null })
+createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {} })
 ```
 
 Create the household control-agent: applies pod ACL grant/revoke AND group-key rotation together
@@ -708,6 +708,7 @@ remains (`force` bypasses); pure orchestration — pod I/O is injected via `shar
 - `[a.roster]` `Array<{webId,publicKey,role}>` — initial member roster
 - `[a.keyEventLog]` `{ append: (event:object) => any }` — optional log sink — when present, every key establishment/grant/rotation ALSO emits the versioned key AS a log key-event (self-distributing, no-pod). The pod key resource is still written (defence-in-depth); the LOG is the source. Absent → pod-only, unchanged.
 - `[a.groupId]` `string` — circle id stamped onto emitted key-events.
+- `[a.podAgents]` `Record<string,string>` — roster ref → pod WebID, as the host saved it (local to this device, never on the roster). A member re-added without one (a reload's roster seed) gets the saved one back, so a later removal revokes the identity the grant actually named.
 
 ## `src/sealing/envelope.js`
 
@@ -1220,7 +1221,7 @@ current version (revoked / never granted).
 **Kind:** function · **Import:** `podStorageBackend` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
 
 ```js
-podStorageBackend(podClient, { isNotFound } = {})
+podStorageBackend(podClient, { isNotFound, base = null } = {})
 ```
 
 Wrap a PodClient-shaped client (read/write/list) as a blind `StorageBackend`. The returned object is a
@@ -1232,6 +1233,7 @@ the pod while treating every body as opaque ciphertext.
 - `podClient` `{read:Function, write:Function, list:Function}` — a PLAIN pod client (NOT a SealedPodClient).
 - `[opts]` `object`
 - `[opts.isNotFound]` `(err:any)=>boolean` — classify a read error as "absent" → get() returns null. Defaults to `err?.code === 'NOT_FOUND'` (the PodClient / mapSourceCode convention).
+- `[opts.base]` `string` — the container relative refs live under (a circle's root, which may be on another person's pod). Absent → refs resolve against the client's own pod root, as before. `list` hands refs back relative to it, so a ref read from a listing is the same ref a writer fanned.
 
 **Returns:** `StorageBackend`
 

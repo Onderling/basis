@@ -154,7 +154,10 @@ export default function JoinGroupWizardModal({
                     the creator accepting it on the joiner's behalf is the pattern the disclosure model
                     exists to prevent. Absent on older / non-pod invites. */}
                 {state.invite?.podBacked === true ? (
-                  <Text style={styles.loading}>{t('circle.nearbyScreen.point_pod_host_sees')}</Text>
+                  <>
+                    <Text style={styles.loading}>{t('circle.nearbyScreen.point_pod_host_sees')}</Text>
+                    <Text style={styles.loading}>{t('circle.nearbyScreen.join_pod_webid_to_admin')}</Text>
+                  </>
                 ) : null}
                 {/* 5.5b — structured v2 doc when the invite carries it, with the
                     question/answer shape the create-wizard authored.  Older

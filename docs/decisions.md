@@ -1289,3 +1289,86 @@ re-keys (only the remaining full devices get the new epoch).
 **This is a convention, not an enforcement** (the enforceability test): a STOLEN full device that ignores rule (3) can
 fork the shared key on purpose. By the fork rule (2026-09-25) the person then loses standing from that depth and is told
 — the same as a stolen per-device key before this — and the re-key plus an admin's re-admit is the way back.
+## 2026-10-22 — The household bot reads several items in one sentence with the MODEL, not a deterministic rule (Frits)
+
+A member wrote "balkondeur isoleren, gangdeur isoleren" and got ONE chore; the proposal was a deterministic split on
+comma / "en" / newline. Frits: no — people also say "add doing dishes to the tasks list, except for the plates", and a
+rule cannot read that. The reading of a sentence stays with the bounded model reader (multi-item is a fixture case of
+the language pipeline). What the bot owes instead: the reply lists exactly what was made, every time; a correction
+("those are two chores") is understood as "split this", never as a remove; when the model is unavailable the bot says it
+cannot read several items right now rather than guessing. Ledger: L413. Already decided by Frits on 2026-10-18 (commit b62b3d22b removed the comma split: "what is one item is the model's call"); this entry records it in words. Reply shape since 64b354b2a: "2 toegevoegd aan Klusjes: … en …".
+
+## 2026-10-23 — One agent per person: two in-process agents with one gate truth, the host key as the one token issuer, every op declares its visibility (Frits)
+
+Basis ran five agents in one process (basis, household bot, pinboard, …), each with its own trust and token story;
+`docs/architecture.md` never described that (one agent per person, one `PolicyEngine`, one store per circle; PR #832
+wrote the invariant down). Frits decided on Fable's recommendation (`plans/notes/NOTE-one-agent-target-2026-10-23.md`
+§3, §6): (a) TWO agents remain for now — the peer façade and the host — but with ONE gate truth: one trust registry
+(`cc-host-trust:`), one revocation resolver over agents, task grants, bot tokens and the grants lane, on both engines;
+reach structural first, gated the same everywhere. (b) The HOST key is the one issuer of every capability token
+(role, mandate, bot); tokens minted by any other in-process key stop working — an alpha reset, no migration.
+(c) A manifest op without a declared `visibility` fails `manifestConformance`: the surface the security self-review
+audits must be complete by construction. Frits: "great idea"; asks what the fold changes for the person using the app
+(answer owed with the fold: nothing to decide for the user; at most a one-time re-grant where a token died).
+Ledger: L407 (answered), L433 (the fold, Opus).
+
+## 2026-10-23 — Settings: a gear "Instellingen" on Mij, four groups, two non-settings move out (Frits)
+
+Mij → "Mijn gegevens →" held one page of 21–22 sections (settings, custody, diagnostics mixed; the order differed per
+shell). Frits decided on Fable's proposal (`plans/notes/NOTE-settings-regroup-L436.md`): (a) the door is a gear named
+"Instellingen" in Mij's header; (b) four screens behind it — Weergave · Verbinding · Apparaten & sleutels · Mijn gegevens
+(the old name survives for the data group); (c) the per-circle parameter screen stays per circle, reached from the
+circle's ⋯ menu, with a reference row under the gear ("Per kring") that lists the circles and opens each one's own
+screen — a door, never a copy; (d) "Met mij gedeeld" is an inbox and becomes a chip on Mij; "Geblokkeerd" moves to
+Contacten. Both shells paint the groups from one manifest declaration (no shell lists a section by hand); rows are
+styled by kind (door · switch · fact). Custody-guarded sections stay guarded. Ledger: L436.
+
+## 2026-10-23 — The help bot is a contact, not a circle tile (Frits)
+
+The help circle "Uitleg" (`cc-help`, `helpCircle.js`) is a real 1:1 circle whose only other member is the
+Onderling-bot; it holds the onboarding conversation and sat as a tile among the person's circles. Frits: a contact,
+"as it is supposed to be improved by an LLM as well, which fits the bot route". So: the help bot shows under
+Contacten like every other bot (one shape for every Onderling bot); the onboarding thread stays that contact's
+conversation (the create-wizard step still opens from it); when the feedback bot lands (L419) the help persona becomes
+a real remote one with the local deck as the offline fallback. A local contact with no card/address is one synthetic
+row (bot-only, never fanned); `enrolForgets` keeps its cc-help special case. Ledger: L435.
+
+## 2026-10-24 — Sitting: relays refer and never host feeds; feedback is its own contact, help stays internal; the realm never holds a credential (Frits)
+
+Three calls from the Saturday sitting. (1) **Relays refer, never host.** A relay forwards a feed ask to the node that
+announced it serves feeds (the companion, the person's always-on device) and never holds or serves a feed itself; a
+desktop relay from the installer is the same relay role; when relay and companion run in one process, the companion
+flag serves the feed. (2) **Feedback ≠ help.** Help is internal to Basis (the help bot, the
+local deck, L435 as a contact). Feedback is a SEPARATE contact, "Onderling", the maker's agent persona on an always-on
+device (L419), seeded in every install in place of the accidental household-bot card (L397); a feedback door is
+reachable from any place in the app (the gear, the + sheet), and a circle or bot may offer its own feedback command as
+long as it routes to the same contact and is not confusing; a feedback message is an ordinary sealed contact message,
+nothing is collected automatically, a log excerpt is a user action through the one redaction pass. The HQ channel
+(L447) rides the same contact; opting out = deleting the contact, the person's own risk. (3) **The realm never holds
+a credential.** Frits: "the realm requests something and the surrounding functions, user-managed trusted pieces of
+code, do the sensitive work and only hand the result to the realm — could even be a stream." So vault access is a
+CONNECTOR: a first-party, pinned op on the node that holds the credential handle, performs the fetch and streams the
+result; the realm asks through a scoped capability and receives data, never the secret (the enforceability test:
+realm code is reconfigurable, connectors are not). Vault adapters sit behind the connector (OS keychain first, KeePass
+file second, Bitwarden CLI third), layered so no single file holds everything. Ledger: L373, L377, L397, L419, L447.
+
+## 2026-10-25 — The roster trail becomes a fold over membership statements (Frits)
+
+Found in fold step 5c-2a: the `membership-redemption` rows are the roster TRAIL (`packages/circles/src/rosterTrail.js`),
+a mutable row patched in place by the address-announce receive path, carried by three carriers of its own (join
+statements, announce envelopes, the roster seed between own devices) and refused by the task lane by hand. Frits, after
+a sitting: the end state is (b) — the row is a PROJECTION folded from signed membership-lane statements, nobody patches
+it. Three rulings. (1) **Field ownership at the fold.** A new kind `membership.address` (self-subject; address, proof,
+primary flag): an address enters only when its proof verifies (deny-by-default); the primary changes only when a
+statement says so or the row has no proven primary yet. The ceremony commitment rides `membership.personKey`,
+first-write-wins. Released properties ride `membership.props`; withdrawal is a props statement that omits the field.
+Retirement stays `membership.addressRevoke`, authority the committed root. No other path may touch these fields; the
+fold is a pure function, a wrong statement is refused, never half-applied. (2) **Where statements live.** The
+membership lane of the device log, beside the nine kinds it carries today; no new store. The folded row lands in the
+circle's OWN store as a read projection (the same place 5c-2a's ruling (a) puts it now), written by nothing but the
+fold; the 14 readers read it there. (3) **The roster seed** retires as a row copy: a new own device pulls the membership
+lane from a sibling over the own-devices lane, verifies and folds. What goes: the announce envelope fan-out and the
+in-place patch (and its per-row chain), the task lane's hand-written refusal of trail rows, the seed's row copy.
+Acceptance: the enrol-race story (one enrol in ten, 2026-09-13) and the pairing walk red-first, then a phone + box
+walk. Order: 5c-2a as (a) now, the fold through 5d, then this as the first post-fold arc; `docs/architecture.md`'s
+data-plane section is rewritten from the code AFTER it lands, not before. Ledger: L467.

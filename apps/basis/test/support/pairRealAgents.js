@@ -140,7 +140,7 @@ const LIVE_NODES = new Set();
  * makes — so an address-revoke fanned to it lands; two walks had wired that by hand. The full suite
  * stayed green: the equilibrium tests keep the minimal composition, which has no rail.)
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true, podWebId = null } = {}) {
   const routerRef = { fn: null };
   // The device log the lane rides. Handed to the factory below exactly as both shells hand theirs.
   const deviceLog = itemsLane ? new EventLog({ initial: [], muted: [] }) : null;
@@ -484,6 +484,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     circleSelfFor: (gid) => agent.circleSelf?.(gid) ?? null,   // as the three shells: a persona's redeem leaves as it
     profileKind:   () => agent.profileKind?.() ?? 'person',     // as the three shells: a bot's node says so
+    podWebId:      () => podWebId,   // as web and mobile hand their pod session's WebID (the box: none)
     // The redeem is a full round-trip (request → admin → response). Over a mesh
     // transport (real NKN) each leg pays a several-second cold-start, so the
     // in-process default (8s) is too tight; the NKN gate boots with a larger
@@ -694,6 +695,19 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
       circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
       alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],   // the person address, as the shells register it
     });
+    // …and on EVERY other relay socket the node holds, as the shells register (`registerCircleAddressesOnRelays` over
+    // `agent.relays.list()`): a circle that rides two connection points has its address bound on both. Binding only the
+    // first left the second unable to send as the circle address — hidden while the transport swapped in the main
+    // address, which it no longer does.
+    for (const r of (n.agent?.relays?.list?.() ?? [])) {
+      if (!r?.port || r.port === transport || !r.port.supportsAliases || !rest.length) continue;
+      await registerCircleAddresses({
+        transport: r.port, relayUrl: r.url, circleIds: rest,
+        circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
+        circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
+        alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],
+      });
+    }
   }
 }
 
@@ -719,12 +733,12 @@ export async function createCircle(admin, { groupId = 'peer-circle', name = 'Pee
  * in-process transport (the real join wizard op path → group-redeem peer bridge → membership trail). Callable
  * repeatedly against one circle to admit several members.
  */
-export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle', handle = 'peerbee', forFunction = false } = {}) {
+export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle', handle = 'peerbee', forFunction = false, podUrl = null } = {}) {
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
   const joinerCallSkill = (app, op, args) => joiner.agent.callSkill(app, op, args);
 
   // the circle's own self as the admin to redeem with, as the shells name it
-  const invite = await buildCircleInviteUri({ callSkill: adminCallSkill, circleId: groupId, adminPeerAddr: admin.agent.circleSelf?.(groupId)?.webid ?? admin.pubKey, ...(forFunction ? { forFunction: true } : {}) });
+  const invite = await buildCircleInviteUri({ callSkill: adminCallSkill, circleId: groupId, adminPeerAddr: admin.agent.circleSelf?.(groupId)?.webid ?? admin.pubKey, ...(forFunction ? { forFunction: true } : {}), ...(podUrl ? { podBacked: true, podUrl } : {}) });
   if (invite?.error) throw new Error(`buildCircleInviteUri failed: ${invite.error}`);
 
   const joined = await joinCircleFromInvite({
@@ -928,6 +942,10 @@ export async function teardown(...nodes) {
  * on the sender's own log (`chatRail.appendMessage`), then fan the STATEMENT through the real pinboard core
  * (`broadcastCircleChatStatement` → transport / pod routing per the circle's policy). The drop-in
  * replacement for the deleted plain-envelope `broadcastCircleMessage` in every journey test.
+ *
+ * NOT the whole production send: it skips the carry to the sender's OWN other devices (that lives in the agent's
+ * `chatEmit`). A test whose receiver is one of the sender's own devices — an enrolled box, a second phone — sends with
+ * `node.agent.chatEmit(circleId, { msgId, ts, text })`, or the line never reaches it (2026-11-05).
  */
 export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now(), card } = {}) {
   const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, card });

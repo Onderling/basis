@@ -444,12 +444,12 @@ async function _findLatestActiveCode(store, groupId) {
 // Household sealed-pod membership hooks. Best-effort + gated: no-op without a control-agent (instances
 // that don't run a sealed pod) or without the joiner's sealing public key. A failure here never breaks
 // the membership audit — key management is recoverable, the redemption record is the source of truth.
-async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics }) {
+async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null }) {
   if (!controlAgent || !sealingPublicKey || !webId) return;
   // Forward groupId so a per-circle control-agent ROUTER can route the grant to the right
   // circle's producer (basis runs one pinboard agent + N per-circle control agents). A
   // single (non-routing) control agent simply ignores the extra field.
-  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId }); }
+  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}) }); }
   catch { metrics?.record?.('control-agent-grant-failed'); }
 }
 async function revokePodAccess(controlAgent, { webId, force = false, policy = 'graceful', groupId, metrics }) {
@@ -1106,9 +1106,16 @@ async function respondToItemCore(scope, a, ctx) {
   const circleOfPost = post.source?.groupId
     ?? (Array.isArray(post.source?.targets) ? post.source.targets.find((t) => t?.kind === 'group' && typeof t.groupId === 'string')?.groupId : null)
     ?? null;
+  // WHO answers: an op that names an ITEM, not a circle, arrives as the device's general self — but the answer belongs to
+  // the self this device is in the POST's circle (a persona in its own circle). That self reads the roster, claims, and
+  // the 1:1 answer leaves AS it: as the general self it would not find the poster on a persona's roster, and its key in a
+  // persona's circle would tie the two together. A foreign caller stays who they are.
+  const asSelf = (circleOfPost && ctx.from && ctx.from === scope.localActor && typeof scope.localActorIn === 'function')
+    ? scope.localActorIn(circleOfPost) : ctx.from;
+  const sendAs = asSelf && asSelf !== ctx.from ? asSelf : null;
   if (!toPubKey && toWebid && circleOfPost) {
     try {
-      const roster = (await listGroupMembersCore(scope, { groupId: circleOfPost }, { from: ctx.from }))?.members ?? [];
+      const roster = (await listGroupMembersCore(scope, { groupId: circleOfPost }, { from: asSelf }))?.members ?? [];
       const row = roster.find((m) => m && m.webid === toWebid);
       toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
     } catch { /* not on the roster: no address, and no guess */ }
@@ -1122,7 +1129,7 @@ async function respondToItemCore(scope, a, ctx) {
 
   // Soft-claim locally so it shows in the requester's listMyRequests
   // when the broadcast loops back (substrate mirror writes their copy).
-  try { await store.claim(a.itemId, { actor: ctx.from }); } catch { /* race-OK */ }
+  try { await store.claim(a.itemId, { actor: asSelf }); } catch { /* race-OK */ }
 
   // The answer is threaded under the POSTER's request id (a mirror copy names it as `source.requestId`) — the poster's
   // device holds that id, files the DM under its own request, and records who answered (`recordResponse`).
@@ -1136,6 +1143,7 @@ async function respondToItemCore(scope, a, ctx) {
     threadId,
     body:     a.body,
     subtype:  'chat-message',
+    ...(sendAs ? { sendAs } : {}),
   });
   if (!r.ok) return { error: r.reason };
 

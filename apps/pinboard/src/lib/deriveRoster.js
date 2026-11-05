@@ -435,7 +435,19 @@ export function deriveRoster({
     if (pk) merged.personKey = { version: pk.version, pubKey: pk.pubKey };
     out.push(merged);
   }
-  for (const r of out) { if (!r) continue; if (kindProven.has(r.webid)) r.provenKind = 'function'; else delete r.provenKind; }
+  for (const r of out) {
+    if (!r) continue;
+    // The 'bot' label is the admitting admin's declaration (only persons vote rests on it): a proven function profile
+    // reads as one from its join — not once its own word (member-props) reaches this device — and its own word cannot
+    // un-bot it; a member's self-said 'function', unproven, labels nobody.
+    if (kindProven.has(r.webid)) {
+      r.provenKind = 'function';
+      r.kind = 'function';
+    } else {
+      delete r.provenKind;
+      if (r.kind === 'function') delete r.kind;
+    }
+  }
   return out;
 }
 

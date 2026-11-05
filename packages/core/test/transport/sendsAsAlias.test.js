@@ -10,7 +10,7 @@
  * if this transport actually holds that address. `_to` on an inbound envelope is attacker-influenced
  * and is one of the values passed here, so an unheld claim must never make us speak as it.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Transport } from '../../src/transport/Transport.js';
 import { P } from '../../src/Envelope.js';
 
@@ -50,9 +50,17 @@ describe('an envelope can speak from an alias', () => {
     expect(tx.sent.at(-1).envelope._from).toBe('primary-address');
   });
 
-  it('REFUSES a claim to an address it does not hold, and falls back to the primary', async () => {
-    await tx.sendOneWay('peer', {}, { from: 'an-address-this-device-never-bound' });
-    expect(tx.sent.at(-1).envelope._from).toBe('primary-address');
+  it('REFUSES a claim to an address it does not hold — after waiting for it — and never sends as the primary', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const before = tx.sent.length;
+      const sending = tx.sendOneWay('peer', {}, { from: 'an-address-this-device-never-bound' });
+      const refused = expect(sending).rejects.toMatchObject({ code: 'ADDRESS_NOT_HELD' });
+      await vi.advanceTimersByTimeAsync(31_000);
+      await refused;
+      expect(tx.sent.length, 'nothing went out as the primary').toBe(before);
+    } finally { vi.useRealTimers(); warn.mockRestore(); }
   });
 
   it('the auto-ACK answers AS the address that was dialled', async () => {

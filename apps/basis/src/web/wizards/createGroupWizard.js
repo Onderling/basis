@@ -22,7 +22,8 @@
 // mobile's RN wizard can reuse them.
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES,
-  STORAGE_POLICIES, KEY_ROTATION_MODES,
+  STORAGE_POLICIES, storageChoices, KEY_ROTATION_MODES,
+  LLM_TOOL_CHOICES, AGENTS_CHOICES, FEATURE_CHOICES, setLlmTool, setAgents, setConsensus, setFeature,
   REVIEW_STEP, nextCreateStep, prevCreateStep, createStepDots, setAdvanced, withCreateDefaults, purposeOrDefault,
   REVEAL_POLICIES, setRevealPolicy, revealPolicyLabelKey,
   initialState, slugify, isValidSlug, labelOf,
@@ -80,9 +81,11 @@ async function persistCreatedCirclePolicy(groupId, state) {
  */
 
 export function renderCreateGroupWizard(opts) {
-  const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr, shareFounderRelease } = opts;
+  const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr, shareFounderRelease, podConnected } = opts;
 
   const state = initialState();
+  // what the host knows: no connected pod → the radio offers only a normal circle, and the create makes one
+  if (typeof podConnected === 'boolean') state.podConnected = podConnected;
 
   // The circle's identity, derived ONCE at mount from the founder — never from the name, and never
   // from what a person types. See the note where the id field used to be. Derived here rather than in
@@ -451,7 +454,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
   const needsUri = () => state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid';
   const uriOk    = () => !needsUri() || /^https?:\/\//.test(String(state.groupPodUri ?? '').trim());
 
-  appendRadioField(wrap, doc, t('circle.wizard.create.storage'), state.storagePolicy, STORAGE_POLICIES,
+  appendRadioField(wrap, doc, t('circle.wizard.create.storage'), state.storagePolicy, storageChoices(state),
     (v) => { Object.assign(state, setStoragePolicy(state, v)); rerender(); }, { consequenceGroup: 'storagePolicy' });
 
   // Conditional pod URI field for centralised/hybrid.
@@ -468,6 +471,43 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     podSees.textContent = t('circle.nearbyScreen.point_pod_host_sees');
     wrap.appendChild(podSees);
   }
+
+  // A preset is a starting point: every axis the circle's policy has is the person's to change here.
+  appendRadioField(wrap, doc, t('circle.settings.llmTool'), state.llmTool,
+    LLM_TOOL_CHOICES.map((o) => ({ id: o.id, label: t(o.labelKey) })),
+    (v) => { Object.assign(state, setLlmTool(state, v)); rerender(); });
+  appendRadioField(wrap, doc, t('circle.settings.agents'), state.agents,
+    AGENTS_CHOICES.map((o) => ({ id: o.id, label: t(o.labelKey) })),
+    (v) => { Object.assign(state, setAgents(state, v)); rerender(); });
+  const consRow = doc.createElement('label');
+  consRow.className = 'cc-wizard-toggle';
+  const consCb = doc.createElement('input');
+  consCb.type = 'checkbox';   // sets: form — whether the new circle's policy changes need the admins' agreement
+  consCb.checked = state.consensusRequired === true;
+  consCb.addEventListener('change', () => { Object.assign(state, setConsensus(state, consCb.checked)); rerender(); });
+  consRow.appendChild(consCb);
+  consRow.appendChild(doc.createTextNode(' ' + t('circle.settings.consensus_label')));
+  wrap.appendChild(consRow);
+  const feats = doc.createElement('fieldset');
+  feats.className = 'cc-wizard-radio-group';
+  const featsLegend = doc.createElement('legend');
+  featsLegend.className = 'cc-wizard-field-label';
+  featsLegend.textContent = t('circle.settings.features');
+  feats.appendChild(featsLegend);
+  // chat has its own switch (with its advice) on a neighbourhood's first step; one switch per fact
+  for (const f of FEATURE_CHOICES.filter((o) => !(o.id === 'chat' && state.kind === 'neighbourhood'))) {
+    const row = doc.createElement('label');
+    row.className = 'cc-wizard-toggle';
+    row.dataset.feature = f.id;
+    const cb = doc.createElement('input');
+    cb.type = 'checkbox';   // sets: form — one feature of the new circle
+    cb.checked = state.features?.[f.id] === true;
+    cb.addEventListener('change', () => { Object.assign(state, setFeature(state, f.id, cb.checked)); rerender(); });
+    row.appendChild(cb);
+    row.appendChild(doc.createTextNode(' ' + t(f.labelKey)));
+    feats.appendChild(row);
+  }
+  wrap.appendChild(feats);
 
   appendRadioField(wrap, doc, t('circle.wizard.create.rotation_mode'), state.keyRotationMode, KEY_ROTATION_MODES,
     (v) => { state.keyRotationMode = v; rerender(); });
@@ -520,6 +560,12 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
       appendReview(dl, doc, t('circle.wizard.create.review_offerings'), offeringsSummary, { pre: true });
     }
     appendReview(dl, doc, t('circle.wizard.create.review_storage'),        labelOf(STORAGE_POLICIES, state.storagePolicy));
+    // every axis the person could change, read back before the create
+    const choice = (list, id) => { const o = list.find((x) => x.id === id); return o ? t(o.labelKey) : '—'; };
+    appendReview(dl, doc, t('circle.settings.llmTool'),        choice(LLM_TOOL_CHOICES, state.llmTool));
+    appendReview(dl, doc, t('circle.settings.agents'),         choice(AGENTS_CHOICES, state.agents));
+    appendReview(dl, doc, t('circle.settings.whoDecides'),     t(`circle.settings.whoDecides_opt.${state.consensusRequired === true ? 'admin-quorum' : 'any-admin'}`));
+    appendReview(dl, doc, t('circle.settings.features'),       FEATURE_CHOICES.filter((f) => state.features?.[f.id] === true).map((f) => t(f.labelKey)).join(', ') || '—');
     if (state.groupPodUri) appendReview(dl, doc, t('circle.wizard.create.review_pod'), state.groupPodUri);
     appendReview(dl, doc, t('circle.wizard.create.review_rotation'),   labelOf(KEY_ROTATION_MODES, state.keyRotationMode));
     appendReview(dl, doc, t('circle.wizard.create.review_rotation_days'),  String(state.rotationDays));

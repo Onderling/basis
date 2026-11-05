@@ -38,7 +38,10 @@
  *                            enrolling alone never makes a box primary. Claimed once per start, carried to the siblings.
  *
  * Flags: --data-dir · --lang · --walk-log · --walk-log-turns off|redacted|full (default off) · --show-offer (print an add-a-device offer and exit) ·
- *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual)
+ *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual) ·
+ *        --persona <name|id> (with --enrol, repeatable: the person's personas this box holds) · --no-general
+ *        Prefer the pick --enrol offers on a terminal over --persona: a persona's name typed on the command line stays in
+ *        the shell's history and shows in the host's process list, and a name can say more than the person meant to.
  *
  * The recovery phrase is NEVER read from the environment or a file here. A device is enrolled by a
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
@@ -64,6 +67,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { createInboundAdmission } from '../src/v2/inboundAdmission.js';
 import { makeCarriedTurnLanding } from '../src/v2/contactTurnFan.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
@@ -73,7 +77,7 @@ import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
 import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { joinCircleFromInvite } from '../src/v2/circleInvite.js';
-import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
+import { leaveCircleLocally, stillInCircle } from '../src/v2/circleMembershipHygiene.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
 import { createBoxAlert } from '../src/v2/boxAlert.js';
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
@@ -126,7 +130,7 @@ import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { boxStores } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPersonas, pickByNames, enrolPickArgs, pickPrimary } from '../src/v2/enrollOffer.js';
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
@@ -166,6 +170,10 @@ const { values } = parseArgs({ options: {
   'walk-log-turns': { type: 'string' },
   'show-offer': { type: 'boolean', default: false },
   enrol:        { type: 'boolean', default: false },
+  // --enrol only: which of the person's personas this box holds (by name or id, repeatable), and whether the general
+  // persona comes too — the shells' picker, on a command line. Without them a terminal asks; a pipe takes the default.
+  persona:      { type: 'string', multiple: true },
+  'no-general': { type: 'boolean', default: false },
 } });
 
 const dataDir = path.resolve(values['data-dir']);
@@ -441,7 +449,28 @@ async function enrolOnce() {
     const stashed = await stashEnrollOffer(offerStash, offerLine);
     if (!stashed.ok) { console.error(`device-runner: that is not an add-a-device offer (${stashed.reason}).`); return 2; }
     const mnemonic = await ask('Your recovery phrase (24 words, not shown): ', { hidden: true });
-    const r = await callSkill('household', 'enrollDevice', { mnemonic, label: 'box' });
+    // WHICH SELVES this box holds — the offer names the person's personas, sealed to the phrase just typed (the shells'
+    // picker): --persona / --no-general, else a pick on a terminal, else (a pipe) the general persona only, as before.
+    const listed = openOfferPersonas(offerLine, mnemonic);
+    let names = values.persona ?? [];
+    if (!names.length && !values['no-general'] && tty && listed.length) {
+      console.log('Which of your selves does this box hold?');
+      console.log('  0) you (the general persona)');
+      listed.forEach((p, i) => console.log(`  ${i + 1}) ${p.name ?? p.id}`));
+      const picked = (await ask('Numbers, comma-separated [0]: ')).split(/[\s,]+/).filter(Boolean);
+      const nums = picked.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= listed.length);
+      names = nums.filter((n) => n > 0).map((n) => listed[n - 1].id);
+      if (nums.length && !nums.includes(0)) values['no-general'] = true;
+    }
+    const pick = pickByNames(listed, names, { withDefault: !values['no-general'] });
+    if (pick.unknown.length) {
+      console.error(`device-runner: not enrolled — this offer names no persona called ${pick.unknown.map((n) => `"${n}"`).join(', ')}`
+        + (listed.length ? ` (it names: ${listed.map((p) => p.name ?? p.id).join(', ')}).` : ' (it names none).'));
+      return 2;
+    }
+    if (pick.refused === 'last-self') { console.error('device-runner: not enrolled — a box holds at least one self: name a --persona, or keep the general persona.'); return 2; }
+    const r = await callSkill('household', 'enrollDevice', { mnemonic, label: 'box', ...enrolPickArgs(pick.state) });
+    if (r?.ok) console.log(`device-runner: this box holds ${pick.state.withDefault ? 'you' : ''}${pick.state.withDefault && pick.state.personas.length ? ' and ' : ''}${pick.state.personas.map((id) => listed.find((p) => p.id === id)?.name ?? id).join(', ')} (it speaks as ${pickPrimary(pick.state) === 'default' ? 'you' : listed.find((p) => p.id === pickPrimary(pick.state))?.name ?? pickPrimary(pick.state)}).`);
     if (!r?.ok) {
       await offerStash.removeItem('onderling.enrollOffer').catch(() => {});
       console.error(`device-runner: not enrolled — ${r?.outcome === 'invalid-phrase' ? 'that is not a valid recovery phrase' : (r?.error ?? 'the ceremony failed')}.`);
@@ -470,6 +499,9 @@ if (values.enrol) { process.exit(await enrolOnce()); }
 let contactChannel = null;
 // The bot's inbox door (a function profile only), late-bound: the contact channel is composed below, the door after it.
 let inboxDoor = { bridge: null, feed: () => false };
+// A function profile's inbox decides who gets in BEFORE it keeps a turn (createInboundAdmission): set once the door's
+// admission exists; until then (and on a person's node) turns land as before.
+let inboundAdmit = null;
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 // A household bot's circles (`/kring`): the join, the leave and "am I still in it" need the wire, composed below; the
 // door that answers `/kring` comes after. A removal the membership lane folds reaches the bot's record through `removed`.
@@ -644,11 +676,22 @@ if (relayUrl) {
   // A person's MESSAGE (never a bot's reply: two bots must not answer each other) lands in the inbox like any other,
   // and on a function profile's node it then goes to the assistant.
   const landMessage = (m) => {
-    const landed = landTurn(m);
-    Promise.resolve(landed).then((r) => {
-      if (r?.deduped) return;
-      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId, ...(m.auth ? { auth: m.auth } : {}) });
-    }).catch(() => {});
+    const contactId = agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr;
+    const toDoor = (extra = {}) => inboxDoor.feed({ contactId, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId, ...(m.auth ? { auth: m.auth } : {}), ...extra });
+    if (!inboundAdmit) {
+      Promise.resolve(landTurn(m)).then((r) => { if (!r?.deduped) toDoor(); }).catch(() => {});
+      return;
+    }
+    // Decided first, kept after: a stranger turned away leaves nothing here — told the reason once, then silence.
+    (async () => {
+      let linked = null;
+      if (m.auth) { try { linked = linkedTurn.verify?.({ auth: m.auth, text: m.text, messageId: m.messageId }) ?? null; } catch { linked = null; } }
+      const d = await inboundAdmit({ contactId, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId,
+        ...(linked?.ok === true && typeof linked.root === 'string' ? { linkedRoot: linked.root } : {}) });
+      if (!d.admitted) { if (d.tell) toDoor({ preAdmission: { refused: d.reason } }); return; }
+      const r = await landTurn(m);
+      if (!r?.deduped) toDoor({ preAdmission: d.result });
+    })().catch(() => {});
   };
 
   // The redeem pair (the join's wire), as both shells wire it — here for the pair roster: the box founds or joins
@@ -664,6 +707,8 @@ if (relayUrl) {
     // this device's per-circle address on the redeem path, proven with its own key (source circle == the circle joined)
     circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+    // the box holds no pod session, so a pod-backed circle's redeem names no pod WebID: it joins without a pod grant
+    podWebId: () => null,
   });
   // After a join: presence in the new circle (the per-circle address on the relay, the announce) and the lanes'
   // catch-up — `registerCirclePresence` is defined below and runs at connect; a join later re-runs it for the one circle.
@@ -707,10 +752,10 @@ if (relayUrl) {
     const me = agent.circleAddressFor?.(circleId) ?? null;
     const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
     const members = Array.isArray(roster?.members) ? roster.members : null;
-    if (!me) return say('no-own-address', true);
-    if (!members?.length) return say(roster ? 'empty-roster' : 'roster-unread', true);
-    const listed = members.some((m) => m?.circleAddress === me || (m?.circleAddresses ?? []).includes(me));
-    return say(listed ? 'still-listed' : 'not-listed', listed);
+    // the fold's verdict, shared: my ROW by my circle self — an evict removes it; my address not on it yet is not a removal
+    const v = stillInCircle({ members, me, selfRef: agent.circleSelf?.(circleId)?.webid ?? agent.identity?.chat?.pubKey ?? null });
+    if (v.reason === 'not-yet-addressed') announceCircleAddresses({ agent, circleIds: [circleId] }).catch(() => { /* the next connect announces */ });
+    return say(v.reason, v.in);
   };
 
   const router = makePeerRouter({
@@ -1005,6 +1050,17 @@ if (tgToken || inboxDoor.bridge) {
   // Everyone in the book is in the gate from the start: the reminder tick and the Sunday overview act AS a person, and
   // after a restart nobody has written yet. A book the gate cannot take is said, not fatal (the door still tiers on the
   // next message).
+  // the inbox's own admission, decided before a turn is kept — a function profile's inbox only (a person's book is theirs)
+  if (botInstall) {
+    inboundAdmit = createInboundAdmission({
+      admit: doorAdmit,
+      isKnown: (key) => agent.isKnownPeer?.(key) ?? false,
+      // someone the door already admitted (a code, a bootstrap id, a linked root) is a household member, never a stranger
+      held: async (contactId, { linkedRoot } = {}) => bootstrapUids.includes(contactId)
+        || Boolean(await botUsers.find?.('web', contactId, linkedRoot ? { linkedRoot } : {})),
+      count: (e) => walkLog(e),   // kind + reason, never who
+    });
+  }
   const inGate = await doorAdmit.atStart().catch((e) => { console.warn(`device-runner: could not put the bot's people in the gate at start: ${e?.message ?? e}`); return null; });
   walkLog({ kind: 'gate-at-start', people: inGate });
   // The household's rows moved to its own circle id on this boot (once, the first boot of the version that gave it one)
@@ -1264,15 +1320,24 @@ if (tgToken || inboxDoor.bridge) {
     handle: async () => botCircleHandle(tgBridge?.botUsername ?? null, (await botUsers.list()).find((u) => u.role === 'admin')?.displayName ?? null),
   }) : null;
   botCirclesRef.ref = botCircles;
+  // a circle line the box passes over before the door says why — once per reason and circle, like the door's own
+  const linePassedSaid = new Set();
+  const noteLinePassed = (reason, circleId) => {
+    const key = `${reason}|${circleId}`;
+    if (linePassedSaid.has(key) || linePassedSaid.size > 500) return;
+    linePassedSaid.add(key);
+    walkLog({ kind: 'circle-line-passed', reason, circleId: String(circleId).slice(0, 12) });
+    console.info(`device-runner: a circle line in ${String(circleId).slice(0, 12)}… was passed over (${reason}); further ones are not said`);
+  };
   if (botCircles && circleDoors) {
     // a member gone from a circle's roster leaves the host gate (the circle door tiered them)
     circleSeams.rosterChanged = (circleId) => circleDoors.rosterChanged(circleId).catch(() => {});
     // a circle message landed: read from the log (the rail verified its author), fed when it is a joined circle's
     circleSeams.landed = async ({ msgId, circleId }) => {
       try {
-        if (!(await botCircles.isJoined(circleId))) return;
+        if (!(await botCircles.isJoined(circleId))) { noteLinePassed('not-joined', circleId); return; }
         const e = deviceLog.query({}).find((x) => x?.id === msgId && x?.type === 'chat-message');
-        if (!e) return;
+        if (!e) { noteLinePassed('not-in-log', circleId); return; }
         await circleDoors.landed({ circleId, msgId, authorRef: e.actor, text: e.payload?.text, ts: e.ts });
       } catch (err) { console.warn(`device-runner: a circle line was not handled: ${err?.message ?? err}`); }
     };
@@ -1553,6 +1618,8 @@ walkLog({ kind: 'host-tick', jobs: hostTick.names() });
 const card = await callSkill('pinboard', 'getContactShareQr', {}).catch(() => null);
 // `clock`: the zone the household's times are read and shown in (the role's TZ; a bare container is UTC).
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
+// what other agents' task requests reach on this node (ids only), so a walk — or an operator — reads it from the box
+walkLog({ kind: 'peer-callable', accepts: agent.peer?.acceptsSkillCalls === true, skills: agent.peer?.callableSkills?.() ?? [] });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

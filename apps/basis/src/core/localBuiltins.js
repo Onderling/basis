@@ -18,6 +18,7 @@
  */
 
 import { feedbackTarget, feedbackDraft, feedbackScreenId } from '../v2/feedbackContact.js';
+import { seedContactCard } from '../v2/seededContact.js';
 import { PERSON_WEEK_OP, personWeekCard } from '../v2/personWeekOverview.js';
 import { buildFileShareEnvelope } from './handlers/fileShare.js';
 import { describeFilter }    from '../filter.js';
@@ -73,6 +74,7 @@ export function createLocalBuiltins({
   openQrScanner,             // 2026-05-27 — () => void (mobile: opens scanner modal)
   openFeedback,              // () => {webid, draft} → void — opens the feedback contact's thread with the draft in its composer
   feedbackCard = null,       // the build's feedback contact card (`onderling-contact://…`), or none
+  confirmFeedbackOffer = null, // ({title, line}) => Promise<boolean> — the shell's confirm: adding the feedback contact is the person's tap
   appVersion = '',           // the build's version tag ('' on a dev build)
   currentScreen = null,      // () => {inCircle, screen, settingsGroup} — the shell's screen state; the prefill names its kind
   podAuth,                   // v0.7. — real Solid OIDC wrapper
@@ -134,18 +136,33 @@ export function createLocalBuiltins({
     logs:      async (args) => runLogsBuiltin(args, { eventLog, t, openLogsPanel }),
     find:      async (args) => runFindBuiltin(args, { findRunner, t }),
     scanQr:    async ()     => runScanQrBuiltin({ openQrScanner, t }),
-    feedback:  async (args) => runFeedbackBuiltin(args, { openFeedback, feedbackCard, appVersion, currentScreen, t }),
+    feedback:  async (args) => runFeedbackBuiltin(args, { openFeedback, feedbackCard, appVersion, currentScreen, t, callSkill, confirmFeedbackOffer }),
   };
 }
 
 /**
  * `/feedback` (and the "+" sheet, and the foot of Instellingen): open the feedback contact's thread with the prefill.
  * Nothing is sent: the person writes and sends it. No card in this build → said, and nothing opens.
+ * The contact is OFFERED, never seeded: not yet in the book, the person is asked first — one line saying who receives
+ * what — and only their yes adds it (the same path a scanned card takes). No, and nothing is added or opened. A contact
+ * they removed is offered again only when they come here again; nothing adds it back on its own.
  */
-async function runFeedbackBuiltin(args, { openFeedback, feedbackCard, appVersion, currentScreen, t }) {
+async function runFeedbackBuiltin(args, { openFeedback, feedbackCard, appVersion, currentScreen, t, callSkill, confirmFeedbackOffer }) {
   const webid = feedbackTarget(feedbackCard);
   if (!webid) return { ok: false, error: t('feedback.no_contact') };
   if (typeof openFeedback !== 'function') return { ok: false, error: t('feedback.not_available') };
+  let inBook = false;
+  try {
+    const r = await callSkill?.('pinboard', 'listContacts', {});
+    inBook = (Array.isArray(r?.items) ? r.items : (Array.isArray(r?.contacts) ? r.contacts : [])).some((c) => c?.webid === webid);
+  } catch { inBook = false; }
+  if (!inBook) {
+    if (typeof confirmFeedbackOffer !== 'function') return { ok: false, error: t('feedback.not_available') };
+    const yes = await Promise.resolve(confirmFeedbackOffer({ title: t('feedback.offer_title'), line: t('feedback.offer_line') })).catch(() => false);
+    if (yes !== true) return { ok: false, declined: true };
+    const added = await seedContactCard({ payload: feedbackCard, callSkill }).catch(() => null);
+    if (!(added?.seeded || added?.reason === 'already-known')) return { ok: false, error: t('feedback.not_available') };
+  }
   // the KIND of screen, never what is on it (feedbackScreenId): a circle's name is the person's, not the maker's
   const state = typeof currentScreen === 'function' ? currentScreen() : null;
   const screen = feedbackScreenId({ screen: args?.screen }) || feedbackScreenId(state && typeof state === 'object' ? state : {});

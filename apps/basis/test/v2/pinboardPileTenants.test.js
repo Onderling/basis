@@ -55,7 +55,10 @@ describe('pinboard\'s pile and member cache after the usual acts', () => {
     const take = async (act) => { await new Promise((r) => { setTimeout(r, 400); }); seen[act] = census(); };
     await take('boot');
     await createCircle(A, { groupId: GID, name: 'Pile' }); await bindCircleAddresses([A], GID); await take('found');
-    await joinExistingCircle(A, B, { groupId: GID, handle: 'bee' }); await joinExistingCircle(A, C, { groupId: GID, handle: 'cee' }); await take('join');
+    await joinExistingCircle(A, B, { groupId: GID, handle: 'bee' }); await joinExistingCircle(A, C, { groupId: GID, handle: 'cee' });
+    // the joiners' circle addresses bound, as a shell's presence step binds them after a join (until they are, a send as
+    // that address waits — it is never sent as the device's main address instead)
+    await bindCircleAddresses([B, C], GID); await take('join');
     await A.agent.callSkill('pinboard', 'postAnnouncement', { groupId: GID, text: 'hallo' }); await take('post');
     await B.agent.callSkill('pinboard', 'leaveGroup', { groupId: GID, confirm: true }); await take('leave');
     await A.agent.callSkill('pinboard', 'removeMember', { groupId: GID, memberWebid: C.pubKey }); await take('remove');

@@ -914,6 +914,8 @@ export async function bootAgentBundle(opts = {}) {
     // …and PROVE it: a fresh per-circle address is signed with its own key (source circle == the
     // circle being joined), so the admin records it instead of dropping it as unproven.
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+    // a pod-backed circle's redeem tells the admitting admin which pod WebID to grant (web parity)
+    podWebId: () => opts.podWebId?.() ?? null,
   });
   pairSeams.sendPeerRedeem = sendPeerRedeem;
 

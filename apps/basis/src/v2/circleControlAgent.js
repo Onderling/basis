@@ -33,6 +33,7 @@ const SEALED_POSTURES = new Set(['p2', 'p3']);
  *   present, every key establish/grant/rotation ALSO emits the versioned key AS a log key-event (fanned to
  *   the then-current members, self-distributing with no pod). The pod key resource is still written
  *   (defence-in-depth); the LOG is the source for a no-pod circle. Absent → pod-only, unchanged.
+ * @param {Record<string,string>} [deps.podAgents]  roster ref → pod WebID saved on this device (see the control agent).
  * @returns {object|null}  the control-agent facade, or `null` for an unsealed (p0/p1) circle.
  */
 export function createCircleControlAgent({
@@ -44,6 +45,7 @@ export function createCircleControlAgent({
   circleRootUri,
   roster = [],
   keyEventLog = null,
+  podAgents = {},
 } = {}) {
   if (!circleId) throw new Error('createCircleControlAgent: circleId is required');
   if (!SEALED_POSTURES.has(storagePosture)) return null;   // p0/p1 → no sealing, no control agent
@@ -68,6 +70,7 @@ export function createCircleControlAgent({
     // secrecy). `groupId` = the circle id, so a member folds only this circle's events.
     keyEventLog,
     groupId: circleId,
+    podAgents,
   });
 
   return {
@@ -80,6 +83,7 @@ export function createCircleControlAgent({
     addMember:    (m) => agent.addMember(m),
     removeMember: (m) => agent.removeMember(m),
     members:      () => agent.members(),
+    podAgents:    () => agent.podAgents(),
     // Device-grained audience surgery (the custody arc): a member's DEVICE joins or leaves the group key's
     // audience without a roster change. Both were routed to by the announce handler and the revoke
     // ceremony since August and reached nothing — this wrapper never exposed them (found 2026-09-04 when the

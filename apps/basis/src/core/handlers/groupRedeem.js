@@ -65,7 +65,7 @@ export function makeHandleGroupRedeemRequest({
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
 
   return async function handleGroupRedeemRequest(fromAddr, payload) {
-    const { requestId, groupId, code, shareCard, peerDisplay, circleAddress, circleAddressProof, personaProperties, rulesAccepted, personKey, profileKind } = payload ?? {};
+    const { requestId, groupId, code, shareCard, peerDisplay, circleAddress, circleAddressProof, personaProperties, rulesAccepted, personKey, profileKind, podWebId } = payload ?? {};
     if (!requestId || !groupId || !code) {
       logger.warn?.('[peer] group-redeem-request missing fields', payload);
       return;
@@ -92,6 +92,9 @@ export function makeHandleGroupRedeemRequest({
         ...(profileKind === 'function' ? { profileKind: 'function' } : {}),
         // Property layer — the joiner's disclosed persona properties, forwarded to the admin's roster.
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
+        // The pod WebID the joiner signs in with, for a pod-backed circle's read grant. The skill hands it to the
+        // grant only; it is not written into the redemption, the roster or the join statement.
+        ...(typeof podWebId === 'string' && podWebId ? { podWebId } : {}),
       });
       if (result?.error) {
         reply = { error: result.error };
@@ -223,6 +226,9 @@ export function makeSendGroupRedeemRequest({
   // () => 'person'|'function' (or a promise of it) — this node's profile kind. A function profile (a bot's node) says
   // so on the redeem; the admin writes it into the signed join only for an invite it minted FOR a bot.
   profileKind = null,
+  // () => string|null — the WebID this device's pod session signs in as. Sent only on a redeem for a pod-backed
+  // circle, and only to the admin the request goes to: their pod's read grant has to name it.
+  podWebId = null,
   sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = 30_000, logger = console,
 } = {}) {
   if (typeof sendPeer !== 'function') {
@@ -243,6 +249,7 @@ export function makeSendGroupRedeemRequest({
     // own relay — where the admin is not — and waited out the full timeout. Scoping it to the invite's
     // relay is what the join dial (which now comes BESIDE the primary, not instead of it) was for.
     relayUrl,
+    podBacked = false,   // the invite says the circle keeps its data in a pod
   }) {
     if (!peerUp()) {
       throw new Error('Peer transport not connected. Try /peer-connect first.');
@@ -282,6 +289,10 @@ export function makeSendGroupRedeemRequest({
     }
     let kind = null;
     try { kind = typeof profileKind === 'function' ? await profileKind() : null; } catch { kind = null; }
+    let ownPodWebId = null;
+    if (podBacked === true && typeof podWebId === 'function') {
+      try { const w = await podWebId(); ownPodWebId = (typeof w === 'string' && /^https?:\/\//.test(w)) ? w : null; } catch { ownPodWebId = null; }
+    }
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -306,6 +317,7 @@ export function makeSendGroupRedeemRequest({
         ...(kind === 'function' ? { profileKind: 'function' } : {}),
         // Property layer — the joiner's disclosed persona properties (from finalSubmit), forwarded to the admin.
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
+        ...(ownPodWebId ? { podWebId: ownPodWebId } : {}),
         sentAt: Date.now(),
       };
       const as = asPersona ? { sendAs: asPersona } : {};

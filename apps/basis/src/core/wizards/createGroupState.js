@@ -27,6 +27,7 @@ export { OFFERING_AXES };
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
 import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat } from '../../v2/circleTemplates.js';
+import { CIRCLE_POLICY_ENUMS, CIRCLE_FEATURES } from '../../v2/circlePolicy.js';
 import { INVITE_CEILING_FALLBACK } from '@onderling-app/pinboard/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
@@ -196,9 +197,48 @@ export function setKind(state, kind) {
   return { ...next, storagePolicy, pod: storagePolicy };
 }
 
+/**
+ * The storage choices the radio offers. Without a connected pod there is one: a normal circle. A pod type made with no
+ * pod only degraded to fan-out with a warning, so it is not offered until the person has connected a pod. `podConnected`
+ * is what the host knows; a state that never says (a programmatic create) gets every choice, as before.
+ * @param {{ podConnected?: boolean }} state
+ */
+export function storageChoices(state) {
+  return state?.podConnected === false ? STORAGE_POLICIES.filter((o) => o.id === 'none') : STORAGE_POLICIES;
+}
+
 /** The person's storage choice — sets both names of the one fact and marks the axis as theirs. */
 export function setStoragePolicy(state, value) {
   return markAxisTouched({ ...state, storagePolicy: value, pod: value }, 'pod');
+}
+
+/* ─── Every axis the person's to change (a preset is a starting point) ─────── */
+
+/** The LLM tool's choices — every value of the policy axis, worded by the settings screen's own keys. */
+export const LLM_TOOL_CHOICES = Object.freeze(CIRCLE_POLICY_ENUMS.llmTool.map((id) => Object.freeze({ id, labelKey: `circle.settings.opt.${id}` })));
+/** Whether agents may join — every value of the policy axis. */
+export const AGENTS_CHOICES = Object.freeze(CIRCLE_POLICY_ENUMS.agents.map((id) => Object.freeze({ id, labelKey: `circle.settings.opt.${id}` })));
+/** Every feature a circle can have — one switch each. */
+export const FEATURE_CHOICES = Object.freeze(CIRCLE_FEATURES.map((id) => Object.freeze({ id, labelKey: `circle.settings.feat.${id}` })));
+
+/** The person's LLM-tool choice (a value outside the axis is ignored). Survives a later switch of kind. */
+export function setLlmTool(state, value) {
+  return CIRCLE_POLICY_ENUMS.llmTool.includes(value) ? markAxisTouched({ ...state, llmTool: value }, 'llmTool') : state;
+}
+/** The person's agents choice. */
+export function setAgents(state, value) {
+  return CIRCLE_POLICY_ENUMS.agents.includes(value) ? markAxisTouched({ ...state, agents: value }, 'agents') : state;
+}
+/** Whether policy changes need the admins' agreement. */
+export function setConsensus(state, on) {
+  return markAxisTouched({ ...state, consensusRequired: on === true }, 'consensusRequired');
+}
+/** One feature on or off (chat keeps its own setter: its advice reads it). */
+export function setFeature(state, name, on) {
+  if (!CIRCLE_FEATURES.includes(name)) return state;
+  if (name === 'chat') return setChatEnabled(state, on);
+  const s = state && typeof state === 'object' ? state : {};
+  return markAxisTouched({ ...s, features: { ...(s.features && typeof s.features === 'object' ? s.features : {}), [name]: on === true } }, `features.${name}`);
 }
 
 /* ─── N1 — neighbourhood size + chat advice ─────────────────────────────── */
@@ -596,6 +636,12 @@ export function encodeInviteUri(payload) {
 export async function finalSubmit({ state, callSkill, shareRelease = null, releaseTimeoutMs = RELEASE_TIMEOUT_MS }) {
   state.submitting  = true;
   state.submitError = null;
+  // no connected pod → a normal circle, whatever a template or an earlier step left in the storage choice
+  if (state.podConnected === false) {
+    state.storagePolicy = 'none';
+    state.pod = 'none';
+    delete state.groupPodUri;
+  }
   // FOUNDING AS A PERSONA: the circle is bound to the persona before the create, as a join binds before its redeem —
   // so the founding statements, the address and the circle's "me" are the persona's from the first byte.
   const asPersona = typeof state.persona === 'string' && state.persona && state.persona !== DEFAULT_PERSONA ? state.persona : null;
@@ -640,7 +686,8 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
     let named = Promise.resolve(false);
     const handle = String(state.handle ?? '').trim();
     if (state.needsHandle && isValidHandle(handle)) {
-      named = withinMs(Promise.resolve().then(() => callSkill('pinboard', 'setMyHandle', { handle })), releaseTimeoutMs)
+      // named by the new circle, so a circle made AS a persona names the persona and never renames the default self
+      named = withinMs(Promise.resolve().then(() => callSkill('pinboard', 'setMyHandle', { handle, groupId: result.groupId })), releaseTimeoutMs)
         .then((r) => !r?.error)
         .catch((err) => {
           if (typeof console !== 'undefined') console.warn(`[create] the founder's handle was not set (Me → handle sets it): ${err?.message ?? err}`);

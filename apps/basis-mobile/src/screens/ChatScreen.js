@@ -68,7 +68,6 @@ import { makeCircleGovernancePeerHandler } from '../../../basis/src/v2/circleLog
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer, consumeCircleEntry } from '../../../basis/src/v2/enrollOffer.js';
-import { seedContactCard }    from '../../../basis/src/v2/seededContact.js';
 import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
@@ -82,7 +81,7 @@ import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin
                                from '../../../basis/src/v2/circleAddressAnnounce.js';
 // G11 — no-pod group-key rotation, RECEIVE side: record an inbound key-event into the local per-circle
 // log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
-import { refreshCircleKeyEventsFromLane } from '../core/circlePods.js';
+import { refreshCircleKeyEventsFromLane, getCirclePodWebId } from '../core/circlePods.js';
 // ε.4 — negotiated catch-up protocol substrate.
 import { makeHandleCalendarRsvp }
                                from '../../../basis/src/core/handlers/calendarRsvp.js';
@@ -813,14 +812,8 @@ export default function ChatScreen({
           }).catch(() => { /* retried next launch — the stash only clears on full success */ });
           setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);
         }
-        // The shipped contact, once per launch (web parity): added through the scanned-card path if the
-        // build-time card is set and the person is not in the book yet.
-        if (bundle?.callSkill && !globalThis.__onderlingSeededContactKicked) {
-          globalThis.__onderlingSeededContactKicked = true;
-          seedContactCard({ payload: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD, callSkill: bundle.callSkill })
-            .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
-            .catch(() => { /* an install without it is not an error state */ });
-        }
+        // The build's feedback contact is OFFERED at the feedback door, never added here (web parity): a boot adds
+        // nobody to the book.
         if (itemsCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
           globalThis.__onderlingTaskCatchUpKicked = true;
           setTimeout(() => { itemsCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);
@@ -1769,6 +1762,8 @@ export default function ChatScreen({
             // by CreateGroupWizardModal; other wizards ignore it.
             persistPolicy={(groupId, patch) => policyStoreRef.current?.update(groupId, patch)}
             // …and says the founding persona's release on the new circle. Only CreateGroupWizardModal reads it.
+            // no pod session → the new circle is a normal one (only CreateGroupWizardModal reads it)
+            podConnected={!!getCirclePodWebId()}
             shareFounderRelease={bootState.kind === 'ready'
               ? (cid, personaId) => bootState.bundle.shareCircleRelease?.(cid, personaId)
               : undefined}

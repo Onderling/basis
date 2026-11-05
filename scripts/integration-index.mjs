@@ -35,6 +35,7 @@ export const INTEGRATION_TESTS = [
   { file: 'apps/basis/test/circlePodProducer.css.test.js',            proves: 'Per-circle producer on a real pod: sealed round-trip + roster growth + survives-restart re-hydration (p2/p3).' },
   { file: 'apps/basis/test/circleSealing.css.test.js',                proves: 'Circle group key persists on the pod + sealed content round-trips; leave rotates the key (forward secrecy).' },
   { file: 'apps/basis/test/circlePod2Pod.css.test.js',                proves: 'Cross-pod sealed circle delivery between two separate CSS accounts/pods — a member reads with their OWN auth, so this is also the only proof the circle ACL grant is REAL.', needs: { acp: true } },
+  { file: 'apps/basis/test/circlePodGrantToPodWebId.css.test.js',     proves: 'A member named by a roster ref is granted on the pod WebID they joined with: refused before, reads after, refused again when the owner reloads and removes them.', needs: { acp: true } },
   { file: 'apps/basis-mobile/test/circleSealE2E.css.test.js',         proves: 'Mobile circle seal end-to-end against a real pod (the RN-side parity of the basis producer path).' },
   { file: 'apps/companion-node/test/companionAgentProxy.css.test.js', proves: 'The companion proxies a device\'s pod fetches to a real pod (holds no secret); out-of-scope is denied; revoke kills the grant.' },
   { file: 'apps/pinboard/test/realPodAttach.css.test.js',                proves: 'Attaching a real Solid pod to pinboard and reading/writing through the attachment.' },

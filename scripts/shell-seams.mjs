@@ -64,7 +64,6 @@ export const SEAMS = Object.freeze([
   // MIJ IS A HEAD TOO, and it hears the agent registry (a profile's facts are no circle's items): a shell that kept only
   // the circle and log subscriptions would show yesterday's name until the next act.
   { id: 'mij-head-hears-registry', pattern: /onRegistryChanged/, shells: ['web', 'mobile'], why: 'Mij would miss a profile fact changed by a sibling while it is shown' },
-  { id: 'seeded-contact', pattern: /seedContactCard\(/, shells: ['web', 'mobile'], why: 'a card the install is handed is a contact on every person\'s shell, through the one scanned-card path' },
   // A turn to a household bot the person's identity is linked to (`/koppel`) carries a statement from THIS device over
   // exactly that turn: the bot takes it as the person only by that, so a device they revoke stops speaking as them. A
   // shell whose contact channel lacks it sends turns the bot takes for a stranger's.
@@ -236,6 +235,12 @@ export const SEAMS = Object.freeze([
   // that list does not hold (joined on another device, through an offer, made by an op) re-reads the list first
   // (`headCircleWatch.js`). Without it the new circle's items stayed off Vandaag until a reload. The box paints no Vandaag.
   { id: 'head-hears-new-circles', pattern: /watchCircleChanges\(/, shells: ['web', 'mobile'], why: 'a circle that arrives while Vandaag is shown keeps its items off the page until a reload' },
+  // A pod-backed circle's read grant names the WebID the joiner's pod session signs in as; the redeem is where the joiner
+  // says it. Every shell hands the redeem sender how to read it — the box hands `() => null`, it holds no pod session.
+  // The feedback contact is OFFERED at the feedback door, never seeded at boot: a shell hands the shared builtin its
+  // confirm, so adding the maker's contact is always the person's own tap (and a removed contact stays removed).
+  { id: 'feedback-offer-asks-first', pattern: /confirmFeedbackOffer:/, shells: ['web', 'mobile'], why: 'a feedback door without the confirm cannot add the contact at all — and a shell that seeds instead adds it with no tap' },
+  { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */

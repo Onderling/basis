@@ -317,6 +317,7 @@ import { buildStandardRolePolicy } from '@onderling-app/tasks';                 
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
+import { makeIsKnownPeer }                  from '../../v2/knownPeer.js';
 import { parseUntrustedJson } from '@onderling/core';
 import { createInProcessSenderAuthorizer } from '@onderling/core';
 
@@ -738,6 +739,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     ...[deviceBindingOf(persona)].filter(Boolean),
   ];
   const secureAgentRef = { current: null };   // late-bound: the secure agent is created further down this scope
+  const isKnownPeerRef = { current: null };   // the wire gate's "do I know this caller" (makeIsKnownPeer), bound once its sources exist
   const registerPersonIdentity = () => {
     const sa2 = secureAgentRef.current;
     if (!sa2 || !persona.personIdentity) return;
@@ -920,6 +922,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         // signed off the record with this key (a revoked device keeps it) is refused, whatever it says it is. Before
         // the agent's own key is set, nothing is allowed (the gate cannot tell).
         // …and a token a PERSONA of this device issued: honoured only while it is active on THAT persona's lane.
+        // A wire caller with no trust row: known (own devices, shared circles, the contact book — by key) keeps the
+        // registry default; anyone else is a stranger and reaches only what is public. Bound below, where its sources
+        // exist; until then every unrecorded caller is a stranger.
+        isKnown: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
         isAllowed: async (token) => {
           const set = typeof token?.issuer === 'string' ? grantSetOfIssuer(token.issuer) : null;
           if (set && set.grants !== surfaceGrants) {
@@ -3249,6 +3255,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { const id = sa.resolver?.pubKeyForAddr?.(addr); if (id && id !== addr) return id; } catch { /* below */ }
     return (await contactRecords()).find((c) => c?.peerAddr === addr)?.webid ?? addr;
   };
+  isKnownPeerRef.current = makeIsKnownPeer({
+    isSelf: isOwnAddress,
+    ownDeviceAddresses: async () => (await Promise.all([...personas.keys()].map((pid) => deviceSiblingRowsOf(pid).catch(() => []))))
+      .flat().map((d) => d?.address).filter(Boolean),
+    myCircleIds: async () => ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])
+      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => typeof id === 'string' && id),
+    rosterOf: async (circleId) => (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [],
+    contacts: contactRecords,
+  });
   /** A contact's row in the contact book, by their webid or by an address of theirs. */
   const contactRecordOf = async (addr) => {
     const webid = await webidFor(addr);
@@ -9288,6 +9303,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // not make it an enrolled device: the runner's `--enrol` and the add-a-device flows still apply to it.
     isEnrolledDevice: () => !!enrolledDevice && enrolledDevice.selfMinted !== true,
 
+    /** Whether this device knows a wire key (own devices, shared circles, contacts) — the wire gate's question, asked
+     *  by a door too (a function profile's inbox lets a known peer past its stranger budgets). */
+    isKnownPeer: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
     // Cross-peer state (delegates to sa.peer).  Same surface main.js
     // already consumes: peer.address / peer.status / peer.error.
     peer: sa.peer,

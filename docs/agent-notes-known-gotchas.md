@@ -819,3 +819,14 @@ whose `node_modules` predates the move (e.g. one made with `plans/tools/mk-workt
 the box and the guards fail with `ERR_MODULE_NOT_FOUND` (`tweetnacl` from `apps/pinboard/src/…`, or the package itself).
 Fix by hand, never by reinstalling: move the old app directory's `node_modules` into `apps/pinboard/`, and in each
 `apps/*/node_modules/@onderling-app/` replace the old link with `pinboard -> ../../../pinboard`. CI installs fresh.
+
+## Vite keeps serving a dependency you swapped in `node_modules` (2026-11-05)
+
+The web dev server pre-bundles dependencies into `apps/basis/node_modules/.vite/deps`, and the cache is keyed on the
+**lockfile hash** (`_metadata.json` → `lockfileHash`). Replace a package's directory in `node_modules` without the
+lockfile changing — to test an older version of a library, or to prove a test red on it — and the browser is still
+served the old pre-bundle: the "red" run passes on the new code. Seen bumping the browser auth library: a sign-in spec
+"passed on 2.5.0" until the cache was moved aside, then failed as it should.
+
+**Fix:** move `node_modules/.vite` aside (it regenerates; never delete `node_modules` itself) before each run that must
+load a swapped package, and once more after swapping back.

@@ -145,3 +145,24 @@ describe('the circle doors', () => {
     expect(d.doors.open()).toEqual(['c1']);
   });
 });
+
+describe('a line the door passes over says why — once per reason and circle', () => {
+  it('an author not on the roster, a line that does not name the bot: each said once in the log, then counted, never silent', async () => {
+    const said = [];
+    const doors = createCircleDoors({
+      roster: async () => [{ webid: 'ann', role: 'member', handle: 'ann' }],
+      botRef: () => 'BOT',
+      botHandle: () => 'huisbot-van-frits',
+      setDoorCaller: async () => {},
+      post: async () => {},
+      makeRunner: () => ({ start: async () => {}, stop: async () => {}, idle: async () => {} }),
+      log: (e) => said.push(e),
+    });
+    const now = Date.now();
+    expect(await doors.landed({ circleId: 'c1', msgId: 'm1', authorRef: 'stranger', text: '@huisbot zet melk op de lijst', ts: now })).toBe(false);
+    expect(await doors.landed({ circleId: 'c1', msgId: 'm2', authorRef: 'stranger', text: '@huisbot nog een keer', ts: now })).toBe(false);
+    expect(await doors.landed({ circleId: 'c1', msgId: 'm3', authorRef: 'ann', text: 'gewoon een praatje', ts: now })).toBe(false);
+    const passed = said.filter((e) => e.kind === 'circle-line-passed');
+    expect(passed.map((e) => e.reason), JSON.stringify(said)).toEqual(['not-on-roster', 'not-named']);
+  });
+});

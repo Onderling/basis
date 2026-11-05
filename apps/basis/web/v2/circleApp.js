@@ -43,7 +43,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
+  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -245,7 +245,6 @@ import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
-import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { foldGovernance } from '../../src/v2/governanceLog.js';
@@ -910,6 +909,8 @@ function mountBasisOpsOnAgent(agent) {
     openFilePicker: webFilePicker,
     // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
     openFeedback: ({ webid, draft }) => { showContactThread(webid, { draft }).catch(() => {}); },
+    // adding the feedback contact is the person's own tap: the offer says who receives what, and only yes adds it
+    confirmFeedbackOffer: async ({ title, line }) => globalThis.confirm(`${title}\n\n${line}`) === true,
     feedbackCard: SEEDED_CONTACT_CARD,
     appVersion: APP_VERSION,
     currentScreen: () => feedbackScreenState(),
@@ -2136,11 +2137,24 @@ async function buildCirclePod(circleId, policy) {
     // The device's per-circle sealing keypair (the address key's image) — one key family, see the producer.
     let sealingKeyPair = null;
     try { sealingKeyPair = _peerAgent?.circleSealingKeyPairFor?.(circleId) ?? null; } catch { sealingKeyPair = null; }
+    // where the circle's pod data lives — one answer for every member (circleRootFor): a central-pod circle's own
+    // address, never this member's own pod; with none recorded there is no producer, and the send degrades honestly
+    let circleRootUri;
+    if (routing) {
+      const recorded = await recordedCirclePodUri({ callSkill: rawCallSkill, points: getConnectionPoints(), circleId });
+      circleRootUri = circleRootFor({ pod: policy?.pod, recordedPodUri: recorded, ownCircleRoot: routing.circleRootUri(circleId) });
+      if (!circleRootUri) { console.warn(`[circleApp] circle ${String(circleId).slice(0, 12)}… is a central-pod circle with no recorded pod address — not using any pod`); return null; }
+    }
+    const ownsRoot = !routing || ownsCircleRoot({ podRoot: routing.podRoot, circleRootUri });
     const producer = await createCirclePodProducer({
       circleId, storagePosture, vault: circleVault, generateKeypair: podGenerateKeypair, sealingKeyPair,
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
-      circleRootUri: routing ? routing.circleRootUri(circleId) : undefined,
-      sharing, keyEventLog,
+      circleRootUri,
+      // only the pod that holds the circle's root takes access rules from this device: on a central-pod circle a
+      // member's own device would try the founder's pod and be refused
+      sharing: ownsRoot ? sharing : undefined,
+      ownsRoot,
+      keyEventLog,
     });
     circlePods.set(circleId, producer);
     return producer;
@@ -6908,6 +6922,7 @@ function openCreateCircleWizard() {
   if (typeof rawCallSkill !== 'function') { globalThis.alert?.(t('circle.create_unavailable')); return; }
   mountMyDataWizard(renderCreateGroupWizard, {
     getMyPeerAddr: () => circleHouseholdAgent?.householdSelfAddr ?? null,
+    podConnected: !!circleOwnerWebId,   // no pod session → the circle is made a normal one
     // the persona the founder picked says what it discloses in the new circle
     shareFounderRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
     onDispatched: async (reply) => {
@@ -9382,6 +9397,8 @@ async function boot() {
       // …and PROVE it: a fresh per-circle address is signed with its own key (source circle == the
       // circle being joined), so the admin records it instead of dropping it as unproven.
       signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+      // a pod-backed circle's redeem tells the admitting admin which pod WebID to grant
+      podWebId: () => circleOwnerWebId,
     });
     // when signed in, route pinboard's items to the user's REAL pod (parity with
     // folio/calendar; reuses pinboard's already-built pod-routing write-through). Best-effort.
@@ -9816,11 +9833,7 @@ async function boot() {
         agent.bootstrapFromStashedOffer();
         itemsCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
-        // The shipped contact, once: added through the scanned-card path if the card is set and the
-        // person is not in the book yet.
-        seedContactCard({ payload: SEEDED_CONTACT_CARD, callSkill: rawCallSkill })
-          .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
-          .catch(() => { /* an install without it is not an error state */ });
+        // The build's feedback contact is OFFERED at the feedback door, never added here: a boot adds nobody to the book.
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {

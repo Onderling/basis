@@ -80,6 +80,10 @@ export class PolicyEngine {
   #isAllowed = null;   // the allow-list (see the constructor)
   /** told of every refused PRESENTED token: `{code, reason, skillId}` (never the token) — a log's way in, never a gate */
   #onDenied = null;
+  // `(peerKey) => boolean | Promise<boolean>` — whether the host knows this wire caller without a trust row (its own
+  // devices, the circles it shares, its contact book). Injected → an unknown, token-less caller is a stranger
+  // (`public`); absent → the registry default for every peer, as before.
+  #isKnown = null;
 
   #groupManager;
   #isRevoked;
@@ -134,6 +138,7 @@ export class PolicyEngine {
     selfIds       = [],
     isAllowed     = null,
     onDenied      = null,
+    isKnown       = null,
   }) {
     this.#trustRegistry = trustRegistry;
     this.#skillRegistry = skillRegistry;
@@ -142,6 +147,7 @@ export class PolicyEngine {
     this.#isRevoked     = typeof isRevoked === 'function' ? isRevoked : null;
     this.#isAllowed     = typeof isAllowed === 'function' ? isAllowed : null;
     this.#onDenied      = typeof onDenied === 'function' ? onDenied : null;
+    this.#isKnown       = typeof isKnown === 'function' ? isKnown : null;
     // SELF, for `private` skills: this agent's own key plus the owner keys its host names here (an in-process host
     // whose only caller is the owner's chat agent names that key). Fixed at construction, like `isRevoked`: there
     // is no setter, so no door, peer or token can be added to self later.
@@ -249,16 +255,32 @@ export class PolicyEngine {
    */
   async checkInbound({ peerPubKey, skillId, action = 'call', token = null, agentPubKey = null }) {
     const myPubKey = agentPubKey ?? this.#agentPubKey;
-    // the tier half, shared with a door's in-process caller (a peer with no record keeps the registry default)
-    const { tier, skill } = await this.checkCaller({ callerId: peerPubKey, skillId });
 
-    // 'never' policy blocks all inbound callers unconditionally.
-    if (skill.policy === 'never') {
+    // 'never' policy blocks all inbound callers unconditionally — before anything a caller presents is read.
+    if (this.#skillRegistry.get(skillId)?.policy === 'never') {
       throw new PolicyDeniedError(
         'POLICY_NEVER',
         `Skill "${skillId}" is not available to external callers`,
       );
     }
+
+    // A presented capability token is judged FIRST, fully (signature · expiry · agent binding · subject==caller · skill
+    // scope · issuer-trust · revocation). One that fails is refused here and never falls back to the caller's tier;
+    // one that holds is the caller's record for this call.
+    // (So with a token, a skill this agent does not have meets the token's scope check before the unknown-skill refusal:
+    // either way the call is refused, only the reason differs.)
+    if (token) await this.#verifyOrRefuse(token, { skillId, peerPubKey, myPubKey });
+
+    // The tier half, shared with a door's in-process caller. A wire caller with no trust row is judged by the host's
+    // `isKnown` when one is injected: known (or holding a valid token) keeps the registry default; unknown is a
+    // stranger, `public`. A co-member whose address this device has not folded yet is a stranger until the fold.
+    let unknownAs = null;
+    if (this.#isKnown && !token) {
+      let known = false;
+      try { known = (await this.#isKnown(peerPubKey)) === true; } catch { known = false; }
+      if (!known) unknownAs = 'public';
+    }
+    const { tier, skill } = await this.checkCaller({ callerId: peerPubKey, skillId, unknownAs });
 
     // role-aware group check.  A skill may declare
     //   requiredRole: { group: <groupId>, role: <roleId> }
@@ -316,22 +338,23 @@ export class PolicyEngine {
     // non-requires-token skill still passes — trusted internal callers are
     // token-less by design. (Enabling this per-agent is a separate wiring/tier
     // decision; see PLAN-agent-management-surface.md.)
-    if (token) {
-      try {
-        await this.#verifyPresentedToken(token, { skillId, peerPubKey, myPubKey });
-      } catch (e) {
-        // the refusal stands whatever the hook does; the hook only hears a short reason, never the token
-        if (this.#onDenied && e instanceof PolicyDeniedError) {
-          const msg = String(e.message ?? '');
-          const reason = /has been revoked/.test(msg) ? 'revoked' : /not active/.test(msg) ? 'not-active'
-            : /Revocation check failed/.test(msg) ? 'check-failed' : 'invalid';
-          try { this.#onDenied({ code: e.code, reason, skillId }); } catch { /* a log is not the gate */ }
-        }
-        throw e;
-      }
-    }
-
+    // (a presented token was verified above, before the tier)
     return { tier, allowed: true };
+  }
+
+  /** Verify a presented token or refuse — telling the `onDenied` hook a short reason, never the token. */
+  async #verifyOrRefuse(token, { skillId, peerPubKey, myPubKey }) {
+    try {
+      await this.#verifyPresentedToken(token, { skillId, peerPubKey, myPubKey });
+    } catch (e) {
+      if (this.#onDenied && e instanceof PolicyDeniedError) {
+        const msg = String(e.message ?? '');
+        const reason = /has been revoked/.test(msg) ? 'revoked' : /not active/.test(msg) ? 'not-active'
+          : /Revocation check failed/.test(msg) ? 'check-failed' : 'invalid';
+        try { this.#onDenied({ code: e.code, reason, skillId }); } catch { /* a log is not the gate */ }
+      }
+      throw e;
+    }
   }
 
   /**

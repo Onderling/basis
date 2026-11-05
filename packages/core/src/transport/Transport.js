@@ -82,6 +82,8 @@ const REQ_TIMEOUT = param({ key: 'transport.reqTimeoutMs', scope: PARAM_SCOPE.DE
 // How long a send asked to go out AS one of our addresses waits for that address to be bound on this transport (the
 // moment after a create or a join, before the presence step binds it) — then it is refused, never sent as the primary.
 const ALIAS_WAIT = param({ key: 'transport.aliasWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });  // ms
+// …and how many sends may wait for one address at once (the oldest gives way): a bound on what one unbound address can park.
+const ALIAS_WAITERS = param({ key: 'transport.aliasWaitersMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 /**
  * Abstract transport base class — the port a wire adapter implements. Subclasses
@@ -191,7 +193,7 @@ export class Transport extends Emitter {
     }
     this.#aliases.set(address, { sign: opts?.sign ?? null, primary: opts?.primary === true });
     const waiting = this.#aliasWaiters.get(address);
-    if (waiting) { this.#aliasWaiters.delete(address); for (const go of waiting) go(); }
+    if (waiting) { for (const go of [...waiting]) go(); }
     try { await this._bindAddress(address, this.#aliases.get(address)); } catch (err) {
       // Keep it in the set: a bind can fail because we are offline, and the replay on reconnect is
       // precisely what should fix that. Report so a caller is not told it worked.
@@ -435,21 +437,32 @@ export class Transport extends Emitter {
    * @param {string|null|undefined} claimed
    * @returns {string|Promise<string>} the address to stamp as `_from`
    */
-  #senderFor(claimed) {
+  #senderFor(claimed, { wait = true } = {}) {
     const asked = typeof claimed === 'string' && claimed ? claimed : null;
     if (!asked || asked === this.#address || this.#aliases.has(asked)) return asked ?? this.#address;
+    // An ANSWER (`wait: false`) names an address the far end chose (`_to` on what it sent us): it never waits — a hostile
+    // or stale `_to` must not park a timer and a waiter. Only our own outbound sends wait for an address being bound.
+    if (!wait) return this.#refuse(asked);
     return this.#waitForAddress(asked);
   }
 
   async #waitForAddress(asked) {
     await new Promise((resolve) => {
       const timer = setTimeout(() => { done(); resolve(); }, ALIAS_WAIT);
-      const go = () => { clearTimeout(timer); resolve(); };
+      const go = () => { clearTimeout(timer); done(); resolve(); };
       const done = () => { const list = this.#aliasWaiters.get(asked); if (list) { list.delete(go); if (!list.size) this.#aliasWaiters.delete(asked); } };
       if (!this.#aliasWaiters.has(asked)) this.#aliasWaiters.set(asked, new Set());
-      this.#aliasWaiters.get(asked).add(go);
+      const list = this.#aliasWaiters.get(asked);
+      // bounded: at most ALIAS_WAITERS sends wait for one address; the oldest gives way (and is refused below)
+      if (list.size >= ALIAS_WAITERS) { const oldest = list.values().next().value; oldest?.(); }
+      list.add(go);
     });
     if (this.#aliases.has(asked)) return asked;
+    return this.#refuse(asked);
+  }
+
+  /** A send as an address this transport does not hold: refused, loudly — never sent as the primary. */
+  #refuse(asked) {
     if (typeof console !== 'undefined') {
       console.warn(`[transport] refused to send as "${String(asked).slice(0, 8)}…": this transport does not hold that address — never sent as the primary instead`);
     }
@@ -530,7 +543,8 @@ export class Transport extends Emitter {
     // then is refused (`#senderFor`, the one rule every sending primitive shares). `_to` on an inbound envelope is
     // attacker-influenced; a bad value can at worst make an answer wait and fail, never claim an address that is not
     // ours and never speak as the primary to it.
-    const held = this.#senderFor(opts.from);
+    // an ANSWER (it names the HI it answers, `re`) speaks as an address the far end chose: refused at once if not held
+    const held = this.#senderFor(opts.from, { wait: !opts.re });
     const from = typeof held === 'string' ? held : await held;
     // `opts.re` — the `_id` of the HI this one ANSWERS.
     //

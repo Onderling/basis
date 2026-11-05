@@ -84,6 +84,34 @@ describe('an address we do not hold cannot be claimed', () => {
     } finally { vi.useRealTimers(); warn.mockRestore(); }
   });
 
+  it('an ANSWER to a HI (it names the HI it answers) dialled at an address we do not hold is refused AT ONCE — no wait, no timer', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const before = tx.sent.length;
+      const timers = vi.getTimerCount();
+      // no timers advanced: an inbound `_to` (attacker-influenced) must not park a waiter
+      await expect(tx.sendHello('peer-1', { pubKey: 'pk-self', ack: true }, { from: 'somebody-elses-address', re: 'hi-1' }))
+        .rejects.toMatchObject({ code: 'ADDRESS_NOT_HELD' });
+      expect(vi.getTimerCount(), 'no timer left behind').toBe(timers);
+      expect(tx.sent.length).toBe(before);
+    } finally { vi.useRealTimers(); warn.mockRestore(); }
+  });
+
+  it('at most eight sends wait for one address: the oldest waiting send is refused when a ninth arrives', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const sends = Array.from({ length: 9 }, () => tx.sendOneWay('peer', {}, { from: 'not-yet-bound' }));
+      const first = expect(sends[0]).rejects.toMatchObject({ code: 'ADDRESS_NOT_HELD' });
+      await vi.advanceTimersByTimeAsync(10);
+      await first;   // dropped as the ninth joined — long before the wait's own end
+      await tx.addAddress('not-yet-bound');
+      await Promise.all(sends.slice(1));
+      expect(tx.sent.filter((s) => s.envelope._from === 'not-yet-bound').length, 'the other eight went out as the address').toBe(8);
+    } finally { vi.useRealTimers(); warn.mockRestore(); }
+  });
+
   it('an address bound WHILE the send waits: the send goes out as that address', async () => {
     vi.useFakeTimers();
     try {

@@ -129,7 +129,7 @@ export function wireChat({
     // cross processes). Tag transport failures so `send()` can reproduce the
     // legacy `{ ok:false, reason:'transport: …' }` return WITHOUT swallowing a
     // later persist error (that still throws, as before).
-    send: async (to, wire) => {
+    send: async (to, wire, sendOpts = null) => {
       try {
         // Prefer the host-injected hold-forward sender: a briefly-offline peer has the
         // DM HELD + flushed on reconnect (it returns `{held:true}` rather than throwing),
@@ -137,8 +137,12 @@ export function wireChat({
         // mirroring the circle-broadcast reliable choke. Absent → the bare per-peer transport
         // (`agent.transportFor(to).sendOneWay`), where an unreachable peer soft-fails as before.
         if (typeof reliableSend === 'function') {
-          return await reliableSend(to, wire, { guarantee: 'hold-forward' });
+          // `sendOpts.sendAs` — the self this turn is sent AS (a persona answering in its own circle); absent = the
+          // device's general self, as before
+          return await reliableSend(to, wire, { guarantee: 'hold-forward', ...(sendOpts?.sendAs ? { sendAs: sendOpts.sendAs } : {}) });
         }
+        // without the host's sender there is no way to speak as another self: refuse rather than send as the general one
+        if (sendOpts?.sendAs) throw new Error('cannot send as another self without the host sender');
         const t = await agent.transportFor(to);
         return await t.sendOneWay(to, wire);
       } catch (err) {
@@ -312,11 +316,13 @@ export function wireChat({
       id:     freshNonce(),
       kind:   subtype,
       ts:     Date.now(),
-      author: localActor,
+      // the self it is sent AS (`args.sendAs`, a persona in its own circle) — never the general self's id inside a persona's turn
+      author: args.sendAs ?? localActor,
       body:   args.body ?? null,
       extras: {
         threadId:     args.threadId ?? null,
-        fromStableId: localStableId ?? null,
+        // the device's stable id is the GENERAL self's; a turn sent as another self carries none
+        fromStableId: args.sendAs ? null : (localStableId ?? null),
         toWebid,                 // persist-only routing fields
         toPubKey,
         // Phase 39 — `attachment` carries inline-bytes chat-image;
@@ -328,7 +334,7 @@ export function wireChat({
     // The shared core sends to the one peer (per-peer transport) and dedups; it keeps no copy of the turn.
     let localId = null;
     try {
-      const { itemId } = await deliverCore.deliver(envelope, { to: toPubKey });
+      const { itemId } = await deliverCore.deliver(envelope, { to: toPubKey, ...(args.sendAs ? { sendOpts: { sendAs: args.sendAs } } : {}) });
       localId = itemId ?? null;
     } catch (err) {
       // A tagged transport failure reproduces the legacy soft return; anything

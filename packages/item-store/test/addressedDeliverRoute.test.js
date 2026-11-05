@@ -42,6 +42,13 @@ describe('deliver — the route first, the person when the route does not delive
     expect(r.itemId, 'stored once').toBeTruthy();
   });
 
+  it('the fallback keeps WHO sends (a persona\'s turn stays the persona\'s) and drops only the circle scope', async () => {
+    const send = vi.fn(async (addr) => (addr === 'pair-addr' ? { delivered: false, held: true, reason: 'peer-unreachable' } : { delivered: true, held: false }));
+    const d = createAddressedDeliver({ send, itemStore: memStore() });
+    await d.deliver(env('m2b'), { to: 'person', deliverTo: 'pair-addr', sendOpts: { circleId: 'pair-x', sendAs: 'persona-key' } });
+    expect(send.mock.calls[1][2], 'the same sender, no circle scope').toEqual({ sendAs: 'persona-key' });
+  });
+
   it('a route that fails outright (the send threw) → the fallback still goes; without a route nothing changes', async () => {
     const send = vi.fn(async (addr) => { if (addr === 'pair-addr') throw new Error('transport failed'); return { delivered: true }; });
     const d = createAddressedDeliver({ send, itemStore: memStore() });

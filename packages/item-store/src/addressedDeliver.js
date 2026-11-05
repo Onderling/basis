@@ -205,7 +205,9 @@ export function createAddressedDeliver({
     // injected sender that returns nothing — is taken as delivered, or every routed turn would go twice.
     let fallback;
     if (routed && sent?.delivered === false) {
-      fallback = await send(to, wire);
+      // Plainly — no circle-scoped options — but as the SAME sender: dropping `sendAs` would speak as the device's
+      // general self in a turn that belongs to another of its selves.
+      fallback = sendOpts?.sendAs ? await send(to, wire, { sendAs: sendOpts.sendAs }) : await send(to, wire);
     }
     const { itemId, deduped } = await persistTurn(envelope, { to, direction: 'out' });
     return { sent, itemId, ...(fallback !== undefined ? { fallback } : {}), ...(deduped ? { deduped: true } : {}) };

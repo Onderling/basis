@@ -339,7 +339,7 @@ export async function createSecureAgent(opts = {}) {
     // bounded: a long-running device meets many senders (a Set iterates oldest first)
     while (receiveDropSaid.size > RECEIVE_DROP_SAID_MAX) receiveDropSaid.delete(receiveDropSaid.values().next().value);
     if (typeof console !== 'undefined') {
-      console.info(`[secure-agent] dropped an inbound envelope from ${from.slice(0, 12)}… (${reason}) — subtype ${env?.payload?.subtype ?? env?._p ?? '?'}; further drops of this kind from this sender are counted, not said`);
+      console.info(`[secure-agent] dropped an inbound envelope from …${from.slice(-6)} (${reason}) — subtype ${env?.payload?.subtype ?? env?._p ?? '?'}; further drops of this kind from this sender are counted, not said`);
     }
   };
   const muteBlockGate = async (env) => {

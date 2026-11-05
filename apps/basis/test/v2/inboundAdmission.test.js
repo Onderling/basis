@@ -88,4 +88,16 @@ describe('inbound admission at a function profile inbox', () => {
     expect(door.calls).toEqual(['/start GOOD']);
     expect(counted).toEqual([]);
   });
+
+  it('a person the door already admitted is no stranger: five turns a day, all admitted, no count line', async () => {
+    const counted = [];
+    // admitted by a code earlier: in no roster and no contact book, but the door holds them
+    const go = createInboundAdmission({
+      admit: async ({ uid }) => uid, isKnown: async () => false,
+      held: async (contactId) => contactId === 'household-member',
+      count: (e) => counted.push(e), now: () => 9,
+    });
+    for (let i = 0; i < 5; i += 1) expect((await go(msg('household-member', `turn ${i}`))).admitted, `turn ${i}`).toBe(true);
+    expect(counted).toEqual([]);
+  });
 });

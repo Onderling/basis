@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,5 +102,15 @@ describe('the bot answers its inbox on a function profile', () => {
     const reply = await until(async () => { const said = await botSaid(sender); return said.length > before ? said[said.length - 1] : null; }, { timeout: 30_000, step: 500 });
     expect(reply, `no answer to /gepland. Runner:\n${out.slice(-1200)}`).toMatch(/Gepland voor jou/);
     expect(reply).toMatch(/weekoverzicht/);
+  }, 90_000);
+
+  it('a person the door admitted writes five times in a row: every turn lands, none meets the stranger wall', async () => {
+    const card = cardFrom(out);
+    const texts = [1, 2, 3, 4, 5].map((i) => `boodschap nummer ${i}`);
+    for (const text of texts) await sender.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text }).sent;
+    const log = () => readdirSync(dataDir).filter((f) => f.startsWith('walk-log-')).flatMap((f) => readFileSync(path.join(dataDir, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)));
+    const landed = await until(async () => (texts.every((t) => log().some((e) => e.kind === 'contact-turn' && e.text === t)) ? true : null), { timeout: 30_000, step: 500 });
+    expect(landed, `not every turn landed: ${JSON.stringify(log().filter((e) => /contact-turn|stranger/.test(e.kind)).slice(-12))}`).toBe(true);
+    expect(log().filter((e) => e.kind === 'stranger-refused' && e.reason !== 'needs-code'), 'an admitted person met a stranger budget').toEqual([]);
   }, 90_000);
 });

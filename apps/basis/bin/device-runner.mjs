@@ -1055,6 +1055,9 @@ if (tgToken || inboxDoor.bridge) {
     inboundAdmit = createInboundAdmission({
       admit: doorAdmit,
       isKnown: (key) => agent.isKnownPeer?.(key) ?? false,
+      // someone the door already admitted (a code, a bootstrap id, a linked root) is a household member, never a stranger
+      held: async (contactId, { linkedRoot } = {}) => bootstrapUids.includes(contactId)
+        || Boolean(await botUsers.find?.('web', contactId, linkedRoot ? { linkedRoot } : {})),
       count: (e) => walkLog(e),   // kind + reason, never who
     });
   }

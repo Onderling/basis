@@ -45,6 +45,8 @@ function lru(cap) {
  * @param {(who: object) => Promise<any>} a.admit   the door's admission: a refusal is `{ refused: reason }`, else the caller
  * @param {(key: string) => Promise<boolean>|boolean} [a.isKnown]     a peer this device knows (no stranger budgets)
  * @param {(key: string) => Promise<boolean>|boolean} [a.answered]    the person or persona already answered this key
+ * @param {(contactId: string, o: {linkedRoot?: string}) => Promise<boolean>|boolean} [a.held]  the door already admitted
+ *   this person (a code, a bootstrap id, a linked root): someone it holds is no stranger, whatever book or roster says
  * @param {boolean} [a.open]   an open door: a stranger within budget is admitted without a code
  * @param {Partial<typeof STRANGER_LIMITS>} [a.limits]
  * @param {(e: {kind: string, reason: string}) => void} [a.count]  a count line: kind and reason, never who
@@ -52,7 +54,7 @@ function lru(cap) {
  * @returns {(m: {contactId: string, fromAddr: string, text: string, admission?: string, linkedRoot?: string, displayName?: string, channel?: string}) =>
  *   Promise<{ admitted: true, result: any, stranger: boolean } | { admitted: false, reason: string, tell: boolean }>}
  */
-export function createInboundAdmission({ admit, isKnown = null, answered = null, open = false, limits = {}, count = null, now = Date.now } = {}) {
+export function createInboundAdmission({ admit, isKnown = null, answered = null, held = null, open = false, limits = {}, count = null, now = Date.now } = {}) {
   if (typeof admit !== 'function') throw new TypeError('createInboundAdmission: admit is required');
   const L = { ...STRANGER_LIMITS, ...limits, perKey: { ...STRANGER_LIMITS.perKey, ...(limits.perKey ?? {}) } };
   const turnsByKey = lru(L.keysKept);   // key → timestamps of recent stranger turns
@@ -78,7 +80,9 @@ export function createInboundAdmission({ admit, isKnown = null, answered = null,
       if (seenIds.has(messageId)) return { admitted: false, reason: 'duplicate', tell: false };
       seenIds.set(messageId, true);
     }
-    const stranger = !(await yes(isKnown, key)) && !(await yes(isKnown, contactId)) && !(await yes(answered, contactId));
+    const isHeld = async () => { try { return typeof held === 'function' && (await held(contactId, { linkedRoot })) === true; } catch { return false; } };
+    // a stranger: not a peer this device knows, not someone it answered, and not someone the door already holds
+    const stranger = !(await yes(isKnown, key)) && !(await yes(isKnown, contactId)) && !(await yes(answered, contactId)) && !(await isHeld());
 
     if (stranger) {
       let bytes = Infinity;

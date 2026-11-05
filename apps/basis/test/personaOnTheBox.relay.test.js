@@ -81,4 +81,18 @@ describe('the box enrolled with a persona keeps that persona\'s circle as it', (
     // refuses a general-persona circle on a box that does not hold the general persona)
     expect(y.steps, `Y was not rejoined as W: ${JSON.stringify(y)}`).toContain('persona');
   }, 150_000);
+
+  // The SHARED path every shell takes (an exit naming this device's own self, folded) — not the household bot's own
+  // removal verdict, which has its own test (stillInCircle.test.js): a membership change landing in a persona's circle
+  // on the box leaves the box in it, and the circle's next line still lands there.
+  it('a membership change in Y lands on the box and the box keeps Y: the phone\'s next line lands there', async () => {
+    const said = await phone.agent.emitMemberProps?.({ circleIds: [Y], props: { handle: 'werk-nieuw' } });
+    expect(said, 'the phone said nothing on Y\'s membership lane').toBeTruthy();
+    await new Promise((r) => setTimeout(r, 3000));   // the statement reaches the box and is folded there
+    // the production send (append + fan + the carry to the person's own devices — the box is one of them)
+    const sent = await phone.agent.chatEmit(Y, { msgId: 'werk-1', ts: Date.now(), text: 'staat de box er nog?' });
+    expect(sent, 'the phone could not write in Y').toBeTruthy();
+    const landed = await until(async () => walkLog(dataDir).find((e) => e.kind === 'chat-landed' && e.circleId === Y && e.msgId === 'werk-1') ?? null, { timeout: 30_000, step: 500 });
+    expect(landed, `the box no longer holds Y after a membership change — walk-log kinds: ${JSON.stringify(Object.entries(walkLog(dataDir).reduce((a, e) => { a[e.kind] = (a[e.kind] ?? 0) + 1; return a; }, {})))}`).toBeTruthy();
+  }, 90_000);
 });

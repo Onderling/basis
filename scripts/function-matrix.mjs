@@ -46,7 +46,9 @@ export const FUNCTIONS = Object.freeze([
   { id: 'personas', name: 'Personas', cells: {
     web: P('apps/basis/test-browser/persona-switcher.spec.js'),
     mobile: null,   // personaSwitcherParity is a parity test
-    box: null,      // REQUIRED: a box enrolled with persona W keeps W's circle as W, never the general persona
+    // a box enrolled with persona W rejoins W's circle as W (never the general persona) and keeps it through a membership
+    // change — named by Fable 2026-11-05
+    box: { file: 'apps/basis/test/personaOnTheBox.relay.test.js', test: 'on its first start it rejoins Y AS W' },
   } },
   { id: 'pod-sync', name: 'Syncing through a pod', cells: {
     web: null,      // walk-pod only LOGS its findings and passes regardless — no proof (and no person can make a pod circle yet, L571)

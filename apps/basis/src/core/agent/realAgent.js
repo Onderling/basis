@@ -738,8 +738,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     ...(personAddress() ? [{ address: personAddress(), sign: personAddressSigner() }] : []),
     ...[deviceBindingOf(persona)].filter(Boolean),
   ];
-  const secureAgentRef = { current: null };
-  const isKnownPeerRef = { current: null };   // the wire gate's "do I know this caller" (makeIsKnownPeer), bound once its sources exist   // late-bound: the secure agent is created further down this scope
+  const secureAgentRef = { current: null };   // late-bound: the secure agent is created further down this scope
+  const isKnownPeerRef = { current: null };   // the wire gate's "do I know this caller" (makeIsKnownPeer), bound once its sources exist
   const registerPersonIdentity = () => {
     const sa2 = secureAgentRef.current;
     if (!sa2 || !persona.personIdentity) return;

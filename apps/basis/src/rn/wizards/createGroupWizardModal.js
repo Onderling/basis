@@ -25,6 +25,7 @@ import {
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
   CIRCLE_KINDS, setKind, setSize, setStoragePolicy, setChatEnabled, chatAdvice, policyPatchFromState,
+  LLM_TOOL_CHOICES, AGENTS_CHOICES, FEATURE_CHOICES, setLlmTool, setAgents, setConsensus, setFeature,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
   // The persona the circle is founded as (web parity).
@@ -444,6 +445,33 @@ export default function CreateGroupWizardModal({
                     </Text>
                   </>
                 )}
+                {/* A preset is a starting point: every axis the circle's policy has is the person's to change here (web parity). */}
+                <RadioGroup
+                  label={t('circle.settings.llmTool')}
+                  value={state.llmTool}
+                  options={LLM_TOOL_CHOICES.map((o) => ({ id: o.id, label: t(o.labelKey) }))}
+                  onChange={(v) => setState((s) => setLlmTool(s, v))}
+                />
+                <RadioGroup
+                  label={t('circle.settings.agents')}
+                  value={state.agents}
+                  options={AGENTS_CHOICES.map((o) => ({ id: o.id, label: t(o.labelKey) }))}
+                  onChange={(v) => setState((s) => setAgents(s, v))}
+                />
+                <Checkbox
+                  label={t('circle.settings.consensus_label')}
+                  checked={state.consensusRequired === true}
+                  onToggle={() => setState((s) => setConsensus(s, s.consensusRequired !== true))}
+                />
+                <Text style={styles.podDisclosure}>{t('circle.settings.features')}</Text>
+                {FEATURE_CHOICES.filter((f) => !(f.id === 'chat' && state.kind === 'neighbourhood')).map((f) => (
+                  <Checkbox
+                    key={f.id}
+                    label={t(f.labelKey)}
+                    checked={state.features?.[f.id] === true}
+                    onToggle={() => setState((s) => setFeature(s, f.id, s.features?.[f.id] !== true))}
+                  />
+                ))}
               </Body>
             )}
             {state.step === REVIEW_STEP && (() => {
@@ -484,6 +512,11 @@ export default function CreateGroupWizardModal({
                     { label: t('circle.wizard.create.review_expiry'),    value: String(state.inviteExpiresInHours) },
                     { label: t('circle.invite.ceiling_review'), value: String(state.inviteMaxRedemptions) },
                     { label: t('circle.wizard.create.review_storage'),     value: labelOf(STORAGE_POLICIES, state.storagePolicy) },
+                    // every axis the person could change, read back before the create (web parity)
+                    { label: t('circle.settings.llmTool'),    value: t(LLM_TOOL_CHOICES.find((o) => o.id === state.llmTool)?.labelKey ?? 'circle.settings.opt.off') },
+                    { label: t('circle.settings.agents'),     value: t(AGENTS_CHOICES.find((o) => o.id === state.agents)?.labelKey ?? 'circle.settings.opt.admin-approval') },
+                    { label: t('circle.settings.whoDecides'), value: t(`circle.settings.whoDecides_opt.${state.consensusRequired === true ? 'admin-quorum' : 'any-admin'}`) },
+                    { label: t('circle.settings.features'),   value: FEATURE_CHOICES.filter((f) => state.features?.[f.id] === true).map((f) => t(f.labelKey)).join(', ') || '—' },
                     ...(state.groupPodUri  ? [{ label: t('circle.wizard.create.review_pod'), value: state.groupPodUri, monospace: true }] : []),
                     ]),
                   ]} />

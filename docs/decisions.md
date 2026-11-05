@@ -1338,7 +1338,7 @@ row (bot-only, never fanned); `enrolForgets` keeps its cc-help special case. Led
 Three calls from the Saturday sitting. (1) **Relays refer, never host.** A relay forwards a feed ask to the node that
 announced it serves feeds (the companion, the person's always-on device) and never holds or serves a feed itself; a
 desktop relay from the installer is the same relay role; when relay and companion run in one process, the companion
-flag serves the feed. (Installer plan §6 Q5.) (2) **Feedback ≠ help.** Help is internal to Basis (the help bot, the
+flag serves the feed. (2) **Feedback ≠ help.** Help is internal to Basis (the help bot, the
 local deck, L435 as a contact). Feedback is a SEPARATE contact, "Onderling", the maker's agent persona on an always-on
 device (L419), seeded in every install in place of the accidental household-bot card (L397); a feedback door is
 reachable from any place in the app (the gear, the + sheet), and a circle or bot may offer its own feedback command as

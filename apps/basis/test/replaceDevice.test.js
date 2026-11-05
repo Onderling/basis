@@ -12,7 +12,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import {
-  bootRealAgentNode, connectNodesOverBus, pairCircle, sealCircleViaProducer, postSealed, readSealed, until, teardown,
+  bootRealAgentNode, connectNodesOverBus, pairCircle, bindCircleAddresses, sealCircleViaProducer, postSealed, readSealed, until, teardown,
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
@@ -77,6 +77,9 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const addrA = A.agent.circleAddressFor(GROUP);
     const addrA2 = A2.agent.circleAddressFor(GROUP);
     expect(addrA2).toBe(addrA);   // one address per persona per circle
+    // the new phone's circle address bound on its transport, as a shell's presence step binds it on connect (until it is,
+    // a send as that address waits — it is never sent as the device's main address instead)
+    await bindCircleAddresses([A2], GROUP);
     const mine = ownAnnouncementFor({ agent: A2.agent, circleId: GROUP });
     for (const node of [A, B, A2]) {
       await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...mine });

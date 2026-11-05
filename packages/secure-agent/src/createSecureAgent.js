@@ -763,7 +763,14 @@ export async function createSecureAgent(opts = {}) {
   const helloedPeers = new Set();
   /** helloKey → the handshake currently running for that peer; later sends await it instead of starting another. */
   const hiInFlight = new Map();
-  const helloKey = (addr, sendAs = null) => `${addr}|${sendAs ?? ''}`;
+  // A hello is per peer, per speaker AND per route: having introduced a circle address to a peer over one relay says
+  // nothing about the other. A circle that rides two connection points sends over either; the far end on the second
+  // point has never seen the address introduced there, refuses what follows (UNKNOWN_SENDER), and — before the
+  // transport stopped swapping identities — only accepted it because it arrived from the main address instead.
+  const routeIds = new WeakMap();
+  let routeSeq = 0;
+  const routeIdOf = (tx) => { if (!tx || typeof tx !== 'object') return ''; if (!routeIds.has(tx)) routeIds.set(tx, ++routeSeq); return String(routeIds.get(tx)); };
+  const helloKey = (addr, sendAs = null, tx = null) => `${addr}|${sendAs ?? ''}|${routeIdOf(tx)}`;
   // Reciprocal HIs are tracked SEPARATELY from `helloedPeers`, and the difference matters.
   //
   // `helloedPeers` answers the SEND path's question: "have I announced myself to this peer, so may I
@@ -1458,7 +1465,8 @@ export async function createSecureAgent(opts = {}) {
           // Answer AS the address they dialled (G13). Without `from`, the reply carries our canonical
           // address, the peer files our key under that, and it keeps waiting for a key under the alias it
           // sent to — so a handshake to a per-circle address never completes. `Transport.sendHello`
-          // validates the claim against our own addresses and falls back to the primary.
+          // validates the claim against our own addresses: one it does not hold waits to be bound, then is refused —
+          // never answered as the primary.
           // Decision 4 — answer with the key that BELONGS to the address they dialled. They
           // dialled a per-circle address; replying with our canonical pubKey would hand them (and
           // the relay, in cleartext, via `_to`) the link between that address and the identity the
@@ -2472,7 +2480,7 @@ export async function createSecureAgent(opts = {}) {
       console.info(`[secure-agent] "${sel.name}" cannot carry per-circle addresses — speaking as the canonical `
         + `identity for this send (the accepted address fallback), not as ${String(sendAs).slice(0, 16)}…`);
     }
-    if (!helloedPeers.has(helloKey(addr, speakAs))) {
+    if (!helloedPeers.has(helloKey(addr, speakAs, tx))) {
       // The peer's key is known once its reciprocal HI has registered it at our
       // SecurityLayer.  Treated as "known" when there is no SecurityLayer to
       // consult, so a plaintext transport never blocks on a handshake it can't
@@ -2510,7 +2518,7 @@ export async function createSecureAgent(opts = {}) {
       // cost three 15 s waits with re-announces, in parallel. A handshake is per peer, not per message, so
       // later sends join the in-flight one and share its outcome (their delivery-failure counts still tick
       // individually, which is what retires a dead address after the FIRST shared timeout, not the third).
-      const hiKey = helloKey(addr, speakAs);
+      const hiKey = helloKey(addr, speakAs, tx);
       const handshake = async () => {
         await announceHi();
         // Wait for the peer's reciprocal HI to register their pubKey at our
@@ -2568,7 +2576,7 @@ export async function createSecureAgent(opts = {}) {
       await inflight;
       // Only mark as helloed after the bidirectional handshake fully
       // completed (or wasn't needed because we already had their key).
-      helloedPeers.add(helloKey(addr, speakAs));
+      helloedPeers.add(helloKey(addr, speakAs, tx));
       // Phase-2 · Piece-2b (population) — now that HI resolved a live route to
       // this peer, record its transport-appropriate wire address into the
       // app-owned PeerGraph attached on the shared router, so LATER sends
@@ -2605,7 +2613,7 @@ export async function createSecureAgent(opts = {}) {
       // No answer at all: the peer may have RESTARTED and forgotten our key (a node keeps its peers' keys in memory),
       // so everything we send it is dropped unread — and since we already said hello, we never would again. Forget
       // that we did: the next call announces us once more, and a peer that is back answers it.
-      if (/Timeout waiting for reply/i.test(String(result.error ?? ''))) { helloedPeers.delete(helloKey(addr, null)); forgetHello(agent, addr); }
+      if (/Timeout waiting for reply/i.test(String(result.error ?? ''))) { helloedPeers.delete(helloKey(addr, null, sel.transport)); forgetHello(agent, addr); }
       throw new Error(result.error ?? `Skill "${skillId}" failed`);
     }
     return result.parts;

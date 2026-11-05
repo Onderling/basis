@@ -139,10 +139,10 @@ export async function primeCircleSecurity({ agent, circleIds = null, onWarn = nu
   //    comment comes to promise something the code beneath it does not do. Kept, rewritten, because the
   //    REASON it moved is the part worth having:
   //
-  //    ⚠ ORDER MATTERS, and getting it wrong is silent. An announcement sent before the per-circle alias
-  //    is bound to the transport goes out signed by our CANONICAL key ("asked to send as … which this
-  //    transport does not hold — falling back to the primary address"), and since per-circle signing
-  //    became enforced every recipient refuses it as
+  //    ⚠ ORDER MATTERS. An announcement sent before the per-circle alias is bound to the transport used to go
+  //    out signed by our CANONICAL key (the transport swapped in the primary address; it no longer does — the
+  //    send now waits for the alias to be bound, then is refused), and since per-circle signing
+  //    became enforced every recipient refused it as
   //    `a-members-canonical-key-where-they-sign-per-circle`. Measured in the three-party run: a joiner's
   //    announcement was refused by all recipients, and the fan reported success.
   //

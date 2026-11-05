@@ -70,16 +70,57 @@ describe('an address we do not hold cannot be claimed', () => {
   let tx;
   beforeEach(() => { tx = new RecordingTransport({ identity, address: 'primary-addr' }); });
 
-  it('falls back to the primary for an unknown address — LOUDLY', async () => {
+  it('REFUSES an address it does not hold — after waiting for it to be bound — and never sends as the primary instead', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.useFakeTimers();
     try {
-      await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'somebody-elses-address' });
-      expect(tx.sent.at(-1).envelope._from).toBe('primary-addr');
-      // Frits (review, 2026-07-30): the fallback is safe against hostile input, but a genuine wiring
-      // mistake must not look like success — the warn is the trace.
-      expect(warn).toHaveBeenCalledOnce();
-      expect(String(warn.mock.calls[0][0])).toMatch(/does not hold/);
-    } finally { warn.mockRestore(); }
+      const before = tx.sent.length;
+      const sending = tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'somebody-elses-address' });
+      const refused = expect(sending).rejects.toMatchObject({ code: 'ADDRESS_NOT_HELD' });
+      await vi.advanceTimersByTimeAsync(31_000);
+      await refused;
+      expect(tx.sent.length, 'nothing went out — least of all as the primary').toBe(before);
+      expect(String(warn.mock.calls.at(-1)?.[0])).toMatch(/refused to send as/);
+    } finally { vi.useRealTimers(); warn.mockRestore(); }
+  });
+
+  it('an ANSWER to a HI (it names the HI it answers) dialled at an address we do not hold is refused AT ONCE — no wait, no timer', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const before = tx.sent.length;
+      const timers = vi.getTimerCount();
+      // no timers advanced: an inbound `_to` (attacker-influenced) must not park a waiter
+      await expect(tx.sendHello('peer-1', { pubKey: 'pk-self', ack: true }, { from: 'somebody-elses-address', re: 'hi-1' }))
+        .rejects.toMatchObject({ code: 'ADDRESS_NOT_HELD' });
+      expect(vi.getTimerCount(), 'no timer left behind').toBe(timers);
+      expect(tx.sent.length).toBe(before);
+    } finally { vi.useRealTimers(); warn.mockRestore(); }
+  });
+
+  it('at most eight sends wait for one address: the oldest waiting send is refused when a ninth arrives', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const sends = Array.from({ length: 9 }, () => tx.sendOneWay('peer', {}, { from: 'not-yet-bound' }));
+      const first = expect(sends[0]).rejects.toMatchObject({ code: 'ADDRESS_NOT_HELD' });
+      await vi.advanceTimersByTimeAsync(10);
+      await first;   // dropped as the ninth joined — long before the wait's own end
+      await tx.addAddress('not-yet-bound');
+      await Promise.all(sends.slice(1));
+      expect(tx.sent.filter((s) => s.envelope._from === 'not-yet-bound').length, 'the other eight went out as the address').toBe(8);
+    } finally { vi.useRealTimers(); warn.mockRestore(); }
+  });
+
+  it('an address bound WHILE the send waits: the send goes out as that address', async () => {
+    vi.useFakeTimers();
+    try {
+      const sending = tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-new' });
+      await vi.advanceTimersByTimeAsync(500);
+      await tx.addAddress('circle-addr-new');
+      await sending;
+      expect(tx.sent.at(-1).envelope._from).toBe('circle-addr-new');
+    } finally { vi.useRealTimers(); }
   });
 
   it('an ordinary hello, and a held alias, warn about nothing', async () => {
@@ -105,8 +146,16 @@ describe('an address we do not hold cannot be claimed', () => {
     expect(tx.sent.at(-1).envelope._from).toBe('circle-addr-circle');
 
     await tx.removeAddress?.('circle-addr-circle');
-    await tx.sendHello('p', { pubKey: 'pk-self' }, { from: 'circle-addr-circle' });
-    expect(tx.sent.at(-1).envelope._from).toBe('primary-addr');
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const before = tx.sent.length;
+      const sending = tx.sendHello('p', { pubKey: 'pk-self' }, { from: 'circle-addr-circle' });
+      const refused = expect(sending).rejects.toMatchObject({ code: 'ADDRESS_NOT_HELD' });
+      await vi.advanceTimersByTimeAsync(31_000);
+      await refused;
+      expect(tx.sent.length, 'refused, not sent as the primary').toBe(before);
+    } finally { vi.useRealTimers(); warn.mockRestore(); }
   });
 });
 

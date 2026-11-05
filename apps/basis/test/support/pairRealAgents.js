@@ -695,6 +695,19 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
       circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
       alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],   // the person address, as the shells register it
     });
+    // …and on EVERY other relay socket the node holds, as the shells register (`registerCircleAddressesOnRelays` over
+    // `agent.relays.list()`): a circle that rides two connection points has its address bound on both. Binding only the
+    // first left the second unable to send as the circle address — hidden while the transport swapped in the main
+    // address, which it no longer does.
+    for (const r of (n.agent?.relays?.list?.() ?? [])) {
+      if (!r?.port || r.port === transport || !r.port.supportsAliases || !rest.length) continue;
+      await registerCircleAddresses({
+        transport: r.port, relayUrl: r.url, circleIds: rest,
+        circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
+        circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
+        alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],
+      });
+    }
   }
 }
 

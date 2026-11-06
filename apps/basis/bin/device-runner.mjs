@@ -1640,6 +1640,10 @@ const stop = async () => {
   // loses the last change — a roster row learned a moment before a deploy's restart, and the box came
   // back not knowing a device it had just met (2026-09-14). The waiting saves are made now, and awaited.
   await flushPendingSaves();
+  // …and say goodbye at the relay: the shutdown resolves once every socket's close has completed, so the relay stops
+  // counting this box as a holder of its addresses BEFORE the process is gone — never a window in which a frame for
+  // them is handed to a box that has stopped reading. Bounded per socket inside the transport.
+  try { await agent.sa?.shutdown?.(); } catch { /* stopping is best-effort */ }
   process.exit(0);
 };
 process.on('SIGINT', stop);

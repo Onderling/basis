@@ -6687,7 +6687,7 @@
     },
     "surface_pref": {
       "text": "How the bot shows actions",
-      "doc": "S6.C — surface-preference section heading."
+      "doc": "Heading of the setting for how a bot that ACTS shows its actions (buttons, a screen, or words). Shown only when the person has a contact bot other than Help: Help only answers, so the setting does not apply to it (showsBotActionsSetting)."
     },
     "language": {
       "text": "Language",

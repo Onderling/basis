@@ -58,6 +58,9 @@ export const SEAMS = Object.freeze([
   // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
   // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
   { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
+  // A SETTING ONLY WHERE IT CHANGES SOMETHING: 'How the bot shows actions' is about a bot that acts; Help only answers.
+  // Each host reads the contact book through one predicate before it offers the setting (a walk saw it with no bot).
+  { id: 'bot-actions-only-with-a-bot', pattern: /showsBotActionsSetting\(/, shells: ['web', 'mobile'], why: 'a person whose only bot is Help sees a bot setting that changes nothing' },
   { id: 'role-change-forwarded-words', pattern: /roleChangeNoticeWords\(/, shells: ['web', 'mobile'], why: 'a forwarded role change read as done before the main device signed it' },
   { id: 'own-spine-outbox-said', pattern: /'ownSpineOutbox'/, why: 'a change that waited days for the main device, or was dropped, would be said nowhere' },
   { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },

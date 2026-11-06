@@ -64,7 +64,7 @@ import { deviceListWords } from '../../../../basis/src/v2/mijWords.js';   // nev
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
-export default function CircleMyDataScreen({ selvesOn = null, callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
+export default function CircleMyDataScreen({ selvesOn = null, showBotActions = false, callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
   eventLog = null,
   // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
   frequent = [], onClearFrequent = null,
@@ -457,7 +457,8 @@ export default function CircleMyDataScreen({ selvesOn = null, callSkill, onBack,
         ) : null}
       </>
     ),
-    'bot-actions': () => (
+    // only for a person with a bot that acts (a contact bot other than Help): the launcher reads it (showsBotActionsSetting)
+    'bot-actions': () => (showBotActions ? (
       <>
         <Section title={t('circle.mydata.surface_pref')}>
           {['inline', 'screen', 'chat'].map((opt) => (
@@ -480,7 +481,7 @@ export default function CircleMyDataScreen({ selvesOn = null, callSkill, onBack,
           ) : null}
         </Section>
       </>
-    ),
+    ) : null),
     'week-overview': () => (
       <>
         {weekOn !== undefined ? (

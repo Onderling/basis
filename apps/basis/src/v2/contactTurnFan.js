@@ -33,6 +33,7 @@
 
 /** The wire subtype for a turn fanned to the owner's own devices. */
 import { makeSiblingCarry } from './siblingCarry.js';
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 export const CONTACT_TURN_BROADCAST = 'device-contact-turn';
 
@@ -175,17 +176,19 @@ export function makeContactTurnPeerHandler({ siblings, selfPubKey, applyTurn, on
   const refuse = (reason, fromAddr) => { try { onRefused?.(reason, fromAddr); } catch { /* observability never throws */ } };
 
   return async function onOwnDeviceContactTurn(fromAddr, payload) {
-    if (!payload || payload.subtype !== CONTACT_TURN_BROADCAST) return;   // not ours
+    if (!payload || payload.subtype !== CONTACT_TURN_BROADCAST) return NOT_TAKEN;   // not ours
     const wire = contactTurnToWire(payload.turn);
-    if (!wire) { refuse('malformed', fromAddr); return; }
+    if (!wire) { refuse('malformed', fromAddr); return NOT_TAKEN; }
     // The profile address is NOT one of my devices here: every device of the person speaks as it, a
     // revoked one included, and revocation retires per-circle addresses only. A turn from one of my
     // own devices arrives from that device's proven address in a circle we share (2026-09-14).
     let addrs = [];
-    try { addrs = (await siblings()) ?? []; } catch { refuse('siblings-unavailable', fromAddr); return; }
-    if (!addrs.includes(fromAddr)) { refuse('not-a-sibling', fromAddr); return; }
+    try { addrs = (await siblings()) ?? []; } catch { refuse('siblings-unavailable', fromAddr); return NOT_TAKEN; }
+    // a sibling this device has not folded yet is the commonest case: refused now, its next copy must be handed on
+    if (!addrs.includes(fromAddr)) { refuse('not-a-sibling', fromAddr); return NOT_TAKEN; }
     // A landed turn never throws into the router — but a shell whose landing failed must hear of it, or the
     // turn vanishes between "received" and "shown" with no line anywhere (2026-09-19).
-    try { await applyTurn(wire, { fromAddr }); } catch (err) { refuse(`apply-failed: ${err?.message ?? err}`, fromAddr); }
+    try { await applyTurn(wire, { fromAddr }); } catch (err) { refuse(`apply-failed: ${err?.message ?? err}`, fromAddr); return NOT_TAKEN; }
+    return undefined;
   };
 }

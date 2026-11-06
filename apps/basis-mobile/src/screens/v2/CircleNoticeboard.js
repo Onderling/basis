@@ -195,7 +195,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       else if (action === 'mute' && post.addedBy) {
         // BLOCK the person — both halves, one act (web parity). Keyed on the webid, which is what
         // makes it a block of a PERSON rather than of one address.
-        await callSkill('basis', 'mute', { peer: post.addedBy });
+        await callSkill('basis', 'mute', { peer: post.addedBy, ...(post.addedByLabel ? { label: post.addedByLabel } : {}) });
         try { onPeerMuted?.(); } catch { /* the chat hide-set refresh is best-effort */ }
       }
     } catch { /* reload reflects the real state */ }

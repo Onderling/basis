@@ -600,6 +600,10 @@ export default function CircleLauncherScreen({
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
+  // does this device know a relay at all (the relay question's own predicate)? true until read, so no false warning;
+  // re-read on every view change (a relay added on the connection points comes back to a composer that knows it)
+  const [relayKnown, setRelayKnown] = useState(true);
+  useEffect(() => { relayQuestion.knows().then(setRelayKnown).catch(() => {}); }, [view]);
   const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
   // the screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name
   const feedbackScreenRef = useRef(null);
@@ -2394,6 +2398,7 @@ export default function CircleLauncherScreen({
       return (
         <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
+            noRelay={!relayKnown}
             bundle={bundle}
             contact={contactThread}
             draft={contactThread?.draft ?? ''}
@@ -2673,6 +2678,7 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        noRelay={!relayKnown}
         pagesBook={screensBook}
         onCloseRemoved={async () => {
           const id = selected?.id;
@@ -3135,6 +3141,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
+  // this device knows no relay: the composer says the message waits (the relay question's predicate, web parity)
+  noRelay = false,
   // "Pin to +" on an attach entry (`onPinEntry(entry)`), and a bookmark opened from the "+" sheet (`openOp`: that op's
   // form, run once the circle's menu has resolved, then `onOpenOpDone()`)
   onPinEntry = null, openOp = null, onOpenOpDone = null,
@@ -5121,6 +5129,7 @@ function CircleDetail({
             ))}
           </View>
         ) : null}
+        {noRelay ? <Text style={styles.placeholder} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
         <View style={styles.composer} testID="circle-detail-composer">
           {attachEntries.length > 0 ? (
             <Pressable

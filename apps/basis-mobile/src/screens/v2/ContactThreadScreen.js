@@ -27,7 +27,7 @@ import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circ
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
-export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '' }) {
+export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '', noRelay = false }) {
   const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
@@ -378,6 +378,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
           ))}
         </View>
       )}
+      {/* no connection point: the composer says the message waits (the host's relay-question predicate; web parity) */}
+      {noRelay ? <Text style={styles.suggestHint} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
       <View style={styles.composer}>
         <TextInput
           style={styles.input}

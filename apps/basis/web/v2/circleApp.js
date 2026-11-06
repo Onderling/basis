@@ -4949,7 +4949,8 @@ async function showMyData(opts) {
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
   // same capability, and the manifest stops describing what the buttons do.
-  const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
+  // the provider the person named (the field on My data), else the default
+  const onSignIn = (issuer = null) => Promise.resolve(rawCallSkill('basis', 'signin', issuer ? { issuer } : {}))
     .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
   // launch the existing restore wizard in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
@@ -5066,7 +5067,7 @@ async function showMyData(opts) {
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,
-    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
+    onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,

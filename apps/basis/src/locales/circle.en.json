@@ -46,11 +46,11 @@
     },
     "offerings_default": {
       "label": {
-        "text": "This circle is about offering-matching — sharing your offerings (as a category) is on.",
+        "text": "This circle is about matching what people offer. Showing the kind of thing you offer is on.",
         "doc": "Fold-in phase C (Q3) — pre-checked, uncheckable wizard line when the joined circle's invite carries the offering-matching signal; checked = disclose offering keys at the coarse 'category' rung for the chosen persona."
       },
       "hint": {
-        "text": "Only the category is shared, never the text or tags. Uncheck if you'd rather not share your offerings here — you can change this later under Me → personas.",
+        "text": "Only the kind is shown, never the text or tags. Untick it if you would rather not show it here. You can change this later under Me → personas.",
         "doc": "Fold-in phase C (Q3) — explains the coarse rung + how to change it later; shown under the pre-checked line."
       }
     },
@@ -2047,7 +2047,7 @@
     },
     "kind": {
       "offering": {
-        "text": "One of your offerings",
+        "text": "Something you offer",
         "doc": "Entrust picker — grant kind offering: group label above your offerings (only offerings you hold)."
       },
       "resource": {
@@ -2960,7 +2960,7 @@
   },
   "offerings": {
     "editor_title": {
-      "text": "Offering",
+      "text": "What you offer",
       "doc": "Offering editor heading (board 8)."
     },
     "matches_title": {
@@ -3178,7 +3178,7 @@
   },
   "offeringMatches": {
     "title": {
-      "text": "Members with matching offerings:",
+      "text": "Members who offer something that fits:",
       "doc": "Heading for the inline offering-match list (P6.7 #345) appended under /find replies."
     }
   },
@@ -3530,7 +3530,7 @@
       "doc": "Visibility banner heading while announcing (Nearby step E)."
     },
     "visible_body": {
-      "text": "People nearby can see your name and published offerings while this screen is open.",
+      "text": "People nearby can see your name and what you offer while this screen is open.",
       "doc": "Visibility banner body while announcing — says exactly what is shared."
     },
     "hidden_title": {
@@ -3606,8 +3606,8 @@
       "doc": "Board 8C — heading of the dedicated `HIER` screen (P6.8)."
     },
     "header": {
-      "text": "{{sharing}} of {{total}} share offerings with you",
-      "doc": "Header line above the row list."
+      "text": "{{sharing}} people here show what they offer",
+      "doc": "Nearby's top line when more than one person here shows what they offer (their aanbod). 'Offerings' never reaches the screen."
     },
     "header_empty": {
       "text": "Nobody nearby right now.",
@@ -3622,7 +3622,7 @@
       "doc": "Footer block heading; shows your own pseudonym + published-tier skills."
     },
     "own_profile_empty": {
-      "text": "You haven't published any offerings yet.",
+      "text": "You are not showing anything you offer yet.",
       "doc": "Footer when no skills are published."
     },
     "delivery_fallback_note": {
@@ -3744,6 +3744,14 @@
     "no_name_yet": {
       "text": "you (no name yet)",
       "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
+    },
+    "header_one": {
+      "text": "{{name}} shows what they offer",
+      "doc": "Nearby's top line when one person here shows what they offer; {{name}} is their label."
+    },
+    "header_none": {
+      "text": "Nobody here is showing what they offer yet",
+      "doc": "Nearby's top line when people are here but none shows what they offer."
     }
   },
   "viewAsSplit": {
@@ -6222,19 +6230,19 @@
       "doc": "S2 — transient save state."
     },
     "offerings": {
-      "text": "Offerings",
+      "text": "What you offer",
       "doc": "S2 — personal offerings section. (Web editor retired in fold-in phase C; mobile CircleProfileScreen still renders it until the mobile mirror lands.)"
     },
     "offerings_moved": {
-      "text": "Offerings now live under Me → personas",
+      "text": "What you offer now lives under Me → personas",
       "doc": "Fold-in phase C — quiet pointer row on the Profiel screen, replacing the retired skills editor; opens the Mij persona surface."
     },
     "no_offerings": {
-      "text": "No offerings yet.",
+      "text": "Nothing offered yet.",
       "doc": "S2 — empty offerings state."
     },
     "pick_offering": {
-      "text": "Pick an offering…",
+      "text": "Pick something you offer…",
       "doc": "S2 — offering-category select placeholder."
     },
     "add_offering": {
@@ -6242,7 +6250,7 @@
       "doc": "S2 — add an offering button."
     },
     "remove_offering": {
-      "text": "Remove offering",
+      "text": "Remove this",
       "doc": "S2 — a11y label for the per-offering remove button."
     },
     "location": {
@@ -7558,11 +7566,11 @@
       "doc": "mij#personas — property without a value on the general persona."
     },
     "offerings_label": {
-      "text": "Offerings",
+      "text": "What you offer",
       "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ offering",
+      "text": "+ something you offer",
       "doc": "mij#personas — dashed add button (potential-action grammar)."
     },
     "offering_text_ph": {
@@ -8174,7 +8182,7 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "offering_add": {
-        "text": "+ Add another offering",
+        "text": "+ Add something else",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "creating": {
@@ -8222,7 +8230,7 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "review_offerings": {
-        "text": "Offerings",
+        "text": "What members offer",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "review_storage": {
@@ -8280,7 +8288,7 @@
         "doc": "Mobile create-wizard, step 3 heading."
       },
       "step_offerings": {
-        "text": "Offerings (optional)",
+        "text": "What members offer (optional)",
         "doc": "Mobile create-wizard, step 4 heading."
       },
       "step_tech": {
@@ -8288,7 +8296,7 @@
         "doc": "Mobile create-wizard, step 5 heading."
       },
       "offering_remove_row": {
-        "text": "Remove offering",
+        "text": "Remove this",
         "doc": "Mobile create-wizard: remove one offering row."
       },
       "step_identity_intro": {
@@ -8304,7 +8312,7 @@
         "doc": "Create wizard step 3 body."
       },
       "step_offerings_intro": {
-        "text": "What members can do or offer here. Each offering has a name and four axes (openness, posture, status, radius). You can skip this and edit it later.",
+        "text": "What members can do or offer here. Each has a name and four axes (openness, posture, status, radius). You can skip this and edit it later.",
         "doc": "Create wizard step 4 body."
       },
       "step_tech_intro": {
@@ -8340,7 +8348,7 @@
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
       },
       "dot_offerings": {
-        "text": "Offerings",
+        "text": "What members offer",
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
       },
       "dot_tech": {

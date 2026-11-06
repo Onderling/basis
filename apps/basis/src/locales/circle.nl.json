@@ -3611,8 +3611,8 @@
       "doc": "Board 8C — heading of the `HIER` screen (P6.8)."
     },
     "header": {
-      "text": "{{sharing}} van {{total}} delen aanbod met jou",
-      "doc": "Header line."
+      "text": "{{sharing}} mensen hier laten zien wat ze aanbieden",
+      "doc": "Nearby's top line when more than one person here shows what they offer (their aanbod). 'Offerings' never reaches the screen."
     },
     "header_empty": {
       "text": "Op dit moment niemand in de buurt.",
@@ -3749,6 +3749,14 @@
     "no_name_yet": {
       "text": "jij (nog geen naam)",
       "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
+    },
+    "header_one": {
+      "text": "{{name}} laat zien wat hij aanbiedt",
+      "doc": "Nearby's top line when one person here shows what they offer; {{name}} is their label."
+    },
+    "header_none": {
+      "text": "Nog niemand hier laat zien wat hij aanbiedt",
+      "doc": "Nearby's top line when people are here but none shows what they offer."
     }
   },
   "viewAsSplit": {

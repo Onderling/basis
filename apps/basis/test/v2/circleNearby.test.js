@@ -7,7 +7,9 @@ import {
 } from '../../src/v2/circleNearby.js';
 
 const t = (key, vars = {}) => {
-  if (key === 'circle.nearbyScreen.header')      return `${vars.sharing} of ${vars.total} share skills with you`;
+  if (key === 'circle.nearbyScreen.header')      return `${vars.sharing} people here show what they offer`;
+  if (key === 'circle.nearbyScreen.header_one')  return `${vars.name} shows what they offer`;
+  if (key === 'circle.nearbyScreen.header_none') return `Nobody here is showing what they offer yet`;
   if (key === 'circle.nearbyScreen.header_empty') return `Nobody nearby right now.`;
   if (key === 'circle.nearbyScreen.anon_peer')   return `someone`;
   return key;
@@ -135,7 +137,16 @@ describe('buildNearbyModel', () => {
       { pubKey: 'c', skills: [] },
     ];
     const m = buildNearbyModel({ peers, mySkills: ['x'], t });
-    expect(m.headerLabel).toBe('1 of 3 share skills with you');
+    expect(m.headerLabel).toBe('someone shows what they offer');
+  });
+
+  // 'offerings' never reaches the screen (the sitting's ruling): the header says who shows what they offer, by name when
+  // one does, and says plainly when nobody does, instead of '0 of 1 share offerings with you'.
+  it('header names the one person who shows what they offer, says when nobody does, and counts more than one', () => {
+    const named = (id, name, skills) => ({ pubKey: id, name, skills });
+    expect(buildNearbyModel({ peers: [named('a', 'tester-b', ['x'])], mySkills: ['x'], t }).headerLabel).toBe('tester-b shows what they offer');
+    expect(buildNearbyModel({ peers: [named('a', 'tester-b', [])], mySkills: ['x'], t }).headerLabel).toBe('Nobody here is showing what they offer yet');
+    expect(buildNearbyModel({ peers: [named('a', 'A', ['x']), named('b', 'B', ['x'])], mySkills: ['x'], t }).headerLabel).toBe('2 people here show what they offer');
   });
 
   it('rows carry lastSeen + proximity verbatim when supplied', () => {

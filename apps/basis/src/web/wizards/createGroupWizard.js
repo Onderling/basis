@@ -35,7 +35,7 @@ import {
   ROLE_TEMPLATE_IDS, toggleRole,
   setStoragePolicy,
   // The persona the circle is founded as — the list, and the choice kept honest against it.
-  loadPersonas, withPersonas, founderPersonaName, personaLabel, loadFounderHandle, identityComplete,
+  loadPersonas, withPersonas, founderPersonaName, personaLabel, loadFounderHandle, founderHandleSuggestionsFor, identityComplete,
   // The circle's id comes from its founder — one helper, both wizards and the quick create.
   resolveFounderKey, newFounderCircleId,
 } from '../../core/wizards/createGroupState.js';
@@ -211,7 +211,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   // reached every member as `peer-xxxxxx`).
   if (state.needsHandle) {
     mkHandleField(wrap, doc, {
-      t, value: state.handle, suggestions: state.handleSuggestions,
+      t, value: state.handle, suggestions: founderHandleSuggestionsFor(state),
       // Under the circle's own name, "Name" read twice: here it is the person's name IN the circle.
       label: t('circle.wizard.create.your_name'), hint: t('circle.join.wizard.handle.intro'),
       onInput: (v) => { state.handle = v; refreshNextBtn(); },

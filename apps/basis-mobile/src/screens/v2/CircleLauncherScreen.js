@@ -183,7 +183,7 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
 import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
-import { useRelayQuestion } from './RelayQuestionModal.js';
+import { useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
@@ -1326,7 +1326,9 @@ export default function CircleLauncherScreen({
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags) },
+        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+        // the reach card: does this device know any relay (the relay question's own predicate, web parity)
+        relayKnown: () => relayQuestion.knows() },
     });
   }, [bundle, eventLog]);   // eslint-disable-line react-hooks/exhaustive-deps -- onboardingFlags is a stable memo declared further down (read at call time, never during render)
   // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the
@@ -2256,6 +2258,8 @@ export default function CircleLauncherScreen({
                   });
                 }
                 else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => refreshScreensBook());
+                // the reach card: the connection points, where a relay is added (the relay question stays quiet after 'Later')
+                else if (a?.kind === 'open-points') setView('points');
                 else if (a?.kind === 'create-circle') setCreating(true);
                 else if (a?.kind === 'join-circle') setJoinScanOpen(true);
                 // a card's one action that IS an op (a chore done): through the waist, then the page repaints

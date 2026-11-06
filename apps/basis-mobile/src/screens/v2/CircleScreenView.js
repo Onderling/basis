@@ -364,6 +364,12 @@ function OnboardingCards({ block, onAction, styles }) {
                 <OnbBtn labelKey="circle.vandaag.onboarding_key_later" a={{ kind: 'key-later' }} quiet testID="onb-key-later" />
               </View>
             </View>
+          ) : c.id === 'reach' ? (
+            // no connection point: what waits, what works already, and the way to add one (web parity)
+            <View>
+              <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_reach_hint')}</Text>
+              <OnbBtn labelKey="circle.vandaag.onboarding_reach_add" a={{ kind: 'open-points' }} testID="onb-reach-add" />
+            </View>
           ) : c.id === 'intro' ? (
             <View>
               {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}

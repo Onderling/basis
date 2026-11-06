@@ -243,6 +243,9 @@ export const SEAMS = Object.freeze([
   // Who answered a post is recorded where the answer lands: every shell hands the threaded-chat handler the agent's
   // noteAnswer. A shell without it shows the answer in the thread but never offers the poster "accept" for it.
   { id: 'records-who-answered', pattern: /noteAnswer:/, why: 'an answer to a post lands in the thread but its sender is never recorded as a responder, so the poster cannot accept it' },
+  // An enrolled device is named in the person's own device list by the model this shell reads (the phone's, the
+  // browser's): the agent records it as the delegation label when the person typed none. The box names itself 'box'.
+  { id: 'enrol-names-the-device', pattern: /enrolDeviceName:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'an enrolled device with no typed name reads "another device" on every one of the person\'s other devices' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 

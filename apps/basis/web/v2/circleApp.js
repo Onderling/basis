@@ -9208,6 +9208,8 @@ async function boot() {
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
       deviceLog: eventLog,
       deviceLogIo,          // the agent hydrates it once the content key exists — see the note there
+      // the browser's name, recorded as this device's label when it is enrolled (the person's own device list)
+      enrolDeviceName: () => browserDeviceName(globalThis.navigator?.userAgent),
       // The A2A surface: these manifests' ops become kernel skills another agent can invoke, each
       // gated by a CapabilityToken naming exactly that op, with the escalation family refused
       // outright. Same list the connection DO menu is built from — see CONNECTION_MANIFESTS.

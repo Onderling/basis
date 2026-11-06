@@ -16,6 +16,7 @@ import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { historyStatusLine } from '../../src/v2/historyMirror.js';
 import { basisManifest } from '../../src/index.js';
+import { deviceListWords } from '../../src/v2/mijWords.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -36,6 +37,8 @@ export function renderCircleMyData(container, {
   // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
   frequent = [], onClearFrequent,
   devices = [],
+  // this device's id and the browser's name for it: the list says "this device (Firefox on Linux)", never a d-… id
+  thisDeviceId = null, deviceName = null,
   onRevokeDevice,
   devicesNeedPhrase = false,
   startScreen = null,
@@ -662,7 +665,7 @@ export function renderCircleMyData(container, {
           row.className = 'cc-mydata__device';
           row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.25rem 0;';
           const label = document.createElement('span');
-          label.textContent = d.label || d.deviceId;
+          label.textContent = deviceListWords(d, { thisDeviceId, deviceName, t: tr });
           if (d.revoked) label.style.textDecoration = 'line-through';
           row.appendChild(label);
           if (!d.revoked) {

@@ -6,7 +6,7 @@
  * Shape matches what `sa.peer.connect({onPeerMessage})` calls when
  * an envelope arrives:
  *
- *     onPeerMessage({ from, payload }) → void
+ *     onPeerMessage({ from, payload }) → Promise<verdict>
  *
  * The dispatch is keyed on `payload.subtype`.  Callers supply a
  * `handlers` map; missing subtypes fall through to `defaultHandler`
@@ -37,7 +37,7 @@
  * @param {Object<string, PeerHandler>} args.handlers       subtype → handler map
  * @param {PeerHandler}           [args.defaultHandler]    fired when subtype is missing OR not in `handlers`
  * @param {{info?: Function, warn?: Function, error?: Function, debug?: Function}} [args.logger]
- * @returns {(env: PeerEnvelope) => void}
+ * @returns {(env: PeerEnvelope) => Promise<*>}  resolves to the handler's verdict (see `_runSafe`); never rejects
  */
 export function makePeerRouter({
   handlers   = {},
@@ -57,15 +57,10 @@ export function makePeerRouter({
     const h = (subtype && typeof handlers[subtype] === 'function')
       ? handlers[subtype]
       : null;
-    if (h) {
-      _runSafe(h, from, payload, subtype, logger);
-      return;
-    }
-    if (typeof defaultHandler === 'function') {
-      _runSafe(defaultHandler, from, payload, 'default', logger);
-      return;
-    }
+    if (h) return _runSafe(h, from, payload, subtype, logger);
+    if (typeof defaultHandler === 'function') return _runSafe(defaultHandler, from, payload, 'default', logger);
     logger.debug?.('[peer] unhandled subtype', subtype, 'from', from);
+    return Promise.resolve(NOT_TAKEN);
   };
 }
 
@@ -76,13 +71,24 @@ function unwrapDataPart(payload) {
   return part?.data?.subtype ? part.data : payload;
 }
 
+/** What a frame nobody took resolves to: the secure agent does not record it, so a repeat is handed on again. */
+export const NOT_TAKEN = Object.freeze({ refused: true });
+
+/**
+ * Run one handler and resolve to its VERDICT, never reject: the handler's own result when it returned (a handler
+ * that did not take the frame says so with `{ refused: true }`), `NOT_TAKEN` when it threw or rejected. The secure
+ * agent records a message as taken only on a verdict that is not a refusal, so a frame a handler could not take
+ * yet (its sender not folded, its circle not known) stays retryable.
+ */
 function _runSafe(handler, from, payload, label, logger) {
   try {
     const r = handler(from, payload);
     if (r && typeof r.then === 'function') {
-      r.catch((err) => logger.error?.(`[peer] ${label} failed`, err));
+      return r.catch((err) => { logger.error?.(`[peer] ${label} failed`, err); return NOT_TAKEN; });
     }
+    return Promise.resolve(r);
   } catch (err) {
     logger.error?.(`[peer] ${label} threw`, err);
+    return Promise.resolve(NOT_TAKEN);
   }
 }

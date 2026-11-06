@@ -620,8 +620,8 @@ export function adoptExistingRelay({ relayUrl, points } = {}) {
  * A scanned contact card names the relays its person is on. Until now those became only the CONTACT's points, and a
  * device with no relay of its own dialled the first one at its first send to that contact: silent, not at the scan,
  * and not saved, so after a restart it was unreachable again. Here, at the scan: a device that knows no relay saves
- * the card's first point as its own (adopted, so `bootRelayUrl` reconnects to it after a restart), dials it, marks it
- * active once the dial did not fail, and says once whose point it now uses. A device with a relay keeps its own: a
+ * the card's first point as its own (adopted, so `bootRelayUrl` reconnects to it after a restart), dials it, and only
+ * when the dial did not fail marks it active and says once whose point it now uses. A device with a relay keeps its own: a
  * card never reconfigures a device that already chose.
  *
  * @param {object} a
@@ -639,6 +639,9 @@ export async function adoptInheritedPoint({ store, knowsRelay, points = [], dial
   if (!url || !store.addFromContact(url)?.ok) return { adopted: null, say: null };
   let dialled = null;
   try { dialled = await dial?.(url); } catch { dialled = { ok: false }; }
-  if (!(dialled && dialled.ok === false)) store.setActive?.(url);
+  const reached = !(dialled && dialled.ok === false);
+  // a failed dial keeps the point saved (the boot retries it) and claims nothing: the no-connection-point line stays true
+  if (!reached) return { adopted: url, say: null };
+  store.setActive?.(url);
   return { adopted: url, say: typeof t === 'function' ? t('circle.nearbyScreen.point_adopted_from', { name }) : null };
 }

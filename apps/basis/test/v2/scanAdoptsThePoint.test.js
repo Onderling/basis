@@ -34,6 +34,16 @@ describe('adoptInheritedPoint', () => {
     expect(r).toEqual({ adopted: null, say: null });
     expect(store.list()).toHaveLength(0);
   });
+  // a failed dial keeps the point saved (the boot retries it) but claims nothing: 'reachable' would not be true
+  it('a failed dial saves the point, leaves it inactive and says nothing', async () => {
+    const store = createConnectionPoints();
+    const r = await adoptInheritedPoint({ store, knowsRelay: false, points: [URL], dial: async () => ({ ok: false }), name: 'Bea', t });
+    expect(r).toEqual({ adopted: URL, say: null });
+    expect(store.list().some((p) => p.url === URL && p.adopted)).toBe(true);
+    expect(store.activeUrl()).toBeNull();
+    const thrown = await adoptInheritedPoint({ store: createConnectionPoints(), knowsRelay: false, points: [URL], dial: async () => { throw new Error('down'); }, name: 'Bea', t });
+    expect(thrown.say).toBeNull();
+  });
   it('a card with no point adopts nothing', async () => {
     const r = await adoptInheritedPoint({ store: createConnectionPoints(), knowsRelay: false, points: [], dial: async () => ({}), name: 'Bea', t });
     expect(r.adopted).toBeNull();

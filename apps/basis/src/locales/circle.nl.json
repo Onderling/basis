@@ -7872,7 +7872,10 @@
   "enroll": {
     "title": "Dit apparaat toevoegen",
     "ceremony": "Dit apparaat wordt toegevoegd",
-    "body": "Typ de herstelzin van dit account om dit apparaat toe te voegen. Elk apparaat krijgt eigen sleutels — de herstelzin zelf wordt nooit opgeslagen.",
+    "body": {
+      "text": "Typ de herstelzin van dit account om dit apparaat toe te voegen. Heb je een herstelbestand? Laad het daarna (Mijn gegevens → Herstelbestand laden): dan zijn je kringen er meteen. De herstelzin zelf wordt nooit opgeslagen.",
+      "doc": "The add-a-device ceremony: the phrase is what adds the device; the recovery file (sealed to the phrase) comes after and brings the circles' member lists."
+    },
     "mnemonic_placeholder": "Herstelzin (24 woorden)",
     "label_placeholder": "Apparaatnaam (bijv. 'werk-laptop')",
     "submit": "Dit apparaat toevoegen",

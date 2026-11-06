@@ -7866,7 +7866,10 @@
   "enroll": {
     "title": "Add this device",
     "ceremony": "Enrolling this device",
-    "body": "Type this account's recovery phrase to add this device. Each device gets its own keys — the phrase itself is never stored.",
+    "body": {
+      "text": "Type this account's recovery phrase to add this device. Have a recovery file? Load it afterwards (My data → Load a recovery file) and your circles are there at once. The phrase itself is never stored.",
+      "doc": "The add-a-device ceremony: the phrase is what adds the device; the recovery file (sealed to the phrase) comes after and brings the circles' member lists."
+    },
     "mnemonic_placeholder": "Recovery phrase (24 words)",
     "label_placeholder": "Device name (e.g. 'work laptop')",
     "submit": "Add this device",

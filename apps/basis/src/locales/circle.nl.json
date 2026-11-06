@@ -7075,7 +7075,7 @@
       "doc": "One row of the blocked list: the name the person saw when they blocked, and the day. Never the key."
     },
     "muted_row_unnamed": {
-      "text": "iemand — geblokkeerd {{date}}",
+      "text": "Iemand (geblokkeerd {{date}})",
       "doc": "A block kept without a name (made before names were kept, or from /block with a bare address)."
     },
     "unmute": {

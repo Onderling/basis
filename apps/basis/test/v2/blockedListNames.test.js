@@ -14,7 +14,7 @@ const KEY = 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw';
 const AT = Date.UTC(2026, 10, 6, 12);
 const t = (k, v = {}) => ({
   'circle.admin.muted_row': `${v.name} (geblokkeerd ${v.date})`,
-  'circle.admin.muted_row_unnamed': `iemand — geblokkeerd ${v.date}`,
+  'circle.admin.muted_row_unnamed': `Iemand (geblokkeerd ${v.date})`,
   'circle.reply.who_someone': 'iemand',
 }[k] ?? k);
 
@@ -43,10 +43,10 @@ describe('the blocked list', () => {
     expect(w).toBe('Jan (geblokkeerd 6 nov)');
   });
 
-  it('a block with no name kept reads "iemand — geblokkeerd …", and never shows any piece of the key', () => {
+  it('a block with no name kept reads "Iemand (geblokkeerd …)", and never shows any piece of the key', () => {
     const [row] = buildBlockedList({ peers: [KEY], entries: [{ key: KEY, label: null, at: AT }], members: [] });
     const w = blockedRowWords(row, { t, lang: 'nl', tz: 'Europe/Amsterdam' });
-    expect(w).toBe('iemand — geblokkeerd 6 nov');
+    expect(w).toBe('Iemand (geblokkeerd 6 nov)');
     expect(w).not.toContain(KEY.slice(0, 6));
   });
 

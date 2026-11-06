@@ -1,7 +1,7 @@
 /**
  * One row of the blocked list in words: the name the person saw when they blocked, and the day — never the key.
  * "Jan (geblokkeerd 6 nov)"; a block with no name kept (one made before names were kept, or from the slash command
- * with a bare address) reads "iemand — geblokkeerd 6 nov". Unblocking still works by the stored key.
+ * with a bare address) reads "Iemand (geblokkeerd 6 nov)". Unblocking still works by the stored key.
  *
  * @param {{ key: string, label?: string|null, at?: number|null }} entry
  * @param {{ t: (k: string, v?: object) => string, lang?: string, tz?: string }} opts

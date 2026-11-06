@@ -252,6 +252,9 @@ export const SEAMS = Object.freeze([
   // Today's reach card: a device with no relay says so and what works already. The host hands the strip the relay
   // question's own predicate; a shell that does not shows no card, and its person sends into nothing unwarned.
   { id: 'today-knows-no-relay', pattern: /relayKnown:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'a device with no connection point sends into nothing and nothing on Today says so' },
+  // …and every composer says it while it lasts (Fable, 2026-11-06: the composer is where a message would vanish): the
+  // host hands the circle and the contact composer the same predicate.
+  { id: 'composer-knows-no-relay', pattern: /noRelay(=\{|:\s*)!_?relayKnown/, shells: ['web', 'mobile'], why: 'a message typed with no connection point waits, and the composer the person types in would not say so' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 

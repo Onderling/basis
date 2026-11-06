@@ -1075,6 +1075,12 @@ async function applyRelayUrl(url) {
 const relayQuestion = createRelayQuestion({
   read: () => ({ saved: localStorageRelayIo().load(), arg: CIRCLE_RELAY_ENV, list: getConnectionPoints().list() }),
 });
+// Does this device know a relay at all (the question's own predicate)? Read at boot, on a relay change and when a thread or a
+// circle opens; true until read, so a composer never warns falsely.
+let _relayKnownNow = true;
+async function refreshRelayKnown() { try { _relayKnownNow = await relayQuestion.knows(); } catch { /* keep what we knew */ } return _relayKnownNow; }
+refreshRelayKnown();
+
 async function askRelayIfNone() {
   if (!(await relayQuestion.check()).ask) return;
   const url = await new Promise((resolve) => {
@@ -1087,6 +1093,7 @@ async function askRelayIfNone() {
   });
   if (!url) { relayQuestion.later(); return; }
   const r = await applyRelayUrl(url);
+  refreshRelayKnown();
   if (!r?.ok) console.warn('[circleApp] the relay was saved but did not connect:', r?.error);
 }
 
@@ -3438,7 +3445,9 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     }
   }
 
+  await refreshRelayKnown();
   const rerender = () => renderContactThread(rootEl, {
+    noRelay: !_relayKnownNow,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
@@ -7022,6 +7031,7 @@ async function runHelpLlm(id, query) {
 let _openOverride = {};   // the open circle's member override (my private per-circle choices), read at open
 
 async function showDetail(id) {
+  await refreshRelayKnown();   // the composer says when a message would wait (no connection point)
   hideTabBar();
   setActiveCircle(id);
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
@@ -7707,6 +7717,7 @@ function showCircle(id, circle, policy) {
       deliveryByMessageId,
     );
     renderCircleView(rootEl, {
+      noRelay: !_relayKnownNow,
       circle, rows, t,
       // P1.7 — the chip model is shared; the shell only renders it and persists the tap.
       chatFilter: { ...chatFilterChips({ allowedKinds: kinds, filter: viewerFilter }), filter: viewerFilter },

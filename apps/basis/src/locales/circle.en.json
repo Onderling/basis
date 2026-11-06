@@ -10167,5 +10167,11 @@
       "text": "Give feedback",
       "doc": "The \"+\" sheet act and the Instellingen door that open the feedback contact's thread."
     }
+  },
+  "composer": {
+    "no_point": {
+      "text": "No connection point: this message waits.",
+      "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
+    }
   }
 }

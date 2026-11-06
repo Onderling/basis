@@ -24,4 +24,8 @@ describe('the invite after a create', () => {
     expect(fn.indexOf("t('circle.invite.making')")).toBeGreaterThan(-1);
     expect(fn.indexOf("t('circle.invite.making')")).toBeLessThan(fn.indexOf('buildCircleInviteUri('));
   });
+  it('web opens the new circle\'s invite after Create too, as mobile does (a capability, not an idiom)', () => {
+    const create = web.slice(web.indexOf('function openCreateCircleWizard'));
+    expect(/if \(gid\) showCircleInvite\(gid\)/.test(create.slice(0, 4000))).toBe(true);
+  });
 });

@@ -127,6 +127,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
+import { besidePersistDb } from '../src/household/persist.js';
 import { boxStores } from '../src/v2/boxStorage.js';
 import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
@@ -270,6 +271,8 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-own-devices': stores.paths.ownDevices,
     'cc-outbox-state': contentPaths.outbox,
     'cc-outbox-cache': contentPaths.outbox,
+    'cc-outbox-state-seen-inbound': besidePersistDb({ path: contentPaths.outbox }, 'seen-inbound').path,
+    'cc-outbox-cache-seen-inbound': besidePersistDb({ path: contentPaths.outbox }, 'seen-inbound').path,
     'cc-push-device': contentPaths.push,
     'cc-settings-state': contentPaths.settings,
     'cc-settings-cache': contentPaths.settings,
@@ -899,6 +902,9 @@ if (relayUrl) {
   // half-composed agent.
   const live = Object.fromEntries(Object.entries(lanes.catchUps).map(([k, v]) => [k, !!v]));
   walkLog({ kind: 'lanes', ...live });
+  // A repeat of a message this device already took, not handed on (the durable inbound record). The subtype only,
+  // never who. Kept in the walk log while the record is new: a frame wrongly recorded as taken shows up here.
+  agent.sa?.agent?.on?.('inbound-repeat', ({ subtype }) => walkLog({ kind: 'inbound-repeat', subtype }));
   const dark = Object.entries(live).filter(([, on]) => !on).map(([k]) => k);
   if (dark.length) console.warn(`device-runner: no rail for ${dark.join(', ')} — this device will not converge on ${dark.length === 1 ? 'that lane' : 'those lanes'}`);
 

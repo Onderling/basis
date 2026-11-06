@@ -1372,3 +1372,14 @@ in-place patch (and its per-row chain), the task lane's hand-written refusal of 
 Acceptance: the enrol-race story (one enrol in ten, 2026-09-13) and the pairing walk red-first, then a phone + box
 walk. Order: 5c-2a as (a) now, the fold through 5d, then this as the first post-fold arc; `docs/architecture.md`'s
 data-plane section is rewritten from the code AFTER it lands, not before. Ledger: L467.
+
+## 2026-11-06 — A word where a key would be: a person nobody has named is "someone", never a piece of their key (Frits)
+
+From the two-phone walk's sitting. Until now the reveal ladder's last resort was the key, shortened (`peer-PflwUn`):
+honest, and distinguishable, as Nearby had settled (2026-08-31, when the invented default names went). Frits reverses
+it: **a person is shown by the name on their card, else the handle they use in a circle you share, else "someone"
+(iemand) — never a key or the first characters of one.** One resolver holds the rule (`apps/basis/src/v2/personLabel.js`)
+and every place a person is painted reads it: the contact list, the chat title and composer, "Share with…", the
+membership notices, the members list, the chat sender, the circle list's preview, the admin page. An identifier a
+person chose to be known by — a `webid:`, a `did:`, a URL — is still a name. The cost is accepted: two unnamed people
+both read "someone" and are told apart by their faces. Ledger: L650 (closes L621).

@@ -25,6 +25,7 @@ import { makeCircleEntryRail } from './circleEntryRail.js';
 import { grantsManifest, GRANTS_LANE, OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { makeGovernanceCatchUp } from './governanceCatchUp.js';
 import { makeSiblingCarry } from './siblingCarry.js';
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 export { GRANTS_LANE, OWN_DEVICES_SCOPE };
 
@@ -119,15 +120,16 @@ export function makeGrantsRail({ eventLog, signerFor, verifyBinding }) {
 export function makeGrantsPeerHandler({ rail, onChange = null, scope = OWN_DEVICES_SCOPE } = {}) {
   if (!rail) throw new Error('makeGrantsPeerHandler: a grants rail is required');
   return async function onDeviceGrants(_fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== GRANTS_BROADCAST) return;
+    if (!payload || payload.subtype !== GRANTS_BROADCAST) return NOT_TAKEN;
     // each self's grants ride its own lane: a statement for another self's lane is not this handler's
-    if ((payload.scope ?? OWN_DEVICES_SCOPE) !== scope) return;
+    if ((payload.scope ?? OWN_DEVICES_SCOPE) !== scope) return NOT_TAKEN;
     const statement = payload.event;
-    if (!statement?.body || !statement?.sig) return;
+    if (!statement?.body || !statement?.sig) return NOT_TAKEN;
     try {
       const res = await rail.ingest(scope, statement);
       if (res?.ok && typeof onChange === 'function') { try { await onChange(); } catch { /* best-effort */ } }
-    } catch { /* ingest is best-effort — never throw on a peer message */ }
+      return res?.ok ? undefined : NOT_TAKEN;
+    } catch { return NOT_TAKEN; /* ingest is best-effort — never throw on a peer message */ }
   };
 }
 

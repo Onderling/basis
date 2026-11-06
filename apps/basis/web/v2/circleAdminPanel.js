@@ -22,6 +22,7 @@ import { roleControlFor, removeControlFor, announceControlFor } from '../../src/
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 import { paintFace } from './faceView.js';
+import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
@@ -33,6 +34,7 @@ export function renderCircleAdminPanel(container, {
   notice = null,
   outboxLine = null,       // changes handed to the main device: `{key, params}` from the shared `ownSpineOutboxLine`
   viewerWebid = null,
+  revealPolicy = 'pairwise',   // the circle's reveal ladder — a member's real name shows only when it lets the admin see it
   t,
   onRemove,
   onLeave,
@@ -116,7 +118,7 @@ export function renderCircleAdminPanel(container, {
       li.appendChild(avatar);
       const name = document.createElement('span');
       name.className = 'cc-admin__member-name';
-      name.textContent = m.displayName || m.handle || m.webid || '';
+      name.textContent = rosterRowShown(m, { viewerId: viewerWebid, policy: revealPolicy, t: tr });   // the ladder: never the raw name, never the key
       li.appendChild(name);
       if (m.role && m.role !== 'member') {
         const role = document.createElement('span');

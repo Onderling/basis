@@ -40,6 +40,10 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc-own-devices',           // the person's own items: their appointments of no circle, their planned rows
     'cc-outbox-state',          // web's outbox
     'cc-outbox-cache',          // mobile's
+    // what the former self had already taken (the inbound repeat record), kept BESIDE each outbox under a derived
+    // name (`besidePersistDb`) — named here because the classification guard reads only literal names
+    'cc-outbox-state-seen-inbound',
+    'cc-outbox-cache-seen-inbound',
     'cc-push-device',           // push subscriptions (the former self's wake tokens), on every shell
     // Settings, the pinboard and the household — each shell names its own, and the two sets are NOT the same
     // words. `lint-content-classification` found the web half missing from this list on its first run, which

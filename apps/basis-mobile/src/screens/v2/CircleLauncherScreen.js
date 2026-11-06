@@ -2423,6 +2423,8 @@ export default function CircleLauncherScreen({
         agent={bundle?.agent}
         groupId={selected.id}
         resolvePicture={circlePictureResolver(selected.id)}
+        // the circle's reveal ladder: a member's real name shows on the admin page only when it lets the admin see it
+        revealPolicyOf={async () => (await policyStore.get(selected.id).catch(() => null))?.revealPolicy ?? 'pairwise'}
         onBack={() => setView('detail')}
         // a member's own row offers LEAVING (the shared decision): the same leave the tile menu runs, with its confirm
         onLeave={() => onLeaveCircle(selected.id, selected, () => setView('list'))}
@@ -4812,7 +4814,10 @@ function CircleDetail({
                     {/* Reveal-gated via the SHARED helper (web parity): the roster row carries `realName`
                         ungated, so an unrevealed member must show their handle, never their name. */}
                     <Text style={styles.memberHandle} numberOfLines={1}>
-                      {revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).primary}
+                      {(() => {
+                        const l = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' });
+                        return l.primary ?? t(l.primaryKey);   // a member nobody has named is "someone", never their key
+                      })()}
                     </Text>
                     {(() => {
                       const sec = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).secondary;

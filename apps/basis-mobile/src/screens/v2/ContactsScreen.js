@@ -21,6 +21,7 @@ import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
 // L125 — the add sheet: what the new contact sees of you, asked before the card is added (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
+import { nameShown } from '../../../../basis/src/v2/personLabel.js';   // never the key on screen
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
@@ -109,7 +110,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
         <FaceView row={c} size={32} fallbackGlyph={c.isBot ? '🤖' : null} resolvePicture={typeof resolvePictureFor === 'function' && !c.synthetic ? resolvePictureFor(c) : null} />
         <View style={styles.body}>
           <Text style={[styles.name, n > 0 && styles.nameUnread]}>
-            {c.name}
+            {nameShown(c, t)}
             {/* two contacts, one name (web parity): every row of the set says which one it is */}
             {c.lookalike ? <Text style={styles.lookalike} accessibilityLabel={t('circle.contacts.lookalike_hint')}>{`  ${c.lookalike}`}</Text> : null}
           </Text>

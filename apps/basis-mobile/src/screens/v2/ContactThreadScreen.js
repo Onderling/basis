@@ -48,8 +48,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     let r = null;
     try { r = await bundle?.callSkill?.(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
     // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
-    const { file, messageId, say } = await settleContactAttach(r, { channel, contactId, peerAddr, t });
-    if (file) setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file }]);
+    const { file, messageId, state, say } = await settleContactAttach(r, { channel, contactId, peerAddr, t });
+    if (file) setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file, delivery: state }]);
     if (say) Alert.alert(say);
   }, [bundle, channel, contactId, peerAddr]);
   const name = nameShown(contact, t, { ids: [contactId] });   // the stamped label, else "someone" — never the key

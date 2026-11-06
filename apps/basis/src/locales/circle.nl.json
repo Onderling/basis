@@ -280,6 +280,10 @@
       "text": "{{used}} van {{max}} plekken op deze uitnodiging gebruikt",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
     },
+    "joined": {
+      "text": "{{name}} is erbij gekomen.",
+      "doc": "On an open invite: someone came in while it was open (one line per newcomer, by name)."
+    },
     "removed_from_circle": {
       "text": "Je bent uit deze kring gehaald. Met deze uitnodiging kom je er niet weer in; vraag een beheerder om een nieuwe.",
       "doc": "Joining with an invite the person kept after an admin removed them: refused; a new invite is the way back."

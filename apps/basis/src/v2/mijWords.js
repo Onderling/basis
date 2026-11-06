@@ -44,3 +44,19 @@ export function agentRowWords(row, t) {
   if (row?.kind === 'bot') return t('circle.profile.agent_bot', { label: row.label ?? '' });
   return '';
 }
+
+/**
+ * One row of "my devices" (My data) in words — never the `d-…` device id. A device the person named is called that;
+ * THIS device is "this device (its model)", the name the shell reads from the phone or the browser, as Me says it;
+ * any other unnamed device is "another device". The same words as Me's agents block (`agentRowWords`).
+ *
+ * @param {{deviceId: string, label?: string|null}} d   a registry delegation row
+ * @param {{ thisDeviceId?: string|null, deviceName?: string|null, t: (k: string, v?: object) => string }} opts
+ * @returns {string}
+ */
+export function deviceListWords(d, { thisDeviceId = null, deviceName = null, t } = {}) {
+  const here = Boolean(thisDeviceId) && d?.deviceId === thisDeviceId;
+  const own = typeof d?.label === 'string' && d.label.trim() ? d.label.trim() : null;
+  const label = own ?? (here && typeof deviceName === 'string' && deviceName.trim() ? deviceName.trim() : null);
+  return agentRowWords({ kind: 'device', label, here }, t);
+}

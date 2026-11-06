@@ -691,6 +691,8 @@ export const basisManifest = {
       writes: { scope: 'device' },
       params: [
         { name: 'peer', kind: 'string', required: true },
+        // the name the person saw (a post's author): kept with the block so the blocked list names them, never matched on
+        { name: 'label', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/block', body: 'argline' },

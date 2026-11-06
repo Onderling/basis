@@ -52,7 +52,6 @@
     "circle.update.available",
     "circle.update.reload",
     "circle.view.tabs_label",
-    "circle.view.tasks_add_prompt",
     "circle.wizard.audience.intro",
     "circle.wizard.audience.max_distance",
     "circle.wizard.create.copied",

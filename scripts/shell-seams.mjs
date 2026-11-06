@@ -245,6 +245,9 @@ export const SEAMS = Object.freeze([
   { id: 'records-who-answered', pattern: /noteAnswer:/, why: 'an answer to a post lands in the thread but its sender is never recorded as a responder, so the poster cannot accept it' },
   // An enrolled device is named in the person's own device list by the model this shell reads (the phone's, the
   // browser's): the agent records it as the delegation label when the person typed none. The box names itself 'box'.
+  // THE PATTERN NAMES THE SUPPLYING ARROW (`enrolDeviceName: () =>`), not the option name: mobile's bundle passes the
+  // option through (`enrolDeviceName: opts.enrolDeviceName`), and a pass-through would satisfy a name-only pattern
+  // while no shell supplied a value. The precedent for any seam a bundle forwards.
   { id: 'enrol-names-the-device', pattern: /enrolDeviceName:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'an enrolled device with no typed name reads "another device" on every one of the person\'s other devices' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);

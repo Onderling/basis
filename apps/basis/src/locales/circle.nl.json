@@ -141,7 +141,7 @@
           "doc": "Join wizard — privacy step heading."
         },
         "notice": {
-          "text": "Lid worden van een kring betekent dat andere leden je posts kunnen zien, je kunnen aanspreken en — afhankelijk van de regels van de kring — kunnen meebeslissen bij conflicten. Kring-admins hebben geen toegang tot je privé-chats, alleen tot wat je publiek post.",
+          "text": "Lid worden van een kring betekent dat andere leden je berichten kunnen zien en je kunnen aanspreken. Afhankelijk van de regels van de kring kunnen ze ook meebeslissen bij conflicten. De admins van de kring zien je privégesprekken niet, alleen wat je in de kring plaatst.",
           "doc": "Join wizard — the privacy notice (folded from the PRIVACY_NOTICE constant)."
         },
         "accept": {
@@ -149,11 +149,11 @@
           "doc": "Join wizard — privacy-accept checkbox."
         },
         "mesh": {
-          "text": "Deel mijn adres zodat andere leden me rechtstreeks kunnen bereiken (aanbevolen voor bijwerken).",
+          "text": "Laat andere leden mij rechtstreeks bereiken",
           "doc": "Join wizard — mesh address-sharing consent checkbox."
         },
         "mesh_hint": {
-          "text": "Uit = de admin geeft alles door; je bent alleen via hen bereikbaar.",
+          "text": "Uit: de admin geeft alles door, en andere leden kunnen je niet rechtstreeks schrijven. Je kunt dit later aanpassen.",
           "doc": "Join wizard — mesh consent hint."
         }
       },
@@ -5785,7 +5785,7 @@
       "doc": "P5 — button on the contacts roster to add a bot by URL/address."
     },
     "add_prompt": {
-      "text": "Botadres — een https-URL (agent card), een peer-adres of een onderling-contact://-contactkaart",
+      "text": "Botadres: een webadres (de agent card), een peer-adres of een contactkaart",
       "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
     },
     "add_failed": {

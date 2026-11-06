@@ -141,7 +141,7 @@
           "doc": "Join wizard — privacy step heading."
         },
         "notice": {
-          "text": "Joining a circle means other members can see your posts, contact you, and — depending on the circle's rules — weigh in on conflicts. Circle admins have no access to your private chats, only to what you post publicly.",
+          "text": "Joining a circle means other members can see your posts and contact you. Depending on the circle's rules, they can also weigh in on conflicts. Circle admins cannot see your private chats, only what you post in the circle.",
           "doc": "Join wizard — the privacy notice (folded from the PRIVACY_NOTICE constant)."
         },
         "accept": {
@@ -149,11 +149,11 @@
           "doc": "Join wizard — privacy-accept checkbox."
         },
         "mesh": {
-          "text": "Share my address so other members can reach me directly (recommended for catch-up).",
+          "text": "Let other members reach me directly",
           "doc": "Join wizard — mesh address-sharing consent checkbox."
         },
         "mesh_hint": {
-          "text": "Off = the admin relays everything; you stay reachable only via them.",
+          "text": "Off: the admin passes everything on, and other members cannot write to you directly. You can change this later.",
           "doc": "Join wizard — mesh consent hint."
         }
       },
@@ -5780,7 +5780,7 @@
       "doc": "P5 — button on the contacts roster to add a bot by URL/address."
     },
     "add_prompt": {
-      "text": "Bot address — an https URL (agent card), a peer address, or a onderling-contact:// contact card",
+      "text": "Bot address: a web address (its agent card), a peer address or a contact card",
       "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
     },
     "add_failed": {

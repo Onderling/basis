@@ -1227,7 +1227,9 @@ export const pinboardManifest = {
       ],
       surfaces: {
         chat: { hint: 'Remove a member from a circle. Admin-only; forces a key rotation and reseal.' },
-        ui:   { control: 'button' },
+        // a confirm before it runs, as making someone an admin has: a removal rotates the circle's key and cannot be
+        // taken back from the list it was tapped in (the walk removed a member with one tap, 2026-11-05)
+        ui:   { control: 'button', confirm: { severity: 'warn' } },
       },
     },
     {

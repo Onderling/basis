@@ -122,7 +122,7 @@ import { renderConfirmDialog } from './confirmDialog.js';
 import { renderRelayQuestionDialog } from './relayQuestionDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, removeMemberConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -8867,7 +8867,8 @@ async function showAdmin(id) {
       // (the circle view re-resolves its hide set at the next circle open — loadRoster does it)
       await load();
     },
-    onRemove: async (m) => {
+    // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
+    onRemove: (m) => runConfirmGate({ request: removeMemberConfirm({ name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }), t }), present: openCircleConfirmDialog, execute: async () => {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
@@ -8909,7 +8910,7 @@ async function showAdmin(id) {
         } catch { /* best-effort — the removal already succeeded, never block it */ }
       }
       busy = false; await load();
-    },
+    } }),
     onAnnounce: async (text) => {
       notice = null; busy = true; rerender();
       try {

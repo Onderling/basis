@@ -7058,6 +7058,10 @@
       "text": "Die actie is alleen voor beheerders.",
       "doc": "S3 — shown when a non-admin op is refused."
     },
+    "remove_member_confirm": {
+      "text": "{{name}} uit deze kring verwijderen? De sleutel van de kring wordt vernieuwd; ze houden andere kringen die jullie delen.",
+      "doc": "The confirm before an admin removes a member: who, and what it does (a key rotation; other shared circles stay)."
+    },
     "saving": {
       "text": "opslaan…",
       "doc": "S3 — transient state."

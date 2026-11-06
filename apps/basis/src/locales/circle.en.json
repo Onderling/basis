@@ -7052,6 +7052,10 @@
       "text": "That action is admin-only.",
       "doc": "S3 — shown when a non-admin op is refused."
     },
+    "remove_member_confirm": {
+      "text": "Remove {{name}} from this circle? The circle's key is renewed; they keep any other circle you share.",
+      "doc": "The confirm before an admin removes a member: who, and what it does (a key rotation; other shared circles stay)."
+    },
     "saving": {
       "text": "saving…",
       "doc": "S3 — transient state."

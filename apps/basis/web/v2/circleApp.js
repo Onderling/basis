@@ -181,7 +181,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
-import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
+import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -4603,9 +4603,9 @@ function onScreenAction(action) {
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
   // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin
   else if (action?.kind === 'set-handle') {
-    const op = handleOp(action.value);
-    if (op.error) return;
-    Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch(() => null).then(() => _showVandaag());
+    // the typed name is the display name, the handle is made from it; never silent (the walk's card just came back)
+    saveNameCard(action.value, { callSkill: rawCallSkill })
+      .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
   else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }

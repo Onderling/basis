@@ -1536,6 +1536,18 @@
       "text": "Typ eerst een naam.",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
+    "onboarding_handle_saved": {
+      "text": "Opgeslagen — je heet hier {{name}}",
+      "doc": "The name card after its save: the name the person typed, which is now their display name (the handle is made from it)."
+    },
+    "onboarding_handle_failed": {
+      "text": "Je naam kon niet worden opgeslagen. Probeer het nog eens.",
+      "doc": "The name card could not save (any refusal other than a taken name)."
+    },
+    "onboarding_handle_unusable": {
+      "text": "Gebruik letters of cijfers in je naam.",
+      "doc": "What was typed holds nothing a name can be made of (only symbols)."
+    },
     "onboarding_intro_title": {
       "text": "Nieuw bij Basis?",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."

@@ -183,7 +183,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
-import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
+import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -4606,9 +4606,9 @@ function onScreenAction(action) {
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
   // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin
   else if (action?.kind === 'set-handle') {
-    const op = handleOp(action.value);
-    if (op.error) return;
-    Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch(() => null).then(() => _showVandaag());
+    // the typed name is the display name, the handle is made from it; never silent (the walk's card just came back)
+    saveNameCard(action.value, { callSkill: rawCallSkill })
+      .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
   else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
@@ -4761,9 +4761,10 @@ async function showBlocked() {
   hideTabBar();
   const paint = async (loading) => {
     let peers = [];
+    let entries = [];   // the same set with the name and day each block was made under
     let members = [];
     if (!loading) {
-      try { peers = (await rawCallSkill('basis', 'muted', {}))?.peers ?? []; } catch { peers = []; }
+      try { const r = await rawCallSkill('basis', 'muted', {}); peers = r?.peers ?? []; entries = r?.entries ?? []; } catch { peers = []; entries = []; }
       // The roster is only here to put NAMES on keys — a screen that fails to load it still shows the
       // list (as keys), because a block you cannot see is worse than one you cannot read.
       try {
@@ -4772,8 +4773,8 @@ async function showBlocked() {
       } catch { members = []; }
     }
     renderBlockedList(rootEl, {
-      rows: buildBlockedList({ peers, members }),
-      t, loading, onBack: showContacts,
+      rows: buildBlockedList({ peers, entries, members }),
+      t, lang: currentLang(), loading, onBack: showContacts,
       onUnblock: async (key) => {
         try { await rawCallSkill('basis', 'unmute', { peer: key }); } catch { /* re-read tells the truth */ }
         await paint(false);
@@ -7626,7 +7627,7 @@ function showCircle(id, circle, policy) {
         // block of a PERSON: the transport check resolves an address to its owner's aliases and
         // matches, so a second address of theirs is blocked too, and the view matches the roster row.
         if (post.addedBy) {
-          await rawCallSkill('basis', 'mute', { peer: post.addedBy });
+          await rawCallSkill('basis', 'mute', { peer: post.addedBy, ...(post.addedByLabel ? { label: post.addedByLabel } : {}) });
           await loadRoster();   // re-resolve the block set → the hide takes effect on the next paint
         }
       } else if (action === 'assign') {
@@ -8806,7 +8807,8 @@ async function showAdmin(id) {
     outboxLine = ownSpineOutboxLine(outbox);
     myWebid = who?.webid ?? who?.webId ?? '';
     members = Array.isArray(mem?.members) ? mem.members : [];
-    muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
+    // the blocked list as named rows (the one projection the Blocked screen reads too): a name, never the key
+    muted = buildBlockedList({ peers: Array.isArray(mut?.peers) ? mut.peers : [], entries: mut?.entries ?? [], members });   // reports moved to §8 governance Reports
     // objective L — enumerate what THIS circle has shared OUT (across the known circles) + whether its posture
     // is `canonical` (the only revocable-in-place posture). Both best-effort — a failure just hides the section.
     const out = await adminOutboundShares({
@@ -8818,7 +8820,7 @@ async function showAdmin(id) {
     rerender();
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
-    members, muted, outboundShares, outboundCanonical, busy, notice, outboxLine, t,
+    members, muted, outboundShares, outboundCanonical, busy, notice, outboxLine, t, lang: currentLang(),
     resolvePicture: circlePictureResolver(id),
     viewerWebid: mySelfIn(id) ?? myWebid,
     revealPolicy,

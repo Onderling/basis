@@ -289,7 +289,7 @@ import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareO
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
 import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
-import { handleOp, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
+import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
 import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import { contactOpenTarget, tileCircles } from '../../../../basis/src/v2/helpContact.js';
@@ -2243,8 +2243,9 @@ export default function CircleLauncherScreen({
                 else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
                 // the onboarding strip's acts: the handle through the profile op, the intro card seen here, begin
                 else if (a?.kind === 'set-handle') {
-                  const op = handleOp(a.value);
-                  if (!op.error) Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch(() => null).then(() => refreshScreensBook());
+                  // the typed name is the display name, the handle is made from it; never silent
+                  saveNameCard(a.value, { callSkill: bundle?.callSkill })
+                    .then((r) => { Alert.alert(nameCardWords(r, t)); if (r.ok) refreshScreensBook(); });
                 }
                 else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
                 else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); });

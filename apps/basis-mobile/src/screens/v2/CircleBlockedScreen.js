@@ -15,7 +15,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
-import { t } from '../../core/localisation.js';
+import { blockedRowWords } from '../../../../basis/src/v2/blockedWords.js';
+import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 
@@ -28,7 +29,8 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') { setRows([]); return; }
     let peers = [];
-    try { peers = (await callSkill('basis', 'muted', {}))?.peers ?? []; } catch { peers = []; }
+    let entries = [];
+    try { const r = await callSkill('basis', 'muted', {}); peers = r?.peers ?? []; entries = r?.entries ?? []; } catch { peers = []; }
     // Best-effort naming across every circle's roster; a failed fetch names fewer, never blocks the list.
     const members = [];
     for (const c of Array.isArray(circles) ? circles : []) {
@@ -39,7 +41,7 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
         if (Array.isArray(r?.members)) members.push(...r.members);
       } catch { /* unnamed keys still render */ }
     }
-    setRows(buildBlockedList({ peers, members }));
+    setRows(buildBlockedList({ peers, entries, members }));
   }, [callSkill, circles]);
   useEffect(() => { load(); }, [load]);
 
@@ -58,14 +60,14 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
         <Text style={styles.muted}>{t('circle.loading')}</Text>
       ) : rows.length === 0 ? (
         <Text style={styles.muted} testID="blocked-empty">{t('circle.blocked.empty')}</Text>
-      ) : rows.map(({ key, label, resolved }) => (
+      ) : rows.map((row) => { const { key, resolved } = row; return (
         <View key={key} style={styles.row} testID={`blocked-row-${key.slice(0, 8)}`}>
-          <Text style={[styles.name, !resolved && styles.rawKey]} numberOfLines={1}>{label}</Text>
+          <Text style={[styles.name, !resolved && styles.rawKey]} numberOfLines={1}>{blockedRowWords(row, { t, lang: lang() })}</Text>
           <Pressable style={styles.unblock} onPress={() => unblock(key)} testID={`blocked-unblock-${key.slice(0, 8)}`}>
             <Text style={styles.unblockText}>{t('circle.blocked.unblock')}</Text>
           </Pressable>
         </View>
-      ))}
+      ); })}
     </ScrollView>
   );
 }

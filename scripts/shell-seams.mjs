@@ -249,6 +249,9 @@ export const SEAMS = Object.freeze([
   // option through (`enrolDeviceName: opts.enrolDeviceName`), and a pass-through would satisfy a name-only pattern
   // while no shell supplied a value. The precedent for any seam a bundle forwards.
   { id: 'enrol-names-the-device', pattern: /enrolDeviceName:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'an enrolled device with no typed name reads "another device" on every one of the person\'s other devices' },
+  // Today's reach card: a device with no relay says so and what works already. The host hands the strip the relay
+  // question's own predicate; a shell that does not shows no card, and its person sends into nothing unwarned.
+  { id: 'today-knows-no-relay', pattern: /relayKnown:\s*\(\)\s*=>/, shells: ['web', 'mobile'], why: 'a device with no connection point sends into nothing and nothing on Today says so' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 

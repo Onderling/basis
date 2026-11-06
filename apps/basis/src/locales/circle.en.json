@@ -1585,6 +1585,18 @@
       "text": "Later",
       "doc": "Vandaag's key card: put the card away for a few days."
     },
+    "onboarding_reach_title": {
+      "text": "You have no connection point yet",
+      "doc": "Today card when this device knows no relay (there is no baked-in one)."
+    },
+    "onboarding_reach_hint": {
+      "text": "Messages wait until there is one. What works already: Nearby, a code you scan together, and the connection point that comes with an invite.",
+      "doc": "What waits, and what works already without a relay. Plain sentences, no dash constructions."
+    },
+    "onboarding_reach_add": {
+      "text": "Add a connection point",
+      "doc": "Opens the connection points."
+    },
     "plus_line_read": {
       "text": "Read",
       "doc": "The \"+\" sheet: the button beside the free line that reads it (Enter does the same)."

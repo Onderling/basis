@@ -38,3 +38,14 @@ describe('handleOp', () => {
     expect(handleOp('  ')).toEqual({ error: 'circle.vandaag.onboarding_handle_empty' });
   });
 });
+
+// No connection point (walk rows 16/9/11): messages went into nothing with no word about it. With no relay known, Today
+// says so, what works already, and opens the connection points; a host that cannot say shows no card rather than a false one.
+describe('the reach card', () => {
+  it('shows when this device knows no relay, and not when it knows one or cannot say', async () => {
+    const m = (relayKnown) => materializeOnboarding({ id: 'o' }, { callSkill: async () => ({ entry: { handle: 'ann' } }), circles: [{ id: 'k' }], introSeen: async () => true, ...(relayKnown ? { relayKnown } : {}) });
+    expect((await m(async () => false)).content.cards.map((c) => c.id)).toContain('reach');
+    expect((await m(async () => true)).content.cards.map((c) => c.id)).not.toContain('reach');
+    expect((await m(null)).content.cards.map((c) => c.id)).not.toContain('reach');
+  });
+});

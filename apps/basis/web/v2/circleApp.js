@@ -4406,6 +4406,8 @@ async function materializeVandaag() {
       selfIn: mySelfIn,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
       allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+      // the reach card: does this device know any relay (the relay question's own predicate)
+      relayKnown: () => relayQuestion.knows(),
     },
   });
 }
@@ -4615,6 +4617,8 @@ function onScreenAction(action) {
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
+  // the reach card: the connection points, where a relay is added (the question that asks stays quiet after 'Later')
+  else if (action?.kind === 'open-points') showConnectionPoints();
   else if (action?.kind === 'create-circle') openCreateCircleWizard();
   else if (action?.kind === 'join-circle') showJoinCircle();
   // a card's one action that IS an op (a chore done): through the waist, then the page repaints

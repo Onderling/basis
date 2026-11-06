@@ -14,7 +14,7 @@
  *   -->
  *
  * Red when: an op is named on two pages · a page names an op no manifest declares · an op is on no page and not in the
- * baseline · a baseline entry is now on a page or no longer exists (the baseline only shrinks; `--update` rewrites it).
+ * baseline · a baseline entry is now on a page or no longer exists (the baseline only shrinks; `--update` only removes).
  * The baseline (`scripts/catalogue-ops-baseline.json`) is the ops of the areas whose page is still owed: debt, visible.
  */
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
@@ -70,6 +70,17 @@ export function auditCatalogue({ declared, pages, baseline }) {
   return problems;
 }
 
+/**
+ * What `--update` writes: the baseline with the entries that are now on a page, or no longer declared, REMOVED. It never
+ * adds: a new op on no page stays red until it goes on its area's page (a page not written yet is started by that PR,
+ * its five headings may be stubs, its block real). Rebuilding from scratch would let the debt grow silently.
+ * @returns {string[]}
+ */
+export function shrunkBaseline({ declared, pages, baseline }) {
+  const named = new Set(Object.values(pages).flat());
+  return [...new Set(baseline)].filter((op) => declared.has(op) && !named.has(op)).sort();
+}
+
 function readPages() {
   const pages = {};
   if (!existsSync(PAGES)) return pages;
@@ -81,10 +92,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const declared = declaredOps();
   const pages = readPages();
   if (process.argv.includes('--update')) {
-    const named = new Set(Object.values(pages).flat());
-    const owed = [...declared].filter((op) => !named.has(op)).sort();
+    const before = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).owed ?? [] : [];
+    const owed = shrunkBaseline({ declared, pages, baseline: before });
     writeFileSync(BASELINE, `${JSON.stringify({ owed }, null, 2)}\n`);
-    console.log(`lint-catalogue-ops: baseline rewritten, ${owed.length} op(s) owed a page`);
+    console.log(`lint-catalogue-ops: baseline shrunk ${before.length} → ${owed.length} (it never grows: a new op goes on its area's page)`);
     process.exit(0);
   }
   const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).owed ?? [] : [];

@@ -10,8 +10,9 @@ closing **decisions that bind this area** (links into `docs/decisions.md`).
 
 Guard: `scripts/lint-catalogue-ops.mjs` (in `npm run guards`): every op in every app manifest is named on exactly one
 page, in that page's `<!-- catalogue-ops -->` block (one line per app: `tasks: addTask claimTask …`). The ops of the
-areas whose page is still owed sit in `scripts/catalogue-ops-baseline.json`; that list may only shrink. Writing a
-page: add its block, then `node scripts/lint-catalogue-ops.mjs --update`.
+areas whose page is still owed sit in `scripts/catalogue-ops-baseline.json`; that list may only shrink, and `--update`
+only removes from it. Writing a page: add its block, then `node scripts/lint-catalogue-ops.mjs --update`. A NEW op goes
+on its area's page; when that page does not exist yet, the PR starts it (stub headings, a real block).
 
 Rule for anyone ruling on absence: before "not built" or "needs design", read the area's page, grep
 `apps/*/manifest.js` and the locale file, grep `plans/` including `archive/`, and say what was checked.

@@ -9681,7 +9681,9 @@ async function boot() {
           'group-redeem-request':    makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
             // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
-            onAdmitted: (a) => circlePairRoster?.onAdmitted?.(a),
+            // …and an open invite catches up: an admin's own admission is a local write, so the membership lane's
+            // signal (circlesChangedUnderneath) never fires for it
+            onAdmitted: (a) => { refreshOpenInvite().catch(() => {}); return circlePairRoster?.onAdmitted?.(a); },
             sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
             // a code bound to one person is theirs from any of their addresses (the canonical chat key)
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,

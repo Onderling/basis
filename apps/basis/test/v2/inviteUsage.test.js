@@ -36,4 +36,13 @@ describe('an open invite', () => {
     expect(/joinedSince\(/.test(web) && /readInviteUsage\(/.test(web)).toBe(true);
     expect(/joinedSince\(\s*cur\.before/.test(mobile) && /\}, \[circles\]\);/.test(mobile)).toBe(true);
   });
+
+  // Measured on the Samsung (2026-11-06): the admin's OWN admission of a joiner is a local write, so the membership
+  // lane's signal never fired and the open invite stayed at "0 of 6" while the joiner was in. The admit hook nudges it.
+  it('the admin\'s own admission nudges an open invite (the lane signal never fires for a local write)', () => {
+    const web = read('../../web/v2/circleApp.js');
+    const chat = read('../../../basis-mobile/src/screens/ChatScreen.js');
+    expect(/onAdmitted:\s*\(a\)\s*=>\s*\{\s*refreshOpenInvite\(\)/.test(web)).toBe(true);
+    expect(/onAdmitted:\s*\(a\)\s*=>\s*\{\s*onCirclesChanged\?\.\(\)/.test(chat)).toBe(true);
+  });
 });

@@ -571,7 +571,9 @@ export default function ChatScreen({
       'group-redeem-request':  makeHandleGroupRedeemRequest({
         callSkill, sendPeer, publishEvent,
         // a member admitted into a PAIR circle is its co-admin (the pair roster's rule; web parity)
-        onAdmitted: (a) => bundle?.pairRoster?.onAdmitted?.(a),
+        // …and the launcher re-reads its circles: an open invite then shows the count and who came in (an admin's own
+        // admission is a local write, so the membership lane's signal never fires for it)
+        onAdmitted: (a) => { onCirclesChanged?.(); return bundle?.pairRoster?.onAdmitted?.(a); },
         // a code bound to one person is theirs from any of their addresses (the canonical chat key)
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         // …and return OUR per-circle address for the circle being joined, proven the same way the joiner

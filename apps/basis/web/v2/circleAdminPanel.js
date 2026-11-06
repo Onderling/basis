@@ -218,7 +218,8 @@ export function renderCircleAdminPanel(container, {
   } else {
     const list = document.createElement('ul');
     list.className = 'cc-admin__muted-list';
-    for (const row of muted) {
+    for (const raw of muted) {
+      const row = typeof raw === 'string' ? { key: raw, label: null, at: null } : raw;   // a bare key still unblocks
       const key = row.key;
       const li = document.createElement('li');
       li.className = 'cc-admin__muted';

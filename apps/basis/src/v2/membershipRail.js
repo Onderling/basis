@@ -13,6 +13,7 @@ import { verifyCeremonyReveal, isCeremonyKind, ceremonyRevealFacts, PERSON_KEY_K
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { membershipManifest, MEMBERSHIP_LANE } from './membershipManifest.js';
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 /** The statement kinds the membership lane carries — DERIVED from the manifest's declared appends. */
 export const MEMBERSHIP_RAIL_KINDS = entryKindRegistryFromManifests(membershipManifest).kindsFor(MEMBERSHIP_LANE);
@@ -310,9 +311,9 @@ export function makeMembershipEmitter({ rail, myRef, fan = null }) {
 export function makeMembershipPeerHandler({ rail, onChange = null, onLanded = null } = {}) {
   if (!rail) throw new Error('makeMembershipPeerHandler: a membership rail is required');
   return async function onCircleMembership(fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== MEMBERSHIP_BROADCAST) return;
+    if (!payload || payload.subtype !== MEMBERSHIP_BROADCAST) return NOT_TAKEN;
     const { circleId, event: statement } = payload;
-    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
+    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return NOT_TAKEN;
     try {
       const res = await rail.ingest(circleId, statement);
       // a statement that arrived and was refused says why: a member who never learns of a leave is then the fold's
@@ -325,6 +326,9 @@ export function makeMembershipPeerHandler({ rail, onChange = null, onLanded = nu
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
         try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }
       }
-    } catch { /* ingest is best-effort — never throw on a peer message */ }
+      // Taken only when the fold took it: a refusal (its signer not on the roster yet, a bad signature) stays
+      // retryable, so the copy that arrives after the fold is not dropped as a repeat.
+      return res?.ok ? undefined : NOT_TAKEN;
+    } catch { return NOT_TAKEN; /* ingest is best-effort — never throw on a peer message */ }
   };
 }

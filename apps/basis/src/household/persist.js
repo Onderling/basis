@@ -44,6 +44,24 @@ import { CachingDataSource, sealedPersist, trackPendingSave } from '@onderling/l
  *   what makes the persisted copy unreadable without the key. Omit for the previous, plaintext behaviour.
  * @returns {Promise<CachingDataSource|null>}
  */
+/**
+ * The persist args for a store that lives BESIDE another one on the same medium, in a row/file/database of its own:
+ * the same kind (a file, IndexedDB, AsyncStorage), a derived name. One store is one value on disk (on a phone, one
+ * storage row read back through a ~2 MB window), so a second record kept apart stays small apart.
+ *
+ * @param {object} persistDb  the args of the store it sits beside
+ * @param {string} suffix     what tells the two apart (`seen-inbound`)
+ */
+export function besidePersistDb(persistDb, suffix) {
+  if (!persistDb || typeof persistDb !== 'object') return persistDb;
+  if (typeof persistDb.path === 'string' && persistDb.path) {
+    const path = /\.json$/.test(persistDb.path) ? persistDb.path.replace(/\.json$/, `-${suffix}.json`) : `${persistDb.path}-${suffix}`;
+    return { ...persistDb, path };
+  }
+  if (typeof persistDb.dbName === 'string' && persistDb.dbName) return { ...persistDb, dbName: `${persistDb.dbName}-${suffix}` };
+  return persistDb;
+}
+
 export async function buildHouseholdDataSource(persistDb, { strategy = null } = {}) {
   if (!persistDb || typeof persistDb !== 'object') return null;
 

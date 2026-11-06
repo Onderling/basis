@@ -84,7 +84,7 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     body.className = 'cc-contacts__body';
     const name = document.createElement('div');
     name.className = 'cc-contacts__name';
-    name.textContent = c.name;
+    name.textContent = c.label ?? (c.labelKey ? tr(c.labelKey) : c.name);   // stamped by the projection: never the key
     // TWO PEOPLE, ONE NAME: a contact is named by what THEY say on the pair roster, so one can take
     // another's name. Every row of a colliding set says which one it is — the handle, else the key's tail.
     if (c.lookalike) {

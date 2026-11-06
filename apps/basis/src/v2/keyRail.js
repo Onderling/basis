@@ -26,6 +26,7 @@ import { selfRefIn } from './selfRef.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { addressBindsOnRow } from './membershipRail.js';
 import { KEY_LANE } from './keyManifest.js';
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 export const KEY_RAIL_KINDS = ['key-establish', 'key-rotate'];
 
@@ -125,16 +126,17 @@ export function makeKeyEmitter({ rail }) {
 /** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
 export function makeKeyPeerHandler({ rail, onChange = null, onLanded = null }) {
   return async function handleKeyStatement(fromAddr, payload) {
-    if (!payload || payload.subtype !== KEY_STATEMENT_BROADCAST) return;
+    if (!payload || payload.subtype !== KEY_STATEMENT_BROADCAST) return NOT_TAKEN;
     const { circleId, event: statement } = payload;
-    if (typeof circleId !== 'string' || !circleId || !statement) return;
+    if (typeof circleId !== 'string' || !circleId || !statement) return NOT_TAKEN;
     try {
       const r = await rail.ingest(circleId, statement);
       if (r?.ok && !r.existed && typeof onChange === 'function') { try { onChange(circleId); } catch { /* observer */ } }
       if (r?.ok && !r.existed && typeof onLanded === 'function') {
         try { await onLanded(circleId, statement, fromAddr); } catch { /* side effects are best-effort */ }
       }
-    } catch { /* refusal is silent — catch-up reconciles */ }
+      return r?.ok ? undefined : NOT_TAKEN;   // a refusal stays retryable (see the membership handler)
+    } catch { return NOT_TAKEN; /* refusal is silent — catch-up reconciles */ }
   };
 }
 

@@ -31,6 +31,9 @@ import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import FaceView from './FaceView.js';
+import { memberShown as memberShownWith } from '../../../../basis/src/v2/personLabel.js';
+
+const memberShown = (m) => memberShownWith(m, t);   // never the key (personLabel.js)
 
 export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null,
   // what this circle shared out, and taking it back (the host binds them to this device's resolvers — `circlePods.js`):
@@ -84,7 +87,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
         memberStableId: m.stableId,
       });
       setNotice(r?.ok
-        ? t('circle.admin.removed', { name: m.displayName || m.handle || m.webid })
+        ? t('circle.admin.removed', { name: memberShown(m) })
         : t('circle.admin.refused'));
       // a removed member loses what this circle shared out (best-effort: the removal already stands)
       if (r?.ok && m.webid && typeof revokeForRemoved === 'function') {
@@ -107,7 +110,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // it, carrying the consequence THIS change has: an ordinary demotion, a handover of the whole circle,
   // or one the fold will not let stand. What that consequence is comes from the shared decision.
   const setRole = useCallback(async (m, control) => {
-    const name = m.displayName || m.handle || m.webid;
+    const name = memberShown(m);
     await runConfirmGate({
       request: roleChangeConfirm({ control, name, t }),
       present: alertConfirmPresenter(Alert.alert),
@@ -150,7 +153,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
             {/* The member's face — the persona picture they DISCLOSED to this circle, so its presence on the
                 row is already the permission. web parity: circleAdminPanel.js. */}
             <FaceView row={m} size={28} resolvePicture={resolvePicture} />
-            <Text style={styles.name}>{m.displayName || m.handle || m.webid}</Text>
+            <Text style={styles.name}>{memberShown(m)}</Text>
             {m.role && m.role !== 'member' && <Text style={styles.role}>{t(`circle.admin.role.${m.role}`)}</Text>}
             {/* …and HOW they came by it: they made the circle, an admin appointed them, or nobody
                 did — the circle was left without an admin and the projection handed it over. web≡mobile. */}

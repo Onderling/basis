@@ -290,7 +290,8 @@ import { parseDateInput as parseCalendarDate } from '@onderling-app/calendar';
 import { InMemoryStore as HouseholdStore } from '../../household/InMemoryStore.js';
 import { buildHouseholdSubstrateStack }    from '../../household/substrateStack.js';
 import { wireHouseholdSubstrateMirror }    from '../../household/substrateMirror.js';
-import { buildHouseholdDataSource }        from '../../household/persist.js';
+import { buildHouseholdDataSource, besidePersistDb } from '../../household/persist.js';
+import { memberShown }                     from '../../v2/personLabel.js';
 import { householdManifest }               from '../../../../household/manifest.js';
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
@@ -825,6 +826,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // device's promise to try again, not the person's data.
     holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource(opts.outboxPersistDb, { strategy: contentSeal }) : undefined,
     holdStoreUri: 'mem://basis/outbox.json',
+    // What this device has already TAKEN (a repeat lands once, also after a restart): beside the outbox on the same
+    // device-local medium, in a store of its OWN — on a phone one store is one storage row, and the outbox and this
+    // record each stay small only apart. Never the pod: it is this device's memory of its own inbox.
+    seenInboundStore: opts.outboxPersistDb ? await buildHouseholdDataSource(besidePersistDb(opts.outboxPersistDb, 'seen-inbound'), { strategy: contentSeal }) : undefined,
+    seenInboundUri:   'mem://basis/seen-inbound.json',
     // onPeerMessage + nknLib supplied later via setPeerWiring().
     // Pass-through for extra factory opts (tests + future ops):
     // identityResolver, capabilityIssuer, policyEngine, groupManager,
@@ -8655,7 +8661,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           id:    m.webid,
           type:  'member',
           webid: m.webid,
-          label: `${m.displayName ?? m.webid.slice(0, 12)} (${m.role ?? 'member'})`,
+          label: `${memberShown(m, tr)} (${m.role ?? 'member'})`,   // their name or handle, else "someone" — never the key
           role:  m.role ?? 'member',
         })),
         message: tr('circle.tasks.config.members_count', { count: circle.members.length, circle: circle.name ?? circle.circleId }),
@@ -9518,7 +9524,7 @@ export async function createRealHouseholdAgent(opts = {}) {
                 .then(() => { if (fresh) return republishCircleItemsToNewPeer(cid); });   // backfill, per-circle
             })
             .catch(() => {});
-          return;
+          return undefined;   // taken: the request is answered (or counted) by the chain above
         }
         // THE OLD ITEM-ENVELOPE WIRE IS CUT INBOUND (2026-10-07). An envelope tagged `__ntfyEnv` used to reach
         // notify-envelope, which writes its payload into this agent's local pseudo-pod at whatever `ref` it names
@@ -9528,7 +9534,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // the tree (kept mechanisms); the wire to them is what is cut.
         if (env?.payload && typeof env.payload === 'object' && Object.prototype.hasOwnProperty.call(env.payload, '__ntfyEnv')) {
           inboundRefused['old-envelope'] = (inboundRefused['old-envelope'] ?? 0) + 1;
-          return;
+          return { refused: true };
         }
         return onPeerMessage?.(env);
       };

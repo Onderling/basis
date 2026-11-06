@@ -72,6 +72,15 @@ describe('an envelope can speak from an alias', () => {
     expect(ack.envelope._re).toBe('as-1');
   });
 
+  it('an AS addressed to an address this transport does NOT hold gets NO ack — never one from the primary', async () => {
+    // An ack from our primary about an envelope sent to some other address hands the sender (and the relay) the pair
+    // "that address ↔ this device's main address" — the same pairing the transport's sends refuse. The sender's own
+    // retry/proof path covers a missing ack; an identity swap is never the answer.
+    tx._receive({ _p: P.AS, _id: 'as-3', _from: 'peer', _to: 'a-circle-address-not-bound-here', payload: {} });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(tx.sent.find((s) => s.envelope._re === 'as-3'), 'no ack at all').toBeUndefined();
+  });
+
   it('the auto-ACK still answers as the primary for ordinary traffic', async () => {
     tx._receive({ _p: P.AS, _id: 'as-2', _from: 'peer', _to: 'primary-address', payload: {} });
     const ack = tx.sent.find((s) => s.envelope._re === 'as-2');

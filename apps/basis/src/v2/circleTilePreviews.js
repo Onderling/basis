@@ -26,6 +26,7 @@
  * helpers stay testable with a Map-backed snapshot.
  */
 import { eventCircleId } from './circleStream.js';
+import { isKeyLike } from './personLabel.js';
 import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item-store';
 
 // Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
@@ -41,7 +42,7 @@ const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_
  * @param {string[]} [opts.myRefs=[]]  this person's refs — their own lines are never unread
  * @returns {Object<string, {subtitle: string|null, ts: number, unread: number}>}
  */
-export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [] } = {}) {
+export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null } = {}) {
   const known = new Set((circles || []).map((c) => c?.id).filter(Boolean));
   const out = {};
   // Seed entries for every known circle so the host can drive layout
@@ -59,7 +60,7 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
 
     // First touch sets subtitle + ts (sorted newest-first).
     if (entry.subtitle === null && entry.ts === 0) {
-      const sub = renderSubtitle(event);
+      const sub = renderSubtitle(event, { actorLabel });
       if (sub) entry.subtitle = sub;
       entry.ts = typeof event.ts === 'number' ? event.ts : 0;
     }
@@ -96,13 +97,21 @@ export function countsAsUnread(event, { myRefs = [] } = {}) {
 /**
  * Best-effort subtitle from a logged event.  Returns null when nothing
  * renderable is in the payload (host falls back to member-count meta).
+ *
+ * The sender before the text is a NAME or nothing: `actorLabel(actor)` (a host holding the roster passes it) names
+ * them, and an actor that is a key is left out rather than printed — "hoi", never "zWOPwK1R: hoi".
+ *
+ * @param {object} event
+ * @param {{ actorLabel?: ((actor: string) => string|null)|null }} [opts]
  */
-export function renderSubtitle(event) {
+export function renderSubtitle(event, { actorLabel = null } = {}) {
   if (!event || typeof event !== 'object') return null;
   const p = (event.payload && typeof event.payload === 'object') ? event.payload : {};
   const text = pickText(p);
   if (!text) return null;
-  const actor = pickActor(event, p);
+  const raw = pickActor(event, p);
+  const named = raw && typeof actorLabel === 'function' ? actorLabel(raw) : null;
+  const actor = named ?? (raw && !isKeyLike(raw) ? raw : null);
   const trimmed = truncate(text);
   return actor ? `${actor}: ${trimmed}` : trimmed;
 }

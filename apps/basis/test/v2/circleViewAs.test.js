@@ -75,10 +75,12 @@ describe('the last resort when nobody has given a name', () => {
   // founder as a 43-character key.
   const label = (m) => revealedMemberLabel(m, { viewerId: null, policy: 'pairwise' }).primary;
 
-  it('shortens an opaque key to something a person can tell apart', () => {
+  // Frits, 2026-11-06 (the UX walk sitting): never a key on screen. A member with no handle and no released name is
+  // "someone" — `primary` null, `primaryKey` the words — not a shortened key (`personLabel.js`).
+  it('a member nobody has named is "someone", never a piece of their key', () => {
     const key = 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw';
-    expect(label({ id: key })).toBe('peer-PflwUn');
-    expect(label({ id: key }).length, 'a row you can read at a glance').toBeLessThan(16);
+    expect(label({ id: key })).toBeNull();
+    expect(revealedMemberLabel({ id: key }, { viewerId: null }).primaryKey).toBe('circle.reply.who_someone');
   });
 
   it('leaves a webid alone — that IS a name someone chose', () => {
@@ -87,11 +89,11 @@ describe('the last resort when nobody has given a name', () => {
   });
 
   it('still prefers a handle, and never borrows an unreleased real name', () => {
-    expect(label({ id: 'PflwUn2aVLieLdb-DW', handle: 'ada' })).toBe('@ada');
-    expect(label({ id: 'PflwUn2aVLieLdb-DW', realName: 'Ada Lovelace' })).toBe('peer-PflwUn');
+    expect(label({ id: 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw', handle: 'ada' })).toBe('@ada');
+    expect(label({ id: 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw', realName: 'Ada Lovelace' })).toBeNull();
   });
 
   it('tolerates a missing id rather than painting "undefined"', () => {
-    expect(label({})).toBe('');
+    expect(label({})).toBeNull();
   });
 });

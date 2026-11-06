@@ -48,14 +48,14 @@ describe('the name card', () => {
     };
     return { calls, callSkill };
   };
-  const t = (k, v = {}) => (k === 'circle.vandaag.onboarding_handle_saved' ? `Opgeslagen — je heet hier ${v.name}` : k);
+  const t = (k, v = {}) => (k === 'circle.vandaag.onboarding_handle_saved' ? `Opgeslagen. Je heet hier ${v.name}` : k);
 
   it('"Tester B" becomes the display name, and the handle is made from it', async () => {
     const h = host();
     const r = await saveNameCard('  Tester B ', h);
     expect(r).toEqual({ ok: true, name: 'Tester B', handle: 'tester-b' });
     expect(h.calls).toEqual([['setMyDisplayName', { displayName: 'Tester B' }], ['setMyHandle', { handle: 'tester-b' }]]);
-    expect(nameCardWords(r, t)).toBe('Opgeslagen — je heet hier Tester B');
+    expect(nameCardWords(r, t)).toBe('Opgeslagen. Je heet hier Tester B');
   });
   it('a taken handle gets a number, silently — never a refusal the person has to understand', async () => {
     const r = await saveNameCard('Tester B', host({ taken: ['tester-b'] }));

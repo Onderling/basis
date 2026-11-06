@@ -91,7 +91,7 @@ export async function saveNameCard(value, { callSkill } = {}) {
   return { ok: false, error: 'circle.vandaag.onboarding_handle_failed' };
 }
 
-/** What the card says after its save — never silence: "Opgeslagen — je heet hier Tester B", or why not. */
+/** What the card says after its save — never silence: "Opgeslagen. Je heet hier Tester B", or why not. */
 export function nameCardWords(result, t) {
   return result?.ok ? t('circle.vandaag.onboarding_handle_saved', { name: result.name }) : t(result?.error ?? 'circle.vandaag.onboarding_handle_failed');
 }

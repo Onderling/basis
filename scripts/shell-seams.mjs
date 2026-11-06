@@ -58,6 +58,10 @@ export const SEAMS = Object.freeze([
   // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
   // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
   { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
+  // A FILE SENT FROM A CONTACT THREAD SHOWS IN IT. The thread's "+" runs send-file, which answers in the slash door's words
+  // (the contact's key in them); the shared settle step keeps the sent file on our side of the thread and says only what
+  // the bubble cannot. A walk on the test phone (2026-11-06) sent a file, saw the key in an alert and no bubble.
+  { id: 'contact-attach-settles', pattern: /settleContactAttach\(/, shells: ['web', 'mobile'], why: 'a file sent from a contact thread is missing from the sender\'s own thread, and the op\'s slash words put the contact\'s key on screen' },
   { id: 'role-change-forwarded-words', pattern: /roleChangeNoticeWords\(/, shells: ['web', 'mobile'], why: 'a forwarded role change read as done before the main device signed it' },
   { id: 'own-spine-outbox-said', pattern: /'ownSpineOutbox'/, why: 'a change that waited days for the main device, or was dropped, would be said nowhere' },
   { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },

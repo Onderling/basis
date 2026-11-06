@@ -433,7 +433,7 @@ async function sendFile(args, {
       return { ok: false, error: t('sendFile.no_lookup') };
     }
     const resolved = await lookupPeerAddrByWebid(peerRaw).catch(() => null);
-    if (!resolved) return { ok: false, error: t('sendFile.lookup_failed', { peer: peerRaw }) };
+    if (!resolved) return { ok: false, code: 'not_reached', error: t('sendFile.lookup_failed', { peer: peerRaw }) };
     peerAddr = resolved;
   }
 
@@ -441,7 +441,7 @@ async function sendFile(args, {
   let file;
   try {
     file = await openFilePicker();
-    if (!file) return { ok: false, error: t('sendFile.cancelled') };
+    if (!file) return { ok: false, code: 'cancelled', error: t('sendFile.cancelled') };
   } catch (err) {
     return { ok: false, error: t('sendFile.pick_failed', { error: err.message ?? String(err) }) };
   }
@@ -503,14 +503,16 @@ async function sendFile(args, {
   try {
     // Sealed to the PERSON when their current key is on record (the same seal as a text turn): the wire then
     // carries a box and a stub, never the bytes. Without a key on record the bytes ride inline, as before.
+    // What went out, handed back with the answer: a thread that ran this records it on its own side.
+    const sentFile = {
+      id:    `file-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      name:  sent.name,
+      mime:  sent.mime,
+      size:  sent.size,
+      dataB64,
+    };
     const envelope = await buildFileShareEnvelope({
-      file: {
-        id:    `file-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-        name:  sent.name,
-        mime:  sent.mime,
-        size:  sent.size,
-        dataB64,
-      },
+      file: sentFile,
       peerAddr,
       sealFor: agent?.contactSeal?.sealFor ?? null,
     });
@@ -524,12 +526,12 @@ async function sendFile(args, {
     // distinguishes delivered / held-for-later / given-up; reporting "sent" for all three is the
     // 2026-05-23 lesson repeating one layer up (sender-side OK, receiver never told otherwise).
     if (res && res.held === true) {
-      return { message: t('sendFile.held', { name: file.name, peer: peerAddr }) };
+      return { message: t('sendFile.held', { name: file.name, peer: peerAddr }), held: true, file: sentFile };
     }
     if (res && res.held === false && res.delivered === false) {
-      return { ok: false, error: t('sendFile.not_delivered', { peer: peerAddr, reason: res.reason ?? 'unknown' }) };
+      return { ok: false, code: 'not_reached', error: t('sendFile.not_delivered', { peer: peerAddr, reason: res.reason ?? 'unknown' }) };
     }
-    return { message: t('sendFile.sent', { name: file.name, size: file.size, peer: peerAddr }) };
+    return { message: t('sendFile.sent', { name: file.name, size: file.size, peer: peerAddr }), file: sentFile };
   } catch (err) {
     return { ok: false, error: t('sendFile.send_failed', { error: err.message ?? String(err) }) };
   }

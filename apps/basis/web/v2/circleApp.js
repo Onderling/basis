@@ -3438,7 +3438,16 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     }
   }
 
+  // the "+" in this thread: the contact-scoped entries of the projector, each run as an op addressed to THIS contact
+  const contactAttach = attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' });
+  const onContactAttach = async (entry) => {
+    let r = null;
+    try { r = await rawCallSkill(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
+    const said = r?.error ?? r?.message ?? null;
+    if (said) globalThis.alert?.(said);
+  };
   const rerender = () => renderContactThread(rootEl, {
+    attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,

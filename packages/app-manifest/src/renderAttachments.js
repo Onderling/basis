@@ -49,7 +49,7 @@ export function renderAttachments(manifest) {
         ...(a.group ? { group: a.group } : {}),
         // How the entry is invoked. `'media'` bypasses dispatch entirely; absent means the waist.
         ...(a.via ? { via: a.via } : {}),
-        // WHERE it is offered: a circle's composer ('circle', the default) and/or the person's own "+" ('own')
+        // WHERE it is offered: a circle's composer ('circle', the default), the person's own "+" ('own'), a contact thread ('contact')
         scopes: scopesOf(a),
         ...(Array.isArray(a.fields) && a.fields.length ? { fields: a.fields } : {}),
         // the ops that change and take away what this entry made (a sheet opened on an existing item)
@@ -84,7 +84,8 @@ export function renderAttachments(manifest) {
 
 /** Where an attach entry is offered: its declared scopes, else a circle's composer only. */
 function scopesOf(a) {
-  const s = Array.isArray(a?.scopes) ? a.scopes.filter((x) => x === 'own' || x === 'circle') : [];
+  // 'contact': a contact thread's composer (one affordance everywhere: the same projector the circle composer reads)
+  const s = Array.isArray(a?.scopes) ? a.scopes.filter((x) => x === 'own' || x === 'circle' || x === 'contact') : [];
   return s.length ? s : ['circle'];
 }
 

@@ -173,6 +173,7 @@ import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src/v2/contactsSource.js';
 import { nameShown } from '../../src/v2/personLabel.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
+import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -3438,7 +3439,18 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     }
   }
 
+  // the "+" in this thread: the contact-scoped entries of the projector, each run as an op addressed to THIS contact
+  const contactAttach = attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' });
+  const onContactAttach = async (entry) => {
+    let r = null;
+    try { r = await rawCallSkill(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
+    // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
+    const { file, messageId, state, say } = await settleContactAttach(r, { channel: circleContactChannel, contactId, peerAddr, t });
+    if (file) { thread.messages.push({ origin: 'user', text: '', messageId, file, delivery: state }); rerender(); }
+    if (say) globalThis.alert?.(say);
+  };
   const rerender = () => renderContactThread(rootEl, {
+    attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,

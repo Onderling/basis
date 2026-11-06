@@ -7792,6 +7792,14 @@
     "list_item": {
       "text": "Lijstitem",
       "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "file_held": {
+      "text": "{{name}} wacht op hen. Het gaat zodra ze online zijn.",
+      "doc": "A file sent from a contact thread's + is waiting because the contact is offline."
+    },
+    "file_not_reached": {
+      "text": "Het bestand is niet bij hen aangekomen. Probeer het later nog eens.",
+      "doc": "A file sent from a contact thread's + could not reach the contact."
     }
   },
   "conversationKinds": {

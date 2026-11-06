@@ -15,6 +15,7 @@ import { sectionsOf } from '../../src/v2/screenSections.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
 import { paintFace } from './faceView.js';
+import { buildAttachControl } from './attachControl.js';
 
 // Privacy-badge palette (§10c) — the discrete states map to Onderling status tokens (mirrors
 // apps/basis/src/v2/theme.js). Colour AMPLIFIES the shape; quiet is a NEUTRAL slate outline (never green).
@@ -36,6 +37,8 @@ function _ensurePrivacyPulseKeyframes() {
 
 export function renderContactThread(container, {
   name = '',
+  attachMenu = [],          // the contact-scoped "+" entries (attachEntriesFor({scope: 'contact'}))
+  onAttachCommand = null,   // (entry) => dispatch it to this contact; absent → no "+"
   face = null,       // the contact's picture as the pair circle carries it (a sealed media ref) — null = the initial
   resolvePicture = null,   // opens it with the pair circle's media opener; absent → the initial
   messages = [],
@@ -311,6 +314,13 @@ export function renderContactThread(container, {
   const commands = createComposerCommands({ kind: 'contact', skills });
   const composer = document.createElement('form');
   composer.className = 'cc-cthread__composer';
+  // THE SAME "+" AS A CIRCLE'S COMPOSER (Frits: one attach affordance everywhere). The entries are the projector's, for a
+  // contact thread (`attachEntriesFor({scope: 'contact'})`); the host dispatches the picked one to THIS contact. A walk
+  // found no way to send a file to a contact here but the `/send-file` slash.
+  const attach = buildAttachControl({
+    attachMenu, onAttachCommand, cls: (s) => `cc-cthread__${s}`, tr, menuLabelKey: 'circle.view.attach',
+  });
+  if (attach) composer.appendChild(attach);
   const suggestEl = document.createElement('ul');
   suggestEl.className = 'cc-cthread__suggest';
   suggestEl.hidden = true;

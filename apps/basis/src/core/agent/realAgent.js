@@ -291,6 +291,7 @@ import { InMemoryStore as HouseholdStore } from '../../household/InMemoryStore.j
 import { buildHouseholdSubstrateStack }    from '../../household/substrateStack.js';
 import { wireHouseholdSubstrateMirror }    from '../../household/substrateMirror.js';
 import { buildHouseholdDataSource, besidePersistDb } from '../../household/persist.js';
+import { memberShown }                     from '../../v2/personLabel.js';
 import { householdManifest }               from '../../../../household/manifest.js';
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
@@ -3927,7 +3928,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // self-heal, reopenMemberCircles, and the per-circle boot re-announce that lands this
     // device's addresses in every roster's set. The phrase itself is never persisted.
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
-    const label = typeof parts?.[0]?.data?.label === 'string' ? parts[0].data.label.trim() : '';
+    // The device's name in the person's OWN device list: the one they typed, else the model this shell reads (the
+    // phone's, the browser's) — so their other devices say "Galaxy A33" instead of "another device". It rides the
+    // device's delegation, which only the person's own devices read (the own-device sibling carry): a model name among
+    // one person's own devices is not a disclosure to anyone else.
+    const typed = typeof parts?.[0]?.data?.label === 'string' ? parts[0].data.label.trim() : '';
+    let label = typed;
+    if (!label && typeof opts.enrolDeviceName === 'function') { try { label = String(opts.enrolDeviceName() ?? '').trim().slice(0, 64); } catch { label = ''; } }
     // the personas the person PICKED for this device (ids from the offer's sealed list) — none: the default only
     const pickedPersonas = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
     // the general persona too, unless the person left it off this device (then the first picked is its primary)
@@ -8654,7 +8661,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           id:    m.webid,
           type:  'member',
           webid: m.webid,
-          label: `${m.displayName ?? m.webid.slice(0, 12)} (${m.role ?? 'member'})`,
+          label: `${memberShown(m, tr)} (${m.role ?? 'member'})`,   // their name or handle, else "someone" — never the key
           role:  m.role ?? 'member',
         })),
         message: tr('circle.tasks.config.members_count', { count: circle.members.length, circle: circle.name ?? circle.circleId }),

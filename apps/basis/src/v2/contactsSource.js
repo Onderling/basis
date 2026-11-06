@@ -13,6 +13,7 @@
  *     URL-only agent with no peer address.
  */
 import { isPairCircleId } from './pairCircleId.js';
+import { personLabel, isKeyLike } from './personLabel.js';
 
 /** A peer is a bot/agent when it's an A2A/hybrid agent or exposes skills. */
 function isBot(peer) {
@@ -334,12 +335,28 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
  * nothing stored but what this device painted.
  */
 async function withNameMarkers(rows, names) {
-  if (!names || typeof names.read !== 'function') return markLookalikes(rows);
+  if (!names || typeof names.read !== 'function') return stampContactLabels(markLookalikes(rows));
   let lastSeenNames = {};
   try { lastSeenNames = await names.read(); } catch { lastSeenNames = {}; }
   const marked = markLookalikes(markRenames(rows, { lastSeenNames }));
   try { await names.remember?.(marked); } catch { /* the marker is a courtesy; a failed write costs nothing else */ }
-  return marked;
+  return stampContactLabels(marked);
+}
+
+/** Every id a contact row knows its person under — refused as a label, never shown. */
+function idsOf(r) {
+  return [r?.contactId, r?.peerAddr, r?.webid, r?.personKey, r?.pubKey, r?.id];
+}
+
+/**
+ * WHAT A SHELL PAINTS for a contact: `label` (their name, else their handle), or `labelKey` ("someone") when the row
+ * has neither — never its key. `name` stays what it was (sorting, the rename and lookalike markers read it).
+ *
+ * @param {Array<object>} rows
+ * @returns {Array<object>}
+ */
+export function stampContactLabels(rows = []) {
+  return rows.map((r) => (r ? { ...r, ...personLabel({ displayName: r.name, handle: r.handle, ids: idsOf(r) }) } : r));
 }
 
 /** The key a name collides on: what a person READS, so case and stray space do not make two names different. */
@@ -390,6 +407,7 @@ export function markRenames(rows = [], { lastSeenNames = {} } = {}) {
     const was = lastSeenNames?.[r.contactId]?.name;
     if (typeof was !== 'string' || !was) return r;              // never seen here: nothing to have changed
     if (nameKey(was) === nameKey(r.name)) return r;
+    if (isKeyLike(was, idsOf(r))) return r;                     // the old "name" was their key: a first name, not a rename
     return { ...r, wasName: was };
   });
 }

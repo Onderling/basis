@@ -9,6 +9,7 @@
  */
 import { pickableRecipients, outOfCircleLinkWarning } from '../../src/v2/shareRecipients.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { nameShown } from '../../src/v2/personLabel.js';
 
 export function renderRecipientPicker(container, {
   contacts = [],
@@ -84,7 +85,7 @@ export function renderRecipientPicker(container, {
 
     const name = document.createElement('span');
     name.className = 'cc-recipient-picker__name';
-    name.textContent = r.name;
+    name.textContent = nameShown(r, tr);   // never the key the share is granted to
     btn.appendChild(name);
 
     // Light attestation (Phase-3 flavour): show the trust level when the contact carries one.

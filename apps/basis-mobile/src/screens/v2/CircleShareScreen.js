@@ -17,6 +17,7 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { outOfCircleShareOffered } from '../../../../basis/src/v2/circleShare.js';
 import { loadShareableItems, loadSharedRows, shareOut, shareToRecipient, stopSharing, pickableCircles, pickableRecipients, outOfCircleLinkWarning } from '../../core/circleShareScreen.js';
+import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 
 export default function CircleShareScreen({ circleId, policy, by, recipient, circles, contacts, onBack }) {
   const theme = useTheme();
@@ -139,7 +140,7 @@ export default function CircleShareScreen({ circleId, policy, by, recipient, cir
                         onPress={() => doShareToRecipient(it.id, r)}
                         testID={`share-recipient-option-${it.id}-${r.id}`}
                       >
-                        <Text style={styles.pickOptionText} numberOfLines={1}>{r.name}</Text>
+                        <Text style={styles.pickOptionText} numberOfLines={1}>{nameShown(r, t)}</Text>
                         {r.trustLevel ? <Text style={styles.pickOptionId} numberOfLines={1}>{t(`circle.share.trust.${r.trustLevel}`)}</Text> : null}
                       </Pressable>
                     ))}

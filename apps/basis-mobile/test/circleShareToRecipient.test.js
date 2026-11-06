@@ -27,7 +27,7 @@ describe('circle share screen — out-of-circle recipient (web≡mobile)', () =>
       peerToContactRow({ url: 'https://bot/agent', name: 'URL Bot' }),   // no key → excluded
     ];
     expect(screenPickable(contacts)).toEqual([
-      { id: 'did:dave', name: 'Dave', recipientNetworkKey: 'KEY_DAVE', trustLevel: 'vertrouwd' },
+      { id: 'did:dave', name: 'Dave', label: 'Dave', labelKey: null, recipientNetworkKey: 'KEY_DAVE', trustLevel: 'vertrouwd' },
     ]);
   });
 

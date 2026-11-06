@@ -31,8 +31,9 @@ import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import FaceView from './FaceView.js';
+import { rosterRowShown } from '../../../../basis/src/v2/circleViewAs.js';
 
-export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null,
+export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null, revealPolicyOf = null,
   // what this circle shared out, and taking it back (the host binds them to this device's resolvers — `circlePods.js`):
   // `outboundFor()` → {shares, revocable} · `stopShare(share)` → reply · `revokeForRemoved(webid)` → the revoke tally
   outboundFor = null, stopShare = null, revokeForRemoved = null }) {
@@ -44,6 +45,8 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // empty first state told a circle's founder they were not its admin (walked on the emulator 2026-10-22)
   const [loaded, setLoaded] = useState(false);
   const [muted, setMuted] = useState([]);
+  // the circle's reveal ladder (the strict one until read): a member's real name shows only when it lets the admin see it
+  const [revealPolicy, setRevealPolicy] = useState('pairwise');
   const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
   const [announce, setAnnounce] = useState('');
   const [notice, setNotice] = useState(null);
@@ -60,13 +63,14 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       callSkill('household', 'ownSpineOutbox', {}).catch(() => null),
     ]);
     setOutboxLine(ownSpineOutboxLine(outbox));
+    if (typeof revealPolicyOf === 'function') setRevealPolicy(await Promise.resolve(revealPolicyOf()).catch(() => 'pairwise'));
     // whose row is mine IN THIS CIRCLE: a persona's circle is the persona's
     setMyWebid((() => { try { return agent?.circleSelf?.(groupId)?.webid ?? null; } catch { return null; } })() ?? who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
     setLoaded(true);
     setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
     if (typeof outboundFor === 'function') setOutbound(await Promise.resolve(outboundFor()).catch(() => ({ shares: [], revocable: false })));
-  }, [callSkill, groupId, outboundFor]);
+  }, [callSkill, groupId, outboundFor]);   // revealPolicyOf is an inline arrow: in the deps it would re-run the load every render
 
   useEffect(() => { load(); }, [load]);
 
@@ -84,7 +88,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
         memberStableId: m.stableId,
       });
       setNotice(r?.ok
-        ? t('circle.admin.removed', { name: m.displayName || m.handle || m.webid })
+        ? t('circle.admin.removed', { name: rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t }) })
         : t('circle.admin.refused'));
       // a removed member loses what this circle shared out (best-effort: the removal already stands)
       if (r?.ok && m.webid && typeof revokeForRemoved === 'function') {
@@ -113,7 +117,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // it, carrying the consequence THIS change has: an ordinary demotion, a handover of the whole circle,
   // or one the fold will not let stand. What that consequence is comes from the shared decision.
   const setRole = useCallback(async (m, control) => {
-    const name = m.displayName || m.handle || m.webid;
+    const name = rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t });
     await runConfirmGate({
       request: roleChangeConfirm({ control, name, t }),
       present: alertConfirmPresenter(Alert.alert),
@@ -156,7 +160,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
             {/* The member's face — the persona picture they DISCLOSED to this circle, so its presence on the
                 row is already the permission. web parity: circleAdminPanel.js. */}
             <FaceView row={m} size={28} resolvePicture={resolvePicture} />
-            <Text style={styles.name}>{m.displayName || m.handle || m.webid}</Text>
+            <Text style={styles.name}>{rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t })}</Text>
             {m.role && m.role !== 'member' && <Text style={styles.role}>{t(`circle.admin.role.${m.role}`)}</Text>}
             {/* …and HOW they came by it: they made the circle, an admin appointed them, or nobody
                 did — the circle was left without an admin and the projection handed it over. web≡mobile. */}

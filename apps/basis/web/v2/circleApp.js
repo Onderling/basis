@@ -171,6 +171,8 @@ import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src/v2/contactsSource.js';
+import { nameShown } from '../../src/v2/personLabel.js';
+import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -3289,18 +3291,18 @@ async function openContactLens(contactId, name) {
   const pairCircleIdOf = circlePairRoster?.pairCircleIdFor;
   const model = await contactLensModel({ callSkill: rawCallSkill, row: row ?? { webid: contactId }, pairCircleIdOf });
   openLensForm({
-    mode: 'change', model: { ...model, name: name || row?.displayName || row?.handle || contactId },
+    mode: 'change', model: { ...model, name: nameShown(name ? { name } : row, t, { ids: [contactId] }) },
     onSubmit: async (choice) => {
       const r = await changeContactLens({ callSkill: rawCallSkill, contactId, ...choice, shareRelease: shareCircleRelease, pairCircleIdOf });
       const personaName = model.personas.find((p) => p.id === choice.persona)?.name ?? choice.persona;
-      globalThis.alert?.(r?.error ? t('circle.contacts.lens.failed') : t('circle.contacts.lens.saved', { name: name || contactId, persona: personaName }));
+      globalThis.alert?.(r?.error ? t('circle.contacts.lens.failed') : t('circle.contacts.lens.saved', { name: nameShown({ name }, t, { ids: [contactId] }), persona: personaName }));
     },
   });
 }
 
 /** Delete a contact (L114, Frits 2026-09-24): the confirm sheet, then hide + leave the pair circle (`contactDelete.js`). */
 async function deleteContactWithConfirm(contactId, name) {
-  const who = name || contactId;
+  const who = nameShown({ name }, t, { ids: [contactId] });
   const ok = await openCircleConfirmDialog({
     severity: 'danger',
     title: t('circle.contacts.delete_title', { name: who }),
@@ -3340,7 +3342,7 @@ async function addBotFromInput(input) {
         return r;
       },
     });
-    globalThis.alert?.(t('circle.contacts.added', { name: rec?.name ?? rec?.displayName ?? rec?.handle ?? rec?.url ?? rec?.pubKey ?? '' }));
+    globalThis.alert?.(t('circle.contacts.added', { name: nameShown({ ...rec, name: rec?.name ?? rec?.displayName ?? rec?.url ?? null }, t) }));
   } catch (err) {
     if (err?.code === 'cancelled') return;   // the person closed the sheet — nothing was added, nothing to say
     console.warn('[circleApp] add bot failed:', err?.message ?? err);
@@ -3359,7 +3361,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   let row = null;
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
   catch { /* fall back to any cached thread below */ }
-  const name = row?.name ?? contactThreads.get(contactId)?.name ?? contactId;
+  // what the thread is titled: the stamped label, else what this thread last showed — never the key
+  const name = nameShown(row ?? { name: contactThreads.get(contactId)?.name ?? null }, t, { ids: [contactId] });
   // …and their face, from the same row Contacten painted — one source, so the thread you opened shows the
   // person you tapped rather than a second guess at who they are.
   const face = row?.face ?? null;
@@ -5062,7 +5065,7 @@ async function showMyData(opts) {
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,
-    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -8792,8 +8795,10 @@ async function showAdmin(id) {
   let notice = null;
   let outboxLine = null;            // changes handed to the main device: over a day, or not sent
   let myWebid = '';                 // whose row is mine — the role control is offered to an admin only
+  let revealPolicy = 'pairwise';    // the circle's reveal ladder: what names the admin may see (the strict one until read)
 
   async function load() {
+    revealPolicy = (await policyStore.get(id).catch(() => null))?.revealPolicy ?? 'pairwise';
     const [mem, mut, who, outbox] = await Promise.all([
       rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }).catch(() => null),
       rawCallSkill('pinboard', 'listMutedPeers', {}).catch(() => null),
@@ -8818,6 +8823,7 @@ async function showAdmin(id) {
     members, muted, outboundShares, outboundCanonical, busy, notice, outboxLine, t,
     resolvePicture: circlePictureResolver(id),
     viewerWebid: mySelfIn(id) ?? myWebid,
+    revealPolicy,
     onBack: () => showDetail(id),
     // A member's own row offers LEAVING (the shared decision): the same leave the circle's tile menu runs, with its confirm.
     onLeave: () => onLeaveCircle(id, circlesCache.find((c) => c?.id === id) ?? { id }),
@@ -8827,7 +8833,7 @@ async function showAdmin(id) {
     // handover of the whole circle, or one the fold will not let stand. What that consequence is comes
     // from the shared decision, not from here.
     onSetRole: async (m, control) => {
-      const name = m.displayName || m.handle || m.webid;
+      const name = rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t });   // the ladder, never the raw name
       const request = roleChangeConfirm({ control, name, t });
       await runConfirmGate({
         request,
@@ -8877,7 +8883,7 @@ async function showAdmin(id) {
         if (!r.ok) notice = t('circle.admin.refused');
         else {
           removed = true;
-          notice = t('circle.admin.removed', { name: m.displayName || m.handle || m.webid });
+          notice = t('circle.admin.removed', { name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }) });
         }
       } catch { notice = t('circle.admin.refused'); }
       // objective L — auto-revoke: on a SUCCESSFUL removal, rotate this circle's outbound canonical shares away
@@ -9209,6 +9215,8 @@ async function boot() {
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
       deviceLog: eventLog,
       deviceLogIo,          // the agent hydrates it once the content key exists — see the note there
+      // the browser's name, recorded as this device's label when it is enrolled (the person's own device list)
+      enrolDeviceName: () => browserDeviceName(globalThis.navigator?.userAgent),
       // The A2A surface: these manifests' ops become kernel skills another agent can invoke, each
       // gated by a CapabilityToken naming exactly that op, with the escalation family refused
       // outright. Same list the connection DO menu is built from — see CONNECTION_MANIFESTS.

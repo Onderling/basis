@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { t } from '../../core/localisation.js';
+import { t, lang } from '../../core/localisation.js';
 import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
 import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circleShare.js';
 // The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
@@ -29,6 +29,7 @@ import { roleControlFor, roleChangeConfirm, removeMemberConfirm, roleChangeNotic
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
+import { blockedRowWords } from '../../../../basis/src/v2/blockedWords.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import FaceView from './FaceView.js';
 import { rosterRowShown } from '../../../../basis/src/v2/circleViewAs.js';
@@ -45,6 +46,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // empty first state told a circle's founder they were not its admin (walked on the emulator 2026-10-22)
   const [loaded, setLoaded] = useState(false);
   const [muted, setMuted] = useState([]);
+  const [mutedEntries, setMutedEntries] = useState([]);   // the same set with the name and day each block was made under
   // the circle's reveal ladder (the strict one until read): a member's real name shows only when it lets the admin see it
   const [revealPolicy, setRevealPolicy] = useState('pairwise');
   const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
@@ -69,6 +71,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
     setLoaded(true);
     setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
+    setMutedEntries(Array.isArray(mut?.entries) ? mut.entries : []);
     if (typeof outboundFor === 'function') setOutbound(await Promise.resolve(outboundFor()).catch(() => ({ shares: [], revocable: false })));
   }, [callSkill, groupId, outboundFor]);   // revealPolicyOf is an inline arrow: in the deps it would re-run the load every render
 
@@ -141,7 +144,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   }, [announce, callSkill, groupId]);
   // The same projection the web shell paints — a raw key is not a person's name, and the two shells
   // must not disagree about who is on this list or what they are called.
-  const blocked = buildBlockedList({ peers: muted, members });
+  const blocked = buildBlockedList({ peers: muted, entries: mutedEntries, members });
 
   const unmute = useCallback(async (key) => {
     // Unblock takes the key as it is listed — the block set stores whatever the block was made on
@@ -246,10 +249,10 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     ),
     'admin-muted': (d) => (
       <Section key={d.id} id={d.id} title={t(d.titleKey)}>
-        {blocked.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : blocked.map(({ key, label }) => (
-          <View key={key} style={styles.row}>
-            <Text style={styles.name}>{label}</Text>
-            <Pressable style={styles.secondary} onPress={() => unmute(key)}><Text style={styles.secondaryText}>{t('circle.admin.unmute')}</Text></Pressable>
+        {blocked.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : blocked.map((row) => (
+          <View key={row.key} style={styles.row}>
+            <Text style={styles.name}>{blockedRowWords(row, { t, lang: lang() })}</Text>
+            <Pressable style={styles.secondary} onPress={() => unmute(row.key)}><Text style={styles.secondaryText}>{t('circle.admin.unmute')}</Text></Pressable>
           </View>
         ))}
       </Section>

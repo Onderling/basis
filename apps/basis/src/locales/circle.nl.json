@@ -990,10 +990,6 @@
       "text": "＋ Taak toevoegen",
       "doc": "tasks tab — compose-knop om een taak toe te voegen."
     },
-    "tasks_add_prompt": {
-      "text": "Wat moet er gedaan worden?",
-      "doc": "tasks tab — prompt bij het toevoegen van een taak."
-    },
     "tasks_untitled": {
       "text": "(naamloze taak)",
       "doc": "tasks tab — fallback als een taak geen tekst heeft."
@@ -1535,6 +1531,18 @@
     "onboarding_handle_empty": {
       "text": "Typ eerst een naam.",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_saved": {
+      "text": "Opgeslagen. Je heet hier {{name}}.",
+      "doc": "The name card after its save: the name the person typed, which is now their display name (the handle is made from it)."
+    },
+    "onboarding_handle_failed": {
+      "text": "Je naam kon niet worden opgeslagen. Probeer het nog eens.",
+      "doc": "The name card could not save (any refusal other than a taken name)."
+    },
+    "onboarding_handle_unusable": {
+      "text": "Gebruik letters of cijfers in je naam.",
+      "doc": "What was typed holds nothing a name can be made of (only symbols)."
     },
     "onboarding_intro_title": {
       "text": "Nieuw bij Basis?",
@@ -7073,6 +7081,14 @@
     "no_muted": {
       "text": "Je hebt niemand geblokkeerd.",
       "doc": "Lege blokkade-lijst."
+    },
+    "muted_row": {
+      "text": "{{name}} (geblokkeerd {{date}})",
+      "doc": "One row of the blocked list: the name the person saw when they blocked, and the day. Never the key."
+    },
+    "muted_row_unnamed": {
+      "text": "Iemand (geblokkeerd {{date}})",
+      "doc": "A block kept without a name (made before names were kept, or from /block with a bare address)."
     },
     "unmute": {
       "text": "Deblokkeren",

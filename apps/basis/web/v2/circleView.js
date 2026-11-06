@@ -781,7 +781,7 @@ function renderLedenTab(body, { members = null, unreachable = null, selfWebid = 
     row.appendChild(face);
     const primary = document.createElement('span');
     primary.className = 'circle-view__member-primary';
-    primary.textContent = label.primary;
+    primary.textContent = label.primary ?? tr(label.primaryKey);
     row.appendChild(primary);
 
     // The real name as a secondary line — only when this viewer may actually see it.

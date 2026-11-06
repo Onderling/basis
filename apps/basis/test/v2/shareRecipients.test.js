@@ -18,8 +18,8 @@ describe('pickableRecipients — the out-of-circle recipient selector', () => {
     const peer   = peerToContactRow({ pubKey: 'KEY_PEER', name: 'Peer One' });
     const rows = pickableRecipients([person, peer]);
     expect(rows).toEqual([
-      { id: 'did:dave', name: 'Dave', recipientNetworkKey: 'KEY_DAVE', trustLevel: 'vertrouwd' },
-      { id: 'KEY_PEER', name: 'Peer One', recipientNetworkKey: 'KEY_PEER' },
+      { id: 'did:dave', name: 'Dave', label: 'Dave', labelKey: null, recipientNetworkKey: 'KEY_DAVE', trustLevel: 'vertrouwd' },
+      { id: 'KEY_PEER', name: 'Peer One', label: 'Peer One', labelKey: null, recipientNetworkKey: 'KEY_PEER' },
     ]);
     // The recipientNetworkKey is exactly the contact's published network address — what the op derives from.
     expect(rows[0].recipientNetworkKey).toBe('KEY_DAVE');
@@ -32,7 +32,7 @@ describe('pickableRecipients — the out-of-circle recipient selector', () => {
     // Mixed: only the keyed one survives.
     const keyed = pinboardContactToRow({ webid: 'did:ann', displayName: 'Ann', pubKey: 'KEY_ANN' });
     expect(pickableRecipients([urlBot, keyed])).toEqual([
-      { id: 'did:ann', name: 'Ann', recipientNetworkKey: 'KEY_ANN' },
+      { id: 'did:ann', name: 'Ann', label: 'Ann', labelKey: null, recipientNetworkKey: 'KEY_ANN' },
     ]);
   });
 
@@ -40,7 +40,7 @@ describe('pickableRecipients — the out-of-circle recipient selector', () => {
     const raw = { contactId: 'c1', name: 'Raw', pubKey: 'KEY_RAW' };            // pubKey field directly
     const dupe = { contactId: 'c1', name: 'Raw again', peerAddr: 'KEY_RAW' };   // same id → dropped
     const rows = pickableRecipients([raw, dupe]);
-    expect(rows).toEqual([{ id: 'c1', name: 'Raw', recipientNetworkKey: 'KEY_RAW' }]);
+    expect(rows).toEqual([{ id: 'c1', name: 'Raw', label: 'Raw', labelKey: null, recipientNetworkKey: 'KEY_RAW' }]);
     expect('trustLevel' in rows[0]).toBe(false);
   });
 

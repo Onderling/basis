@@ -2991,8 +2991,8 @@ export async function createSecureAgent(opts = {}) {
 
     // mute / block list (instrumented for autoLog)
     mute: {
-      async add(addr) {
-        const r = await muteSet.add(addr);
+      async add(addr, meta = {}) {
+        const r = await muteSet.add(addr, meta);   // meta: { label } — the name the person saw (never used to match)
         if (auditAutoLog && r) audit('mute.add', addr);
         return r;
       },
@@ -3003,6 +3003,7 @@ export async function createSecureAgent(opts = {}) {
       },
       has:    (addr) => muteSet.has(addr),
       list:   ()     => muteSet.list(),
+      entries: ()    => muteSet.entries(),
       clear:  ()     => muteSet.clear(),
       get size() { return muteSet.size; },
     },

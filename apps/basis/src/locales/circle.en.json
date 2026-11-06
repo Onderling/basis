@@ -7064,6 +7064,14 @@
       "text": "You have not blocked anyone.",
       "doc": "Empty block list."
     },
+    "muted_row": {
+      "text": "{{name}} (blocked {{date}})",
+      "doc": "One row of the blocked list: the name the person saw when they blocked, and the day. Never the key."
+    },
+    "muted_row_unnamed": {
+      "text": "someone — blocked {{date}}",
+      "doc": "A block kept without a name (made before names were kept, or from /block with a bare address)."
+    },
     "unmute": {
       "text": "Unblock",
       "doc": "Reverses the block (basis:unmute)."

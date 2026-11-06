@@ -7,8 +7,9 @@
  */
 
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { blockedRowWords } from '../../src/v2/blockedWords.js';
 
-export function renderBlockedList(container, { rows = [], t, onBack, onUnblock, loading = false } = {}) {
+export function renderBlockedList(container, { rows = [], t, lang = 'nl', onBack, onUnblock, loading = false } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'blockedList.js');
   container.innerHTML = '';
@@ -56,7 +57,7 @@ export function renderBlockedList(container, { rows = [], t, onBack, onUnblock, 
 
     const label = document.createElement('span');
     label.className = row.resolved ? 'cc-blocked__label' : 'cc-blocked__label cc-blocked__label--key';
-    label.textContent = row.label;
+    label.textContent = blockedRowWords(row, { t: tr, lang });   // the name and the day — never the key
     el.appendChild(label);
 
     const btn = document.createElement('button');

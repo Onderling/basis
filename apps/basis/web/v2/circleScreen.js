@@ -514,6 +514,7 @@ function renderOnboarding(section, block, tr, onAction) {
       input.type = 'text';
       input.className = 'circle-screen__onb-handle';
       input.placeholder = tr('circle.vandaag.onboarding_handle_ph');
+      if (c.name) input.value = c.name;   // the name already on the profile (the one the avatar's letters come from)
       input.setAttribute('aria-label', tr('circle.vandaag.onboarding_handle_title'));
       form.appendChild(input);
       const save = document.createElement('button');

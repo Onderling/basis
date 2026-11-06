@@ -122,7 +122,7 @@ import { renderConfirmDialog } from './confirmDialog.js';
 import { renderRelayQuestionDialog } from './relayQuestionDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, removeMemberConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -184,7 +184,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
-import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
+import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -328,7 +328,7 @@ import { EventLog } from '../../src/eventLog.js';
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
-import { attachEntriesFor } from '../../src/v2/attachEntries.js';
+import { attachEntriesFor, attachEntryForType } from '../../src/v2/attachEntries.js';
 import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
@@ -4618,9 +4618,9 @@ function onScreenAction(action) {
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
   // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin
   else if (action?.kind === 'set-handle') {
-    const op = handleOp(action.value);
-    if (op.error) return;
-    Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch(() => null).then(() => _showVandaag());
+    // the typed name is the display name, the handle is made from it; never silent (the walk's card just came back)
+    saveNameCard(action.value, { callSkill: rawCallSkill })
+      .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
   else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
@@ -4961,7 +4961,8 @@ async function showMyData(opts) {
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
   // same capability, and the manifest stops describing what the buttons do.
-  const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
+  // the provider the person named (the field on My data), else the default
+  const onSignIn = (issuer = null) => Promise.resolve(rawCallSkill('basis', 'signin', issuer ? { issuer } : {}))
     .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
   // launch the existing restore wizard in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
@@ -5078,7 +5079,7 @@ async function showMyData(opts) {
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,
-    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
+    onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -5417,6 +5418,19 @@ async function showJoinCircle(inviteArg) {
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId, { forFunction = false } = {}) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
+  // THE INVITE IS ON SCREEN AT ONCE, saying it is being made: building it below takes a few seconds (the policy, the
+  // storage posture, the code), and nothing on screen said so (mobile parity: the same line, the same key)
+  const overlay = document.createElement('div');
+  overlay.className = 'cc-mydata-modal';
+  const card = document.createElement('div');
+  card.className = 'cc-mydata-modal__card';
+  overlay.appendChild(card);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const making = document.createElement('p');
+  making.dataset.role = 'invite-pending';
+  making.textContent = t('circle.invite.making');
+  card.appendChild(making);
+  document.body.appendChild(overlay);
   // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
   // address in a persona's circle, which the joiner's trail would record as its confirming admin
   const adminPeerAddr = _peerAgent?.circleSelf?.(circleId)?.webid ?? circleHouseholdAgent?.householdSelfAddr ?? null;
@@ -5466,13 +5480,8 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
     });
   }
   catch { r = { error: 'failed' }; }
-  const overlay = document.createElement('div');
-  overlay.className = 'cc-mydata-modal';
-  const card = document.createElement('div');
-  card.className = 'cc-mydata-modal__card';
-  overlay.appendChild(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
+  making.remove();
+  if (!overlay.isConnected) return;   // closed while it was being made
   const h = document.createElement('h3');
   h.textContent = t('circle.invite.title');
   card.appendChild(h);
@@ -6947,6 +6956,8 @@ function openCreateCircleWizard() {
       // the founder's first policy (the wizard wrote it locally) goes on the lane, so a joiner catches it up
       if (gid) circlePolicyLane.state(gid).catch(() => {});
       try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
+      // …and the new circle's invite, as mobile opens it (web ≡ mobile): on screen at once, saying it is being made
+      if (gid) showCircleInvite(gid).catch(() => { /* the ⋯ menu still offers it */ });
     },
   });
 }
@@ -7447,14 +7458,12 @@ function showCircle(id, circle, policy) {
   // (circleDispatchReady → scope-inject the active circle onto the create), then refreshes
   // the list. A `/addtask` typed in the composer reaches the tasks agent by its own path;
   // both end up in the same list via loadTasks().
+  // The tab's button opens the SAME form "+ → Task" opens (`attachEntryForType`): one way to make a task here, not a
+  // `prompt()` of its own. Absent entry → the button is not painted (see `onAddTask` below).
   async function addTaskFromTab() {
-    const text = (globalThis.prompt?.(t('circle.view.tasks_add_prompt')) || '').trim();
-    if (!text) return;
-    try {
-      if (typeof circleDispatchReady === 'function') {
-        await circleDispatchReady({ opId: 'addTask', args: { text }, appOrigin: 'tasks' });
-      }
-    } catch { /* the reload reflects the real state */ }
+    const entry = attachEntryForType(circleAttachMenu, 'task');
+    if (!entry) return;
+    await attachCommandDispatch(entry);
     await loadTasks();
   }
 
@@ -7751,7 +7760,7 @@ function showCircle(id, circle, policy) {
       // Taken (tasks) tab — the circle's tasks (stream rows) + the compose affordance.
       // The view only reads these when the taken tab is active.
       tasks: circleTasks,
-      onAddTask: addTaskFromTab,
+      ...(attachEntryForType(circleAttachMenu, 'task') ? { onAddTask: addTaskFromTab } : {}),   // only where a task can be made here
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,
@@ -8881,7 +8890,8 @@ async function showAdmin(id) {
       // (the circle view re-resolves its hide set at the next circle open — loadRoster does it)
       await load();
     },
-    onRemove: async (m) => {
+    // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
+    onRemove: (m) => runConfirmGate({ request: removeMemberConfirm({ name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }), t }), present: openCircleConfirmDialog, execute: async () => {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
@@ -8923,7 +8933,7 @@ async function showAdmin(id) {
         } catch { /* best-effort — the removal already succeeded, never block it */ }
       }
       busy = false; await load();
-    },
+    } }),
     onAnnounce: async (text) => {
       notice = null; busy = true; rerender();
       try {

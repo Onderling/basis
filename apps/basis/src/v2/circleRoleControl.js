@@ -47,6 +47,7 @@ import { translatorOr } from '../locales/translatorOr.js';
 /** The op this control drives, and its declaration. */
 const SET_MEMBER_ROLE = 'setMemberRole';
 const SET_MEMBER_ROLE_OP = (pinboardManifest.operations ?? []).find((o) => o?.id === SET_MEMBER_ROLE) ?? null;
+const REMOVE_MEMBER_OP = (pinboardManifest.operations ?? []).find((o) => o?.id === 'removeMember') ?? null;
 
 /**
  * Every locale key this control can ask for, flat, so the label-key fitness check can walk it and a
@@ -168,6 +169,17 @@ export function roleChangeConfirm({ control, name, t } = {}) {
   if (!control) return null;
   const tr = translatorOr(t, 'circleRoleControl.js');
   return confirmRequestForOp(SET_MEMBER_ROLE_OP, { t: tr, message: tr(control.confirmKey, { name }) });
+}
+
+/**
+ * The confirm in front of REMOVING a member — the removeMember op's own `ui.confirm` declaration, worded with who it
+ * is ("Tester B uit deze kring verwijderen?"). The same gate making someone an admin passes through.
+ *
+ * @param {{ name: string, t: Function }} a
+ */
+export function removeMemberConfirm({ name, t } = {}) {
+  const tr = translatorOr(t, 'circleRoleControl.js');
+  return confirmRequestForOp(REMOVE_MEMBER_OP, { t: tr, message: tr('circle.admin.remove_member_confirm', { name }) });
 }
 
 /**

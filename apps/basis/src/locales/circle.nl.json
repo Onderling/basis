@@ -990,10 +990,6 @@
       "text": "＋ Taak toevoegen",
       "doc": "tasks tab — compose-knop om een taak toe te voegen."
     },
-    "tasks_add_prompt": {
-      "text": "Wat moet er gedaan worden?",
-      "doc": "tasks tab — prompt bij het toevoegen van een taak."
-    },
     "tasks_untitled": {
       "text": "(naamloze taak)",
       "doc": "tasks tab — fallback als een taak geen tekst heeft."

@@ -326,7 +326,7 @@ import { EventLog } from '../../src/eventLog.js';
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
-import { attachEntriesFor } from '../../src/v2/attachEntries.js';
+import { attachEntriesFor, attachEntryForType } from '../../src/v2/attachEntries.js';
 import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
@@ -7433,14 +7433,12 @@ function showCircle(id, circle, policy) {
   // (circleDispatchReady → scope-inject the active circle onto the create), then refreshes
   // the list. A `/addtask` typed in the composer reaches the tasks agent by its own path;
   // both end up in the same list via loadTasks().
+  // The tab's button opens the SAME form "+ → Task" opens (`attachEntryForType`): one way to make a task here, not a
+  // `prompt()` of its own. Absent entry → the button is not painted (see `onAddTask` below).
   async function addTaskFromTab() {
-    const text = (globalThis.prompt?.(t('circle.view.tasks_add_prompt')) || '').trim();
-    if (!text) return;
-    try {
-      if (typeof circleDispatchReady === 'function') {
-        await circleDispatchReady({ opId: 'addTask', args: { text }, appOrigin: 'tasks' });
-      }
-    } catch { /* the reload reflects the real state */ }
+    const entry = attachEntryForType(circleAttachMenu, 'task');
+    if (!entry) return;
+    await attachCommandDispatch(entry);
     await loadTasks();
   }
 
@@ -7737,7 +7735,7 @@ function showCircle(id, circle, policy) {
       // Taken (tasks) tab — the circle's tasks (stream rows) + the compose affordance.
       // The view only reads these when the taken tab is active.
       tasks: circleTasks,
-      onAddTask: addTaskFromTab,
+      ...(attachEntryForType(circleAttachMenu, 'task') ? { onAddTask: addTaskFromTab } : {}),   // only where a task can be made here
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,

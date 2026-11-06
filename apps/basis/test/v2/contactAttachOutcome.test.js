@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
 import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
+import { DELIVERY } from '../../src/v2/deliveryState.js';
 
 const t = (key, params = {}) => {
   const tail = Object.entries(params).map(([k, v]) => `${k}=${v}`).join(' ');
@@ -42,6 +43,7 @@ describe('the contact thread\'s "+" records what it sent and keeps the key off s
     const channel = memChannel();
     const out = await settleContactAttach(r, { channel, contactId: 'webid:bea', peerAddr: PEER, t });
     expect(out.say, 'the bubble says it; no alert').toBeNull();
+    expect(out.state, 'sent claims no more than the ladder allows').toBe(DELIVERY.MAYBE);
     const turns = await channel.rehydrate('webid:bea');
     const mine = turns.find((x) => x.file);
     expect(mine, 'the sent file is in the sender\'s own thread').toBeTruthy();
@@ -55,6 +57,7 @@ describe('the contact thread\'s "+" records what it sent and keeps the key off s
     const channel = memChannel();
     const out = await settleContactAttach(r, { channel, contactId: 'webid:bea', peerAddr: PEER, t });
     expect(out.say).toBe('[circle.attach.file_held](name=plant.png)');
+    expect(out.state).toBe(DELIVERY.PENDING);
     expect((await channel.rehydrate('webid:bea')).some((x) => x.file)).toBe(true);
   });
 
@@ -62,6 +65,7 @@ describe('the contact thread\'s "+" records what it sent and keeps the key off s
     const r = await sendFileWith({ held: false, delivered: false, reason: 'gone' })({ peer: PEER });
     const out = await settleContactAttach(r, { channel: memChannel(), contactId: 'webid:bea', peerAddr: PEER, t });
     expect(out.say).toBe('[circle.attach.file_not_reached]');
+    expect(out.state).toBe(DELIVERY.FAILED);
     expect(String(out.say)).not.toContain(PEER);
     const cancelled = await settleContactAttach({ ok: false, code: 'cancelled', error: '[sendFile.cancelled]' }, { channel: memChannel(), contactId: 'x', peerAddr: PEER, t });
     expect(cancelled.say).toBeNull();

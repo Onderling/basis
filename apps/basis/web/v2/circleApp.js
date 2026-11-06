@@ -3445,8 +3445,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     let r = null;
     try { r = await rawCallSkill(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
     // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
-    const { file, messageId, say } = await settleContactAttach(r, { channel: circleContactChannel, contactId, peerAddr, t });
-    if (file) { thread.messages.push({ origin: 'user', text: '', messageId, file }); rerender(); }
+    const { file, messageId, state, say } = await settleContactAttach(r, { channel: circleContactChannel, contactId, peerAddr, t });
+    if (file) { thread.messages.push({ origin: 'user', text: '', messageId, file, delivery: state }); rerender(); }
     if (say) globalThis.alert?.(say);
   };
   const rerender = () => renderContactThread(rootEl, {

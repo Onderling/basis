@@ -88,7 +88,7 @@ export function gatedActions(manifest, { policy = null, platform = 'web', render
     // An entry reserved for a role (`role: 'admin'`) is HIDDEN for a viewer the circle's roster says is not an admin
     // (`isAdmin === false`): a member's ⋯ offers nothing they cannot do (the sitting, 2026-11-06). While the roster has
     // not answered (`isAdmin` null) it waits GREYED with the sentence that says why, so an admin never sees it vanish
-    // and come back; 'greyed, never hidden' (#554/#557) now applies only to that unknown state.
+    // and come back; the earlier rule 'greyed, never hidden' now applies only to that unknown state.
     // A convention, not the gate: the op or screen behind the entry keeps its own refusal.
     if (action.role === 'admin' && isAdmin !== true) {
       if (isAdmin === false) continue;

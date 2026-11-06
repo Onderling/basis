@@ -85,6 +85,7 @@ import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
+import Constants from 'expo-constants';
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);
@@ -507,6 +508,8 @@ export default function App() {
           // The membership rider: hand the device log so membership statements ride its lane.
           deviceLog: eventLogRef.current ?? undefined,
           deviceLogIo,          // the agent hydrates it once the content key exists — see the note there
+          // the phone's model, recorded as this device's label when it is enrolled (the person's own device list)
+          enrolDeviceName: () => Constants.deviceName ?? null,
           provisionSettingsMedium: async (strategy) => createSettingsPodMedium({
             fetch:   getCirclePodFetch(),
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,

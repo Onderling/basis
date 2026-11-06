@@ -595,7 +595,9 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
       for (const to of shared ? targets.slice(1) : targets) {
         await sendPeerMessage(to, {
           type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
-          msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
+          // unique per send: a receiver keeps what it took per (sender, msgId), so a later announce from this
+          // address (a changed primary, a retry with more in it) must not read as a repeat of this one
+          msgId: `enroll-announce-${c.id}-${Date.now().toString(36)}`, ts: Date.now(), announcements: [mine],
         }, send);
       }
       row.steps.push('announce');

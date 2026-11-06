@@ -59,6 +59,8 @@ import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, c
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
+import Constants from 'expo-constants';
+import { deviceListWords } from '../../../../basis/src/v2/mijWords.js';   // never the d-… id on screen
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
@@ -785,7 +787,7 @@ export default function CircleMyDataScreen({ selvesOn = null, callSkill, onBack,
             {devices.map((d) => (
               <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
                 <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>
-                  {d.label || d.deviceId}
+                  {deviceListWords(d, { thisDeviceId: agent?.myDeviceId?.() ?? null, deviceName: Constants.deviceName ?? null, t })}
                 </Text>
                 {!d.revoked && (
                   <Pressable onPress={() => setRevokeTarget(d.deviceId)} testID={`mydata-revoke-${d.deviceId}`}>

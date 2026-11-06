@@ -336,7 +336,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
             {p.type === 'lend' && p.mine && <Chip label={t('circle.noticeboard.action.assign')} onPress={() => runAction('assign', p)} />}
             {p.type === 'lend' && p.mine && <Chip label={t('circle.noticeboard.action.returned')} onPress={() => runAction('markReturned', p)} />}
             {(Array.isArray(p.responders) ? p.responders : []).map((r) => (
-              <Chip key={`accept-${r.webid}`} label={t('circle.noticeboard.action.accept', { name: r.label })} onPress={() => runAction('accept', p, r.webid)} />
+              <Chip key={`accept-${r.webid}`} label={t('circle.noticeboard.action.accept', { name: r.label ?? t(r.labelKey) })} onPress={() => runAction('accept', p, r.webid)} />
             ))}
             {p.mine && <Chip label={t('circle.noticeboard.action.cancel')} onPress={() => runAction('cancel', p)} />}
             {!p.mine && <Chip label={t('circle.noticeboard.action.report')} muted onPress={() => runAction('report', p)} />}

@@ -5,7 +5,7 @@
  * included). With a handle already, nothing is asked.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { initialState, finalSubmit, loadFounderHandle, identityComplete } from '../../src/core/wizards/createGroupState.js';
+import { initialState, finalSubmit, loadFounderHandle, identityComplete, founderHandleSuggestionsFor } from '../../src/core/wizards/createGroupState.js';
 
 const profile = (entry) => vi.fn(async (app, op) => {
   if (op === 'getMyProfile') return { entry };
@@ -20,6 +20,22 @@ describe("the founder's handle", () => {
     const r = await loadFounderHandle({ callSkill: profile({ displayName: 'Bea Bakker' }) });
     expect(r.needsHandle).toBe(true);
     expect(r.handleSuggestions.length).toBeGreaterThan(0);
+  });
+  // The walk (2026-11-05): "Tester B", no handle yet, one earlier id-derived handle — the only suggestion was that
+  // handle. The person's own name comes first; what they used before follows it.
+  it("the founder's own name is the first suggestion, before any handle they used before", async () => {
+    const callSkill = vi.fn(async (app, op) => {
+      if (op === 'getMyProfile') return { entry: { displayName: 'Tester B' } };
+      if (op === 'listMyHandles') return { handles: ['pzwopwk1'] };
+      return {};
+    });
+    const r = await loadFounderHandle({ callSkill });
+    expect(r.handleSuggestions[0]).toBe('tester-b');
+    expect(r.handleSuggestions).toContain('pzwopwk1');
+  });
+  it('a circle founded as a named persona suggests that persona\'s name first', () => {
+    const state = { persona: 'p-werk', personas: [{ id: 'p-werk', name: 'Werk Frits' }], profileName: 'Tester B', priorHandles: [] };
+    expect(founderHandleSuggestionsFor(state)).toEqual(['werk-frits', 'tester-b']);
   });
   it('a handle already → nothing asked', async () => {
     expect((await loadFounderHandle({ callSkill: profile({ handle: 'bea' }) })).needsHandle).toBe(false);

@@ -187,7 +187,7 @@ describe('receiving an announcement', () => {
 
     const handler = makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET });
     const res = await handler('pk-admin', envelopeOf([bramAnnouncement]));
-    expect(res).toEqual({ recorded: 1, refused: 0 });
+    expect(res).toEqual({ recorded: 1, unproven: 0 });
 
     // The address became sealable…
     expect(log.registered).toContainEqual({
@@ -220,7 +220,7 @@ describe('receiving an announcement', () => {
 
     const handler = makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET });
     const res = await handler('pk-admin', envelopeOf([{ ...bramAnnouncement, circleAddressProof: 'forged' }]));
-    expect(res).toEqual({ recorded: 0, refused: 1 });
+    expect(res).toEqual({ recorded: 0, unproven: 1 });
     expect(opsCalled(log)).not.toContain('recordCircleAddressAnnouncement');
     expect(log.snapshots).toHaveLength(0);
     expect(rows[1].circleAddress).toBeUndefined();
@@ -248,7 +248,7 @@ describe('receiving an announcement', () => {
       bramAnnouncement,
       { circleId: CIRCLE, memberWebid: CATO, circleAddress: addressOf(4), circleAddressProof: 'nope' },
     ]));
-    expect(res).toEqual({ recorded: 1, refused: 1 });
+    expect(res).toEqual({ recorded: 1, unproven: 1 });
     expect(rows.find((r) => r.webid === BRAM)).toBeTruthy();
     expect(rows.find((r) => r.webid === CATO)).toBeFalsy();
   });
@@ -257,7 +257,7 @@ describe('receiving an announcement', () => {
     const { agent, log } = fakeAgent();
     const handler = makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET });
     for (const bad of [null, {}, { subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND }, envelopeOf([])]) {
-      expect(await handler('x', bad)).toEqual({ recorded: 0, refused: 0 });
+      expect(await handler('x', bad)).toEqual({ recorded: 0, unproven: 0 });
     }
     expect(log.skills).toHaveLength(0);
     expect(isValidCircleAddressAnnounceEnvelope(envelopeOf([bramAnnouncement]))).toBe(true);

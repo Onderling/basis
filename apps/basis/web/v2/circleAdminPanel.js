@@ -23,6 +23,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 import { paintFace } from './faceView.js';
 import { blockedRowWords } from '../../src/v2/blockedWords.js';
+import { memberShown } from '../../src/v2/personLabel.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
@@ -118,7 +119,7 @@ export function renderCircleAdminPanel(container, {
       li.appendChild(avatar);
       const name = document.createElement('span');
       name.className = 'cc-admin__member-name';
-      name.textContent = m.displayName || m.handle || m.webid || '';
+      name.textContent = memberShown(m, tr);   // never the key
       li.appendChild(name);
       if (m.role && m.role !== 'member') {
         const role = document.createElement('span');

@@ -27,6 +27,7 @@ import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circ
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { settleContactAttach } from '../../../../basis/src/v2/contactAttachOutcome.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
 export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '' }) {
@@ -46,9 +47,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     setAttachOpen(false);
     let r = null;
     try { r = await bundle?.callSkill?.(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
-    const said = r?.error ?? r?.message ?? null;
-    if (said) Alert.alert(said);
-  }, [bundle, peerAddr]);
+    // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
+    const { file, messageId, say } = await settleContactAttach(r, { channel, contactId, peerAddr, t });
+    if (file) setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file }]);
+    if (say) Alert.alert(say);
+  }, [bundle, channel, contactId, peerAddr]);
   const name = nameShown(contact, t, { ids: [contactId] });   // the stamped label, else "someone" — never the key
   // The pre-send floor this contact declared (its card → the roster row): the channel applies it on
   // every turn; the header says so before the person types. web≡mobile with contactThread.js.

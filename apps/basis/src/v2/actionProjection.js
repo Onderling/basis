@@ -74,7 +74,7 @@ export function circleActions(manifest, opts = {}) {
  * platform allow. What a shell would paint once the alpha widens; what tests of the feature gate and
  * the platform gate assert on, since the trim hides most of the gated ids from the DOM today.
  */
-export function gatedActions(manifest, { policy = null, platform = 'web', renderer = renderWeb, availability = null, isAdmin = false } = {}) {
+export function gatedActions(manifest, { policy = null, platform = 'web', renderer = renderWeb, availability = null, isAdmin = null } = {}) {
   const nav = renderer(manifest);
   const actions = Array.isArray(nav.actions) ? nav.actions : [];
   const out = [];
@@ -85,12 +85,19 @@ export function gatedActions(manifest, { policy = null, platform = 'web', render
     const opId = action?.target?.kind === 'op' ? action.target.opId : null;
     const st = opId && availability?.of ? availability.of(opId)?.state : 'available';
     if (st === 'hidden') continue;
-    // An entry reserved for a role (`role: 'admin'`) is GREYED for anyone else — shown, with the sentence that says
-    // why, never hidden and never offered as if it would work. `isAdmin` is the viewer's role from the circle's
-    // roster; until that answers it is false, so the entry waits greyed rather than being offered and refused.
+    // An entry reserved for a role (`role: 'admin'`) is HIDDEN for a viewer the circle's roster says is not an admin
+    // (`isAdmin === false`): a member's ⋯ offers nothing they cannot do (the sitting, 2026-11-06). While the roster has
+    // not answered (`isAdmin` null) it waits GREYED with the sentence that says why, so an admin never sees it vanish
+    // and come back; 'greyed, never hidden' (#554/#557) now applies only to that unknown state.
     // A convention, not the gate: the op or screen behind the entry keeps its own refusal.
     if (action.role === 'admin' && isAdmin !== true) {
+      if (isAdmin === false) continue;
       out.push({ ...action, disabled: true, reasonKey: ROLE_REASON_KEYS[action.id] ?? 'circle.op.admin_only' });
+      continue;
+    }
+    // An entry with a member's own name for the same place (`memberLabelKey`) says that one to a known non-admin.
+    if (isAdmin === false && action.memberLabelKey) {
+      out.push({ ...(st === 'greyed' ? { ...action, disabled: true } : action), labelKey: action.memberLabelKey });
       continue;
     }
     out.push(st === 'greyed' ? { ...action, disabled: true } : action);

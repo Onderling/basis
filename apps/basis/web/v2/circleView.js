@@ -123,7 +123,7 @@ export function renderCircleView(container, {
   // gate is the real security boundary; this is owner-only VISIBILITY). Absent →
   // no entrust action (backwards-compatible).
   viewerWebid = null,
-  viewerIsAdmin = false,
+  viewerIsAdmin = null,   // true · false · null while the roster has not answered
   // Composer affordances (web↔mobile parity, ported from the classic shell). Both optional — without
   // them the composer renders exactly as before.
   //   `catalogue`  the merged dispatch catalogue → drives the slash-command auto-suggest dropdown.

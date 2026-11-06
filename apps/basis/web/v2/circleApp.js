@@ -7260,7 +7260,7 @@ function showCircle(id, circle, policy) {
       circleMembers = members;   // 1:1-bot gate reads the raw rows (relation/webid) at render time
       const me = members.find((m) => (m?.webid ?? m?.id) === myWebid);
       myCircleRole = me?.role ?? '';
-    } catch { myCircleRole = ''; }
+    } catch { myCircleRole = null; }   // no answer is not 'not an admin': unknown
     if (getActiveCircle() === id) rerender();
     return myCircleRole;
   }
@@ -7731,7 +7731,8 @@ function showCircle(id, circle, policy) {
       // stays hidden (fail-closed), and a locally-authored task row still offers it
       // via the row's `isOwn` path inside the renderer.
       viewerWebid: myWebid || null,
-      viewerIsAdmin: myCircleRole === 'admin',
+      // null while the roster has not answered (an admin-only ⋯ entry waits greyed), then known: true or false
+      viewerIsAdmin: myCircleRole === null ? null : myCircleRole === 'admin',
       // D / Surface 2 — feeds the ⋯ overflow menu's manifest-projected feature gate.
       policy,
       tabs, activeTab,

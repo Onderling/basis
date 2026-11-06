@@ -3297,7 +3297,7 @@ function CircleDetail({
   // roster is what the labels resolve against. The circle roster via listGroupMembers (web≡mobile);
   // null = not loaded yet, [] = loaded empty. Loads at circle OPEN (batch 4): the chat tab needs it
   // for sender labels the moment it paints, not first when MEMBERS is opened.
-  const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
+  const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: null });   // isAdmin null until the roster answers
   const [tabMembers, setTabMembers] = useState(null);
   const [unreachable, setUnreachable] = useState(() => new Set());
   // The RAW rows the same load returns. `normalizeCircleMembers` is the member-list projection and
@@ -3771,7 +3771,7 @@ function CircleDetail({
   useEffect(() => {
     let cancelled = false;
     circleMembersRef.current = null; myWebidRef.current = null;
-    if (!circle?.id || typeof rawCallSkill !== 'function') { setMandateViewer({ viewerWebid: null, isAdmin: false }); setBotLabel(null); return undefined; }
+    if (!circle?.id || typeof rawCallSkill !== 'function') { setMandateViewer({ viewerWebid: null, isAdmin: null }); setBotLabel(null); return undefined; }
     setBotLabel(null);   // reset on circle change — fail-closed until the roster resolves
     (async () => {
       let webid = null;
@@ -3789,7 +3789,7 @@ function CircleDetail({
         }
         return;
       }
-      let isAdmin = false;
+      let isAdmin = null;   // stays unknown when the roster does not answer
       try {
         const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circle.id });
         const mem = Array.isArray(res?.members) ? res.members : [];

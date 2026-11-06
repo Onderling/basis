@@ -24,15 +24,11 @@ const MEMBER_OPEN = ['settings', 'admin'];
 
 describe('the ⋯ menu — admin-only entries', () => {
   for (const [shell, project] of [['web', (o) => circleActions(basisManifest, { platform: 'web', ...o })], ['mobile', (o) => circleActionsMobile(basisManifest, o)]]) {
-    it(`${shell}: a member sees them GREYED, with the reason — never hidden`, () => {
+    // A member KNOWN not to be an admin is offered nothing they cannot do: the entry is hidden (the sitting, 2026-11-06).
+    // Greyed with the reason is now only the unknown state (below), so an admin never sees it vanish and come back.
+    it(`${shell}: a known member does not see them`, () => {
       const roster = project({ isAdmin: false });
-      for (const id of ADMIN_ONLY) {
-        const a = roster.find((x) => x.id === id);
-        expect(a, id).toBeTruthy();
-        expect(a.disabled, id).toBe(true);
-        expect(typeof a.reasonKey, id).toBe('string');
-      }
-      expect(roster.find((x) => x.id === 'invite').reasonKey).toBe('circle.invite.admin_only');
+      for (const id of ADMIN_ONLY) expect(roster.find((x) => x.id === id), id).toBeUndefined();
     });
 
     it(`${shell}: settings and admin stay open to a member (adopting a policy, reading the roster)`, () => {
@@ -54,6 +50,7 @@ describe('the ⋯ menu — admin-only entries', () => {
     it(`${shell}: a viewer whose role is not known yet is not offered them (fail closed until the roster answers)`, () => {
       const roster = project({});
       for (const id of ADMIN_ONLY) expect(roster.find((x) => x.id === id)?.disabled, id).toBe(true);
+      expect(roster.find((x) => x.id === 'invite').reasonKey).toBe('circle.invite.admin_only');
     });
   }
 

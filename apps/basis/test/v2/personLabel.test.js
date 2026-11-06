@@ -12,6 +12,7 @@ import { membershipNoticeRows } from '../../src/v2/membershipNotices.js';
 import { revealedMemberLabel } from '../../src/v2/circleViewAs.js';
 import { renderSubtitle } from '../../src/v2/circleTilePreviews.js';
 import { stampSenderLabels } from '../../src/v2/circleStream.js';
+import { responderChoices } from '../../src/v2/circlePinboardScope.js';
 
 const KEY = 'zWOPwK1R5XsnsQe3vT0b7yHk2LmN9pQrS4tUvWxYz01';   // an opaque 43-character key
 const t = (k, a = {}) => (k === SOMEONE_LABEL_KEY ? 'iemand' : `${k}${a.name != null ? `(${a.name})` : ''}`);
@@ -78,6 +79,14 @@ describe('every site that showed a key now shows someone', () => {
     const [row] = stampSenderLabels([{ actor: KEY }], { members: [{ id: KEY, webid: KEY }] });
     expect(row.senderLabel).toBeNull();
     expect(row.senderLabelKey).toBe(SOMEONE_LABEL_KEY);
+  });
+
+  it('"Accept …" on a post, for a responder the roster cannot name', () => {
+    const item = { addedBy: 'me', source: { responders: [KEY] } };
+    const [c] = responderChoices(item, { viewerId: 'me', members: [] });
+    expect(c.webid).toBe(KEY);
+    expect(c.label).toBeNull();
+    expect(c.labelKey).toBe(SOMEONE_LABEL_KEY);
   });
 
   it('the circle list preview: the text, never "<key>: text"', () => {

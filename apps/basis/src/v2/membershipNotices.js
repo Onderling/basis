@@ -26,7 +26,7 @@
  */
 import { VIEWER_FACING_SYSTEM_KINDS } from '@onderling/item-store';
 import { revealedMemberLabel } from './circleViewAs.js';
-import { SOMEONE_LABEL_KEY } from './personLabel.js';
+import { SOMEONE_LABEL_KEY, isKeyLike } from './personLabel.js';
 import { REMOVAL_NOTICE_KEYS, SHOW_REMOVAL_REASON } from './removalNotice.js';
 
 export const MEMBERSHIP_NOTICE_KEYS = Object.freeze({
@@ -65,7 +65,7 @@ export function membershipNoticeFor(body, { viewerId, members = null } = {}) {
     if (role !== 'admin' && role !== 'member') return null;
     if (subject === viewerId) return { notice: role === 'admin' ? 'promoted' : 'demoted' };
     const row = Array.isArray(members) ? members.find((m) => refOf(m) === subject) : null;
-    const name = row ? revealedMemberLabel(row, { viewerId }).primary : null;   // null → "someone" at render, never the key
+    const name = row ? revealedMemberLabel(row, { viewerId }).primary : (isKeyLike(subject) ? null : subject);   // a chosen id (webid:) stays; a key → "someone" at render
     return { notice: role === 'admin' ? 'memberPromoted' : 'memberDemoted', args: { name } };
   }
   if (kind === 'join') {
@@ -73,7 +73,7 @@ export function membershipNoticeFor(body, { viewerId, members = null } = {}) {
     // self-authored join names nobody but the joiner, and the joiner needs no line about themselves.
     if (author !== viewerId || subject === viewerId) return null;
     const row = Array.isArray(members) ? members.find((m) => refOf(m) === subject) : null;
-    const name = row ? revealedMemberLabel(row, { viewerId }).primary : null;   // null → "someone" at render, never the key
+    const name = row ? revealedMemberLabel(row, { viewerId }).primary : (isKeyLike(subject) ? null : subject);   // a chosen id (webid:) stays; a key → "someone" at render
     return { notice: 'joined', args: { name } };
   }
   return null;

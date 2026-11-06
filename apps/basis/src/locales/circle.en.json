@@ -990,10 +990,6 @@
       "text": "＋ Add task",
       "doc": "Taken (tasks) tab — compose button to add a task."
     },
-    "tasks_add_prompt": {
-      "text": "What needs doing?",
-      "doc": "Taken (tasks) tab — prompt when adding a task."
-    },
     "tasks_untitled": {
       "text": "(untitled task)",
       "doc": "Taken (tasks) tab — fallback when a task has no text."

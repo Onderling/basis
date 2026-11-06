@@ -189,7 +189,7 @@ import { useRelayQuestion } from './RelayQuestionModal.js';
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
-import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { attachEntriesFor, attachEntryForType } from '../../../../basis/src/v2/attachEntries.js';
 import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
@@ -4865,14 +4865,18 @@ function CircleDetail({
           // owner-only entrust chip (the same seam the chat stream uses). Tapping entrust
           // opens the mandate picker; claim/done route to the tasks agent. web≡mobile.
           <View testID="circle-detail-taken">
-            <Pressable
-              style={styles.takenAdd}
-              accessibilityRole="button"
-              testID="circle-taken-add"
-              onPress={() => setComposerText('/addtask ')}
-            >
-              <Text style={styles.takenAddText}>{t('circle.view.tasks_add')}</Text>
-            </Pressable>
+            {/* the SAME form "+ → Task" opens (attachEntryForType): it used to put "/addtask " into a composer this tab
+                does not show, so the button did nothing (walk, 2026-11-05); not painted where no task can be made */}
+            {attachEntryForType(attachEntries, 'task') ? (
+              <Pressable
+                style={styles.takenAdd}
+                accessibilityRole="button"
+                testID="circle-taken-add"
+                onPress={() => runAttachEntry(attachEntryForType(attachEntries, 'task'))}
+              >
+                <Text style={styles.takenAddText}>{t('circle.view.tasks_add')}</Text>
+              </Pressable>
+            ) : null}
             {circleTasks.length === 0 ? (
               <Text style={styles.placeholder}>{t('circle.view.tasks_empty')}</Text>
             ) : (

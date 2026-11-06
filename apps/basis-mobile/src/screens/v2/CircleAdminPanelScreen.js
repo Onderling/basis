@@ -23,7 +23,7 @@ import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circ
 import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
 // decision (web ≡ mobile); the screen paints it and works nothing out for itself.
-import { roleControlFor, roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, removeControlFor, announceControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
+import { roleControlFor, roleChangeConfirm, removeMemberConfirm, roleChangeNoticeWords, ownSpineOutboxLine, removeControlFor, announceControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
 // The confirm the op declares, run through the SAME gate the chat path uses — Alert.alert is only
 // this platform's presenter.
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
@@ -74,7 +74,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // that member's per-circle address, then re-record the authorize snapshot from a fresh roster read.
   // Mobile previously called the raw skill and did neither of the last two, so a member removed on a
   // phone could still speak into the circle — the drift invariant 2 exists to catch.
-  const remove = useCallback(async (m) => {
+  const removeConfirmed = useCallback(async (m) => {
     setNotice(null);
     try {
       const r = await removeCircleMember({
@@ -94,6 +94,12 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     } catch { setNotice(t('circle.admin.refused')); }
     load();
   }, [agent, callSkill, groupId, load, revokeForRemoved]);
+  // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
+  const remove = useCallback((m) => runConfirmGate({
+    request: removeMemberConfirm({ name: m.displayName || m.handle || m.webid, t }),
+    present: alertConfirmPresenter(Alert.alert),
+    execute: () => removeConfirmed(m),
+  }), [removeConfirmed]);
   // "Stop sharing": take ONE share back in place (a canonical circle only — the shared decision says which)
   const stop = useCallback(async (s) => {
     setNotice(null);

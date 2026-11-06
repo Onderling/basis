@@ -283,7 +283,8 @@ describe('createSecureAgent — S1 mute + helloGate', () => {
     // And persists fresh state cleanly:
     await set.add('app.a');
     const raw = await vault.get('sa-mute');
-    expect(JSON.parse(raw)).toEqual(['app.a']);
+    // each block is kept with the name it was made under and the moment (none given here)
+    expect(JSON.parse(raw)).toEqual([{ k: 'app.a', l: null, at: expect.any(Number) }]);
   });
 });
 

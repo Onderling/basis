@@ -22,6 +22,7 @@ import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
 // L125 — the add sheet: what the new contact sees of you, asked before the card is added (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';   // never the key on screen
+import { contactPointAdopter } from './RelayQuestionModal.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
@@ -40,8 +41,10 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState('');
   const [error, setError] = useState(false);
+  // a device with no relay of its own adopts the point a scanned card brings (said once)
+  const contactAdopter = useMemo(() => contactPointAdopter(bundle?.agent ?? null), [bundle]);
   const lens = useContactLensSheet({
-    callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, t, theme,
+    callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t, theme,
   });
   // Hidden contacts (L106, web parity with contactsRoster.js) fold away at the bottom: the row stays, out of
   // sight, until they write again or the person shows them. A list of only hidden contacts is not empty.

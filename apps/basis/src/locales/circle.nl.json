@@ -3753,6 +3753,14 @@
     "no_name_yet": {
       "text": "jij (nog geen naam)",
       "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
+    },
+    "point_from_contact": {
+      "text": "Kwam mee met het kaartje van een contact",
+      "doc": "Where a connection point came from: a scanned contact card, adopted because this device had no relay of its own."
+    },
+    "point_adopted_from": {
+      "text": "Je bent nu bereikbaar via het verbindingspunt van {{name}}.",
+      "doc": "Said once after a scan when this device had no relay and now uses the card's; {{name}} is the contact."
     }
   },
   "viewAsSplit": {

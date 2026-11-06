@@ -55,3 +55,17 @@ export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, 
 }
 
 export default attachEntriesFor;
+
+/**
+ * The "+" entry that makes an item of this type HERE — what a tab's own add button runs, so "＋ Add task" on the Tasks
+ * tab opens the same form as "+ → Task" in the composer. A walk (2026-11-05) found the tab's button doing nothing on
+ * both phones: mobile put "/addtask " into a composer the Tasks tab does not show, web asked through `prompt()`.
+ * `null` when this circle offers no such entry (the button is then not painted: never offer what does not work).
+ *
+ * @param {Array<{itemType?: string}>} entries  `attachEntriesFor`'s answer for this circle
+ * @param {string} itemType
+ * @returns {object|null}
+ */
+export function attachEntryForType(entries, itemType) {
+  return (Array.isArray(entries) ? entries : []).find((e) => e?.itemType === itemType) ?? null;
+}

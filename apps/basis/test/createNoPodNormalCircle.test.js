@@ -16,6 +16,9 @@ describe('a circle made without a connected pod', () => {
   it('the radio offers only "no pod"', () => {
     expect(storageChoices({ podConnected: false }).map((o) => o.id)).toEqual(['none']);
     expect(storageChoices({ podConnected: true }).map((o) => o.id)).toContain('shared');
+    // only 'no pod' and 'one shared pod' are offered (personal/hybrid wait for the companion; sitting 2026-11-06)
+    expect(storageChoices({ podConnected: true }).map((o) => o.id)).toEqual(['none', 'shared']);
+    expect(storageChoices({}).map((o) => o.id)).toEqual(['none', 'shared']);
     expect(storageChoices({}).map((o) => o.id)).toContain('shared');
   });
 

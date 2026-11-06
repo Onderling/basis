@@ -14,6 +14,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderAttachments } from '@onderling/app-manifest';
 import { basisManifest } from '../manifest.js';
+import { attachEntriesFor } from '../src/v2/attachEntries.js';
 import { renderCircleNoticeboard } from '../web/v2/circleNoticeboard.js';
 import { renderCircleView } from '../web/v2/circleView.js';
 
@@ -31,7 +32,15 @@ describe('renderAttachments(basisManifest) — the ATTACHMENT projector', () => 
     // `embed` is NOT here, and its absence is the decision: it takes an item id, so as a "+" entry it
     // could only open a form asking a person to type one. It is a ROW ACTION on the item instead —
     // the item is on the screen and knows its own id. The "+" is for things that do not exist yet.
-    expect(attachMenu.map((e) => e.opId)).toEqual(['embed-file', 'embed-time', 'feedback']);
+    // `send-file` declares an attach entry too, scoped to a contact thread only (its own "+", addressed to that contact).
+    expect(attachMenu.map((e) => e.opId)).toEqual(['embed-file', 'embed-time', 'feedback', 'send-file']);
+    expect(attachMenu.find((e) => e.opId === 'send-file')?.scopes).toEqual(['contact']);
+  });
+
+  it('a circle "+" never offers the contact-only send-file; a contact thread "+" offers only it', () => {
+    const circle = attachEntriesFor({ manifestsByOrigin: { basis: basisManifest } }).map((e) => e.opId);
+    expect(circle).not.toContain('send-file');
+    expect(attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' }).map((e) => e.opId)).toEqual(['send-file']);
   });
 
   it('projects the file entry (embed-file → "Bestand") with its itemType', () => {

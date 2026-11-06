@@ -103,9 +103,14 @@ export async function run() {
     };
 
     check('the drawer offers a row for every op this journey walks',
-      ['find', 'brief', 'logs', 'help', 'help-with', 'whoami', 'muted', 'scanQr', 'send-file']
+      ['find', 'brief', 'logs', 'help', 'help-with', 'whoami', 'muted', 'scanQr']
         .every((op) => !!rowFor(op)),
       rows.filter((r) => r.app === 'basis').map((r) => r.op).join(','));
+    // send-file has its own door now (the contact thread's "+", its declared attach entry), so it leaves the drawer of
+    // last resort, as the embed ops did: a door elsewhere, not a stranded op.
+    check('send-file has a door of its own: the contact thread\'s +, not the drawer',
+      !rowFor('send-file') && basisManifest.operations.find((o) => o.id === 'send-file')?.surfaces?.attach?.scopes?.includes('contact') === true,
+      JSON.stringify(basisManifest.operations.find((o) => o.id === 'send-file')?.surfaces?.attach ?? null));
 
     // help — the printed list. Frits kept it deliberately ("a printed list could still be useful"), so
     // the story is that it prints, and prints the SHELVES the drawer uses rather than a flat wall.
@@ -167,7 +172,7 @@ export async function run() {
     await throughTheDrawer('scanQr');
     check('the drawer runs scanQr and the camera is opened', opened.scanner === 1, `opened=${opened.scanner}`);
 
-    // send-file — its own door is still owed (it waits on the + menu question); the op works today.
+    // send-file: its door is the contact thread's "+"; the op itself, walked here:
     // Two halves of one story. FIRST, on a device that is not on the peer network, it refuses and says
     // so instead of opening a picker for a file it could never send — the state most devices are in.
     await declaredOp('basis', 'send-file');

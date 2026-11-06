@@ -337,7 +337,8 @@ const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, c
 // THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
 // Web twin: circleScreen.js `renderOnboarding`.
 function OnboardingCards({ block, onAction, styles }) {
-  const [handle, setHandle] = useState('');
+  // starts with the name already on the profile (the one the avatar's letters come from), as web's field does
+  const [handle, setHandle] = useState(() => (block.content?.cards ?? []).find((c) => c.id === 'handle')?.name ?? '');
   const act = (a) => { if (typeof onAction === 'function') onAction(a); };
   // the family (Btn): the strip's act is the screen's primary, the second choice quiet
   const OnbBtn = ({ labelKey, a, quiet = false, variant = null, testID }) => (

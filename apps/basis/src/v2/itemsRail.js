@@ -20,6 +20,7 @@ import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { itemsManifest, ITEMS_LANE } from './itemsManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 /** The statement kinds the items lane carries — DERIVED from the manifest's declared appends. */
 export const ITEMS_RAIL_KINDS = entryKindRegistryFromManifests(itemsManifest).kindsFor(ITEMS_LANE);
@@ -334,24 +335,25 @@ export function routeItemsMirror({ circleId, emitter, requireSigned = false } = 
 export function makeItemsPeerHandler({ rail, onChange = null, onLanded = null, holds = null, onPassed = null } = {}) {
   if (!rail) throw new Error('makeItemsPeerHandler: a items rail is required');
   return async function onCircleTask(fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== ITEMS_BROADCAST) return;
+    if (!payload || payload.subtype !== ITEMS_BROADCAST) return NOT_TAKEN;
     const { circleId, event: statement } = payload;
-    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
+    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return NOT_TAKEN;
     // This device's selection (sync-policy §11) — the same three answers as the chat handler: land · verify
     // and pass on (hold nothing, still carry) · refuse (the kring is off here).
     const h = typeof holds === 'function' ? holds(circleId) : true;
-    if (h === null) return;
+    if (h === null) return NOT_TAKEN;
     try {
       if (h === false) {
         const v = typeof rail.verify === 'function' ? await rail.verify(circleId, statement) : { ok: false };
         if (v?.ok && typeof onPassed === 'function') { try { await onPassed(circleId, statement, fromPeerAddr); } catch { /* best-effort */ } }
-        return;
+        return v?.ok ? undefined : NOT_TAKEN;
       }
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
         try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }
       }
-    } catch { /* ingest is best-effort — never throw on a peer message */ }
+      return res?.ok ? undefined : NOT_TAKEN;   // a refusal stays retryable (see the membership handler)
+    } catch { return NOT_TAKEN; /* ingest is best-effort — never throw on a peer message */ }
   };
 }

@@ -1,6 +1,6 @@
 # Convention: cross-pod references
 
-> **Status:** deliverable (per transition doc §V.5). Documents the
+> **Status:** in force (checked against the code 2026-11-06). Documents the
 > `embeds` field shape on canonical item types + the permission-
 > failure rendering policy. Substrate primitives live in
 > `@onderling/item-types` (schema) + `@onderling/item-store/embeds`

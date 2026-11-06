@@ -1533,6 +1533,18 @@
       "text": "Type a name first.",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
+    "onboarding_handle_saved": {
+      "text": "Saved. You are called {{name}} here.",
+      "doc": "The name card after its save: the name the person typed, which is now their display name (the handle is made from it)."
+    },
+    "onboarding_handle_failed": {
+      "text": "Your name could not be saved. Please try again.",
+      "doc": "The name card could not save (any refusal other than a taken name)."
+    },
+    "onboarding_handle_unusable": {
+      "text": "Use letters or digits in your name.",
+      "doc": "What was typed holds nothing a name can be made of (only symbols)."
+    },
     "onboarding_intro_title": {
       "text": "New to Basis?",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."

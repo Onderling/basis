@@ -33,7 +33,7 @@ import {
   // The circle's id comes from its founder (web parity, L126).
   resolveFounderKey, newFounderCircleId,
   // The founder's handle, asked only when their profile has none (the join wizard's field and checks).
-  loadFounderHandle, identityComplete,
+  loadFounderHandle, founderHandleSuggestionsFor, identityComplete,
 } from '../../core/wizards/createGroupState.js';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { attachConsequences } from '../../v2/optionConsequences.js';
@@ -183,7 +183,7 @@ export default function CreateGroupWizardModal({
                     t={t}
                     value={state.handle}
                     onChange={(v) => setState((s) => ({ ...s, handle: v }))}
-                    suggestions={state.handleSuggestions}
+                    suggestions={founderHandleSuggestionsFor(state)}
                     // Under the circle's own name, "Name" read twice: here it is the person's name IN the circle.
                     label={t('circle.wizard.create.your_name')}
                     hint={t('circle.join.wizard.handle.intro')}

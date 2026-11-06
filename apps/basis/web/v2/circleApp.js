@@ -5403,6 +5403,19 @@ async function showJoinCircle(inviteArg) {
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId, { forFunction = false } = {}) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
+  // THE INVITE IS ON SCREEN AT ONCE, saying it is being made: building it below takes a few seconds (the policy, the
+  // storage posture, the code), and nothing on screen said so (mobile parity: the same line, the same key)
+  const overlay = document.createElement('div');
+  overlay.className = 'cc-mydata-modal';
+  const card = document.createElement('div');
+  card.className = 'cc-mydata-modal__card';
+  overlay.appendChild(card);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const making = document.createElement('p');
+  making.dataset.role = 'invite-pending';
+  making.textContent = t('circle.invite.making');
+  card.appendChild(making);
+  document.body.appendChild(overlay);
   // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
   // address in a persona's circle, which the joiner's trail would record as its confirming admin
   const adminPeerAddr = _peerAgent?.circleSelf?.(circleId)?.webid ?? circleHouseholdAgent?.householdSelfAddr ?? null;
@@ -5452,13 +5465,8 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
     });
   }
   catch { r = { error: 'failed' }; }
-  const overlay = document.createElement('div');
-  overlay.className = 'cc-mydata-modal';
-  const card = document.createElement('div');
-  card.className = 'cc-mydata-modal__card';
-  overlay.appendChild(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
+  making.remove();
+  if (!overlay.isConnected) return;   // closed while it was being made
   const h = document.createElement('h3');
   h.textContent = t('circle.invite.title');
   card.appendChild(h);

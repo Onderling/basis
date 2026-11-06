@@ -172,6 +172,7 @@ import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_P
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src/v2/contactsSource.js';
 import { nameShown } from '../../src/v2/personLabel.js';
+import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -8795,8 +8796,10 @@ async function showAdmin(id) {
   let notice = null;
   let outboxLine = null;            // changes handed to the main device: over a day, or not sent
   let myWebid = '';                 // whose row is mine — the role control is offered to an admin only
+  let revealPolicy = 'pairwise';    // the circle's reveal ladder: what names the admin may see (the strict one until read)
 
   async function load() {
+    revealPolicy = (await policyStore.get(id).catch(() => null))?.revealPolicy ?? 'pairwise';
     const [mem, mut, who, outbox] = await Promise.all([
       rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }).catch(() => null),
       rawCallSkill('pinboard', 'listMutedPeers', {}).catch(() => null),
@@ -8822,6 +8825,7 @@ async function showAdmin(id) {
     members, muted, outboundShares, outboundCanonical, busy, notice, outboxLine, t, lang: currentLang(),
     resolvePicture: circlePictureResolver(id),
     viewerWebid: mySelfIn(id) ?? myWebid,
+    revealPolicy,
     onBack: () => showDetail(id),
     // A member's own row offers LEAVING (the shared decision): the same leave the circle's tile menu runs, with its confirm.
     onLeave: () => onLeaveCircle(id, circlesCache.find((c) => c?.id === id) ?? { id }),
@@ -8831,7 +8835,7 @@ async function showAdmin(id) {
     // handover of the whole circle, or one the fold will not let stand. What that consequence is comes
     // from the shared decision, not from here.
     onSetRole: async (m, control) => {
-      const name = m.displayName || m.handle || m.webid;
+      const name = rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t });   // the ladder, never the raw name
       const request = roleChangeConfirm({ control, name, t });
       await runConfirmGate({
         request,
@@ -8880,7 +8884,7 @@ async function showAdmin(id) {
         if (!r.ok) notice = t('circle.admin.refused');
         else {
           removed = true;
-          notice = t('circle.admin.removed', { name: m.displayName || m.handle || m.webid });
+          notice = t('circle.admin.removed', { name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }) });
         }
       } catch { notice = t('circle.admin.refused'); }
       // objective L — auto-revoke: on a SUCCESSFUL removal, rotate this circle's outbound canonical shares away

@@ -24,8 +24,12 @@ describe('the invite after a create', () => {
     expect(fn.indexOf("t('circle.invite.making')")).toBeGreaterThan(-1);
     expect(fn.indexOf("t('circle.invite.making')")).toBeLessThan(fn.indexOf('buildCircleInviteUri('));
   });
-  it('web opens the new circle\'s invite after Create too, as mobile does (a capability, not an idiom)', () => {
+  // Web's create wizard ENDS on the invite (its result panel: "Circle created", the link, the code, Done), so web already
+  // shows the new circle's invite after Create. Opening showCircleInvite on top of it (2026-11-06) put a second invite
+  // over the first, and on a device with no relay the relay question over both: the browser tail went red on every
+  // spec that creates a circle. One invite after Create, the wizard's own.
+  it('web does not open a second invite over the create wizard\'s own invite', () => {
     const create = web.slice(web.indexOf('function openCreateCircleWizard'));
-    expect(/if \(gid\) showCircleInvite\(gid\)/.test(create.slice(0, 4000))).toBe(true);
+    expect(/showCircleInvite\(gid\)/.test(create.slice(0, 4000))).toBe(false);
   });
 });

@@ -244,6 +244,10 @@
       "text": "Uitnodigen voor deze kring",
       "doc": "OBJ-2 — heading of the invite-QR overlay."
     },
+    "making": {
+      "text": "De uitnodiging wordt gemaakt.",
+      "doc": "The invite right after a circle is made, while it is being built (a few seconds): on screen at once, so nothing else is tapped meanwhile."
+    },
     "hint": {
       "text": "Scan dit op het andere apparaat om lid te worden van deze kring.",
       "doc": "OBJ-2 — caption under the invite QR."

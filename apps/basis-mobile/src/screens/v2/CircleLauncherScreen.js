@@ -2088,6 +2088,8 @@ export default function CircleLauncherScreen({
                       onPress={() => { const cid = inviteFor.circleId; setInviteFor(null); openCircleInvite(cid, { forFunction: true }); }} />
                   ) : null}
                 </>
+              ) : inviteFor?.pending ? (
+                <Text style={styles.inviteHint} testID="invite-pending">{t('circle.invite.making')}</Text>
               ) : (
                 <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
               )}
@@ -2979,7 +2981,9 @@ export default function CircleLauncherScreen({
             load();
             // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
             // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
-            if (gid) openCircleInvite(gid).catch(() => {});
+            // THE INVITE IS ON SCREEN AT ONCE, saying it is being made: building it takes a few seconds, and a walk found the
+            // bare circle list showing all that time — a tap there opened a circle and the invite then came over it
+            if (gid) { setInviteFor({ circleId: gid, pending: true }); openCircleInvite(gid).catch(() => {}); }
           }}
         />
       ) : null}

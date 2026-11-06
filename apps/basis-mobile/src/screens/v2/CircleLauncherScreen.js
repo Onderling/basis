@@ -6091,7 +6091,7 @@ function NearbyScreen({
               <Text style={styles.nearbyActionText}>{t(answering ? 'circle.nearbyScreen.answer_send' : 'circle.nearbyScreen.ask_send')}</Text>
             </Pressable>
             <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
-              <Text style={styles.nearbyActionText}>{t('circle.back')}</Text>
+              <Text style={styles.nearbyActionText}>{t('circle.confirm.cancel')}</Text>
             </Pressable>
           </View>
         ) : (

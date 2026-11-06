@@ -6675,7 +6675,7 @@
       "doc": "S5 — push subscribed state."
     },
     "notif_off": {
-      "text": "Krijg een melding bij reacties en kringactiviteit, ook als dit tabblad dicht is.",
+      "text": "Krijg een melding bij reacties en kringactiviteit, ook als de app dicht is.",
       "doc": "S5 — push not-subscribed state."
     },
     "notif_unsupported": {
@@ -6791,7 +6791,7 @@
       "doc": "J-CS8 — button when the lock is on."
     },
     "notif_privacy": {
-      "text": "Om je telefoon te wekken bewaart de relay waarmee je verbonden bent één wek-token voor dit apparaat. Daardoor kan die relay zien dat jouw kringen bij één apparaat horen — dus dat ze van jou zijn.",
+      "text": "Om je telefoon te wekken bewaart je verbindingspunt (de relay waarmee je verbonden bent) één wekcode voor dit apparaat. Daardoor kan het zien dat je kringen bij één apparaat horen, en dus dat ze van jou zijn.",
       "doc": "J-CS10 — the trade, stated where it is made."
     },
     "notif_privacy_not": {
@@ -6799,7 +6799,7 @@
       "doc": "J-CS10 — what is NOT learned."
     },
     "notif_privacy_escape": {
-      "text": "Vind je dat bezwaarlijk: draai je eigen relay, of verdeel je kringen over verschillende relays — een relay ziet alleen de kringen die erop draaien.",
+      "text": "Vind je dat bezwaarlijk, draai dan je eigen relay of verdeel je kringen over verschillende relays. Een relay ziet alleen de kringen die hem gebruiken.",
       "doc": "J-CS10 — name the escape rather than leaving a dead end."
     },
     "pod_local_consequence": {

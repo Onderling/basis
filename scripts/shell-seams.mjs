@@ -240,6 +240,9 @@ export const SEAMS = Object.freeze([
   // The feedback contact is OFFERED at the feedback door, never seeded at boot: a shell hands the shared builtin its
   // confirm, so adding the maker's contact is always the person's own tap (and a removed contact stays removed).
   { id: 'feedback-offer-asks-first', pattern: /confirmFeedbackOffer:/, shells: ['web', 'mobile'], why: 'a feedback door without the confirm cannot add the contact at all — and a shell that seeds instead adds it with no tap' },
+  // Who answered a post is recorded where the answer lands: every shell hands the threaded-chat handler the agent's
+  // noteAnswer. A shell without it shows the answer in the thread but never offers the poster "accept" for it.
+  { id: 'records-who-answered', pattern: /noteAnswer:/, why: 'an answer to a post lands in the thread but its sender is never recorded as a responder, so the poster cannot accept it' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 

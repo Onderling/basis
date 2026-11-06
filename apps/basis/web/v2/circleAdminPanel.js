@@ -22,7 +22,7 @@ import { roleControlFor, removeControlFor, announceControlFor } from '../../src/
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 import { paintFace } from './faceView.js';
-import { nameShown } from '../../src/v2/personLabel.js';
+import { memberShown } from '../../src/v2/personLabel.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
@@ -117,7 +117,7 @@ export function renderCircleAdminPanel(container, {
       li.appendChild(avatar);
       const name = document.createElement('span');
       name.className = 'cc-admin__member-name';
-      name.textContent = nameShown({ name: m.displayName || null, handle: m.handle || null }, tr, { ids: [m.webid] });   // never the key
+      name.textContent = memberShown(m, tr);   // never the key
       li.appendChild(name);
       if (m.role && m.role !== 'member') {
         const role = document.createElement('span');

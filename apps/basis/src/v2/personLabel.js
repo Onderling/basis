@@ -80,3 +80,14 @@ export function nameShown(row, t, { ids = [] } = {}) {
   const l = personLabel({ displayName: row?.name ?? row?.displayName ?? null, handle: row?.handle ?? null, ids: [...ids, ...rowIds] });
   return l.label ?? t(l.labelKey);
 }
+
+/**
+ * `nameShown` for a RAW roster row (`listGroupMembers`: `{webid, displayName, handle}`) — the admin page's shape.
+ *
+ * @param {{webid?: string, displayName?: string, handle?: string}|null} m
+ * @param {(key: string, args?: object) => string} t
+ * @returns {string}
+ */
+export function memberShown(m, t) {
+  return nameShown({ name: m?.displayName || null, handle: m?.handle || null }, t, { ids: [m?.webid] });
+}

@@ -4811,7 +4811,10 @@ function CircleDetail({
                     {/* Reveal-gated via the SHARED helper (web parity): the roster row carries `realName`
                         ungated, so an unrevealed member must show their handle, never their name. */}
                     <Text style={styles.memberHandle} numberOfLines={1}>
-                      {revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).primary}
+                      {(() => {
+                        const l = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' });
+                        return l.primary ?? t(l.primaryKey);   // a member nobody has named is "someone", never their key
+                      })()}
                     </Text>
                     {(() => {
                       const sec = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).secondary;

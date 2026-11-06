@@ -20,6 +20,7 @@
  */
 
 import { isKeyLike, SOMEONE_LABEL_KEY } from './personLabel.js';
+import { normalizeCircleMembers } from '@onderling/kring-host/circleMembers';
 
 /** Who you can preview the circle as. */
 export const VIEWER_KINDS = ['member', 'stranger', 'agent'];
@@ -107,3 +108,19 @@ export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwis
   };
 }
 
+
+/**
+ * A RAW roster row (`listGroupMembers`: `{webid, handle, displayName, said…}`) labelled by the reveal ladder — the
+ * admin page's rows and its confirm texts. The raw row carries the member's display name UNGATED; read straight, an
+ * unreleased member's real name showed on the admin page and in "… was removed" (walk rows 67/68). It goes through
+ * the same projection the members list uses (`normalizeCircleMembers`), so the admin sees what the ladder lets them.
+ *
+ * @param {object} raw
+ * @param {{ viewerId?: string|null, policy?: 'open'|'pairwise', t: (k: string, v?: object) => string }} opts
+ * @returns {string}
+ */
+export function rosterRowShown(raw, { viewerId = null, policy = 'pairwise', t } = {}) {
+  const [m] = normalizeCircleMembers({ members: raw ? [raw] : [] });
+  const l = revealedMemberLabel(m ?? {}, { viewerId, policy });
+  return l.primary ?? t(l.primaryKey);
+}

@@ -2444,6 +2444,8 @@ export default function CircleLauncherScreen({
         agent={bundle?.agent}
         groupId={selected.id}
         resolvePicture={circlePictureResolver(selected.id)}
+        // the circle's reveal ladder: a member's real name shows on the admin page only when it lets the admin see it
+        revealPolicyOf={async () => (await policyStore.get(selected.id).catch(() => null))?.revealPolicy ?? 'pairwise'}
         onBack={() => setView('detail')}
         // a member's own row offers LEAVING (the shared decision): the same leave the tile menu runs, with its confirm
         onLeave={() => onLeaveCircle(selected.id, selected, () => setView('list'))}

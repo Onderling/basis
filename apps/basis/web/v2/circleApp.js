@@ -6956,8 +6956,6 @@ function openCreateCircleWizard() {
       // the founder's first policy (the wizard wrote it locally) goes on the lane, so a joiner catches it up
       if (gid) circlePolicyLane.state(gid).catch(() => {});
       try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
-      // …and the new circle's invite, as mobile opens it (web ≡ mobile): on screen at once, saying it is being made
-      if (gid) showCircleInvite(gid).catch(() => { /* the ⋯ menu still offers it */ });
     },
   });
 }

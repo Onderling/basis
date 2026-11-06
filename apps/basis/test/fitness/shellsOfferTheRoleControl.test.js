@@ -87,3 +87,23 @@ describe('FITNESS — both shells dispatch the op, behind the confirm it declare
     });
   }
 });
+
+// REMOVE ASKS FIRST, the same way. A walk (2026-11-05) removed a member with one tap: Make admin asked, Remove did not.
+// The op now declares `ui.confirm`; each shell must honour it through the shared gate with the shared request.
+describe('FITNESS — both shells confirm a removal through the op\'s declared confirm', () => {
+  const DISPATCHERS = [
+    ['web (circleApp.js showAdmin)', WEB_HOST],
+    ['mobile (CircleAdminPanelScreen.js)', RN_ADMIN_PANEL],
+  ];
+  for (const [name, source] of DISPATCHERS) {
+    it(`${name} builds the removal's confirm from the shared request and runs it through the gate`, () => {
+      expect(/removeMemberConfirm\s*\(/.test(source), `${name} removes a member with no confirmation`).toBe(true);
+      expect(/runConfirmGate\(\s*\{\s*request:\s*removeMemberConfirm/.test(source.replace(/\s+/g, ' ')),
+        `${name} builds the removal's confirm but does not run it through the shared gate`).toBe(true);
+    });
+    it(`${name} names the member in the confirm through the reveal ladder, never a key`, () => {
+      expect(/removeMemberConfirm\(\s*\{\s*name:\s*rosterRowShown\(/.test(source.replace(/\s+/g, ' ')),
+        `${name} names the member in the removal confirm without rosterRowShown (a raw key can show)`).toBe(true);
+    });
+  }
+});

@@ -96,6 +96,7 @@ import {
 } from './passkey.js';
 import { loadAuditLog }       from './auditLog.js';
 import { chunkPayloadForRoute, makeChunkReassembler } from './peerChunking.js';
+import { createSeenInboundRing } from './seenInbound.js';
 
 /**
  * @typedef {object} CreateSecureAgentOpts
@@ -798,10 +799,11 @@ export async function createSecureAgent(opts = {}) {
   //                 newest send supersedes the held one) · `seq:n` (neither: every send is its own)
   //
   // De-dup is at TWO layers: the sender collapses a repeat `msgId` here (so a
-  // retry while offline doesn't double-queue), and the receiver stays the
-  // single source of exactly-once idempotency on `msgId` (unchanged — we do
-  // NOT rebuild that). Flush snapshots-and-clears a peer's queue atomically so
-  // two presence signals can't double-deliver.
+  // retry while offline doesn't double-queue), and the RECEIVER drops a repeat
+  // of a message it already took, per (sender, `msgId`), in its durable inbound
+  // record (`handToApp` + seenInbound.js) — before any handler, across restarts,
+  // for every kind that carries an id. Flush snapshots-and-clears a peer's queue
+  // atomically so two presence signals can't double-deliver.
   //
   // Later (kept for a following phase, NOT built here): the QueueStore that
   // unifies this local-pending queue with the relay + companion + pod hold
@@ -1329,14 +1331,78 @@ export async function createSecureAgent(opts = {}) {
     // a transfer given up on is a receive-boundary drop like any other: said once per reason and sender, counted
     onDrop: (reason, env) => noteDrop(reason, env),
     onPayload: (whole, env) => {
-      if (typeof onPeerMessageFn !== 'function') return;
-      try {
-        onPeerMessageFn({ from: env._from, payload: whole, ts: env._ts ?? Date.now() });
-      } catch (err) {
-        if (typeof console !== 'undefined') console.error('[secure-agent] onPeerMessage threw', err);
-      }
+      handToApp(env._from, whole, env._ts ?? Date.now()).catch(() => { /* handToApp says its own failures */ });
     },
   });
+
+  // ── A MESSAGE THAT ALREADY LANDED LANDS ONCE — across a restart too ────────────────────────────────────────────
+  //
+  // A frame can reach this device twice: a sender re-sends after a lost acknowledgement, a hold-forward flush
+  // replays, a relay hands a frame on. `seenInbound` is the device's durable record of what it has TAKEN, keyed by
+  // (sender address, message id); the host injects it and keeps it across restarts. It is asked before any handler
+  // and written only after the handler ACCEPTED — returned (or resolved) without throwing and without
+  // `{ refused: true }` — so a frame that was refused, or whose handler failed, stays retryable. The one window
+  // left: a handler that accepted and then the device died before the write; that frame lands again on its repeat.
+  // A payload without a message id (a greeting, a ping, an acknowledgement) is never deduped: repeatable by design.
+  // Copies of one content-addressed statement from DIFFERENT senders are each their own message here; collapsing
+  // those is the fold's job (it does, by hash), not this record's.
+  // The host hands either the record itself (`seenInbound`, tests) or a device-local store to keep one in
+  // (`seenInboundStore`, any `{read, write}` DataSource, its own row — see seenInbound.js). Neither → no record.
+  const seenInbound = (opts.seenInbound && typeof opts.seenInbound.has === 'function' && typeof opts.seenInbound.add === 'function')
+    ? opts.seenInbound
+    : (opts.seenInboundStore && typeof opts.seenInboundStore.write === 'function')
+      ? createSeenInboundRing({ store: opts.seenInboundStore, ...(typeof opts.seenInboundUri === 'string' ? { uri: opts.seenInboundUri } : {}) })
+      : null;
+  const landingNow = new Set();              // keys whose handler is running: a concurrent copy is the same message
+  const repeatSaid = new Set();              // say a dropped repeat once per subtype (never who), count every one
+  let repeatsDropped = 0;
+  function inboundMessageKey(from, payload) {
+    if (typeof from !== 'string' || !from || !payload || typeof payload !== 'object') return null;
+    // A chat turn rides the A2A message shape with its id inside the data part (`nonce`); every other kind is flat.
+    const inner = (payload.type === 'message' && Array.isArray(payload.parts))
+      ? (payload.parts.find((p) => p && typeof p.data === 'object')?.data ?? null) : null;
+    const id = payload.msgId ?? inner?.msgId ?? inner?.nonce ?? null;
+    return (typeof id === 'string' && id) ? `${from}\u0000${id}` : null;
+  }
+  function subtypeOf(payload) {
+    const inner = (payload?.type === 'message' && Array.isArray(payload.parts)) ? payload.parts.find((p) => p?.data)?.data : null;
+    return inner?.subtype ?? payload?.subtype ?? payload?.type ?? '?';
+  }
+  async function handToApp(from, payload, ts) {
+    if (typeof onPeerMessageFn !== 'function') return;
+    const key = seenInbound ? inboundMessageKey(from, payload) : null;
+    if (key) {
+      let seen = landingNow.has(key);
+      if (!seen) { try { seen = !!(await seenInbound.has(key)); } catch { seen = false; } }
+      if (seen) {
+        repeatsDropped += 1;
+        const subtype = subtypeOf(payload);
+        // told as an event too (the subtype, never who): a host's walk log shows how often repeats are dropped, and a
+        // frame that was recorded when it should have been refused shows up here as the repeat that never landed
+        try { agent.emit('inbound-repeat', { subtype }); } catch { /* a listener that throws must not take the receive path down */ }
+        if (!repeatSaid.has(subtype) && typeof console !== 'undefined') {
+          repeatSaid.add(subtype);
+          console.info(`[secure-agent] a repeat of a message already taken was not handed on — subtype ${subtype}; further repeats are counted, not said`);
+        }
+        return;
+      }
+      landingNow.add(key);
+    }
+    try {
+      let verdict;
+      try {
+        verdict = await onPeerMessageFn({ from, payload, ts });
+      } catch (err) {
+        if (typeof console !== 'undefined') console.error('[secure-agent] onPeerMessage threw', err);
+        return;
+      }
+      if (key && !(verdict && verdict.refused === true)) {
+        try { await seenInbound.add(key); } catch { /* the record failed: the repeat lands again, as before this record */ }
+      }
+    } finally {
+      if (key) landingNow.delete(key);
+    }
+  }
 
   /**
    * Wire a transport's receive-handler.  Shared by connectPeer (NKN)
@@ -1554,19 +1620,8 @@ export async function createSecureAgent(opts = {}) {
       if (peerSkillCalls && env?.payload?.type === 'task') { await peerSkillCalls(env, tx); return; }
       // A greeting is this channel's own handshake — answered above and told as `peer` — never a message for the app:
       // handed on, its payload (no subtype, no type) reached every router as a frame it could not route.
-      if (typeof onPeerMessageFn === 'function' && env?._p !== 'HI') {
-        try {
-          onPeerMessageFn({
-            from:    env._from,
-            payload: env.payload,
-            ts:      env._ts ?? Date.now(),
-          });
-        } catch (err) {
-          if (typeof console !== 'undefined') {
-            console.error('[secure-agent] onPeerMessage threw', err);
-          }
-        }
-      }
+      // Handed on now; awaited at the end, so the presence flush below never waits on an app handler.
+      const handed = env?._p !== 'HI' ? handToApp(env._from, env.payload, env._ts ?? Date.now()) : null;
       // Delivery guarantee — PRESENCE-FLUSH. Any inbound envelope from a peer
       // (their reconnect HI, or any message) proves they are reachable now, so
       // flush anything we were holding for them. Fire-and-forget: re-hold on a
@@ -1580,6 +1635,7 @@ export async function createSecureAgent(opts = {}) {
         // had given up attempting delivery to, or the next send would be refused on stale evidence.
         for (const t of addressesOfIdentity(env._from)) clearDeliveryFailures(t);
       }
+      if (handed) await handed.catch(() => { /* handToApp says its own failures */ });
     });
   }
 
@@ -2677,6 +2733,7 @@ export async function createSecureAgent(opts = {}) {
       muteCount:       muteSet.size,
       mutedDrops,      // envelopes refused at the boundary because their sender is blocked
       receiveDrops: { ...receiveDrops },   // every receive-boundary drop, per reason (muted · circle-blocked · rate-limited)
+      repeatsDropped,                      // repeats of a message already taken, not handed on again (the durable inbound record)
       mutedPeers:      muteSet.list(),
       muteIsPersistent: !!opts.muteListVaultKey,
       helloGateWired:  !!userHelloGate,
@@ -2716,6 +2773,7 @@ export async function createSecureAgent(opts = {}) {
    * Close the peer transport + stop the in-process agent.
    */
   async function shutdown() {
+    try { await seenInbound?.flush?.(); } catch { /* the record is best-effort; a lost save lets a repeat land again */ }
     for (const st of youngReflush.values()) if (st.timer) clearTimeout(st.timer);
     youngReflush.clear();
     for (const [, tx] of extraTransports) { try { await tx.disconnect?.(); } catch { /* defensive */ } }

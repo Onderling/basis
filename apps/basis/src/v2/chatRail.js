@@ -29,6 +29,7 @@ import { entryKindRegistryFromManifests, toEventLogItem, kindWakes } from '@onde
 import { cardForCircleWire } from '@onderling/kring-host/circleBroadcast';
 import { chatManifest, CHAT_LANE } from './chatManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 /** The statement kinds the chat lane carries — DERIVED from the manifest's declared appends. */
 export const CHAT_RAIL_KINDS = entryKindRegistryFromManifests(chatManifest).kindsFor(CHAT_LANE);
@@ -260,14 +261,14 @@ export function makeChatEmitter({ rail, fan = null }) {
 export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null, holds = null, onPassed = null } = {}) {
   if (!rail) throw new Error('makeChatPeerHandler: a chat rail is required');
   return async function onCircleChatStatement(fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== CHAT_STATEMENT_BROADCAST) return;
+    if (!payload || payload.subtype !== CHAT_STATEMENT_BROADCAST) return NOT_TAKEN;
     const { circleId } = payload;
-    if (typeof circleId !== 'string' || !circleId) return;
+    if (typeof circleId !== 'string' || !circleId) return NOT_TAKEN;
     // THIS DEVICE'S SELECTION (sync-policy §11): `holds(circleId)` → true (land it), false (this device holds
     // no chat for this circle: VERIFY, hand it on to the siblings through `onPassed`, keep nothing), or null
     // (this device holds this KRING not at all: refused on landing, nothing carried — the stale case).
     const h = typeof holds === 'function' ? holds(circleId) : true;
-    if (h === null) return;
+    if (h === null) return NOT_TAKEN;
     try {
       // Two carriages, one subtype: the statement INLINE (`payload.event` — the peer fan and catch-up
       // batches), or a POD REF (`payload.ref`, a pod-signal circle's row pointer) resolved through the
@@ -276,23 +277,24 @@ export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null, 
       // dropped WITHOUT a pod read.
       let statement = payload.event ?? null;
       if (!statement && typeof payload.ref === 'string' && payload.ref && typeof resolveRef === 'function') {
-        if (typeof payload.msgId === 'string' && payload.msgId && rail.hasEntry(circleId, payload.msgId)) return;
+        if (typeof payload.msgId === 'string' && payload.msgId && rail.hasEntry(circleId, payload.msgId)) return undefined;   // already landed: taken
         const row = await resolveRef(payload);
         statement = row?.event ?? null;
       }
-      if (!statement?.body || !statement?.sig) return;
+      if (!statement?.body || !statement?.sig) return NOT_TAKEN;   // a ref the pod could not serve yet stays retryable
       if (h === false) {
         // hold nothing, still carry — and never carry what did not verify (a carrier is not an authority)
         const v = typeof rail.verify === 'function' ? await rail.verify(circleId, statement) : { ok: false };
         if (v?.ok && typeof onPassed === 'function') { try { await onPassed(circleId, statement, fromPeerAddr); } catch { /* best-effort */ } }
-        return;
+        return v?.ok ? undefined : NOT_TAKEN;
       }
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
         // fromPeerAddr rides along — the delivery receipt cannot answer a sender it was never told about.
         try { await onLanded(circleId, res.entry, fromPeerAddr, statement); } catch { /* side effects are best-effort */ }
       }
-    } catch { /* ingest is best-effort — never throw on a peer message */ }
+      return res?.ok ? undefined : NOT_TAKEN;   // a refusal stays retryable (see the membership handler)
+    } catch { return NOT_TAKEN; /* ingest is best-effort — never throw on a peer message */ }
   };
 }
 

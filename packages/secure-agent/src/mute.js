@@ -25,14 +25,17 @@
  * @returns {Promise<MuteSet>}
  */
 export async function loadMuteSet({ vault, vaultKey = null } = {}) {
-  const set = new Set();
+  const set = new Map();   // key → { label, at } — what the person saw when they tapped block, and when
   if (vaultKey && vault) {
     try {
       const raw = await vault.get(vaultKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          for (const k of parsed) if (typeof k === 'string') set.add(k);
+          for (const e of parsed) {
+            if (typeof e === 'string') set.set(e, { label: null, at: null });   // a block written before the label
+            else if (e && typeof e.k === 'string') set.set(e.k, { label: typeof e.l === 'string' && e.l ? e.l : null, at: typeof e.at === 'number' ? e.at : null });
+          }
         }
       }
     } catch {
@@ -42,27 +45,38 @@ export async function loadMuteSet({ vault, vaultKey = null } = {}) {
   return new MuteSet({ set, vault, vaultKey });
 }
 
+/**
+ * The block set: keys the receive path refuses, each with the LABEL the person saw when they blocked it and the
+ * moment they did. The label is never used to match — only to say who it was, so a list of blocks is a list of
+ * names ("Jan (geblokkeerd 6 nov)") and never a list of keys.
+ */
 export class MuteSet {
   #set;
   #vault;
   #key;
 
   constructor({ set, vault, vaultKey }) {
-    this.#set   = set;
+    this.#set   = set instanceof Map ? set : new Map([...(set ?? [])].map((k) => [k, { label: null, at: null }]));
     this.#vault = vault;
     this.#key   = vaultKey;
   }
 
   has(peerKey)  { return this.#set.has(peerKey); }
-  list()        { return [...this.#set]; }
+  list()        { return [...this.#set.keys()]; }
+  /** @returns {Array<{key: string, label: string|null, at: number|null}>} */
+  entries()     { return [...this.#set].map(([key, e]) => ({ key, label: e.label ?? null, at: e.at ?? null })); }
   get size()    { return this.#set.size; }
 
-  async add(peerKey) {
+  /**
+   * @param {string} peerKey
+   * @param {{ label?: string|null, at?: number }} [meta]  the name the person saw, and when (default: now)
+   */
+  async add(peerKey, { label = null, at = Date.now() } = {}) {
     if (typeof peerKey !== 'string' || !peerKey) {
       throw new Error('MuteSet.add: peerKey must be a non-empty string');
     }
     if (this.#set.has(peerKey)) return false;
-    this.#set.add(peerKey);
+    this.#set.set(peerKey, { label: typeof label === 'string' && label.trim() ? label.trim().slice(0, 80) : null, at });
     await this.#persist();
     return true;
   }
@@ -82,6 +96,6 @@ export class MuteSet {
 
   async #persist() {
     if (!this.#key || !this.#vault) return;
-    await this.#vault.set(this.#key, JSON.stringify([...this.#set]));
+    await this.#vault.set(this.#key, JSON.stringify([...this.#set].map(([k, e]) => ({ k, l: e.label, at: e.at }))));
   }
 }

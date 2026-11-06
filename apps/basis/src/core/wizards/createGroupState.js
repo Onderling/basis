@@ -204,8 +204,16 @@ export function setKind(state, kind) {
  * @param {{ podConnected?: boolean }} state
  */
 export function storageChoices(state) {
-  return state?.podConnected === false ? STORAGE_POLICIES.filter((o) => o.id === 'none') : STORAGE_POLICIES;
+  if (state?.podConnected === false) return STORAGE_POLICIES.filter((o) => o.id === 'none');
+  return STORAGE_POLICIES.filter((o) => OFFERED_STORAGE_POSTURES.includes(o.id));
 }
+
+/**
+ * What the wizard OFFERS (Frits, the UX-walk sitting, 2026-11-06): no pod, or one shared circle pod. Personal and hybrid
+ * stay in the vocabulary (an existing circle keeps its posture, and its review still names it) but are not offered
+ * until the companion brokers them; a person cannot pick what does not yet work end to end.
+ */
+export const OFFERED_STORAGE_POSTURES = Object.freeze(['none', 'shared']);
 
 /** The person's storage choice — sets both names of the one fact and marks the axis as theirs. */
 export function setStoragePolicy(state, value) {

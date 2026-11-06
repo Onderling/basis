@@ -28,6 +28,10 @@ verbs actually relate (§3, "The data plane"). One sentence of it, because it de
 > **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds
 > its own where it needs them; and whatever the store holds is what syncs to the circle's other members.**
 
+**And [`docs/catalogue/`](docs/catalogue/README.md)** — one page per capability area: what a person can do, where it
+lives, what proves it, what was decided not to build. Read the area's page before ruling something absent or building
+in it; every manifest op is on exactly one page (`lint-catalogue-ops`).
+
 That file also lists **where the runtime does not match the model yet** — read those before concluding
 something is unbuilt. The recurring failure here is not a wrong decision; it is a route that quietly
 stopped following a right one, and the code kept working locally the whole time.

@@ -652,7 +652,10 @@ async function muteHandler(args, { agent, t }) {
   if (!peer) return { ok: false, error: t('mute.no_peer') };
   const sa = agent?.sa;
   if (!sa?.mute) return { ok: false, error: t('mute.unavailable') };
-  const added = await sa.mute.add(peer);
+  // the name the person saw when they blocked (a post's author label): kept beside the key, shown in the blocked list
+  // instead of the key; never used to match
+  const label = typeof args?.label === 'string' && args.label.trim() ? args.label.trim() : null;
+  const added = await sa.mute.add(peer, { label });
   if (!added) return { ok: true, message: t('mute.already', { peer }) };
   return { ok: true, message: t('mute.added', { peer }) };
 }
@@ -680,12 +683,14 @@ async function mutedHandler(_args, { agent, t }) {
   // The list is DATA as well as prose: the stream and the noticeboard hide a blocked person's posts by
   // reading this same set, so it has to be readable by something other than a person. It was a message
   // only, which is why the view had to keep a second block set of its own to filter by.
-  if (list.length === 0) return { ok: true, peers: [], message: t('mute.empty') };
+  // …and with the name each was blocked under and when (`entries`), for a list that never shows a key
+  const entries = typeof sa.mute.entries === 'function' ? sa.mute.entries() : list.map((key) => ({ key, label: null, at: null }));
+  if (list.length === 0) return { ok: true, peers: [], entries: [], message: t('mute.empty') };
   const lines = [t('mute.list_heading', { count: list.length })];
   for (const p of list) {
     lines.push(`  - ${p.length > 64 ? p.slice(0, 60) + '…' : p}`);
   }
-  return { ok: true, peers: list, message: lines.join('\n') };
+  return { ok: true, peers: list, entries, message: lines.join('\n') };
 }
 
 /**

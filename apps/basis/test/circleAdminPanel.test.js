@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleAdminPanel } from '../web/v2/circleAdminPanel.js';
+import { buildBlockedList } from '../src/v2/blockedList.js';
 
 const t = (k) => k;
 
@@ -54,14 +55,18 @@ describe('renderCircleAdminPanel', () => {
     const onUnmute = vi.fn();
     const el = renderCircleAdminPanel(document.createElement('div'), {
       t, members: [], onUnmute,
-      muted: ['webid:https://bob.example/me', 'stable-7'],
+      // the blocked list's rows (buildBlockedList): the name the person saw when they blocked, else "someone" — never the key
+      muted: buildBlockedList({ peers: ['webid:https://bob.example/me', 'stable-7'], entries: [{ key: 'webid:https://bob.example/me', label: 'Bob', at: null }] }),
     });
     // Reports are NOT in the admin panel — they live on the §8 governance Reports surface.
     expect(el.querySelector('.cc-admin__report')).toBeNull();
     const muted = el.querySelectorAll('.cc-admin__muted');
     expect(muted).toHaveLength(2);
-    expect(muted[0].querySelector('.cc-admin__muted-key').textContent).toBe('https://bob.example/me'); // webid: stripped
-    muted[1].querySelector('.cc-admin__unmute').click();
-    expect(onUnmute).toHaveBeenCalledWith('stable-7');
+    const words = [...muted].map((li) => li.querySelector('.cc-admin__muted-key').textContent);
+    expect(words).toContain('Bob');
+    expect(words.join(' ')).not.toContain('stable-7');
+    const unnamed = [...muted].find((li) => li.dataset.key === 'stable-7');
+    unnamed.querySelector('.cc-admin__unmute').click();
+    expect(onUnmute).toHaveBeenCalledWith('stable-7');   // unblock still goes by the stored key
   });
 });

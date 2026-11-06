@@ -22,12 +22,14 @@ import { roleControlFor, removeControlFor, announceControlFor } from '../../src/
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 import { paintFace } from './faceView.js';
+import { blockedRowWords } from '../../src/v2/blockedWords.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
   resolvePicture = null,   // opens a member's sealed picture for this circle; absent → the initial
-  muted = [],
+  muted = [],          // the blocked list's rows (`buildBlockedList`): {key, label, at}
+  lang = 'nl',
   outboundShares = [],
   outboundCanonical = false,
   busy = false,
@@ -217,13 +219,15 @@ export function renderCircleAdminPanel(container, {
   } else {
     const list = document.createElement('ul');
     list.className = 'cc-admin__muted-list';
-    for (const key of muted) {
+    for (const raw of muted) {
+      const row = typeof raw === 'string' ? { key: raw, label: null, at: null } : raw;   // a bare key still unblocks
+      const key = row.key;
       const li = document.createElement('li');
       li.className = 'cc-admin__muted';
       li.dataset.key = key;
       const name = document.createElement('span');
       name.className = 'cc-admin__muted-key';
-      name.textContent = String(key).replace(/^webid:/, '');
+      name.textContent = blockedRowWords(row, { t: tr, lang });   // the name the person saw and the day — never the key
       li.appendChild(name);
       const un = document.createElement('button');
       un.type = 'button';

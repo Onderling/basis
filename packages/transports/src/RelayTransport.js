@@ -54,6 +54,8 @@ const MAX_BACKOFF_MS = param({ key: 'transports.maxBackoffMs', scope: PARAM_SCOP
 const PUSH_ACK_TIMEOUT_MS = param({ key: 'transports.pushAckTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5_000 });
 // A send AS an address waits for that address's bind on this socket; past this it is said, with why the bind was lost.
 const BIND_WAIT_WARN_MS = param({ key: 'transports.bindWaitWarnMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
+// How long `disconnect()` waits for the socket's own close before it gives up waiting (the close still proceeds).
+const CLOSE_WAIT_MS = param({ key: 'transports.closeWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2_000 });
 
 /**
  * WebSocket relay-server `Transport`: registers this agent's address with the relay, which
@@ -300,8 +302,19 @@ export class RelayTransport extends Transport {
       const h = this.#pendingPushAcks[0];
       h.reject(new Error('Relay: transport disconnected before ack'));
     }
-    this.#ws?.close();
+    // DISCONNECT MEANS CLOSED: resolve once the socket's close has completed, not when it has merely started. Until the
+    // relay has processed the close, this socket is still a holder of every address it registered, and a frame for one
+    // of them can be handed to a device that has stopped reading. Bounded, so a dead network never hangs a shutdown.
+    const ws = this.#ws;
     this.#ws = null;
+    if (ws && ws.readyState !== 3) {
+      await new Promise((resolve) => {
+        const done = () => { clearTimeout(timer); resolve(); };
+        const timer = setTimeout(done, CLOSE_WAIT_MS);
+        try { ws.addEventListener ? ws.addEventListener('close', done, { once: true }) : ws.once?.('close', done); } catch { done(); }
+        try { ws.close(); } catch { done(); }
+      });
+    }
     this.emit('disconnect');
   }
 

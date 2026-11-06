@@ -291,6 +291,7 @@ import { InMemoryStore as HouseholdStore } from '../../household/InMemoryStore.j
 import { buildHouseholdSubstrateStack }    from '../../household/substrateStack.js';
 import { wireHouseholdSubstrateMirror }    from '../../household/substrateMirror.js';
 import { buildHouseholdDataSource, besidePersistDb } from '../../household/persist.js';
+import { memberShown }                     from '../../v2/personLabel.js';
 import { householdManifest }               from '../../../../household/manifest.js';
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
@@ -8654,7 +8655,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           id:    m.webid,
           type:  'member',
           webid: m.webid,
-          label: `${m.displayName ?? m.webid.slice(0, 12)} (${m.role ?? 'member'})`,
+          label: `${memberShown(m, tr)} (${m.role ?? 'member'})`,   // their name or handle, else "someone" — never the key
           role:  m.role ?? 'member',
         })),
         message: tr('circle.tasks.config.members_count', { count: circle.members.length, circle: circle.name ?? circle.circleId }),

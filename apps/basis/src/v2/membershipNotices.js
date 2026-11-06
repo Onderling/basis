@@ -26,6 +26,7 @@
  */
 import { VIEWER_FACING_SYSTEM_KINDS } from '@onderling/item-store';
 import { revealedMemberLabel } from './circleViewAs.js';
+import { SOMEONE_LABEL_KEY, isKeyLike } from './personLabel.js';
 import { REMOVAL_NOTICE_KEYS, SHOW_REMOVAL_REASON } from './removalNotice.js';
 
 export const MEMBERSHIP_NOTICE_KEYS = Object.freeze({
@@ -64,7 +65,7 @@ export function membershipNoticeFor(body, { viewerId, members = null } = {}) {
     if (role !== 'admin' && role !== 'member') return null;
     if (subject === viewerId) return { notice: role === 'admin' ? 'promoted' : 'demoted' };
     const row = Array.isArray(members) ? members.find((m) => refOf(m) === subject) : null;
-    const name = row ? revealedMemberLabel(row, { viewerId }).primary : subject;
+    const name = row ? revealedMemberLabel(row, { viewerId }).primary : (isKeyLike(subject) ? null : subject);   // a chosen id (webid:) stays; a key → "someone" at render
     return { notice: role === 'admin' ? 'memberPromoted' : 'memberDemoted', args: { name } };
   }
   if (kind === 'join') {
@@ -72,7 +73,7 @@ export function membershipNoticeFor(body, { viewerId, members = null } = {}) {
     // self-authored join names nobody but the joiner, and the joiner needs no line about themselves.
     if (author !== viewerId || subject === viewerId) return null;
     const row = Array.isArray(members) ? members.find((m) => refOf(m) === subject) : null;
-    const name = row ? revealedMemberLabel(row, { viewerId }).primary : subject;
+    const name = row ? revealedMemberLabel(row, { viewerId }).primary : (isKeyLike(subject) ? null : subject);   // a chosen id (webid:) stays; a key → "someone" at render
     return { notice: 'joined', args: { name } };
   }
   return null;
@@ -103,7 +104,8 @@ export function membershipNoticeRows({ events = [], circleId, viewerId, members 
     const hit = membershipNoticeFor(body, { viewerId, members });
     if (!hit) continue;
     if (typeof wants === 'function' && !wants(hit.notice)) continue;
-    const text = t(MEMBERSHIP_NOTICE_KEYS[hit.notice], hit.args ?? {});
+    const args = hit.args ?? {};
+    const text = t(MEMBERSHIP_NOTICE_KEYS[hit.notice], 'name' in args && args.name == null ? { ...args, name: t(SOMEONE_LABEL_KEY) } : args);
     const id = `notice:${e.id}`;
     const ts = typeof e.ts === 'number' ? e.ts : 0;
     out.push({
@@ -173,7 +175,7 @@ export function forkNoticeRows({ events = [], circleId, viewerId, members = null
     if (isMe) text = t(FORK_NOTICE_KEYS.you);
     else {
       const row = members.find((m) => refOf(m) === person);
-      const name = row ? revealedMemberLabel(row, { viewerId }).primary : String(person ?? '').slice(0, 8);
+      const name = (row ? revealedMemberLabel(row, { viewerId }).primary : null) ?? t(SOMEONE_LABEL_KEY);
       text = t(FORK_NOTICE_KEYS.member, { name });
     }
     const notice = isMe ? 'keyForked' : 'memberKeyForked';

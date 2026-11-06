@@ -257,7 +257,7 @@ export function renderCircleNoticeboard(container, {
       actions.appendChild(b);
     };
     // the people who answered MY request: accept one of them (`acceptResponder`)
-    for (const r of (Array.isArray(p.responders) ? p.responders : [])) chip('accept', 'circle.noticeboard.action.accept', '', { vars: { name: r.label }, responder: r.webid });
+    for (const r of (Array.isArray(p.responders) ? p.responders : [])) chip('accept', 'circle.noticeboard.action.accept', '', { vars: { name: r.label ?? tr(r.labelKey) }, responder: r.webid });
     if (!p.mine) chip('respond', 'circle.noticeboard.action.respond');
     if (p.type === 'lend' && p.mine) chip('assign', 'circle.noticeboard.action.assign');
     if (p.type === 'lend' && p.mine) chip('markReturned', 'circle.noticeboard.action.returned');

@@ -24,6 +24,7 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 // L114 — delete as a relationship act (hide + leave the pair circle), and the words above a returning turn (web parity)
 import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/contactDelete.js';
 import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
+import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
 export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '' }) {
@@ -35,7 +36,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   const registry = bundle?.contactSkills ?? null;
   const contactId = contact?.contactId;
   const peerAddr = contact?.peerAddr ?? contactId;
-  const name = contact?.name ?? contactId ?? '';
+  const name = nameShown(contact, t, { ids: [contactId] });   // the stamped label, else "someone" — never the key
   // The pre-send floor this contact declared (its card → the roster row): the channel applies it on
   // every turn; the header says so before the person types. web≡mobile with contactThread.js.
   const floor = useMemo(() => presendFloorFor(contact), [contact]);
@@ -130,7 +131,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   }, [lens, contactId, contact]);
   // DELETE (L114): asked first — the confirm is the undo — then hide + leave the pair circle.
   const confirmDelete = useCallback(() => {
-    const who = contact?.name ?? contactId;
+    const who = name;
     Alert.alert(t('circle.contacts.delete_title', { name: who }), t('circle.contacts.delete_body', { name: who }), [
       { text: t('circle.contacts.lens.cancel'), style: 'cancel' },
       { text: t('circle.contacts.delete_confirm'), style: 'destructive', onPress: async () => {

@@ -15,6 +15,8 @@
  * defaults to the contact's stable id (`contactId`), which is the WebID for a pinboard ContactBook person.
  */
 
+import { personLabel } from './personLabel.js';
+
 /** The published network key carried on a roster row, or null. Accepts either field name. */
 function networkKeyOf(contact) {
   return contact?.recipientNetworkKey ?? contact?.pubKey ?? contact?.peerAddr ?? null;
@@ -91,7 +93,13 @@ export function pickableRecipients(contacts = []) {
     const id = c.contactId ?? c.id ?? recipientNetworkKey;
     if (seen.has(id)) continue;
     seen.add(id);
-    const row = { id, name: c.name ?? c.displayName ?? c.handle ?? id, recipientNetworkKey };
+    const row = {
+      id,
+      name: c.name ?? c.displayName ?? c.handle ?? id,
+      // what the picker paints: their name or handle, else "someone" — never the key the grant is made to
+      ...personLabel({ displayName: c.label ?? c.name ?? c.displayName ?? null, handle: c.handle ?? null, ids: [id, recipientNetworkKey, c.contactId, c.webid, c.peerAddr] }),
+      recipientNetworkKey,
+    };
     // Light attestation seam (Phase-3 flavour): surface the contact's trust level when it carries one, so a
     // UI can badge it and a caller MAY gate the share with a `verify` predicate. Omitted when absent.
     if (c.trustLevel != null) row.trustLevel = c.trustLevel;

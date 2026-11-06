@@ -101,5 +101,9 @@ describe('FITNESS — both shells confirm a removal through the op\'s declared c
       expect(/runConfirmGate\(\s*\{\s*request:\s*removeMemberConfirm/.test(source.replace(/\s+/g, ' ')),
         `${name} builds the removal's confirm but does not run it through the shared gate`).toBe(true);
     });
+    it(`${name} names the member in the confirm through the reveal ladder, never a key`, () => {
+      expect(/removeMemberConfirm\(\s*\{\s*name:\s*rosterRowShown\(/.test(source.replace(/\s+/g, ' ')),
+        `${name} names the member in the removal confirm without rosterRowShown (a raw key can show)`).toBe(true);
+    });
   }
 });

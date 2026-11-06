@@ -100,7 +100,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   }, [agent, callSkill, groupId, load, revokeForRemoved]);
   // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
   const remove = useCallback((m) => runConfirmGate({
-    request: removeMemberConfirm({ name: m.displayName || m.handle || m.webid, t }),
+    request: removeMemberConfirm({ name: rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t }), t }),
     present: alertConfirmPresenter(Alert.alert),
     execute: () => removeConfirmed(m),
   }), [removeConfirmed]);

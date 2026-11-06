@@ -8868,7 +8868,7 @@ async function showAdmin(id) {
       await load();
     },
     // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
-    onRemove: (m) => runConfirmGate({ request: removeMemberConfirm({ name: m.displayName || m.handle || m.webid, t }), present: openCircleConfirmDialog, execute: async () => {
+    onRemove: (m) => runConfirmGate({ request: removeMemberConfirm({ name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }), t }), present: openCircleConfirmDialog, execute: async () => {
       notice = null; busy = true; rerender();
       let removed = false;
       try {

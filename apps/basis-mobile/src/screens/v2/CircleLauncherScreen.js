@@ -183,13 +183,14 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
 import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
-import { useRelayQuestion } from './RelayQuestionModal.js';
+import { useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor, attachEntryForType } from '../../../../basis/src/v2/attachEntries.js';
+import { readInviteUsage, joinedSince, memberIdsOf } from '../../../../basis/src/v2/inviteUsage.js';
 import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
@@ -296,6 +297,7 @@ import { contactOpenTarget, tileCircles } from '../../../../basis/src/v2/helpCon
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
 import { loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
+import { showsBotActionsSetting } from '../../../../basis/src/v2/surfacePref.js';
 import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
@@ -600,6 +602,10 @@ export default function CircleLauncherScreen({
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
+  // does this device know a relay at all (the relay question's own predicate)? true until read, so no false warning;
+  // re-read on every view change (a relay added on the connection points comes back to a composer that knows it)
+  const [relayKnown, setRelayKnown] = useState(true);
+  useEffect(() => { relayQuestion.knows().then(setRelayKnown).catch(() => {}); }, [view]);
   const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
   // the screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name
   const feedbackScreenRef = useRef(null);
@@ -737,6 +743,16 @@ export default function CircleLauncherScreen({
     setContactThread({ ...(row ?? { contactId: webid }), draft });
     setView('contacten');
   }, [bundle, contactNames]);
+  // 'How the bot shows actions' only for a person with a bot that acts: read from the contact book when a settings group opens
+  const [botActionsShown, setBotActionsShown] = useState(false);
+  useEffect(() => {
+    if (view !== 'settingsGroup') return undefined;
+    let live = true;
+    loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames })
+      .then((rows) => { if (live) setBotActionsShown(showsBotActionsSetting(rows)); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [view, bundle, contactNames]);
   const openContactThread = useCallback((contact) => {
     setContactThread(contact);
     // opening the thread is reading it — the seen-mark moves to now, the badge is gone
@@ -1326,7 +1342,9 @@ export default function CircleLauncherScreen({
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags) },
+        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+        // the reach card: does this device know any relay (the relay question's own predicate, web parity)
+        relayKnown: () => relayQuestion.knows() },
     });
   }, [bundle, eventLog]);   // eslint-disable-line react-hooks/exhaustive-deps -- onboardingFlags is a stable memo declared further down (read at call time, never during render)
   // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the
@@ -1970,7 +1988,25 @@ export default function CircleLauncherScreen({
       });
     } catch { r = { error: 'failed' }; }
     setInviteFor({ circleId, ...(forFunction ? { forFunction: true } : {}), ...(r || {}) });
+    // who is in the circle as the invite opens, so a later membership change can name who came in
+    readInviteUsage({ callSkill: bundle?.callSkill, circleId }).then(({ members }) => {
+      setInviteFor((cur) => (cur && cur.circleId === circleId ? { ...cur, before: memberIdsOf(members) } : cur));
+    }).catch(() => {});
   }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
+  // THE OPEN INVITE KEEPS UP: the membership lane's signal reloads `circles` (onCirclesChanged); an open invite then
+  // re-reads its count and names each newcomer — the walk's invite said "0 of 6" while someone joined (web ≡ mobile)
+  useEffect(() => {
+    const cid = inviteFor?.circleId;
+    if (!cid || !inviteFor?.before) return;
+    readInviteUsage({ callSkill: bundle?.callSkill, circleId: cid }).then(({ used, max, members }) => {
+      setInviteFor((cur) => (cur && cur.circleId === cid ? {
+        ...cur,
+        ...(typeof used === 'number' ? { redemptionsUsed: used } : {}),
+        ...(typeof max === 'number' ? { maxRedemptions: max } : {}),
+        joined: joinedSince(cur.before, members, t),
+      } : cur));
+    }).catch(() => {});
+  }, [circles]);   // eslint-disable-line react-hooks/exhaustive-deps — the signal is `circles`; the invite is read inside
 
   // ONE mount for everything a scan or the Join button opens, painted beside whichever view is up (the Mij view returns
   // early, so a modal living in one branch's return never shows in another). The scanner is the `scanQr` op's seam
@@ -2056,6 +2092,9 @@ export default function CircleLauncherScreen({
                     <Text style={styles.inviteHint}>
                       {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
                     </Text>
+                  ) : null}
+                  {(inviteFor.joined ?? []).length ? (
+                    <Text style={styles.inviteHint} testID="invite-joined">{inviteFor.joined.join(' ')}</Text>
                   ) : null}
                   {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
                       listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
@@ -2259,6 +2298,8 @@ export default function CircleLauncherScreen({
                   });
                 }
                 else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => refreshScreensBook());
+                // the reach card: the connection points, where a relay is added (the relay question stays quiet after 'Later')
+                else if (a?.kind === 'open-points') setView('points');
                 else if (a?.kind === 'create-circle') setCreating(true);
                 else if (a?.kind === 'join-circle') setJoinScanOpen(true);
                 // a card's one action that IS an op (a chore done): through the waist, then the page repaints
@@ -2340,7 +2381,7 @@ export default function CircleLauncherScreen({
   // My data, and a settings group's screen: ONE element with every section's handlers — a group passes `only`,
   // `groupTitle` and its own back (the gear's home), and paints just its declared sections.
   const myDataScreen = (extra = {}) => (
-    <CircleMyDataScreen selvesOn={selvesOn} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+    <CircleMyDataScreen selvesOn={selvesOn} showBotActions={botActionsShown} frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
           personClock={personClockRef.current} selfSet={{ held: heldSelves, on: selvesOn }} {...extra} />
   );
@@ -2393,6 +2434,7 @@ export default function CircleLauncherScreen({
       return (
         <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
+            noRelay={!relayKnown}
             bundle={bundle}
             contact={contactThread}
             draft={contactThread?.draft ?? ''}
@@ -2672,6 +2714,7 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        noRelay={!relayKnown}
         pagesBook={screensBook}
         onCloseRemoved={async () => {
           const id = selected?.id;
@@ -3136,6 +3179,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
+  // this device knows no relay: the composer says the message waits (the relay question's predicate, web parity)
+  noRelay = false,
   // "Pin to +" on an attach entry (`onPinEntry(entry)`), and a bookmark opened from the "+" sheet (`openOp`: that op's
   // form, run once the circle's menu has resolved, then `onOpenOpDone()`)
   onPinEntry = null, openOp = null, onOpenOpDone = null,
@@ -3290,7 +3335,7 @@ function CircleDetail({
   // roster is what the labels resolve against. The circle roster via listGroupMembers (web≡mobile);
   // null = not loaded yet, [] = loaded empty. Loads at circle OPEN (batch 4): the chat tab needs it
   // for sender labels the moment it paints, not first when MEMBERS is opened.
-  const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
+  const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: null });   // isAdmin null until the roster answers
   const [tabMembers, setTabMembers] = useState(null);
   const [unreachable, setUnreachable] = useState(() => new Set());
   // The RAW rows the same load returns. `normalizeCircleMembers` is the member-list projection and
@@ -3764,7 +3809,7 @@ function CircleDetail({
   useEffect(() => {
     let cancelled = false;
     circleMembersRef.current = null; myWebidRef.current = null;
-    if (!circle?.id || typeof rawCallSkill !== 'function') { setMandateViewer({ viewerWebid: null, isAdmin: false }); setBotLabel(null); return undefined; }
+    if (!circle?.id || typeof rawCallSkill !== 'function') { setMandateViewer({ viewerWebid: null, isAdmin: null }); setBotLabel(null); return undefined; }
     setBotLabel(null);   // reset on circle change — fail-closed until the roster resolves
     (async () => {
       let webid = null;
@@ -3782,7 +3827,7 @@ function CircleDetail({
         }
         return;
       }
-      let isAdmin = false;
+      let isAdmin = null;   // stays unknown when the roster does not answer
       try {
         const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circle.id });
         const mem = Array.isArray(res?.members) ? res.members : [];
@@ -5126,6 +5171,7 @@ function CircleDetail({
             ))}
           </View>
         ) : null}
+        {noRelay ? <Text style={styles.placeholder} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
         <View style={styles.composer} testID="circle-detail-composer">
           {attachEntries.length > 0 ? (
             <Pressable
@@ -6095,7 +6141,7 @@ function NearbyScreen({
               <Text style={styles.nearbyActionText}>{t(answering ? 'circle.nearbyScreen.answer_send' : 'circle.nearbyScreen.ask_send')}</Text>
             </Pressable>
             <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
-              <Text style={styles.nearbyActionText}>{t('circle.back')}</Text>
+              <Text style={styles.nearbyActionText}>{t('circle.confirm.cancel')}</Text>
             </Pressable>
           </View>
         ) : (

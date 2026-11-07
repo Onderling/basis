@@ -95,7 +95,7 @@
       "doc": "QrScannerModal titel"
     },
     "scan_subheading": {
-      "text": "Richt de camera op een onderling-contact:// of onderling-invite:// QR. Je kunt ook plakken.",
+      "text": "Richt de camera op de code die iemand je laat zien. Je kunt hem ook plakken.",
       "doc": "QrScannerModal hint onder camera"
     },
     "scan_perm_rationale": {

@@ -80,7 +80,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             const piece = {
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1}
+              {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
+              <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
                 placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />

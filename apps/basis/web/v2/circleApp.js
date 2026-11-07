@@ -173,6 +173,7 @@ import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src/v2/contactsSource.js';
 import { nameShown } from '../../src/v2/personLabel.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
+import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -258,7 +259,7 @@ import { openThumbnail } from '@onderling/blob-gateway';
 // S6.A — manifest-driven inline buttons on bot replies (the resurrected "inline menu").
 import { embedButtonsForReply, embedsFromReply } from '../../src/v2/replyEmbeds.js';
 // S6.C — per-user preference selecting which projection (inline / screen / minimal) renders.
-import { selectSurfaceButtons, createSurfacePrefStore, registerSurfacePrefIo, SURFACE_PREFS } from '../../src/v2/surfacePref.js';
+import { selectSurfaceButtons, createSurfacePrefStore, registerSurfacePrefIo, SURFACE_PREFS, showsBotActionsSetting } from '../../src/v2/surfacePref.js';
 // S6.D — is the conversational "chat" projection enriched by an LLM here? (user-loaded LLM + circle permits)
 import { resolveChatAi } from '../../src/v2/chatAi.js';
 // §4 storage-policy bridge — the circle `pod` axis drives pinboard's authoritative
@@ -328,6 +329,7 @@ import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
 import { attachEntriesFor, attachEntryForType } from '../../src/v2/attachEntries.js';
+import { readInviteUsage, joinedSince, memberIdsOf } from '../../src/v2/inviteUsage.js';
 import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
@@ -1075,6 +1077,12 @@ async function applyRelayUrl(url) {
 const relayQuestion = createRelayQuestion({
   read: () => ({ saved: localStorageRelayIo().load(), arg: CIRCLE_RELAY_ENV, list: getConnectionPoints().list() }),
 });
+// Does this device know a relay at all (the question's own predicate)? Read at boot, on a relay change and when a thread or a
+// circle opens; true until read, so a composer never warns falsely.
+let _relayKnownNow = true;
+async function refreshRelayKnown() { try { _relayKnownNow = await relayQuestion.knows(); } catch { /* keep what we knew */ } return _relayKnownNow; }
+refreshRelayKnown();
+
 async function askRelayIfNone() {
   if (!(await relayQuestion.check()).ask) return;
   const url = await new Promise((resolve) => {
@@ -1087,6 +1095,7 @@ async function askRelayIfNone() {
   });
   if (!url) { relayQuestion.later(); return; }
   const r = await applyRelayUrl(url);
+  refreshRelayKnown();
   if (!r?.ok) console.warn('[circleApp] the relay was saved but did not connect:', r?.error);
 }
 
@@ -3438,7 +3447,20 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     }
   }
 
+  await refreshRelayKnown();
+  // the "+" in this thread: the contact-scoped entries of the projector, each run as an op addressed to THIS contact
+  const contactAttach = attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' });
+  const onContactAttach = async (entry) => {
+    let r = null;
+    try { r = await rawCallSkill(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
+    // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
+    const { file, messageId, state, say } = await settleContactAttach(r, { channel: circleContactChannel, contactId, peerAddr, t });
+    if (file) { thread.messages.push({ origin: 'user', text: '', messageId, file, delivery: state }); rerender(); }
+    if (say) globalThis.alert?.(say);
+  };
   const rerender = () => renderContactThread(rootEl, {
+    noRelay: !_relayKnownNow,
+    attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
@@ -3726,7 +3748,18 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  * in: re-read the list and, when the launcher is what the person is looking at, repaint it. Without this a freshly
  * enrolled device showed none of its circles until a reload (found 2026-09-24 by the own-devices browser walk).
  */
+// The invite that is open now (one at a time), so a membership change can bring its count and newcomers up to date.
+let _openInvite = null;
+async function refreshOpenInvite() {
+  const o = _openInvite;
+  if (!o || !o.overlay?.isConnected) { _openInvite = null; return; }
+  const { used, max, members } = await readInviteUsage({ callSkill: rawCallSkill, circleId: o.circleId });
+  if (o.usedEl && typeof used === 'number' && typeof max === 'number') o.usedEl.textContent = t('circle.invite.uses_left', { used, max });
+  o.joinedEl.textContent = joinedSince(o.before, members, t).join(' ');
+}
+
 async function circlesChangedUnderneath() {
+  refreshOpenInvite().catch(() => { /* the invite keeps what it said */ });
   try { circlesCache = await loadLauncherCircles(); } catch { return; }
   _vandaagHead?.invalidate();   // Vandaag reads over this list: a circle that came or went changes what it shows
   // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
@@ -4406,6 +4439,8 @@ async function materializeVandaag() {
       selfIn: mySelfIn,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
       allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+      // the reach card: does this device know any relay (the relay question's own predicate)
+      relayKnown: () => relayQuestion.knows(),
     },
   });
 }
@@ -4615,6 +4650,8 @@ function onScreenAction(action) {
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
+  // the reach card: the connection points, where a relay is added (the question that asks stays quiet after 'Later')
+  else if (action?.kind === 'open-points') showConnectionPoints();
   else if (action?.kind === 'create-circle') openCreateCircleWizard();
   else if (action?.kind === 'join-circle') showJoinCircle();
   // a card's one action that IS an op (a chore done): through the waist, then the page repaints
@@ -4944,6 +4981,8 @@ async function showMyData(opts) {
   try { await refreshSelfSet(); } catch { /* the set as held stands */ }
   hideTabBar();
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
+  // 'How the bot shows actions' only for a person with a bot that acts (a contact bot other than Help)
+  let showBotActions = false;
   let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
@@ -5138,7 +5177,7 @@ async function showMyData(opts) {
     // Message cleanup — the conversation is the RECORD (never expires by policy); this is the user's own
     // explicit deletion, taking effect NOW in the conversation they are looking at. Returns the real count.
     onPurgeMessages: (days) => eventLog.purgeConversation({ olderThanMs: daysToMs(normalizeRetentionDays(days)) }),
-    surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
+    surfacePref: circleSurfacePref.get(), onSetSurfacePref: showBotActions ? onSetSurfacePref : null, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
     // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
     // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel,
@@ -5192,6 +5231,7 @@ async function showMyData(opts) {
     rawCallSkill('pinboard', 'getMetrics', {}).catch(() => null),
     rawCallSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null),
   ]);
+  showBotActions = showsBotActionsSetting(await loadAllContacts().catch(() => []));
   // The enrolled-devices list (add-a-device bookkeeping): one row per registry delegation,
   // tombstones shown struck — the revoke door acts on the live ones.
   devices = Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
@@ -5493,12 +5533,21 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
   card.appendChild(hint);
   // how many places this invite still has. The admin holding a code is the one person who can
   // act on the number, and until now nothing anywhere said it (web ≡ mobile: same line, same key).
+  let used = null;
   if (typeof r.maxRedemptions === 'number' && typeof r.redemptionsUsed === 'number') {
-    const used = document.createElement('p');
+    used = document.createElement('p');
     used.textContent = t('circle.invite.uses_left', { used: r.redemptionsUsed, max: r.maxRedemptions });
     used.style.cssText = 'font-size:12px;opacity:.8';
     card.appendChild(used);
   }
+  // …and it keeps up while it is open: on the membership lane's signal (`circlesChangedUnderneath`) the count is re-read
+  // and each newcomer named ("Tester B is erbij gekomen.") — the walk's invite said "0 of 6" while someone joined
+  const joinedEl = document.createElement('p');
+  joinedEl.className = 'cc-invite__joined';
+  card.appendChild(joinedEl);
+  readInviteUsage({ callSkill: rawCallSkill, circleId }).then(({ members }) => {
+    _openInvite = { circleId, overlay, usedEl: used, joinedEl, before: memberIdsOf(members) };
+  }).catch(() => {});
   const code = document.createElement('code');
   code.textContent = deepLink;
   code.style.cssText = 'display:block;word-break:break-all;font-size:11px;margin-top:6px;opacity:.7';
@@ -6944,8 +6993,6 @@ function openCreateCircleWizard() {
       // the founder's first policy (the wizard wrote it locally) goes on the lane, so a joiner catches it up
       if (gid) circlePolicyLane.state(gid).catch(() => {});
       try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
-      // …and the new circle's invite, as mobile opens it (web ≡ mobile): on screen at once, saying it is being made
-      if (gid) showCircleInvite(gid).catch(() => { /* the ⋯ menu still offers it */ });
     },
   });
 }
@@ -7030,6 +7077,7 @@ async function runHelpLlm(id, query) {
 let _openOverride = {};   // the open circle's member override (my private per-circle choices), read at open
 
 async function showDetail(id) {
+  await refreshRelayKnown();   // the composer says when a message would wait (no connection point)
   hideTabBar();
   setActiveCircle(id);
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
@@ -7268,7 +7316,7 @@ function showCircle(id, circle, policy) {
       circleMembers = members;   // 1:1-bot gate reads the raw rows (relation/webid) at render time
       const me = members.find((m) => (m?.webid ?? m?.id) === myWebid);
       myCircleRole = me?.role ?? '';
-    } catch { myCircleRole = ''; }
+    } catch { myCircleRole = null; }   // no answer is not 'not an admin': unknown
     if (getActiveCircle() === id) rerender();
     return myCircleRole;
   }
@@ -7713,6 +7761,7 @@ function showCircle(id, circle, policy) {
       deliveryByMessageId,
     );
     renderCircleView(rootEl, {
+      noRelay: !_relayKnownNow,
       circle, rows, t,
       // P1.7 — the chip model is shared; the shell only renders it and persists the tap.
       chatFilter: { ...chatFilterChips({ allowedKinds: kinds, filter: viewerFilter }), filter: viewerFilter },
@@ -7739,7 +7788,8 @@ function showCircle(id, circle, policy) {
       // stays hidden (fail-closed), and a locally-authored task row still offers it
       // via the row's `isOwn` path inside the renderer.
       viewerWebid: myWebid || null,
-      viewerIsAdmin: myCircleRole === 'admin',
+      // null while the roster has not answered (an admin-only ⋯ entry waits greyed), then known: true or false
+      viewerIsAdmin: myCircleRole === null ? null : myCircleRole === 'admin',
       // D / Surface 2 — feeds the ⋯ overflow menu's manifest-projected feature gate.
       policy,
       tabs, activeTab,
@@ -9678,7 +9728,9 @@ async function boot() {
           'group-redeem-request':    makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
             // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
-            onAdmitted: (a) => circlePairRoster?.onAdmitted?.(a),
+            // …and an open invite catches up: an admin's own admission is a local write, so the membership lane's
+            // signal (circlesChangedUnderneath) never fires for it
+            onAdmitted: (a) => { refreshOpenInvite().catch(() => {}); return circlePairRoster?.onAdmitted?.(a); },
             sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
             // a code bound to one person is theirs from any of their addresses (the canonical chat key)
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,

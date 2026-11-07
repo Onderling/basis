@@ -23,28 +23,6 @@ import { endpointToDialForInvite } from '../../v2/connectionPoints.js';
 import { personaPresetKeys } from '../../v2/memberCards.js';
 import { parseUntrustedJson } from '@onderling/core';
 
-/* ─── Locale strings ────────────────────────────────────────── */
-
-/**
- * Privacy notice text shown in step 2.  Bilingual constant; the
- * caller passes `lang: 'nl' | 'en'` (defaults to 'en') to pick.
- * Future sweep moves these into the locale JSON; for now they
- * live here for surface-parity with the original web wizard.
- */
-export const PRIVACY_NOTICE = Object.freeze({
-  nl: `Lid worden van een buurt betekent dat andere
-leden je posts kunnen zien, je kunnen aanspreken en — afhankelijk van
-groepsregels — kunnen oordelen over conflicten. Buurt-admins hebben
-geen toegang tot je privé-chats, alleen tot wat je publiek post.`,
-  en: `Joining a circle means other members can see
-your posts, contact you, and — depending on group rules — weigh in on
-conflicts. Circle admins have no access to your private chats, only to
-what you post publicly.`,
-});
-
-export function privacyNoticeFor(lang) {
-  return PRIVACY_NOTICE[lang] ?? PRIVACY_NOTICE.en;
-}
 
 /* ─── Handle helpers ───────────────────────────────────────── */
 
@@ -726,7 +704,7 @@ export function isJoinDirty(state) {
   if (typeof state.handle === 'string' && state.handle.trim() !== '') return true;
   if (state.persona != null) return true;
   if (Array.isArray(state.capabilityOptOuts) && state.capabilityOptOuts.length > 0) return true;
-  if (state.shareAddress === false) return true;  // the mesh-consent default is ON, so OFF is a choice
+  if (state.shareAddress === true) return true;   // the address share starts OFF, so ON is a choice
   return false;
 }
 
@@ -740,7 +718,7 @@ export function initialState() {
     rulesError:       null,
     rulesAccepted:    false,
     privacyAccepted:  false,
-    shareAddress:     true,         // mesh-consent default ON
+    shareAddress:     false,        // strict by default (the sitting): other members reach you directly only when you tick it
     // the join-time capability consent (opt-outable caps + this joiner's declines).
     consentModel:     { items: [], keys: [] },
     capabilityOptOuts: [],

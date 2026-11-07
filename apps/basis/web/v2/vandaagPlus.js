@@ -63,6 +63,8 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       li.value = line ?? '';
       li.placeholder = tr('circle.vandaag.plus_line_ph');
       li.setAttribute('aria-label', tr('circle.vandaag.plus_line_ph'));
+      // with a form open the line shows what was said but takes no typing or focus: the form below has them
+      if (act) { li.readOnly = true; li.tabIndex = -1; }
       lf.appendChild(li);
       // Enter reads it, and so does the button beside it (a phone keyboard's Enter is not where a person looks)
       const go = document.createElement('button');

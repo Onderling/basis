@@ -46,11 +46,11 @@
     },
     "offerings_default": {
       "label": {
-        "text": "This circle is about offering-matching — sharing your offerings (as a category) is on.",
+        "text": "This circle is about matching what people offer. Showing the kind of thing you offer is on.",
         "doc": "Fold-in phase C (Q3) — pre-checked, uncheckable wizard line when the joined circle's invite carries the offering-matching signal; checked = disclose offering keys at the coarse 'category' rung for the chosen persona."
       },
       "hint": {
-        "text": "Only the category is shared, never the text or tags. Uncheck if you'd rather not share your offerings here — you can change this later under Me → personas.",
+        "text": "Only the kind is shown, never the text or tags. Untick it if you would rather not show it here. You can change this later under Me → personas.",
         "doc": "Fold-in phase C (Q3) — explains the coarse rung + how to change it later; shown under the pre-checked line."
       }
     },
@@ -141,7 +141,7 @@
           "doc": "Join wizard — privacy step heading."
         },
         "notice": {
-          "text": "Joining a circle means other members can see your posts, contact you, and — depending on the circle's rules — weigh in on conflicts. Circle admins have no access to your private chats, only to what you post publicly.",
+          "text": "Joining a circle means other members can see your posts and contact you. Depending on the circle's rules, they can also weigh in on conflicts. Circle admins cannot see your private chats, only what you post in the circle.",
           "doc": "Join wizard — the privacy notice (folded from the PRIVACY_NOTICE constant)."
         },
         "accept": {
@@ -149,11 +149,11 @@
           "doc": "Join wizard — privacy-accept checkbox."
         },
         "mesh": {
-          "text": "Share my address so other members can reach me directly (recommended for catch-up).",
+          "text": "Let other members reach me directly",
           "doc": "Join wizard — mesh address-sharing consent checkbox."
         },
         "mesh_hint": {
-          "text": "Off = the admin relays everything; you stay reachable only via them.",
+          "text": "Off: the admin passes everything on, and other members cannot write to you directly. You can change this later.",
           "doc": "Join wizard — mesh consent hint."
         }
       },
@@ -283,6 +283,10 @@
     "uses_left": {
       "text": "{{used}} of {{max}} places on this invite used",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
+    },
+    "joined": {
+      "text": "{{name}} joined.",
+      "doc": "On an open invite: someone came in while it was open (one line per newcomer, by name)."
     },
     "removed_from_circle": {
       "text": "You were removed from this circle. This invite does not let you back in; ask an admin for a new one.",
@@ -1597,6 +1601,18 @@
       "text": "Later",
       "doc": "Vandaag's key card: put the card away for a few days."
     },
+    "onboarding_reach_title": {
+      "text": "You have no connection point yet",
+      "doc": "Today card when this device knows no relay (there is no baked-in one)."
+    },
+    "onboarding_reach_hint": {
+      "text": "Messages wait until there is one. What works already: Nearby, a code you scan together, and the connection point that comes with an invite.",
+      "doc": "What waits, and what works already without a relay. Plain sentences, no dash constructions."
+    },
+    "onboarding_reach_add": {
+      "text": "Add a connection point",
+      "doc": "Opens the connection points."
+    },
     "plus_line_read": {
       "text": "Read",
       "doc": "The \"+\" sheet: the button beside the free line that reads it (Enter does the same)."
@@ -2051,7 +2067,7 @@
     },
     "kind": {
       "offering": {
-        "text": "One of your offerings",
+        "text": "Something you offer",
         "doc": "Entrust picker — grant kind offering: group label above your offerings (only offerings you hold)."
       },
       "resource": {
@@ -2964,7 +2980,7 @@
   },
   "offerings": {
     "editor_title": {
-      "text": "Offering",
+      "text": "What you offer",
       "doc": "Offering editor heading (board 8)."
     },
     "matches_title": {
@@ -3182,7 +3198,7 @@
   },
   "offeringMatches": {
     "title": {
-      "text": "Members with matching offerings:",
+      "text": "Members who offer something that fits:",
       "doc": "Heading for the inline offering-match list (P6.7 #345) appended under /find replies."
     }
   },
@@ -3534,7 +3550,7 @@
       "doc": "Visibility banner heading while announcing (Nearby step E)."
     },
     "visible_body": {
-      "text": "People nearby can see your name and published offerings while this screen is open.",
+      "text": "People nearby can see your name and what you offer while this screen is open.",
       "doc": "Visibility banner body while announcing — says exactly what is shared."
     },
     "hidden_title": {
@@ -3610,8 +3626,8 @@
       "doc": "Board 8C — heading of the dedicated `HIER` screen (P6.8)."
     },
     "header": {
-      "text": "{{sharing}} of {{total}} share offerings with you",
-      "doc": "Header line above the row list."
+      "text": "{{sharing}} people here show what they offer",
+      "doc": "Nearby's top line when more than one person here shows what they offer (their aanbod). 'Offerings' never reaches the screen."
     },
     "header_empty": {
       "text": "Nobody nearby right now.",
@@ -3626,7 +3642,7 @@
       "doc": "Footer block heading; shows your own pseudonym + published-tier skills."
     },
     "own_profile_empty": {
-      "text": "You haven't published any offerings yet.",
+      "text": "You are not showing anything you offer yet.",
       "doc": "Footer when no skills are published."
     },
     "delivery_fallback_note": {
@@ -3748,6 +3764,14 @@
     "no_name_yet": {
       "text": "you (no name yet)",
       "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
+    },
+    "header_one": {
+      "text": "{{name}} shows what they offer",
+      "doc": "Nearby's top line when one person here shows what they offer; {{name}} is their label."
+    },
+    "header_none": {
+      "text": "Nobody here is showing what they offer yet",
+      "doc": "Nearby's top line when people are here but none shows what they offer."
     }
   },
   "viewAsSplit": {
@@ -5776,7 +5800,7 @@
       "doc": "P5 — button on the contacts roster to add a bot by URL/address."
     },
     "add_prompt": {
-      "text": "Bot address — an https URL (agent card), a peer address, or a onderling-contact:// contact card",
+      "text": "Bot address: a web address (its agent card), a peer address or a contact card",
       "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
     },
     "add_failed": {
@@ -6226,19 +6250,19 @@
       "doc": "S2 — transient save state."
     },
     "offerings": {
-      "text": "Offerings",
+      "text": "What you offer",
       "doc": "S2 — personal offerings section. (Web editor retired in fold-in phase C; mobile CircleProfileScreen still renders it until the mobile mirror lands.)"
     },
     "offerings_moved": {
-      "text": "Offerings now live under Me → personas",
+      "text": "What you offer now lives under Me → personas",
       "doc": "Fold-in phase C — quiet pointer row on the Profiel screen, replacing the retired skills editor; opens the Mij persona surface."
     },
     "no_offerings": {
-      "text": "No offerings yet.",
+      "text": "Nothing offered yet.",
       "doc": "S2 — empty offerings state."
     },
     "pick_offering": {
-      "text": "Pick an offering…",
+      "text": "Pick something you offer…",
       "doc": "S2 — offering-category select placeholder."
     },
     "add_offering": {
@@ -6246,7 +6270,7 @@
       "doc": "S2 — add an offering button."
     },
     "remove_offering": {
-      "text": "Remove offering",
+      "text": "Remove this",
       "doc": "S2 — a11y label for the per-offering remove button."
     },
     "location": {
@@ -6666,7 +6690,7 @@
       "doc": "S5 — push subscribed state."
     },
     "notif_off": {
-      "text": "Get notified about replies and circle activity even when this tab is closed.",
+      "text": "Get notified about replies and circle activity, even when the app is closed.",
       "doc": "S5 — push not-subscribed state."
     },
     "notif_unsupported": {
@@ -6683,7 +6707,7 @@
     },
     "surface_pref": {
       "text": "How the bot shows actions",
-      "doc": "S6.C — surface-preference section heading."
+      "doc": "Heading of the setting for how a bot that ACTS shows its actions (buttons, a screen, or words). Shown only when the person has a contact bot other than Help: Help only answers, so the setting does not apply to it (showsBotActionsSetting)."
     },
     "language": {
       "text": "Language",
@@ -6782,7 +6806,7 @@
       "doc": "J-CS8 — button when the lock is on."
     },
     "notif_privacy": {
-      "text": "To wake your phone, the relay you are connected to keeps one wake-token for this device. That lets it see that your circles belong to one device — so that relay can tell they are yours.",
+      "text": "To wake your phone, your connection point (the relay you are connected to) keeps one wake code for this device. That lets it see that your circles belong to one device, and so that they are yours.",
       "doc": "J-CS10 — the trade, stated where it is made. One device gets one push token from the OS, registered under each of its per-circle addresses; grouping by token groups the circles."
     },
     "notif_privacy_not": {
@@ -6790,7 +6814,7 @@
       "doc": "J-CS10 — what is NOT learned. A bare \"affects your privacy\" invites imagining something worse than the truth."
     },
     "notif_privacy_escape": {
-      "text": "If that matters to you: run your own relay, or spread your circles across different relays — a relay only ever sees the circles that ride it.",
+      "text": "If that matters to you, run your own relay or spread your circles over different relays. A relay only sees the circles that use it.",
       "doc": "J-CS10 — name the escape rather than leaving a dead end (the companion node; relay diversity)."
     },
     "pod_local_consequence": {
@@ -7566,11 +7590,11 @@
       "doc": "mij#personas — property without a value on the general persona."
     },
     "offerings_label": {
-      "text": "Offerings",
+      "text": "What you offer",
       "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ offering",
+      "text": "+ something you offer",
       "doc": "mij#personas — dashed add button (potential-action grammar)."
     },
     "offering_text_ph": {
@@ -7786,6 +7810,14 @@
     "list_item": {
       "text": "List item",
       "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "file_held": {
+      "text": "{{name}} waits for them. It goes as soon as they are online.",
+      "doc": "A file sent from a contact thread's + is waiting because the contact is offline."
+    },
+    "file_not_reached": {
+      "text": "The file did not reach them. Try again later.",
+      "doc": "A file sent from a contact thread's + could not reach the contact."
     }
   },
   "conversationKinds": {
@@ -8185,7 +8217,7 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "offering_add": {
-        "text": "+ Add another offering",
+        "text": "+ Add something else",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "creating": {
@@ -8233,7 +8265,7 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "review_offerings": {
-        "text": "Offerings",
+        "text": "What members offer",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "review_storage": {
@@ -8291,7 +8323,7 @@
         "doc": "Mobile create-wizard, step 3 heading."
       },
       "step_offerings": {
-        "text": "Offerings (optional)",
+        "text": "What members offer (optional)",
         "doc": "Mobile create-wizard, step 4 heading."
       },
       "step_tech": {
@@ -8299,7 +8331,7 @@
         "doc": "Mobile create-wizard, step 5 heading."
       },
       "offering_remove_row": {
-        "text": "Remove offering",
+        "text": "Remove this",
         "doc": "Mobile create-wizard: remove one offering row."
       },
       "step_identity_intro": {
@@ -8315,7 +8347,7 @@
         "doc": "Create wizard step 3 body."
       },
       "step_offerings_intro": {
-        "text": "What members can do or offer here. Each offering has a name and four axes (openness, posture, status, radius). You can skip this and edit it later.",
+        "text": "What members can do or offer here. Each has a name and four axes (openness, posture, status, radius). You can skip this and edit it later.",
         "doc": "Create wizard step 4 body."
       },
       "step_tech_intro": {
@@ -8351,7 +8383,7 @@
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
       },
       "dot_offerings": {
-        "text": "Offerings",
+        "text": "What members offer",
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
       },
       "dot_tech": {
@@ -10181,6 +10213,12 @@
     "plus": {
       "text": "Give feedback",
       "doc": "The \"+\" sheet act and the Instellingen door that open the feedback contact's thread."
+    }
+  },
+  "composer": {
+    "no_point": {
+      "text": "No connection point: this message waits.",
+      "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
     }
   }
 }

@@ -61,6 +61,10 @@ export const SEAMS = Object.freeze([
   // THE RELAY TRAVELS WITH THE CARD: a device with no relay of its own adopts the point a scanned contact card brings, saved so
   // a restart reconnects to it, and says whose it now uses. Before, it dialled the card's relay only at the first send, unsaid.
   { id: 'contact-scan-adopts-point', pattern: /adoptInheritedPoint\(|contactPointAdopter\(/, shells: ['web', 'mobile'], why: 'a device with no relay scans a card and stays unreachable (until its first send, and again after every restart)' },
+  // A FILE SENT FROM A CONTACT THREAD SHOWS IN IT. The thread's "+" runs send-file, which answers in the slash door's words
+  // (the contact's key in them); the shared settle step keeps the sent file on our side of the thread and says only what
+  // the bubble cannot. A walk on the test phone (2026-11-06) sent a file, saw the key in an alert and no bubble.
+  { id: 'contact-attach-settles', pattern: /settleContactAttach\(/, shells: ['web', 'mobile'], why: 'a file sent from a contact thread is missing from the sender\'s own thread, and the op\'s slash words put the contact\'s key on screen' },
   { id: 'role-change-forwarded-words', pattern: /roleChangeNoticeWords\(/, shells: ['web', 'mobile'], why: 'a forwarded role change read as done before the main device signed it' },
   { id: 'own-spine-outbox-said', pattern: /'ownSpineOutbox'/, why: 'a change that waited days for the main device, or was dropped, would be said nowhere' },
   { id: 'vandaag-head', pattern: /createScreenHead\(/, shells: ['web', 'mobile'], why: 'Vandaag read again on every tab landing, though nothing had changed' },

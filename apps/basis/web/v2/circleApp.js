@@ -122,7 +122,7 @@ import { renderConfirmDialog } from './confirmDialog.js';
 import { renderRelayQuestionDialog } from './relayQuestionDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, removeMemberConfirm, roleChangeNoticeWords, ownSpineOutboxLine, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -173,6 +173,7 @@ import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src/v2/contactsSource.js';
 import { nameShown } from '../../src/v2/personLabel.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
+import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -183,7 +184,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
-import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
+import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -327,7 +328,8 @@ import { EventLog } from '../../src/eventLog.js';
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
-import { attachEntriesFor } from '../../src/v2/attachEntries.js';
+import { attachEntriesFor, attachEntryForType } from '../../src/v2/attachEntries.js';
+import { readInviteUsage, joinedSince, memberIdsOf } from '../../src/v2/inviteUsage.js';
 import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
@@ -3457,8 +3459,19 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   }
 
   await refreshRelayKnown();
+  // the "+" in this thread: the contact-scoped entries of the projector, each run as an op addressed to THIS contact
+  const contactAttach = attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' });
+  const onContactAttach = async (entry) => {
+    let r = null;
+    try { r = await rawCallSkill(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
+    // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
+    const { file, messageId, state, say } = await settleContactAttach(r, { channel: circleContactChannel, contactId, peerAddr, t });
+    if (file) { thread.messages.push({ origin: 'user', text: '', messageId, file, delivery: state }); rerender(); }
+    if (say) globalThis.alert?.(say);
+  };
   const rerender = () => renderContactThread(rootEl, {
     noRelay: !_relayKnownNow,
+    attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
@@ -3746,7 +3759,18 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  * in: re-read the list and, when the launcher is what the person is looking at, repaint it. Without this a freshly
  * enrolled device showed none of its circles until a reload (found 2026-09-24 by the own-devices browser walk).
  */
+// The invite that is open now (one at a time), so a membership change can bring its count and newcomers up to date.
+let _openInvite = null;
+async function refreshOpenInvite() {
+  const o = _openInvite;
+  if (!o || !o.overlay?.isConnected) { _openInvite = null; return; }
+  const { used, max, members } = await readInviteUsage({ callSkill: rawCallSkill, circleId: o.circleId });
+  if (o.usedEl && typeof used === 'number' && typeof max === 'number') o.usedEl.textContent = t('circle.invite.uses_left', { used, max });
+  o.joinedEl.textContent = joinedSince(o.before, members, t).join(' ');
+}
+
 async function circlesChangedUnderneath() {
+  refreshOpenInvite().catch(() => { /* the invite keeps what it said */ });
   try { circlesCache = await loadLauncherCircles(); } catch { return; }
   _vandaagHead?.invalidate();   // Vandaag reads over this list: a circle that came or went changes what it shows
   // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
@@ -4628,9 +4652,9 @@ function onScreenAction(action) {
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
   // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin
   else if (action?.kind === 'set-handle') {
-    const op = handleOp(action.value);
-    if (op.error) return;
-    Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch(() => null).then(() => _showVandaag());
+    // the typed name is the display name, the handle is made from it; never silent (the walk's card just came back)
+    saveNameCard(action.value, { callSkill: rawCallSkill })
+      .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
   else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
@@ -4973,7 +4997,8 @@ async function showMyData(opts) {
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
   // same capability, and the manifest stops describing what the buttons do.
-  const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
+  // the provider the person named (the field on My data), else the default
+  const onSignIn = (issuer = null) => Promise.resolve(rawCallSkill('basis', 'signin', issuer ? { issuer } : {}))
     .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
   // launch the existing restore wizard in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
@@ -5090,7 +5115,7 @@ async function showMyData(opts) {
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,
-    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
+    onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -5429,6 +5454,19 @@ async function showJoinCircle(inviteArg) {
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId, { forFunction = false } = {}) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
+  // THE INVITE IS ON SCREEN AT ONCE, saying it is being made: building it below takes a few seconds (the policy, the
+  // storage posture, the code), and nothing on screen said so (mobile parity: the same line, the same key)
+  const overlay = document.createElement('div');
+  overlay.className = 'cc-mydata-modal';
+  const card = document.createElement('div');
+  card.className = 'cc-mydata-modal__card';
+  overlay.appendChild(card);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const making = document.createElement('p');
+  making.dataset.role = 'invite-pending';
+  making.textContent = t('circle.invite.making');
+  card.appendChild(making);
+  document.body.appendChild(overlay);
   // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
   // address in a persona's circle, which the joiner's trail would record as its confirming admin
   const adminPeerAddr = _peerAgent?.circleSelf?.(circleId)?.webid ?? circleHouseholdAgent?.householdSelfAddr ?? null;
@@ -5478,13 +5516,8 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
     });
   }
   catch { r = { error: 'failed' }; }
-  const overlay = document.createElement('div');
-  overlay.className = 'cc-mydata-modal';
-  const card = document.createElement('div');
-  card.className = 'cc-mydata-modal__card';
-  overlay.appendChild(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
+  making.remove();
+  if (!overlay.isConnected) return;   // closed while it was being made
   const h = document.createElement('h3');
   h.textContent = t('circle.invite.title');
   card.appendChild(h);
@@ -5508,12 +5541,21 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
   card.appendChild(hint);
   // how many places this invite still has. The admin holding a code is the one person who can
   // act on the number, and until now nothing anywhere said it (web ≡ mobile: same line, same key).
+  let used = null;
   if (typeof r.maxRedemptions === 'number' && typeof r.redemptionsUsed === 'number') {
-    const used = document.createElement('p');
+    used = document.createElement('p');
     used.textContent = t('circle.invite.uses_left', { used: r.redemptionsUsed, max: r.maxRedemptions });
     used.style.cssText = 'font-size:12px;opacity:.8';
     card.appendChild(used);
   }
+  // …and it keeps up while it is open: on the membership lane's signal (`circlesChangedUnderneath`) the count is re-read
+  // and each newcomer named ("Tester B is erbij gekomen.") — the walk's invite said "0 of 6" while someone joined
+  const joinedEl = document.createElement('p');
+  joinedEl.className = 'cc-invite__joined';
+  card.appendChild(joinedEl);
+  readInviteUsage({ callSkill: rawCallSkill, circleId }).then(({ members }) => {
+    _openInvite = { circleId, overlay, usedEl: used, joinedEl, before: memberIdsOf(members) };
+  }).catch(() => {});
   const code = document.createElement('code');
   code.textContent = deepLink;
   code.style.cssText = 'display:block;word-break:break-all;font-size:11px;margin-top:6px;opacity:.7';
@@ -7460,14 +7502,12 @@ function showCircle(id, circle, policy) {
   // (circleDispatchReady → scope-inject the active circle onto the create), then refreshes
   // the list. A `/addtask` typed in the composer reaches the tasks agent by its own path;
   // both end up in the same list via loadTasks().
+  // The tab's button opens the SAME form "+ → Task" opens (`attachEntryForType`): one way to make a task here, not a
+  // `prompt()` of its own. Absent entry → the button is not painted (see `onAddTask` below).
   async function addTaskFromTab() {
-    const text = (globalThis.prompt?.(t('circle.view.tasks_add_prompt')) || '').trim();
-    if (!text) return;
-    try {
-      if (typeof circleDispatchReady === 'function') {
-        await circleDispatchReady({ opId: 'addTask', args: { text }, appOrigin: 'tasks' });
-      }
-    } catch { /* the reload reflects the real state */ }
+    const entry = attachEntryForType(circleAttachMenu, 'task');
+    if (!entry) return;
+    await attachCommandDispatch(entry);
     await loadTasks();
   }
 
@@ -7765,7 +7805,7 @@ function showCircle(id, circle, policy) {
       // Taken (tasks) tab — the circle's tasks (stream rows) + the compose affordance.
       // The view only reads these when the taken tab is active.
       tasks: circleTasks,
-      onAddTask: addTaskFromTab,
+      ...(attachEntryForType(circleAttachMenu, 'task') ? { onAddTask: addTaskFromTab } : {}),   // only where a task can be made here
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,
@@ -8895,7 +8935,8 @@ async function showAdmin(id) {
       // (the circle view re-resolves its hide set at the next circle open — loadRoster does it)
       await load();
     },
-    onRemove: async (m) => {
+    // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
+    onRemove: (m) => runConfirmGate({ request: removeMemberConfirm({ name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }), t }), present: openCircleConfirmDialog, execute: async () => {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
@@ -8937,7 +8978,7 @@ async function showAdmin(id) {
         } catch { /* best-effort — the removal already succeeded, never block it */ }
       }
       busy = false; await load();
-    },
+    } }),
     onAnnounce: async (text) => {
       notice = null; busy = true; rerender();
       try {
@@ -9694,7 +9735,9 @@ async function boot() {
           'group-redeem-request':    makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
             // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
-            onAdmitted: (a) => circlePairRoster?.onAdmitted?.(a),
+            // …and an open invite catches up: an admin's own admission is a local write, so the membership lane's
+            // signal (circlesChangedUnderneath) never fires for it
+            onAdmitted: (a) => { refreshOpenInvite().catch(() => {}); return circlePairRoster?.onAdmitted?.(a); },
             sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
             // a code bound to one person is theirs from any of their addresses (the canonical chat key)
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,

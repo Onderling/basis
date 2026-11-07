@@ -189,7 +189,8 @@ import { contactPointAdopter, useRelayQuestion, relayQuestion } from './RelayQue
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
-import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { attachEntriesFor, attachEntryForType } from '../../../../basis/src/v2/attachEntries.js';
+import { readInviteUsage, joinedSince, memberIdsOf } from '../../../../basis/src/v2/inviteUsage.js';
 import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
@@ -289,7 +290,7 @@ import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareO
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
 import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
-import { handleOp, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
+import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
 import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import { contactOpenTarget, tileCircles } from '../../../../basis/src/v2/helpContact.js';
@@ -1978,7 +1979,25 @@ export default function CircleLauncherScreen({
       });
     } catch { r = { error: 'failed' }; }
     setInviteFor({ circleId, ...(forFunction ? { forFunction: true } : {}), ...(r || {}) });
+    // who is in the circle as the invite opens, so a later membership change can name who came in
+    readInviteUsage({ callSkill: bundle?.callSkill, circleId }).then(({ members }) => {
+      setInviteFor((cur) => (cur && cur.circleId === circleId ? { ...cur, before: memberIdsOf(members) } : cur));
+    }).catch(() => {});
   }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
+  // THE OPEN INVITE KEEPS UP: the membership lane's signal reloads `circles` (onCirclesChanged); an open invite then
+  // re-reads its count and names each newcomer — the walk's invite said "0 of 6" while someone joined (web ≡ mobile)
+  useEffect(() => {
+    const cid = inviteFor?.circleId;
+    if (!cid || !inviteFor?.before) return;
+    readInviteUsage({ callSkill: bundle?.callSkill, circleId: cid }).then(({ used, max, members }) => {
+      setInviteFor((cur) => (cur && cur.circleId === cid ? {
+        ...cur,
+        ...(typeof used === 'number' ? { redemptionsUsed: used } : {}),
+        ...(typeof max === 'number' ? { maxRedemptions: max } : {}),
+        joined: joinedSince(cur.before, members, t),
+      } : cur));
+    }).catch(() => {});
+  }, [circles]);   // eslint-disable-line react-hooks/exhaustive-deps — the signal is `circles`; the invite is read inside
 
   // ONE mount for everything a scan or the Join button opens, painted beside whichever view is up (the Mij view returns
   // early, so a modal living in one branch's return never shows in another). The scanner is the `scanQr` op's seam
@@ -2065,6 +2084,9 @@ export default function CircleLauncherScreen({
                       {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
                     </Text>
                   ) : null}
+                  {(inviteFor.joined ?? []).length ? (
+                    <Text style={styles.inviteHint} testID="invite-joined">{inviteFor.joined.join(' ')}</Text>
+                  ) : null}
                   {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
                       listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
                   <Pressable
@@ -2096,6 +2118,8 @@ export default function CircleLauncherScreen({
                       onPress={() => { const cid = inviteFor.circleId; setInviteFor(null); openCircleInvite(cid, { forFunction: true }); }} />
                   ) : null}
                 </>
+              ) : inviteFor?.pending ? (
+                <Text style={styles.inviteHint} testID="invite-pending">{t('circle.invite.making')}</Text>
               ) : (
                 <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
               )}
@@ -2251,8 +2275,9 @@ export default function CircleLauncherScreen({
                 else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
                 // the onboarding strip's acts: the handle through the profile op, the intro card seen here, begin
                 else if (a?.kind === 'set-handle') {
-                  const op = handleOp(a.value);
-                  if (!op.error) Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch(() => null).then(() => refreshScreensBook());
+                  // the typed name is the display name, the handle is made from it; never silent
+                  saveNameCard(a.value, { callSkill: bundle?.callSkill })
+                    .then((r) => { Alert.alert(nameCardWords(r, t)); if (r.ok) refreshScreensBook(); });
                 }
                 else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
                 else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); });
@@ -2993,7 +3018,9 @@ export default function CircleLauncherScreen({
             load();
             // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
             // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
-            if (gid) openCircleInvite(gid).catch(() => {});
+            // THE INVITE IS ON SCREEN AT ONCE, saying it is being made: building it takes a few seconds, and a walk found the
+            // bare circle list showing all that time — a tap there opened a circle and the invite then came over it
+            if (gid) { setInviteFor({ circleId: gid, pending: true }); openCircleInvite(gid).catch(() => {}); }
           }}
         />
       ) : null}
@@ -4878,14 +4905,18 @@ function CircleDetail({
           // owner-only entrust chip (the same seam the chat stream uses). Tapping entrust
           // opens the mandate picker; claim/done route to the tasks agent. web≡mobile.
           <View testID="circle-detail-taken">
-            <Pressable
-              style={styles.takenAdd}
-              accessibilityRole="button"
-              testID="circle-taken-add"
-              onPress={() => setComposerText('/addtask ')}
-            >
-              <Text style={styles.takenAddText}>{t('circle.view.tasks_add')}</Text>
-            </Pressable>
+            {/* the SAME form "+ → Task" opens (attachEntryForType): it used to put "/addtask " into a composer this tab
+                does not show, so the button did nothing (walk, 2026-11-05); not painted where no task can be made */}
+            {attachEntryForType(attachEntries, 'task') ? (
+              <Pressable
+                style={styles.takenAdd}
+                accessibilityRole="button"
+                testID="circle-taken-add"
+                onPress={() => runAttachEntry(attachEntryForType(attachEntries, 'task'))}
+              >
+                <Text style={styles.takenAddText}>{t('circle.view.tasks_add')}</Text>
+              </Pressable>
+            ) : null}
             {circleTasks.length === 0 ? (
               <Text style={styles.placeholder}>{t('circle.view.tasks_empty')}</Text>
             ) : (

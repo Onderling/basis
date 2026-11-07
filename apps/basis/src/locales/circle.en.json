@@ -244,6 +244,10 @@
       "text": "Invite to this circle",
       "doc": "OBJ-2 — heading of the invite-QR overlay."
     },
+    "making": {
+      "text": "Making the invite.",
+      "doc": "The invite right after a circle is made, while it is being built (a few seconds): on screen at once, so nothing else is tapped meanwhile."
+    },
     "hint": {
       "text": "Scan this on the other device to join this circle.",
       "doc": "OBJ-2 — caption under the invite QR."
@@ -279,6 +283,10 @@
     "uses_left": {
       "text": "{{used}} of {{max}} places on this invite used",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
+    },
+    "joined": {
+      "text": "{{name}} joined.",
+      "doc": "On an open invite: someone came in while it was open (one line per newcomer, by name)."
     },
     "removed_from_circle": {
       "text": "You were removed from this circle. This invite does not let you back in; ask an admin for a new one.",
@@ -990,10 +998,6 @@
       "text": "＋ Add task",
       "doc": "Taken (tasks) tab — compose button to add a task."
     },
-    "tasks_add_prompt": {
-      "text": "What needs doing?",
-      "doc": "Taken (tasks) tab — prompt when adding a task."
-    },
     "tasks_untitled": {
       "text": "(untitled task)",
       "doc": "Taken (tasks) tab — fallback when a task has no text."
@@ -1532,6 +1536,18 @@
     "onboarding_handle_empty": {
       "text": "Type a name first.",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_saved": {
+      "text": "Saved. You are called {{name}} here.",
+      "doc": "The name card after its save: the name the person typed, which is now their display name (the handle is made from it)."
+    },
+    "onboarding_handle_failed": {
+      "text": "Your name could not be saved. Please try again.",
+      "doc": "The name card could not save (any refusal other than a taken name)."
+    },
+    "onboarding_handle_unusable": {
+      "text": "Use letters or digits in your name.",
+      "doc": "What was typed holds nothing a name can be made of (only symbols)."
     },
     "onboarding_intro_title": {
       "text": "New to Basis?",
@@ -7072,6 +7088,10 @@
       "text": "That action is admin-only.",
       "doc": "S3 — shown when a non-admin op is refused."
     },
+    "remove_member_confirm": {
+      "text": "Remove {{name}} from this circle? The circle's key is renewed; they keep any other circle you share.",
+      "doc": "The confirm before an admin removes a member: who, and what it does (a key rotation; other shared circles stay)."
+    },
     "saving": {
       "text": "saving…",
       "doc": "S3 — transient state."
@@ -7790,6 +7810,14 @@
     "list_item": {
       "text": "List item",
       "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "file_held": {
+      "text": "{{name}} waits for them. It goes as soon as they are online.",
+      "doc": "A file sent from a contact thread's + is waiting because the contact is offline."
+    },
+    "file_not_reached": {
+      "text": "The file did not reach them. Try again later.",
+      "doc": "A file sent from a contact thread's + could not reach the contact."
     }
   },
   "conversationKinds": {
@@ -7894,7 +7922,10 @@
   "enroll": {
     "title": "Add this device",
     "ceremony": "Enrolling this device",
-    "body": "Type this account's recovery phrase to add this device. Each device gets its own keys — the phrase itself is never stored.",
+    "body": {
+      "text": "Type this account's recovery phrase to add this device. Have a recovery file? Load it afterwards (My data → Load a recovery file) and your circles are there at once. The phrase itself is never stored.",
+      "doc": "The add-a-device ceremony: the phrase is what adds the device; the recovery file (sealed to the phrase) comes after and brings the circles' member lists."
+    },
     "mnemonic_placeholder": "Recovery phrase (24 words)",
     "label_placeholder": "Device name (e.g. 'work laptop')",
     "submit": "Add this device",

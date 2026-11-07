@@ -329,6 +329,7 @@ import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
 import { attachEntriesFor, attachEntryForType } from '../../src/v2/attachEntries.js';
+import { readInviteUsage, joinedSince, memberIdsOf } from '../../src/v2/inviteUsage.js';
 import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
@@ -3747,7 +3748,18 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  * in: re-read the list and, when the launcher is what the person is looking at, repaint it. Without this a freshly
  * enrolled device showed none of its circles until a reload (found 2026-09-24 by the own-devices browser walk).
  */
+// The invite that is open now (one at a time), so a membership change can bring its count and newcomers up to date.
+let _openInvite = null;
+async function refreshOpenInvite() {
+  const o = _openInvite;
+  if (!o || !o.overlay?.isConnected) { _openInvite = null; return; }
+  const { used, max, members } = await readInviteUsage({ callSkill: rawCallSkill, circleId: o.circleId });
+  if (o.usedEl && typeof used === 'number' && typeof max === 'number') o.usedEl.textContent = t('circle.invite.uses_left', { used, max });
+  o.joinedEl.textContent = joinedSince(o.before, members, t).join(' ');
+}
+
 async function circlesChangedUnderneath() {
+  refreshOpenInvite().catch(() => { /* the invite keeps what it said */ });
   try { circlesCache = await loadLauncherCircles(); } catch { return; }
   _vandaagHead?.invalidate();   // Vandaag reads over this list: a circle that came or went changes what it shows
   // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
@@ -5521,12 +5533,21 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
   card.appendChild(hint);
   // how many places this invite still has. The admin holding a code is the one person who can
   // act on the number, and until now nothing anywhere said it (web ≡ mobile: same line, same key).
+  let used = null;
   if (typeof r.maxRedemptions === 'number' && typeof r.redemptionsUsed === 'number') {
-    const used = document.createElement('p');
+    used = document.createElement('p');
     used.textContent = t('circle.invite.uses_left', { used: r.redemptionsUsed, max: r.maxRedemptions });
     used.style.cssText = 'font-size:12px;opacity:.8';
     card.appendChild(used);
   }
+  // …and it keeps up while it is open: on the membership lane's signal (`circlesChangedUnderneath`) the count is re-read
+  // and each newcomer named ("Tester B is erbij gekomen.") — the walk's invite said "0 of 6" while someone joined
+  const joinedEl = document.createElement('p');
+  joinedEl.className = 'cc-invite__joined';
+  card.appendChild(joinedEl);
+  readInviteUsage({ callSkill: rawCallSkill, circleId }).then(({ members }) => {
+    _openInvite = { circleId, overlay, usedEl: used, joinedEl, before: memberIdsOf(members) };
+  }).catch(() => {});
   const code = document.createElement('code');
   code.textContent = deepLink;
   code.style.cssText = 'display:block;word-break:break-all;font-size:11px;margin-top:6px;opacity:.7';
@@ -9707,7 +9728,9 @@ async function boot() {
           'group-redeem-request':    makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
             // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
-            onAdmitted: (a) => circlePairRoster?.onAdmitted?.(a),
+            // …and an open invite catches up: an admin's own admission is a local write, so the membership lane's
+            // signal (circlesChangedUnderneath) never fires for it
+            onAdmitted: (a) => { refreshOpenInvite().catch(() => {}); return circlePairRoster?.onAdmitted?.(a); },
             sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
             // a code bound to one person is theirs from any of their addresses (the canonical chat key)
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,

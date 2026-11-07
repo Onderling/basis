@@ -266,6 +266,12 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   `plans/DOC-STATUS.md` (doc lifecycle) + `plans/DECISIONS-FOR-REVIEW.md` (every autonomous call), and
   sanity-check that mapping at each session's close (the wave-2 log in `DOC-STATUS.md` is the worked example).
 
+- **Shared checkout, two agents (Fable + Opus work in one `canopy-mono` clone):** a tracked file is edited only in a
+  `wt-*` worktree (`plans/tools/mk-worktree.sh`), never in the shared checkout; its branch is never switched. At session
+  start and before stopping, `git status --short` in `canopy-mono` must be empty, or the change is named in the memory
+  state file with its owner. An unowned change is reported, never stashed, never reverted blind.
+- **Never `git stash` in this repo** (two slips: 2026-10-06, 2026-11-05 — a failed `stash push` left the ref empty and `stash apply $S` applied another session's WIP). A worktree makes it unnecessary: commit the WIP on the branch, or `git diff > <scratchpad>/x.patch` + `git checkout -- <paths>` and `git apply` it back. `stash apply/pop/drop` without an explicit ref is forbidden outright.
+
 ## Where the truth is
 - **Doc layout (task #66 model — [`docs/repository-layout.md`](docs/repository-layout.md)):** function is encoded in
   name/location and drives git. **Tracked/public:** `docs/**`, `README.md`, `QUICKSTART.md`, `CLAUDE.md`/`AGENTS.md`,

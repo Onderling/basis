@@ -180,6 +180,35 @@ export function createContactThreadChannel({
   // whose turn never landed ages out.
   const heardAsMessage = new Map();
   let landedHook = null;   // `setLandedHook` — the receipt back to a sender whose turn landed here
+  // WHICH CONTACT A TURN OF MINE WENT TO, by message id, this boot (the delivery map that a receipt advances is per boot
+  // too). It is what lets the receipt RECEIVER refuse a receipt for my DM from anyone but that contact: a contact turn
+  // never reaches the event log with a circle id, so the circle-roster gate has no opinion on it, and without this a
+  // stranger who learns the id could paint "their app has it" on my bubble.
+  const sentTo = new Map();   // msgId → { contactId, peerAddr }
+  const rememberSentTo = (msgId, contactId, peerAddr) => {
+    if (typeof msgId !== 'string' || !msgId) return;
+    sentTo.set(msgId, { contactId: contactId ?? peerAddr ?? null, peerAddr: peerAddr ?? null });
+    if (sentTo.size > 2000) sentTo.delete(sentTo.keys().next().value);   // bounded: the oldest goes
+  };
+  /** The contact a turn of mine went to, or null (not mine, or not this boot). */
+  const contactOfMessage = (msgId) => (typeof msgId === 'string' && sentTo.get(msgId)) || null;
+  /**
+   * Whether, and inside which circle, a landed turn is answered with a receipt (see the landed hook for the why).
+   * `{ send: true }` plainly for a turn from the contact's canonical address; `{ send: true, circleId }` for a per-circle
+   * address the pair roster knows; `{ send: false }` for a per-circle address nothing explains.
+   */
+  const receiptScopeFor = async ({ who, fromAddr }) => {
+    if (typeof fromAddr !== 'string' || !fromAddr) return { send: false };
+    // Their CANONICAL address: the resolver binds no identity behind it (`identityOfAddress` returns a per-circle alias's
+    // person key, and the address itself otherwise). A per-circle address resolves to someone else.
+    if (resolveId(fromAddr) === fromAddr) return { send: true, circleId: null };
+    let known = null;
+    if (pair && typeof pair.rosterAddressesFor === 'function') {
+      try { known = await pair.rosterAddressesFor(who); } catch { known = null; }
+    }
+    if (known?.addresses?.has?.(fromAddr) && typeof known.circleId === 'string') return { send: true, circleId: known.circleId };
+    return { send: false };
+  };
   const noteHeardAsMessage = (fromAddr, messageId, extra) => {
     if (typeof messageId !== 'string' || !messageId) return;
     heardAsMessage.set(`${fromAddr}\n${messageId}`, extra);
@@ -253,6 +282,7 @@ export function createContactThreadChannel({
     if (!peerAddr) throw new Error('contactThreadChannel.sendTurn: peerAddr is required');
     if (typeof sendToPeer !== 'function') throw new Error('contactThreadChannel: sendToPeer is required');
     const id = messageId ?? mkId();
+    rememberSentTo(id, threadId, peerAddr);
     // The pre-send floor: what a contact declared is applied HERE, the one place every shell's turn
     // passes, so nothing raw leaves the device for such a contact — and the durable copy below is the
     // redacted one, so the thread remembers what actually went out.
@@ -411,16 +441,17 @@ export function createContactThreadChannel({
         // setting (the hook is `makeReceiptSender`'s `onStored`; it decides whether anything goes). Only a turn that
         // came straight from them and carries their id — a carried copy or a duplicate confirms nothing new.
         if (typeof messageId === 'string' && messageId && typeof landedHook === 'function') {
-          // The receipt goes back the way the turn came. A turn over the PAIR ROUTE arrives from the contact's per-circle
-          // address, and an unscoped answer to that address leaves as my canonical identity — which their roster
-          // authorizer refuses (verified, dropped; measured 2026-11-07 on two web apps: the receipt was "delivered" and
-          // never applied). Scoped to the pair circle it is signed as my per-circle self, as a circle receipt is. A turn
-          // at my main address (before the pair circle exists) is answered plainly, as before.
-          let circleId = null;
-          if (pair && typeof pair.routeFor === 'function') {
-            try { const r = await pair.routeFor(who); if (r?.to && r.to === fromAddr && typeof r.circleId === 'string') circleId = r.circleId; } catch { circleId = null; }
+          // The receipt goes back the way the turn came, or not at all. A turn from the contact's CANONICAL address
+          // (the address is the identity) is answered plainly. A turn from a PER-CIRCLE address of theirs is answered
+          // inside the pair circle — signed as my per-circle self, as a circle receipt is — when that address is on
+          // the pair circle's roster (any of their devices, not only the one my router would pick). An unscoped answer
+          // to a per-circle address is refused by their authorizer (measured 2026-11-07 on two web apps: "delivered",
+          // never applied) AND hands the relay the link canonical-me ↔ their per-circle address, which that address
+          // exists to withhold — so a per-circle address no pair roster explains gets NO receipt rather than that.
+          const scope = await receiptScopeFor({ who, fromAddr });
+          if (scope.send) {
+            try { await landedHook({ msgId: messageId, fromPeerAddr: fromAddr, source: 'receiver', ...(scope.circleId ? { circleId: scope.circleId } : {}) }); } catch { /* best-effort, as the circle's */ }
           }
-          try { await landedHook({ msgId: messageId, fromPeerAddr: fromAddr, source: 'receiver', ...(circleId ? { circleId } : {}) }); } catch { /* best-effort, as the circle's */ }
         }
       }
       return { ...res, ...(isReturn ? { returned: true } : {}) };
@@ -443,6 +474,7 @@ export function createContactThreadChannel({
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
   function persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, file, viaOwnDevice = false } = {}) {
+    if (!viaOwnDevice) rememberSentTo(messageId, contactId, peerAddr);   // a sent file (the "+") is mine too; a sibling's carry is not this device's send
     const envelope = {
       id:     messageId ?? mkId(),
       kind:   subtypes.out,
@@ -629,5 +661,5 @@ export function createContactThreadChannel({
   /** What runs when a contact's turn LANDS here (the shells hand it the delivery receipt sender). One; null unsets. */
   function setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; }
 
-  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, setLandedHook, subtypes };
+  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, setLandedHook, contactOfMessage, subtypes };
 }

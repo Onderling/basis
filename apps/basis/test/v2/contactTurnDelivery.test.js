@@ -11,7 +11,7 @@ import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
 import { deliveryAfterContactSend, trackContactTurn } from '../../src/v2/contactTurnDelivery.js';
 import { DELIVERY, DELIVERY_REASON_LABELS } from '../../src/v2/deliveryState.js';
-import { makeReceiptSender } from '../../src/v2/deliverySettings.js';
+import { makeReceiptSender, makeReceiptReceiver, contactReceiptAddresses } from '../../src/v2/deliverySettings.js';
 
 const PEER = 'app.4wFydlNFFFoDesd7cy6ac5KIr0';
 
@@ -93,16 +93,59 @@ describe('the receiver answers a landed turn with the circle\'s receipt', () => 
     await ch.persistInbound({ contactId: 'webid:bea', fromAddr: PEER, text: 'nog', messageId: 'their-2', ts: 2 });
     expect(wire, 'receipts off: nothing leaves').toHaveLength(1);
   });
-  it('a turn that came over the pair route is answered inside the pair circle; one at my main address plainly', async () => {
-    // measured 2026-11-07: an unscoped receipt to a per-circle address is "delivered" and dropped by their roster authorizer
-    const ROUTED = 'per-circle-address-of-bea';
+  it('a turn from ANY of the contact\'s pair-circle addresses is answered inside the pair circle; from their canonical address plainly; from a per-circle address nothing explains, not at all', async () => {
+    // measured 2026-11-07: an unscoped receipt to a per-circle address is "delivered" and dropped by their roster
+    // authorizer — and it would hand the relay the link canonical-me ↔ their per-circle address
+    const PHONE = 'per-circle-address-of-bea-phone';
+    const LAPTOP = 'per-circle-address-of-bea-laptop';   // her other device: a second address of the same pair circle
+    const STRANGE = 'per-circle-address-nobody-explains';
     const landed = [];
-    const pair = { routeFor: async (who) => (who === 'webid:bea' ? { to: ROUTED, circleId: 'pair:anna:bea' } : null) };
-    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore(), pair });
+    const pair = { rosterAddressesFor: async (who) => (who === PEER ? { circleId: 'pair:anna:bea', addresses: new Set([PHONE, LAPTOP, 'me-in-pair']) } : null) };
+    // the channel keys the thread by the identity behind the address: a per-circle address resolves to the person
+    const identityOf = (addr) => ([PHONE, LAPTOP, STRANGE].includes(addr) ? PEER : addr);
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore(), pair, identityOf });
     ch.setLandedHook((info) => { landed.push(info); });
-    await ch.persistInbound({ contactId: 'webid:bea', fromAddr: ROUTED, text: 'via de kring', messageId: 'their-1', ts: 1 });
-    expect(landed[0]).toEqual({ msgId: 'their-1', fromPeerAddr: ROUTED, source: 'receiver', circleId: 'pair:anna:bea' });
-    await ch.persistInbound({ contactId: 'webid:bea', fromAddr: PEER, text: 'aan mijn hoofdadres', messageId: 'their-2', ts: 2 });
-    expect(landed[1]).toEqual({ msgId: 'their-2', fromPeerAddr: PEER, source: 'receiver' });
+    await ch.persistInbound({ contactId: PEER, fromAddr: PHONE, text: 'via de kring', messageId: 'their-1', ts: 1 });
+    expect(landed[0]).toEqual({ msgId: 'their-1', fromPeerAddr: PHONE, source: 'receiver', circleId: 'pair:anna:bea' });
+    await ch.persistInbound({ contactId: PEER, fromAddr: LAPTOP, text: 'van haar laptop', messageId: 'their-2', ts: 2 });
+    expect(landed[1], 'her other device is on the same roster: scoped too').toEqual({ msgId: 'their-2', fromPeerAddr: LAPTOP, source: 'receiver', circleId: 'pair:anna:bea' });
+    await ch.persistInbound({ contactId: PEER, fromAddr: PEER, text: 'aan mijn hoofdadres', messageId: 'their-3', ts: 3 });
+    expect(landed[2], 'her canonical address: plainly').toEqual({ msgId: 'their-3', fromPeerAddr: PEER, source: 'receiver' });
+    await ch.persistInbound({ contactId: PEER, fromAddr: STRANGE, text: 'van een onbekend adres', messageId: 'their-4', ts: 4 });
+    expect(landed, 'a per-circle address no roster explains: no receipt at all, never an unscoped one').toHaveLength(3);
+  });
+});
+
+describe('who may confirm MY turn to a contact', () => {
+  const BEA_PAIR = 'per-circle-address-of-bea';
+  const makeReceiver = (ch, pair, map) => makeReceiptReceiver({
+    deliveryMap: map, eventLog: { query: () => [] }, listCircleMembers: async () => [],
+    contactAddressesOf: contactReceiptAddresses({ channel: ch, pair }),
+  });
+  it('a receipt for my DM id from a third address is refused; from the contact\'s canonical or pair address it is applied', async () => {
+    const map = createDeliveryStateMap();
+    const pair = { rosterAddressesFor: async (who) => (who === PEER ? { circleId: 'pair:anna:bea', addresses: new Set([BEA_PAIR]) } : null) };
+    const ch = createContactThreadChannel({ sendToPeer: async () => ({ delivered: true }), itemStore: memStore(), pair });
+    const onReceipt = makeReceiptReceiver({
+      deliveryMap: map, eventLog: { query: () => [] }, listCircleMembers: async () => [],
+      contactAddressesOf: contactReceiptAddresses({ channel: ch, pair }),
+    });
+    const { messageId, sent } = ch.sendTurn({ peerAddr: PEER, threadId: PEER, text: 'hoi' });
+    await trackContactTurn({ messageId, sent, deliveryMap: map });
+    expect(map.get(messageId)).toBe(DELIVERY.MAYBE);
+    expect(await onReceipt({ subtype: 'delivery-receipt', messageId }, 'some-stranger'), 'a stranger who learnt the id').toBe(false);
+    expect(map.get(messageId)).toBe(DELIVERY.MAYBE);
+    expect(await onReceipt({ subtype: 'delivery-receipt', messageId }, BEA_PAIR), 'the contact, from her pair address').toBe(true);
+    expect(map.get(messageId)).toBe(DELIVERY.STORED);
+    const second = ch.sendTurn({ peerAddr: PEER, threadId: PEER, text: 'nog' });
+    await trackContactTurn({ messageId: second.messageId, sent: second.sent, deliveryMap: map });
+    expect(await onReceipt({ subtype: 'delivery-receipt', messageId: second.messageId }, PEER), 'the contact, from her canonical address').toBe(true);
+  });
+  it('an id that is not a contact turn of mine keeps the id gate alone (no opinion, never "nobody")', async () => {
+    const map = createDeliveryStateMap();
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore() });
+    const onReceipt = makeReceiver(ch, null, map);
+    expect(await onReceipt({ subtype: 'delivery-receipt', messageId: 'never-sent' }, 'anyone'), 'an id this device never sent').toBe(false);
+    await expect(contactReceiptAddresses({ channel: ch, pair: null })('never-sent')).resolves.toBeNull();
   });
 });

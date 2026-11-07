@@ -197,7 +197,7 @@ import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsH
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant, connectionSelfChoice } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
-  createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
+  createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, contactReceiptAddresses, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
 import { createFallbackOffer, fallbackOfferStateIo } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/pinboard';
@@ -1423,6 +1423,9 @@ const applyIncomingReceipt = makeReceiptReceiver({
     const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     return Array.isArray(r?.members) ? r.members : [];
   },
+  // A turn to a CONTACT: only that contact may confirm it (canonical address, or any address of the pair circle's
+  // roster). Late-bound: the channel and the pair roster land with the agent.
+  contactAddressesOf: (msgId) => (circleContactChannel ? contactReceiptAddresses({ channel: circleContactChannel, pair: circlePairRoster })(msgId) : null),
   // Receipt-keyed outbox removal: their app confirmed the message arrived, so the copy still held for
   // THEM is obsolete (a presence flush would resend it). Late-bound — the agent lands after this module
   // evaluates; a receipt arrives much later still.

@@ -140,6 +140,21 @@ describe('Pinboard V1 — privacy / data-location', () => {
     expect(r.sections[0].heading).toMatch(/versleuteld/i);
   });
 
+  // The notice tells the truth about where the data is: a person with no pod (the app's 'only on this device') was told
+  // their profile and posts were on their own Solid pod. It names no old app, says circle, and points at nothing absent.
+  it('getPrivacyNotice says where the data is for the storage in play, in the app\'s own words', async () => {
+    const local = await callSkill((await buildAgent()).agent, 'getPrivacyNotice', { lang: 'nl' });
+    const where = (r) => r.sections.find((s) => /Waar je data staat|Where your data lives/.test(s.heading)).body;
+    expect(where(local)).not.toMatch(/Solid pod/);
+    expect(where(local)).toMatch(/dit apparaat/);
+    const onPod = await callSkill((await buildAgent({ dataLocationConfig: { podRoot: 'https://pod.example/me/' } })).agent, 'getPrivacyNotice', { lang: 'nl' });
+    expect(where(onPod)).toMatch(/pod/);
+    for (const r of [local, onPod, await callSkill((await buildAgent()).agent, 'getPrivacyNotice', { lang: 'en' })]) {
+      const all = r.sections.map((s) => `${s.heading} ${s.body}`).join(' ');
+      expect(all).not.toMatch(/Pinboard|groep|group|onderaan deze pagina|bottom of this page| — /);
+    }
+  });
+
   it('getPrivacyNotice supports lang switch + falls back to en for unknown', async () => {
     const bundle = await buildAgent();
     const en = await callSkill(bundle.agent, 'getPrivacyNotice', { lang: 'en' });

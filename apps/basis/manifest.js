@@ -1282,7 +1282,8 @@ export const basisManifest = {
     { id: 'files',    labelKey: 'circle.folio.title',          target: { kind: 'nav', to: 'files' },    requires: ['lists', 'notes'] },
     { id: 'rules',    labelKey: 'circle.rules.title',          target: { kind: 'nav', to: 'rules' },     requires: ['houseRules'] },
     { id: 'recipes',  labelKey: 'circle.recipe.editor.book_title', target: { kind: 'nav', to: 'recipes' } },
-    { id: 'admin',    labelKey: 'circle.admin.title',          target: { kind: 'nav', to: 'admin' } },
+    // for a member the same page is the members list, and is called that (`memberLabelKey`)
+    { id: 'admin',    labelKey: 'circle.admin.title',          target: { kind: 'nav', to: 'admin' },    memberLabelKey: 'circle.admin.members' },
     { id: 'governance', labelKey: 'circle.governance.title',   target: { kind: 'nav', to: 'governance' } },
     { id: 'share',    labelKey: 'circle.share.screen_title',   target: { kind: 'nav', to: 'share' },     platforms: ['mobile'] },
   ],

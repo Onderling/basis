@@ -3150,7 +3150,9 @@ export function buildSkills({
     defineSkill('getPrivacyNotice', async ({ parts }) => {
       const a = dataArgs(parts);
       const lang = a.lang ?? 'nl';
-      return { lang, sections: getPrivacyNotice(lang) };
+      // the storage item says what is true for THIS device: on a pod when a pod session is there, else on the device
+      const onPod = podSignInStatus({ bundle }).signedIn === true || !!dataLocationConfig?.podRoot;
+      return { lang, sections: getPrivacyNotice(lang, { onPod }) };
     }, {
       description: 'Return the closed-beta privacy notice in the requested language.',
       visibility:  'authenticated',

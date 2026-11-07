@@ -23,6 +23,7 @@ import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';   // never the key on screen
 import { contactPointAdopter } from './RelayQuestionModal.js';
+import { HEADER_AVATAR_SIDE_CLEARANCE } from './fab.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
@@ -199,7 +200,7 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   blockedText: { fontSize: 15, color: theme.color.ink },
   blockedArrow: { fontSize: 15, color: theme.color.inkSoft },
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingRight: HEADER_AVATAR_SIDE_CLEARANCE },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   acts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', flexShrink: 1 },
   add: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent },

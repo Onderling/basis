@@ -179,6 +179,7 @@ export function createContactThreadChannel({
   // admission code and linked-person proof beside it), and the fan takes the note with the turn. Bounded: a note
   // whose turn never landed ages out.
   const heardAsMessage = new Map();
+  let landedHook = null;   // `setLandedHook` — the receipt back to a sender whose turn landed here
   const noteHeardAsMessage = (fromAddr, messageId, extra) => {
     if (typeof messageId !== 'string' || !messageId) return;
     heardAsMessage.set(`${fromAddr}\n${messageId}`, extra);
@@ -406,6 +407,21 @@ export function createContactThreadChannel({
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
         await fanOwn({ direction: 'in', contactId: who, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}) });
+        // …and the sender hears that it landed, the way a circle member does: the SAME receipt, the same per-person
+        // setting (the hook is `makeReceiptSender`'s `onStored`; it decides whether anything goes). Only a turn that
+        // came straight from them and carries their id — a carried copy or a duplicate confirms nothing new.
+        if (typeof messageId === 'string' && messageId && typeof landedHook === 'function') {
+          // The receipt goes back the way the turn came. A turn over the PAIR ROUTE arrives from the contact's per-circle
+          // address, and an unscoped answer to that address leaves as my canonical identity — which their roster
+          // authorizer refuses (verified, dropped; measured 2026-11-07 on two web apps: the receipt was "delivered" and
+          // never applied). Scoped to the pair circle it is signed as my per-circle self, as a circle receipt is. A turn
+          // at my main address (before the pair circle exists) is answered plainly, as before.
+          let circleId = null;
+          if (pair && typeof pair.routeFor === 'function') {
+            try { const r = await pair.routeFor(who); if (r?.to && r.to === fromAddr && typeof r.circleId === 'string') circleId = r.circleId; } catch { circleId = null; }
+          }
+          try { await landedHook({ msgId: messageId, fromPeerAddr: fromAddr, source: 'receiver', ...(circleId ? { circleId } : {}) }); } catch { /* best-effort, as the circle's */ }
+        }
       }
       return { ...res, ...(isReturn ? { returned: true } : {}) };
     });
@@ -610,5 +626,8 @@ export function createContactThreadChannel({
     };
   }
 
-  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, subtypes };
+  /** What runs when a contact's turn LANDS here (the shells hand it the delivery receipt sender). One; null unsets. */
+  function setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; }
+
+  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, setLandedHook, subtypes };
 }

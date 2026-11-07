@@ -869,8 +869,11 @@ function renderLedenTab(body, { members = null, unreachable = null, selfWebid = 
  * repaint below, so a state can never look different depending on which drew it.
  *
  * @returns {HTMLElement|null} null when the state renders nothing (`show: false`, or no state yet).
+ *
+ * Exported since the contact thread's own bubbles carry the same state (the two-phone walk's rows 9 and 11): one
+ * builder, one set of classes, so a DM and a circle message can never word or shape the same fact differently.
  */
-function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, reason = null } = {}) {
+export function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, reason = null } = {}) {
   const p = deliveryPresentation(state, { reason });
   if (!p) return null;
   const label = tr(p.labelKey);
@@ -912,9 +915,13 @@ function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, re
  * @param {string|null} state     the new delivery state
  * @returns {boolean} whether a chip was found or placed
  */
-export function paintDeliveryChip(root, rowId, state, { tr, onRetryDelivery = null, reason = null } = {}) {
+export function paintDeliveryChip(root, rowId, state, {
+  tr, onRetryDelivery = null, reason = null,
+  // the contact thread's bubbles carry the same chip under their own class names (`cc-cthread__*`)
+  bubbleClass = 'circle-view__bubble', metaClass = 'circle-view__bubble-meta',
+} = {}) {
   if (!root || !rowId || typeof tr !== 'function') return false;
-  const bubble = root.querySelector(`.circle-view__bubble[data-row-id="${CSS.escape(String(rowId))}"]`);
+  const bubble = root.querySelector(`.${bubbleClass}[data-row-id="${CSS.escape(String(rowId))}"]`);
   if (!bubble) return false;
   const existing = bubble.querySelector('.circle-view__bubble-delivery');
   const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId, reason });
@@ -923,7 +930,7 @@ export function paintDeliveryChip(root, rowId, state, { tr, onRetryDelivery = nu
   else {
     // No chip yet (the message was sent in a state that shows nothing). It belongs at the end of the
     // bottom meta line, which is where the initial render puts it.
-    const meta = bubble.querySelector('.circle-view__bubble-meta') ?? bubble;
+    const meta = bubble.querySelector(`.${metaClass}`) ?? bubble;
     meta.appendChild(next);
   }
   return true;

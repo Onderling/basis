@@ -24,9 +24,12 @@ test('the gear opens Instellingen; Weergave holds the appearance settings, Per k
   await expect(page.locator('.cc-settings__per-circle'), 'Per kring is the last row').toBeVisible();
 
   await page.locator('.cc-settings__group--appearance').click();
-  for (const id of ['theme', 'language', 'bot-actions', 'notifications']) {
+  for (const id of ['theme', 'language', 'notifications']) {
     await expect(page.locator(`[data-section="${id}"]`), id).toBeVisible({ timeout: 15_000 });
   }
+  // 'How the bot shows actions' is about a bot that ACTS; Help only answers. A fresh profile has Help as its only bot,
+  // so the section is not offered at all (the shared predicate showsBotActionsSetting, both shells, ruled 2026-11-07).
+  await expect(page.locator('[data-section="bot-actions"]'), 'no bot setting while the only bot is Help').toHaveCount(0);
   const week = page.locator('.cc-profile__week-toggle');
   if (await week.count()) await expect(week, 'the week overview is a switch').toHaveAttribute('role', 'switch');
 

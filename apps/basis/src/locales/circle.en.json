@@ -3765,6 +3765,14 @@
       "text": "you (no name yet)",
       "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
     },
+    "point_from_contact": {
+      "text": "Came with a contact's card",
+      "doc": "Where a connection point came from: a scanned contact card, adopted because this device had no relay of its own."
+    },
+    "point_adopted_from": {
+      "text": "You can now be reached through {{name}}'s connection point.",
+      "doc": "Said once after a scan when this device had no relay and now uses the card's; {{name}} is the contact."
+    },
     "header_one": {
       "text": "{{name}} shows what they offer",
       "doc": "Nearby's top line when one person here shows what they offer; {{name}} is their label."

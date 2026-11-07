@@ -125,9 +125,9 @@ describe('NEARBY_INVITE_LABELS — one action, and it is a join', () => {
 
 describe('POINT_SOURCE_LABELS — provenance, described once', () => {
   it('covers every source the store can produce', () => {
-    // "A circle brought this" and "I typed this in" read differently, and a suggestion is a third thing.
+    // "A circle brought this", "I typed this in" and "a contact's card brought this" read differently; a suggestion is another.
     // Both renderers read this map, so neither can describe the same point differently.
-    expect(Object.keys(POINT_SOURCE_LABELS).sort()).toEqual(['join', 'manual', 'suggested']);
+    expect(Object.keys(POINT_SOURCE_LABELS).sort()).toEqual(['contact', 'join', 'manual', 'suggested']);   // contact: a scanned card's point, adopted
     expect(Object.isFrozen(POINT_SOURCE_LABELS)).toBe(true);
   });
 });

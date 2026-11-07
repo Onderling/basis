@@ -2954,7 +2954,6 @@ function hideTabBar() {
 function showTabBar(active) {
   // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
   // it must not repaint the thread over whatever is showing.
-  _activeContactThread?.leave?.();
   _activeContactThread = null;
   if (active !== 'screens') _vandaagHead?.hide();   // Vandaag is not shown: a change waits for the next landing
   if (active !== 'mij') _mijHead?.hide();
@@ -3486,6 +3485,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     trackContactTurn({ messageId: msgId, sent, deliveryMap: deliveryStateMap }).catch(() => {});
   };
   const unsubscribeDelivery = deliveryStateMap.subscribe((msgId, state) => {
+    // self-cleaning: once this thread is no longer the one on screen (a tab, another thread), the subscription ends itself
+    if (_activeContactThread?.leave !== unsubscribeDelivery) { unsubscribeDelivery(); return; }
     if (!thread.messages.some((x) => x.messageId === msgId)) return;
     paintDeliveryChip(rootEl, msgId, state, { tr: t, onRetryDelivery, reason: deliveryStateMap.reasonOf(msgId), bubbleClass: 'cc-cthread__bubble', metaClass: 'cc-cthread__meta' });
   });

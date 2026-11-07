@@ -466,9 +466,11 @@ export async function joinFromInvite(page, inviteUri, { handle = 'joiner', tag =
   if (await rulesCheck.count()) { await rulesCheck.check().catch(() => {}); await page.waitForTimeout(400); }
   await card.locator('.cc-wizard-btn-primary').first().click().catch(() => {});
   await page.waitForTimeout(1200);
-  // Step 2 — privacy (leave mesh/DM default on)
-  const privCheck = card.locator('.cc-wizard-check input[type="checkbox"]').first();
-  if (await privCheck.count()) { await privCheck.check().catch(() => {}); await page.waitForTimeout(400); }
+  // Step 2 — privacy: the notice AND "let other members reach me directly". The share starts unticked (strict by
+  // default); the walks are about members who reach each other, so the joiner ticks it, as a person choosing it would.
+  const privChecks = card.locator('.cc-wizard-check input[type="checkbox"]');
+  for (let i = 0; i < await privChecks.count(); i += 1) await privChecks.nth(i).check().catch(() => {});
+  await page.waitForTimeout(400);
   await card.locator('.cc-wizard-btn-primary').first().click().catch(() => {});
   await page.waitForTimeout(1200);
   // Step 3 — handle + submit

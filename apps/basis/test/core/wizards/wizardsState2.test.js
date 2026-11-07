@@ -179,11 +179,6 @@ describe('settingsState', () => {
 import * as JG from '../../../src/core/wizards/joinGroupState.js';
 
 describe('joinGroupState', () => {
-  it('privacyNoticeFor picks the right language; falls back to en', () => {
-    expect(JG.privacyNoticeFor('nl')).toMatch(/buurt|leden/i);
-    expect(JG.privacyNoticeFor('en')).toMatch(/circle|posts/i);
-    expect(JG.privacyNoticeFor('xx')).toBe(JG.PRIVACY_NOTICE.en);
-  });
 
   it('handleSuggestions slugifies the base name + adds 2 variants, all of them VALID', () => {
     // This test used to pin the old output exactly — and the old output was wrong in a way the test

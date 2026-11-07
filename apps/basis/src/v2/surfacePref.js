@@ -20,6 +20,8 @@
 // which is *potentially enriched by an LLM* (the user can load one that powers all
 // in-app chat; a circle may forbid it — see chatAi.js). It subsumes the old bare
 // "minimal" (chat with no LLM available degrades to plain text replies).
+import { ONDERLING_BOT_WEBID } from './helpCircle.js';
+
 export const SURFACE_PREFS = Object.freeze(['inline', 'screen', 'chat']);
 export const DEFAULT_SURFACE_PREF = 'inline';
 
@@ -85,4 +87,16 @@ export function registerSurfacePrefIo(getAgent, key = SURFACE_PREF_PARAM_KEY) {
       if (agent) await agent.callSkill('params', 'set-param', { key, value: v });
     },
   };
+}
+
+/**
+ * Whether "How the bot shows actions" is worth showing: only when the person has a bot that ACTS (buttons, screens,
+ * confirms in words), a contact bot other than Help. Help ('Onderling') only answers, so the setting does not apply
+ * to it, and a person whose only bot is Help would see a setting that changes nothing.
+ *
+ * @param {Array<{contactId?: string, isBot?: boolean, synthetic?: boolean}>} contacts  the contact rows as painted
+ * @returns {boolean}
+ */
+export function showsBotActionsSetting(contacts = []) {
+  return (contacts || []).some((c) => c?.isBot === true && c.synthetic !== true && c.contactId !== ONDERLING_BOT_WEBID);
 }

@@ -31,13 +31,13 @@ export const TRANSLATOR_CONTRACT = Object.freeze([
 
   // ── 2 · {{name}} substitution, including a zero and an empty string ──
   { name: 'interpolation, two values', key: 'circle.nearbyScreen.header',
-    params: { sharing: 2, total: 5 }, lang: 'en', expect: '2 of 5 share offerings with you' },
+    params: { sharing: 2, total: 5 }, lang: 'en', expect: '2 people here show what they offer' },
   { name: 'interpolation, a value of 0 is a value (not "missing")', key: 'circle.nearbyScreen.header',
-    params: { sharing: 0, total: 3 }, lang: 'en', expect: '0 of 3 share offerings with you' },
+    params: { sharing: 0, total: 3 }, lang: 'en', expect: '0 people here show what they offer' },
   { name: 'interpolation, an empty string is a value too', key: 'circle.nearbyScreen.header',
-    params: { sharing: '', total: 3 }, lang: 'en', expect: ' of 3 share offerings with you' },
+    params: { sharing: '', total: 3 }, lang: 'en', expect: ' people here show what they offer' },
   { name: 'interpolation, nl uses its own sentence', key: 'circle.nearbyScreen.header',
-    params: { sharing: 1, total: 4 }, lang: 'nl', expect: '1 van 4 delen aanbod met jou' },
+    params: { sharing: 3, total: 4 }, lang: 'nl', expect: '3 mensen hier laten zien wat ze aanbieden' },
 
   // ── 3 · a value the caller did not pass leaves its placeholder visible — on BOTH shells ──
   //   Not an endorsement: `{{count}} device(s)` on screen is ugly. It is what i18next does with this

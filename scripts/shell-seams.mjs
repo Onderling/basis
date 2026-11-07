@@ -58,6 +58,9 @@ export const SEAMS = Object.freeze([
   // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
   // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
   { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
+  // A SETTING ONLY WHERE IT CHANGES SOMETHING: 'How the bot shows actions' is about a bot that acts; Help only answers.
+  // Each host reads the contact book through one predicate before it offers the setting (a walk saw it with no bot).
+  { id: 'bot-actions-only-with-a-bot', pattern: /showsBotActionsSetting\(/, shells: ['web', 'mobile'], why: 'a person whose only bot is Help sees a bot setting that changes nothing' },
   // A FILE SENT FROM A CONTACT THREAD SHOWS IN IT. The thread's "+" runs send-file, which answers in the slash door's words
   // (the contact's key in them); the shared settle step keeps the sent file on our side of the thread and says only what
   // the bubble cannot. A walk on the test phone (2026-11-06) sent a file, saw the key in an alert and no bubble.

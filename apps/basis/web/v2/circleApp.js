@@ -259,7 +259,7 @@ import { openThumbnail } from '@onderling/blob-gateway';
 // S6.A — manifest-driven inline buttons on bot replies (the resurrected "inline menu").
 import { embedButtonsForReply, embedsFromReply } from '../../src/v2/replyEmbeds.js';
 // S6.C — per-user preference selecting which projection (inline / screen / minimal) renders.
-import { selectSurfaceButtons, createSurfacePrefStore, registerSurfacePrefIo, SURFACE_PREFS } from '../../src/v2/surfacePref.js';
+import { selectSurfaceButtons, createSurfacePrefStore, registerSurfacePrefIo, SURFACE_PREFS, showsBotActionsSetting } from '../../src/v2/surfacePref.js';
 // S6.D — is the conversational "chat" projection enriched by an LLM here? (user-loaded LLM + circle permits)
 import { resolveChatAi } from '../../src/v2/chatAi.js';
 // §4 storage-policy bridge — the circle `pod` axis drives pinboard's authoritative
@@ -4981,6 +4981,8 @@ async function showMyData(opts) {
   try { await refreshSelfSet(); } catch { /* the set as held stands */ }
   hideTabBar();
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
+  // 'How the bot shows actions' only for a person with a bot that acts (a contact bot other than Help)
+  let showBotActions = false;
   let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
@@ -5175,7 +5177,7 @@ async function showMyData(opts) {
     // Message cleanup — the conversation is the RECORD (never expires by policy); this is the user's own
     // explicit deletion, taking effect NOW in the conversation they are looking at. Returns the real count.
     onPurgeMessages: (days) => eventLog.purgeConversation({ olderThanMs: daysToMs(normalizeRetentionDays(days)) }),
-    surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
+    surfacePref: circleSurfacePref.get(), onSetSurfacePref: showBotActions ? onSetSurfacePref : null, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
     // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
     // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel,
@@ -5229,6 +5231,7 @@ async function showMyData(opts) {
     rawCallSkill('pinboard', 'getMetrics', {}).catch(() => null),
     rawCallSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null),
   ]);
+  showBotActions = showsBotActionsSetting(await loadAllContacts().catch(() => []));
   // The enrolled-devices list (add-a-device bookkeeping): one row per registry delegation,
   // tombstones shown struck — the revoke door acts on the live ones.
   devices = Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
@@ -7313,7 +7316,7 @@ function showCircle(id, circle, policy) {
       circleMembers = members;   // 1:1-bot gate reads the raw rows (relation/webid) at render time
       const me = members.find((m) => (m?.webid ?? m?.id) === myWebid);
       myCircleRole = me?.role ?? '';
-    } catch { myCircleRole = ''; }
+    } catch { myCircleRole = null; }   // no answer is not 'not an admin': unknown
     if (getActiveCircle() === id) rerender();
     return myCircleRole;
   }
@@ -7785,7 +7788,8 @@ function showCircle(id, circle, policy) {
       // stays hidden (fail-closed), and a locally-authored task row still offers it
       // via the row's `isOwn` path inside the renderer.
       viewerWebid: myWebid || null,
-      viewerIsAdmin: myCircleRole === 'admin',
+      // null while the roster has not answered (an admin-only ⋯ entry waits greyed), then known: true or false
+      viewerIsAdmin: myCircleRole === null ? null : myCircleRole === 'admin',
       // D / Surface 2 — feeds the ⋯ overflow menu's manifest-projected feature gate.
       policy,
       tabs, activeTab,

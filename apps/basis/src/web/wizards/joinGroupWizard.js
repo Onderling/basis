@@ -31,9 +31,9 @@
  */
 
 // State-machine pieces (decodeInvite, summariseEmbeddedRules,
-// fetchGroupRules, isValidHandle, handleSuggestions, finalSubmit,
-// PRIVACY_NOTICE) moved to ../../core/wizards/joinGroupState.js
-// so basis-mobile's RN wizard can reuse them.
+// fetchGroupRules, isValidHandle, handleSuggestions, finalSubmit) moved to
+// ../../core/wizards/joinGroupState.js so basis-mobile's RN wizard can reuse
+// them. The privacy notice is the locale's circle.join.wizard.privacy.notice.
 import {
   handleSuggestions as HANDLE_SUGGESTIONS,
   decodeInvite,

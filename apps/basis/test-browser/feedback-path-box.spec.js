@@ -179,7 +179,9 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     // CI — and an answer sent to it went nowhere (the STEP5 red of 2026-09-19). Asserted so it cannot come back.
     const personRows = (makerRows ?? []).filter((r) => !r.includes('(bot)'));
     const makerBook = await maker.page.evaluate(async () => ((await window.onderlingCall('pinboard', 'listContacts', {}))?.contacts ?? []).map((c) => `${String(c.webid).slice(0, 8)}:${c.displayName ?? ''}/${c.handle ?? ''}`)).catch((e) => String(e));
-    expect(personRows, `the maker's Contacten lists exactly the visitor, named by their key (no name given, no placeholder) — no row for the maker's own addresses (box: ${JSON.stringify(boxPrimary)}; maker book: ${JSON.stringify(makerBook)}; maker rosters: ${JSON.stringify(makerRosters)})`).toEqual([`${String(visitorWho?.webid)}:${String(visitorWho?.webid)}`]);
+    // A person with no name given shows the someone-label, never their key (the person-label resolver, 2026-11-06).
+    const someone = ['nl', 'en'].map((l) => JSON.parse(readFileSync(new URL(`../src/locales/circle.${l}.json`, import.meta.url), 'utf8')).reply.who_someone.text.slice(0, 12));
+    expect(personRows.length === 1 && someone.some((w) => personRows[0] === `${String(visitorWho?.webid).slice(0, 12)}:${w}`), `the maker's Contacten lists exactly the visitor, named by the someone-label (no name given; never their key) — no row for the maker's own addresses (box: ${JSON.stringify(boxPrimary)}; maker book: ${JSON.stringify(makerBook)}; maker rosters: ${JSON.stringify(makerRosters)}; rows: ${JSON.stringify(personRows)})`).toBe(true);
     const reply = `dank je, ik kijk ernaar ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });
     expect(answered.sent, `the maker could not answer: ${answered.why}`).toBe(true);

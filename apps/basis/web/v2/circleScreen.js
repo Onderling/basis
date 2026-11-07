@@ -540,6 +540,12 @@ function renderOnboarding(section, block, tr, onAction) {
       card.appendChild(p);
       card.appendChild(btn('circle.vandaag.onboarding_key_show', { kind: 'key-show' }));
       card.appendChild(btn('circle.vandaag.onboarding_key_later', { kind: 'key-later' }, ' circle-screen__onb-btn--quiet'));
+    } else if (c.id === 'reach') {
+      // no connection point: what waits, what works already, and the way to add one
+      const p = document.createElement('p');
+      p.textContent = tr('circle.vandaag.onboarding_reach_hint');
+      card.appendChild(p);
+      card.appendChild(btn('circle.vandaag.onboarding_reach_add', { kind: 'open-points' }));
     } else if (c.id === 'begin') {
       card.appendChild(btn('circle.vandaag.onboarding_begin_create', { kind: 'create-circle' }));
       card.appendChild(btn('circle.vandaag.onboarding_begin_join', { kind: 'join-circle' }));   // the pair in one style

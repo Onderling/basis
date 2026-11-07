@@ -65,6 +65,7 @@ import { timeWords } from '../../src/v2/whenWords.js';
 
 export function renderCircleView(container, {
   circle = {},
+  noRelay = false,   // this device knows no relay: the composer says the message waits
   rows = [],
   onBack,
   onSend,
@@ -600,6 +601,14 @@ export function renderCircleView(container, {
       // Keep focus so a quick burst of messages feels native.
       input.focus();
     });
+    // No connection point: the composer says the message waits (the host's relay-question predicate; contact thread parity)
+    if (noRelay) {
+      const wait = document.createElement('p');
+      wait.className = 'cc-composer__no-point';
+      wait.dataset.role = 'no-point';
+      wait.textContent = tr('circle.composer.no_point');
+      container.appendChild(wait);
+    }
     container.appendChild(form);
   }
 

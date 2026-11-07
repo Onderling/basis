@@ -244,6 +244,10 @@
       "text": "Invite to this circle",
       "doc": "OBJ-2 — heading of the invite-QR overlay."
     },
+    "making": {
+      "text": "Making the invite.",
+      "doc": "The invite right after a circle is made, while it is being built (a few seconds): on screen at once, so nothing else is tapped meanwhile."
+    },
     "hint": {
       "text": "Scan this on the other device to join this circle.",
       "doc": "OBJ-2 — caption under the invite QR."
@@ -1592,6 +1596,18 @@
     "onboarding_key_later": {
       "text": "Later",
       "doc": "Vandaag's key card: put the card away for a few days."
+    },
+    "onboarding_reach_title": {
+      "text": "You have no connection point yet",
+      "doc": "Today card when this device knows no relay (there is no baked-in one)."
+    },
+    "onboarding_reach_hint": {
+      "text": "Messages wait until there is one. What works already: Nearby, a code you scan together, and the connection point that comes with an invite.",
+      "doc": "What waits, and what works already without a relay. Plain sentences, no dash constructions."
+    },
+    "onboarding_reach_add": {
+      "text": "Add a connection point",
+      "doc": "Opens the connection points."
     },
     "plus_line_read": {
       "text": "Read",
@@ -7790,6 +7806,14 @@
     "list_item": {
       "text": "List item",
       "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "file_held": {
+      "text": "{{name}} waits for them. It goes as soon as they are online.",
+      "doc": "A file sent from a contact thread's + is waiting because the contact is offline."
+    },
+    "file_not_reached": {
+      "text": "The file did not reach them. Try again later.",
+      "doc": "A file sent from a contact thread's + could not reach the contact."
     }
   },
   "conversationKinds": {
@@ -7894,7 +7918,10 @@
   "enroll": {
     "title": "Add this device",
     "ceremony": "Enrolling this device",
-    "body": "Type this account's recovery phrase to add this device. Each device gets its own keys — the phrase itself is never stored.",
+    "body": {
+      "text": "Type this account's recovery phrase to add this device. Have a recovery file? Load it afterwards (My data → Load a recovery file) and your circles are there at once. The phrase itself is never stored.",
+      "doc": "The add-a-device ceremony: the phrase is what adds the device; the recovery file (sealed to the phrase) comes after and brings the circles' member lists."
+    },
     "mnemonic_placeholder": "Recovery phrase (24 words)",
     "label_placeholder": "Device name (e.g. 'work laptop')",
     "submit": "Add this device",
@@ -10182,6 +10209,12 @@
     "plus": {
       "text": "Give feedback",
       "doc": "The \"+\" sheet act and the Instellingen door that open the feedback contact's thread."
+    }
+  },
+  "composer": {
+    "no_point": {
+      "text": "No connection point: this message waits.",
+      "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
     }
   }
 }

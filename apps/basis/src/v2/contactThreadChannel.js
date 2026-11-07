@@ -426,19 +426,21 @@ export function createContactThreadChannel({
    * @param {boolean} [turn.viaOwnDevice]  arrived from my own device's fan — store, do not re-send.
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
-  function persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, viaOwnDevice = false } = {}) {
+  function persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, file, viaOwnDevice = false } = {}) {
     const envelope = {
       id:     messageId ?? mkId(),
       kind:   subtypes.out,
       ts:     typeof ts === 'number' ? ts : now(),
       author: localActor ?? null,
       body:   text ?? '',
-      extras: { threadId: contactId, threadKey: contactId, peerAddr, replyTo },
+      // A file this person sent from the thread's "+" (it went out by the send-file op) is kept on our side as a
+      // received one is on theirs, so the thread shows what was sent.
+      extras: { threadId: contactId, threadKey: contactId, peerAddr, replyTo, ...(file && typeof file === 'object' ? { file: fileToKeep(file) } : {}) },
     };
     const persisted = holdsHere() ? Promise.resolve(core.persistOutbound(envelope, { to: peerAddr ?? contactId })) : Promise.resolve({ itemId: null, held: false });
     return persisted.then(async (res) => {
       if (!viaOwnDevice && !res?.deduped) {
-        await fanOwn({ direction: 'out', contactId, peerAddr, text, messageId: envelope.id, replyTo, ts: envelope.ts });
+        await fanOwn({ direction: 'out', contactId, peerAddr, text, messageId: envelope.id, replyTo, ts: envelope.ts, ...(file ? { file } : {}) });
       }
       return res;
     });
@@ -463,7 +465,7 @@ export function createContactThreadChannel({
     const contactId = resolveId(wire.contactId);
     const outbound = direction === 'out';
     const res = outbound
-      ? await persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, viaOwnDevice: true })
+      ? await persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, file, viaOwnDevice: true })
       : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true, returned: wire.returned === true });
     return {
       contactId,

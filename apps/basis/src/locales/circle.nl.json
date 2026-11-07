@@ -244,6 +244,10 @@
       "text": "Uitnodigen voor deze kring",
       "doc": "OBJ-2 — heading of the invite-QR overlay."
     },
+    "making": {
+      "text": "De uitnodiging wordt gemaakt.",
+      "doc": "The invite right after a circle is made, while it is being built (a few seconds): on screen at once, so nothing else is tapped meanwhile."
+    },
     "hint": {
       "text": "Scan dit op het andere apparaat om lid te worden van deze kring.",
       "doc": "OBJ-2 — caption under the invite QR."
@@ -1595,6 +1599,18 @@
     "onboarding_key_later": {
       "text": "Later",
       "doc": "Vandaag's key card: put the card away for a few days."
+    },
+    "onboarding_reach_title": {
+      "text": "Je hebt nog geen verbindingspunt",
+      "doc": "Today card when this device knows no relay (there is no baked-in one)."
+    },
+    "onboarding_reach_hint": {
+      "text": "Berichten wachten tot er een is. Wat nu al werkt: Nearby, een code die je samen scant, en het verbindingspunt dat met een uitnodiging meekomt.",
+      "doc": "What waits, and what works already without a relay. Plain sentences, no dash constructions."
+    },
+    "onboarding_reach_add": {
+      "text": "Verbindingspunt toevoegen",
+      "doc": "Opens the connection points."
     },
     "plus_line_read": {
       "text": "Lees",
@@ -7796,6 +7812,14 @@
     "list_item": {
       "text": "Lijstitem",
       "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "file_held": {
+      "text": "{{name}} wacht op hen. Het gaat zodra ze online zijn.",
+      "doc": "A file sent from a contact thread's + is waiting because the contact is offline."
+    },
+    "file_not_reached": {
+      "text": "Het bestand is niet bij hen aangekomen. Probeer het later nog eens.",
+      "doc": "A file sent from a contact thread's + could not reach the contact."
     }
   },
   "conversationKinds": {
@@ -7900,7 +7924,10 @@
   "enroll": {
     "title": "Dit apparaat toevoegen",
     "ceremony": "Dit apparaat wordt toegevoegd",
-    "body": "Typ de herstelzin van dit account om dit apparaat toe te voegen. Elk apparaat krijgt eigen sleutels — de herstelzin zelf wordt nooit opgeslagen.",
+    "body": {
+      "text": "Typ de herstelzin van dit account om dit apparaat toe te voegen. Heb je een herstelbestand? Laad het daarna (Mijn gegevens → Herstelbestand laden): dan zijn je kringen er meteen. De herstelzin zelf wordt nooit opgeslagen.",
+      "doc": "The add-a-device ceremony: the phrase is what adds the device; the recovery file (sealed to the phrase) comes after and brings the circles' member lists."
+    },
     "mnemonic_placeholder": "Herstelzin (24 woorden)",
     "label_placeholder": "Apparaatnaam (bijv. 'werk-laptop')",
     "submit": "Dit apparaat toevoegen",
@@ -10188,6 +10215,12 @@
     "plus": {
       "text": "Feedback geven",
       "doc": "The \"+\" sheet act and the Instellingen door that open the feedback contact's thread."
+    }
+  },
+  "composer": {
+    "no_point": {
+      "text": "Geen verbindingspunt: dit bericht wacht.",
+      "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
     }
   }
 }

@@ -22,7 +22,8 @@ const readKnown = async () => ({
 });
 
 // One per app session, shared by every screen that asks.
-const relayQuestion = createRelayQuestion({ read: readKnown });
+// exported: Vandaag's reach card asks the same predicate (does this device know a relay at all)
+export const relayQuestion = createRelayQuestion({ read: readKnown });
 
 /** The relay this device knows (an add-device offer names it), or null. */
 export async function currentRelayUrl() {

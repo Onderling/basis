@@ -173,6 +173,7 @@ import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src/v2/contactsSource.js';
 import { nameShown } from '../../src/v2/personLabel.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
+import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -1075,6 +1076,12 @@ async function applyRelayUrl(url) {
 const relayQuestion = createRelayQuestion({
   read: () => ({ saved: localStorageRelayIo().load(), arg: CIRCLE_RELAY_ENV, list: getConnectionPoints().list() }),
 });
+// Does this device know a relay at all (the question's own predicate)? Read at boot, on a relay change and when a thread or a
+// circle opens; true until read, so a composer never warns falsely.
+let _relayKnownNow = true;
+async function refreshRelayKnown() { try { _relayKnownNow = await relayQuestion.knows(); } catch { /* keep what we knew */ } return _relayKnownNow; }
+refreshRelayKnown();
+
 async function askRelayIfNone() {
   if (!(await relayQuestion.check()).ask) return;
   const url = await new Promise((resolve) => {
@@ -1087,6 +1094,7 @@ async function askRelayIfNone() {
   });
   if (!url) { relayQuestion.later(); return; }
   const r = await applyRelayUrl(url);
+  refreshRelayKnown();
   if (!r?.ok) console.warn('[circleApp] the relay was saved but did not connect:', r?.error);
 }
 
@@ -3438,7 +3446,20 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     }
   }
 
+  await refreshRelayKnown();
+  // the "+" in this thread: the contact-scoped entries of the projector, each run as an op addressed to THIS contact
+  const contactAttach = attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' });
+  const onContactAttach = async (entry) => {
+    let r = null;
+    try { r = await rawCallSkill(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
+    // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
+    const { file, messageId, state, say } = await settleContactAttach(r, { channel: circleContactChannel, contactId, peerAddr, t });
+    if (file) { thread.messages.push({ origin: 'user', text: '', messageId, file, delivery: state }); rerender(); }
+    if (say) globalThis.alert?.(say);
+  };
   const rerender = () => renderContactThread(rootEl, {
+    noRelay: !_relayKnownNow,
+    attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
@@ -4406,6 +4427,8 @@ async function materializeVandaag() {
       selfIn: mySelfIn,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
       allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+      // the reach card: does this device know any relay (the relay question's own predicate)
+      relayKnown: () => relayQuestion.knows(),
     },
   });
 }
@@ -4615,6 +4638,8 @@ function onScreenAction(action) {
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
+  // the reach card: the connection points, where a relay is added (the question that asks stays quiet after 'Later')
+  else if (action?.kind === 'open-points') showConnectionPoints();
   else if (action?.kind === 'create-circle') openCreateCircleWizard();
   else if (action?.kind === 'join-circle') showJoinCircle();
   // a card's one action that IS an op (a chore done): through the waist, then the page repaints
@@ -4951,7 +4976,8 @@ async function showMyData(opts) {
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
   // same capability, and the manifest stops describing what the buttons do.
-  const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
+  // the provider the person named (the field on My data), else the default
+  const onSignIn = (issuer = null) => Promise.resolve(rawCallSkill('basis', 'signin', issuer ? { issuer } : {}))
     .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
   // launch the existing restore wizard in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
@@ -5068,7 +5094,7 @@ async function showMyData(opts) {
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,
-    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
+    onSignIn, podIssuerDefault: podAuth.resolveIssuer()?.url ?? null, podIssuers: podAuth.KNOWN_ISSUERS, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, thisDeviceId: circleHouseholdAgent?.myDeviceId?.() ?? null, deviceName: browserDeviceName(globalThis.navigator?.userAgent), onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -5408,6 +5434,19 @@ async function showJoinCircle(inviteArg) {
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId, { forFunction = false } = {}) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
+  // THE INVITE IS ON SCREEN AT ONCE, saying it is being made: building it below takes a few seconds (the policy, the
+  // storage posture, the code), and nothing on screen said so (mobile parity: the same line, the same key)
+  const overlay = document.createElement('div');
+  overlay.className = 'cc-mydata-modal';
+  const card = document.createElement('div');
+  card.className = 'cc-mydata-modal__card';
+  overlay.appendChild(card);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const making = document.createElement('p');
+  making.dataset.role = 'invite-pending';
+  making.textContent = t('circle.invite.making');
+  card.appendChild(making);
+  document.body.appendChild(overlay);
   // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
   // address in a persona's circle, which the joiner's trail would record as its confirming admin
   const adminPeerAddr = _peerAgent?.circleSelf?.(circleId)?.webid ?? circleHouseholdAgent?.householdSelfAddr ?? null;
@@ -5457,13 +5496,8 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
     });
   }
   catch { r = { error: 'failed' }; }
-  const overlay = document.createElement('div');
-  overlay.className = 'cc-mydata-modal';
-  const card = document.createElement('div');
-  card.className = 'cc-mydata-modal__card';
-  overlay.appendChild(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
+  making.remove();
+  if (!overlay.isConnected) return;   // closed while it was being made
   const h = document.createElement('h3');
   h.textContent = t('circle.invite.title');
   card.appendChild(h);
@@ -7022,6 +7056,7 @@ async function runHelpLlm(id, query) {
 let _openOverride = {};   // the open circle's member override (my private per-circle choices), read at open
 
 async function showDetail(id) {
+  await refreshRelayKnown();   // the composer says when a message would wait (no connection point)
   hideTabBar();
   setActiveCircle(id);
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
@@ -7705,6 +7740,7 @@ function showCircle(id, circle, policy) {
       deliveryByMessageId,
     );
     renderCircleView(rootEl, {
+      noRelay: !_relayKnownNow,
       circle, rows, t,
       // P1.7 — the chip model is shared; the shell only renders it and persists the tap.
       chatFilter: { ...chatFilterChips({ allowedKinds: kinds, filter: viewerFilter }), filter: viewerFilter },

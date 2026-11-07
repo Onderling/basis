@@ -245,7 +245,14 @@ test('de wandeling met drie — A maakt, B is de basis, C komt en gaat', async (
     if (!removed && await openMore(A.page, 'admin')) {
       const ceeRow = A.page.locator('.cc-admin__member', { hasText: /cee/i });
       const rm = ceeRow.locator('.cc-admin__member-remove');
-      if (await rm.count()) { await rm.first().click(); await A.page.waitForTimeout(3000); }
+      if (await rm.count()) {
+        await rm.first().click();
+        // removing asks first, as making an admin does: accept the confirmation the op declares
+        const confirm = A.page.locator('.cc-confirm__accept');
+        await confirm.first().waitFor({ timeout: 5000 }).catch(() => {});
+        if (await confirm.count()) await confirm.first().click();
+        await A.page.waitForTimeout(3000);
+      }
       const back = A.page.locator('.cc-admin__back');
       if (await back.count()) await back.first().click();
       await openWalk(A.page);

@@ -17,7 +17,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `signin` | add | · | ✅ | · | · | ✅ | · |  |
 |  | `whoami` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `me` | list | ✅ | ✅ | · | · | ✅ | · |  |
-|  | `send-file` | add | ✅ | ✅ | · | · | ✅ | · |  |
+|  | `send-file` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
 |  | `lookup-peer` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `publish-peer` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `security-status` | list | ✅ | ✅ | · | · | · | · |  |
@@ -331,7 +331,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
 |  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 326 ops | | 234 | 179 | 28 | 7 | 145 | 69 | |
+| **totals** | 326 ops | | 234 | 179 | 28 | 8 | 145 | 69 | |
 
 ### Flows
 

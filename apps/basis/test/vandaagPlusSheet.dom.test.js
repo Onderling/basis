@@ -38,3 +38,25 @@ describe('the "+" sheet', () => {
     expect(el.querySelector('[data-me]')).toBe(null);
   });
 });
+
+// THE LINE DOES NOT TAKE THE FORM'S TYPING. A walk typed an appointment into the form while the keyboard moved the sheet,
+// and the text landed in "Say what you want" above it as well. With a form open the line shows what was said, read-only,
+// so focus and typing stay in the form; both shells.
+describe('the free line while a form is open', () => {
+  it('is read-only on web once an act is picked, and editable before', () => {
+    const before = renderVandaagPlus(document.createElement('div'), { t, onRead: () => {} });
+    expect(before.querySelector('.circle-vandaag-plus__line').readOnly).toBe(false);
+    const open = renderVandaagPlus(document.createElement('div'), { t, onRead: () => {}, actId: 'calendar.calendar-event', line: 'koffie vrijdag 14:00' });
+    const li = open.querySelector('.circle-vandaag-plus__line');
+    expect(open.querySelector('.circle-vandaag-plus__form')).toBeTruthy();
+    expect(li.readOnly).toBe(true);
+    expect(li.tabIndex).toBe(-1);
+    expect(li.value).toBe('koffie vrijdag 14:00');
+  });
+  it('is not editable on mobile once an act is picked', async () => {
+    const fs = await import('node:fs'); const path = await import('node:path');
+    const src = fs.readFileSync(path.join(process.cwd(), '../basis-mobile/src/screens/v2/VandaagPlusModal.js'), 'utf8');
+    const line = src.slice(src.indexOf('testID="vandaag-plus-line"') - 400, src.indexOf('testID="vandaag-plus-line"'));
+    expect(line).toMatch(/editable=\{!act\}/);
+  });
+});

@@ -499,7 +499,7 @@ export function knownRelayUrl({ saved = null, arg = null, list = [] } = {}) {
  *
  * @param {object} deps
  * @param {() => ({ saved?: string|null, arg?: string|null, list?: Array<object> } | Promise<object>)} deps.read
- * @returns {{ check: () => Promise<{ ask: boolean }>, later: () => void }}
+ * @returns {{ check: () => Promise<{ ask: boolean }>, later: () => void, knows: () => Promise<boolean> }}
  */
 export function createRelayQuestion({ read } = {}) {
   let deferred = false;
@@ -512,6 +512,10 @@ export function createRelayQuestion({ read } = {}) {
     },
     /** "Later": not again this session. */
     later() { deferred = true; },
+    /** Does this device know a relay at all (saved, given, or on the list)? "Later" does not change the answer. */
+    async knows() {
+      try { return !!knownRelayUrl((await read?.()) ?? {}); } catch { return false; }
+    },
   };
 }
 

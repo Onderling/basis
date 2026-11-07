@@ -1,6 +1,6 @@
 # Convention: storage layout for `@onderling` pods
 
-> **Status:** deliverable (per transition doc §V.5). Documents the
+> **Status:** in force (checked against the code 2026-11-06). Documents the
 > canonical pod-resource layout that `@onderling/pod-onboarding`
 > provisions and that `@onderling/pod-routing` consumes. Discovery
 > happens via the WebID profile; the layout below is what
@@ -10,7 +10,7 @@
 > are now **type/domain-keyed, app-agnostic** (the former
 > `<app>/<function>` rule is superseded); added the *cross-app
 > type-indexable layout* standard (new section below). Rationale +
-> full decision record: `TODO-GENERAL.md` 🔴 "Pinboard pod-backed
+> full decision record: the old private `TODO-GENERAL.md` 🔴 "Pinboard pod-backed
 > storage" (D3). This resolves the open question in the substrates-v2
 > functional design §4.3.6.
 
@@ -33,7 +33,7 @@ contains (at least):
 These are written by `pod-onboarding.provisionDefault()` →
 `patchWebidProfile({pointers, predicates})`. The exact predicate
 URIs and the JSON-LD shape live in
-`packages/pod-onboarding/src/webidPointers.js`.
+`packages/pod-onboarding/src/initialResources.js` (`pointerPredicates`).
 
 **Third-party tool flow:**
 1. Resolve the user's WebID.
@@ -246,7 +246,7 @@ substrate handles it.
   provisioning + WebID-profile patch
 - `packages/pod-onboarding/src/initialResources.js` — initial
   config + agent-registry shapes
-- `packages/pod-onboarding/src/webidPointers.js` — predicate URIs
+- `packages/pod-onboarding/src/initialResources.js` `pointerPredicates()` — predicate URIs
 - `packages/pod-onboarding/src/acpTemplates.js` — default ACPs
 - `packages/pod-routing/src/configResource.js` — config-resource
   read/write

@@ -8,7 +8,7 @@
  * `lens.openLens(contactId, name)`. Closing the sheet any way but the primary button is a cancel.
  */
 import React, { useState, useCallback, useRef } from 'react';   // useRef: the ask counter
-import { Modal, View, ScrollView, Pressable, Text, StyleSheet } from 'react-native';
+import { Modal, View, ScrollView, Pressable, Text, StyleSheet, Alert } from 'react-native';
 import { RadioGroup, Actions, WizardTheme } from './wizards/_kit.js';
 import { wizardPalette } from './wizards/_palette.js';
 import {
@@ -70,10 +70,11 @@ export function ContactLensSheet({ visible, mode = 'change', model, t, theme, on
  * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill
  * @param {(contactWebid: string) => string} [a.pairCircleIdOf]   the pair roster's own `pairCircleIdFor`
  * @param {(circleId: string, personaId: string) => Promise<any>} [a.shareRelease]   the bundle's `shareCircleRelease`
+ * @param {(contact: object) => Promise<{adopted: string|null, say: string|null}>} [a.adoptPoint]   the host's adoption of a card's point
  * @param {Function} a.t
  * @param {object} [a.theme]
  */
-export function useContactLensSheet({ callSkill, pairCircleIdOf = null, shareRelease = null, t, theme } = {}) {
+export function useContactLensSheet({ callSkill, pairCircleIdOf = null, shareRelease = null, adoptPoint = null, t, theme } = {}) {
   const [ask, setAsk] = useState(null);   // { id, mode, model, resolve }
   const seq = useRef(0);
   const answer = useCallback((choice) => {
@@ -90,8 +91,11 @@ export function useContactLensSheet({ callSkill, pairCircleIdOf = null, shareRel
     if (!model) return callSkill('pinboard', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
     const choice = await askPerson('add', model);
     if (!choice) return null;
-    return addContactAs({ callSkill, payload, ...choice, pairCircleIdOf });
-  }, [callSkill, pairCircleIdOf, askPerson]);
+    const r = await addContactAs({ callSkill, payload, ...choice, pairCircleIdOf, adoptPoint });
+    // a device with no relay of its own now uses the card's point: said once
+    if (r?.adoptedSay) Alert.alert('', r.adoptedSay);
+    return r;
+  }, [callSkill, pairCircleIdOf, askPerson, adoptPoint]);
 
   /** The thread header's control: the row's lens, changed in place; `{ saved, personaName }` or `null` (closed). */
   const openLens = useCallback(async (contactId, name) => {

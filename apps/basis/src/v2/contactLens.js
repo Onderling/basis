@@ -83,14 +83,19 @@ export async function contactAddSheetModel({ payload, callSkill } = {}) {
  * FIRST, so whatever founds that circle later says a release that already honours it; then the row is written
  * with the persona. A level that fails to set does not stop the add — the default disclosure is strict.
  */
-export async function addContactAs({ callSkill, payload, persona = DEFAULT_PERSONA, revealPreset = null, pairCircleIdOf = null } = {}) {
+export async function addContactAs({ callSkill, payload, persona = DEFAULT_PERSONA, revealPreset = null, pairCircleIdOf = null, adoptPoint = null } = {}) {
   const card = decodeContactCard(payload);
   const chosen = typeof persona === 'string' && persona ? persona : DEFAULT_PERSONA;
   const pairId = card ? await pairIdFor(card.webid, { pairCircleIdOf, callSkill }) : null;
   if (pairId && revealPreset) {
     await applyJoinRevealState({ state: { persona: chosen, revealPreset }, callSkill, contextId: pairId }).catch(() => {});
   }
-  return callSkill('pinboard', 'addContactFromQr', { payload, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
+  const r = await callSkill('pinboard', 'addContactFromQr', { payload, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
+  // a device with no relay of its own adopts the point the card brought (the host's `adoptInheritedPoint`), said once
+  if (r?.contact && typeof adoptPoint === 'function') {
+    try { const a = await adoptPoint(r.contact); if (a?.say) return { ...r, adoptedSay: a.say }; } catch { /* the contact is added regardless */ }
+  }
+  return r;
 }
 
 /**

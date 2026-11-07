@@ -541,6 +541,11 @@ export default function ChatScreen({
     // Mirrors web's `store.getThread('main').addShellMessage`.
     const addMainBubble = (bubble) => appendBubble('main', bubble);
 
+    // A contact's turn that lands in its thread answers with the SAME delivery receipt a circle member sends, under the
+    // same per-person setting (the App-owned sender): the sender's own bubble moves to "their app has it" (web parity:
+    // circleApp hands circleContactChannel the same sender).
+    try { contactChannel?.setLandedHook?.((info) => chatStoredReceipt?.(info)); } catch { /* the thread works without receipts */ }
+
     const handlers = {
       // Substrate-only handlers — no UI bubble; just persist local
       // state + publish a notification for /logs.

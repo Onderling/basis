@@ -28,9 +28,12 @@ import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
 import { settleContactAttach } from '../../../../basis/src/v2/contactAttachOutcome.js';
+import { trackContactTurn } from '../../../../basis/src/v2/contactTurnDelivery.js';
+import DeliveryChip from '../../rn/DeliveryChip.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
-export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '', noRelay = false }) {
+// `deliveryStateMap` — the SHARED per-message map (App.js owns it; receipts land there): my own bubbles read it.
+export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '', deliveryStateMap = null }) {
   const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
@@ -49,9 +52,10 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     try { r = await bundle?.callSkill?.(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
     // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
     const { file, messageId, state, say } = await settleContactAttach(r, { channel, contactId, peerAddr, t });
-    if (file) setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file, delivery: state }]);
+    // the sent file's state goes on the same map every own bubble reads, so its chip paints as a typed turn's does
+    if (file) { if (state) { try { deliveryStateMap?.set?.(messageId, state); } catch { /* mirror */ } } setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file }]); }
     if (say) Alert.alert(say);
-  }, [bundle, channel, contactId, peerAddr]);
+  }, [bundle, channel, contactId, peerAddr, deliveryStateMap]);
   const name = nameShown(contact, t, { ids: [contactId] });   // the stamped label, else "someone" — never the key
   // The pre-send floor this contact declared (its card → the roster row): the channel applies it on
   // every turn; the header says so before the person types. web≡mobile with contactThread.js.
@@ -91,6 +95,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         if (!alive || durable.length === 0) return;
         setMessages((prev) => (prev.length ? prev : durable.map((m) => ({
           id: mkId(), origin: m.origin, text: m.text ?? '',
+          ...(m.messageId ? { messageId: m.messageId } : {}),   // the id the turn was sent under: what its chip is keyed by
           ...(m.buttons ? { buttons: m.buttons } : {}),
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
@@ -123,6 +128,20 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     () => (input.startsWith('/') ? commands.suggest(input) : []), [commands, input]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  // My own bubbles read the shared delivery map; a change there (the verdict, a receipt) redraws this screen. The send
+  // path bumps it itself through the map, so one subscription covers every writer.
+  const [, setDeliveryTick] = useState(0);
+  useEffect(() => {
+    if (typeof deliveryStateMap?.subscribe !== 'function') return undefined;
+    return deliveryStateMap.subscribe(() => setDeliveryTick((n) => n + 1));
+  }, [deliveryStateMap]);
+  // Retry re-sends the same turn under the same id (the channel dedups the fan; the receiver dedups by id).
+  const onRetryDelivery = useCallback((msgId) => {
+    const m = messages.find((x) => x.messageId === msgId && x.origin === 'user' && !x.file);
+    if (!m || !channel) return;   // a file retries through its own op; a turn that is not mine has nothing to retry
+    const { sent } = channel.sendTurn({ peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
+    trackContactTurn({ messageId: msgId, sent, deliveryMap: deliveryStateMap }).catch(() => {});
+  }, [messages, channel, peerAddr, contactId, floor, deliveryStateMap]);
   // Verbergen / Tonen (L106, web parity — contactThread.js's header control): every person gets the control — a
   // contact from the book, and a stranger who wrote to me (hiding them puts them in the book, hidden). A bot
   // does not: a bot is removed, not hidden. `null` keeps the header without it. The mark is the book's — the ONE
@@ -222,19 +241,15 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     // is a conversational turn, because in a conversation a slash is sometimes just a slash.
     const cmd = commands.parse(text);
     if (cmd) { await runSkill(cmd.opId, cmd.rest ? { text: cmd.rest } : {}); return; }
-    setError(false);
-    setBusy(true);
-    try {
-      // The echo is what LEFT the device: with a floor, the redacted text.
-      const { sent, text: sentText } = channel.sendTurn({ peerAddr, threadId: contactId, text, floor });
-      setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: sentText }]);
-      await sent;
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  }, [input, channel, peerAddr, contactId, commands, runSkill, floor]);
+    // The echo is what LEFT the device: with a floor, the redacted text. The bubble carries the send's state from here
+    // on (pending → the verdict; a receipt moves it further): no "versturen…" line and no error line for a typed turn —
+    // the chip says it, and a tap on it retries (web parity: showContactThread's onSend).
+    let turn;
+    try { turn = channel.sendTurn({ peerAddr, threadId: contactId, text, floor }); }
+    catch { setError(true); return; }   // the turn never got an id: nothing is on screen to carry a state
+    setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: turn.text, messageId: turn.messageId }]);
+    await trackContactTurn({ messageId: turn.messageId, sent: turn.sent, deliveryMap: deliveryStateMap });
+  }, [input, channel, peerAddr, contactId, commands, runSkill, floor, deliveryStateMap]);
 
   return (
     <View style={styles.wrap} testID="contact-thread-screen">
@@ -335,6 +350,17 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
                 </Text>
               ) : null}
             </View>
+            {/* My own turn's delivery state, off the shared map under the id it was sent with — the same chip a circle
+                bubble carries (web ≡ mobile with contactThread.js). A turn with no id (an older live push) carries none. */}
+            {m.origin === 'user' && m.messageId && deliveryStateMap ? (
+              <DeliveryChip
+                state={deliveryStateMap.get?.(m.messageId) ?? null}
+                reason={deliveryStateMap.reasonOf?.(m.messageId) ?? null}
+                rowId={m.messageId}
+                onRetry={onRetryDelivery}
+                testIDPrefix="contact-delivery"
+              />
+            ) : null}
           </View>
           </React.Fragment>
         ))}
@@ -404,7 +430,6 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         </View>
       ) : null}
       {/* no connection point: the composer says the message waits (the host's relay-question predicate; web parity) */}
-      {noRelay ? <Text style={styles.suggestHint} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
       <View style={styles.composer}>
         {contactAttach.length ? (
           <Pressable onPress={() => setAttachOpen((v) => !v)} accessibilityRole="button" accessibilityLabel={t('circle.view.attach')} testID="contact-composer-attach">

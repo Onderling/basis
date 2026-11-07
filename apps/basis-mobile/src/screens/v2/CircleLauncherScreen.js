@@ -33,6 +33,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import Constants from 'expo-constants';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
 import { useTheme } from './themeContext.js';
+import DeliveryChip from '../../rn/DeliveryChip.js';
 import { FAB, FAB_CLEARANCE, HEADER_AVATAR } from './fab.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
@@ -75,7 +76,6 @@ import {
   applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
   // "Never share my global address" — the publication lock (web parity).
   shareableAddress,
-  deliveryPresentation,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
   // per-circle bottom tabs from policy.features (v2 §1).
@@ -2436,7 +2436,7 @@ export default function CircleLauncherScreen({
       return (
         <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
-            noRelay={!relayKnown}
+            deliveryStateMap={deliveryStateMap}
             bundle={bundle}
             contact={contactThread}
             draft={contactThread?.draft ?? ''}
@@ -5490,36 +5490,9 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
           })}
         </View>
       ) : null}
-      {/* Delivery state, driven by the SHARED presentation table (deliverySettings.js) — the same one
-          the web bubble reads, replacing a three-state chain that knew nothing of the far-end states
-          (`maybe-received` / `reached-device` / `stored` would have rendered as silence here). Retryable
-          states are a Pressable; the rest a static Text with role=text. */}
-      {(() => {
-        const p = deliveryPresentation(deliveryState, { reason: deliveryReason });
-        if (!p) return null;
-        const label = t(p.labelKey);
-        const line = `${p.glyph} ${label}`;
-        return p.retryable ? (
-          <Pressable
-            style={styles.deliveryFailed}
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            testID={`circle-delivery-${p.state}-${row.id}`}
-            onPress={() => { if (onRetryDelivery) onRetryDelivery(row.id); }}
-          >
-            <Text style={styles.deliveryFailedText}>{line}</Text>
-          </Pressable>
-        ) : (
-          <Text
-            style={styles.deliveryPending}
-            accessibilityLabel={label}
-            accessibilityRole="text"
-            testID={`circle-delivery-${p.state}-${row.id}`}
-          >
-            {line}
-          </Text>
-        );
-      })()}
+      {/* Delivery state: the ONE chip (rn/DeliveryChip.js) that the contact thread's own bubbles paint too, over the
+          SHARED presentation table (deliverySettings.js) the web bubble reads. */}
+      <DeliveryChip state={deliveryState} reason={deliveryReason} rowId={row.id} onRetry={onRetryDelivery} />
     </View>
   );
 }
@@ -6619,9 +6592,6 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   consentBtnSecondary:   { backgroundColor: theme.color.card, borderColor: theme.color.ink },
   // δ.2 — per-message delivery state.  Pending = subtle clock-line,
   // Failed = warning pill (tap-to-retry).  Sent renders nothing.
-  deliveryPending:    { marginTop: 4, fontSize: 11, color: theme.color.inkSoft },
-  deliveryFailed:     { marginTop: 4, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: theme.color.danger, backgroundColor: theme.color.dangerBg },
-  deliveryFailedText: { fontSize: 11, color: theme.color.danger },
   deliveryUndeliverable: { marginTop: 4, fontSize: 11, color: theme.color.inkSoft },
   ownProfile: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.color.line },
   ownProfileTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 4 },

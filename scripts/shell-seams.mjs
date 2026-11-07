@@ -58,6 +58,9 @@ export const SEAMS = Object.freeze([
   // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
   // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
   { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
+  // THE RELAY TRAVELS WITH THE CARD: a device with no relay of its own adopts the point a scanned contact card brings, saved so
+  // a restart reconnects to it, and says whose it now uses. Before, it dialled the card's relay only at the first send, unsaid.
+  { id: 'contact-scan-adopts-point', pattern: /adoptInheritedPoint\(|contactPointAdopter\(/, shells: ['web', 'mobile'], why: 'a device with no relay scans a card and stays unreachable (until its first send, and again after every restart)' },
   // A SETTING ONLY WHERE IT CHANGES SOMETHING: 'How the bot shows actions' is about a bot that acts; Help only answers.
   // Each host reads the contact book through one predicate before it offers the setting (a walk saw it with no bot).
   { id: 'bot-actions-only-with-a-bot', pattern: /showsBotActionsSetting\(/, shells: ['web', 'mobile'], why: 'a person whose only bot is Help sees a bot setting that changes nothing' },

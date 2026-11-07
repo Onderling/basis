@@ -183,7 +183,7 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
 import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
-import { useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
+import { contactPointAdopter, useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
@@ -823,8 +823,10 @@ export default function CircleLauncherScreen({
   const [scanTask, setScanTask] = useState(null);
   const [scanForm, setScanForm] = useState(null);   // a scanned code's op, asking what the code did not say (`opFormOrRun`)
   // The "what will they see of you" sheet — the painter of the add-contact flow's needs (persona + reveal), asked first.
+  // a device with no relay of its own adopts the point a scanned card brings (said once)
+  const contactAdopter = useMemo(() => contactPointAdopter(bundle?.agent ?? null), [bundle]);
   const contactLens = useContactLensSheet({
-    callSkill: bundle?.callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, t, theme,
+    callSkill: bundle?.callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t, theme,
   });
   const [joinArgs, setJoinArgs] = useState(null);     // {invite} → JoinGroupWizardModal runs
   const [inviteFor, setInviteFor] = useState(null);   // {circleId, uri, error} → invite-QR modal

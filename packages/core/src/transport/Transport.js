@@ -381,26 +381,9 @@ export class Transport extends Emitter {
   // ── Four primitives ─────────────────────────────────────────────────────────
 
   /**
-   * WHICH of our addresses to speak from (G13 / Decision 4).
-   *
-   * A caller may ask to send AS one of our extra addresses — the per-circle address that circle's
-   * traffic belongs to — so that neither the header nor the signature over it names the person
-   * globally. The claim is validated against the addresses this transport actually holds: `_to` on
-   * an inbound envelope is attacker-influenced and is one of the things callers pass here, so a bad
-   * value must never let someone make us claim an address that is not ours. Unknown ⇒ the primary.
-   *
-   * `warn` is on for a DELIBERATE claim (a caller that meant to send as a circle) and off where the
-   * claim is opportunistic (answering at whatever address an inbound envelope was addressed to,
-   * which on a mesh transport is routinely a pubkey rather than one of our bound addresses).
-   *
-   * @param {string|null|undefined} claimed
-   * @param {{warn?: boolean}} [opts]
-   * @returns {string} one of our own addresses
-   */
-  /**
    * Does this transport hold `address` as one of its own — the primary, or a bound alias? What a caller
    * asks before sending AS an address: a send in the name of an address this transport does not hold
-   * leaves from the primary instead (see `#ownAddress`), which is the wrong identity for circle traffic.
+   * waits for it to be bound and is then refused (see `#senderFor`) — never sent as the primary instead.
    * @param {string} address
    * @returns {boolean}
    */
@@ -408,22 +391,7 @@ export class Transport extends Emitter {
     return typeof address === 'string' && !!address && (address === this.#address || this.#aliases.has(address));
   }
 
-  #ownAddress(claimed, { warn = true } = {}) {
-    const asked = typeof claimed === 'string' && claimed ? claimed : null;
-    if (!asked) return this.#address;
-    if (asked === this.#address || this.#aliases.has(asked)) return asked;
-    if (warn && typeof console !== 'undefined') {
-      // Loud on purpose (Frits, review 2026-07-30). The fallback is SAFE against hostile input — but
-      // a genuine wiring mistake, passing an address this transport never bound, would otherwise
-      // look like success, and "looks right, does nothing" is the failure class behind most of this
-      // month's bugs. Hostile input can at worst make log noise; a real bug now leaves a trace.
-      console.warn(
-        `[transport] asked to send as "${String(asked).slice(0, 16)}…" `
-        + 'which this transport does not hold — falling back to the primary address',
-      );
-    }
-    return this.#address;
-  }
+
   /**
    * WHICH of our addresses a send goes out as — never a substitute. Asked to send as an address this transport does
    * not hold, the send WAITS for that address to be added (the moment after a create or a join, before the presence
@@ -472,7 +440,7 @@ export class Transport extends Emitter {
 
   /**
    * OW — fire-and-forget. No reply expected.
-   * `opts.from` — send AS one of our extra addresses (see `#ownAddress`).
+   * `opts.from` — send AS one of our extra addresses (see `#senderFor`).
    */
   async sendOneWay(to, payload, opts = {}) {
     const from = this.#senderFor(opts?.from);
@@ -713,10 +681,15 @@ export class Transport extends Emitter {
       // of having a per-circle address. `warn: false` because `_to` is the key the sender sealed to
       // and is routinely not one of our bound addresses (a mesh transport's primary is not a pubkey);
       // that is the ordinary case, not a wiring mistake.
-      const ack = mkEnvelope(
-        P.AK, this.#ownAddress(envelope._to, { warn: false }), envelope._from, {}, { re: envelope._id },
-      );
-      this._send(envelope._from, ack).catch(err => this.emit('error', err));
+      // …and ONLY as an address this transport holds. An envelope sent to an address we do not hold here gets no ack at
+      // all — never one from the primary, which would pair that address with this device's main address for the sender
+      // and the relay (the same pairing the sending primitives refuse). The sender's retry covers a missing ack.
+      const to = typeof envelope._to === 'string' && envelope._to ? envelope._to : null;
+      if (!to || this.holdsAddress(to)) {
+        // (no `_to` names no address at all: the primary answers, as it always did — that pairs nothing)
+        const ack = mkEnvelope(P.AK, to ?? this.address, envelope._from, {}, { re: envelope._id });
+        this._send(envelope._from, ack).catch(err => this.emit('error', err));
+      }
       // fall through — also dispatch AS to the application
     }
 

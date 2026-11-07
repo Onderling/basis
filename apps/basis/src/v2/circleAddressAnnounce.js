@@ -415,21 +415,23 @@ export function isValidCircleAddressAnnounceEnvelope(p) {
  * @param {object} a
  * @param {object} a.agent
  * @param {{warn?: Function, info?: Function}} [a.logger]
- * @returns {(fromPeerAddr: string, payload: object) => Promise<{recorded: number, refused: number}>}
+ * @returns {(fromPeerAddr: string, payload: object) => Promise<{recorded: number, unproven: number, refused?: true}>}
+ *   `refused: true` (the receive record's verdict) when a PROVEN announcement could not be recorded yet — its member
+ *   not on this device's roster yet — so the copy that comes again after the fold is handed on, not dropped.
  */
 export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, grantSealedAudience = null } = {}) {
   return async function onCircleAddressAnnounce(_fromPeerAddr, payload) {
     if (!isValidCircleAddressAnnounceEnvelope(payload)) {
       logger?.warn?.('[circle-address] dropping malformed announcement envelope');
-      return { recorded: 0, refused: 0 };
+      return { recorded: 0, unproven: 0 };
     }
     const circleId = payload.circleId;
     const proven = verifyCircleAddressAnnouncements(payload.announcements, circleId);
-    const refused = payload.announcements.length - proven.length;
-    if (refused > 0) {
+    const unproven = payload.announcements.length - proven.length;
+    if (unproven > 0) {
       // Deny-by-default is silent to the sender by design, but never silent to us: an unprovable
       // announcement is either a bug in a peer or someone trying something.
-      logger?.warn?.(`[circle-address] refused ${refused} unproven announcement(s) for ${circleId}`);
+      logger?.warn?.(`[circle-address] refused ${unproven} unproven announcement(s) for ${circleId}`);
     }
     let recorded = 0;
     for (const one of proven) {
@@ -494,6 +496,6 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
       }
       if (introduced > 0) logger?.info?.(`[circle-address] introduced ${introduced} new device(s) of mine to ${circleId}`);
     }
-    return { recorded, refused };
+    return { recorded, unproven, ...(recorded < proven.length ? { refused: true } : {}) };
   };
 }

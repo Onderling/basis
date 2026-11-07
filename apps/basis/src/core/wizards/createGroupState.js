@@ -204,8 +204,16 @@ export function setKind(state, kind) {
  * @param {{ podConnected?: boolean }} state
  */
 export function storageChoices(state) {
-  return state?.podConnected === false ? STORAGE_POLICIES.filter((o) => o.id === 'none') : STORAGE_POLICIES;
+  if (state?.podConnected === false) return STORAGE_POLICIES.filter((o) => o.id === 'none');
+  return STORAGE_POLICIES.filter((o) => OFFERED_STORAGE_POSTURES.includes(o.id));
 }
+
+/**
+ * What the wizard OFFERS (Frits, the UX-walk sitting, 2026-11-06): no pod, or one shared circle pod. Personal and hybrid
+ * stay in the vocabulary (an existing circle keeps its posture, and its review still names it) but are not offered
+ * until the companion brokers them; a person cannot pick what does not yet work end to end.
+ */
+export const OFFERED_STORAGE_POSTURES = Object.freeze(['none', 'shared']);
 
 /** The person's storage choice — sets both names of the one fact and marks the axis as theirs. */
 export function setStoragePolicy(state, value) {
@@ -493,7 +501,31 @@ export async function loadFounderHandle({ callSkill } = {}) {
   try { entry = (await callSkill('pinboard', 'getMyProfile', {}))?.entry ?? null; } catch { return { needsHandle: false, handleSuggestions: [] }; }
   if (!entry || (typeof entry.handle === 'string' && entry.handle.trim())) return { needsHandle: false, handleSuggestions: [] };
   const prior = await loadPriorHandles({ callSkill });
-  return { needsHandle: true, handleSuggestions: handleSuggestions(prior, entry.displayName ?? '') };
+  const profileName = typeof entry.displayName === 'string' ? entry.displayName : '';
+  return { needsHandle: true, priorHandles: prior, profileName, handleSuggestions: founderHandleSuggestions({ profileName, prior }) };
+}
+
+/**
+ * THE HANDLE THE FOUNDER IS OFFERED: their own name first — the name of the persona the circle is founded as, else
+ * the profile's name — lowercased into a handle ("Tester B" → "tester-b"), then the handles they used before. A prior
+ * handle never pushes the name out: a walk (2026-11-05) offered only "pzwopwk1", an id-derived handle from an earlier
+ * circle, to a person called "Tester B".
+ *
+ * @param {{ personaName?: string|null, profileName?: string|null, prior?: string[] }} a
+ * @returns {string[]}  at most 8, valid handles, no repeats
+ */
+export function founderHandleSuggestions({ personaName = null, profileName = null, prior = [] } = {}) {
+  const fromName = (n) => (typeof n === 'string' && n.trim() ? handleSuggestions(n).slice(0, 1) : []);
+  const own = [...fromName(personaName), ...fromName(profileName)];
+  const before = handleSuggestions(Array.isArray(prior) ? prior : [], '');
+  return [...new Set([...own, ...before])].slice(0, 8);
+}
+
+/** The founder's suggestions for the wizard as it stands now — the persona picked in it names the first one. */
+export function founderHandleSuggestionsFor(state) {
+  const p = (state?.personas ?? []).find((x) => x.id === state?.persona) ?? null;
+  const personaName = p && typeof p.name === 'string' && p.name !== p.id ? p.name : null;
+  return founderHandleSuggestions({ personaName, profileName: state?.profileName ?? null, prior: state?.priorHandles ?? [] });
 }
 
 /** Can the identity step be left? A name, a valid id, and — when the founder needs one — a valid handle. */

@@ -27,6 +27,7 @@ import { createMediaEmbed } from '../core/handlers/mediaEmbed.js';
 import { pinboardManifest } from '@onderling-app/pinboard/manifest';
 import { PINBOARD_OP_ALIAS } from './pinboardOpAliases.js';
 import { memberLabelFor } from './circleStream.js';
+import { SOMEONE_LABEL_KEY } from './personLabel.js';
 
 /**
  * Which pinboard ops act on the ACTIVE circle's items — DERIVED from the manifest's `circleScoped`
@@ -232,13 +233,14 @@ export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, get
  *
  * @param {object} item  a pinboard item as `listOpen` returns it
  * @param {{viewerId?: string|null, members?: object[], policy?: string}} [o]
- * @returns {Array<{webid: string, label: string}>}
+ * @returns {Array<{webid: string, label: string|null, labelKey: string|null}>}  paint `label ?? t(labelKey)`
  */
 export function responderChoices(item, { viewerId = null, members = [], policy = 'pairwise' } = {}) {
   if (!item || !viewerId || item.addedBy !== viewerId || item.completedAt) return [];
   const responders = Array.isArray(item.source?.responders) ? item.source.responders : [];
-  return responders.filter((w) => typeof w === 'string' && w && w !== viewerId).map((webid) => ({
-    webid,
-    label: memberLabelFor(webid, { members, viewerId, policy }) ?? `${webid.slice(0, 8)}…`,
-  }));
+  return responders.filter((w) => typeof w === 'string' && w && w !== viewerId).map((webid) => {
+    // a responder the roster cannot name is "someone" (`labelKey`), never a piece of their key
+    const label = memberLabelFor(webid, { members, viewerId, policy });
+    return { webid, label: label ?? null, labelKey: label ? null : SOMEONE_LABEL_KEY };
+  });
 }

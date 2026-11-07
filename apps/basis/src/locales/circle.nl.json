@@ -141,7 +141,7 @@
           "doc": "Join wizard — privacy step heading."
         },
         "notice": {
-          "text": "Lid worden van een kring betekent dat andere leden je posts kunnen zien, je kunnen aanspreken en — afhankelijk van de regels van de kring — kunnen meebeslissen bij conflicten. Kring-admins hebben geen toegang tot je privé-chats, alleen tot wat je publiek post.",
+          "text": "Lid worden van een kring betekent dat andere leden je berichten kunnen zien en je kunnen aanspreken. Afhankelijk van de regels van de kring kunnen ze ook meebeslissen bij conflicten. De admins van de kring zien je privégesprekken niet, alleen wat je in de kring plaatst.",
           "doc": "Join wizard — the privacy notice (folded from the PRIVACY_NOTICE constant)."
         },
         "accept": {
@@ -149,11 +149,11 @@
           "doc": "Join wizard — privacy-accept checkbox."
         },
         "mesh": {
-          "text": "Deel mijn adres zodat andere leden me rechtstreeks kunnen bereiken (aanbevolen voor bijwerken).",
+          "text": "Laat andere leden mij rechtstreeks bereiken",
           "doc": "Join wizard — mesh address-sharing consent checkbox."
         },
         "mesh_hint": {
-          "text": "Uit = de admin geeft alles door; je bent alleen via hen bereikbaar.",
+          "text": "Uit: de admin geeft alles door, en andere leden kunnen je niet rechtstreeks schrijven. Je kunt dit later aanpassen.",
           "doc": "Join wizard — mesh consent hint."
         }
       },
@@ -244,6 +244,10 @@
       "text": "Uitnodigen voor deze kring",
       "doc": "OBJ-2 — heading of the invite-QR overlay."
     },
+    "making": {
+      "text": "De uitnodiging wordt gemaakt.",
+      "doc": "The invite right after a circle is made, while it is being built (a few seconds): on screen at once, so nothing else is tapped meanwhile."
+    },
     "hint": {
       "text": "Scan dit op het andere apparaat om lid te worden van deze kring.",
       "doc": "OBJ-2 — caption under the invite QR."
@@ -279,6 +283,10 @@
     "uses_left": {
       "text": "{{used}} van {{max}} plekken op deze uitnodiging gebruikt",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
+    },
+    "joined": {
+      "text": "{{name}} is erbij gekomen.",
+      "doc": "On an open invite: someone came in while it was open (one line per newcomer, by name)."
     },
     "removed_from_circle": {
       "text": "Je bent uit deze kring gehaald. Met deze uitnodiging kom je er niet weer in; vraag een beheerder om een nieuwe.",
@@ -990,10 +998,6 @@
       "text": "＋ Taak toevoegen",
       "doc": "tasks tab — compose-knop om een taak toe te voegen."
     },
-    "tasks_add_prompt": {
-      "text": "Wat moet er gedaan worden?",
-      "doc": "tasks tab — prompt bij het toevoegen van een taak."
-    },
     "tasks_untitled": {
       "text": "(naamloze taak)",
       "doc": "tasks tab — fallback als een taak geen tekst heeft."
@@ -1536,6 +1540,18 @@
       "text": "Typ eerst een naam.",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
+    "onboarding_handle_saved": {
+      "text": "Opgeslagen. Je heet hier {{name}}.",
+      "doc": "The name card after its save: the name the person typed, which is now their display name (the handle is made from it)."
+    },
+    "onboarding_handle_failed": {
+      "text": "Je naam kon niet worden opgeslagen. Probeer het nog eens.",
+      "doc": "The name card could not save (any refusal other than a taken name)."
+    },
+    "onboarding_handle_unusable": {
+      "text": "Gebruik letters of cijfers in je naam.",
+      "doc": "What was typed holds nothing a name can be made of (only symbols)."
+    },
     "onboarding_intro_title": {
       "text": "Nieuw bij Basis?",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
@@ -1587,6 +1603,18 @@
     "onboarding_key_later": {
       "text": "Later",
       "doc": "Vandaag's key card: put the card away for a few days."
+    },
+    "onboarding_reach_title": {
+      "text": "Je hebt nog geen verbindingspunt",
+      "doc": "Today card when this device knows no relay (there is no baked-in one)."
+    },
+    "onboarding_reach_hint": {
+      "text": "Berichten wachten tot er een is. Wat nu al werkt: Nearby, een code die je samen scant, en het verbindingspunt dat met een uitnodiging meekomt.",
+      "doc": "What waits, and what works already without a relay. Plain sentences, no dash constructions."
+    },
+    "onboarding_reach_add": {
+      "text": "Verbindingspunt toevoegen",
+      "doc": "Opens the connection points."
     },
     "plus_line_read": {
       "text": "Lees",
@@ -3603,8 +3631,8 @@
       "doc": "Board 8C — heading of the `HIER` screen (P6.8)."
     },
     "header": {
-      "text": "{{sharing}} van {{total}} delen aanbod met jou",
-      "doc": "Header line."
+      "text": "{{sharing}} mensen hier laten zien wat ze aanbieden",
+      "doc": "Nearby's top line when more than one person here shows what they offer (their aanbod). 'Offerings' never reaches the screen."
     },
     "header_empty": {
       "text": "Op dit moment niemand in de buurt.",
@@ -3741,6 +3769,22 @@
     "no_name_yet": {
       "text": "jij (nog geen naam)",
       "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
+    },
+    "point_from_contact": {
+      "text": "Kwam mee met het kaartje van een contact",
+      "doc": "Where a connection point came from: a scanned contact card, adopted because this device had no relay of its own."
+    },
+    "point_adopted_from": {
+      "text": "Je bent nu bereikbaar via het verbindingspunt van {{name}}.",
+      "doc": "Said once after a scan when this device had no relay and now uses the card's; {{name}} is the contact."
+    },
+    "header_one": {
+      "text": "{{name}} laat zien wat hij aanbiedt",
+      "doc": "Nearby's top line when one person here shows what they offer; {{name}} is their label."
+    },
+    "header_none": {
+      "text": "Nog niemand hier laat zien wat hij aanbiedt",
+      "doc": "Nearby's top line when people are here but none shows what they offer."
     }
   },
   "viewAsSplit": {
@@ -5769,7 +5813,7 @@
       "doc": "P5 — button on the contacts roster to add a bot by URL/address."
     },
     "add_prompt": {
-      "text": "Botadres — een https-URL (agent card), een peer-adres of een onderling-contact://-contactkaart",
+      "text": "Botadres: een webadres (de agent card), een peer-adres of een contactkaart",
       "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
     },
     "add_failed": {
@@ -6659,7 +6703,7 @@
       "doc": "S5 — push subscribed state."
     },
     "notif_off": {
-      "text": "Krijg een melding bij reacties en kringactiviteit, ook als dit tabblad dicht is.",
+      "text": "Krijg een melding bij reacties en kringactiviteit, ook als de app dicht is.",
       "doc": "S5 — push not-subscribed state."
     },
     "notif_unsupported": {
@@ -6676,7 +6720,7 @@
     },
     "surface_pref": {
       "text": "Hoe de bot acties toont",
-      "doc": "S6.C — surface-preference section heading."
+      "doc": "Heading of the setting for how a bot that ACTS shows its actions (buttons, a screen, or words). Shown only when the person has a contact bot other than Help: Help only answers, so the setting does not apply to it (showsBotActionsSetting)."
     },
     "language": {
       "text": "Taal",
@@ -6775,7 +6819,7 @@
       "doc": "J-CS8 — button when the lock is on."
     },
     "notif_privacy": {
-      "text": "Om je telefoon te wekken bewaart de relay waarmee je verbonden bent één wek-token voor dit apparaat. Daardoor kan die relay zien dat jouw kringen bij één apparaat horen — dus dat ze van jou zijn.",
+      "text": "Om je telefoon te wekken bewaart je verbindingspunt (de relay waarmee je verbonden bent) één wekcode voor dit apparaat. Daardoor kan het zien dat je kringen bij één apparaat horen, en dus dat ze van jou zijn.",
       "doc": "J-CS10 — the trade, stated where it is made."
     },
     "notif_privacy_not": {
@@ -6783,7 +6827,7 @@
       "doc": "J-CS10 — what is NOT learned."
     },
     "notif_privacy_escape": {
-      "text": "Vind je dat bezwaarlijk: draai je eigen relay, of verdeel je kringen over verschillende relays — een relay ziet alleen de kringen die erop draaien.",
+      "text": "Vind je dat bezwaarlijk, draai dan je eigen relay of verdeel je kringen over verschillende relays. Een relay ziet alleen de kringen die hem gebruiken.",
       "doc": "J-CS10 — name the escape rather than leaving a dead end."
     },
     "pod_local_consequence": {
@@ -7058,6 +7102,10 @@
       "text": "Die actie is alleen voor beheerders.",
       "doc": "S3 — shown when a non-admin op is refused."
     },
+    "remove_member_confirm": {
+      "text": "{{name}} uit deze kring verwijderen? De sleutel van de kring wordt vernieuwd; ze houden andere kringen die jullie delen.",
+      "doc": "The confirm before an admin removes a member: who, and what it does (a key rotation; other shared circles stay)."
+    },
     "saving": {
       "text": "opslaan…",
       "doc": "S3 — transient state."
@@ -7069,6 +7117,14 @@
     "no_muted": {
       "text": "Je hebt niemand geblokkeerd.",
       "doc": "Lege blokkade-lijst."
+    },
+    "muted_row": {
+      "text": "{{name}} (geblokkeerd {{date}})",
+      "doc": "One row of the blocked list: the name the person saw when they blocked, and the day. Never the key."
+    },
+    "muted_row_unnamed": {
+      "text": "Iemand (geblokkeerd {{date}})",
+      "doc": "A block kept without a name (made before names were kept, or from /block with a bare address)."
     },
     "unmute": {
       "text": "Deblokkeren",
@@ -7768,6 +7824,14 @@
     "list_item": {
       "text": "Lijstitem",
       "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "file_held": {
+      "text": "{{name}} wacht op hen. Het gaat zodra ze online zijn.",
+      "doc": "A file sent from a contact thread's + is waiting because the contact is offline."
+    },
+    "file_not_reached": {
+      "text": "Het bestand is niet bij hen aangekomen. Probeer het later nog eens.",
+      "doc": "A file sent from a contact thread's + could not reach the contact."
     }
   },
   "conversationKinds": {
@@ -7872,7 +7936,10 @@
   "enroll": {
     "title": "Dit apparaat toevoegen",
     "ceremony": "Dit apparaat wordt toegevoegd",
-    "body": "Typ de herstelzin van dit account om dit apparaat toe te voegen. Elk apparaat krijgt eigen sleutels — de herstelzin zelf wordt nooit opgeslagen.",
+    "body": {
+      "text": "Typ de herstelzin van dit account om dit apparaat toe te voegen. Heb je een herstelbestand? Laad het daarna (Mijn gegevens → Herstelbestand laden): dan zijn je kringen er meteen. De herstelzin zelf wordt nooit opgeslagen.",
+      "doc": "The add-a-device ceremony: the phrase is what adds the device; the recovery file (sealed to the phrase) comes after and brings the circles' member lists."
+    },
     "mnemonic_placeholder": "Herstelzin (24 woorden)",
     "label_placeholder": "Apparaatnaam (bijv. 'werk-laptop')",
     "submit": "Dit apparaat toevoegen",
@@ -10160,6 +10227,12 @@
     "plus": {
       "text": "Feedback geven",
       "doc": "The \"+\" sheet act and the Instellingen door that open the feedback contact's thread."
+    }
+  },
+  "composer": {
+    "no_point": {
+      "text": "Geen verbindingspunt: dit bericht wacht.",
+      "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
     }
   }
 }

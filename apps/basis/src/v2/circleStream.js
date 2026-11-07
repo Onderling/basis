@@ -319,11 +319,12 @@ export function stampSenderLabels(rows, { members = [], viewerId = null, policy 
     if (!member) {
       return { ...row, senderSelf: false, senderLabel: null, senderLabelKey: 'circle.chat.unknown_sender' };
     }
+    const label = revealedMemberLabel(member, { viewerId, policy });
     return {
       ...row,
       senderSelf: false,
-      senderLabel: revealedMemberLabel(member, { viewerId, policy }).primary,
-      senderLabelKey: null,
+      senderLabel: label.primary,
+      senderLabelKey: label.primaryKey,   // a member with no name to show is "someone", never their key
     };
   });
 }

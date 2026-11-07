@@ -449,6 +449,9 @@ export const basisManifest = {
       surfaces: {
         slash: { command: '/send-file', body: 'flags' },
         chat:  { reply: 'text', hint: 'share a file with a peer via NKN' },
+        // the "+" in a CONTACT thread (Frits: one attach affordance everywhere; a walk found no way to send a file to a
+        // contact but the slash): the same projector the circle composer reads, offered only where a contact is
+        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', scopes: ['contact'] },
       },
     },
 
@@ -691,6 +694,8 @@ export const basisManifest = {
       writes: { scope: 'device' },
       params: [
         { name: 'peer', kind: 'string', required: true },
+        // the name the person saw (a post's author): kept with the block so the blocked list names them, never matched on
+        { name: 'label', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/block', body: 'argline' },
@@ -1277,7 +1282,8 @@ export const basisManifest = {
     { id: 'files',    labelKey: 'circle.folio.title',          target: { kind: 'nav', to: 'files' },    requires: ['lists', 'notes'] },
     { id: 'rules',    labelKey: 'circle.rules.title',          target: { kind: 'nav', to: 'rules' },     requires: ['houseRules'] },
     { id: 'recipes',  labelKey: 'circle.recipe.editor.book_title', target: { kind: 'nav', to: 'recipes' } },
-    { id: 'admin',    labelKey: 'circle.admin.title',          target: { kind: 'nav', to: 'admin' } },
+    // for a member the same page is the members list, and is called that (`memberLabelKey`)
+    { id: 'admin',    labelKey: 'circle.admin.title',          target: { kind: 'nav', to: 'admin' },    memberLabelKey: 'circle.admin.members' },
     { id: 'governance', labelKey: 'circle.governance.title',   target: { kind: 'nav', to: 'governance' } },
     { id: 'share',    labelKey: 'circle.share.screen_title',   target: { kind: 'nav', to: 'share' },     platforms: ['mobile'] },
   ],

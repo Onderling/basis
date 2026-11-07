@@ -24,9 +24,13 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 // L114 — delete as a relationship act (hide + leave the pair circle), and the words above a returning turn (web parity)
 import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/contactDelete.js';
 import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
+import { nameShown } from '../../../../basis/src/v2/personLabel.js';
+import { basisManifest } from '../../../../basis/src/index.js';
+import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { settleContactAttach } from '../../../../basis/src/v2/contactAttachOutcome.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
-export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '' }) {
+export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '', noRelay = false }) {
   const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
@@ -35,7 +39,20 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   const registry = bundle?.contactSkills ?? null;
   const contactId = contact?.contactId;
   const peerAddr = contact?.peerAddr ?? contactId;
-  const name = contact?.name ?? contactId ?? '';
+  // THE SAME "+" AS A CIRCLE'S COMPOSER (web parity): the projector's contact-scoped entries, each run as an op addressed
+  // to this contact (a file today). A walk found no way to send a file here but the `/send-file` slash.
+  const contactAttach = useMemo(() => attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' }), []);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const runContactAttach = useCallback(async (entry) => {
+    setAttachOpen(false);
+    let r = null;
+    try { r = await bundle?.callSkill?.(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
+    // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
+    const { file, messageId, state, say } = await settleContactAttach(r, { channel, contactId, peerAddr, t });
+    if (file) setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file, delivery: state }]);
+    if (say) Alert.alert(say);
+  }, [bundle, channel, contactId, peerAddr]);
+  const name = nameShown(contact, t, { ids: [contactId] });   // the stamped label, else "someone" — never the key
   // The pre-send floor this contact declared (its card → the roster row): the channel applies it on
   // every turn; the header says so before the person types. web≡mobile with contactThread.js.
   const floor = useMemo(() => presendFloorFor(contact), [contact]);
@@ -130,7 +147,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   }, [lens, contactId, contact]);
   // DELETE (L114): asked first — the confirm is the undo — then hide + leave the pair circle.
   const confirmDelete = useCallback(() => {
-    const who = contact?.name ?? contactId;
+    const who = name;
     Alert.alert(t('circle.contacts.delete_title', { name: who }), t('circle.contacts.delete_body', { name: who }), [
       { text: t('circle.contacts.lens.cancel'), style: 'cancel' },
       { text: t('circle.contacts.delete_confirm'), style: 'destructive', onPress: async () => {
@@ -377,7 +394,23 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
           ))}
         </View>
       )}
+      {attachOpen && contactAttach.length ? (
+        <View testID="contact-attach-menu">
+          {contactAttach.map((e) => (
+            <Pressable key={`${e.appOrigin}.${e.opId}`} onPress={() => runContactAttach(e)} accessibilityRole="button" testID={`contact-attach-${e.opId}`}>
+              <Text style={styles.suggestHint}>{t(e.label)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {/* no connection point: the composer says the message waits (the host's relay-question predicate; web parity) */}
+      {noRelay ? <Text style={styles.suggestHint} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
       <View style={styles.composer}>
+        {contactAttach.length ? (
+          <Pressable onPress={() => setAttachOpen((v) => !v)} accessibilityRole="button" accessibilityLabel={t('circle.view.attach')} testID="contact-composer-attach">
+            <Text style={styles.suggestHint}>+</Text>
+          </Pressable>
+        ) : null}
         <TextInput
           style={styles.input}
           value={input}

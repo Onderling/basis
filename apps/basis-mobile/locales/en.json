@@ -95,7 +95,7 @@
       "doc": "QrScannerModal title"
     },
     "scan_subheading": {
-      "text": "Point the camera at a onderling-contact:// or onderling-invite:// QR. You can also paste it.",
+      "text": "Point the camera at the code someone shows you. You can also paste it.",
       "doc": "QrScannerModal under-camera hint"
     },
     "scan_perm_rationale": {

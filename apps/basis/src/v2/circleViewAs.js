@@ -19,6 +19,9 @@
  * with a separate name, and it can only ever NARROW what a release shows.
  */
 
+import { isKeyLike, SOMEONE_LABEL_KEY } from './personLabel.js';
+import { normalizeCircleMembers } from '@onderling/kring-host/circleMembers';
+
 /** Who you can preview the circle as. */
 export const VIEWER_KINDS = ['member', 'stranger', 'agent'];
 
@@ -81,8 +84,9 @@ export function viewAsDirectory({ members = [], viewer = {}, policy = 'pairwise'
  *
  * @param {CircleMember} member
  * @param {{viewerId?:string|null, policy?:'open'|'pairwise'}} [opts]
- * @returns {{primary:string, secondary:string|null, revealed:boolean}}
- *   `primary` is always safe to render; `secondary` is the real name ONLY when it may be shown.
+ * @returns {{primary:string|null, primaryKey:string|null, secondary:string|null, revealed:boolean}}
+ *   `primary` is always safe to render, or null — then paint `t(primaryKey)` ("someone"); `secondary` is the real
+ *   name ONLY when it may be shown.
  */
 export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwise' } = {}) {
   const m = member && typeof member === 'object' ? member : {};
@@ -90,30 +94,33 @@ export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwis
   const revealed = !!(self || policy === 'open' || m.released === true);
   const handle = m.handle ?? null;
   const realName = (m.realName ?? (self ? m.ownDisplayName : null)) ?? null;
+  // Never fall back to the real name for an unreleased member. Past the handle and a released name, an identifier
+  // the person chose (a webid, a URL) is still theirs to be known by; an opaque key is not a name — that member is
+  // "someone" (`primaryKey`), never a key or a piece of one (`personLabel.js`).
+  const named = handle ? `@${handle}` : ((revealed && realName) ? realName : null);
+  const byId = named == null && typeof m.id === 'string' && m.id && !isKeyLike(m.id) ? m.id : null;
+  const primary = named ?? byId;
   return {
     revealed,
-    // Never fall back to the real name for an unreleased member — the id is the honest last resort.
-    primary: handle ? `@${handle}` : ((revealed && realName) ? realName : shortId(m.id)),
+    primary,
+    primaryKey: primary == null ? SOMEONE_LABEL_KEY : null,
     secondary: (revealed && realName && handle) ? realName : null,
   };
 }
 
+
 /**
- * The id, shortened enough to read — the last resort when nobody has given a name.
+ * A RAW roster row (`listGroupMembers`: `{webid, handle, displayName, said…}`) labelled by the reveal ladder — the
+ * admin page's rows and its confirm texts. The raw row carries the member's display name UNGATED; read straight, an
+ * unreleased member's real name showed on the admin page and in "… was removed" (walk rows 67/68). It goes through
+ * the same projection the members list uses (`normalizeCircleMembers`), so the admin sees what the ladder lets them.
  *
- * Honest and readable are not in tension here. A 43-character key IS the honest answer and it is not one
- * a person can hold in their head or tell two rows apart by; Nearby settled this already (`pickPeerLabel`
- * in `circleNearby.js`: *"short-suffix the pubKey so rows are distinguishable without leaking the whole
- * identity. Anonymous-by-default per design."*), and a roster wants the same answer for the same reason.
- *
- * It mattered from 2026-08-31, when the invented default names were removed: before that a fresh circle
- * called its creator "me", so nothing ever reached this branch with a real key in it.
- *
- * Only an opaque key is shortened. A `webid:` or a URL is already a name a person chose to be known by,
- * and cutting it would mangle it.
+ * @param {object} raw
+ * @param {{ viewerId?: string|null, policy?: 'open'|'pairwise', t: (k: string, v?: object) => string }} opts
+ * @returns {string}
  */
-function shortId(id) {
-  if (typeof id !== 'string' || !id) return '';
-  if (id.includes(':') || id.includes('/') || id.length <= 12) return id;
-  return `peer-${id.slice(0, 6)}`;
+export function rosterRowShown(raw, { viewerId = null, policy = 'pairwise', t } = {}) {
+  const [m] = normalizeCircleMembers({ members: raw ? [raw] : [] });
+  const l = revealedMemberLabel(m ?? {}, { viewerId, policy });
+  return l.primary ?? t(l.primaryKey);
 }

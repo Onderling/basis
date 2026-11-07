@@ -8,6 +8,7 @@
  */
 import { GOVERNANCE_KIND } from './governanceLog.js';
 import { isReportStatementKind } from './reportLane.js';
+import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
 /** Peer handler for `circle-governance-broadcast` → ingest the vote/proposal event locally.
  *  `notify(circleId, event)` fires an IN-APP nudge for wake-worthy events (a decision opened),
@@ -21,14 +22,14 @@ export function makeCircleGovernancePeerHandler({ eventLog, onChange, notify, ra
   if (!rail) throw new Error('makeCircleGovernancePeerHandler: a governance rail is required — a fanned statement must verify before it lands');
   {
     return async function onCircleGovernanceRail(fromPeerAddr, payload) {
-      if (!payload || payload.subtype !== 'circle-governance-broadcast') return;
+      if (!payload || payload.subtype !== 'circle-governance-broadcast') return NOT_TAKEN;
       const { circleId, event: statement } = payload;
-      if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;   // signed-only
+      if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return NOT_TAKEN;   // signed-only
       const id = `${GOVERNANCE_KIND}:${statement.body.hash}`;
       const isNew = eventLog.query({}).every((e) => e.id !== id);
       try {
         const res = await rail.ingest(circleId, statement);
-        if (!res?.ok) return;                     // refused: unverifiable — never lands, never notifies
+        if (!res?.ok) return NOT_TAKEN;           // refused (unverifiable, or its signer not folded yet) — retryable
         try { onChange?.(circleId); } catch { /* re-render is best-effort */ }
         // a NEW statement goes on to the person's other devices (the one sibling carry's seam)
         if (isNew && typeof onLanded === 'function') { try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* best-effort */ } }
@@ -37,7 +38,8 @@ export function makeCircleGovernancePeerHandler({ eventLog, onChange, notify, ra
           const { authorRef, ...flat } = statement.body.payload ?? {};
           try { notify(circleId, { ...flat, event: statement.body.kind, proposalId: statement.body.subject }); } catch { /* best-effort */ }
         }
-      } catch { /* ingest is best-effort — never throw on a peer message */ }
+        return undefined;
+      } catch { return NOT_TAKEN; /* ingest is best-effort — never throw on a peer message */ }
     };
   }
 }
@@ -51,13 +53,14 @@ export function makeCircleGovernancePeerHandler({ eventLog, onChange, notify, ra
 export function makeCircleReportPeerHandler({ rail, onChange = null } = {}) {
   if (!rail) throw new Error('makeCircleReportPeerHandler: the governance rail is required — a report must verify before it lands');
   return async function onCircleReport(_fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== 'circle-report-broadcast') return;
+    if (!payload || payload.subtype !== 'circle-report-broadcast') return NOT_TAKEN;
     const { circleId, event: statement } = payload;
-    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;   // signed-only
-    if (!isReportStatementKind(statement.body.kind)) return;   // this door carries reports, nothing else of the lane
+    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return NOT_TAKEN;   // signed-only
+    if (!isReportStatementKind(statement.body.kind)) return NOT_TAKEN;   // this door carries reports, nothing else of the lane
     try {
       const res = await rail.ingest(circleId, statement);
       if (res?.ok) { try { onChange?.(circleId); } catch { /* re-render is best-effort */ } }
-    } catch { /* ingest is best-effort — never throw on a peer message */ }
+      return res?.ok ? undefined : NOT_TAKEN;
+    } catch { return NOT_TAKEN; /* ingest is best-effort — never throw on a peer message */ }
   };
 }

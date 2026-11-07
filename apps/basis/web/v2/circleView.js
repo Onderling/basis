@@ -65,6 +65,7 @@ import { timeWords } from '../../src/v2/whenWords.js';
 
 export function renderCircleView(container, {
   circle = {},
+  noRelay = false,   // this device knows no relay: the composer says the message waits
   rows = [],
   onBack,
   onSend,
@@ -123,7 +124,7 @@ export function renderCircleView(container, {
   // gate is the real security boundary; this is owner-only VISIBILITY). Absent →
   // no entrust action (backwards-compatible).
   viewerWebid = null,
-  viewerIsAdmin = false,
+  viewerIsAdmin = null,   // true · false · null while the roster has not answered
   // Composer affordances (web↔mobile parity, ported from the classic shell). Both optional — without
   // them the composer renders exactly as before.
   //   `catalogue`  the merged dispatch catalogue → drives the slash-command auto-suggest dropdown.
@@ -600,6 +601,14 @@ export function renderCircleView(container, {
       // Keep focus so a quick burst of messages feels native.
       input.focus();
     });
+    // No connection point: the composer says the message waits (the host's relay-question predicate; contact thread parity)
+    if (noRelay) {
+      const wait = document.createElement('p');
+      wait.className = 'cc-composer__no-point';
+      wait.dataset.role = 'no-point';
+      wait.textContent = tr('circle.composer.no_point');
+      container.appendChild(wait);
+    }
     container.appendChild(form);
   }
 
@@ -781,7 +790,7 @@ function renderLedenTab(body, { members = null, unreachable = null, selfWebid = 
     row.appendChild(face);
     const primary = document.createElement('span');
     primary.className = 'circle-view__member-primary';
-    primary.textContent = label.primary;
+    primary.textContent = label.primary ?? tr(label.primaryKey);
     row.appendChild(primary);
 
     // The real name as a secondary line — only when this viewer may actually see it.

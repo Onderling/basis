@@ -9,7 +9,8 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createRelayQuestion, knownRelayUrl, createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../../basis/src/v2/connectionPoints.js';
+import { createRelayQuestion, knownRelayUrl, createConnectionPoints, asyncStorageConnectionPointsIo, adoptInheritedPoint } from '../../../../basis/src/v2/connectionPoints.js';
+import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 import { asyncStorageRelayIo, normalizeRelayUrl } from '../../../../basis/src/v2/relayPref.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
@@ -22,7 +23,25 @@ const readKnown = async () => ({
 });
 
 // One per app session, shared by every screen that asks.
-const relayQuestion = createRelayQuestion({ read: readKnown });
+// exported: Vandaag's reach card asks the same predicate (does this device know a relay at all)
+export const relayQuestion = createRelayQuestion({ read: readKnown });
+
+/**
+ * A device with no relay of its own adopts the point a scanned card brought (the shared `adoptInheritedPoint`), through
+ * a SAVING points store, so the boot choice reconnects to it after a restart. Web parity: circleApp's adoptContactPoint.
+ * @param {object} agent  the bundle's agent (its `addRelay` dials)
+ * @returns {(contact: object) => Promise<{adopted: string|null, say: string|null}>}
+ */
+export function contactPointAdopter(agent) {
+  return async (contact) => {
+    const io = asyncStorageConnectionPointsIo(AsyncStorage);
+    const store = createConnectionPoints({ initial: await io.load(), save: io.save });
+    return adoptInheritedPoint({
+      store, knowsRelay: await relayQuestion.knows(), points: contact?.points ?? [],
+      dial: (url) => agent?.addRelay?.(url, { awaitReady: true }), name: nameShown(contact, t), t,
+    });
+  };
+}
 
 /** The relay this device knows (an add-device offer names it), or null. */
 export async function currentRelayUrl() {

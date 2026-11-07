@@ -21,6 +21,9 @@ import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
 // L125 — the add sheet: what the new contact sees of you, asked before the card is added (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
+import { nameShown } from '../../../../basis/src/v2/personLabel.js';   // never the key on screen
+import { contactPointAdopter } from './RelayQuestionModal.js';
+import { HEADER_AVATAR_SIDE_CLEARANCE } from './fab.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
@@ -39,8 +42,10 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState('');
   const [error, setError] = useState(false);
+  // a device with no relay of its own adopts the point a scanned card brings (said once)
+  const contactAdopter = useMemo(() => contactPointAdopter(bundle?.agent ?? null), [bundle]);
   const lens = useContactLensSheet({
-    callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, t, theme,
+    callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t, theme,
   });
   // Hidden contacts (L106, web parity with contactsRoster.js) fold away at the bottom: the row stays, out of
   // sight, until they write again or the person shows them. A list of only hidden contacts is not empty.
@@ -109,7 +114,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
         <FaceView row={c} size={32} fallbackGlyph={c.isBot ? '🤖' : null} resolvePicture={typeof resolvePictureFor === 'function' && !c.synthetic ? resolvePictureFor(c) : null} />
         <View style={styles.body}>
           <Text style={[styles.name, n > 0 && styles.nameUnread]}>
-            {c.name}
+            {nameShown(c, t)}
             {/* two contacts, one name (web parity): every row of the set says which one it is */}
             {c.lookalike ? <Text style={styles.lookalike} accessibilityLabel={t('circle.contacts.lookalike_hint')}>{`  ${c.lookalike}`}</Text> : null}
           </Text>
@@ -195,7 +200,7 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   blockedText: { fontSize: 15, color: theme.color.ink },
   blockedArrow: { fontSize: 15, color: theme.color.inkSoft },
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingRight: HEADER_AVATAR_SIDE_CLEARANCE },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   acts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', flexShrink: 1 },
   add: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent },

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 68
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 69
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -21,6 +21,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `browser-specs-assert` | — | every spec in apps/basis/test-browser/ asserts something |
 | `callskill-literals` | — | a literal `callSkill('group', 'op')` must name an op some manifest declares |
 | `carrying` | — | the carrying index held to the code (`carrying.mjs`): every server route and store is declared with |
+| `catalogue-ops` | — | every op in every app manifest is named on exactly ONE page of the functionality catalogue |
 | `chat-hints-localised` | — | every op the household assistant can be asked for has a Dutch hint |
 | `ci-runs-guards` | — | the mechanism that runs the checks is itself checked |
 | `circle-store-door` | G-C1 | one store per circle |

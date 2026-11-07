@@ -33,7 +33,7 @@
  */
 
 /** How a point came to be here. Kept because "I added this" and "a circle brought this" read differently. */
-export const POINT_SOURCE = Object.freeze({ JOIN: 'join', MANUAL: 'manual', SUGGESTED: 'suggested' });
+export const POINT_SOURCE = Object.freeze({ JOIN: 'join', MANUAL: 'manual', SUGGESTED: 'suggested', CONTACT: 'contact' });
 
 /**
  * What KIND of connection point (2026-07-28, the NKN+pod circle).
@@ -55,6 +55,7 @@ export const POINT_SOURCE_LABELS = Object.freeze({
   join:      'circle.nearbyScreen.point_from_join',
   manual:    'circle.nearbyScreen.point_from_manual',
   suggested: 'circle.nearbyScreen.point_suggested',
+  contact:   'circle.nearbyScreen.point_from_contact',
 });
 
 /** Status → locale key. Shared, so web and mobile cannot describe the same point differently. */
@@ -181,6 +182,17 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
      */
     addPodPoint(podUrl, circleId) {
       return this.addFromJoin(podUrl, circleId, { kind: POINT_KIND.POD });
+    },
+
+    /**
+     * A point a scanned contact card brought, adopted by a device that had no relay of its own
+     * (`adoptInheritedPoint`): scanning the card is the consent, as joining is for an invite's point.
+     */
+    addFromContact(url) {
+      if (!isUrl(url)) return { ok: false, reason: 'invalid-url' };
+      upsert(url, { source: POINT_SOURCE.CONTACT, adopted: true });
+      commit();
+      return { ok: true };
     },
 
     /** A point the user typed in themselves. */
@@ -499,7 +511,7 @@ export function knownRelayUrl({ saved = null, arg = null, list = [] } = {}) {
  *
  * @param {object} deps
  * @param {() => ({ saved?: string|null, arg?: string|null, list?: Array<object> } | Promise<object>)} deps.read
- * @returns {{ check: () => Promise<{ ask: boolean }>, later: () => void }}
+ * @returns {{ check: () => Promise<{ ask: boolean }>, later: () => void, knows: () => Promise<boolean> }}
  */
 export function createRelayQuestion({ read } = {}) {
   let deferred = false;
@@ -512,6 +524,10 @@ export function createRelayQuestion({ read } = {}) {
     },
     /** "Later": not again this session. */
     later() { deferred = true; },
+    /** Does this device know a relay at all (saved, given, or on the list)? "Later" does not change the answer. */
+    async knows() {
+      try { return !!knownRelayUrl((await read?.()) ?? {}); } catch { return false; }
+    },
   };
 }
 
@@ -597,3 +613,35 @@ export function adoptExistingRelay({ relayUrl, points } = {}) {
   return { migrated: !known };
 }
 
+
+/**
+ * THE RELAY TRAVELS WITH EVERY SHARE, AND A DEVICE WITHOUT ONE ADOPTS IT (Frits 2026-10-30).
+ *
+ * A scanned contact card names the relays its person is on. Until now those became only the CONTACT's points, and a
+ * device with no relay of its own dialled the first one at its first send to that contact: silent, not at the scan,
+ * and not saved, so after a restart it was unreachable again. Here, at the scan: a device that knows no relay saves
+ * the card's first point as its own (adopted, so `bootRelayUrl` reconnects to it after a restart), dials it, and only
+ * when the dial did not fail marks it active and says once whose point it now uses. A device with a relay keeps its own: a
+ * card never reconfigures a device that already chose.
+ *
+ * @param {object} a
+ * @param {object} a.store          a `createConnectionPoints` store that saves
+ * @param {boolean} a.knowsRelay    whether this device knows a relay already (the relay question's `knows()`)
+ * @param {string[]} [a.points]     the card's relays, as the added contact carries them
+ * @param {(url: string) => Promise<any>} a.dial   the host's dial (the agent's `addRelay(url, {awaitReady})`)
+ * @param {string} [a.name]         who the card is, for the line
+ * @param {(key: string, params?: object) => string} a.t
+ * @returns {Promise<{adopted: string|null, say: string|null}>}
+ */
+export async function adoptInheritedPoint({ store, knowsRelay, points = [], dial, name = '', t } = {}) {
+  if (knowsRelay !== false || !store) return { adopted: null, say: null };
+  const url = (Array.isArray(points) ? points : []).find((u) => typeof u === 'string' && /^wss?:\/\/\S+$/.test(u.trim())) ?? null;
+  if (!url || !store.addFromContact(url)?.ok) return { adopted: null, say: null };
+  let dialled = null;
+  try { dialled = await dial?.(url); } catch { dialled = { ok: false }; }
+  const reached = !(dialled && dialled.ok === false);
+  // a failed dial keeps the point saved (the boot retries it) and claims nothing: the no-connection-point line stays true
+  if (!reached) return { adopted: url, say: null };
+  store.setActive?.(url);
+  return { adopted: url, say: typeof t === 'function' ? t('circle.nearbyScreen.point_adopted_from', { name }) : null };
+}

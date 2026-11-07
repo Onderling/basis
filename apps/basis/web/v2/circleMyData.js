@@ -16,6 +16,7 @@ import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { historyStatusLine } from '../../src/v2/historyMirror.js';
 import { basisManifest } from '../../src/index.js';
+import { deviceListWords } from '../../src/v2/mijWords.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -25,6 +26,8 @@ export function renderCircleMyData(container, {
   t,
   onBack,
   onSignIn,
+  // the pod provider field: its default and the known providers (podAuth's list)
+  podIssuerDefault = null, podIssuers = [],
   onViewMnemonic,
   onRestore,
   onEnroll, onReceivePersonas,
@@ -36,6 +39,8 @@ export function renderCircleMyData(container, {
   // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
   frequent = [], onClearFrequent,
   devices = [],
+  // this device's id and the browser's name for it: the list says "this device (Firefox on Linux)", never a d-… id
+  thisDeviceId = null, deviceName = null,
   onRevokeDevice,
   devicesNeedPhrase = false,
   startScreen = null,
@@ -662,7 +667,7 @@ export function renderCircleMyData(container, {
           row.className = 'cc-mydata__device';
           row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.25rem 0;';
           const label = document.createElement('span');
-          label.textContent = d.label || d.deviceId;
+          label.textContent = deviceListWords(d, { thisDeviceId, deviceName, t: tr });
           if (d.revoked) label.style.textDecoration = 'line-through';
           row.appendChild(label);
           if (!d.revoked) {
@@ -1037,12 +1042,30 @@ export function renderCircleMyData(container, {
         storage.appendChild(localNote);
       }
       // Sign in to a real Solid pod (reuses src/web/podAuth.js) — sealed circles then store there.
+      // WHICH POD PROVIDER: a field, as mobile has. The walk found web going straight to Inrupt PodSpaces — a person with
+      // any other pod (and the repo's own test pod) could not connect from the web. Pre-filled with the default, the
+      // known providers offered as suggestions; what is typed is what sign-in uses.
       if (!podStatus.signedIn && typeof onSignIn === 'function') {
+        const issuer = document.createElement('input');
+        issuer.type = 'url';
+        issuer.className = 'cc-mydata__issuer';
+        issuer.value = podIssuerDefault ?? '';
+        issuer.placeholder = tr('circle.mydata.pod_issuer');
+        issuer.setAttribute('aria-label', tr('circle.mydata.pod_issuer'));
+        issuer.dataset.role = 'pod-issuer';
+        if (Array.isArray(podIssuers) && podIssuers.length) {
+          const list = document.createElement('datalist');
+          list.id = 'cc-pod-issuers';
+          for (const i of podIssuers) { const o = document.createElement('option'); o.value = i.url; o.label = i.name ?? i.url; list.appendChild(o); }
+          storage.appendChild(list);
+          issuer.setAttribute('list', list.id);
+        }
+        storage.appendChild(issuer);
         const signIn = document.createElement('button');
         signIn.type = 'button';
         signIn.className = 'cc-mydata__signin';
         signIn.textContent = tr('circle.mydata.pod_sign_in');
-        signIn.addEventListener('click', () => onSignIn());
+        signIn.addEventListener('click', () => onSignIn(issuer.value.trim() || null));
         storage.appendChild(signIn);
       }
       if (dataLocation.podRoot) storage.appendChild(kv(tr('circle.mydata.pod_root'), dataLocation.podRoot));

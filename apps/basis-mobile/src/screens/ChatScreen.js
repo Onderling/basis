@@ -146,6 +146,7 @@ import { getBasisClassifiers } from '../core/qrClassifiers.js';
 import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../core/mappingsStoreRN.js';
+import { contactPointAdopter } from './v2/RelayQuestionModal.js';
 // ε.6 — multi-offer chooser modal (opt-in via policy.catchUpChooserMode='prompt').
 // ε.6 follow-up — read the same per-circle policy the launcher writes so
 // the chooser mode is honoured on mobile (web reads localStorage
@@ -250,9 +251,11 @@ export default function ChatScreen({
   }
   const [logsPanelOpen, setLogsPanelOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  // a device with no relay of its own adopts the point a scanned card brings (said once)
+  const contactAdopter = useMemo(() => contactPointAdopter(bundle?.agent ?? null), [bundle]);
   const contactLens = useContactLensSheet({
     callSkill: bundle?.callSkill ?? null, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor,
-    shareRelease: bundle?.shareCircleRelease, t,
+    shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t,
   });
   // E5 — record/mini-page "⤢ Open in full": holds the reply shown in
   // the full-height detail modal, or null when closed.
@@ -571,7 +574,9 @@ export default function ChatScreen({
       'group-redeem-request':  makeHandleGroupRedeemRequest({
         callSkill, sendPeer, publishEvent,
         // a member admitted into a PAIR circle is its co-admin (the pair roster's rule; web parity)
-        onAdmitted: (a) => bundle?.pairRoster?.onAdmitted?.(a),
+        // …and the launcher re-reads its circles: an open invite then shows the count and who came in (an admin's own
+        // admission is a local write, so the membership lane's signal never fires for it)
+        onAdmitted: (a) => { onCirclesChanged?.(); return bundle?.pairRoster?.onAdmitted?.(a); },
         // a code bound to one person is theirs from any of their addresses (the canonical chat key)
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         // …and return OUR per-circle address for the circle being joined, proven the same way the joiner

@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { t } from '../../core/localisation.js';
+import { t, lang } from '../../core/localisation.js';
 import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
 import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circleShare.js';
 // The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
@@ -23,16 +23,18 @@ import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circ
 import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
 // decision (web ≡ mobile); the screen paints it and works nothing out for itself.
-import { roleControlFor, roleChangeConfirm, roleChangeNoticeWords, ownSpineOutboxLine, removeControlFor, announceControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
+import { roleControlFor, roleChangeConfirm, removeMemberConfirm, roleChangeNoticeWords, ownSpineOutboxLine, removeControlFor, announceControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
 // The confirm the op declares, run through the SAME gate the chat path uses — Alert.alert is only
 // this platform's presenter.
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
+import { blockedRowWords } from '../../../../basis/src/v2/blockedWords.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import FaceView from './FaceView.js';
+import { rosterRowShown } from '../../../../basis/src/v2/circleViewAs.js';
 
-export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null,
+export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null, revealPolicyOf = null,
   // what this circle shared out, and taking it back (the host binds them to this device's resolvers — `circlePods.js`):
   // `outboundFor()` → {shares, revocable} · `stopShare(share)` → reply · `revokeForRemoved(webid)` → the revoke tally
   outboundFor = null, stopShare = null, revokeForRemoved = null }) {
@@ -44,6 +46,9 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // empty first state told a circle's founder they were not its admin (walked on the emulator 2026-10-22)
   const [loaded, setLoaded] = useState(false);
   const [muted, setMuted] = useState([]);
+  const [mutedEntries, setMutedEntries] = useState([]);   // the same set with the name and day each block was made under
+  // the circle's reveal ladder (the strict one until read): a member's real name shows only when it lets the admin see it
+  const [revealPolicy, setRevealPolicy] = useState('pairwise');
   const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
   const [announce, setAnnounce] = useState('');
   const [notice, setNotice] = useState(null);
@@ -60,13 +65,15 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       callSkill('household', 'ownSpineOutbox', {}).catch(() => null),
     ]);
     setOutboxLine(ownSpineOutboxLine(outbox));
+    if (typeof revealPolicyOf === 'function') setRevealPolicy(await Promise.resolve(revealPolicyOf()).catch(() => 'pairwise'));
     // whose row is mine IN THIS CIRCLE: a persona's circle is the persona's
     setMyWebid((() => { try { return agent?.circleSelf?.(groupId)?.webid ?? null; } catch { return null; } })() ?? who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
     setLoaded(true);
     setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
+    setMutedEntries(Array.isArray(mut?.entries) ? mut.entries : []);
     if (typeof outboundFor === 'function') setOutbound(await Promise.resolve(outboundFor()).catch(() => ({ shares: [], revocable: false })));
-  }, [callSkill, groupId, outboundFor]);
+  }, [callSkill, groupId, outboundFor]);   // revealPolicyOf is an inline arrow: in the deps it would re-run the load every render
 
   useEffect(() => { load(); }, [load]);
 
@@ -74,7 +81,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // that member's per-circle address, then re-record the authorize snapshot from a fresh roster read.
   // Mobile previously called the raw skill and did neither of the last two, so a member removed on a
   // phone could still speak into the circle — the drift invariant 2 exists to catch.
-  const remove = useCallback(async (m) => {
+  const removeConfirmed = useCallback(async (m) => {
     setNotice(null);
     try {
       const r = await removeCircleMember({
@@ -84,7 +91,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
         memberStableId: m.stableId,
       });
       setNotice(r?.ok
-        ? t('circle.admin.removed', { name: m.displayName || m.handle || m.webid })
+        ? t('circle.admin.removed', { name: rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t }) })
         : t('circle.admin.refused'));
       // a removed member loses what this circle shared out (best-effort: the removal already stands)
       if (r?.ok && m.webid && typeof revokeForRemoved === 'function') {
@@ -94,6 +101,12 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     } catch { setNotice(t('circle.admin.refused')); }
     load();
   }, [agent, callSkill, groupId, load, revokeForRemoved]);
+  // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
+  const remove = useCallback((m) => runConfirmGate({
+    request: removeMemberConfirm({ name: rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t }), t }),
+    present: alertConfirmPresenter(Alert.alert),
+    execute: () => removeConfirmed(m),
+  }), [removeConfirmed]);
   // "Stop sharing": take ONE share back in place (a canonical circle only — the shared decision says which)
   const stop = useCallback(async (s) => {
     setNotice(null);
@@ -107,7 +120,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   // it, carrying the consequence THIS change has: an ordinary demotion, a handover of the whole circle,
   // or one the fold will not let stand. What that consequence is comes from the shared decision.
   const setRole = useCallback(async (m, control) => {
-    const name = m.displayName || m.handle || m.webid;
+    const name = rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t });
     await runConfirmGate({
       request: roleChangeConfirm({ control, name, t }),
       present: alertConfirmPresenter(Alert.alert),
@@ -131,7 +144,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   }, [announce, callSkill, groupId]);
   // The same projection the web shell paints — a raw key is not a person's name, and the two shells
   // must not disagree about who is on this list or what they are called.
-  const blocked = buildBlockedList({ peers: muted, members });
+  const blocked = buildBlockedList({ peers: muted, entries: mutedEntries, members });
 
   const unmute = useCallback(async (key) => {
     // Unblock takes the key as it is listed — the block set stores whatever the block was made on
@@ -150,7 +163,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
             {/* The member's face — the persona picture they DISCLOSED to this circle, so its presence on the
                 row is already the permission. web parity: circleAdminPanel.js. */}
             <FaceView row={m} size={28} resolvePicture={resolvePicture} />
-            <Text style={styles.name}>{m.displayName || m.handle || m.webid}</Text>
+            <Text style={styles.name}>{rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t })}</Text>
             {m.role && m.role !== 'member' && <Text style={styles.role}>{t(`circle.admin.role.${m.role}`)}</Text>}
             {/* …and HOW they came by it: they made the circle, an admin appointed them, or nobody
                 did — the circle was left without an admin and the projection handed it over. web≡mobile. */}
@@ -236,10 +249,10 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     ),
     'admin-muted': (d) => (
       <Section key={d.id} id={d.id} title={t(d.titleKey)}>
-        {blocked.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : blocked.map(({ key, label }) => (
-          <View key={key} style={styles.row}>
-            <Text style={styles.name}>{label}</Text>
-            <Pressable style={styles.secondary} onPress={() => unmute(key)}><Text style={styles.secondaryText}>{t('circle.admin.unmute')}</Text></Pressable>
+        {blocked.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : blocked.map((row) => (
+          <View key={row.key} style={styles.row}>
+            <Text style={styles.name}>{blockedRowWords(row, { t, lang: lang() })}</Text>
+            <Pressable style={styles.secondary} onPress={() => unmute(row.key)}><Text style={styles.secondaryText}>{t('circle.admin.unmute')}</Text></Pressable>
           </View>
         ))}
       </Section>

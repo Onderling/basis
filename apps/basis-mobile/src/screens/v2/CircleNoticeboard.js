@@ -195,7 +195,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       else if (action === 'mute' && post.addedBy) {
         // BLOCK the person — both halves, one act (web parity). Keyed on the webid, which is what
         // makes it a block of a PERSON rather than of one address.
-        await callSkill('basis', 'mute', { peer: post.addedBy });
+        await callSkill('basis', 'mute', { peer: post.addedBy, ...(post.addedByLabel ? { label: post.addedByLabel } : {}) });
         try { onPeerMuted?.(); } catch { /* the chat hide-set refresh is best-effort */ }
       }
     } catch { /* reload reflects the real state */ }
@@ -336,7 +336,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
             {p.type === 'lend' && p.mine && <Chip label={t('circle.noticeboard.action.assign')} onPress={() => runAction('assign', p)} />}
             {p.type === 'lend' && p.mine && <Chip label={t('circle.noticeboard.action.returned')} onPress={() => runAction('markReturned', p)} />}
             {(Array.isArray(p.responders) ? p.responders : []).map((r) => (
-              <Chip key={`accept-${r.webid}`} label={t('circle.noticeboard.action.accept', { name: r.label })} onPress={() => runAction('accept', p, r.webid)} />
+              <Chip key={`accept-${r.webid}`} label={t('circle.noticeboard.action.accept', { name: r.label ?? t(r.labelKey) })} onPress={() => runAction('accept', p, r.webid)} />
             ))}
             {p.mine && <Chip label={t('circle.noticeboard.action.cancel')} onPress={() => runAction('cancel', p)} />}
             {!p.mine && <Chip label={t('circle.noticeboard.action.report')} muted onPress={() => runAction('report', p)} />}

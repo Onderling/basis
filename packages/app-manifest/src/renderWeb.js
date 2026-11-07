@@ -864,6 +864,7 @@ function buildAction(action) {
     }
   }
   if (typeof action.role === 'string' && action.role !== '') out.role = action.role;   // who the entry is for
+  if (typeof action.memberLabelKey === 'string' && action.memberLabelKey !== '') out.memberLabelKey = action.memberLabelKey;   // what a known non-admin calls the same place
   return out;
 }
 

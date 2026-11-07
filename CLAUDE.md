@@ -28,6 +28,10 @@ verbs actually relate (§3, "The data plane"). One sentence of it, because it de
 > **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds
 > its own where it needs them; and whatever the store holds is what syncs to the circle's other members.**
 
+**And [`docs/catalogue/`](docs/catalogue/README.md)** — one page per capability area: what a person can do, where it
+lives, what proves it, what was decided not to build. Read the area's page before ruling something absent or building
+in it; every manifest op is on exactly one page (`lint-catalogue-ops`).
+
 That file also lists **where the runtime does not match the model yet** — read those before concluding
 something is unbuilt. The recurring failure here is not a wrong decision; it is a route that quietly
 stopped following a right one, and the code kept working locally the whole time.
@@ -265,6 +269,12 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   a HOMES home, that is drift — stop and reconcile before continuing. Keep the two trackers live as you work:
   `plans/DOC-STATUS.md` (doc lifecycle) + `plans/DECISIONS-FOR-REVIEW.md` (every autonomous call), and
   sanity-check that mapping at each session's close (the wave-2 log in `DOC-STATUS.md` is the worked example).
+
+- **Shared checkout, two agents (Fable + Opus work in one `canopy-mono` clone):** a tracked file is edited only in a
+  `wt-*` worktree (`plans/tools/mk-worktree.sh`), never in the shared checkout; its branch is never switched. At session
+  start and before stopping, `git status --short` in `canopy-mono` must be empty, or the change is named in the memory
+  state file with its owner. An unowned change is reported, never stashed, never reverted blind.
+- **Never `git stash` in this repo** (two slips: 2026-10-06, 2026-11-05 — a failed `stash push` left the ref empty and `stash apply $S` applied another session's WIP). A worktree makes it unnecessary: commit the WIP on the branch, or `git diff > <scratchpad>/x.patch` + `git checkout -- <paths>` and `git apply` it back. `stash apply/pop/drop` without an explicit ref is forbidden outright.
 
 ## Where the truth is
 - **Doc layout (task #66 model — [`docs/repository-layout.md`](docs/repository-layout.md)):** function is encoded in

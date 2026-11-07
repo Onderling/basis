@@ -433,7 +433,7 @@ async function sendFile(args, {
       return { ok: false, error: t('sendFile.no_lookup') };
     }
     const resolved = await lookupPeerAddrByWebid(peerRaw).catch(() => null);
-    if (!resolved) return { ok: false, error: t('sendFile.lookup_failed', { peer: peerRaw }) };
+    if (!resolved) return { ok: false, code: 'not_reached', error: t('sendFile.lookup_failed', { peer: peerRaw }) };
     peerAddr = resolved;
   }
 
@@ -441,7 +441,7 @@ async function sendFile(args, {
   let file;
   try {
     file = await openFilePicker();
-    if (!file) return { ok: false, error: t('sendFile.cancelled') };
+    if (!file) return { ok: false, code: 'cancelled', error: t('sendFile.cancelled') };
   } catch (err) {
     return { ok: false, error: t('sendFile.pick_failed', { error: err.message ?? String(err) }) };
   }
@@ -503,14 +503,16 @@ async function sendFile(args, {
   try {
     // Sealed to the PERSON when their current key is on record (the same seal as a text turn): the wire then
     // carries a box and a stub, never the bytes. Without a key on record the bytes ride inline, as before.
+    // What went out, handed back with the answer: a thread that ran this records it on its own side.
+    const sentFile = {
+      id:    `file-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      name:  sent.name,
+      mime:  sent.mime,
+      size:  sent.size,
+      dataB64,
+    };
     const envelope = await buildFileShareEnvelope({
-      file: {
-        id:    `file-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-        name:  sent.name,
-        mime:  sent.mime,
-        size:  sent.size,
-        dataB64,
-      },
+      file: sentFile,
       peerAddr,
       sealFor: agent?.contactSeal?.sealFor ?? null,
     });
@@ -524,12 +526,12 @@ async function sendFile(args, {
     // distinguishes delivered / held-for-later / given-up; reporting "sent" for all three is the
     // 2026-05-23 lesson repeating one layer up (sender-side OK, receiver never told otherwise).
     if (res && res.held === true) {
-      return { message: t('sendFile.held', { name: file.name, peer: peerAddr }) };
+      return { message: t('sendFile.held', { name: file.name, peer: peerAddr }), held: true, file: sentFile };
     }
     if (res && res.held === false && res.delivered === false) {
-      return { ok: false, error: t('sendFile.not_delivered', { peer: peerAddr, reason: res.reason ?? 'unknown' }) };
+      return { ok: false, code: 'not_reached', error: t('sendFile.not_delivered', { peer: peerAddr, reason: res.reason ?? 'unknown' }) };
     }
-    return { message: t('sendFile.sent', { name: file.name, size: file.size, peer: peerAddr }) };
+    return { message: t('sendFile.sent', { name: file.name, size: file.size, peer: peerAddr }), file: sentFile };
   } catch (err) {
     return { ok: false, error: t('sendFile.send_failed', { error: err.message ?? String(err) }) };
   }
@@ -650,7 +652,10 @@ async function muteHandler(args, { agent, t }) {
   if (!peer) return { ok: false, error: t('mute.no_peer') };
   const sa = agent?.sa;
   if (!sa?.mute) return { ok: false, error: t('mute.unavailable') };
-  const added = await sa.mute.add(peer);
+  // the name the person saw when they blocked (a post's author label): kept beside the key, shown in the blocked list
+  // instead of the key; never used to match
+  const label = typeof args?.label === 'string' && args.label.trim() ? args.label.trim() : null;
+  const added = await sa.mute.add(peer, { label });
   if (!added) return { ok: true, message: t('mute.already', { peer }) };
   return { ok: true, message: t('mute.added', { peer }) };
 }
@@ -678,12 +683,14 @@ async function mutedHandler(_args, { agent, t }) {
   // The list is DATA as well as prose: the stream and the noticeboard hide a blocked person's posts by
   // reading this same set, so it has to be readable by something other than a person. It was a message
   // only, which is why the view had to keep a second block set of its own to filter by.
-  if (list.length === 0) return { ok: true, peers: [], message: t('mute.empty') };
+  // …and with the name each was blocked under and when (`entries`), for a list that never shows a key
+  const entries = typeof sa.mute.entries === 'function' ? sa.mute.entries() : list.map((key) => ({ key, label: null, at: null }));
+  if (list.length === 0) return { ok: true, peers: [], entries: [], message: t('mute.empty') };
   const lines = [t('mute.list_heading', { count: list.length })];
   for (const p of list) {
     lines.push(`  - ${p.length > 64 ? p.slice(0, 60) + '…' : p}`);
   }
-  return { ok: true, peers: list, message: lines.join('\n') };
+  return { ok: true, peers: list, entries, message: lines.join('\n') };
 }
 
 /**

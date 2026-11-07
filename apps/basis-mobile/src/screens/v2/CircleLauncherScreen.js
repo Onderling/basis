@@ -183,13 +183,13 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
 import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
-import { useRelayQuestion } from './RelayQuestionModal.js';
+import { useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
-import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { attachEntriesFor, attachEntryForType } from '../../../../basis/src/v2/attachEntries.js';
 import { readInviteUsage, joinedSince, memberIdsOf } from '../../../../basis/src/v2/inviteUsage.js';
 import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
@@ -290,7 +290,7 @@ import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareO
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
 import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
-import { handleOp, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
+import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
 import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import { contactOpenTarget, tileCircles } from '../../../../basis/src/v2/helpContact.js';
@@ -601,6 +601,10 @@ export default function CircleLauncherScreen({
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
+  // does this device know a relay at all (the relay question's own predicate)? true until read, so no false warning;
+  // re-read on every view change (a relay added on the connection points comes back to a composer that knows it)
+  const [relayKnown, setRelayKnown] = useState(true);
+  useEffect(() => { relayQuestion.knows().then(setRelayKnown).catch(() => {}); }, [view]);
   const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
   // the screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name
   const feedbackScreenRef = useRef(null);
@@ -1327,7 +1331,9 @@ export default function CircleLauncherScreen({
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags) },
+        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+        // the reach card: does this device know any relay (the relay question's own predicate, web parity)
+        relayKnown: () => relayQuestion.knows() },
     });
   }, [bundle, eventLog]);   // eslint-disable-line react-hooks/exhaustive-deps -- onboardingFlags is a stable memo declared further down (read at call time, never during render)
   // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the
@@ -2110,6 +2116,8 @@ export default function CircleLauncherScreen({
                       onPress={() => { const cid = inviteFor.circleId; setInviteFor(null); openCircleInvite(cid, { forFunction: true }); }} />
                   ) : null}
                 </>
+              ) : inviteFor?.pending ? (
+                <Text style={styles.inviteHint} testID="invite-pending">{t('circle.invite.making')}</Text>
               ) : (
                 <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
               )}
@@ -2265,8 +2273,9 @@ export default function CircleLauncherScreen({
                 else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
                 // the onboarding strip's acts: the handle through the profile op, the intro card seen here, begin
                 else if (a?.kind === 'set-handle') {
-                  const op = handleOp(a.value);
-                  if (!op.error) Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch(() => null).then(() => refreshScreensBook());
+                  // the typed name is the display name, the handle is made from it; never silent
+                  saveNameCard(a.value, { callSkill: bundle?.callSkill })
+                    .then((r) => { Alert.alert(nameCardWords(r, t)); if (r.ok) refreshScreensBook(); });
                 }
                 else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
                 else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); });
@@ -2278,6 +2287,8 @@ export default function CircleLauncherScreen({
                   });
                 }
                 else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => refreshScreensBook());
+                // the reach card: the connection points, where a relay is added (the relay question stays quiet after 'Later')
+                else if (a?.kind === 'open-points') setView('points');
                 else if (a?.kind === 'create-circle') setCreating(true);
                 else if (a?.kind === 'join-circle') setJoinScanOpen(true);
                 // a card's one action that IS an op (a chore done): through the waist, then the page repaints
@@ -2412,6 +2423,7 @@ export default function CircleLauncherScreen({
       return (
         <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
+            noRelay={!relayKnown}
             bundle={bundle}
             contact={contactThread}
             draft={contactThread?.draft ?? ''}
@@ -2691,6 +2703,7 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        noRelay={!relayKnown}
         pagesBook={screensBook}
         onCloseRemoved={async () => {
           const id = selected?.id;
@@ -3003,7 +3016,9 @@ export default function CircleLauncherScreen({
             load();
             // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
             // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
-            if (gid) openCircleInvite(gid).catch(() => {});
+            // THE INVITE IS ON SCREEN AT ONCE, saying it is being made: building it takes a few seconds, and a walk found the
+            // bare circle list showing all that time — a tap there opened a circle and the invite then came over it
+            if (gid) { setInviteFor({ circleId: gid, pending: true }); openCircleInvite(gid).catch(() => {}); }
           }}
         />
       ) : null}
@@ -3153,6 +3168,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
+  // this device knows no relay: the composer says the message waits (the relay question's predicate, web parity)
+  noRelay = false,
   // "Pin to +" on an attach entry (`onPinEntry(entry)`), and a bookmark opened from the "+" sheet (`openOp`: that op's
   // form, run once the circle's menu has resolved, then `onOpenOpDone()`)
   onPinEntry = null, openOp = null, onOpenOpDone = null,
@@ -4886,14 +4903,18 @@ function CircleDetail({
           // owner-only entrust chip (the same seam the chat stream uses). Tapping entrust
           // opens the mandate picker; claim/done route to the tasks agent. web≡mobile.
           <View testID="circle-detail-taken">
-            <Pressable
-              style={styles.takenAdd}
-              accessibilityRole="button"
-              testID="circle-taken-add"
-              onPress={() => setComposerText('/addtask ')}
-            >
-              <Text style={styles.takenAddText}>{t('circle.view.tasks_add')}</Text>
-            </Pressable>
+            {/* the SAME form "+ → Task" opens (attachEntryForType): it used to put "/addtask " into a composer this tab
+                does not show, so the button did nothing (walk, 2026-11-05); not painted where no task can be made */}
+            {attachEntryForType(attachEntries, 'task') ? (
+              <Pressable
+                style={styles.takenAdd}
+                accessibilityRole="button"
+                testID="circle-taken-add"
+                onPress={() => runAttachEntry(attachEntryForType(attachEntries, 'task'))}
+              >
+                <Text style={styles.takenAddText}>{t('circle.view.tasks_add')}</Text>
+              </Pressable>
+            ) : null}
             {circleTasks.length === 0 ? (
               <Text style={styles.placeholder}>{t('circle.view.tasks_empty')}</Text>
             ) : (
@@ -5139,6 +5160,7 @@ function CircleDetail({
             ))}
           </View>
         ) : null}
+        {noRelay ? <Text style={styles.placeholder} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
         <View style={styles.composer} testID="circle-detail-composer">
           {attachEntries.length > 0 ? (
             <Pressable

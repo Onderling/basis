@@ -449,6 +449,9 @@ export const basisManifest = {
       surfaces: {
         slash: { command: '/send-file', body: 'flags' },
         chat:  { reply: 'text', hint: 'share a file with a peer via NKN' },
+        // the "+" in a CONTACT thread (Frits: one attach affordance everywhere; a walk found no way to send a file to a
+        // contact but the slash): the same projector the circle composer reads, offered only where a contact is
+        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', scopes: ['contact'] },
       },
     },
 
@@ -691,6 +694,8 @@ export const basisManifest = {
       writes: { scope: 'device' },
       params: [
         { name: 'peer', kind: 'string', required: true },
+        // the name the person saw (a post's author): kept with the block so the blocked list names them, never matched on
+        { name: 'label', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/block', body: 'argline' },

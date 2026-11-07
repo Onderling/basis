@@ -31,7 +31,7 @@ describe('isJoinDirty — what counts as something to lose', () => {
     ['a handle was typed',         { handle: 'anna' }],
     ['a persona was chosen',       { persona: 'default' }],
     ['a capability was declined',  { capabilityOptOuts: ['prikbord'] }],
-    ['address sharing was turned OFF (a choice, though it leaves no text)', { shareAddress: false }],
+    ['address sharing was turned ON (a choice, though it leaves no text)', { shareAddress: true }],
     ['the join is in flight',      { submitting: true }],
   ]) {
     it(`is dirty once ${what}`, () => {

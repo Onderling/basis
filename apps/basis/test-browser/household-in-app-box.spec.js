@@ -90,8 +90,9 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
     if (!opened) await page.reload();
     await expect(wizard, 'the app opened its join screen from the link').toBeVisible({ timeout: 120_000 });
     for (let step = 0; step < 2; step += 1) {
-      const tick = wizard.locator('.cc-wizard-check input[type="checkbox"]').first();
-      if (await tick.count()) await tick.check().catch(() => {});
+      // every tick on the step: the rules, then the notice and "let other members reach me directly" (it starts unticked)
+      const ticks = wizard.locator('.cc-wizard-check input[type="checkbox"]');
+      for (let i = 0; i < await ticks.count(); i += 1) await ticks.nth(i).check().catch(() => {});
       await wizard.locator('.cc-wizard-btn-primary').first().click().catch(() => {});
       await page.waitForTimeout(1200);
     }

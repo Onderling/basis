@@ -103,9 +103,14 @@ export function buildNearbyModel({
       pseudonym:       typeof myPseudonym === 'string' && myPseudonym ? myPseudonym : null,
       publishedSkills: myPublishedSkills,
     },
+    // Who here shows what they offer: by name when one does, plainly when nobody does, a count past one.
     headerLabel: total === 0
       ? tr('circle.nearbyScreen.header_empty')
-      : tr('circle.nearbyScreen.header', { total, sharing: sharingAny }),
+      : sharingAny === 0
+        ? tr('circle.nearbyScreen.header_none')
+        : sharingAny === 1
+          ? tr('circle.nearbyScreen.header_one', { name: rows.find((r) => r.sharesAny)?.pseudonym ?? '' })
+          : tr('circle.nearbyScreen.header', { total, sharing: sharingAny }),
   };
 }
 

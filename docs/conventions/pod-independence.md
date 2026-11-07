@@ -1,6 +1,6 @@
 # Convention: preserve pod-independence
 
-> **Status:** deliverable (per transition doc §V.5 + §V.6).
+> **Status:** in force (checked against the code 2026-11-06).
 > Pins the design principle that the substrates-v2 plan MUST not
 > regress capabilities today's code already delivers without
 > requiring a Solid pod.

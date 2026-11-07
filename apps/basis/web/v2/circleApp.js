@@ -101,7 +101,7 @@ import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembe
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
 import {
-  createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND,
+  createConnectionPoints, adoptExistingRelay, adoptInheritedPoint, localStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND,
   // Used at module scope to pick the boot relay; it was never imported, so loading the web shell threw
   // `bootRelayUrl is not defined` before anything rendered — a BLANK PAGE, not a degraded one.
   bootRelayUrl, bootRelayUrls,
@@ -3291,7 +3291,18 @@ async function addContactWithSheet(payload) {
     mode: 'add', model, onSubmit: (c) => resolve(c), onCancel: () => resolve(null),
   }));
   if (!choice) return null;
-  return addContactAs({ callSkill: rawCallSkill, payload, ...choice, pairCircleIdOf: circlePairRoster?.pairCircleIdFor });
+  const r = await addContactAs({ callSkill: rawCallSkill, payload, ...choice, pairCircleIdOf: circlePairRoster?.pairCircleIdFor, adoptPoint: adoptContactPoint });
+  if (r?.adoptedSay) globalThis.alert?.(r.adoptedSay);
+  return r;
+}
+/** A device with no relay of its own adopts the point a scanned card brought (the shared `adoptInheritedPoint`). */
+async function adoptContactPoint(contact) {
+  const r = await adoptInheritedPoint({
+    store: getConnectionPoints(), knowsRelay: await refreshRelayKnown(), points: contact?.points ?? [],
+    dial: (url) => _peerAgent?.addRelay?.(url, { awaitReady: true }), name: nameShown(contact, t), t,
+  });
+  if (r.adopted) refreshRelayKnown();
+  return r;
 }
 /** The thread header's "what they see": the row's lens, changed in place, the release said on the pair circle. */
 async function openContactLens(contactId, name) {

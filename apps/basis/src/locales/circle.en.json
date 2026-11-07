@@ -659,6 +659,24 @@
       "doc": "The sender shown on a bubble the APP wrote — a command reply, a caretaker notice, \"you were removed\". Until 2026-08-28 these carried `unknown_sender` (\"Onbekend lid\"), because the bot actor is a sentinel and never resolves against the roster: the app spoke to people as a stranger nobody could place. The product's OWN NAME is used rather than \"de assistent\", because these lines are not all the assistant answering — a removal notice is the app telling you something, and attributing that to an assistant misdescribes who is speaking. If the assistant is later given its own voice, that is a second actor, not a rename of this one."
     }
   },
+  "act": {
+    "pending": {
+      "text": "Working…",
+      "doc": "The shared act strip (actState.js): an act the person just took is still running, shown only after a short delay so a fast act never flickers. One line for every op; a screen invents no Save feedback of its own."
+    },
+    "done": {
+      "text": "Done.",
+      "doc": "The shared act strip: the act ended well and its op has no reply-family line of its own (replyLine.js words the ones that do). Clears by itself."
+    },
+    "failed": {
+      "text": "That did not work.",
+      "doc": "The shared act strip: the act failed and nothing said why. Stays until the next act or a tap."
+    },
+    "failed_with": {
+      "text": "That did not work: {{error}}",
+      "doc": "The shared act strip: the act failed with words from the op or the error. Stays until the next act or a tap."
+    }
+  },
   "tabs": {
     "conversation": {
       "text": "Conversation",

@@ -175,6 +175,7 @@ import { nameShown } from '../../src/v2/personLabel.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
 import { trackContactTurn } from '../../src/v2/contactTurnDelivery.js';
+import { createActState, wrapCallSkillWithActState, actStateLine } from '../../src/v2/actState.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -1480,6 +1481,26 @@ let resolveSkill = null; // (opId, args) => Promise<object|null>
 // code), which would wipe a boot parameter such as `?addbot` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
+// THE SHARED ACT STATE (actState.js): every act the person just took paints pending · done · failed through ONE strip,
+// whatever screen dispatched it — the waist is wrapped once where `rawCallSkill` is made (below, at agent boot). The
+// person's interactions are noted here so background calls through the same waist paint nothing. Mobile: ActStateBar.
+const actState = createActState();
+for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => actState.noteInteraction(), { capture: true, passive: true });
+let _actStateEl = null;
+actState.subscribe((current) => {
+  const line = actStateLine(current, { t });
+  if (!line) { _actStateEl?.remove(); _actStateEl = null; return; }
+  if (!_actStateEl) {
+    _actStateEl = document.createElement('div');
+    _actStateEl.className = 'cc-act-state';
+    _actStateEl.setAttribute('role', 'status');
+    _actStateEl.setAttribute('aria-live', 'polite');
+    _actStateEl.addEventListener('click', () => actState.dismiss());
+    document.body.appendChild(_actStateEl);
+  }
+  _actStateEl.dataset.state = line.state;
+  _actStateEl.textContent = line.text;
+});
 /**
  * The post-join step every join runs (the wizard's, the pair roster's): register THIS device's per-circle address,
  * bind the other members' addresses, and PULL the circle's pull-all lanes — the `create`, earlier joins, roles,
@@ -9152,7 +9173,9 @@ async function showSettings(id) {
     onBack: () => showDetail(id),
     onSave: async () => {
       if (!asProposal()) {
-        await policyStore.update(id, working);
+        // Save says what happened (the walk: it said nothing). The policy save is not an op — a local store and the
+        // governance lane — so the act strip is told by hand; everything through the waist is told by the wrap.
+        await actState.track({ appOrigin: 'basis', opId: 'circle-settings-save' }, policyStore.update(id, working));
         // The just-saved policy goes on the governance lane as a signed statement — every member, and whoever
         // joins later, catches it up.
         circlePolicyLane.state(id).catch(() => { /* catch-up reconciles */ });
@@ -9528,6 +9551,8 @@ async function boot() {
         isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
         publishEvent: publishEventToLog,
       });
+      // …and every act through it paints its state on the one strip (actState.js; the manifests say which ops act)
+      rawCallSkill = wrapCallSkillWithActState(rawCallSkill, { store: actState, manifestsByOrigin: () => circleManifestsByOrigin });
       mountBasisOpsOnAgent(agent);
       // THE PERSON'S CLOCK: their own planned rows (their week on Saturday), run while this page is in view — the page's
       // visibility is the app state; a hidden page does not tick

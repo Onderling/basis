@@ -245,6 +245,11 @@ export const SEAMS = Object.freeze([
   // shell follows the send on the shared map (`trackContactTurn`) and hands the channel the receipt sender for turns that
   // land (`setLandedHook`), so the other side's bubble can reach "their app has it". The box paints no bubbles.
   { id: 'dm-bubble-carries-delivery', pattern: /trackContactTurn\(/, shells: ['web', 'mobile'], why: 'a person\'s own DM bubble said nothing — sent? waiting? failed? — while the circle bubble beside it did; the state is on the shared map only when the shell writes it there' },
+  // EVERY ACT PAINTS ITS STATE (sitting Part 2 §4): the waist is wrapped once per shell (`wrapCallSkillWithActState`) and one
+  // strip paints the store (`cc-act-state` on web, `ActStateBar` on mobile). A shell that composes neither has screens whose
+  // Save says nothing again. The box has no screen.
+  { id: 'acts-paint-their-state', pattern: /wrapCallSkillWithActState\(/, shells: ['web', 'mobile'], why: 'an act with no pending · done · failed is a Save that says nothing and a join that shows nothing for 23 seconds' },
+  { id: 'act-state-has-a-strip', pattern: /cc-act-state|<ActStateBar\b/, shells: ['web', 'mobile'], why: 'a wrapped waist with nothing painting the store is feedback computed and never shown' },
   { id: 'dm-landing-answers-with-a-receipt', pattern: /[cC]ontactChannel\??\.setLandedHook(\?\.)?\(/, shells: ['web', 'mobile'], why: 'without the receipt a DM can never reach "their app has it" on the sender\'s side, whatever the sender\'s setting says' },
   // A HEAD HEARS OF A CIRCLE IT DOES NOT KNOW YET: Vandaag re-reads over the shell's circle list, so a change in a circle
   // that list does not hold (joined on another device, through an offer, made by an op) re-reads the list first

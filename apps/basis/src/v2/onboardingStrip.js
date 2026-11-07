@@ -28,11 +28,15 @@ export function keySnoozeUntil(now = Date.now()) {
  * @param {{handle: string|null, inCircle: boolean, introSeen: boolean, keyPending?: boolean}} s
  * @returns {Array<{id: 'key'|'handle'|'intro'|'begin'}>}
  */
-export function onboardingCards({ handle, inCircle, introSeen, keyPending = false } = {}) {
+export function onboardingCards({ handle, inCircle, introSeen, keyPending = false, noRelay = false } = {}) {
   const hasHandle = typeof handle === 'string' && handle.trim() !== '';
   const returning = hasHandle && inCircle;
   return [
     ...(keyPending ? [{ id: 'key' }] : []),
+    // NO CONNECTION POINT: this device knows no relay (there is no baked-in one). Messages wait until it has one; the
+    // card says what still works meanwhile (Nearby, a code scanned face to face, a point that comes with an invite)
+    // and opens the connection points. A walk (rows 16/9/11) sent messages into nothing with no word about it.
+    ...(noRelay ? [{ id: 'reach' }] : []),
     ...(hasHandle ? [] : [{ id: 'handle' }]),
     ...(introSeen || returning ? [] : [{ id: 'intro' }]),
     ...(inCircle ? [] : [{ id: 'begin' }]),
@@ -44,7 +48,7 @@ export function onboardingCards({ handle, inCircle, introSeen, keyPending = fals
  * @param {{id: string}} block
  * @param {{callSkill: Function, circles?: Array<{id: string}>, allCircles?: Array<{id: string}>, introSeen?: () => Promise<boolean>, keyPending?: () => Promise<boolean>}} hostOps
  */
-export async function materializeOnboarding(block, { callSkill, circles = [], allCircles = null, introSeen = async () => false, keyPending = async () => false } = {}) {
+export async function materializeOnboarding(block, { callSkill, circles = [], allCircles = null, introSeen = async () => false, keyPending = async () => false, relayKnown = null } = {}) {
   let handle = null;
   let name = null;   // the display name already on the profile: the card shows it, so a person sees the name the avatar uses
   try {
@@ -58,7 +62,10 @@ export async function materializeOnboarding(block, { callSkill, circles = [], al
   try { seen = !!(await introSeen()); } catch { seen = false; }
   let keyDue = false;
   try { keyDue = !!(await keyPending()); } catch { keyDue = false; }
-  const cards = onboardingCards({ handle, inCircle, introSeen: seen, keyPending: keyDue })
+  // a host that cannot say (no `relayKnown`) shows no reach card, rather than a false one
+  let noRelay = false;
+  if (typeof relayKnown === 'function') { try { noRelay = !(await relayKnown()); } catch { noRelay = false; } }
+  const cards = onboardingCards({ handle, inCircle, introSeen: seen, keyPending: keyDue, noRelay })
     .map((c) => (c.id === 'handle' && name ? { ...c, name } : c));
   return { blockId: block.id, type: 'onboarding', status: cards.length ? 'ok' : 'empty', content: { cards } };
 }

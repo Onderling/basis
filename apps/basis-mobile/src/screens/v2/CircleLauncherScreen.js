@@ -183,7 +183,7 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
 import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
-import { useRelayQuestion } from './RelayQuestionModal.js';
+import { useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
@@ -600,6 +600,10 @@ export default function CircleLauncherScreen({
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
+  // does this device know a relay at all (the relay question's own predicate)? true until read, so no false warning;
+  // re-read on every view change (a relay added on the connection points comes back to a composer that knows it)
+  const [relayKnown, setRelayKnown] = useState(true);
+  useEffect(() => { relayQuestion.knows().then(setRelayKnown).catch(() => {}); }, [view]);
   const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
   // the screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name
   const feedbackScreenRef = useRef(null);
@@ -1326,7 +1330,9 @@ export default function CircleLauncherScreen({
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags) },
+        allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+        // the reach card: does this device know any relay (the relay question's own predicate, web parity)
+        relayKnown: () => relayQuestion.knows() },
     });
   }, [bundle, eventLog]);   // eslint-disable-line react-hooks/exhaustive-deps -- onboardingFlags is a stable memo declared further down (read at call time, never during render)
   // VANDAAG'S HEAD (`screenHead.js`, web parity): the blocks as last read for the landing's key, kept current by the
@@ -2259,6 +2265,8 @@ export default function CircleLauncherScreen({
                   });
                 }
                 else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => refreshScreensBook());
+                // the reach card: the connection points, where a relay is added (the relay question stays quiet after 'Later')
+                else if (a?.kind === 'open-points') setView('points');
                 else if (a?.kind === 'create-circle') setCreating(true);
                 else if (a?.kind === 'join-circle') setJoinScanOpen(true);
                 // a card's one action that IS an op (a chore done): through the waist, then the page repaints
@@ -2393,6 +2401,7 @@ export default function CircleLauncherScreen({
       return (
         <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
+            noRelay={!relayKnown}
             bundle={bundle}
             contact={contactThread}
             draft={contactThread?.draft ?? ''}
@@ -2672,6 +2681,7 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        noRelay={!relayKnown}
         pagesBook={screensBook}
         onCloseRemoved={async () => {
           const id = selected?.id;
@@ -3136,6 +3146,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
+  // this device knows no relay: the composer says the message waits (the relay question's predicate, web parity)
+  noRelay = false,
   // "Pin to +" on an attach entry (`onPinEntry(entry)`), and a bookmark opened from the "+" sheet (`openOp`: that op's
   // form, run once the circle's menu has resolved, then `onOpenOpDone()`)
   onPinEntry = null, openOp = null, onOpenOpDone = null,
@@ -5126,6 +5138,7 @@ function CircleDetail({
             ))}
           </View>
         ) : null}
+        {noRelay ? <Text style={styles.placeholder} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
         <View style={styles.composer} testID="circle-detail-composer">
           {attachEntries.length > 0 ? (
             <Pressable

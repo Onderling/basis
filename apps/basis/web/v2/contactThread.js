@@ -37,6 +37,7 @@ function _ensurePrivacyPulseKeyframes() {
 
 export function renderContactThread(container, {
   name = '',
+  noRelay = false,   // this device knows no relay: the composer says the message waits
   attachMenu = [],          // the contact-scoped "+" entries (attachEntriesFor({scope: 'contact'}))
   onAttachCommand = null,   // (entry) => dispatch it to this contact; absent → no "+"
   face = null,       // the contact's picture as the pair circle carries it (a sealed media ref) — null = the initial
@@ -378,6 +379,15 @@ export function renderContactThread(container, {
     if (cmd && typeof onSkillTap === 'function') { onSkillTap({ id: cmd.opId }, cmd.rest); return; }
     if (typeof onSend === 'function') onSend(text);
   });
+  // No connection point: the person stands HERE when a message would vanish, so the composer says it waits
+  // (the relay question's predicate, handed by the host; the bubble's own state replaces this with L716)
+  if (noRelay) {
+    const wait = document.createElement('p');
+    wait.className = 'cc-composer__no-point';
+    wait.dataset.role = 'no-point';
+    wait.textContent = tr('circle.composer.no_point');
+    container.appendChild(wait);
+  }
   container.appendChild(composer);
 
   return container;

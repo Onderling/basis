@@ -190,6 +190,7 @@ import { useRelayQuestion, relayQuestion } from './RelayQuestionModal.js';
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor, attachEntryForType } from '../../../../basis/src/v2/attachEntries.js';
+import { readInviteUsage, joinedSince, memberIdsOf } from '../../../../basis/src/v2/inviteUsage.js';
 import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
@@ -1976,7 +1977,25 @@ export default function CircleLauncherScreen({
       });
     } catch { r = { error: 'failed' }; }
     setInviteFor({ circleId, ...(forFunction ? { forFunction: true } : {}), ...(r || {}) });
+    // who is in the circle as the invite opens, so a later membership change can name who came in
+    readInviteUsage({ callSkill: bundle?.callSkill, circleId }).then(({ members }) => {
+      setInviteFor((cur) => (cur && cur.circleId === circleId ? { ...cur, before: memberIdsOf(members) } : cur));
+    }).catch(() => {});
   }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
+  // THE OPEN INVITE KEEPS UP: the membership lane's signal reloads `circles` (onCirclesChanged); an open invite then
+  // re-reads its count and names each newcomer — the walk's invite said "0 of 6" while someone joined (web ≡ mobile)
+  useEffect(() => {
+    const cid = inviteFor?.circleId;
+    if (!cid || !inviteFor?.before) return;
+    readInviteUsage({ callSkill: bundle?.callSkill, circleId: cid }).then(({ used, max, members }) => {
+      setInviteFor((cur) => (cur && cur.circleId === cid ? {
+        ...cur,
+        ...(typeof used === 'number' ? { redemptionsUsed: used } : {}),
+        ...(typeof max === 'number' ? { maxRedemptions: max } : {}),
+        joined: joinedSince(cur.before, members, t),
+      } : cur));
+    }).catch(() => {});
+  }, [circles]);   // eslint-disable-line react-hooks/exhaustive-deps — the signal is `circles`; the invite is read inside
 
   // ONE mount for everything a scan or the Join button opens, painted beside whichever view is up (the Mij view returns
   // early, so a modal living in one branch's return never shows in another). The scanner is the `scanQr` op's seam
@@ -2062,6 +2081,9 @@ export default function CircleLauncherScreen({
                     <Text style={styles.inviteHint}>
                       {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
                     </Text>
+                  ) : null}
+                  {(inviteFor.joined ?? []).length ? (
+                    <Text style={styles.inviteHint} testID="invite-joined">{inviteFor.joined.join(' ')}</Text>
                   ) : null}
                   {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
                       listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}

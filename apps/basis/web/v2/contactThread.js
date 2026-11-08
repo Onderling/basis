@@ -12,6 +12,7 @@
 
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
+import { buildDeliveryChip } from './circleView.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
 import { paintFace } from './faceView.js';
@@ -37,7 +38,12 @@ function _ensurePrivacyPulseKeyframes() {
 
 export function renderContactThread(container, {
   name = '',
-  noRelay = false,   // this device knows no relay: the composer says the message waits
+  // My own bubbles carry their delivery state, as a circle's do (the same ladder, map and chip — `buildDeliveryChip`):
+  // `deliveryStateFor(messageId)` → a state or null; `deliveryReasonFor(messageId)` → why, when known; a tap on a
+  // retryable chip calls `onRetryDelivery(messageId)`. All optional: absent, the bubble says nothing, as before.
+  deliveryStateFor = null,
+  deliveryReasonFor = null,
+  onRetryDelivery = null,
   attachMenu = [],          // the contact-scoped "+" entries (attachEntriesFor({scope: 'contact'}))
   onAttachCommand = null,   // (entry) => dispatch it to this contact; absent → no "+"
   face = null,       // the contact's picture as the pair circle carries it (a sealed media ref) — null = the initial
@@ -258,6 +264,20 @@ export function renderContactThread(container, {
         if (el) { el.dataset.section = d.id; bubble.appendChild(el); }
       }
     }
+    // My own turn's delivery state: the state lives on the shared map under the id the turn was sent with, and the chip
+    // repaints in place when it moves (`paintDeliveryChip`, keyed by `data-row-id`), so a tap on a bubble's words is
+    // never lost to a whole-thread redraw. A turn with no id (an older live push) carries none.
+    if (side === 'user' && m.messageId && typeof deliveryStateFor === 'function') {
+      bubble.dataset.rowId = m.messageId;
+      const meta = document.createElement('div');
+      meta.className = 'cc-cthread__meta';
+      const chip = buildDeliveryChip(deliveryStateFor(m.messageId), {
+        tr, rowId: m.messageId, onRetryDelivery,
+        reason: typeof deliveryReasonFor === 'function' ? deliveryReasonFor(m.messageId) : null,
+      });
+      if (chip) meta.appendChild(chip);
+      bubble.appendChild(meta);
+    }
     row.appendChild(bubble);
     if (Array.isArray(m.buttons) && m.buttons.length) {
       const btnRow = document.createElement('div');
@@ -379,15 +399,8 @@ export function renderContactThread(container, {
     if (cmd && typeof onSkillTap === 'function') { onSkillTap({ id: cmd.opId }, cmd.rest); return; }
     if (typeof onSend === 'function') onSend(text);
   });
-  // No connection point: the person stands HERE when a message would vanish, so the composer says it waits
-  // (the relay question's predicate, handed by the host; the bubble's own state replaces this with L716)
-  if (noRelay) {
-    const wait = document.createElement('p');
-    wait.className = 'cc-composer__no-point';
-    wait.dataset.role = 'no-point';
-    wait.textContent = tr('circle.composer.no_point');
-    container.appendChild(wait);
-  }
+  // No connection point: the bubble itself says the message waits (its held state, above), so the composer no longer
+  // carries a line for it — one place that says one thing about one message.
   container.appendChild(composer);
 
   return container;

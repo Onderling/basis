@@ -174,6 +174,7 @@ import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src
 import { nameShown } from '../../src/v2/personLabel.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
+import { trackContactTurn } from '../../src/v2/contactTurnDelivery.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -196,7 +197,7 @@ import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsH
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant, connectionSelfChoice } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
-  createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
+  createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, contactReceiptAddresses, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
 import { createFallbackOffer, fallbackOfferStateIo } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/pinboard';
@@ -1422,6 +1423,9 @@ const applyIncomingReceipt = makeReceiptReceiver({
     const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     return Array.isArray(r?.members) ? r.members : [];
   },
+  // A turn to a CONTACT: only that contact may confirm it (canonical address, or any address of the pair circle's
+  // roster). Late-bound: the channel and the pair roster land with the agent.
+  contactAddressesOf: (msgId) => (circleContactChannel ? contactReceiptAddresses({ channel: circleContactChannel, pair: circlePairRoster })(msgId) : null),
   // Receipt-keyed outbox removal: their app confirmed the message arrived, so the copy still held for
   // THEM is obsolete (a presence flush would resend it). Late-bound — the agent lands after this module
   // evaluates; a receipt arrives much later still.
@@ -3466,11 +3470,28 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     try { r = await rawCallSkill(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
     // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
     const { file, messageId, state, say } = await settleContactAttach(r, { channel: circleContactChannel, contactId, peerAddr, t });
-    if (file) { thread.messages.push({ origin: 'user', text: '', messageId, file, delivery: state }); rerender(); }
+    // the sent file's state goes on the same map every own bubble reads, so its chip paints as a typed turn's does
+    if (file) { if (state) deliveryStateMap.set(messageId, state); thread.messages.push({ origin: 'user', text: '', messageId, file }); rerender(); }
     if (say) globalThis.alert?.(say);
   };
+  // My own bubbles carry their delivery state off the SAME map the circle bubbles read (receipts land there too);
+  // a change repaints that one chip in place, never the composer. Retry re-sends the same turn under the same id.
+  const deliveryStateFor = (msgId) => deliveryStateMap.get(msgId);
+  const deliveryReasonFor = (msgId) => deliveryStateMap.reasonOf(msgId);
+  const onRetryDelivery = (msgId) => {
+    const m = thread.messages.find((x) => x.messageId === msgId && x.origin === 'user' && !x.file);
+    if (!m) return;   // a file retries through its own op; a turn that is not mine has nothing to retry
+    const { sent } = circleContactChannel.sendTurn({ peerAddr: thread.peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
+    trackContactTurn({ messageId: msgId, sent, deliveryMap: deliveryStateMap }).catch(() => {});
+  };
+  const unsubscribeDelivery = deliveryStateMap.subscribe((msgId, state) => {
+    // self-cleaning: once this thread is no longer the one on screen (a tab, another thread), the subscription ends itself
+    if (_activeContactThread?.leave !== unsubscribeDelivery) { unsubscribeDelivery(); return; }
+    if (!thread.messages.some((x) => x.messageId === msgId)) return;
+    paintDeliveryChip(rootEl, msgId, state, { tr: t, onRetryDelivery, reason: deliveryStateMap.reasonOf(msgId), bubbleClass: 'cc-cthread__bubble', metaClass: 'cc-cthread__meta' });
+  });
   const rerender = () => renderContactThread(rootEl, {
-    noRelay: !_relayKnownNow,
+    deliveryStateFor, deliveryReasonFor, onRetryDelivery,
     attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
@@ -3527,26 +3548,21 @@ async function showContactThread(contactId, { draft = '' } = {}) {
         const rest = sp === -1 ? '' : text.slice(sp + 2).trim();
         if (skills.some((s) => s.id === skillId)) { await runSkill(skillId, rest ? { text: rest } : {}); return; }
       }
-      error = false;
-      busy = true;
-      try {
-        // The id the turn is PERSISTED under rides the bubble, so reopening the thread merges the
-        // durable copy onto this one instead of showing the message twice.
-        // The echo is what LEFT the device: with a floor, the redacted text.
-        const { messageId, sent, text: sentText } = circleContactChannel.sendTurn({
-          peerAddr: thread.peerAddr, threadId: contactId, text, floor,
-        });
-        thread.messages.push({ origin: 'user', text: sentText, messageId });
-        rerender();
-        await sent;
-      } catch {
-        error = true;
-      } finally {
-        busy = false; rerender();
-      }
+      // The id the turn is PERSISTED under rides the bubble, so reopening the thread merges the
+      // durable copy onto this one instead of showing the message twice.
+      // The echo is what LEFT the device: with a floor, the redacted text.
+      // The bubble carries the send's state from here on (pending → the verdict; a receipt moves it further):
+      // no "versturen…" line under the list and no error line — the chip says it, and a tap on it retries.
+      let turn;
+      try { turn = circleContactChannel.sendTurn({ peerAddr: thread.peerAddr, threadId: contactId, text, floor }); }
+      catch { error = true; rerender(); return; }   // the turn never got an id: nothing is on screen to carry a state
+      thread.messages.push({ origin: 'user', text: turn.text, messageId: turn.messageId });
+      rerender();
+      await trackContactTurn({ messageId: turn.messageId, sent: turn.sent, deliveryMap: deliveryStateMap });
     },
   });
-  _activeContactThread = { contactId, rerender, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
+  _activeContactThread?.leave?.();   // the thread this one replaces stops listening to the map
+  _activeContactThread = { contactId, rerender, leave: unsubscribeDelivery, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
   rerender();
   // Opening the thread is reading it: the seen-mark moves to now, and the row's count is gone next time.
   contactSeen.mark(contactId, Date.now()).then(() => { if (_contactUnread[contactId]) _contactUnread[contactId].unread = 0; }).catch(() => {});
@@ -9564,6 +9580,12 @@ async function boot() {
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
       // Delivery honesty + repaint for a signed chat statement that lands: a LIVE inbound insert answers the sender
       // with a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
+      const sendStoredReceipt = makeReceiptSender({
+        getSettings: () => deliverySettingsStore.get(),
+        sendTo: (to, payload, opts = {}) => (typeof _peerAgent?.sendPeerMessage === 'function'
+          ? _peerAgent.sendPeerMessage(to, payload, opts)
+          : Promise.reject(new Error('no peer agent'))),
+      });
       const onCircleStored = ((sendReceipt) => (info) => {
           try { sendReceipt(info); } catch { /* a failed receipt must not stop the repaint below */ }
           // …and REPAINT, because a message that arrived while the circle is open has to APPEAR.
@@ -9586,14 +9608,12 @@ async function boot() {
           if (info?.source !== 'receiver') return;
           if (!info?.circleId || info.circleId !== _circleRender?.circleId) return;
           try { _circleRender?.rerender?.(); } catch { /* no open circle */ }
-        })(makeReceiptSender({
-          getSettings: () => deliverySettingsStore.get(),
-          sendTo: (to, payload, opts = {}) => (typeof _peerAgent?.sendPeerMessage === 'function'
-            ? _peerAgent.sendPeerMessage(to, payload, opts)
-            : Promise.reject(new Error('no peer agent'))),
-        }));
+        })(sendStoredReceipt);
       // The Nearby room confirms what lands with the SAME receipt (nearbyRoomBinding.js).
       try { ensureNearbyRoom(agent)?.setLandedHook(onCircleStored); } catch { /* the room works without receipts */ }
+      // …and so does a contact's turn that lands in its thread: the sender's own bubble moves to "their app has it"
+      // under the same setting (web ≡ mobile: ChatScreen hands the channel the same sender).
+      try { circleContactChannel?.setLandedHook?.(sendStoredReceipt); } catch { /* the thread works without receipts */ }
       // The SIGNED chat receive path (the content re-root): a fanned statement verifies at the agent's
       // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
       // entry (bubble + proof) — the device log is the record — with the delivery receipt and the repaint.

@@ -241,6 +241,11 @@ export const SEAMS = Object.freeze([
   // turns each into the bubble's state. Without it a given-up message keeps looking fine, and a "waiting" bubble keeps
   // waiting after the message has gone. The box paints no bubbles: it has no delivery map to move.
   { id: 'delivery-outcomes-reach-the-bubble', pattern: /makeGiveUpConsumers\(/, shells: ['web', 'mobile'], why: 'a message given up on, or held and then sent, must change its bubble — else it looks fine, or waits for ever' },
+  // A TYPED TURN TO A CONTACT carries its delivery state as a circle message does (the two-phone walk, rows 9 and 11): the
+  // shell follows the send on the shared map (`trackContactTurn`) and hands the channel the receipt sender for turns that
+  // land (`setLandedHook`), so the other side's bubble can reach "their app has it". The box paints no bubbles.
+  { id: 'dm-bubble-carries-delivery', pattern: /trackContactTurn\(/, shells: ['web', 'mobile'], why: 'a person\'s own DM bubble said nothing — sent? waiting? failed? — while the circle bubble beside it did; the state is on the shared map only when the shell writes it there' },
+  { id: 'dm-landing-answers-with-a-receipt', pattern: /[cC]ontactChannel\??\.setLandedHook(\?\.)?\(/, shells: ['web', 'mobile'], why: 'without the receipt a DM can never reach "their app has it" on the sender\'s side, whatever the sender\'s setting says' },
   // A HEAD HEARS OF A CIRCLE IT DOES NOT KNOW YET: Vandaag re-reads over the shell's circle list, so a change in a circle
   // that list does not hold (joined on another device, through an offer, made by an op) re-reads the list first
   // (`headCircleWatch.js`). Without it the new circle's items stayed off Vandaag until a reload. The box paints no Vandaag.

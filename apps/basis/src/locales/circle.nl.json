@@ -640,6 +640,14 @@
       "persona_no_connection": {
         "text": "Niet verstuurd: deze persona heeft geen verbinding met de kring (tik om opnieuw te proberen)",
         "doc": "The circle belongs to one of your personas and that persona has no connection of its own to the circle's relay right now, so the message did not leave (it is never sent under another identity). Retryable once the connection is back."
+      },
+      "held_waiting": {
+        "text": "Wacht tot er een verbinding is. Het gaat dan vanzelf.",
+        "doc": "A message to a contact is held on this device because it has no connection to send on (no connection point yet). Not a failure: it leaves by itself once there is one, and the bubble moves on. Pairs with the pending state."
+      },
+      "peer_unreachable": {
+        "text": "Niet bereikt, misschien offline (tik om opnieuw te proberen)",
+        "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."
       }
     },
     "unknown_sender": {

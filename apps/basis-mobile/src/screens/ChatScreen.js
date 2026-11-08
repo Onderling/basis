@@ -58,7 +58,7 @@ import {
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes }    from '../../../basis/src/v2/circleLanes.js';
-import { makeReceiptReceiver, rehydrateDeliveryState } from '../../../basis/src/v2/deliverySettings.js';
+import { makeReceiptReceiver, contactReceiptAddresses, rehydrateDeliveryState } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
 import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
 import { useTheme }          from './v2/themeContext.js';
@@ -524,6 +524,9 @@ export default function ChatScreen({
           const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
           return Array.isArray(r?.members) ? r.members : [];
         },
+        // A turn to a CONTACT: only that contact may confirm it (web parity — canonical address, or any address of
+        // the pair circle's roster). Late-bound through the bundle.
+        contactAddressesOf: (msgId) => (contactChannel ? contactReceiptAddresses({ channel: contactChannel, pair: bundle?.pairRoster ?? null })(msgId) : null),
         // Receipt-keyed outbox removal (web parity): their app confirmed the message arrived, so the
         // copy still held for THEM is obsolete — a presence flush would resend it.
         removeHeld: (a) => bundle?.agent?.removeHeld?.(a),
@@ -540,6 +543,11 @@ export default function ChatScreen({
     // main-thread bubble landing.
     // Mirrors web's `store.getThread('main').addShellMessage`.
     const addMainBubble = (bubble) => appendBubble('main', bubble);
+
+    // A contact's turn that lands in its thread answers with the SAME delivery receipt a circle member sends, under the
+    // same per-person setting (the App-owned sender): the sender's own bubble moves to "their app has it" (web parity:
+    // circleApp hands circleContactChannel the same sender).
+    try { contactChannel?.setLandedHook?.((info) => chatStoredReceipt?.(info)); } catch { /* the thread works without receipts */ }
 
     const handlers = {
       // Substrate-only handlers — no UI bubble; just persist local

@@ -449,6 +449,8 @@ export const basisManifest = {
       surfaces: {
         slash: { command: '/send-file', body: 'flags' },
         chat:  { reply: 'text', hint: 'share a file with a peer via NKN' },
+        // the sent file's own bubble carries this act's state (its delivery chip); the shared act strip stays quiet
+        actState: 'bubble',
         // the "+" in a CONTACT thread (Frits: one attach affordance everywhere; a walk found no way to send a file to a
         // contact but the slash): the same projector the circle composer reads, offered only where a contact is
         attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', scopes: ['contact'] },

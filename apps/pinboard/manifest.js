@@ -1461,6 +1461,8 @@ export const pinboardManifest = {
       surfaces: {
         chat: { hint: 'Fan a signed chat statement to a circle.' },
         ui:   { control: 'page' },
+        // the message's own bubble carries this act's state (its delivery chip); the shared act strip stays quiet
+        actState: 'bubble',
       },
     },
     {

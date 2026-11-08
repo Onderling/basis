@@ -10,6 +10,7 @@ import {
   ACT_PENDING_DELAY_MS, ACT_DONE_SHOWN_MS, ACT_INTERACTION_WINDOW_MS,
 } from '../../src/v2/actState.js';
 import { basisManifest } from '../../src/index.js';
+import { pinboardManifest } from '../../../pinboard/manifest.js';
 
 const t = (k, p = {}) => (Object.keys(p).length ? `${k}(${Object.entries(p).map(([a, b]) => `${a}=${b}`).join(',')})` : k);
 
@@ -39,8 +40,11 @@ describe('what counts as an act', () => {
     expect(isActOp(MANIFESTS, 'nobody', 'addToList')).toBe(false);
     expect(isActOp(() => MANIFESTS, 'lists', 'addToList'), 'a getter works too').toBe(true);
   });
-  it('an op whose own bubble carries its state stays quiet', () => {
-    expect(isActOp({ pinboard: { operations: [{ id: 'broadcastCircleChatStatement', verb: 'add' }] } }, 'pinboard', 'broadcastCircleChatStatement')).toBe(false);
+  it('an op that declares its own bubble carries its state (surfaces.actState: bubble) stays quiet; the real two do', () => {
+    expect(isActOp({ x: { operations: [{ id: 'fan', verb: 'share', surfaces: { actState: 'bubble' } }] } }, 'x', 'fan')).toBe(false);
+    expect(isActOp({ x: { operations: [{ id: 'fan', verb: 'share', surfaces: {} }] } }, 'x', 'fan'), 'undeclared: the strip paints').toBe(true);
+    expect(isActOp(MANIFESTS, 'basis', 'send-file'), 'the thread bubble carries the sent file\'s state').toBe(false);
+    expect(isActOp({ pinboard: pinboardManifest }, 'pinboard', 'broadcastCircleChatStatement'), 'the circle bubble carries the message\'s state').toBe(false);
   });
   it('failure by the waist\'s conventions', () => {
     expect(actFailed({ ok: false })).toBe(true);

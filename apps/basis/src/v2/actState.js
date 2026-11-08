@@ -31,24 +31,25 @@ export const ACT_PENDING_DELAY_MS = 400;
 export const ACT_DONE_SHOWN_MS = 2500;
 export const ACT_INTERACTION_WINDOW_MS = 1500;
 
-/** Ops whose own surface carries their state (a bubble): the strip stays quiet for them. */
-export const ACTS_WITH_THEIR_OWN_STATE = Object.freeze(new Set([
-  'broadcastCircleChatStatement',   // the circle bubble's delivery chip
-  'broadcastKringMessage',          // (the older fan-out name, same bubble)
-  'send-file',                      // the thread bubble's chip + the settle line (contactAttachOutcome.js)
-  'sendFile',
-]));
+/**
+ * An op whose own surface carries its state declares it on its manifest entry — `surfaces.actState: 'bubble'` (the
+ * message's or the sent file's delivery chip) — and the strip stays quiet for it. The manifest is the source of truth
+ * for surfaces, and the strip is one: a list of names here would silently double-paint after a rename or a new
+ * bubble-carrying op.
+ */
+export const ACT_STATE_OWN = 'bubble';
 
 /**
- * Does this op WRITE, by the manifests' own classification? Unknown op or verb → false (no claim).
+ * Does this op WRITE, by the manifests' own classification, and paint on the strip? Unknown op or verb → false (no claim).
  * @param {object|(() => object)|null} manifestsByOrigin   appOrigin → manifest (or a getter)
  */
 export function isActOp(manifestsByOrigin, appOrigin, opId) {
-  if (typeof opId !== 'string' || !opId || ACTS_WITH_THEIR_OWN_STATE.has(opId)) return false;
+  if (typeof opId !== 'string' || !opId) return false;
   let byOrigin = null;
   try { byOrigin = typeof manifestsByOrigin === 'function' ? manifestsByOrigin() : manifestsByOrigin; } catch { byOrigin = null; }
   const manifest = byOrigin?.[appOrigin] ?? null;
   const op = manifest?.operations?.find?.((o) => o?.id === opId) ?? null;
+  if (op?.surfaces?.actState === ACT_STATE_OWN) return false;
   const verb = typeof op?.verb === 'string' ? op.verb : null;
   if (!verb) return false;
   if (isAtom(verb)) return isWritingVerb(verb);   // alias-aware: `edit`, `done`, `delete` are writes; `list`/`get`/`read` are not

@@ -808,6 +808,7 @@ import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
 // agent-add admin approval store.
 import { createAgentRequestStore } from '../../src/v2/agentRequest.js';
 import { buildTilePreviews, bumpSeenAt, seenOnLeave } from '../../src/v2/circleTilePreviews.js';
+import { createReadMarks } from '../../src/v2/readMarks.js';
 import { makeAfterClaimHook } from '../../src/v2/claimRouter.js';
 import { mergeAvailability } from '../../src/v2/memberAvailability.js';
 import { createAvailabilityStore, localStorageAvailabilityIo, podAvailabilityIo, tieredAvailabilityIo } from '../../src/v2/memberAvailability.js';
@@ -3043,7 +3044,7 @@ const contactNames = makeContactNameStore({ getItem: (k) => window.localStorage.
 async function refreshContactUnread() {
   try {
     const turns = await circleContactChannel?.rehydrateAll?.() ?? [];
-    _contactUnread = buildContactUnread({ turns, seenAt: await contactSeen.read() });
+    _contactUnread = buildContactUnread({ turns, seenAt: await contactSeen.read(), readIds: readMarks.ids() });
   } catch { _contactUnread = {}; }
   return _contactUnread;
 }
@@ -3561,6 +3562,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   _activeContactThread = { contactId, rerender, leave: unsubscribeDelivery, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
   rerender();
   // Opening the thread is reading it: the seen-mark moves to now, and the row's count is gone next time.
+  readMarks.markContact(contactId, _contactUnread[contactId]?.unreadIds ?? []).catch(() => {});   // …read on every device
   contactSeen.mark(contactId, Date.now()).then(() => { if (_contactUnread[contactId]) _contactUnread[contactId].unread = 0; }).catch(() => {});
   // …and it acknowledges a rename: the "was: …" line under the row clears once you have been in the thread.
   contactNames.seen(contactId, name).catch(() => { /* the marker is a courtesy */ });
@@ -3601,7 +3603,7 @@ function onContactReply({ contactId: keyedBy, fromAddr, threadId, text, buttons,
   // still routes by its echoed threadId; an unresolved sender still falls back to their address.
   const contactId = keyedBy
     ?? ((threadId && contactThreads.has(threadId)) ? threadId : fromAddr);
-  const painted = paintContactTurn({ contactId, fromAddr, origin: 'bot', text, buttons, messageId, replyTo, file });
+  const painted = paintContactTurn({ contactId, fromAddr, origin: 'bot', text, buttons, messageId, replyTo, file, ts });
   // Phase 2 (C3 / the G18 fix): persist the inbound turn so the thread is durable
   // in BOTH directions (dedup on messageId is shared with sendTurn's outbound). Persisting is also
   // what hands the turn to my OTHER DEVICES, so their thread reads the same as this one.
@@ -3628,14 +3630,14 @@ async function onOwnDeviceContactTurn(wire) {
     fromAddr:  landed.fromAddr ?? landed.peerAddr,
     origin:    landed.origin,
     text: landed.text, buttons: landed.buttons, messageId: landed.messageId,
-    replyTo: landed.replyTo, file: landed.file, returned: landed.returned,
+    replyTo: landed.replyTo, file: landed.file, returned: landed.returned, ts: landed.ts,
   });
   noteNewContactTurn(landed.contactId, landed.origin);   // stored already (the channel persisted before answering)
 }
 
 // The render half every arriving turn shares: put the bubble in its thread, paint if that thread is
 // on screen, and give a thread nobody has named yet a real name when the directory can supply one.
-function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageId, replyTo, file, returned }) {
+function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageId, replyTo, file, returned, ts }) {
   let thread = contactThreads.get(contactId);
   const isNew = !thread;
   if (isNew) { thread = { name: contactId, peerAddr: fromAddr, messages: [] }; contactThreads.set(contactId, thread); }
@@ -3646,6 +3648,8 @@ function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageI
   if (_activeContactThread?.contactId === contactId) {
     _activeContactThread.rerender();
     contactSeen.mark(contactId, Date.now()).catch(() => {});   // read as it arrives
+    // …on every device of mine too (marked with when it was SENT, the same everywhere); my own turns are no news
+    if (messageId && origin !== 'user') readMarks.markContact(contactId, [{ id: messageId, at: typeof ts === 'number' ? ts : Date.now() }]).catch(() => {});
   }
   // Resolve a friendlier name for an unsolicited inbound thread (fire-and-forget).
   if (isNew) {
@@ -3676,10 +3680,19 @@ function writeSeenAt(map) {
   _mijHead?.invalidate();       // …and Mij's unread reading
 }
 // …and on LEAVING a circle too: what happened while you were inside is not news on the launcher (one rule, both shells).
-subscribeActiveCircle(seenOnLeave((id) => writeSeenAt(bumpSeenAt(readSeenAt(), id))));
+subscribeActiveCircle(seenOnLeave((id) => {
+  writeSeenAt(bumpSeenAt(readSeenAt(), id));
+  readMarks.markCircleFrom({ events: eventLog.query({ excludeMuted: true }), circleId: id, myRefs: unreadMyRefs }).catch(() => {});
+}));
 // Whose lines are MINE for the unread count: 'me' (local stamps) and every address this person's devices speak as —
 // refreshed when the agent is up and on every launcher visit (`ownAddresses`, the one source the Contacts filter reads).
 let unreadMyRefs = ['me'];
+// WHAT THE PERSON READ ON ANY OF THEIR DEVICES (`readMarks.js`): the one read set the tiles, Vandaag and the contact
+// badges test; opening a circle or a conversation adds to it. Refreshed when the agent is up and when a sibling's marks land.
+const readMarks = createReadMarks({
+  callSkill: (...a) => rawCallSkill(...a),
+  onChange: () => { _vandaagHead?.invalidate(); _mijHead?.invalidate(); },
+});
 function refreshUnreadMyRefs() {
   Promise.resolve(_peerAgent?.ownAddresses?.()).then((a) => {
     if (Array.isArray(a)) unreadMyRefs = ['me', ...a.filter((x) => typeof x === 'string' && x)];
@@ -3799,6 +3812,8 @@ function paintLauncher() {
     myRefs:  unreadMyRefs,
     // a landed item's subtitle names its kind in words
     t,
+    // read on another of my devices: not news here either
+    readIds: readMarks.ids(),
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
@@ -4459,7 +4474,7 @@ async function materializeVandaag() {
       // the switcher's set: own items show when the self that made them is ticked
       ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
       // the circles-with-news block counts what the circle tiles count
-      seenAt: readSeenAt(), myRefs: unreadMyRefs,
+      seenAt: readSeenAt(), myRefs: unreadMyRefs, readIds: readMarks.ids(),
       // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
       selfIn: mySelfIn,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
@@ -4752,7 +4767,7 @@ async function showMij({ landing = false } = {}) {
   const counted = (...a) => { _mijReads.ops += 1; return rawCallSkill(...a); };
   const readMij = async () => { _mijReads.materializes += 1; return mijScreenBlocks({ hostOps: {
     callSkill: counted, eventLog, circles: circlesShown(), ...(mijSelf ? { mijSelf } : {}),
-    seenAt: readSeenAt(), myRefs: unreadMyRefs, selfIn: mySelfIn,
+    seenAt: readSeenAt(), myRefs: unreadMyRefs, readIds: readMarks.ids(), selfIn: mySelfIn,
     availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
     online: relays.length ? relays.some((r) => r.connected) : undefined,
@@ -7113,8 +7128,10 @@ async function showDetail(id) {
   // folio /zoek's embedder (or null it for an 'off' circle). Best-effort.
   try { circleSyncFolioNoteEmbedder?.(); } catch { /* /zoek stays lexical */ }
   // bump the seenAt marker so the next launcher render clears
-  // this circle's unread badge.
+  // this circle's unread badge…
   writeSeenAt(bumpSeenAt(readSeenAt(), id));
+  // …and mark what is in it read on every device of the person
+  readMarks.markCircleFrom({ events: eventLog.query({ excludeMuted: true }), circleId: id, myRefs: unreadMyRefs }).catch(() => {});
   const circle = circlesCache.find((c) => c.id === id) || removedCirclesCache.find((c) => c.id === id) || { id };
   // no chat-shell auto-route anymore. Every circle opens the
   // circle view; v2 §1 says chat IS the circle view (CONVERSATION tab).  The
@@ -9799,6 +9816,9 @@ async function boot() {
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       refreshUnreadMyRefs();
+      readMarks.refresh().catch(() => {});
+      // a sibling's marks landed in the own store: re-read the set
+      readMarks.follow((fn) => agent.onCircleChanged?.(fn));
       // A noticeboard post from another member LANDS in the circle store through the items lane (one carry);
       // the shell bridges it into pinboard's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({

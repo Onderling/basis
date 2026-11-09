@@ -18,8 +18,9 @@ const turns = [
 
 describe('buildContactUnread', () => {
   it('counts the inbound turns newer than the contact\'s seen-mark; a never-opened thread counts them all', () => {
-    expect(buildContactUnread({ turns, seenAt: { bea: 120 } })).toEqual({ bea: { unread: 1, lastTs: 200 }, cas: { unread: 2, lastTs: 60 } });
-    expect(buildContactUnread({ turns, seenAt: { bea: 200, cas: 60 } })).toEqual({ bea: { unread: 0, lastTs: 200 }, cas: { unread: 0, lastTs: 60 } });
+    const counts = (m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { unread: v.unread, lastTs: v.lastTs }]));
+    expect(counts(buildContactUnread({ turns, seenAt: { bea: 120 } }))).toEqual({ bea: { unread: 1, lastTs: 200 }, cas: { unread: 2, lastTs: 60 } });
+    expect(counts(buildContactUnread({ turns, seenAt: { bea: 200, cas: 60 } }))).toEqual({ bea: { unread: 0, lastTs: 200 }, cas: { unread: 0, lastTs: 60 } });
     expect(buildContactUnread({ turns: [], seenAt: {} })).toEqual({});
   });
   it('the tab shows the sum', () => {

@@ -149,6 +149,14 @@ The canonical types that declare field-sets merging by their own clock (`field-c
 store's default resolution registry reads this; a type with per-field rules declares them here and writes no merge
 code of its own.
 
+### `CANONICAL_SET_UNIONS`
+
+**Kind:** constant · **Import:** `CANONICAL_SET_UNIONS` from `'@onderling/item-types'`
+
+The canonical types that declare a grow-only set merging as a UNION (`set-union`), by type name: the set, each
+member's key and time, and the floor that prunes it the same way on every device. Read by the item store's default
+resolution registry, like the field-clock sets above.
+
 ### `LISTS_TYPES`
 
 **Kind:** constant · **Import:** `LISTS_TYPES` from `'@onderling/item-types'`
@@ -455,3 +463,11 @@ Is this the inbox item we mean — the noun AND the kind, never one without the 
 Every caller wants both halves, and the half that used to be checked alone (`type ===
 'subtask-request'`) was checking a type that no longer exists, so it silently answered no
 everywhere. Exported from the type's own package because both apps and other packages ask.
+
+## `src/types/readMarks.js`
+
+### `READ_MARKS_SET_UNION`
+
+**Kind:** constant · **Import:** `READ_MARKS_SET_UNION` from `'@onderling/item-types'`
+
+The type's set-union declaration: the set, each member's key and time, and the floor that prunes it.

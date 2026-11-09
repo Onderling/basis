@@ -60,6 +60,9 @@ export const SEAMS = Object.freeze([
   { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
   // THE RELAY TRAVELS WITH THE CARD: a device with no relay of its own adopts the point a scanned contact card brings, saved so
   // a restart reconnects to it, and says whose it now uses. Before, it dialled the card's relay only at the first send, unsaid.
+  // READ ON ONE DEVICE = READ ON ALL: a shell that paints news (circle tiles, Today, the contact badges) holds the one
+  // read set and marks what is opened, so a message read on the phone is not news on the laptop. The box paints none.
+  { id: 'read-marks-across-devices', pattern: /createReadMarks\(/, shells: ['web', 'mobile'], why: 'without it a circle or conversation read on one device stays new on every other device of the person' },
   { id: 'contact-scan-adopts-point', pattern: /adoptInheritedPoint\(|contactPointAdopter\(/, shells: ['web', 'mobile'], why: 'a device with no relay scans a card and stays unreachable (until its first send, and again after every restart)' },
   // A SETTING ONLY WHERE IT CHANGES SOMETHING: 'How the bot shows actions' is about a bot that acts; Help only answers.
   // Each host reads the contact book through one predicate before it offers the setting (a walk saw it with no bot).

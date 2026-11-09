@@ -20,6 +20,7 @@ Rule for anyone ruling on absence: before "not built" or "needs design", read th
 | Page | Area | State |
 |---|---|---|
 | [tasks-and-dispatch.md](tasks-and-dispatch.md) | tasks, chores, claims, subtasks, approval, mandates, skill dispatch | first draft 2026-10-23 |
+| [news-and-read-state.md](news-and-read-state.md) | what is new for the person (circle tiles, Today's news, contact badges), read state across their devices | started 2026-11-09 |
 | circles-and-pinboard | circles, membership, governance, posts, requests | owed |
 | calendar | appointments, rsvp, week overview | owed |
 | lists | plain lines, sendable lists | owed |

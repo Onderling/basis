@@ -69,6 +69,7 @@ export const householdManifest = {
     'receive-personas': 'write',   // the picked personas' keys, into this install's sealed slots
     'pause-persona':    'write',   // a device entry: which held personas do not run here
     'resume-persona':   'write',
+    'mark-read':        'write',   // the self's own read-marks row (carried to that self's other devices)
     'remove-persona':   'write',   // this device's delegation under one persona, tombstoned; its keys here wiped
     'set-nearby-level': 'write',   // a self's Nearby level, on its disclosure
     'revoke-device': 'write',
@@ -434,6 +435,25 @@ export const householdManifest = {
       // The inverse: from the next boot the persona runs here again. Typed by name too (`/hervat Werk`).
       params: [ { name: 'personaId', kind: 'string', required: true, pickerSource: { listOp: 'listPersonasHere' } } ],
       surfaces: { slash: { command: '/hervat' } },
+    },
+    {
+      id:   'markRead', visibility: 'private', group: 'device',
+      verb: 'mark-read',
+      writes: { scope: 'person' },   // the self's own read-marks row, carried to that self's other devices
+      // WHAT I READ, ON ALL MY DEVICES — the ids just read in one group (a circle, a contact), each with its source's
+      // own time; a grow-only set that merges as a union, pruned the same way everywhere. Called by the shells when a
+      // circle or a conversation is opened; no chat or slash surface (reading is not an act a person types).
+      params: [
+        { name: 'group',  kind: 'string', required: true },
+        { name: 'read',   kind: 'object', required: true },
+        { name: 'selfId', kind: 'string', required: false },
+      ],
+    },
+    {
+      id:   'listReadMarks', visibility: 'private', group: 'device',
+      verb: 'list',
+      // every read-marks row this device holds (all selves): the one read set the news, the tiles and the badges test
+      params: [],
     },
     {
       id:   'receivePersonas', visibility: 'private', group: 'device',

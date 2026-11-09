@@ -15,7 +15,8 @@
  *              (e.g. a post / chat-message payload), or null when no
  *              event matched a renderable shape (host falls back to the
  *              member-count meta).
- *   ts       = ms-epoch of the most-recent matched event (0 when none).
+ *   ts       = when the most-recent matched event ARRIVED on this device (`landedAt`; 0 when none): what the news is
+ *              ordered by. Not when it was said: a tile that shows a time shows this one.
  *   unread   = number of events for this circle whose `ts > seenAt[id]` AND that
  *              `countsAsUnread` — what OTHERS said on the human lane
  *              (default seenAt 0 → "all of that is unread the first time").

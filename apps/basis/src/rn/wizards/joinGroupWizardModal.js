@@ -14,7 +14,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 
 import {
   initialState, decodeInvite, fetchGroupRules,
-  handleSuggestions, joinAsLine, joinNeedsName, joinFoldStartsOpen, joinAsNewPersona,
+  handleSuggestions, joinAsLine, joinNeedsName, joinFoldStartsOpen, joinAsNewPersona, addressHintKey,
   finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, isJoinDirty,
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
@@ -264,7 +264,7 @@ export default function JoinGroupWizardModal({
                       ]}
                     />
                   ) : null}
-                  <Hint>{t('circle.join.wizard.link.hint')}</Hint>
+                  <Hint>{t(addressHintKey(state))}</Hint>
                   {/* The real separation: a new persona, a different person to everyone, members included. */}
                   <Hint>{t('circle.join.wizard.new_persona.hint')}</Hint>
                   {state.newPersonaOpen ? (

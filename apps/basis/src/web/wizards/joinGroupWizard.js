@@ -41,6 +41,7 @@ import {
   joinNeedsName,
   joinFoldStartsOpen,
   joinAsNewPersona,
+  addressHintKey,
   initialState,
   fetchGroupRules,
   finalSubmit,
@@ -460,7 +461,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     }
     const lHint = doc.createElement('div');
     lHint.className = 'cc-wizard-field-hint cc-wizard-address-hint';
-    lHint.textContent = t('circle.join.wizard.link.hint');
+    lHint.textContent = t(addressHintKey(state));
     lWrap.appendChild(lHint);
     fold.appendChild(lWrap);
   }

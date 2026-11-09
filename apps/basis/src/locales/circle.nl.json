@@ -195,6 +195,10 @@
         "hint": {
           "text": "De relay ziet niet dat je kringen bij elkaar horen. Leden die in beide kringen zitten wel.",
           "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
+        },
+        "hint_same": {
+          "text": "De relay en de leden van beide kringen zien dat dit dezelfde persoon is.",
+          "doc": "Join wizard: the sentence under the address choice when the same address as in another circle is chosen (the relay and members of both circles see one person)."
         }
       },
       "persona": {

@@ -2153,7 +2153,7 @@ export function buildSkills({
         return { handle: v.handle, _sync: simulateSync() };
       });
     }, {
-      description: 'Set the calling actor\'s handle (lowercase, 3–32 chars).',
+      description: 'Set the calling actor\'s name in circles (any letters, spaces and capitals, 1 to 40 characters).',
       visibility:  'authenticated',
     }),
 

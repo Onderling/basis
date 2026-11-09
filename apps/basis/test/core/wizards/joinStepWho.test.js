@@ -2,9 +2,9 @@
 // The name is for people (any letters, spaces, capitals); it is no longer an identifier with a format rule.
 import { describe, it, expect } from 'vitest';
 import {
-  initialState, isValidName, joinName, joinAsLine, joinNeedsName, joinAsNewPersona,
+  initialState, isValidName, joinName, joinAsLine, joinNeedsName, joinAsNewPersona, addressHintKey, setLinkChoice,
+  finalSubmit,
 } from '../../../src/core/wizards/joinGroupState.js';
-import { validateHandle } from '../../../../pinboard/src/lib/handle.js';
 
 const t = (k, v) => (v ? `${k}|${JSON.stringify(v)}` : k);
 
@@ -18,12 +18,6 @@ describe('the name a person uses in a circle', () => {
   });
   it('refuses nothing-but-space, a control character, and an over-long name', () => {
     for (const n of ['', '   ', 'a\u0007b', 'x'.repeat(41), null, 42]) expect(isValidName(n)).toBe(false);
-  });
-  it('is the same rule the circle store applies when the name is saved', () => {
-    for (const n of ['Tester B', 'Émile de Vries', 'J', 'x'.repeat(40), 'x'.repeat(41), '   ']) {
-      expect(validateHandle(n).ok).toBe(isValidName(n));
-    }
-    expect(validateHandle('Tester B').handle).toBe('Tester B');   // kept as the person typed it
   });
 });
 
@@ -72,5 +66,38 @@ describe('joining as a new persona', () => {
     const s = stateWith();
     expect(await joinAsNewPersona({ state: s, callSkill: async () => ({}), name: '  ' })).toEqual({ ok: false });
     expect(s.persona).toBe(null);
+  });
+});
+
+describe('the sentence under the address says what the chosen address does', () => {
+  it('a new address: the relay cannot tie your circles together, members of both can', () => {
+    const s = stateWith({ existingSelves: [{ circleId: 'c-x', name: 'X' }] });
+    expect(addressHintKey(s)).toBe('circle.join.wizard.link.hint');
+  });
+  it('the same address as in another circle: the relay and the members of both see it is one person', () => {
+    const s = stateWith({ existingSelves: [{ circleId: 'c-x', name: 'X' }] });
+    setLinkChoice(s, 'c-x');
+    expect(addressHintKey(s)).toBe('circle.join.wizard.link.hint_same');
+  });
+});
+
+describe('a failed join leaves the other-name field as the person left it', () => {
+  it('the persona name is not written into the field when the failure is not about the name', async () => {
+    const s = stateWith({
+      personas: [{ id: 'p-werk', name: 'Werk' }], persona: 'p-werk', handle: '',
+      invite: { groupId: 'g1', code: 'x' },
+    });
+    const callSkill = async () => { throw Object.assign(new Error('admin-unreachable'), { reason: 'admin-unreachable' }); };
+    await finalSubmit({ state: s, callSkill });
+    expect(s.submitErrorReason).not.toBe('handle-taken');
+    expect(s.handle).toBe('');          // a later persona switch still moves the one line
+    expect(joinName(s)).toBe('Werk');
+  });
+  it('a refused name stays in the field, to change', async () => {
+    const s = stateWith({ personas: [{ id: 'p-werk', name: 'Werk' }], persona: 'p-werk', handle: '', invite: { groupId: 'g1', code: 'x' } });
+    const callSkill = async () => { throw Object.assign(new Error('handle-taken'), { reason: 'handle-taken' }); };
+    await finalSubmit({ state: s, callSkill });
+    expect(s.submitErrorReason).toBe('handle-taken');
+    expect(s.handle).toBe('Werk');
   });
 });

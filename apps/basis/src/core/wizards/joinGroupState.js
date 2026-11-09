@@ -23,26 +23,18 @@ import { endpointToDialForInvite } from '../../v2/connectionPoints.js';
 import { personaPresetKeys } from '../../v2/memberCards.js';
 import { newPersonaArgs } from '../../v2/newPersona.js';
 import { parseUntrustedJson } from '@onderling/core';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { validateHandle } from '@onderling-app/pinboard/lib/handle';
 
 
 /* ─── The name a person uses in a circle ───────────────────── */
 
-/** The longest name a circle takes, after trimming (the circle store applies the same bound when it saves it). */
-export const NAME_MAX_LEN = param({ key: 'joinWizard.nameMaxLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 40 });
-// eslint-disable-next-line no-control-regex
-const CONTROL_RE = /[\u0000-\u001f\u007f]/;
-
 /**
- * Is this a name a person can use in a circle? The name is for people: any letters, spaces and capitals, 1 to
- * NAME_MAX_LEN characters after trimming, no control characters. A leading `@` (the old display prefix) is not
- * part of it. The same rule as the circle store's `validateHandle`; a test pins the two together.
+ * Is this a name a person can use in a circle? The name is for people: any letters, spaces and capitals, 1 to 40
+ * characters after trimming, no control characters, a leading `@` not part of it. ONE rule: the circle store's own
+ * `validateHandle`, so what the wizard lets through is exactly what the store saves.
  */
 export function isValidName(name) {
-  if (typeof name !== 'string') return false;
-  let s = name.trim();
-  if (s.startsWith('@')) s = s.slice(1).trim();
-  return s.length >= 1 && s.length <= NAME_MAX_LEN && !CONTROL_RE.test(s);
+  return validateHandle(name).ok;
 }
 
 /**
@@ -401,6 +393,9 @@ export function joinAsLine(state, t) {
  * where a new address only hides the link from the relay). Makes the persona (`agents.createProfile`, the same op
  * Mij uses), adds it to the picker and chooses it.
  *
+ * The persona is made when this is pressed, before the join is sent. A wizard cancelled afterwards leaves it in Mij,
+ * where the person sees it and can remove it: accepted, rather than a persona that exists only inside a wizard.
+ *
  * @param {{state: object, callSkill: Function, name: string}} a
  * @returns {Promise<{ok: true, personaId: string}|{ok: false}>}
  */
@@ -541,6 +536,15 @@ export function setLinkChoice(state, choice) {
     && state.existingSelves.some((s) => s.circleId === choice);
   state.linkChoice = known ? choice : 'fresh';
   return state;
+}
+
+/**
+ * The sentence under the address choice, true for what is chosen: a new address hides the link from the relay (not
+ * from members of both circles); the same address as in another circle shows the relay and those members that this is
+ * one person.
+ */
+export function addressHintKey(state) {
+  return isLinkableChoice(state) ? 'circle.join.wizard.link.hint_same' : 'circle.join.wizard.link.hint';
 }
 
 /** True when the joiner chose to continue as an existing self (a linkable key). */
@@ -837,7 +841,9 @@ export async function finalSubmit({
   state.submitErrorParams = null;
   state.handleRejected = false;
   // The name the circle will hold: the other name from the fold, else the persona's (or your own) name. Resolved
-  // once here, so everything below sends the name the one line said; a refused name comes back in the fold's field.
+  // once here, so everything below sends the name the one line said. The fold's own field is given back on a failure
+  // (below), except when the circle refused that name: then the name it refused is in the field, to change.
+  const ownField = state.handle;
   state.handle = joinName(state);
   try {
     // J-CP1 (S4, 2026-07-29) — be ON the circle's endpoint before asking its admin for anything.
@@ -981,6 +987,7 @@ export async function finalSubmit({
         ? 'invalid-or-expired-code'
         : 'join-failed';
     }
+    if (state.submitErrorReason !== 'handle-taken') state.handle = ownField;
     state.submitting = false;
     state.submitStage = null;
     return { state };

@@ -57,8 +57,18 @@ export function landingEntryFor({ circleId, item, fresh = true, self = null, aut
   if (!kind || typeof author !== 'string' || !author || (self && author === self)) return null;
   return makeSilentEntry({
     id: landingIdOf(circleId, item.id), circleId, kind: ITEM_LANDED, actor: author, ts: now,
-    payload: { circleId, itemId: item.id, kind },
+    // `saidAt`: the item's own time (when it was written, the same on every device): what a read mark keeps
+    payload: { circleId, itemId: item.id, kind, saidAt: saidAtOf(item, now) },
   });
+}
+
+/** When a row was written, as a number (a stored row carries it as a number or an ISO string). */
+function saidAtOf(item, fallback) {
+  for (const v of [item?.createdAt, item?.updatedAt]) {
+    if (Number.isFinite(v)) return v;
+    if (typeof v === 'string') { const n = Date.parse(v); if (Number.isFinite(n)) return n; }
+  }
+  return fallback;
 }
 
 /** One landing per item per circle: the entry's id, so a second landing of the same row is never news twice. */

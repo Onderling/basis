@@ -13,19 +13,25 @@ export const CONTACT_SEEN_KEY = 'cc.contactSeenAt';
 
 /**
  * @param {{ turns: Array<{contactId?: string, origin?: string, ts?: number, receivedAt?: number}>, seenAt: Object<string, number> }} a
- * @returns {Object<string, {unread: number, lastTs: number}>}  per contact that has any inbound turn
+ * @param {Set<string>} [a.readIds]  every id the person read, on any of their devices
+ * @returns {Object<string, {unread: number, lastTs: number, unreadIds: Array<{id: string, at: number}>}>}  per contact that has any inbound turn
  */
-export function buildContactUnread({ turns = [], seenAt = {} } = {}) {
+export function buildContactUnread({ turns = [], seenAt = {}, readIds = null } = {}) {
   const out = {};
   for (const t of Array.isArray(turns) ? turns : []) {
     const id = t?.contactId;
     if (typeof id !== 'string' || !id || t.origin === 'user') continue;
     // when it ARRIVED here (a message the relay held is new once it lands), else when it was sent
     const ts = typeof t.receivedAt === 'number' ? t.receivedAt : (typeof t.ts === 'number' ? t.ts : 0);
-    const entry = out[id] ?? (out[id] = { unread: 0, lastTs: 0 });
+    const entry = out[id] ?? (out[id] = { unread: 0, lastTs: 0, unreadIds: [] });
     if (ts > entry.lastTs) entry.lastTs = ts;
     const seen = typeof seenAt?.[id] === 'number' ? seenAt[id] : -Infinity;
-    if (ts > seen) entry.unread += 1;
+    // …and read on none of my devices (`readMarks.js`: the message id, marked with when it was SENT)
+    const mid = typeof t.messageId === 'string' && t.messageId ? t.messageId : null;
+    if (ts > seen && !(readIds && mid && readIds.has(mid))) {
+      entry.unread += 1;
+      if (mid) entry.unreadIds.push({ id: mid, at: typeof t.ts === 'number' ? t.ts : ts });
+    }
   }
   return out;
 }

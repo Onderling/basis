@@ -10053,6 +10053,10 @@
       "assistant_calendarFeed": {
         "text": "Calendar subscription",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_windowDays": {
+        "text": "How long something new stays in your news (days)",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {

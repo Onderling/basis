@@ -18,6 +18,7 @@ import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../../../basis/src/v2/vandaag.js';
 import { createScreenHead } from '../../../../basis/src/v2/screenHead.js';
+import { createReadMarks } from '../../../../basis/src/v2/readMarks.js';
 import { watchCircleChanges } from '../../../../basis/src/v2/headCircleWatch.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
@@ -722,15 +723,25 @@ export default function CircleLauncherScreen({
   // from the channel's durable turns, the count on each row and the sum on the tab. Recomputed when a turn lands
   // (the reply inbox) and when a thread is opened (its seen-mark moves to now).
   const contactSeen = useMemo(() => makeContactSeenStore(AsyncStorage), []);
+  // WHAT THE PERSON READ ON ANY OF THEIR DEVICES (`readMarks.js`, web parity): the one read set the tiles, Vandaag and
+  // the contact badges test; opening a circle or a conversation adds to it; re-read when a sibling's marks land.
+  const [readTick, setReadTick] = useState(0);
+  const readMarks = useMemo(() => createReadMarks({ callSkill: (...a) => bundle?.callSkill?.(...a), onChange: () => setReadTick((n) => n + 1) }), [bundle]);
+  const readMarksRef = useRef(readMarks);
+  readMarksRef.current = readMarks;
+  useEffect(() => {
+    readMarks.refresh();
+    return readMarks.follow((fn) => bundle?.agent?.onCircleChanged?.(fn));
+  }, [readMarks, bundle]);
   // …and what each row LAST READ here — the rename marker's left-hand side (web parity).
   const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
   const [contactUnread, setContactUnread] = useState({});
   const refreshContactUnread = useCallback(async () => {
     try {
       const turns = (await bundle?.contactChannel?.rehydrateAll?.()) ?? [];
-      setContactUnread(buildContactUnread({ turns, seenAt: await contactSeen.read() }));
+      setContactUnread(buildContactUnread({ turns, seenAt: await contactSeen.read(), readIds: readMarks.ids() }));
     } catch { setContactUnread({}); }
-  }, [bundle, contactSeen]);
+  }, [bundle, contactSeen, readMarks, readTick]);
   useEffect(() => { refreshContactUnread(); }, [refreshContactUnread]);
   useEffect(() => subscribeContactReplies(() => { refreshContactUnread(); }), [refreshContactUnread]);
   // the feedback door: the contact's row (the one Contacten paints), its thread opened with the draft in the composer
@@ -755,11 +766,12 @@ export default function CircleLauncherScreen({
   }, [view, bundle, contactNames]);
   const openContactThread = useCallback((contact) => {
     setContactThread(contact);
-    // opening the thread is reading it — the seen-mark moves to now, the badge is gone
+    // opening the thread is reading it — the seen-mark moves to now, the badge is gone, on every device (read marks)
+    readMarks.markContact(contact?.contactId, contactUnread[contact?.contactId]?.unreadIds ?? []).catch(() => {});
     contactSeen.mark(contact?.contactId, Date.now()).then(refreshContactUnread).catch(() => {});
     // …and it acknowledges a rename: the "was: …" line under the row clears (web parity)
     contactNames.seen(contact?.contactId, contact?.name).catch(() => {});
-  }, [contactSeen, contactNames, refreshContactUnread]);
+  }, [contactSeen, contactNames, refreshContactUnread, readMarks, contactUnread]);
   const tabBadges = useMemo(() => ({ contacten: totalUnread(contactUnread) }), [contactUnread]);
   const [viewAsPolicy, setViewAsPolicy] = useState('pairwise');
   const [viewAsMembers, setViewAsMembers] = useState([]);
@@ -859,9 +871,13 @@ export default function CircleLauncherScreen({
       AsyncStorage.setItem('cc.circleSeenAt', JSON.stringify(next)).catch(() => {});
       return next;
     });
-  })), []);
+    // …and what is in it is read on every device of the person (web parity)
+    readMarksRef.current?.markCircleFrom({ events: eventLog?.query ? eventLog.query({ excludeMuted: true }) : [], circleId: id, myRefs: myRefsRef.current }).catch(() => {});
+  })), []);   // eslint-disable-line react-hooks/exhaustive-deps
   // Whose lines are MINE for the unread count: 'me' (local stamps) and every address this person's devices speak as.
   const [unreadMyRefs, setUnreadMyRefs] = useState(['me']);
+  const myRefsRef = useRef(unreadMyRefs);
+  myRefsRef.current = unreadMyRefs;
   useEffect(() => {
     let alive = true;
     Promise.resolve(bundle?.agent?.ownAddresses?.()).then((a) => {
@@ -873,8 +889,8 @@ export default function CircleLauncherScreen({
   useEffect(() => {
     const events = eventLog?.query ? eventLog.query({ excludeMuted: true }) : [];
     // a landed item's subtitle names its kind in words
-    setPreviews(buildTilePreviews({ events, circles, seenAt, myRefs: unreadMyRefs, t }));
-  }, [eventLog, circles, seenAt, unreadMyRefs]);
+    setPreviews(buildTilePreviews({ events, circles, seenAt, myRefs: unreadMyRefs, t, readIds: readMarks.ids() }));
+  }, [eventLog, circles, seenAt, unreadMyRefs, readMarks, readTick]);
   // per-circle voorstellen badge. Populated lazily after
   // circles load; refresh after a settings save (CircleSettingsScreen
   // calls back through onPoll once it persists a new proposal).
@@ -1085,7 +1101,7 @@ export default function CircleLauncherScreen({
   // the governance binding, for Mij's reads (made further down; read through a ref when Mij asks, after render)
   const govPolicyRef = useRef(null);
   const mijSources = useMemo(() => ({
-    eventLog, circles: circlesShown, seenAt, myRefs: unreadMyRefs, availabilityStore,
+    eventLog, circles: circlesShown, seenAt, myRefs: unreadMyRefs, readIds: readMarks.ids(), availabilityStore,
     // "wat wacht op jou": the votes open in each circle (the same fold the tile badge reads), a device offer here
     openProposals: (cid) => (govPolicyRef.current ? openPolicyProposals(govPolicyRef.current, cid) : Promise.resolve({ proposals: [] })),
     pendingDeviceOffer: () => pendingEnrollOffer(AsyncStorage),
@@ -1340,7 +1356,7 @@ export default function CircleLauncherScreen({
       // path and this sibling kept the wrong one): 'calendar' arg-shifted into the opId and the
       // agenda materialised empty. Found by the rename that makes the two waists unmistakable.
       // …and the circles-with-news block counts what the circle tiles count (their 'seen' and 'me')
-      hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs,
+      hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs, readIds: readMarksRef.current?.ids(),
         ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
@@ -1376,7 +1392,7 @@ export default function CircleLauncherScreen({
     return () => { off(); head.dispose(); if (vandaagHead.current === head) vandaagHead.current = null; };
   }, [bundle, eventLog, materializeVandaagNow]);
   // the circles-with-news block counts what is not yet seen, and the marks live in AsyncStorage, not in a store
-  useEffect(() => { vandaagHead.current?.invalidate(); mijHead?.invalidate(); }, [seenAt]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { vandaagHead.current?.invalidate(); mijHead?.invalidate(); }, [seenAt, readTick]);   // eslint-disable-line react-hooks/exhaustive-deps
   // MIJ'S HEAD (web parity): Me's blocks kept current by the circles' items, the event log and the agent registry (a
   // profile's facts are the registry's); CircleProfileScreen lands on it with its own reader. Only a TAB landing reads
   // the head as it is (`mijByTab`): every other way into Mij follows an act and reads again.
@@ -1655,6 +1671,8 @@ export default function CircleLauncherScreen({
       AsyncStorage.setItem('cc.circleSeenAt', JSON.stringify(next)).catch(() => {});
       return next;
     });
+    // …and mark what is in it read on every device of the person (web parity)
+    readMarksRef.current?.markCircleFrom({ events: eventLog?.query ? eventLog.query({ excludeMuted: true }) : [], circleId: c.id, myRefs: myRefsRef.current }).catch(() => {});
     // no chat-route fallback anymore. Every tap-on-circle
     // opens the circle view (which will host the CONVERSATION tab in).
     setSelected(c);
@@ -2443,7 +2461,11 @@ export default function CircleLauncherScreen({
             draft={contactThread?.draft ?? ''}
             resolvePicture={circlePictureResolver(contactThread?.pairCircleId)}
             onBack={() => setContactThread(null)}
-            onRead={() => contactSeen.mark(contactThread?.contactId, Date.now()).then(refreshContactUnread).catch(() => {})}
+            onRead={() => {
+              // a turn read as it arrives: on every device too (read marks, web parity)
+              readMarks.markContact(contactThread?.contactId, contactUnread[contactThread?.contactId]?.unreadIds ?? []).catch(() => {});
+              contactSeen.mark(contactThread?.contactId, Date.now()).then(refreshContactUnread).catch(() => {});
+            }}
           />
         </WithTabBar>
       );

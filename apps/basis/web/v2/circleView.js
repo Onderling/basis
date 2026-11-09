@@ -51,7 +51,7 @@ import { buildAttachControl } from './attachControl.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { pickRowText } from '../../src/v2/rowText.js';
 import { embedButtonText } from '../../src/v2/replyEmbeds.js';
-import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
+import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, itemKindChip } from '../../src/v2/embedChips.js';
 // Long bot bubbles (e.g. a big verify-summary) chunk to a preview + "Show more" — shared with mobile so the
 // truncation is identical across surfaces.
 import { chunkBubble } from '../../src/v2/chunkBubble.js';
@@ -83,11 +83,6 @@ export function renderCircleView(container, {
   // (`circle.view.bot_header`) rides in as the helper's fallback for a named-less bot,
   // never as an always-on default here. Null → the chat card renders without a head.
   botLabel = null,
-  // P1.7 — the viewer's conversation filter. `chatFilter` is the SHARED chip model
-  // (`chatFilterChips` + the active filter); `onChatFilter(nextFilter)` is the tap. Null → no chip row,
-  // exactly as before. The shell holds no filter logic: each chip already carries its `nextFilter`.
-  chatFilter = null,
-  onChatFilter = null,
   // per-circle bottom tabs (board Example 1-3).
   // `tabs`     `[{id, label}]` produced by `buildCircleTabs(policy, t)`
   // `activeTab` current tab id (defaults to first / 'conversation')
@@ -341,11 +336,6 @@ export function renderCircleView(container, {
   const inPrikbord = effectiveTab === 'noticeboard' && !!noticeboard;
   // the chat composer is the CONVERSATION's; under Leden (and tasks, lists, …) it only confused people
   const noComposer = inPrikbord || !chatComposerVisible(effectiveTab);
-  // P1.7 — the filter strip, above the stream and only in the conversation view. Rendering it only
-  // where it applies keeps it from reading as a global control over tabs it does not touch.
-  if (chatFilter && typeof onChatFilter === 'function' && effectiveTab === 'conversation' && viewMode !== 'screen') {
-    container.appendChild(buildChatFilterStrip(chatFilter, onChatFilter, tr));
-  }
 
   const body = document.createElement('div');
   body.className = 'circle-view__list';
@@ -1001,13 +991,14 @@ function renderBubble(row, {
     scopeEl.textContent = tr(`circle.scope.${scope}`);
   }
 
-  // Kind pill (small, inline before text — matches the v2 NOTICEBOARD card
-  // shape).  For chat-only messages the kind is null and no pill renders.
-  const kind = pickKindLabel(row);
-  if (kind) {
+  // The item's small kind chip (the shared item-kind vocabulary, the same icon and word as an embed chip of that
+  // type). Plain chat carries none.
+  const kindChip = itemKindChip(row.event?.payload?.kind);
+  if (kindChip) {
     const tag = document.createElement('span');
     tag.className = 'circle-view__bubble-kind';
-    tag.textContent = kind;
+    tag.dataset.kind = kindChip.type;
+    tag.textContent = `${kindChip.icon} ${tr(kindChip.labelKey)}`;
     el.appendChild(tag);
   }
 
@@ -1326,14 +1317,6 @@ function formatDayLabel(ts, tr) {
   return d.toLocaleDateString();
 }
 
-function pickKindLabel(row) {
-  const p = row?.event?.payload && typeof row.event.payload === 'object' ? row.event.payload : {};
-  const k = typeof p.kind === 'string' && p.kind ? p.kind : null;
-  // Don't show a kind pill for plain chat messages — they're the default.
-  if (!k || k === 'message' || k === 'chat-message') return null;
-  return k.toUpperCase();
-}
-
 // D / Surface 2 — the ⋯ overflow roster is PROJECTED from `manifest.actions`
 // via the shared `circleActions` selector, NOT a hardcoded list (the old
 // `MORE_ITEMS` literal is gone — invariants #1/#3/#4).  The roster carries the
@@ -1361,51 +1344,4 @@ function collectMoreActions(more, tr, policy, availability = null, viewerIsAdmin
   return out;
 }
 
-/**
- * P1.7 — the conversation filter strip: one chip per kind the circle allows, then the people/agents
- * chips. Pure projection of the shared model — a chip's tap just hands back its precomputed
- * `nextFilter`, so web and mobile can never drift on what a tap means.
- *
- * The wording matters here: this narrows what YOU read. It is not a circle setting and changes nothing
- * for anyone else, so the strip says so rather than looking like an admin control.
- */
-function buildChatFilterStrip(model, onChatFilter, tr) {
-  const strip = document.createElement('div');
-  strip.className = 'circle-view__filter';
-  if (model.active) strip.classList.add('circle-view__filter--active');
-
-  const chip = (label, { selected, disabled, nextFilter, title }) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'circle-view__filter-chip';
-    if (selected) b.classList.add('is-on');
-    b.textContent = label;
-    if (title) b.title = title;
-    if (disabled) {
-      b.disabled = true;
-      // The last remaining kind: say why rather than leaving a chip that silently does nothing.
-      b.title = tr('circle.chatFilter.last_kind');
-    } else {
-      b.addEventListener('click', () => onChatFilter(nextFilter));
-    }
-    return b;
-  };
-
-  for (const c of model.kindChips ?? []) {
-    strip.appendChild(chip(tr(`circle.chatFilter.kind.${c.kind}`, { defaultValue: c.kind }), c));
-  }
-  const sep = document.createElement('span');
-  sep.className = 'circle-view__filter-sep';
-  sep.setAttribute('aria-hidden', 'true');
-  strip.appendChild(sep);
-  for (const c of model.authorChips ?? []) {
-    strip.appendChild(chip(tr(`circle.chatFilter.authors.${c.authors}`), c));
-  }
-
-  const note = document.createElement('span');
-  note.className = 'circle-view__filter-note';
-  note.textContent = tr('circle.chatFilter.note');
-  strip.appendChild(note);
-  return strip;
-}
 

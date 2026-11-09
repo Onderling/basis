@@ -72,8 +72,8 @@ import {
   // the membership lane's entry kind — a statement about who is in this circle (join · leave · role · what a
   // member says about themselves) is what makes the members tab re-read
   MEMBERSHIP_LANE,
-  // P1.7 — the viewer's conversation filter (kinds × people/agents), shared model, device-local store.
-  applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
+  // the small kind chip on a conversation item (the shared item-kind vocabulary)
+  itemKindChip,
   // "Never share my global address" — the publication lock (web parity).
   shareableAddress,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
@@ -2750,7 +2750,6 @@ export default function CircleLauncherScreen({
         catalogue={bundle?.catalogue}
         policy={selectedPolicy}
         override={selectedOverride}
-        peerGraph={bundle?.peerGraph ?? null}
         signChatStatement={(cid, mid) => bundle?.agent?.chatRail?.signEntry?.(cid, mid) ?? null}
         myListTasks={myListTasks}
         eventLog={eventLog}
@@ -3196,13 +3195,6 @@ function CircleDetail({
   deliveryStateMap = null,
   registerCircleBotSink = null,
   onAcceptFallback = null,
-  // `isAgentActor` needs the peer graph to tell an agent actor from a person. It used to read
-  // `bundle?.peerGraph`, and `bundle` is the LAUNCHER's prop — not one of ours. Optional chaining does not
-  // save an UNDECLARED name, so that was a third render crash stacked behind `onAcceptFallback` and
-  // `selectedPolicy` (found 2026-07-30 by the scope fitness guard, after the first two were fixed by hand).
-  // Passed narrowly rather than handing this component the whole bundle: it needs one lookup, and the file's
-  // style is to thread the specific store.
-  peerGraph = null,
   // The chat lane's sign-the-appended-entry hook (`agent.chatRail.signEntry`) — threaded narrowly, the
   // file's style: the fan needs one function, not the whole bundle.
   signChatStatement = null,
@@ -3313,27 +3305,6 @@ function CircleDetail({
     circleSetting: policy?.conversationKinds ?? circle?.conversationKinds ?? null,
     templateKind:  policy?.kind ?? circle?.kind ?? null,
   }), [policy?.kind, policy?.conversationKinds, circle?.kind, circle?.conversationKinds]);
-  // P1.7 — the reader's own narrowing on top of the circle's setting (web parity). Device-local per
-  // circle; an actor we cannot resolve counts as a person, so nobody vanishes from a conversation.
-  const chatFilterIo = useMemo(() => asyncStorageChatFilterIo(AsyncStorage), []);
-  const [chatFilter, setChatFilter] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    const cid = circle?.id ?? null;
-    if (!cid) { setChatFilter(null); return undefined; }
-    chatFilterIo.load(cid).then((v) => { if (alive) setChatFilter(v); }).catch(() => {});
-    return () => { alive = false; };
-  }, [circle?.id, chatFilterIo]);
-  const viewerFilter = useMemo(
-    () => normalizeChatFilter(chatFilter, allowedKinds),
-    [chatFilter, allowedKinds],
-  );
-  const isAgentActor = useCallback((actor) => {
-    if (actor == null) return false;
-    const list = peerGraph?.list ? peerGraph.list() : [];
-    return (list ?? []).some((p) => (p?.pubKey === actor || p?.url === actor)
-      && (p?.type === 'a2a' || p?.type === 'hybrid' || (Array.isArray(p?.skills) && p.skills.length > 0)));
-  }, [peerGraph]);
   // Declared HERE (not with the entrust/MEMBERS blocks below) because the rows memo reads them: the
   // viewer signals gate the owner-only entrust action AND the reveal-gated sender labels, and the
   // roster is what the labels resolve against. The circle roster via listGroupMembers (web≡mobile);
@@ -3346,36 +3317,25 @@ function CircleDetail({
   // drops the acknowledgement flag; the caretaker notice is the one reader that needs it.
   const [rosterRows, setRosterRows] = useState(null);
   const [mutedActors, setMutedActors] = useState(new Set());   // the person-mute hide set (web parity)
-  const rows = useMemo(() => applyChatFilter({
-    rows: chatRows({
-      events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
-      circles,
-      circleId:  circle?.id ?? null,
-      kinds:     allowedKinds,
-      // Membership + governance notices are RENDERED from the log by the shared projection (web≡mobile by
-      // construction); `wants` is the person's per-kind setting (decision 4: circle default, private override).
-      t,
-      wants: noticeWants({ policy, override }),
-      // Sender labels through the reveal ladder (batch 4, web≡mobile): the projector stamps
-      // `senderLabel`/`senderLabelKey`, the view only paints. `tabMembers` is null until the
-      // circle-open roster load resolves — rows stay unstamped for that window, never a wire name.
-      members:   tabMembers,
-      // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
-      excludeActors: mutedActors,
-      viewerId:  mandateViewer.viewerWebid ?? null,
-      policy:    policy?.revealPolicy ?? 'pairwise',
-    }),
-    filter: viewerFilter,
-    allowedKinds,
-    isAgentActor,
-  }), [eventLog, circles, circle?.id, allowedKinds, viewerFilter, isAgentActor, streamTick,
+  const rows = useMemo(() => chatRows({
+    events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
+    circles,
+    circleId:  circle?.id ?? null,
+    kinds:     allowedKinds,
+    // Membership + governance notices are RENDERED from the log by the shared projection (web≡mobile by
+    // construction); `wants` is the person's per-kind setting (decision 4: circle default, private override).
+    t,
+    wants: noticeWants({ policy, override }),
+    // Sender labels through the reveal ladder (batch 4, web≡mobile): the projector stamps
+    // `senderLabel`/`senderLabelKey`, the view only paints. `tabMembers` is null until the
+    // circle-open roster load resolves — rows stay unstamped for that window, never a wire name.
+    members:   tabMembers,
+    // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
+    excludeActors: mutedActors,
+    viewerId:  mandateViewer.viewerWebid ?? null,
+    policy:    policy?.revealPolicy ?? 'pairwise',
+  }), [eventLog, circles, circle?.id, allowedKinds, streamTick,
     tabMembers, mutedActors, mandateViewer, policy]);
-  const onChatFilter = useCallback((next) => {
-    const cid = circle?.id ?? null;
-    if (!cid) return;
-    setChatFilter(next);
-    chatFilterIo.save(cid, next).catch(() => {});
-  }, [circle?.id, chatFilterIo]);
   // Conversation memory — a ref so the bot reads the LATEST rows without re-creating.
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
@@ -4750,17 +4710,6 @@ function CircleDetail({
           2px-ink border. The noticeboard / screen / members tabs keep the plain body. The
           header + the bordered scroll are stacked siblings that read as one contiguous
           card (matching 2px-ink sides). */}
-      {/* P1.7 — the viewer's conversation filter strip (kinds × people/agents), web parity. Only in the
-          conversation view: elsewhere it would read as a control over tabs it does not touch. The chip
-          model is shared, so a tap means the same thing on both platforms. */}
-      {viewMode !== 'screen' && activeTab === 'conversation' ? (
-        <ChatFilterStrip
-          model={chatFilterChips({ allowedKinds, filter: viewerFilter })}
-          onPick={onChatFilter}
-          t={t}
-          styles={styles}
-        />
-      ) : null}
       {viewMode !== 'screen' && activeTab === 'conversation' && botLabel ? (
         <View style={styles.chatHead} testID="circle-detail-bot-head">
           <View style={styles.chatDot} />
@@ -5249,42 +5198,6 @@ function CircleDetail({
 // the web circleView renderer.  Keeps the mobile parity tight.
 // δ.2 — `deliveryOpts` carries the per-message delivery-state hooks
 // for locally-sent bubbles (clock / warning + tap-to-retry).
-/**
- * P1.7 — the conversation filter strip (mobile mirror of web's `buildChatFilterStrip`).
- *
- * Pure projection of the SHARED chip model: each chip carries its own `nextFilter`, so neither shell
- * decides what a tap means. The note under the chips says this changes only what YOU see — it is a
- * reading preference, not a circle setting, and must not read like an admin control.
- */
-function ChatFilterStrip({ model, onPick, t, styles }) {
-  if (!model || typeof onPick !== 'function') return null;
-  const chip = (key, label, c) => (
-    <Pressable
-      key={key}
-      onPress={() => { if (!c.disabled) onPick(c.nextFilter); }}
-      disabled={c.disabled}
-      accessibilityRole="button"
-      accessibilityState={{ selected: c.selected, disabled: !!c.disabled }}
-      style={[styles.filterChip, c.selected && styles.filterChipOn, c.disabled && styles.filterChipOff]}
-      testID={`chat-filter-${key}`}
-    >
-      <Text style={[styles.filterChipText, c.selected && styles.filterChipTextOn]}>{label}</Text>
-    </Pressable>
-  );
-  return (
-    <View style={[styles.filterStrip, model.active && styles.filterStripActive]} testID="chat-filter-strip">
-      <View style={styles.filterRow}>
-        {(model.kindChips ?? []).map((c) =>
-          chip(c.kind, t(`circle.chatFilter.kind.${c.kind}`, { defaultValue: c.kind }), c))}
-        <View style={styles.filterSep} />
-        {(model.authorChips ?? []).map((c) =>
-          chip(c.authors, t(`circle.chatFilter.authors.${c.authors}`), c))}
-      </View>
-      <Text style={styles.filterNote}>{t('circle.chatFilter.note')}</Text>
-    </View>
-  );
-}
-
 function renderBubblesWithDayDividers(rows, t, deliveryOpts = null, styles) {
   const chronological = [...rows].reverse();
   const nodes = [];
@@ -5316,9 +5229,9 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
   const sender = row?.senderSelf
     ? null
     : (row?.senderLabel ?? (row?.senderLabelKey ? t(row.senderLabelKey) : null));
-  const kindRaw = payload.kind;
-  const kind = (typeof kindRaw === 'string' && kindRaw && kindRaw !== 'message' && kindRaw !== 'chat-message')
-    ? kindRaw.toUpperCase() : null;
+  // the item's small kind chip (the shared item-kind vocabulary, web parity); plain chat carries none
+  const kindChip = itemKindChip(payload.kind);
+  const kind = kindChip ? `${kindChip.icon} ${t(kindChip.labelKey)}` : null;
   // Owner-only "entrust" (mandate) action rides the SAME actionsForStreamRow seam as web's
   // circleView — gated by the viewer's identity signals (WebID + admin) plus the locally-
   // authored `isOwn` path. Without signals threaded the mandate action stays hidden (fail-closed).
@@ -6484,26 +6397,13 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   moreItem:       { paddingVertical: 9, paddingHorizontal: 12 },
   moreItemText:   { fontSize: 13, color: theme.color.ink },
   moreItemReason: { fontSize: 11, color: theme.color.inkSoft, marginTop: 2 },
-  // Bulletin restyle — the CONVERSATION stream is ONE bot card (mirror of onderling.org's
-  // .chatbox / web's circle-view__chat-card). The header strip + the bordered scroll
-  // are stacked siblings sharing a 2px-ink frame so they read as one card.
-  chatHead:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: theme.color.card, borderTopWidth: 2, borderLeftWidth: 2, borderRightWidth: 2, borderColor: theme.color.ink, borderTopLeftRadius: theme.radius.md, borderTopRightRadius: theme.radius.md, borderBottomWidth: 1, borderBottomColor: theme.color.line },
-  // P1.7 — the conversation filter strip. Quiet by default; the strip warms when a filter is active so
-  // a narrowed conversation never reads as a missing one (web parity).
-  filterStrip:      { paddingHorizontal: 4, paddingTop: 6, paddingBottom: 2, gap: 4 },
-  filterStripActive:{ backgroundColor: theme.color.paper2, borderRadius: theme.radius.sm },
-  filterRow:        { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  filterChip:       { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },
-  filterChipOn:     { backgroundColor: theme.color.card, borderColor: theme.color.ink },
-  filterChipOff:    { opacity: 0.55 },
-  filterChipText:   { fontSize: 12, color: theme.color.inkSoft },
-  filterChipTextOn: { color: theme.color.ink, fontWeight: '600' },
-  filterSep:        { width: 1, height: 14, backgroundColor: theme.color.line, marginHorizontal: 2 },
-  filterNote:       { fontSize: 11, color: theme.color.inkSoft, paddingHorizontal: 2 },
+  // The CONVERSATION stream: the message log straight on the screen, no frame around it (a frame took room before
+  // any content; web parity with circle-view__chat-card). A 1:1 bot chat keeps its header strip on top.
+  chatHead:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   chatDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.color.green },
   chatName:  { fontSize: 12.5, fontWeight: '700', color: theme.color.ink },
-  chatScroll:{ flex: 1, backgroundColor: theme.color.card, borderLeftWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: theme.color.ink, borderBottomLeftRadius: theme.radius.md, borderBottomRightRadius: theme.radius.md },
-  chatListPad:{ padding: 14 },
+  chatScroll:{ flex: 1 },
+  chatListPad:{ paddingHorizontal: 2, paddingVertical: 8 },
   // chat bubbles + composer (v2 §1+§5). Others'/bot = --bot-bg + --bot-line (left);
   // mine = --me-bg block (right, no border) — web parity.
   bubble:           { padding: 10, borderWidth: 1, borderColor: theme.color.botLine, borderRadius: theme.radius.md, backgroundColor: theme.color.botBg, marginBottom: 6, maxWidth: '78%', alignSelf: 'flex-start' },
@@ -6518,7 +6418,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   bubbleScopeSelf:  { backgroundColor: theme.color.paper, color: theme.color.inkSoft },
   bubbleScopeCircle: { backgroundColor: theme.color.blueBg, color: theme.color.blue },
   bubbleText:       { fontSize: 14, color: theme.color.ink },
-  bubbleKind:       { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: theme.color.accent },
+  bubbleKind:       { fontSize: 11, fontWeight: '700', color: theme.color.accent },
   bubbleMore:       { marginTop: 4, fontSize: 12, fontWeight: '700', color: theme.color.accent },
   bubbleReport:     { marginTop: 4, fontSize: 11, color: theme.color.inkSoft },
   // embeds[] — cross-object "See also" chips on a circle message.

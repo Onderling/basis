@@ -69,13 +69,16 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(days[1].textContent).toBe('circle.view.day_today');
   });
 
-  it('shows a KIND pill on bubbles whose payload carries a kind ≠ message', () => {
+  it('shows the item kind chip (the shared vocabulary, translated) on bubbles whose payload carries a kind ≠ message', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
     const bubbles = el.querySelectorAll('.circle-view__bubble');
-    // r1 ask, r2 offer, r3 chat-message (no pill).
-    expect(bubbles[0].querySelector('.circle-view__bubble-kind').textContent).toBe('ASK');
-    expect(bubbles[1].querySelector('.circle-view__bubble-kind').textContent).toBe('OFFER');
+    // r1 ask, r2 offer, r3 chat-message (no chip). An ask is a request in the item vocabulary; never the raw kind.
+    const k0 = bubbles[0].querySelector('.circle-view__bubble-kind');
+    expect(k0.dataset.kind).toBe('request');
+    expect(k0.textContent).toContain(t('circle.embed.type.request'));
+    expect(k0.textContent).not.toMatch(/ASK/);
+    expect(bubbles[1].querySelector('.circle-view__bubble-kind').dataset.kind).toBe('offer');
     expect(bubbles[2].querySelector('.circle-view__bubble-kind')).toBeNull();
   });
 

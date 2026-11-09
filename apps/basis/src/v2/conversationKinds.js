@@ -171,8 +171,7 @@ export function withDerivedChatFeature(policy) {
  * The admin control for a circle's conversation kinds — the row model both shells render.
  *
  * `setConversationKind` existed with no call site for a day (S3/J-CW5: "passes for the wrong reason —
- * nobody has the control, admin included"). This is that call site, expressed the way `chatFilterChips`
- * expresses the reader's own filter: a pure model, so the shells add only markup.
+ * nobody has the control, admin included"). This is that call site, as a pure model, so the shells add only markup.
  *
  * Every registered kind appears, on or off, so an admin can see what a conversation COULD contain rather
  * than only what it currently does. The rows carry the whole next list rather than a delta, so a shell

@@ -413,10 +413,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     // `member-props` — what a member says about themselves: handle · displayName · avatarRef (2026-09-21, the note
     // `NOTE-member-props-on-the-membership-lane.md`, Fable's review). Self-only (subject == authorRef), members only
     // (after this depth's joins and removals), the allowlist (a statement naming an admin-owned fact is refused
-    // whole), newest wins per field (fold order; an absent field leaves the old value). THE HANDLE IS UNIQUE in the
-    // circle: a handle another CURRENT member holds refuses the whole statement, deny-wins, on every device
-    // independently — the one check the admin did at the join that moves here now the member writes their own row.
-    // Ordered by hash within the depth, so two devices fold the same collision the same way.
+    // whole), newest wins per field (fold order; an absent field leaves the old value). A BOT'S NAME IS ITS OWN: a name
+    // that a current bot holds, or a bot's statement taking a name another member holds, refuses the whole statement,
+    // deny-wins, on every device independently. People may share a name (2026-11-06). Ordered by hash within the
+    // depth, so two devices fold the same collision the same way.
     for (const s of [...batch].filter((x) => x.kind === 'member-props').sort((a, b) => (a.hash < b.hash ? -1 : 1))) {
       const p = s.payload && typeof s.payload === 'object' ? s.payload : null;
       if (!p || p.authorRef !== s.subject) continue;                       // self-only
@@ -436,8 +436,14 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // folds independently — a writer's own limit is whatever app version the sender happens to run.
       if (p.personaProperties && !faceThumbWithinCap(p.personaProperties.profilePicture)) continue;
       if (typeof p.handle === 'string' && p.handle) {
-        const taken = [...members].some((m) => m !== s.subject && handles[m] === p.handle);
-        if (taken) continue;                                                // uniqueness: deny-wins, the old handle stays
+        // Two PEOPLE may share a name (Frits 2026-11-06: the name is for people, uniqueness stays on the key, and the
+        // members list tells two equal names apart). A BOT's name stays its own: a bot is addressed by its name in
+        // chat, so a statement that would give a bot and anyone else one name (case-blind) is refused, deny-wins.
+        const want = p.handle.trim().toLowerCase();
+        const subjectIsBot = kinds[s.subject] === 'function';
+        const clash = [...members].some((m) => m !== s.subject && typeof handles[m] === 'string'
+          && handles[m].trim().toLowerCase() === want && (subjectIsBot || kinds[m] === 'function'));
+        if (clash) continue;                                                // deny-wins, the old name stays
       }
       const mine = props[s.subject] ?? (props[s.subject] = {});
       {   // record what this ACCEPTED statement set, for supersession (see `propSetters` above)

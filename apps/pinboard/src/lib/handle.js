@@ -53,31 +53,6 @@ export function foldHandle(input) {
 }
 
 /**
- * Per-circle handle-uniqueness check (Phase 4 Wave B — the pinned rule: no
- * duplicate handles within a single circle). Pure; the caller supplies the set
- * of handles already held in THIS circle.
- *
- * A member re-claiming their OWN current handle is NOT a collision — rows whose
- * `webid` equals `claimantWebid` are skipped. Comparison is case-folded via
- * `foldHandle`, matching `validateHandle`'s normalisation.
- *
- * @param {object} o
- * @param {string} o.candidate            the handle being claimed (raw or normalised)
- * @param {string} o.claimantWebid        the webid claiming it (its own row never collides)
- * @param {Array<{webid: string, handle: *}>} [o.taken]  handles already held in the circle
- * @returns {string|null}  the webid of the colliding member, or null when free.
- */
-export function findHandleCollision({ candidate, claimantWebid, taken = [] }) {
-  const want = foldHandle(candidate);
-  if (!want) return null;
-  for (const entry of taken) {
-    if (!entry || entry.webid === claimantWebid) continue;
-    if (foldHandle(entry.handle) === want) return entry.webid;
-  }
-  return null;
-}
-
-/**
  * Serialise a handle CLAIM for one circle, so the uniqueness rule survives concurrency.
  *
  * Found 2026-07-26 (story 2.1). Every claim path is read-then-write —

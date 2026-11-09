@@ -87,7 +87,7 @@ import {
 } from '@onderling/circles';
 import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
-import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
+import { validateHandle, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
 import { resolveMemberAddress, makeFallbackReporter, ADDRESS_VIA } from '../lib/memberAddress.js';
 import { kindWakes, assigneesOf } from '@onderling/item-store';
@@ -286,45 +286,6 @@ async function _findLatestGroupRules(store, groupId) {
   return latest;
 }
 
-/**
- * Collect the handles already TAKEN by members of ONE circle — the roster the
- * per-circle handle-uniqueness rule (Phase 4 Wave B) is enforced against.
- *
- * Reads BOTH authorities the handle can live in, so a collision is caught
- * regardless of which path recorded the incumbent:
- *   - the durable, signed `membership-redemption` trail (`source.peerDisplay` —
- *     the handle a peer-joiner claimed, recorded admin-side on
- *     `verifyMembershipCodeForPeer`), filtered to `groupId` so a handle held in
- *     ANOTHER circle never counts (cross-circle reuse stays allowed);
- *   - the in-circle `MemberMap` display cache (`handle`) — same-circle by
- *     construction (one MemberMap per circle), so no group filter is needed.
- *
- * Returns `[{ webid, handle }]` so the caller can exclude the claimant's own
- * row (re-claiming your current handle is not a collision). Both reads are
- * best-effort — a missing store/roster yields fewer entries, never a throw.
- *
- * @param {object} o
- * @param {{listOpen: Function}} [o.store]
- * @param {{list: Function}} [o.members]
- * @param {string|null} [o.groupId]
- * @returns {Promise<Array<{webid: string, handle: string}>>}
- */
-async function collectCircleHandles({ store, groupId } = {}) {
-  const taken = [];
-  if (store && typeof store.listOpen === 'function') {
-    try {
-      const reds = await store.listOpen({ type: 'membership-redemption' });
-      for (const it of reds ?? []) {
-        const src = it?.source ?? {};
-        if (groupId && src.groupId !== groupId) continue;
-        if (src.redeemedBy && src.peerDisplay) {
-          taken.push({ webid: src.redeemedBy, handle: src.peerDisplay });
-        }
-      }
-    } catch { /* trail read is best-effort — the MemberMap pass still runs */ }
-  }
-  return taken;
-}
 
 /**
  * How much clock difference a REDEEM tolerates past a code's expiry.
@@ -2109,45 +2070,19 @@ export function buildSkills({
     // ── Pinboard V1 Phase 6 (2026-05-06) — handle / displayName / reveal ─────
 
     /**
-     * setMyHandle({handle})  — validate + upsert into MemberMap.
+     * setMyHandle({handle})  — validate + store the caller's name in circles on their own profile.
      *
-     * Normalises (lowercases, strips leading `@`).  Does NOT broadcast
-     * to other group members; pod-side propagation is the app's
-     * concern (Phase 4 cache writes the MemberMap snapshot, the pod's
-     * group-config blob is rebuilt on admin's next save).
+     * The name is for people (any letters, spaces, capitals; `validateHandle`) and is kept as typed. Two people may
+     * share a name in a circle (Frits 2026-11-06): uniqueness stays on the key, and the members list tells two
+     * equal names apart with a small number (`normalizeCircleMembers`). A bot's name stays its own: the roster fold
+     * refuses a person's statement that takes a bot's name.
      */
     defineSkill('setMyHandle', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const v = validateHandle(a.handle ?? '');
       if (!v.ok) return { error: 'invalid-handle', reason: v.reason };
-      // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
-      // handles within a single circle). Reject if ANOTHER member of this circle
-      // already holds the handle (case-folded, so `Jan`/`jan` collide). The
-      // claimant re-setting their OWN current handle is not a collision (excluded
-      // by webid). Cross-circle reuse still passes: `collectCircleHandles`
-      // filters the trail to this `groupId`, and the MemberMap is circle-local.
-      // SERIALISED per (circle, handle): the check and the write are separated by awaits, so two members
-      // renaming to the same handle at once would both read a free handle and both write it (story 2.1).
+      // one write at a time per (circle, name), as while the name was unique
       return withHandleClaim(store, groupId, v.handle, async () => {
-        const taken = await collectCircleHandles({ store, groupId });
-        // …and every FOLDED roster's handles (2026-09-21): a member's later `member-props` rename lives on the lane, not
-        // in this device's cache, so the trail + cache alone would let two members claim one handle. The handle is the
-        // person's, one across their circles (`member-props` goes to every circle they are in), so every circle counts.
-        // The fold is the rule that binds (it refuses the statement on every device); this read says so up front.
-        try {
-          const mine = new Set();
-          for (const it of (await store.listOpen({ type: 'membership-redemption' })) ?? []) { if (it?.source?.redeemedBy === from && typeof it?.source?.groupId === 'string') mine.add(it.source.groupId); }
-          if (groupId) mine.add(groupId);
-          for (const gid of mine) {
-            try {
-              const r = await listGroupMembersCore(scope, { groupId: gid }, { from });
-              for (const m of r?.members ?? []) if (m?.webid && m.handle) taken.push({ webid: m.webid, handle: m.handle });
-            } catch { /* this circle's fold still refuses a collision */ }
-          }
-        } catch { /* the fold still refuses a collision */ }
-        if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
-          return { error: 'invalid-handle', reason: 'handle-taken' };
-        }
         const updated = await selfProfile?.set?.(from, { handle: v.handle });
         if (!updated) return { error: 'not-a-self-here' };
         return { handle: v.handle, _sync: simulateSync() };
@@ -2571,7 +2506,7 @@ export function buildSkills({
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
         codeRedeemableNow, inviteRedemptionVerdict: verdictWithRoster(), INVITE_LIMIT_REACHED, verifyCircleLink,
-        withHandleClaim, collectCircleHandles, findHandleCollision,
+        withHandleClaim,
       }, { a: dataArgs(parts), from });
     }, {
       description: 'Admin-side peer validator: confirms a joiner-presented code + records redemption.',

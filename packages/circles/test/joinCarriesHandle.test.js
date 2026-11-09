@@ -28,8 +28,6 @@ const deps = (spine) => ({
   INVITE_LIMIT_REACHED: 'invite-limit-reached',
   verifyCircleLink: () => false,
   withHandleClaim: async (_store, _group, _handle, fn) => fn(),
-  collectCircleHandles: async () => [],
-  findHandleCollision: () => false,
 });
 
 describe('the signed join carries the handle the joiner chose', () => {

@@ -227,6 +227,15 @@ export function makeAgentTrailEntry({
   });
 }
 
+/**
+ * When an entry arrived on THIS device: its `landedAt`, else (an entry from before the field) its `ts`. What a
+ * seen-mark and "new" compare; the sender's `ts` stays what a bubble shows and a conversation orders by.
+ *
+ * @param {object} e  a logged entry
+ * @returns {number}
+ */
+export const landedTimeOf = (e) => (typeof e?.landedAt === 'number' ? e.landedAt : (typeof e?.ts === 'number' ? e.ts : 0));
+
 export class EventLog {
   /** @type {LoggedEvent[]} most-recent first */
   #events;
@@ -301,15 +310,20 @@ export class EventLog {
     if (typeof event.id !== 'string' || event.id === '') return undefined;
     // De-dup on the caller's id.
     const existing = this.#events.findIndex((e) => e.id === event.id);
+    // When THIS device first held the entry: kept across a re-append (a re-delivery is not a second arrival)
+    let landedAt = null;
     if (existing !== -1) {
       // Invariant 4b: an auditable entry is immutable once written. Return the ORIGINAL so a caller that
       // reads the result still gets a truthful entry rather than the version it hoped to write.
       if (isAuditKind(event.type)) return this.#events[existing];
+      landedAt = this.#events[existing].landedAt ?? null;
       this.#events.splice(existing, 1);
     }
-    // Most-recent first. `seq` is ours: strip any caller-supplied one before stamping.
-    const { seq: _ignored, ...rest } = event;
-    const stored = { ...rest, seq: (this.#seq += 1) };
+    // Most-recent first. `seq` and `landedAt` are ours: strip any caller-supplied ones before stamping. The sender's
+    // `ts` stays as given (when it was said); `landedAt` is this device's clock (when it arrived here), which is what
+    // "new since I looked" compares, so a line the relay held for hours still counts once it lands.
+    const { seq: _ignored, landedAt: _theirs, ...rest } = event;
+    const stored = { ...rest, landedAt: landedAt ?? this.#now(), seq: (this.#seq += 1) };
     this.#events.unshift(stored);
     this.prune();
     // Persist async — caller doesn't await.

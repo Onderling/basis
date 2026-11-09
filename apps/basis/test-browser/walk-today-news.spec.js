@@ -68,6 +68,21 @@ test('everything someone else adds is news on Today, by kind; an empty Today nam
     const appt = await B.page.evaluate((cid) => window.onderlingCall('calendar', 'addEvent', { circleId: cid, title: 'koffie met A', when: new Date(Date.now() + 86_400_000).toISOString() }), gid);
     expect(appt?.ok, JSON.stringify(appt)).toBe(true);
     await expect.poll(() => todayNews(A.page), { timeout: 60_000, message: 'an appointment is news' }).toMatch(/📅.*4 nieuw/);
+
+    // A LATE LINE: said while A was offline, A looks at the circle (marks it seen) before it arrives; once it
+    // lands it is new, though it was said before A looked (news compares when it landed, not when it was said)
+    await A.page.context().setOffline(true);
+    await gotoCircles(B.page);
+    await openCircleMatching(B.page, RE);
+    await toChat(B.page);
+    await sendChat(B.page, 'later binnen');
+    await gotoCircles(A.page);
+    await openCircleMatching(A.page, RE);
+    await A.page.waitForTimeout(1500);
+    await gotoCircles(A.page);   // leaving marks the circle seen
+    expect(await todayNews(A.page), 'nothing new right after looking').toMatch(/Niets nieuws in Nieuws Kring/);
+    await A.page.context().setOffline(false);
+    await expect.poll(() => todayNews(A.page), { timeout: 90_000, message: 'a line said before I looked but delivered after is new' }).toMatch(/💬\s*1 nieuw/);
   } finally {
     await teardown(peers);
   }

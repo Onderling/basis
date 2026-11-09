@@ -47,3 +47,16 @@ describe('makeContactSeenStore — the seen-marks on the device, one code for bo
     expect(await store.read()).toEqual({ bea: 5 });
   });
 });
+
+describe('a direct message counts by when it ARRIVED here, not when it was sent', () => {
+  it('sent before I looked, received after: new', async () => {
+    const { buildContactUnread } = await import('../../src/v2/contactUnread.js');
+    const turns = [{ contactId: 'b', origin: 'bot', ts: 500, receivedAt: 2000 }, { contactId: 'b', origin: 'bot', ts: 400, receivedAt: 900 }];
+    expect(buildContactUnread({ turns, seenAt: { b: 1000 } }).b.unread).toBe(1);
+  });
+  it('the stored turn carries receivedAt beside its sender time', async () => {
+    const { chatTurnsFromItems } = await import('@onderling/item-store');
+    const [t] = chatTurnsFromItems([{ id: 'i', text: 'hoi', source: { dm: true, threadKey: 'b', direction: 'in', sentAt: 500, receivedAt: 2000, nonce: 'n' } }]);
+    expect(t).toMatchObject({ ts: 500, receivedAt: 2000 });
+  });
+});

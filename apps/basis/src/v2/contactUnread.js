@@ -12,7 +12,7 @@
 export const CONTACT_SEEN_KEY = 'cc.contactSeenAt';
 
 /**
- * @param {{ turns: Array<{contactId?: string, origin?: string, ts?: number}>, seenAt: Object<string, number> }} a
+ * @param {{ turns: Array<{contactId?: string, origin?: string, ts?: number, receivedAt?: number}>, seenAt: Object<string, number> }} a
  * @returns {Object<string, {unread: number, lastTs: number}>}  per contact that has any inbound turn
  */
 export function buildContactUnread({ turns = [], seenAt = {} } = {}) {
@@ -20,7 +20,8 @@ export function buildContactUnread({ turns = [], seenAt = {} } = {}) {
   for (const t of Array.isArray(turns) ? turns : []) {
     const id = t?.contactId;
     if (typeof id !== 'string' || !id || t.origin === 'user') continue;
-    const ts = typeof t.ts === 'number' ? t.ts : 0;
+    // when it ARRIVED here (a message the relay held is new once it lands), else when it was sent
+    const ts = typeof t.receivedAt === 'number' ? t.receivedAt : (typeof t.ts === 'number' ? t.ts : 0);
     const entry = out[id] ?? (out[id] = { unread: 0, lastTs: 0 });
     if (ts > entry.lastTs) entry.lastTs = ts;
     const seen = typeof seenAt?.[id] === 'number' ? seenAt[id] : -Infinity;

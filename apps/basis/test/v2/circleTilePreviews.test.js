@@ -49,9 +49,9 @@ describe('buildTilePreviews', () => {
   it('seeds an empty preview per known circle when there are no events', () => {
     const map = buildTilePreviews({ events: [], circles });
     expect(map).toEqual({
-      selwerd:     { subtitle: null, ts: 0, unread: 0 },
-      huisgenoten: { subtitle: null, ts: 0, unread: 0 },
-      leescircle:   { subtitle: null, ts: 0, unread: 0 },
+      selwerd:     { subtitle: null, ts: 0, unread: 0, kinds: [] },
+      huisgenoten: { subtitle: null, ts: 0, unread: 0, kinds: [] },
+      leescircle:   { subtitle: null, ts: 0, unread: 0, kinds: [] },
     });
   });
 

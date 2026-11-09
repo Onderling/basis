@@ -35,6 +35,7 @@ import {
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
+import { landingEntryFor, landingIdOf, markLandingRemoved } from '../../v2/itemLanding.js';
 import { parseCompanionClaim } from '../../v2/companionClaim.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
@@ -6104,9 +6105,23 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the post itself is already where pinboard reads it: the circle's store.
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
       onItemApplied: async (circleId, item, landing = {}) => {
+        // the landing on this device's log: what makes a row someone else wrote news, by when it ARRIVED (a late
+        // arrival by catch-up counts); a reference only, the words stay in the store. Only a FRESH row is news: an edit
+        // or a claim of a row this device already held is not (yet)
+        if (opts.deviceLog) {
+          try {
+            const entry = landingEntryFor({ circleId, item, fresh: landing?.fresh !== false, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
+            // once per row: a re-application (a rebuild from the log) is not a second arrival
+            if (entry && !opts.deviceLog.query().some((e) => e.id === entry.id)) opts.deviceLog.append(entry);
+          } catch { /* a news mark never fails the merge */ }
+        }
         try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
         circleChanged(circleId, 'landed');
         return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item, landing) : undefined;
+      },
+      // a row removed from the store leaves the news: its landing is marked, never re-counted
+      onItemRemoved: (circleId, itemId) => {
+        try { opts.deviceLog?.compactEntries?.([landingIdOf(circleId, itemId)], markLandingRemoved); } catch { /* best-effort */ }
       },
     });
     itemsEmit = makeItemsEmitter({

@@ -68,7 +68,7 @@ export const OWN_ITEMS_CATCHUP_SUBTYPES = Object.freeze({
  *   carried so a sibling verifies the chain without the registry. `belongs(scope, item)` says which lane an item of the
  *   one shared own store rides: a lane serves and applies only its own items (none of another self's).
  */
-export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, own = null }) {
+export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, onItemRemoved = null, own = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
   const isOwn = (circleId) => (typeof own?.isOwn === 'function' ? own.isOwn(circleId) === true : (Boolean(own?.scope) && circleId === own.scope));
@@ -157,10 +157,13 @@ export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, s
       }
       // A snapshot that LANDED (verified, merged) — the seam for anything that indexes what the store holds
       // (the noticeboard bridge into pinboard's index). Best-effort: an indexer must never fail the merge.
-      if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item, { fresh: !existed }); } catch { /* indexed later by catch-up */ } }
+      if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item, { fresh: !existed, authorRef: body.payload?.authorRef ?? null }); } catch { /* indexed later by catch-up */ } }
     } else if (body.kind === 'remove') {
       const id = body.payload?.id ?? body.subject;
-      if (typeof id === 'string' && id) await store.delete(id, { sync: false });
+      if (typeof id === 'string' && id) {
+        await store.delete(id, { sync: false });
+        if (typeof onItemRemoved === 'function') { try { await onItemRemoved(circleId, id); } catch { /* never fails the merge */ } }
+      }
     }
   }
 

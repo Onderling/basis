@@ -872,7 +872,8 @@ export default function CircleLauncherScreen({
   // Recompute the previews map whenever events / circles / seenAt change.
   useEffect(() => {
     const events = eventLog?.query ? eventLog.query({ excludeMuted: true }) : [];
-    setPreviews(buildTilePreviews({ events, circles, seenAt, myRefs: unreadMyRefs }));
+    // a landed item's subtitle names its kind in words
+    setPreviews(buildTilePreviews({ events, circles, seenAt, myRefs: unreadMyRefs, t }));
   }, [eventLog, circles, seenAt, unreadMyRefs]);
   // per-circle voorstellen badge. Populated lazily after
   // circles load; refresh after a settings save (CircleSettingsScreen

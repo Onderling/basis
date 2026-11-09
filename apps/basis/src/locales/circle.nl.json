@@ -1341,8 +1341,8 @@
       "doc": "An empty task block: nothing open."
     },
     "block_empty_news": {
-      "text": "{{title}} — geen",
-      "doc": "An empty \"circles with news\" block: none."
+      "text": "Nog geen kringen hier",
+      "doc": "An empty \"circles with news\" block when the page shows no circles at all."
     },
     "block_untitled": {
       "text": "Dit blok",
@@ -1359,6 +1359,14 @@
     "block_empty_awaiting": {
       "text": "{{title}} — niets",
       "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "block_empty_news_in": {
+      "text": "Niets nieuws in {{name}}",
+      "doc": "An empty \"circles with news\" block over one circle: it names the circle, so Today never goes empty without saying what it looked at."
+    },
+    "block_empty_news_count": {
+      "text": "Niets nieuws in je {{count}} kringen",
+      "doc": "An empty \"circles with news\" block over several circles: how many it looked at."
     }
   },
   "vandaag": {

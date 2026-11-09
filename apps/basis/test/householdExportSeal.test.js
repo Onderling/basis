@@ -52,7 +52,9 @@ describe('the shelf seals when the admin has set a key', () => {
     const all = await Promise.all(names.map((n) => shelf.read(n)));
     expect(all.every(isSealedExport)).toBe(true);
     expect(all.map((f) => f.holds)).toEqual([false, false, true]);
-    expect(JSON.stringify(all)).not.toContain('melk');
+    // the QUOTED plaintext form: a bare 'melk' can occur by chance inside base64 ciphertext (m, e, l, k are base64
+    // letters; it did once on development, 2026-11-08), quotes cannot — so this asserts leakage, not luck
+    expect(JSON.stringify(all)).not.toContain('"melk"');
   });
 });
 

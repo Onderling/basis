@@ -25,8 +25,10 @@ describe('Vandaag', () => {
   });
 
   it('circles with news: another person\'s lines since this device looked, newest first; my own never count', async () => {
-    const log = new EventLog({ initial: [], muted: [] });
-    const at = (circleId, actor, ts, id) => log.append({ id, ts, app: 'chat', type: 'chat-message', circleId, actor, payload: { text: 'hoi' } });
+    // each line lands when it is said here (news orders by when a line ARRIVED on this device)
+    let clock = 0;
+    const log = new EventLog({ initial: [], muted: [], now: () => clock });
+    const at = (circleId, actor, ts, id) => { clock = ts; return log.append({ id, ts, app: 'chat', type: 'chat-message', circleId, actor, payload: { text: 'hoi' } }); };
     at('a', 'bea', 1000, 'm1');
     at('b', 'cor', 2000, 'm2');
     at('b', 'me', 3000, 'm3');

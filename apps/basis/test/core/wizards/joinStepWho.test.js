@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   initialState, isValidName, joinName, joinAsLine, joinNeedsName, joinAsNewPersona, addressHintKey, setLinkChoice,
-  finalSubmit,
+  finalSubmit, prepareJoinIdentity,
 } from '../../../src/core/wizards/joinGroupState.js';
 
 const t = (k, v) => (v ? `${k}|${JSON.stringify(v)}` : k);
@@ -99,5 +99,35 @@ describe('a failed join leaves the other-name field as the person left it', () =
     await finalSubmit({ state: s, callSkill });
     expect(s.submitErrorReason).toBe('handle-taken');
     expect(s.handle).toBe('Werk');
+  });
+});
+
+describe('the stored name in circles is a last resort, never a key piece', () => {
+  const KEY = 'pZWOPwK1R5XsnsQ3d7tYb2kVfA9mLcE4hJ6uW8xN0rT';
+  it('a stored handle never beats the name: "tester-b" + name "Tester B" says "Tester B"', () => {
+    const s = stateWith({ profileName: 'Tester B', personaHandles: { default: 'tester-b' }, ownIds: [KEY] });
+    expect(joinName(s)).toBe('Tester B');
+  });
+  it('no name and a stored handle made from the key: the fold asks, never the slug', () => {
+    const s = stateWith({ profileName: '', personaHandles: { default: 'pzwopwk1' }, ownIds: [KEY] });
+    expect(joinName(s)).toBe('');
+    expect(joinNeedsName(s)).toBe(true);
+  });
+  it('no name and a real stored name: that name', () => {
+    const s = stateWith({ profileName: '', personaHandles: { default: 'Frits B' }, ownIds: [KEY] });
+    expect(joinName(s)).toBe('Frits B');
+  });
+  it('is loaded with the step: your own profile for the default persona, the persona view for the others', async () => {
+    const callSkill = async (app, op, args) => {
+      if (op === 'getMyProfile') return { entry: { webid: KEY, displayName: 'Frits', handle: 'Frits B' } };
+      if (op === 'listAgents') return { agents: [{ agentId: 'default', role: 'profile', name: 'default' }, { agentId: 'p-werk', role: 'profile', name: 'Werk' }] };
+      if (op === 'getPersonaView' && args.id === 'p-werk') return { properties: { handle: 'Frits van Werk' } };
+      return {};
+    };
+    const s = stateWith();
+    await prepareJoinIdentity({ state: s, callSkill, circles: [] });
+    expect(s.profileName).toBe('Frits');
+    expect(s.personaHandles).toEqual({ default: 'Frits B', 'p-werk': 'Frits van Werk' });
+    expect(s.ownIds).toEqual([KEY]);
   });
 });

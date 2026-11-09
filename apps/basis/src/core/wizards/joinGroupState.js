@@ -22,6 +22,7 @@ import { buildJoinConsentModel, optOutsFromDeclined } from '../../v2/circleConse
 import { endpointToDialForInvite } from '../../v2/connectionPoints.js';
 import { personaPresetKeys } from '../../v2/memberCards.js';
 import { newPersonaArgs } from '../../v2/newPersona.js';
+import { isKeyLike } from '../../v2/personLabel.js';
 import { parseUntrustedJson } from '@onderling/core';
 import { validateHandle } from '@onderling-app/pinboard/lib/handle';
 
@@ -351,14 +352,23 @@ export function setPersona(state, personaId) {
  * rest in a fold: another name in this circle (an optional mask; empty = the persona's name), the persona, how
  * much you show, the address, and the real separation, joining as a new persona. `state.handle` is the mask. */
 
-/** The persona's own name: a named persona's name, else (the default persona, or joining minimally) your name. */
+/**
+ * The persona's own name (Frits 2026-11-05: you join under your persona's NAME), in this order: a named persona's
+ * name; for the default persona (or joining minimally) your profile name, what the name card saved. Only when there
+ * is no name: the name the persona already goes by in circles (its stored handle, which a save of a name writes onto
+ * the persona), and only if it is not a piece of a key (early handles were made from one: 'pzwopwk1'). Else ''.
+ */
 function personaNameOf(state) {
-  const p = typeof state?.persona === 'string' && state.persona
-    ? (state.personas ?? []).find((x) => x?.id === state.persona) ?? null
-    : null;
+  const id = typeof state?.persona === 'string' && state.persona ? state.persona : 'default';
+  const p = (state?.personas ?? []).find((x) => x?.id === id) ?? null;
   if (p && p.id !== 'default' && typeof p.name === 'string' && p.name.trim() && p.name !== p.id) return p.name.trim();
-  const own = typeof state?.profileName === 'string' ? state.profileName.trim() : '';
-  return own || '';
+  if (id === 'default') {
+    const own = typeof state?.profileName === 'string' ? state.profileName.trim() : '';
+    if (own) return own;
+  }
+  const stored = state?.personaHandles?.[id];
+  if (typeof stored === 'string' && isValidName(stored) && !isKeyLike(stored, state?.ownIds ?? [])) return stored.trim();
+  return '';
 }
 
 /**
@@ -578,23 +588,42 @@ export function presentedCircleAddress(state, circleAddressFor) {
  * @param {{state:object, callSkill:Function, circles?:Array}} a
  * @returns {Promise<object>} the mutated state
  */
-/** Your own name (the profile's display name, what the name card on Today saves); '' when unset or unreadable. */
-export async function loadOwnName({ callSkill } = {}) {
-  if (typeof callSkill !== 'function') return '';
+/**
+ * Your own name and the names your personas already go by. `name` is the profile's display name (what the name card
+ * on Today saves); `handles` maps a persona id to its stored name in circles: the default persona's from your own
+ * profile, each other persona's from its persona view. Best-effort: anything unreadable is simply absent.
+ *
+ * @returns {Promise<{name: string, handles: Record<string, string>, ids: string[]}>}
+ */
+export async function loadOwnNames({ callSkill, personas = null } = {}) {
+  const out = { name: '', handles: {}, ids: [] };
+  if (typeof callSkill !== 'function') return out;
   try {
     const entry = (await callSkill('pinboard', 'getMyProfile', {}))?.entry ?? null;
-    return typeof entry?.displayName === 'string' ? entry.displayName.trim() : '';
-  } catch { return ''; }
+    if (typeof entry?.displayName === 'string') out.name = entry.displayName.trim();
+    if (typeof entry?.webid === 'string' && entry.webid) out.ids.push(entry.webid);   // to refuse a stored name made from it
+    if (typeof entry?.handle === 'string' && isValidName(entry.handle)) out.handles.default = entry.handle.trim();
+  } catch { /* no profile: no name */ }
+  const list = Array.isArray(personas) && personas.length ? personas : await loadPersonas({ callSkill });
+  await Promise.all(list.filter((p) => p?.id && p.id !== 'default').map(async (p) => {
+    try {
+      const h = (await callSkill('agents', 'getPersonaView', { id: p.id }))?.properties?.handle;
+      if (typeof h === 'string' && isValidName(h)) out.handles[p.id] = h.trim();
+    } catch { /* offline: this persona's label stands */ }
+  }));
+  return out;
 }
 
 export async function prepareJoinIdentity({ state, callSkill, circles, profileIdOf = null } = {}) {
-  const [priorHandles, personalDefault, profileName] = await Promise.all([
+  const [priorHandles, personalDefault, own] = await Promise.all([
     loadPriorHandles({ callSkill }),
     loadPersonalRevealDefault({ callSkill }),
-    loadOwnName({ callSkill }),
+    loadOwnNames({ callSkill, personas: state.personas }),
   ]);
   state.priorHandles = priorHandles;
-  state.profileName = profileName;   // the name the one line says when no persona or other name is chosen
+  state.profileName = own.name;          // the name the one line says when no persona or other name is chosen
+  state.personaHandles = own.handles;    // the names your personas already go by in circles
+  state.ownIds = own.ids;                // your own ids: a stored name that is a piece of one is not a name
   state.personalRevealDefault = personalDefault;
   // Circle-suggested level rides the invite; shown, NEVER forced.
   const suggested = state.invite?.suggestedReveal;
@@ -764,6 +793,8 @@ export function initialState() {
     capabilityOptOuts: [],
     handle:           '',           // the other name for this circle, typed in the fold ('' = the persona's name)
     profileName:      '',           // your own name (prepareJoinIdentity), what the one line says by default
+    personaHandles:   {},           // persona id → the name it already goes by in circles (prepareJoinIdentity)
+    ownIds:           [],           // your own ids (prepareJoinIdentity), to refuse a stored name made from one
     // Property layer — join-with-persona. `null` = join minimally (disclose no
     // background); a profile id = join AS that persona (its per-circle disclosure
     // applies). `personas` is the picker's option list, lazily loaded. Protective

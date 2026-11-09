@@ -40,7 +40,8 @@ export function isKeyLike(text, ids = []) {
   for (const id of ids) {
     if (typeof id !== 'string' || !id || isChosenIdentifier(id)) continue;
     if (s === id) return true;
-    if (s.length >= 6 && id.startsWith(s.replace(/[.…]+$/, ''))) return true;
+    // a prefix, in any case: early handles were made from a key by lowercasing its start ('pzwopwk1')
+    if (s.length >= 6 && id.toLowerCase().startsWith(s.replace(/[.…]+$/, '').toLowerCase())) return true;
   }
   // an opaque key on its own: one long run of key characters, no space (a name a person types has neither length
   // nor this alphabet alone — 32+ base64url/hex characters is a key)

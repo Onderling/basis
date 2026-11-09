@@ -13,7 +13,7 @@ import { decodeInvite, summariseEmbeddedRules, initialState } from '../core/wiza
 /** How long a pasted invite waits for its yes (the screen's ten minutes). */
 const OFFER_FOR_MS = 10 * 60 * 1000;
 
-/** The handle rule a roster row keeps (`isValidHandle`): lowercase, 3–30, letters/digits with `_`/`-` inside. */
+/** A bot's roster name, made from its label: lowercase, 3–30, letters/digits with `_`/`-` inside (a bot is addressed by it). */
 const slug = (s) => String(s ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/^@+/, '').replace(/[^a-z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^[-_]+|[-_]+$/g, '');
 

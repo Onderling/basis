@@ -40,7 +40,8 @@ export function isKeyLike(text, ids = []) {
   for (const id of ids) {
     if (typeof id !== 'string' || !id || isChosenIdentifier(id)) continue;
     if (s === id) return true;
-    if (s.length >= 6 && id.startsWith(s.replace(/[.…]+$/, ''))) return true;
+    // a prefix, in any case: early handles were made from a key by lowercasing its start ('pzwopwk1')
+    if (s.length >= 6 && id.toLowerCase().startsWith(s.replace(/[.…]+$/, '').toLowerCase())) return true;
   }
   // an opaque key on its own: one long run of key characters, no space (a name a person types has neither length
   // nor this alphabet alone — 32+ base64url/hex characters is a key)
@@ -52,15 +53,15 @@ export function isKeyLike(text, ids = []) {
  *
  * @param {object} p
  * @param {string|null} [p.displayName]  the name on their card (what they called themselves)
- * @param {string|null} [p.handle]       the handle they use in a circle you share (painted `@handle`)
+ * @param {string|null} [p.handle]       the name they use in a circle you share (painted as written)
  * @param {Array<string|null|undefined>} [p.ids]  their ids on this row — never shown, only refused as a label
  * @returns {{ label: string|null, labelKey: string|null }}  exactly one of the two is set
  */
 export function personLabel({ displayName = null, handle = null, ids = [] } = {}) {
   if (typeof displayName === 'string' && displayName.trim() && !isKeyLike(displayName, ids)) return { label: displayName.trim(), labelKey: null };
   if (typeof handle === 'string' && handle.trim() && !isKeyLike(handle, ids)) {
-    const h = handle.trim();
-    return { label: h.startsWith('@') ? h : `@${h}`, labelKey: null };
+    // the name as the person wrote it: no '@' (it was the old display prefix of a handle, and the name is for people)
+    return { label: handle.trim().replace(/^@\s*/, ''), labelKey: null };
   }
   return { label: null, labelKey: SOMEONE_LABEL_KEY };
 }

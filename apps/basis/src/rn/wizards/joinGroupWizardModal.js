@@ -5,7 +5,7 @@
  * 3-step flow:
  *   1. Rules — fetched from the invite or via pinboard.getGroupRules
  *   2. Privacy — acknowledge + mesh-consent toggle
- *   3. Handle — pick a circle handle with suggestions
+ *   3. Who — one line naming who joins, and a fold for another name or more privacy
  *
  * Shares src/core/wizards/joinGroupState.js with web.
  */
@@ -14,8 +14,8 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 
 import {
   initialState, decodeInvite, fetchGroupRules,
-  handleSuggestions, isValidHandle,
-  finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, applyPersonaHandle, isJoinDirty,
+  handleSuggestions, joinAsLine, joinNeedsName, joinFoldStartsOpen, joinAsNewPersona, addressHintKey,
+  finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, isJoinDirty,
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
   personaLabel,
@@ -24,7 +24,7 @@ import {
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 
 import {
-  Steps, Body, Field, Checkbox, HandleField, RadioGroup, Actions, ErrorBanner, Submitting,
+  Steps, Body, Field, Checkbox, HandleField, RadioGroup, Actions, ErrorBanner, Submitting, Fold, Hint, Lead, SmallButton,
   WizardTheme, wizardPalette,
 } from './_kit.js';
 
@@ -118,7 +118,6 @@ export default function JoinGroupWizardModal({
     );
   }
 
-  const suggestions = handleSuggestions(/* TODO: pull from agent.profile if available */ '');
 
   return (
     // The kit's primitives read their palette from here, so the sheet and its contents cannot disagree.
@@ -211,79 +210,99 @@ export default function JoinGroupWizardModal({
               </Body>
             )}
             {state.step === 3 && (
-              <Body
-                title={t('circle.join.wizard.handle.title')}
-                intro={t('circle.join.wizard.handle.intro')}
-              >
-                {/* The one handle field both wizards share (_kit.js). Suggestions show only when there is something to
-                    suggest — a heading over an empty row was its own small lie (S3, 2026-07-30). */}
-                <HandleField
-                  t={t}
-                  value={state.handle}
-                  onChange={(v) => setState((s) => ({ ...s, handle: v }))}
-                  suggestions={suggestions}
-                />
-                {/* Property layer — join-with-persona. Pick a persona whose
-                    per-circle disclosure applies here, or join minimally (the
-                    protective default: share no background). Nothing is shared
-                    on a first join regardless — this is the identity you enter
-                    the circle as; adjust its sharing later in "About me". */}
-                {Array.isArray(state.personas) && state.personas.length ? (
-                  <RadioGroup
-                    label={t('circle.join.wizard.persona.label')}
-                    value={state.persona ?? ''}
-                    onChange={(id) => setState((s) => {
-                      const next = setPersona({ ...s }, id);
-                      // …and the persona brings its own handle in, when the field is still empty (web
-                      // parity). Prefill, never override — a picker a person can go back to must not undo
-                      // their own words.
-                      applyPersonaHandle({ state: next, callSkill }).then((r) => {
-                        if (r.applied) setState((cur) => ({ ...cur, handle: next.handle }));
-                      }).catch(() => {});
-                      return next;
-                    })}
-                    options={[
-                      { id: '', label: t('circle.join.wizard.persona.minimal') },
-                      ...state.personas.map((p) => ({
-                        id: p.id,
-                        label: personaLabel(p, t),
-                      })),
-                    ]}
+              <Body title={t('circle.join.wizard.handle.title')}>
+                {/* THE ONE LINE: who joins, under which name. Everything else waits in the fold (joinGroupState.js). */}
+                <Lead testID="join-as-line">{joinAsLine(state, t)}</Lead>
+                <Fold
+                  label={t('circle.join.wizard.join_as.fold')}
+                  open={state.foldOpen === true || joinFoldStartsOpen(state)}
+                  onToggle={(open) => setState((s) => ({ ...s, foldOpen: open }))}
+                  testID="join-fold"
+                >
+                  {/* Another name in this circle: an optional mask. Empty = the persona's name. */}
+                  <HandleField
+                    t={t}
+                    value={state.handle}
+                    onChange={(v) => setState((s) => ({ ...s, handle: v }))}
+                    suggestions={handleSuggestions(state.priorHandles ?? [])}
+                    hint={t('circle.join.wizard.handle.intro')}
                   />
-                ) : null}
-                {/* ONE SELF PER CIRCLE ON A DEVICE — this device is already in the circle as another of the person's personas */}
-                {(() => {
-                  const second = secondPersonaRefusal(state);
-                  if (!second) return null;
-                  const held = (state.personas ?? []).find((p) => p.id === second.personaId) ?? { id: second.personaId };
-                  return <ErrorBanner message={t('circle.join.wizard.persona.already_in', { persona: personaLabel(held, t) })} />;
-                })()}
-                {/* Reveal level (§1.6) — how much of your persona this circle sees. You pick it
-                    (default = your resolved usual level, else the fallback); adjustable down to
-                    handle. Makes the join release VISIBLE + yours to set, not a silent default. */}
-                <RadioGroup
-                  label={t('circle.join.wizard.reveal.label')}
-                  value={state.revealPreset || 'profile'}
-                  onChange={(lvl) => setState((s) => setJoinReveal({ ...s }, lvl))}
-                  options={REVEAL_PRESETS.map((lvl) => ({ id: lvl, label: t(`circle.reveal.preset.${lvl}`) }))}
-                />
-                {/* #4 — continue as an existing self? Default FRESH (unlinkable); choosing an
-                    existing self presents that circle's key + a signing proof (provably the
-                    same person to anyone in both circles). Shown only when you're in others. */}
-                {Array.isArray(state.existingSelves) && state.existingSelves.length ? (
+                  {/* The persona you join as: its name is the name, and only what it shares in this circle is shared. */}
+                  {Array.isArray(state.personas) && state.personas.length ? (
+                    <RadioGroup
+                      label={t('circle.join.wizard.persona.label')}
+                      value={state.persona ?? ''}
+                      onChange={(id) => setState((s) => setPersona({ ...s }, id))}
+                      options={[
+                        { id: '', label: t('circle.join.wizard.persona.minimal') },
+                        ...state.personas.map((p) => ({ id: p.id, label: personaLabel(p, t) })),
+                      ]}
+                    />
+                  ) : null}
+                  {Array.isArray(state.personas) && state.personas.length ? <Hint>{t('circle.join.wizard.persona.hint')}</Hint> : null}
+                  {/* ONE SELF PER CIRCLE ON A DEVICE — this device is already in the circle as another of the person's personas */}
+                  {(() => {
+                    const second = secondPersonaRefusal(state);
+                    if (!second) return null;
+                    const held = (state.personas ?? []).find((p) => p.id === second.personaId) ?? { id: second.personaId };
+                    return <ErrorBanner message={t('circle.join.wizard.persona.already_in', { persona: personaLabel(held, t) })} />;
+                  })()}
+                  {/* The address. A new one is the default, and the sentence under it says honestly what it hides: the
+                      link from the relay, not from members who are in both circles. Another circle's address is
+                      offered only when there is one. */}
+                  {Array.isArray(state.existingSelves) && state.existingSelves.length ? (
+                    <RadioGroup
+                      label={t('circle.join.wizard.link.label')}
+                      value={state.linkChoice || 'fresh'}
+                      onChange={(cid) => setState((s) => setLinkChoice({ ...s }, cid))}
+                      options={[
+                        { id: 'fresh', label: t('circle.join.wizard.link.fresh') },
+                        ...state.existingSelves.map((self) => ({
+                          id: self.circleId,
+                          label: t('circle.join.wizard.link.same_person', { name: self.name }),
+                        })),
+                      ]}
+                    />
+                  ) : null}
+                  <Hint>{t(addressHintKey(state))}</Hint>
+                  {/* The real separation: a new persona, a different person to everyone, members included. */}
+                  <Hint>{t('circle.join.wizard.new_persona.hint')}</Hint>
+                  {state.newPersonaOpen ? (
+                    <>
+                      <Field
+                        label={t('circle.join.wizard.new_persona.label')}
+                        value={state.newPersonaName ?? ''}
+                        onChangeText={(v) => setState((s) => ({ ...s, newPersonaName: v }))}
+                        testID="join-new-persona-name"
+                      />
+                      <SmallButton
+                        label={t('circle.join.wizard.new_persona.make')}
+                        testID="join-new-persona-make"
+                        onPress={async () => {
+                          const next = { ...state };
+                          const r = await joinAsNewPersona({ state: next, callSkill, name: state.newPersonaName });
+                          setState((s) => (r.ok
+                            ? { ...s, personas: next.personas, persona: next.persona, handle: next.handle, newPersonaOpen: false, newPersonaName: '' }
+                            : s));
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <SmallButton
+                      label={t('circle.join.wizard.new_persona.button')}
+                      testID="join-new-persona"
+                      onPress={() => setState((s) => ({ ...s, newPersonaOpen: true, foldOpen: true }))}
+                    />
+                  )}
+                  {/* Reveal level (§1.6) — how much of your persona this circle sees. You pick it
+                      (default = your resolved usual level, else the fallback). */}
                   <RadioGroup
-                    label={t('circle.join.wizard.link.label')}
-                    value={state.linkChoice || 'fresh'}
-                    onChange={(cid) => setState((s) => setLinkChoice({ ...s }, cid))}
-                    options={[
-                      { id: 'fresh', label: t('circle.join.wizard.link.fresh') },
-                      ...state.existingSelves.map((self) => ({
-                        id: self.circleId,
-                        label: t('circle.join.wizard.link.same_person', { name: self.name }),
-                      })),
-                    ]}
+                    label={t('circle.join.wizard.reveal.label')}
+                    value={state.revealPreset || 'profile'}
+                    onChange={(lvl) => setState((s) => setJoinReveal({ ...s }, lvl))}
+                    options={REVEAL_PRESETS.map((lvl) => ({ id: lvl, label: t(`circle.reveal.preset.${lvl}`) }))}
                   />
-                ) : null}
+                </Fold>
                 {/* A typed failure carries a locale KEY; an untyped one a raw substrate string. Rendering
                     only the second meant the two failures that bothered to type themselves — the admin
                     being offline, and a handle already taken — showed nothing at all (J-NP2, 2026-07-30). */}
@@ -308,7 +327,7 @@ export default function JoinGroupWizardModal({
               { label: t('circle.join.wizard.back'),   onPress: () => setStep(2), kind: 'secondary', disabled: state.submitting },
               { label: t('circle.join.wizard.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
               { label: t('circle.join.wizard.join'),   onPress: onJoin, kind: 'primary', testID: 'join-submit',
-                disabled: !isValidHandle(state.handle) || state.submitting },
+                disabled: joinNeedsName(state) || state.submitting },
             ];
           })()} />
           </>

@@ -308,7 +308,7 @@ describe('chatRows — membership notices as rendered projections (2026-08-29)',
       circleId: 'k1', viewerId: 'me', t, members: [{ webid: 'newbie', handle: 'piet' }],
     });
     const notice = rows.find((r) => r.actor === 'bot');
-    expect(notice?.event.payload.text, 'named through the reveal ladder, in the app\'s own @handle form').toBe('circle.membership.someone_joined:@piet');
+    expect(notice?.event.payload.text, 'named through the reveal ladder, as the name is written').toBe('circle.membership.someone_joined:piet');
   });
 
   it('is derived, so it is idempotent by construction: the same log projects the same one row', () => {

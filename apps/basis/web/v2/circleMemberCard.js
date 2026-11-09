@@ -20,7 +20,7 @@
  * from `memberCards.js` (`revealPresetOf`), the single reveal-state home.
  */
 
-import { revealPresetWords } from '../../src/v2/memberCards.js';
+import { revealPresetWords, viewerChipLabel } from '../../src/v2/memberCards.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
@@ -46,7 +46,7 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
   const realNameVisible = (split.sees || []).some((a) => a.key === 'realName');
   title.textContent = (realNameVisible && member.realName)
     ? member.realName
-    : (member.handle ? `@${member.handle}` : (member.id || ''));
+    : (member.handle ? member.handle : (member.id || ''));
   container.appendChild(title);
 
   const lede = document.createElement('p');
@@ -112,7 +112,7 @@ export function renderSelfViewCard(container, {
   const chips = [
     ...members
       .filter((m) => m && m.id && m.id !== me.id)
-      .map((m) => ({ id: m.id, kind: 'member', label: m.handle ? `@${m.handle}` : (m.realName || m.id) })),
+      .map((m) => ({ id: m.id, kind: 'member', label: viewerChipLabel(m, tr) })),
     { kind: 'stranger', label: tr('circle.viewAs.stranger') },
     { kind: 'agent',    label: tr('circle.viewAs.agent') },
   ];

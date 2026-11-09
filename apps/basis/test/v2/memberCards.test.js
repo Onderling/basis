@@ -6,7 +6,7 @@ import { isDisclosed, revealPresetOf } from '@onderling/agent-registry';
 import { peerFacade } from '@onderling/core';
 import {
   personaAttributes, memberPersonaView, selfViewSplit, memberRevealState,
-  personaPresetKeys, revealPresetLabelKey, REVEAL_PRESETS,
+  personaPresetKeys, revealPresetLabelKey, REVEAL_PRESETS, viewerChipLabel,
 } from '../../src/v2/memberCards.js';
 
 // A small roster (same shape `normalizeCircleMembers` emits): `realName` is RELEASE-sourced and
@@ -19,7 +19,7 @@ describe('personaAttributes', () => {
   it('projects the roster pair the reveal ladder covers: handle (public) + realName (pairwise)', () => {
     const attrs = personaAttributes(bob);
     expect(attrs.map((a) => [a.key, a.openness])).toEqual([['handle', 'public'], ['realName', 'pairwise']]);
-    expect(attrs[0].value).toBe('@Fox');
+    expect(attrs[0].value).toBe('Fox');
     expect(attrs[1].value).toBe('Bob');
     // labels ride as locale keys (invariant 8), never baked strings.
     expect(attrs.every((a) => a.labelKey.startsWith('circle.memberCard.attr.'))).toBe(true);
@@ -184,5 +184,16 @@ describe('reveal-state + amount presets (C7)', () => {
     expect(revealPresetLabelKey('full')).toBe('circle.reveal.preset.full');
     expect(revealPresetLabelKey('identity')).toBeNull();   // rejected name is not a preset
     expect(revealPresetLabelKey(null)).toBeNull();
+  });
+});
+
+describe('viewerChipLabel — a member on the "view as" chips', () => {
+  const t = (k) => k;
+  it('is their name in the circle, as written', () => {
+    expect(viewerChipLabel(bob, t)).toBe('Fox');
+  });
+  it('never an unreleased real name, and never a key', () => {
+    const key = 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw';
+    expect(viewerChipLabel({ id: key, handle: null, realName: 'Dirk', released: false }, t)).toBe('circle.reply.who_someone');
   });
 });

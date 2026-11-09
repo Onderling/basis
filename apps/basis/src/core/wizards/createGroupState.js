@@ -32,9 +32,9 @@ import { INVITE_CEILING_FALLBACK } from '@onderling-app/pinboard/lib/inviteCeili
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 // The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
-import { loadPersonas, loadPriorHandles, handleSuggestions, isValidHandle, personaLabel } from './joinGroupState.js';
+import { loadPersonas, loadPriorHandles, handleSuggestions, isValidName, personaLabel } from './joinGroupState.js';
 import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
-export { loadPersonas, isValidHandle, personaLabel };
+export { loadPersonas, isValidName, personaLabel };
 
 // How long the founder's release may take after the create has answered — it runs after the wizard, never in it.
 // Parameter register (#36), device-scoped, internal.
@@ -506,18 +506,18 @@ export async function loadFounderHandle({ callSkill } = {}) {
 }
 
 /**
- * THE HANDLE THE FOUNDER IS OFFERED: their own name first — the name of the persona the circle is founded as, else
- * the profile's name — lowercased into a handle ("Tester B" → "tester-b"), then the handles they used before. A prior
- * handle never pushes the name out: a walk (2026-11-05) offered only "pzwopwk1", an id-derived handle from an earlier
- * circle, to a person called "Tester B".
+ * THE NAME THE FOUNDER IS OFFERED: their own name first, as they write it: the name of the persona the circle is
+ * founded as, else the profile's name ("Tester B"), then the names they used before. A prior name never pushes the
+ * own name out: a walk (2026-11-05) offered only "pzwopwk1", an id-derived handle from an earlier circle, to a person
+ * called "Tester B".
  *
  * @param {{ personaName?: string|null, profileName?: string|null, prior?: string[] }} a
- * @returns {string[]}  at most 8, valid handles, no repeats
+ * @returns {string[]}  at most 8, valid names, no repeats
  */
 export function founderHandleSuggestions({ personaName = null, profileName = null, prior = [] } = {}) {
-  const fromName = (n) => (typeof n === 'string' && n.trim() ? handleSuggestions(n).slice(0, 1) : []);
+  const fromName = (n) => (typeof n === 'string' && isValidName(n) ? [n.trim()] : []);
   const own = [...fromName(personaName), ...fromName(profileName)];
-  const before = handleSuggestions(Array.isArray(prior) ? prior : [], '');
+  const before = handleSuggestions(Array.isArray(prior) ? prior : []);
   return [...new Set([...own, ...before])].slice(0, 8);
 }
 
@@ -531,7 +531,7 @@ export function founderHandleSuggestionsFor(state) {
 /** Can the identity step be left? A name, a valid id, and — when the founder needs one — a valid handle. */
 export function identityComplete(state) {
   if (!state?.name?.trim() || !isValidSlug(state.groupId)) return false;
-  return !state.needsHandle || isValidHandle(String(state.handle ?? '').trim());
+  return !state.needsHandle || isValidName(String(state.handle ?? '').trim());
 }
 
 export function founderPersonaName(state, t = null) {
@@ -717,7 +717,7 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
     // they are on — this new circle included. After the create, bounded; `named` is its outcome.
     let named = Promise.resolve(false);
     const handle = String(state.handle ?? '').trim();
-    if (state.needsHandle && isValidHandle(handle)) {
+    if (state.needsHandle && isValidName(handle)) {
       // named by the new circle, so a circle made AS a persona names the persona and never renames the default self
       named = withinMs(Promise.resolve().then(() => callSkill('pinboard', 'setMyHandle', { handle, groupId: result.groupId })), releaseTimeoutMs)
         .then((r) => !r?.error)

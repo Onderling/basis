@@ -1,42 +1,37 @@
 /**
- * Handle validation — pure, no I/O.
+ * The name a person uses in a circle — pure, no I/O.
  *
- * Pinboard V1 (Phase 6) handle rules:
- *   - lowercase a–z, digits 0–9, `-` (hyphen) and `_` (underscore) only
- *   - 3 to 32 chars
- *   - no leading `@` (the UI prepends `@` when rendering)
- *   - no spaces
+ * The name is for people: any letters, spaces and capitals, 1 to 40 characters after trimming, no control
+ * characters. It used to be an identifier (lowercase, digits, `-`/`_`, 3–32, painted `@name`); that rule went
+ * when the walk showed people could not use their own name ("Tester B") in a circle (Frits, 2026-11-06). The
+ * join wizard's `isValidName` applies the same rule before the name is sent; a test pins the two together.
  *
- * Apps render handles as `@<handle>` in lists; the storage form is
- * unprefixed.  Strip a leading `@` before validating so users who type
- * `@anne-23` get a friendly normalisation rather than a hard error.
+ * Kept as typed (no lowercasing). A leading `@` is still stripped: it was the old display prefix, and someone
+ * who types it means the name after it. Uniqueness compares case-folded (`foldHandle`).
  */
 
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-// Parameter register (#36) — handle length bounds (scope:device, kind:internal).
-const MIN_LEN = param({ key: 'pinboard.handleMinLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
-const MAX_LEN = param({ key: 'pinboard.handleMaxLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 32 });
-const HANDLE_RE = /^[a-z0-9_-]+$/;
+// Parameter register (#36) — name length bounds (scope:device, kind:internal).
+const MIN_LEN = param({ key: 'pinboard.handleMinLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1 });
+const MAX_LEN = param({ key: 'pinboard.handleMaxLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 40 });
+// eslint-disable-next-line no-control-regex
+const CONTROL_RE = /[\u0000-\u001f\u007f]/;
 
 /**
- * @param {string} input  user-entered handle (raw)
+ * @param {string} input  the name as typed
  * @returns {{ ok: true, handle: string } | { ok: false, reason: string }}
- *   On success returns the normalised (lowercased, leading-`@`-stripped)
- *   handle. On failure returns a machine-readable reason code that apps
- *   can map to localised copy.
+ *   On success the name, trimmed and without a leading `@`. On failure a machine-readable reason code that
+ *   apps can map to localised copy.
  */
 export function validateHandle(input) {
   if (typeof input !== 'string') return { ok: false, reason: 'not-a-string' };
-  // Friendly normalisation: strip leading `@`, lowercase.
   let h = input.trim();
-  if (h.startsWith('@')) h = h.slice(1);
-  h = h.toLowerCase();
+  if (h.startsWith('@')) h = h.slice(1).trim();
 
-  if (h.length < MIN_LEN) return { ok: false, reason: 'too-short' };
-  if (h.length > MAX_LEN) return { ok: false, reason: 'too-long' };
-  if (/\s/.test(h))       return { ok: false, reason: 'contains-whitespace' };
-  if (!HANDLE_RE.test(h)) return { ok: false, reason: 'invalid-chars' };
+  if (h.length < MIN_LEN)  return { ok: false, reason: 'too-short' };
+  if (h.length > MAX_LEN)  return { ok: false, reason: 'too-long' };
+  if (CONTROL_RE.test(h))  return { ok: false, reason: 'invalid-chars' };
 
   return { ok: true, handle: h };
 }
@@ -125,5 +120,4 @@ export function withHandleClaim(owner, circleId, handle, fn) {
 export const HANDLE_RULES = Object.freeze({
   minLen: MIN_LEN,
   maxLen: MAX_LEN,
-  pattern: HANDLE_RE.source,
 });

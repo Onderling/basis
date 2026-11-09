@@ -21,51 +21,39 @@ export { REVEAL_PRESETS };
 import { buildJoinConsentModel, optOutsFromDeclined } from '../../v2/circleConsent.js';
 import { endpointToDialForInvite } from '../../v2/connectionPoints.js';
 import { personaPresetKeys } from '../../v2/memberCards.js';
+import { newPersonaArgs } from '../../v2/newPersona.js';
+import { isKeyLike } from '../../v2/personLabel.js';
 import { parseUntrustedJson } from '@onderling/core';
+import { validateHandle } from '@onderling-app/pinboard/lib/handle';
 
 
-/* ─── Handle helpers ───────────────────────────────────────── */
+/* ─── The name a person uses in a circle ───────────────────── */
 
 /**
- * Suggest handle candidates for the join field.
- *
- * Wave B (NOTE-identity-and-linkability, Decision B): the PRIMARY source is the
- * joiner's OWN prior handles — the handles you've used in circles you're already
- * in (`loadPriorHandles` → `pinboard.listMyHandles`). That is your own information,
- * so surfacing it leaks nothing, and it lets you re-use a handle you like. Only
- * when you have no prior handles yet do we fall back to display-name-derived
- * candidates (the pre-Wave-B behaviour).
- *
- * Polymorphic for back-compat: a STRING first arg is the legacy display-name seed
- * (`handleSuggestions(displayName)`); an ARRAY first arg is the prior-handle list
- * (`handleSuggestions(priorHandles, displayName)`).
+ * Is this a name a person can use in a circle? The name is for people: any letters, spaces and capitals, 1 to 40
+ * characters after trimming, no control characters, a leading `@` not part of it. ONE rule: the circle store's own
+ * `validateHandle`, so what the wizard lets through is exactly what the store saves.
  */
-export function handleSuggestions(priorOrName, existingDisplayName) {
-  let priorHandles = priorOrName;
-  let displayName = existingDisplayName;
-  if (typeof priorOrName === 'string') { priorHandles = []; displayName = priorOrName; }
-  const prior = Array.isArray(priorHandles)
-    ? [...new Set(priorHandles.map((h) => String(h ?? '').trim().toLowerCase()).filter(isValidHandle))]
-    : [];
-  if (prior.length) return prior.slice(0, 8);        // your own prior handles — no leak
-  // Derived candidates, and three things this got wrong (seen on a device, S3 2026-07-30 — the chips read
-  // as an empty pill, `-29` and `.2026`):
-  //
-  //   1. `displayName ?? 'me'` only catches null/undefined, so an EMPTY STRING passed straight through and
-  //      `base` became ''. Every candidate was then a bare suffix.
-  //   2. `Math.random()` made the suggestions change on every render, so a chip a person was reaching for
-  //      moved under their finger.
-  //   3. Nothing checked the output against `isValidHandle`, three lines above in this same file — '' and
-  //      '-29' are not handles, and the field would have refused them if anyone had tried.
-  //
-  // Deterministic, and validated with the rule the field itself uses.
-  const base = String(displayName ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  // No name to work from ⇒ suggest NOTHING. The old fallback was `'me'`, which is not even a valid handle
-  // (the rule three lines up wants 3+ characters), and inventing an English word as someone's name in a
-  // Dutch-first product is the wrong instinct regardless. An empty list is honest: we do not know.
-  if (!base) return [];
-  const year = new Date().getFullYear();
-  return [base, `${base}-${year}`, `${base}2`].filter(isValidHandle);
+export function isValidName(name) {
+  return validateHandle(name).ok;
+}
+
+/**
+ * Names to offer in the fold's name field: the names you used in your other circles (your own information, so
+ * offering them leaks nothing), else your own name. As written, never lowercased or suffixed.
+ *
+ * @param {string[]} [priorNames]  names you use in circles you are already in (`loadPriorHandles`)
+ * @param {string|null} [ownName]  your own name, offered when there are no prior names
+ * @returns {string[]}  at most 8, no repeats
+ */
+export function handleSuggestions(priorNames = [], ownName = null) {
+  const seen = new Set();   // 'Jan' and 'jan' are one name, offered once, as first written
+  const prior = (Array.isArray(priorNames) ? priorNames : [])
+    .map((h) => String(h ?? '').trim())
+    .filter((h) => isValidName(h) && !seen.has(h.toLowerCase()) && seen.add(h.toLowerCase()));
+  if (prior.length) return prior.slice(0, 8);
+  const own = typeof ownName === 'string' ? ownName.trim() : '';
+  return isValidName(own) ? [own] : [];
 }
 
 /**
@@ -88,11 +76,6 @@ export async function loadPriorHandles({ callSkill } = {}) {
   }
 }
 
-/** Validate a circle handle: lowercase, digits, _ / -; 3-30 chars. */
-export function isValidHandle(handle) {
-  return typeof handle === 'string'
-    && /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/.test(handle);
-}
 
 /* ─── Invite decoding ───────────────────────────────────────── */
 
@@ -362,39 +345,86 @@ export function setPersona(state, personaId) {
   return state;
 }
 
+/* ─── Who joins: one line, and a fold for another name or more privacy ─────────────────────────────────────
+ *
+ * Step 3 used to ask a name (with a format rule) and then three groups of choices before the person had anything
+ * to decide about (the 2026-11-05 walk). Now it names who joins in one line, "You join as Frits.", and keeps the
+ * rest in a fold: another name in this circle (an optional mask; empty = the persona's name), the persona, how
+ * much you show, the address, and the real separation, joining as a new persona. `state.handle` is the mask. */
+
 /**
- * Bring the chosen persona's own handle into the join field.
- *
- * A persona is a profile and a profile has properties, so `handle` is one of them (`setProfileProperty` takes
- * any key; `getPersonaView` reads it back with the own-or-inherit graph). The persona you join AS then brings
- * the name you use when you are that persona, instead of you typing it again in every circle.
- *
- * PREFILL, NEVER OVERRIDE — the whole contract, and what makes this safe to run on every change of the
- * picker: it fills an EMPTY field and never touches one a person has put their hands on. Going back to the
- * picker must not undo their own words.
- *
- * Uniqueness is untouched. It stays per circle, at the fold, and a prefilled handle that collides gets the
- * same `handle-taken` prompt a typed one would — so this changes what the field STARTS as, and nothing about
- * what the circle will accept.
- *
- * A stored value that is not a valid handle is ignored rather than prefilled: a property can hold anything,
- * and putting something the field will refuse into the field hands the person an error they did not cause.
- *
- * @returns {Promise<{applied: boolean, handle?: string}>}
+ * The persona's own name (Frits 2026-11-05: you join under your persona's NAME), in this order: a named persona's
+ * name; for the default persona (or joining minimally) your profile name, what the name card saved. Only when there
+ * is no name: the name the persona already goes by in circles (its stored handle, which a save of a name writes onto
+ * the persona), and only if it is not a piece of a key (early handles were made from one: 'pzwopwk1'). Else ''.
  */
-export async function applyPersonaHandle({ state, callSkill } = {}) {
-  if (!state || typeof callSkill !== 'function') return { applied: false };
-  const personaId = state.persona;
-  if (typeof personaId !== 'string' || !personaId) return { applied: false };   // joining minimally
-  if (typeof state.handle === 'string' && state.handle.trim() !== '') return { applied: false };   // theirs
-  let view = null;
-  try { view = await callSkill('agents', 'getPersonaView', { id: personaId }); }
-  catch { return { applied: false }; }                                          // offline — the field stands
-  const stored = view?.properties?.handle;
-  const handle = typeof stored === 'string' ? stored.trim().toLowerCase() : '';
-  if (!isValidHandle(handle)) return { applied: false };
-  state.handle = handle;
-  return { applied: true, handle };
+function personaNameOf(state) {
+  const id = typeof state?.persona === 'string' && state.persona ? state.persona : 'default';
+  const p = (state?.personas ?? []).find((x) => x?.id === id) ?? null;
+  if (p && p.id !== 'default' && typeof p.name === 'string' && p.name.trim() && p.name !== p.id) return p.name.trim();
+  if (id === 'default') {
+    const own = typeof state?.profileName === 'string' ? state.profileName.trim() : '';
+    if (own) return own;
+  }
+  const stored = state?.personaHandles?.[id];
+  if (typeof stored === 'string' && isValidName(stored) && !isKeyLike(stored, state?.ownIds ?? [])) return stored.trim();
+  return '';
+}
+
+/**
+ * The name members of this circle will see: the other name typed in the fold, else the persona's name.
+ * @returns {string}  '' when there is none (the fold opens with the name field)
+ */
+export function joinName(state) {
+  const typed = typeof state?.handle === 'string' ? state.handle.trim() : '';
+  return typed || personaNameOf(state);
+}
+
+/** True when there is no name to join under yet: the one line cannot be said, the fold must ask. */
+export function joinNeedsName(state) {
+  return !isValidName(joinName(state));
+}
+
+/** The fold starts open when it holds the one thing left to do: a name to give, or a name the circle refused. */
+export function joinFoldStartsOpen(state) {
+  return joinNeedsName(state) || state?.handleRejected === true;
+}
+
+/** The one line naming who joins, or the request for a name when there is none. */
+export function joinAsLine(state, t) {
+  const name = joinName(state);
+  return isValidName(name)
+    ? t('circle.join.wizard.join_as.line', { name })
+    : t('circle.join.wizard.join_as.no_name');
+}
+
+/**
+ * Join as a NEW persona: the real separation (a new persona is a different person to everyone, members included,
+ * where a new address only hides the link from the relay). Makes the persona (`agents.createProfile`, the same op
+ * Mij uses), adds it to the picker and chooses it.
+ *
+ * The persona is made when this is pressed, before the join is sent. A wizard cancelled afterwards leaves it in Mij,
+ * where the person sees it and can remove it: accepted, rather than a persona that exists only inside a wizard.
+ *
+ * @param {{state: object, callSkill: Function, name: string}} a
+ * @returns {Promise<{ok: true, personaId: string}|{ok: false}>}
+ */
+export async function joinAsNewPersona({ state, callSkill, name } = {}) {
+  const n = typeof name === 'string' ? name.trim() : '';
+  if (!state || typeof callSkill !== 'function' || !isValidName(n)) return { ok: false };
+  const before = new Set((state.personas ?? []).map((p) => p?.id));
+  let reply = null;
+  try { reply = await callSkill('agents', 'createProfile', newPersonaArgs(n)); } catch { return { ok: false }; }
+  const personas = await loadPersonas({ callSkill });
+  const replyId = reply?.profileId ?? reply?.agentId ?? reply?.entry?.agentId ?? null;
+  const made = personas.find((p) => p.id === replyId)
+    ?? personas.find((p) => !before.has(p.id) && p.name === n)
+    ?? (replyId ? { id: replyId, name: n } : null);
+  if (!made) return { ok: false };
+  state.personas = personas.some((p) => p.id === made.id) ? personas : [...personas, made];
+  setPersona(state, made.id);
+  state.handle = '';   // the new persona's own name is the name
+  return { ok: true, personaId: made.id };
 }
 
 /* ─── Reveal-state default at join (C7 · NOTE-reveal-state-and-profile-updates §1.6) ─ */
@@ -518,6 +548,15 @@ export function setLinkChoice(state, choice) {
   return state;
 }
 
+/**
+ * The sentence under the address choice, true for what is chosen: a new address hides the link from the relay (not
+ * from members of both circles); the same address as in another circle shows the relay and those members that this is
+ * one person.
+ */
+export function addressHintKey(state) {
+  return isLinkableChoice(state) ? 'circle.join.wizard.link.hint_same' : 'circle.join.wizard.link.hint';
+}
+
 /** True when the joiner chose to continue as an existing self (a linkable key). */
 export function isLinkableChoice(state) {
   return typeof state?.linkChoice === 'string' && state.linkChoice !== 'fresh';
@@ -549,12 +588,42 @@ export function presentedCircleAddress(state, circleAddressFor) {
  * @param {{state:object, callSkill:Function, circles?:Array}} a
  * @returns {Promise<object>} the mutated state
  */
+/**
+ * Your own name and the names your personas already go by. `name` is the profile's display name (what the name card
+ * on Today saves); `handles` maps a persona id to its stored name in circles: the default persona's from your own
+ * profile, each other persona's from its persona view. Best-effort: anything unreadable is simply absent.
+ *
+ * @returns {Promise<{name: string, handles: Record<string, string>, ids: string[]}>}
+ */
+export async function loadOwnNames({ callSkill, personas = null } = {}) {
+  const out = { name: '', handles: {}, ids: [] };
+  if (typeof callSkill !== 'function') return out;
+  try {
+    const entry = (await callSkill('pinboard', 'getMyProfile', {}))?.entry ?? null;
+    if (typeof entry?.displayName === 'string') out.name = entry.displayName.trim();
+    if (typeof entry?.webid === 'string' && entry.webid) out.ids.push(entry.webid);   // to refuse a stored name made from it
+    if (typeof entry?.handle === 'string' && isValidName(entry.handle)) out.handles.default = entry.handle.trim();
+  } catch { /* no profile: no name */ }
+  const list = Array.isArray(personas) && personas.length ? personas : await loadPersonas({ callSkill });
+  await Promise.all(list.filter((p) => p?.id && p.id !== 'default').map(async (p) => {
+    try {
+      const h = (await callSkill('agents', 'getPersonaView', { id: p.id }))?.properties?.handle;
+      if (typeof h === 'string' && isValidName(h)) out.handles[p.id] = h.trim();
+    } catch { /* offline: this persona's label stands */ }
+  }));
+  return out;
+}
+
 export async function prepareJoinIdentity({ state, callSkill, circles, profileIdOf = null } = {}) {
-  const [priorHandles, personalDefault] = await Promise.all([
+  const [priorHandles, personalDefault, own] = await Promise.all([
     loadPriorHandles({ callSkill }),
     loadPersonalRevealDefault({ callSkill }),
+    loadOwnNames({ callSkill, personas: state.personas }),
   ]);
   state.priorHandles = priorHandles;
+  state.profileName = own.name;          // the name the one line says when no persona or other name is chosen
+  state.personaHandles = own.handles;    // the names your personas already go by in circles
+  state.ownIds = own.ids;                // your own ids: a stored name that is a piece of one is not a name
   state.personalRevealDefault = personalDefault;
   // Circle-suggested level rides the invite; shown, NEVER forced.
   const suggested = state.invite?.suggestedReveal;
@@ -722,7 +791,10 @@ export function initialState() {
     // the join-time capability consent (opt-outable caps + this joiner's declines).
     consentModel:     { items: [], keys: [] },
     capabilityOptOuts: [],
-    handle:           '',
+    handle:           '',           // the other name for this circle, typed in the fold ('' = the persona's name)
+    profileName:      '',           // your own name (prepareJoinIdentity), what the one line says by default
+    personaHandles:   {},           // persona id → the name it already goes by in circles (prepareJoinIdentity)
+    ownIds:           [],           // your own ids (prepareJoinIdentity), to refuse a stored name made from one
     // Property layer — join-with-persona. `null` = join minimally (disclose no
     // background); a profile id = join AS that persona (its per-circle disclosure
     // applies). `personas` is the picker's option list, lazily loaded. Protective
@@ -799,6 +871,11 @@ export async function finalSubmit({
   state.submitErrorKey = null;
   state.submitErrorParams = null;
   state.handleRejected = false;
+  // The name the circle will hold: the other name from the fold, else the persona's (or your own) name. Resolved
+  // once here, so everything below sends the name the one line said. The fold's own field is given back on a failure
+  // (below), except when the circle refused that name: then the name it refused is in the field, to change.
+  const ownField = state.handle;
+  state.handle = joinName(state);
   try {
     // J-CP1 (S4, 2026-07-29) — be ON the circle's endpoint before asking its admin for anything.
     // Best-effort: a join that would have worked over a shared transport must not start failing
@@ -941,6 +1018,7 @@ export async function finalSubmit({
         ? 'invalid-or-expired-code'
         : 'join-failed';
     }
+    if (state.submitErrorReason !== 'handle-taken') state.handle = ownField;
     state.submitting = false;
     state.submitStage = null;
     return { state };

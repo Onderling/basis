@@ -359,7 +359,7 @@ export { VIEWER_KINDS, viewAsDirectory } from './v2/circleViewAs.js';
 export {
   personaAttributes, memberPersonaView, selfViewSplit,
   personaPresetKeys, revealPresetLabelKey, PERSONA_TIER_KEYS, REVEAL_PRESETS,
-  revealPresetWords,
+  revealPresetWords, viewerChipLabel,
 } from './v2/memberCards.js';
 export { normalizeCircleMembers, circleMemberCount } from '@onderling/kring-host/circleMembers';
 // 5.9d — Proof-of-Location placeholder seam (real attestation deferred).

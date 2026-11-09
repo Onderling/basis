@@ -34,7 +34,7 @@ describe('renderCircleView · MEMBERS tab', () => {
     const rows = el.querySelectorAll('.circle-view__member');
     expect(rows.length).toBe(2);
     expect(rows[0].dataset.memberId).toBe('me');
-    expect(rows[0].querySelector('.circle-view__member-primary').textContent).toBe('@Owl');
+    expect(rows[0].querySelector('.circle-view__member-primary').textContent).toBe('Owl');
     expect(rows[0].querySelector('.circle-view__member-secondary').textContent).toBe('Frits');
   });
 

@@ -21,7 +21,7 @@ describe('the not-reachable line on a member row', () => {
     const lines = [...el.querySelectorAll('[data-not-reachable="true"]')];
     expect(lines).toHaveLength(1);
     expect(lines[0].closest('[data-member-id]')?.dataset.memberId).toBe('webid:dirk');
-    expect(lines[0].textContent).toBe('circle.membership.not_reachable:@dirk');
+    expect(lines[0].textContent).toBe('circle.membership.not_reachable:dirk');
   });
   it('is absent when everyone is reachable', () => {
     expect(paint(new Set()).querySelectorAll('[data-not-reachable="true"]')).toHaveLength(0);

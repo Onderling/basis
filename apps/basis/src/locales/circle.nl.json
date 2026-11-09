@@ -81,8 +81,8 @@
           "doc": "Join wizard — step 2 label."
         },
         "handle": {
-          "text": "Naam",
-          "doc": "Join wizard — step 3 label (pick a handle)."
+          "text": "Wie",
+          "doc": "Join wizard: step 3 label (who joins)."
         }
       },
       "cancel": {
@@ -159,20 +159,20 @@
       },
       "handle": {
         "title": {
-          "text": "Kies een naam",
-          "doc": "Join wizard — handle step heading."
+          "text": "Wie doet mee",
+          "doc": "Join wizard, step 3 heading: who joins this circle."
         },
         "intro": {
-          "text": "Je naam is hoe andere leden je aanspreken in deze kring. Kleine letters, cijfers, liggend streepje of underscore; 3–30 tekens.",
-          "doc": "Join wizard — handle step intro."
+          "text": "Leden van deze kring zien deze naam. Je andere kringen houden die van hen.",
+          "doc": "Join wizard: the hint under the optional name for this circle."
         },
         "label": {
-          "text": "Naam",
-          "doc": "Join wizard — handle input label."
+          "text": "Je naam in deze kring",
+          "doc": "Join wizard: label of the optional name for this circle (empty = the persona's name)."
         },
         "placeholder": {
-          "text": "bijv. alice",
-          "doc": "Join wizard — handle input placeholder."
+          "text": "bijv. Alice",
+          "doc": "Join wizard: placeholder of the optional name for this circle."
         },
         "suggestions": {
           "text": "Suggesties",
@@ -181,20 +181,24 @@
       },
       "link": {
         "label": {
-          "text": "Ga verder als",
-          "doc": "Join wizard — cross-circle linkability choice label."
+          "text": "Adres in deze kring",
+          "doc": "Join wizard: the address choice label."
         },
         "fresh": {
-          "text": "Een nieuwe identiteit (niet te koppelen)",
-          "doc": "Join wizard — fresh/unlinkable key option."
+          "text": "Een nieuw adres voor deze kring",
+          "doc": "Join wizard: the default address option (this circle's own address)."
         },
         "same_person": {
-          "text": "Dezelfde persoon als in {{name}}",
-          "doc": "Join wizard — continue-as-existing-self option."
+          "text": "Hetzelfde adres als in {{name}}",
+          "doc": "Join wizard: present the address used in another circle ({{name}} = that circle)."
         },
         "hint": {
-          "text": "Een nieuwe identiteit houdt deze kring los van je andere kringen. Als dezelfde persoon verdergaan bewijst dat je dezelfde bent voor iedereen in beide kringen.",
-          "doc": "Join wizard — linkability explanation."
+          "text": "De relay ziet niet dat je kringen bij elkaar horen. Leden die in beide kringen zitten wel.",
+          "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
+        },
+        "hint_same": {
+          "text": "De relay en de leden van beide kringen zien dat dit dezelfde persoon is.",
+          "doc": "Join wizard: the sentence under the address choice when the same address as in another circle is chosen (the relay and members of both circles see one person)."
         }
       },
       "persona": {
@@ -211,8 +215,8 @@
           "doc": "Join wizard — default persona option label."
         },
         "hint": {
-          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld — niets bij een eerste keer. Later aanpassen kan bij Mij → persona's.",
-          "doc": "Join wizard — persona disclosure hint."
+          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld. Niets bij een eerste keer. Later aanpassen kan bij Mij, persona's.",
+          "doc": "Join wizard: persona disclosure hint."
         },
         "already_in": {
           "text": "Je bent hier al als {{persona}} — met een andere persona kan dat vanaf een ander apparaat.",
@@ -231,6 +235,38 @@
         "suggested": {
           "text": "Deze kring stelt voor: {{level}}",
           "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)."
+        }
+      },
+      "join_as": {
+        "line": {
+          "text": "Je doet mee als {{name}}.",
+          "doc": "Join wizard step 3: the one line naming who joins ({{name}} = the name members will see)."
+        },
+        "no_name": {
+          "text": "Kies de naam die leden van deze kring zien.",
+          "doc": "Join wizard step 3: shown instead of the one line when there is no name yet (the fold opens with the name field)."
+        },
+        "fold": {
+          "text": "Anders heten in deze kring, of meer privacy",
+          "doc": "Join wizard step 3: the fold holding the optional name, the persona, how much you show and the address."
+        }
+      },
+      "new_persona": {
+        "hint": {
+          "text": "Helemaal los, ook voor leden? Doe mee als nieuwe persona.",
+          "doc": "Join wizard: the real separation. A new persona is a different person to everyone, members included."
+        },
+        "button": {
+          "text": "Als nieuwe persona",
+          "doc": "Join wizard: makes a new persona and joins as it."
+        },
+        "label": {
+          "text": "Naam van de nieuwe persona",
+          "doc": "Join wizard: the name field for the new persona."
+        },
+        "make": {
+          "text": "Maken",
+          "doc": "Join wizard: confirms making the new persona."
         }
       }
     }

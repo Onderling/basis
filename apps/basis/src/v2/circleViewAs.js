@@ -97,7 +97,7 @@ export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwis
   // Never fall back to the real name for an unreleased member. Past the handle and a released name, an identifier
   // the person chose (a webid, a URL) is still theirs to be known by; an opaque key is not a name — that member is
   // "someone" (`primaryKey`), never a key or a piece of one (`personLabel.js`).
-  const named = handle ? `@${handle}` : ((revealed && realName) ? realName : null);
+  const named = handle ? handle : ((revealed && realName) ? realName : null);
   const byId = named == null && typeof m.id === 'string' && m.id && !isKeyLike(m.id) ? m.id : null;
   const primary = named ?? byId;
   return {

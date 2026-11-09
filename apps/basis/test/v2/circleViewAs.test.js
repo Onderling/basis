@@ -89,7 +89,7 @@ describe('the last resort when nobody has given a name', () => {
   });
 
   it('still prefers a handle, and never borrows an unreleased real name', () => {
-    expect(label({ id: 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw', handle: 'ada' })).toBe('@ada');
+    expect(label({ id: 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw', handle: 'ada' })).toBe('ada');
     expect(label({ id: 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw', realName: 'Ada Lovelace' })).toBeNull();
   });
 

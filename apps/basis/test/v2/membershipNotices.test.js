@@ -18,8 +18,8 @@ describe('membership notices — a role change is everyone\'s line', () => {
     const promote = signSpine(admin, { kind: 'role', circleId: CIRCLE, subject: 'webid:bee', payload: { role: 'admin' } }).body;
     const members = [{ webid: 'webid:bee', handle: 'bee' }];
     expect(membershipNoticeFor(promote, { viewerId: 'webid:bee', members })).toEqual({ notice: 'promoted' });
-    expect(membershipNoticeFor(promote, { viewerId: 'webid:cee', members })).toEqual({ notice: 'memberPromoted', args: { name: '@bee' } });
-    expect(membershipNoticeFor(promote, { viewerId: admin.pubKey, members })).toEqual({ notice: 'memberPromoted', args: { name: '@bee' } });
+    expect(membershipNoticeFor(promote, { viewerId: 'webid:cee', members })).toEqual({ notice: 'memberPromoted', args: { name: 'bee' } });
+    expect(membershipNoticeFor(promote, { viewerId: admin.pubKey, members })).toEqual({ notice: 'memberPromoted', args: { name: 'bee' } });
   });
 
   it('a demotion the same way, and a role statement about nobody known still names the ref honestly', async () => {
@@ -35,7 +35,7 @@ describe('membership notices — a role change is everyone\'s line', () => {
     const events = [{ id: 'e1', ts: 10, type: 'membership', circleId: CIRCLE, payload: promote }];
     const rows = membershipNoticeRows({ events, circleId: CIRCLE, viewerId: 'webid:cee', members: [{ webid: 'webid:bee', handle: 'bee' }], t });
     expect(rows).toHaveLength(1);
-    expect(rows[0].event.payload.text).toBe(`${MEMBERSHIP_NOTICE_KEYS.memberPromoted}(@bee)`);
+    expect(rows[0].event.payload.text).toBe(`${MEMBERSHIP_NOTICE_KEYS.memberPromoted}(bee)`);
     expect(rows[0].event.payload.notice).toBe('memberPromoted');
     const off = membershipNoticeRows({ events, circleId: CIRCLE, viewerId: 'webid:cee', t, wants: noticeWants({ override: { notices: { promoted: false } } }) });
     expect(off, 'a bystander\'s line follows the same setting as the person\'s own').toHaveLength(0);

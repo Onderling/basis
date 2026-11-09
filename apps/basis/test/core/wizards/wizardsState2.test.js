@@ -180,25 +180,20 @@ import * as JG from '../../../src/core/wizards/joinGroupState.js';
 
 describe('joinGroupState', () => {
 
-  it('handleSuggestions slugifies the base name + adds 2 variants, all of them VALID', () => {
-    // This test used to pin the old output exactly — and the old output was wrong in a way the test
-    // recorded without noticing: `'anne-k-'` ends in a dash, and `isValidHandle` (asserted three lines
-    // below) rejects that. The other two carried a random two-digit suffix, so they changed on every
-    // render. Seen on a device as an empty pill, `-29` and `.2026` (S3, 2026-07-30).
-    const suggestions = JG.handleSuggestions('Anne K.');
-    expect(suggestions).toEqual(['anne-k', 'anne-k-2026', 'anne-k2']);
-    // The property that matters more than the exact strings:
-    for (const s of suggestions) expect(JG.isValidHandle(s), s).toBe(true);
+  it('handleSuggestions offers your own name as written, and only valid names', () => {
+    // It once slugified ('anne-k', 'anne-k-2026'); since the name is for people it is offered as typed.
+    const suggestions = JG.handleSuggestions([], 'Anne K.');
+    expect(suggestions).toEqual(['Anne K.']);
+    for (const s of suggestions) expect(JG.isValidName(s), s).toBe(true);
   });
 
-  it('isValidHandle accepts lower+digits+ _ -; rejects mixed case', () => {
-    expect(JG.isValidHandle('anne')).toBe(true);
-    expect(JG.isValidHandle('anne-k_99')).toBe(true);
-    expect(JG.isValidHandle('Anne')).toBe(false);
-    // 'a' is valid per the regex (^[a-z0-9](?:...)?$ — optional middle).
-    expect(JG.isValidHandle('a')).toBe(true);
-    expect(JG.isValidHandle('a'.repeat(31))).toBe(false);  // too long (max 30)
-    expect(JG.isValidHandle('with space')).toBe(false);
+  it('isValidName takes any letters, spaces and capitals, 1..40, no control characters', () => {
+    expect(JG.isValidName('anne')).toBe(true);
+    expect(JG.isValidName('Anne van Dijk')).toBe(true);
+    expect(JG.isValidName('a')).toBe(true);
+    expect(JG.isValidName('a'.repeat(41))).toBe(false);
+    expect(JG.isValidName('   ')).toBe(false);
+    expect(JG.isValidName('an\nne')).toBe(false);
   });
 
   it('decodeInvite: no invite → parse error', () => {

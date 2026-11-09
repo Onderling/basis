@@ -1383,3 +1383,16 @@ and every place a person is painted reads it: the contact list, the chat title a
 membership notices, the members list, the chat sender, the circle list's preview, the admin page. An identifier a
 person chose to be known by — a `webid:`, a `did:`, a URL — is still a name. The cost is accepted: two unnamed people
 both read "someone" and are told apart by their faces. Ledger: L650 (closes L621).
+
+## 2026-11-06 — The name in a circle is for people: no format rule, no '@', and joining says one line (Frits)
+
+From the two-phone walk's sitting. The name a person uses in a circle was an identifier: lowercase, digits, `-`/`_`,
+3 to 30 characters, painted `@name`. "Tester B" could not be used. Frits: **the name is for people. Any letters,
+spaces and capitals, 1 to 40 characters, no '@'.** One rule in the join wizard (`isValidName`) and the same rule where
+the circle store saves it (`validateHandle` in pinboard); a test pins the two together. Join step 3 says one line,
+"You join as Frits.", under the chosen persona's name or your own; the rest waits in a fold: another name for this
+circle (an optional mask), the persona, how much you show, the address, and joining as a new persona. The address
+sentence is honest about what a new address hides: the link from the relay, not from members who are in both circles
+(the default persona's identity stays the same across circles, 2026-11-07). A new persona is the real separation.
+Uniqueness of the name within a circle still holds for now; dropping it waits for a suffix that tells two equal names
+apart on screen. Ledger: L718 (with L629, L633).

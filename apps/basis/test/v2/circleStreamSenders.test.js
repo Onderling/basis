@@ -40,7 +40,7 @@ describe('sender labels', () => {
 
   it('leaves a resolved member and the viewer alone', () => {
     const [them, mine] = stamp([{ actor: THEM }, { actor: ME }]);
-    expect(them.senderLabel).toBe('@frits');
+    expect(them.senderLabel).toBe('frits');
     expect(mine.senderSelf).toBe(true);
   });
 });
@@ -76,8 +76,8 @@ describe('memberLabelFor — the same resolution, for surfaces that carry the au
   const label = (actor) => memberLabelFor(actor, { members: [anna], viewerId: ME, policy: 'open' });
 
   it('answers the roster label for every address the member can prove', () => {
-    expect(label('webid:anna')).toBe('@anna');
-    expect(label('addr-2')).toBe('@anna');
+    expect(label('webid:anna')).toBe('anna');
+    expect(label('addr-2')).toBe('anna');
   });
 
   it('answers null for someone the roster cannot place — the caller keeps its own fallback', () => {

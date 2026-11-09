@@ -81,8 +81,8 @@
           "doc": "Join wizard — step 2 label."
         },
         "handle": {
-          "text": "Name",
-          "doc": "Join wizard — step 3 label (pick a handle)."
+          "text": "Who",
+          "doc": "Join wizard: step 3 label (who joins)."
         }
       },
       "cancel": {
@@ -159,20 +159,20 @@
       },
       "handle": {
         "title": {
-          "text": "Pick a name",
-          "doc": "Join wizard — handle step heading."
+          "text": "Who joins",
+          "doc": "Join wizard, step 3 heading: who joins this circle."
         },
         "intro": {
-          "text": "Your name is how other members address you in this circle. Lowercase letters, digits, underscore or dash; 3–30 characters.",
-          "doc": "Join wizard — handle step intro."
+          "text": "Members of this circle see this name. Your other circles keep theirs.",
+          "doc": "Join wizard: the hint under the optional name for this circle."
         },
         "label": {
-          "text": "Name",
-          "doc": "Join wizard — handle input label."
+          "text": "Your name in this circle",
+          "doc": "Join wizard: label of the optional name for this circle (empty = the persona's name)."
         },
         "placeholder": {
-          "text": "e.g. alice",
-          "doc": "Join wizard — handle input placeholder."
+          "text": "e.g. Alice",
+          "doc": "Join wizard: placeholder of the optional name for this circle."
         },
         "suggestions": {
           "text": "Suggestions",
@@ -181,20 +181,20 @@
       },
       "link": {
         "label": {
-          "text": "Continue as",
-          "doc": "Join wizard — cross-circle linkability choice label."
+          "text": "Address in this circle",
+          "doc": "Join wizard: the address choice label."
         },
         "fresh": {
-          "text": "A fresh identity (unlinkable)",
-          "doc": "Join wizard — fresh/unlinkable key option."
+          "text": "A new address for this circle",
+          "doc": "Join wizard: the default address option (this circle's own address)."
         },
         "same_person": {
-          "text": "The same person as in {{name}}",
-          "doc": "Join wizard — continue-as-existing-self option."
+          "text": "The same address as in {{name}}",
+          "doc": "Join wizard: present the address used in another circle ({{name}} = that circle)."
         },
         "hint": {
-          "text": "A fresh identity keeps this circle unlinkable from your others. Continuing as an existing self proves you are the same person to anyone in both circles.",
-          "doc": "Join wizard — linkability explanation."
+          "text": "The relay cannot see that your circles belong together. Members who are in both circles can.",
+          "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
         }
       },
       "persona": {
@@ -211,8 +211,8 @@
           "doc": "Join wizard — default persona option label."
         },
         "hint": {
-          "text": "Only what this persona discloses in this circle is shared — nothing on first join. Adjust later under Me → personas.",
-          "doc": "Join wizard — persona disclosure hint."
+          "text": "Only what this persona shares in this circle is shared. Nothing on a first join. You can change it later under Me, personas.",
+          "doc": "Join wizard: persona disclosure hint."
         },
         "already_in": {
           "text": "You are already here as {{persona}} — joining as another persona can be done from another device.",
@@ -231,6 +231,38 @@
         "suggested": {
           "text": "This circle suggests: {{level}}",
           "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)."
+        }
+      },
+      "join_as": {
+        "line": {
+          "text": "You join as {{name}}.",
+          "doc": "Join wizard step 3: the one line naming who joins ({{name}} = the name members will see)."
+        },
+        "no_name": {
+          "text": "Choose the name members of this circle will see.",
+          "doc": "Join wizard step 3: shown instead of the one line when there is no name yet (the fold opens with the name field)."
+        },
+        "fold": {
+          "text": "Another name in this circle, or more privacy",
+          "doc": "Join wizard step 3: the fold holding the optional name, the persona, how much you show and the address."
+        }
+      },
+      "new_persona": {
+        "hint": {
+          "text": "Fully separate, also for members? Join as a new persona.",
+          "doc": "Join wizard: the real separation. A new persona is a different person to everyone, members included."
+        },
+        "button": {
+          "text": "As a new persona",
+          "doc": "Join wizard: makes a new persona and joins as it."
+        },
+        "label": {
+          "text": "Name of the new persona",
+          "doc": "Join wizard: the name field for the new persona."
+        },
+        "make": {
+          "text": "Make it",
+          "doc": "Join wizard: confirms making the new persona."
         }
       }
     }

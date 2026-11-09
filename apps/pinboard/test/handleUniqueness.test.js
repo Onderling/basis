@@ -82,15 +82,15 @@ describe('setMyHandle — per-circle handle uniqueness', () => {
     const again = await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, ANNE);
     expect(again.error).toBeUndefined();
     expect(again.handle).toBe('jan');
-    // ...and re-setting via a different case is still fine for the owner.
+    // ...and re-setting via a different case is still fine for the owner (kept as typed).
     const cased = await callSkill(bundle.agent, 'setMyHandle', { handle: 'JAN' }, ANNE);
     expect(cased.error).toBeUndefined();
-    expect(cased.handle).toBe('jan');
+    expect(cased.handle).toBe('JAN');
   });
 
   it('still applies format validation before the uniqueness check', async () => {
     const bundle = await buildBundle();
-    const tooShort = await callSkill(bundle.agent, 'setMyHandle', { handle: 'an' }, BOB);
+    const tooShort = await callSkill(bundle.agent, 'setMyHandle', { handle: '   ' }, BOB);
     expect(tooShort.error).toBe('invalid-handle');
     expect(tooShort.reason).toBe('too-short');
   });

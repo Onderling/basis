@@ -23,19 +23,19 @@ describe("the founder's handle", () => {
   });
   // The walk (2026-11-05): "Tester B", no handle yet, one earlier id-derived handle — the only suggestion was that
   // handle. The person's own name comes first; what they used before follows it.
-  it("the founder's own name is the first suggestion, before any handle they used before", async () => {
+  it("the founder's own name is the first suggestion, before any name they used before", async () => {
     const callSkill = vi.fn(async (app, op) => {
       if (op === 'getMyProfile') return { entry: { displayName: 'Tester B' } };
       if (op === 'listMyHandles') return { handles: ['pzwopwk1'] };
       return {};
     });
     const r = await loadFounderHandle({ callSkill });
-    expect(r.handleSuggestions[0]).toBe('tester-b');
+    expect(r.handleSuggestions[0]).toBe('Tester B');
     expect(r.handleSuggestions).toContain('pzwopwk1');
   });
   it('a circle founded as a named persona suggests that persona\'s name first', () => {
     const state = { persona: 'p-werk', personas: [{ id: 'p-werk', name: 'Werk Frits' }], profileName: 'Tester B', priorHandles: [] };
-    expect(founderHandleSuggestionsFor(state)).toEqual(['werk-frits', 'tester-b']);
+    expect(founderHandleSuggestionsFor(state)).toEqual(['Werk Frits', 'Tester B']);
   });
   it('a handle already → nothing asked', async () => {
     expect((await loadFounderHandle({ callSkill: profile({ handle: 'bea' }) })).needsHandle).toBe(false);
@@ -43,7 +43,7 @@ describe("the founder's handle", () => {
   it('the identity step cannot be left without a valid handle when one is needed', () => {
     const s = { ...initialState(), name: 'Buurt', groupId: 'abc123', needsHandle: true, handle: '' };
     expect(identityComplete(s)).toBe(false);
-    expect(identityComplete({ ...s, handle: 'Bea!' })).toBe(false);
+    expect(identityComplete({ ...s, handle: '   ' })).toBe(false);
     expect(identityComplete({ ...s, handle: 'bea' })).toBe(true);
     expect(identityComplete({ ...s, needsHandle: false })).toBe(true);
   });

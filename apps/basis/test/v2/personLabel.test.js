@@ -20,7 +20,7 @@ const t = (k, a = {}) => (k === SOMEONE_LABEL_KEY ? 'iemand' : `${k}${a.name != 
 describe('the one person-label resolver', () => {
   it('card name, then handle, then someone — in that order', () => {
     expect(personLabel({ displayName: 'Tester B', handle: 'tester-b', ids: [KEY] })).toEqual({ label: 'Tester B', labelKey: null });
-    expect(personLabel({ handle: 'tester-b', ids: [KEY] })).toEqual({ label: '@tester-b', labelKey: null });
+    expect(personLabel({ handle: 'tester-b', ids: [KEY] })).toEqual({ label: 'tester-b', labelKey: null });
     expect(personLabel({ ids: [KEY] })).toEqual({ label: null, labelKey: SOMEONE_LABEL_KEY });
   });
 

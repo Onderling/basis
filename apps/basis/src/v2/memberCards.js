@@ -44,7 +44,19 @@ import {
   setDisclosure, isSealedMediaRef,
 } from '@onderling/agent-registry';
 import { splitViewAsAttributes, viewAsCounts } from './viewAsAttributes.js';
-import { VIEWER_KINDS } from './circleViewAs.js';
+import { VIEWER_KINDS, revealedMemberLabel } from './circleViewAs.js';
+
+/**
+ * The label on a member's "view as" chip: what the reveal ladder shows of them (their name in the circle, else a
+ * released real name, else "someone"), never an unreleased real name or a key. Both shells paint this one.
+ * @param {object} member  a roster row `{id, handle?, realName?, released?}`
+ * @param {(key: string) => string} t
+ * @returns {string}
+ */
+export function viewerChipLabel(member, t) {
+  const l = revealedMemberLabel(member);
+  return l.primary ?? t(l.primaryKey);
+}
 
 /**
  * The persona card's amount-preset key assignment (design §1.3, NOTE-reveal-state):
@@ -177,7 +189,7 @@ export function personaAttributes(member) {
   const m = member && typeof member === 'object' ? member : {};
   const out = [];
   if (m.handle) {
-    out.push({ key: 'handle', labelKey: 'circle.memberCard.attr.handle', value: `@${m.handle}`, openness: 'public' });
+    out.push({ key: 'handle', labelKey: 'circle.memberCard.attr.handle', value: m.handle, openness: 'public' });
   }
   out.push({ key: 'realName', labelKey: 'circle.memberCard.attr.realName', value: m.realName ?? null, openness: 'pairwise' });
   // Profile picture — a media-typed attribute whose value is a SEALED media ref

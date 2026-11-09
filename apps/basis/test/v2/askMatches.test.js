@@ -20,7 +20,7 @@ describe('askMatchChoices', () => {
   it('shows the asker the members whose released offering matches — never the asker', () => {
     const out = askMatchChoices(ask, { viewerId: ME, members });
     expect(out.map((m) => m.webid)).toEqual([BRAM]);
-    expect(out[0]).toMatchObject({ label: '@bram', address: 'addr-bram', offering: 'I fix bikes and bike repair' });
+    expect(out[0]).toMatchObject({ label: 'bram', address: 'addr-bram', offering: 'I fix bikes and bike repair' });
   });
 
   it('leaves out a match with no address here (Dan offers it, but nobody can ask him)', () => {

@@ -1396,3 +1396,14 @@ sentence is honest about what a new address hides: the link from the relay, not 
 (the default persona's identity stays the same across circles, 2026-11-07). A new persona is the real separation.
 Uniqueness of the name within a circle still holds for now; dropping it waits for a suffix that tells two equal names
 apart on screen. Ledger: L718 (with L629, L633).
+
+## 2026-11-09 — Two people may share a name in a circle; a bot's name stays its own (Frits 2026-11-06, Fable)
+
+Follows from the name being for people. **The name in a circle is no longer unique: uniqueness stays on the key.**
+Three places used to refuse a name another member held: the save-name op (`setMyHandle`), the admin's redeem of a
+join, and the roster fold's `member-props` rule. The first two now refuse no name (each keeps its per-name write lock,
+which still serialises the write). The fold keeps one case: **a bot's name is its own** (a bot is addressed by its name
+in chat), so a statement that would give a bot and anyone else one name, case-blind, is refused, deny-wins. Two
+members with one name are told apart on screen by the avatar and, only on a collision, a small number: the first
+in roster order is "Jan", the next "Jan · 2" (`withNameNumbers` in the roster normaliser, painted by the reveal
+ladder). Ledger: L718.

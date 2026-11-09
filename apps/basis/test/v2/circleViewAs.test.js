@@ -97,3 +97,10 @@ describe('the last resort when nobody has given a name', () => {
     expect(label({})).toBeNull();
   });
 });
+
+describe('a shared name shows its number', () => {
+  it('"Jan · 2" for the second Jan; the first is just "Jan"', () => {
+    expect(revealedMemberLabel({ id: 'w3', handle: 'jan', nameNumber: 2 }).primary).toBe('jan · 2');
+    expect(revealedMemberLabel({ id: 'w1', handle: 'Jan' }).primary).toBe('Jan');
+  });
+});

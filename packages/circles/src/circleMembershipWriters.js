@@ -255,7 +255,7 @@ export async function redeemMembershipCode({
 export async function verifyMembershipCodeForPeer({
   store, members, metrics, simulateSync, grantKey, emitSpine,
   codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
-  withHandleClaim, deriveSealingKey = null,
+  withHandleClaim, deriveSealingKey = null, botNamesIn = null,
 }, { a, from } = {}) {
   if (typeof a.groupId !== 'string' || !a.groupId)
     return { error: 'groupId required' };
@@ -335,9 +335,22 @@ export async function verifyMembershipCodeForPeer({
     };
   }
 
-  // SERIALISED per (circle, name): the redemption write runs one at a time per name, as it did while the
-  // name was unique; unrelated joins still run concurrently.
+  // SERIALISED per (circle, name), so the bot-name check below and the write cannot interleave with a second
+  // joiner of the same name; unrelated joins still run concurrently.
   const claimed = await withHandleClaim(store, a.groupId, a.peerDisplay, async () => {
+    // A BOT'S NAME IS ITS OWN (a bot is addressed by its name in chat). People may share a name, but a joiner named
+    // like a CURRENT bot of this circle (case-blind) is refused here, where the roster is: the roster fold checks a
+    // member's later `member-props` but not a join's name, so this is the front door. `botNamesIn` is the host's
+    // read of the folded roster's function members; absent, nothing is refused.
+    if (typeof a.peerDisplay === 'string' && a.peerDisplay.trim() && typeof botNamesIn === 'function') {
+      const want = a.peerDisplay.trim().toLowerCase();
+      let bots = [];
+      try { bots = (await botNamesIn(a.groupId)) ?? []; } catch { bots = []; }
+      if (bots.some((b) => b && b.webid !== a.requesterWebid && typeof b.handle === 'string' && b.handle.trim().toLowerCase() === want)) {
+        return { error: 'handle-taken', reason: 'handle-taken' };
+      }
+    }
+
     const [item] = await store.addItems([{
       type:       'membership-redemption',
       text:       `${a.requesterWebid} redeemed (via peer) membership code for ${a.groupId}`,

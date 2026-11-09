@@ -2081,12 +2081,9 @@ export function buildSkills({
       const a = dataArgs(parts);
       const v = validateHandle(a.handle ?? '');
       if (!v.ok) return { error: 'invalid-handle', reason: v.reason };
-      // one write at a time per (circle, name), as while the name was unique
-      return withHandleClaim(store, groupId, v.handle, async () => {
-        const updated = await selfProfile?.set?.(from, { handle: v.handle });
-        if (!updated) return { error: 'not-a-self-here' };
-        return { handle: v.handle, _sync: simulateSync() };
-      });
+      const updated = await selfProfile?.set?.(from, { handle: v.handle });
+      if (!updated) return { error: 'not-a-self-here' };
+      return { handle: v.handle, _sync: simulateSync() };
     }, {
       description: 'Set the calling actor\'s name in circles (any letters, spaces and capitals, 1 to 40 characters).',
       visibility:  'authenticated',
@@ -2507,6 +2504,13 @@ export function buildSkills({
         deriveSealingKey: deriveSealingKeyFromAddress,
         codeRedeemableNow, inviteRedemptionVerdict: verdictWithRoster(), INVITE_LIMIT_REACHED, verifyCircleLink,
         withHandleClaim,
+        // the circle's current bots, from the folded roster (provenKind: the admitting admin's word, never a member's
+        // own claim): a joiner may not take a bot's name
+        botNamesIn: async (gid) => {
+          const r = await listGroupMembersCore(scope, { groupId: gid }, { from });
+          return (r?.members ?? []).filter((m) => m?.provenKind === 'function' && typeof m.handle === 'string')
+            .map((m) => ({ webid: m.webid, handle: m.handle }));
+        },
       }, { a: dataArgs(parts), from });
     }, {
       description: 'Admin-side peer validator: confirms a joiner-presented code + records redemption.',

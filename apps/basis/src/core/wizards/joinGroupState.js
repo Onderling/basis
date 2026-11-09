@@ -979,6 +979,7 @@ export async function finalSubmit({
       state.submitErrorParams = { personaId: err.personaId ?? null };
       state.submitErrorReason = 'already-in-as-another-persona';
     } else if (err?.reason === 'handle-taken' || /handle-taken/.test(String(err?.message ?? ''))) {
+      // People may share a name now; the one name a circle still refuses is a current bot's (the admin's redeem).
       state.handleRejected = true;
       state.submitErrorKey = 'circle.errors.invalid_handle.handle-taken';
       state.submitErrorReason = 'handle-taken';

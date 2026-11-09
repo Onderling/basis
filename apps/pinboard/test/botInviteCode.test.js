@@ -39,3 +39,17 @@ describe('a bot invite code', () => {
     expect(ok.redemptionId, JSON.stringify(ok)).toBeTruthy();
   });
 });
+
+describe('a bot\'s name is its own at the door', () => {
+  it('after the bot joined as "Huisbot", a person joining as "huisbot" is refused; as "Jan" they get in', async () => {
+    const b = await bundle();
+    const shared = (await callSkill(b.agent, 'createGroupV2', { groupId: GROUP, name: 'Thuis', rules: RULES })).code;
+    const bot = await callSkill(b.agent, 'rotateMyGroupCode', { groupId: GROUP, forFunction: true });
+    const admitted = await callSkill(b.agent, 'verifyMembershipCodeForPeer', { groupId: GROUP, code: bot.code, requesterWebid: BOT, rulesAccepted: '1', profileKind: 'function', peerDisplay: 'Huisbot' });
+    expect(admitted.redemptionId, JSON.stringify(admitted)).toBeTruthy();
+    const taken = await callSkill(b.agent, 'verifyMembershipCodeForPeer', { groupId: GROUP, code: shared, requesterWebid: 'https://id.example/cee', rulesAccepted: '1', peerDisplay: 'huisbot' });
+    expect(taken.error, JSON.stringify(taken)).toBe('handle-taken');
+    const jan = await callSkill(b.agent, 'verifyMembershipCodeForPeer', { groupId: GROUP, code: shared, requesterWebid: 'https://id.example/dee', rulesAccepted: '1', peerDisplay: 'Jan' });
+    expect(jan.redemptionId, JSON.stringify(jan)).toBeTruthy();
+  });
+});

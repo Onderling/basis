@@ -1401,9 +1401,9 @@ apart on screen. Ledger: L718 (with L629, L633).
 
 Follows from the name being for people. **The name in a circle is no longer unique: uniqueness stays on the key.**
 Three places used to refuse a name another member held: the save-name op (`setMyHandle`), the admin's redeem of a
-join, and the roster fold's `member-props` rule. The first two now refuse no name (each keeps its per-name write lock,
-which still serialises the write). The fold keeps one case: **a bot's name is its own** (a bot is addressed by its name
-in chat), so a statement that would give a bot and anyone else one name, case-blind, is refused, deny-wins. Two
+join, and the roster fold's `member-props` rule. The first two refuse no person's name. One case stays: **a bot's name is its own** (a bot is addressed by its name in
+chat). The admin's redeem refuses a joiner named like a current bot (case-blind, from the folded roster's proven kind),
+and the fold refuses a statement that would give a bot and anyone else one name, deny-wins. Two
 members with one name are told apart on screen by the avatar and, only on a collision, a small number: the first
 in roster order is "Jan", the next "Jan · 2" (`withNameNumbers` in the roster normaliser, painted by the reveal
 ladder). Ledger: L718.

@@ -10,6 +10,13 @@ read state; the notification projection and "Nieuw voor jou" on Today follow.
 - See which contacts wrote: the count on a contact's row and the sum on the Contacten tab.
 - Read something on one device and have it read on all: opening a circle or a conversation marks what is in it read,
   and the person's other devices stop counting it once the mark arrives.
+- See "Nieuw voor jou" at the top of Today (only when something is there): a new post, task or appointment, a line in
+  a circle, a direct message, someone they admitted joining, their own removal; each row opens the thing, ✕ sets it
+  aside, "Alles gelezen" clears the block; a row that arrived long after it was sent says "kwam later binnen".
+
+The notification projection: `apps/basis/src/v2/notifications.js` (`notificationRows`), prepended to Today by the
+shared screen materializer when the shell asks (`forYou: true`), painted by `renderForYou` on both shells; setting a row
+aside marks its ids read (`createReadMarks().markRows`).
 
 ## Where it lives
 

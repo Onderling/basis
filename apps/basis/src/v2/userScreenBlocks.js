@@ -42,6 +42,7 @@ import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
+import { notificationRows, FOR_YOU_KEYS } from './notifications.js';
 import { tileCircles } from './helpContact.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { isPairCircleId } from './pairCircleId.js';
@@ -90,10 +91,29 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
     ops = { ...hostOps, selfIn: () => me };
   }
 
-  return Promise.all(screen.blocks.map((block) => materializeOneBlock({
+  const blocks = await Promise.all(screen.blocks.map((block) => materializeOneBlock({
     block, activeCircleIds, allCircleIds, hostOps: ops,
     screenIsAll: isAllCircles(screen),
   })));
+  // "Nieuw voor jou" at the top of the page the shell asks it for (Vandaag), and only when it holds rows: never an
+  // empty block. Not a block of the stored page: what is new is not something a person places or removes.
+  if (hostOps.forYou === true) {
+    const shown = new Set(activeCircleIds);
+    const rows = notificationRows({
+      events: hostOps.eventLog?.query ? hostOps.eventLog.query({ excludeMuted: true }) : [],
+      turns: hostOps.turns ?? [],
+      circles: (hostOps.circles ?? []).filter((c) => c?.id && shown.has(c.id)),
+      contactName: hostOps.contactName ?? null,
+      viewerIdIn: typeof ops.selfIn === 'function' ? ops.selfIn : null,
+      myRefs: hostOps.myRefs ?? [],
+      readIds: hostOps.readIds ?? null,
+      t: hostOps.t,
+      now: typeof hostOps.now === 'function' ? hostOps.now() : Date.now(),
+      windowDays: hostOps.notifyWindowDays,
+    });
+    if (rows.length > 0) blocks.unshift({ blockId: 'for-you', type: 'forYou', status: 'ok', titleKey: FOR_YOU_KEYS.title, content: { items: rows } });
+  }
+  return blocks;
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */

@@ -128,5 +128,7 @@ export function createReadMarks({ callSkill, onChange = null } = {}) {
       return mark(circleId, p[circleId]?.unreadIds ?? []);
     },
     markContact: (contactId, unreadIds, selfId = null) => mark(contactId, unreadIds, selfId),
+    // rows of "Nieuw voor jou" read (dismissed, opened, or "Alles gelezen"): each row's ids into its group's marks
+    markRows: (rows) => Promise.all((Array.isArray(rows) ? rows : []).map((r) => (r?.group?.id ? mark(r.group.id, r.ids ?? []) : false))),
   };
 }

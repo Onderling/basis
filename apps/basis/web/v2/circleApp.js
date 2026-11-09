@@ -3041,9 +3041,12 @@ const contactSeen = makeContactSeenStore({ getItem: (k) => window.localStorage.g
 // contact who renames themselves on the pair roster announces nothing, so the row says what they were until
 // the thread is opened.
 const contactNames = makeContactNameStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
+let _contactTurns = [];
 async function refreshContactUnread() {
   try {
     const turns = await circleContactChannel?.rehydrateAll?.() ?? [];
+    _contactTurns = turns;   // …and "Nieuw voor jou" on Vandaag reads the same turns
+    _vandaagHead?.invalidate();
     _contactUnread = buildContactUnread({ turns, seenAt: await contactSeen.read(), readIds: readMarks.ids() });
   } catch { _contactUnread = {}; }
   return _contactUnread;
@@ -4475,6 +4478,9 @@ async function materializeVandaag() {
       ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
       // the circles-with-news block counts what the circle tiles count
       seenAt: readSeenAt(), myRefs: unreadMyRefs, readIds: readMarks.ids(),
+      // "Nieuw voor jou" on top (the shared projection): the direct messages and who they are from, the news window
+      forYou: true, t, turns: _contactTurns, contactName: (id) => contactThreads.get(id)?.name ?? null,
+      notifyWindowDays: circleHouseholdAgent?.getParamValue?.('notify.windowDays'),
       // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
       selfIn: mySelfIn,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
@@ -4677,6 +4683,15 @@ function showVandaagCustomise() {
 // what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
 function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
+  // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
+  else if (action?.kind === 'for-you-open' && action.row) {
+    readMarks.markRows([action.row]).catch(() => {});
+    if (action.row.open?.kind === 'thread') showContactThread(action.row.open.id).catch(() => {});
+    else if (action.row.open?.id) showDetail(action.row.open.id);
+  }
+  else if (action?.kind === 'for-you-read' && Array.isArray(action.rows)) {
+    readMarks.markRows(action.rows).then(() => _showVandaag()).catch(() => {});
+  }
   // an own row (no circle): the "+" sheet opened on it — change it or take it away
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
   // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin

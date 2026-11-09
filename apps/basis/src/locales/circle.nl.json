@@ -10266,5 +10266,51 @@
       "text": "Geen verbindingspunt: dit bericht wacht.",
       "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
     }
+  },
+  "forYou": {
+    "title": {
+      "text": "Nieuw voor jou",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "all_read": {
+      "text": "Alles gelezen",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "item": {
+      "text": "{{kind}} in {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "line": {
+      "text": "{{circle}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dm": {
+      "text": "{{name}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "joined": {
+      "text": "{{name}} is erbij in {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "removed": {
+      "text": "Je bent verwijderd uit {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "many": {
+      "text": "{{count}} nieuwe dingen bij {{name}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "late": {
+      "text": "kwam later binnen",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "someone": {
+      "text": "Iemand",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dismiss": {
+      "text": "Weghalen",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    }
   }
 }

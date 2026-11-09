@@ -172,6 +172,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       else renderItems(section, block, tr, onAction);
       break;
     case 'rules':        renderRules(section, block, tr);        break;
+    case 'forYou':       renderForYou(section, block, tr, onAction);       break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
     case 'awaiting':      renderAwaiting(section, block, tr, onAction); break;
     case 'onboarding':   renderOnboarding(section, block, tr, onAction); break;
@@ -253,6 +254,59 @@ function renderAwaiting(section, block, tr, onAction) {
     b.textContent = tr(it.labelKey, { count: it.count, name: it.name ?? '' });
     if (typeof onAction === 'function') b.addEventListener('click', () => onAction({ ...it.open }));
     section.appendChild(b);
+  }
+}
+
+// "Nieuw voor jou": what came in for the person, each row a tap to its source and a ✕ to set it aside (both mark it
+// read on all their devices), "Alles gelezen" at the foot. Rows come whole from the shared projection; this only paints.
+function renderForYou(section, block, tr, onAction) {
+  section.classList.add('circle-screen__for-you');
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr('circle.forYou.title');
+  section.appendChild(title);
+  const items = block.content?.items ?? [];
+  const list = document.createElement('ul');
+  list.className = 'circle-screen__for-you-list';
+  for (const row of items) {
+    const li = document.createElement('li');
+    li.className = 'circle-screen__for-you-row';
+    li.dataset.kind = row.kind;
+    li.dataset.id = row.id;
+    const icon = document.createElement('span');
+    icon.className = 'circle-screen__for-you-icon';
+    icon.textContent = row.icon ?? '';
+    const text = document.createElement('span');
+    text.className = 'circle-screen__for-you-text';
+    text.textContent = row.text;
+    li.append(icon, text);
+    if (row.late) {
+      const late = document.createElement('span');
+      late.className = 'circle-screen__for-you-late';
+      late.textContent = tr('circle.forYou.late');
+      li.appendChild(late);
+    }
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'circle-screen__for-you-dismiss';
+    dismiss.textContent = '✕';
+    dismiss.setAttribute('aria-label', tr('circle.forYou.dismiss'));
+    dismiss.addEventListener('click', (e) => { e.stopPropagation(); onAction?.({ kind: 'for-you-read', rows: [row] }); });
+    li.appendChild(dismiss);
+    if (typeof onAction === 'function') {
+      li.tabIndex = 0;
+      li.addEventListener('click', () => onAction({ kind: 'for-you-open', row }));
+    }
+    list.appendChild(li);
+  }
+  section.appendChild(list);
+  if (items.length > 0 && typeof onAction === 'function') {
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'circle-screen__for-you-all';
+    all.textContent = tr('circle.forYou.all_read');
+    all.addEventListener('click', () => onAction({ kind: 'for-you-read', rows: items }));
+    section.appendChild(all);
   }
 }
 

@@ -44,6 +44,13 @@ export function blockOpensWhole(block) {
 export function blockEmptyLine(block, t) {
   // a lists block whose feature the circle switched off: one quiet line, not nothing
   if (block?.type === 'lists' && block?.content?.off === true) return t('circle.screen.lists_off');
+  // the circles with news never goes empty silently: it says which circles it looked at (Today shows the union of the
+  // ticked selves' circles, so this is also what tells the person which selves they are looking as)
+  if (block?.type === 'circlesUnread') {
+    const quiet = Array.isArray(block?.content?.quiet) ? block.content.quiet : [];
+    if (quiet.length === 1) return t('circle.screen.block_empty_news_in', { name: quiet[0] });
+    if (quiet.length > 1) return t('circle.screen.block_empty_news_count', { count: quiet.length });
+  }
   const key = EMPTY_KEY[block?.type] ?? (block?.type === 'items' ? EMPTY_KEY_BY_NOUN[block?.content?.noun] : null) ?? 'circle.screen.block_empty';
   return t(key, { title: blockTitle(block, t) });
 }

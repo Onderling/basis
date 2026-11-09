@@ -9,7 +9,7 @@
  * the resulting per-circle map.
  *
  * Output shape per circleId:
- *   { subtitle: string|null, ts: number, unread: number }
+ *   { subtitle: string|null, ts: number, unread: number, kinds: string[] }
  *
  *   subtitle = "<actor>: <text>" when the most-recent event carries both
  *              (e.g. a post / chat-message payload), or null when no
@@ -27,6 +27,8 @@
  */
 import { eventCircleId } from './circleStream.js';
 import { isKeyLike } from './personLabel.js';
+import { isItemLanding } from './itemLanding.js';
+import { itemKindChip } from './embedChips.js';
 import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item-store';
 
 // Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
@@ -40,14 +42,15 @@ const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_
  * @param {object[]} [opts.circles=[]]  normalised circles ({ id, ... })
  * @param {Object<string,number>} [opts.seenAt={}]  { [circleId]: epochMs }
  * @param {string[]} [opts.myRefs=[]]  this person's refs — their own lines are never unread
- * @returns {Object<string, {subtitle: string|null, ts: number, unread: number}>}
+ * @param {(key: string) => string} [opts.t]  the translator: a landed item's subtitle names its kind in words
+ * @returns {Object<string, {subtitle: string|null, ts: number, unread: number, kinds: string[]}>}
  */
-export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null } = {}) {
+export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null } = {}) {
   const known = new Set((circles || []).map((c) => c?.id).filter(Boolean));
   const out = {};
   // Seed entries for every known circle so the host can drive layout
   // off a stable keyset even when a circle has zero events.
-  for (const id of known) out[id] = { subtitle: null, ts: 0, unread: 0 };
+  for (const id of known) out[id] = { subtitle: null, ts: 0, unread: 0, kinds: [] };
 
   const sorted = [...(events || [])]
     .filter((e) => e && typeof e === 'object')
@@ -57,16 +60,25 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
     const cid = eventCircleId(event);
     if (!cid || !known.has(cid)) continue;
     const entry = out[cid];
+    // News is a line on the human lane or an item that landed (and is still held); a system row (a notification, a
+    // statement) never speaks on the tile
+    const landing = isItemLanding(event);
+    if (!landing && entryKind(event.type).lane !== LANE.HUMAN) continue;
 
     // First touch sets subtitle + ts (sorted newest-first).
     if (entry.subtitle === null && entry.ts === 0) {
-      const sub = renderSubtitle(event, { actorLabel });
+      const sub = landing ? landingSubtitle(event, { actorLabel, t }) : renderSubtitle(event, { actorLabel });
       if (sub) entry.subtitle = sub;
       entry.ts = typeof event.ts === 'number' ? event.ts : 0;
     }
     // Unread: what someone ELSE said, newer than the host-supplied seenAt.
     const seen = typeof seenAt[cid] === 'number' ? seenAt[cid] : 0;
-    if ((event.ts ?? 0) > seen && countsAsUnread(event, { myRefs })) entry.unread += 1;
+    if ((event.ts ?? 0) > seen && countsAsUnread(event, { myRefs })) {
+      entry.unread += 1;
+      // what is new, by kind (the label a row of news carries): a landed item's own kind, else the line's kind
+      const kind = landing ? event.payload.kind : (event.payload?.kind ?? event.type);
+      if (typeof kind === 'string' && !entry.kinds.includes(kind)) entry.kinds.push(kind);
+    }
   }
 
   return out;
@@ -88,7 +100,7 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
  */
 export function countsAsUnread(event, { myRefs = [] } = {}) {
   if (!event || typeof event !== 'object') return false;
-  if (entryKind(event.type).lane !== LANE.HUMAN) return false;
+  if (!isItemLanding(event) && entryKind(event.type).lane !== LANE.HUMAN) return false;
   const actor = event.actor ?? event.payload?.actor ?? null;
   if (actor === 'bot' && event.payload?.scope === 'self') return false;
   return !(actor && myRefs.includes(actor));
@@ -114,6 +126,18 @@ export function renderSubtitle(event, { actorLabel = null } = {}) {
   const actor = named ?? (raw && !isKeyLike(raw) ? raw : null);
   const trimmed = truncate(text);
   return actor ? `${actor}: ${trimmed}` : trimmed;
+}
+
+/** A landed item on the tile: who (a name, never a key) and its kind in words: "Tester B: 🙋 Vraag". */
+function landingSubtitle(event, { actorLabel = null, t = null } = {}) {
+  const chip = itemKindChip(event.payload?.kind);
+  if (!chip) return null;
+  const word = typeof t === 'function' ? t(chip.labelKey) : null;
+  const what = word && word !== chip.labelKey ? `${chip.icon} ${word}` : chip.icon;
+  const raw = event.actor ?? null;
+  const named = raw && typeof actorLabel === 'function' ? actorLabel(raw) : null;
+  const actor = named ?? (raw && !isKeyLike(raw) ? raw : null);
+  return actor ? `${actor}: ${what}` : what;
 }
 
 function pickText(payload) {

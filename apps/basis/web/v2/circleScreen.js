@@ -27,7 +27,7 @@ import { blockEmptyLine, blockOpensWhole } from '../../src/v2/blockTitle.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
-import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
+import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, newsKindIcons } from '../../src/v2/embedChips.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { identityLineWords, agentRowWords } from '../../src/v2/mijWords.js';
 import { dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -269,10 +269,14 @@ function renderCirclesUnread(section, block, tr, onAction) {
     li.dataset.circleId = row.circleId ?? '';
     const name = document.createElement('span');
     name.textContent = row.name ?? row.circleId;
+    // what is new there, by kind (the item-kind vocabulary's icons)
+    const kinds = document.createElement('span');
+    kinds.className = 'circle-screen__circles-unread-kinds';
+    kinds.textContent = newsKindIcons(row.kinds);
     const n = document.createElement('span');
     n.className = 'circle-screen__circles-unread-count';
     n.textContent = tr('circle.screen.unread_count', { count: row.unread });
-    li.append(name, n);
+    li.append(name, kinds, n);
     if (typeof onAction === 'function') {
       li.tabIndex = 0;
       li.addEventListener('click', () => onAction({ kind: 'open-circle', circleId: row.circleId }));

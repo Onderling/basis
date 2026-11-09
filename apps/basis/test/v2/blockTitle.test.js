@@ -13,7 +13,10 @@ describe("a block's title and empty line (Vandaag polish)", () => {
   it('the agenda says nothing is planned, tasks that nothing is open, the news line that there is none', () => {
     expect(blockEmptyLine({ type: 'calendar', status: 'empty' }, t)).toBe('Agenda — nothing planned');
     expect(blockEmptyLine({ type: 'tasks', status: 'empty' }, t)).toBe('Tasks — nothing open');
-    expect(blockEmptyLine({ type: 'circlesUnread', status: 'empty' }, t)).toBe('Circles with news — none');
+    expect(blockEmptyLine({ type: 'circlesUnread', status: 'empty' }, t)).toBe('No circles here yet');
+    // never silently empty: it names what it looked at
+    expect(blockEmptyLine({ type: 'circlesUnread', status: 'empty', content: { quiet: ['Werk Test'] } }, t)).toBe('Nothing new in Werk Test');
+    expect(blockEmptyLine({ type: 'circlesUnread', status: 'empty', content: { quiet: ['A', 'B', 'C'] } }, t)).toBe('Nothing new in your 3 circles');
     // …and a projected list of appointments or tasks says the same as its kind does
     expect(blockEmptyLine({ type: 'items', status: 'empty', content: { noun: 'calendar-event' } }, t)).toMatch(/— nothing planned$/);
     expect(blockEmptyLine({ type: 'items', status: 'empty', content: { noun: 'task' } }, t)).toMatch(/— nothing open$/);

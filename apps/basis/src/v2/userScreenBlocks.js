@@ -42,6 +42,7 @@ import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
+import { tileCircles } from './helpContact.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { isPairCircleId } from './pairCircleId.js';
 import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
@@ -169,19 +170,23 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
  * human lane, since this device last looked), for the page's circles, newest first, capped by the block's limit.
  * `hostOps.seenAt` and `hostOps.myRefs` are what the tiles use; without them every line counts as new once.
  */
-function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [] } = {}) {
+function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [], t = null } = {}) {
   const limit = clampInt(block.config?.limit, 1, 50, 5);
   const base = { blockId: block.id, type: 'circlesUnread', titleKey: 'circle.recipe.block.circlesUnread' };
   if (!eventLog?.query || activeCircleIds.length === 0) return { ...base, status: 'empty', content: { items: [] } };
   const wanted = new Set(activeCircleIds);
   const inPage = (circles ?? []).filter((c) => c?.id && wanted.has(c.id));
-  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [] });
+  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [], t });
   const items = inPage
-    .map((c) => ({ circleId: c.id, name: c.name ?? null, unread: previews[c.id]?.unread ?? 0, subtitle: previews[c.id]?.subtitle ?? null, ts: previews[c.id]?.ts ?? 0 }))
+    .map((c) => ({ circleId: c.id, name: c.name ?? null, unread: previews[c.id]?.unread ?? 0, kinds: previews[c.id]?.kinds ?? [], subtitle: previews[c.id]?.subtitle ?? null, ts: previews[c.id]?.ts ?? 0 }))
     .filter((r) => r.unread > 0)
     .sort((a, b) => b.ts - a.ts)
     .slice(0, limit);
-  return { ...base, status: items.length > 0 ? 'ok' : 'empty', content: { items } };
+  // empty: the names of the circles it looked at, as the person sees circles (the help circle's door is in Contacten),
+  // so the line can say so (never silently empty)
+  return items.length > 0
+    ? { ...base, status: 'ok', content: { items } }
+    : { ...base, status: 'empty', content: { items, quiet: tileCircles(inPage).map((c) => c.name ?? c.id) } };
 }
 
 /**

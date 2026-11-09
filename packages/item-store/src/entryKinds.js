@@ -113,6 +113,10 @@ export const ENTRY_KINDS = Object.freeze({
   // human task kind: the store row is the durable head, the statements age out and catch-up re-serves heads.
   'items':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING()),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
+  // A store row someone else wrote, held by this device for the first time: a REFERENCE (circle, item id, kind,
+  // author), never its words. The store keeps no landing time, so this is what makes a late arrival news. Written by
+  // this device about itself, never carried; the item's own row is the durable head.
+  'item-landed':     K(LANE.SYSTEM, false, RETAIN.CHAT, false, LOCAL_BINDING),
   // A planned occurrence that RAN (pending work): written once per occurrence id by the host that ran it — first
   // write wins, so a second host or a repeat never records a second run. Short: the row's own `lastRunAt` is the
   // durable head; the mark only has to outlive the occurrence's window.

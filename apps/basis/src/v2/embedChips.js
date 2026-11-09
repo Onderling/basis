@@ -112,3 +112,19 @@ function pickLabel(e) {
   if (typeof e.label === 'string' && e.label.trim()) return e.label.trim();        // stored label
   return null;
 }
+
+/**
+ * What is new in a circle, as the small icons of the item-kind vocabulary, newest kind first: "💬 🙋". A plain chat line
+ * is the conversation's own icon; a kind outside the vocabulary is left out.
+ *
+ * @param {string[]} kinds
+ * @returns {string}
+ */
+export function newsKindIcons(kinds) {
+  const icons = [];
+  for (const k of Array.isArray(kinds) ? kinds : []) {
+    const icon = (k === 'chat-message' || k === 'message') ? EMBED_TYPE_ICON['chat-message'] : itemKindChip(k)?.icon;
+    if (icon && !icons.includes(icon)) icons.push(icon);
+  }
+  return icons.join(' ');
+}

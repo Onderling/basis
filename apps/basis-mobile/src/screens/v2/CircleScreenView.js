@@ -27,7 +27,7 @@ import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput } from 'react-native';
 import { featureActionLabelKey } from '@onderling-app/basis';
-import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
+import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, newsKindIcons } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { t } from '../../core/localisation.js';
@@ -235,7 +235,8 @@ function renderCirclesUnread(block, onAction, styles) {
         <Pressable key={row.circleId} style={styles.noticeRow} testID={`circles-unread-${row.circleId}`}
           disabled={typeof onAction !== 'function'}
           onPress={() => onAction?.({ kind: 'open-circle', circleId: row.circleId })}>
-          <Text style={styles.noticeText}>{row.name ?? row.circleId} · {t('circle.screen.unread_count', { count: row.unread })}</Text>
+          {/* what is new there, by kind (the item-kind vocabulary's icons), web parity */}
+          <Text style={styles.noticeText}>{[row.name ?? row.circleId, newsKindIcons(row.kinds), t('circle.screen.unread_count', { count: row.unread })].filter(Boolean).join(' · ')}</Text>
         </Pressable>
       ))}
     </View>

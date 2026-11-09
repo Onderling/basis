@@ -1,6 +1,6 @@
 /**
- * The announcement of a circle post that landed from another member: a notification, no ingest (the post is already
- * in the circle's store), and the driver match.
+ * A circle post that landed from another member: no ingest (the post is already in the circle's store), no second
+ * log row (its landing entry is the record), and the driver match.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { makeHandleCirclePost } from '../../src/core/handlers/circlePost.js';
@@ -32,14 +32,11 @@ describe('makeHandleCirclePost', () => {
     expect(d.publishEvent).not.toHaveBeenCalled();
   });
 
-  it('publishes the notification and ingests nothing: the post is already in the circle\'s store', async () => {
+  it('logs no notification of its own and ingests nothing: the post is in the store and its landing on the log', async () => {
     const d = deps();
     const handle = makeHandleCirclePost(d);
     await handle('peer-A', env());
-    expect(d.callSkill.mock.calls.filter(([app, op]) => app === 'pinboard')).toEqual([]);
-    expect(d.publishEvent).toHaveBeenCalledWith(expect.objectContaining({
-      app: 'pinboard', type: 'notification',
-      payload: expect.objectContaining({ postId: 'req-1', groupId: 'g1' }),
-    }));
+    expect(d.callSkill.mock.calls.filter(([app]) => app === 'pinboard')).toEqual([]);
+    expect(d.publishEvent).not.toHaveBeenCalled();   // no drivers here, so no resonance nudge either
   });
 });

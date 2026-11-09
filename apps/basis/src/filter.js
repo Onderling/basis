@@ -113,7 +113,7 @@ export function matchesFilter(event, filter) {
   if (!matchesKey(event.type,   filter.eventTypes)) return false;
   if (!matchesKey(event.actor,  filter.actors))     return false;
   // circle scoping reads groupId off the event payload.
-  // publishEventRef calls from handleCirclePost + local post echo
+  // events that name their circle this way (a driver-match nudge, a local post echo)
   // surface `payload.groupId`.
   if (!matchesKey(event.payload?.groupId, filter.circleId)) return false;
   return true;

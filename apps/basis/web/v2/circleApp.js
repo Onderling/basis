@@ -3797,6 +3797,8 @@ function paintLauncher() {
     circles: circlesCache,
     seenAt:  readSeenAt(),
     myRefs:  unreadMyRefs,
+    // a landed item's subtitle names its kind in words
+    t,
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {

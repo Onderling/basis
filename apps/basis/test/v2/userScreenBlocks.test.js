@@ -296,3 +296,22 @@ describe('materializeScreen · α.2.b — error tolerance', () => {
     expect(out[1].status).toBe('ok');
   });
 });
+
+describe('Today\'s circles with news: one projection, never silently empty', () => {
+  const screen = { id: 's', blocks: [{ id: 'n', type: 'circlesUnread', config: { limit: 5 } }], circleFilter: null };
+  const circles = [{ id: 'c1', name: 'Werk Test' }, { id: 'help', name: 'Help' }];
+  it('empty: it names the circle it looked at (the help circle is not one the person sees as a circle)', async () => {
+    const { HELP_CIRCLE_ID } = await import('../../src/v2/helpCircle.js');
+    const cs = [circles[0], { id: HELP_CIRCLE_ID, name: 'Help' }];
+    const [b] = await materializeScreen({ screen, hostOps: { eventLog: { query: () => [] }, circles: cs } });
+    expect(b.status).toBe('empty');
+    expect(b.content.quiet).toEqual(['Werk Test']);
+  });
+  it('a post that landed is news, with its kind on the row', async () => {
+    const { landingEntryFor } = await import('../../src/v2/itemLanding.js');
+    const landed = landingEntryFor({ circleId: 'c1', item: { id: 'p1', type: 'request', source: { from: 'addr-b' } } });
+    const [b] = await materializeScreen({ screen, hostOps: { eventLog: { query: () => [landed] }, circles: [circles[0]], myRefs: ['me'] } });
+    expect(b.status).toBe('ok');
+    expect(b.content.items[0]).toMatchObject({ circleId: 'c1', unread: 1, kinds: ['ask'] });
+  });
+});

@@ -28,6 +28,7 @@
 import { eventCircleId } from './circleStream.js';
 import { isKeyLike } from './personLabel.js';
 import { isItemLanding } from './itemLanding.js';
+import { landedTimeOf } from '../eventLog.js';
 import { itemKindChip } from './embedChips.js';
 import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item-store';
 
@@ -54,7 +55,7 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
 
   const sorted = [...(events || [])]
     .filter((e) => e && typeof e === 'object')
-    .sort((a, b) => (b?.ts ?? 0) - (a?.ts ?? 0));
+    .sort((a, b) => landedTimeOf(b) - landedTimeOf(a));   // newest ARRIVAL first
 
   for (const event of sorted) {
     const cid = eventCircleId(event);
@@ -69,11 +70,12 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
     if (entry.subtitle === null && entry.ts === 0) {
       const sub = landing ? landingSubtitle(event, { actorLabel, t }) : renderSubtitle(event, { actorLabel });
       if (sub) entry.subtitle = sub;
-      entry.ts = typeof event.ts === 'number' ? event.ts : 0;
+      entry.ts = landedTimeOf(event);
     }
     // Unread: what someone ELSE said, newer than the host-supplied seenAt.
     const seen = typeof seenAt[cid] === 'number' ? seenAt[cid] : 0;
-    if ((event.ts ?? 0) > seen && countsAsUnread(event, { myRefs })) {
+    // new = LANDED here after I looked (a line the relay held for hours counts once it arrives)
+    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs })) {
       entry.unread += 1;
       // what is new, by kind (the label a row of news carries): a landed item's own kind, else the line's kind
       const kind = landing ? event.payload.kind : (event.payload?.kind ?? event.type);

@@ -120,6 +120,9 @@ export function createAddressedDeliver({
         // The turn that brought a hidden contact back: the thread's one-line marker is painted from this.
         ...(ex.returned === true ? { returned: true } : {}),
         sentAt:       typeof envelope?.ts === 'number' ? envelope.ts : Date.now(),
+        // an inbound turn: when it ARRIVED on this device (the sender's time stays in sentAt). What "new since I
+        // looked" compares, so a message the relay held for hours still counts once it lands.
+        ...(direction === 'in' ? { receivedAt: Date.now() } : {}),
         nonce:        envelope?.id ?? null,
       },
     };
@@ -259,6 +262,7 @@ export function chatTurnsFromItems(items, { threadKey } = {}) {
       text:      it.text ?? '',
       messageId: s.nonce ?? it.id ?? '',
       ts:        typeof s.sentAt === 'number' ? s.sentAt : (it.addedAt ?? 0),
+      ...(typeof s.receivedAt === 'number' ? { receivedAt: s.receivedAt } : {}),
       ...(s.replyTo ? { replyTo: s.replyTo } : {}),
       ...(Array.isArray(s.buttons) ? { buttons: s.buttons } : {}),
       ...(s.file && typeof s.file === 'object' ? { file: s.file } : {}),

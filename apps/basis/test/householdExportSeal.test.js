@@ -15,7 +15,8 @@ describe('the sealed export', () => {
     expect(Object.keys(key).sort()).toEqual(['publicKey', 'sealedSecret', 'v']);
     const sealed = sealExport(FILE, { publicKey: key.publicKey, sealedSecret: key.sealedSecret });
     expect(isSealedExport(sealed)).toBe(true);
-    expect(JSON.stringify(sealed)).not.toContain('melk');
+    // quoted, as below: a bare 'melk' can occur by chance inside base64 ciphertext
+    expect(JSON.stringify(sealed)).not.toContain('"melk"');
     // a new box: only the file
     const secret = await unlockExportKey({ key: sealed, passphrase: 'correct horse battery', argonOpts: LIGHT });
     expect(openExport(sealed, secret)).toEqual(FILE);

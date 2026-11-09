@@ -264,3 +264,12 @@ describe('a member that says it is a function (a household bot)', () => {
     expect('bot' in rows.find((r) => r.id === 'c')).toBe(false);
   });
 });
+
+describe('two people with one name: the later one carries a small number', () => {
+  it('the second and third "Jan" (in any case) are numbered, the first is not, others untouched', () => {
+    const rows = normalizeCircleMembers({ members: [
+      { webid: 'w1', handle: 'Jan' }, { webid: 'w2', handle: 'Piet' }, { webid: 'w3', handle: 'jan' }, { webid: 'w4', handle: 'JAN' },
+    ] });
+    expect(rows.map((r) => [r.id, r.nameNumber ?? null])).toEqual([['w1', null], ['w2', null], ['w3', 2], ['w4', 3]]);
+  });
+});

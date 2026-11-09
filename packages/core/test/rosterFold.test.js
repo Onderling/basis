@@ -578,9 +578,8 @@ describe('foldRoster — the handle a member chose rides the join', () => {
 // ── `member-props` — what a member says about themselves, on their own row (2026-09-21) ───────────────────────────
 // One generalized self-subject kind on the membership lane (the note `NOTE-member-props-on-the-membership-lane.md`,
 // Fable's review): handle · displayName · avatarRef — fields, never new kinds. Self-only, members-only, an allowlist
-// (admin-owned facts are refused), newest wins per field, and the HANDLE is unique in the circle: a handle another
-// current member holds is refused, deny-wins, on every device independently — the one check the admin did at the
-// join that moves to the fold.
+// (admin-owned facts are refused), newest wins per field. Two people may share a name (2026-11-06); a BOT's name stays
+// its own: a statement giving a bot and anyone else one name is refused, deny-wins, on every device independently.
 describe('member-props — a member\'s own display fields, folded onto their row', () => {
   it('a self-signed member-props sets displayName / avatarRef / handle on the member\'s row; newest wins per field', async () => {
     const { founder, bob } = await ids();
@@ -701,23 +700,21 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r.admins).toEqual([founder.pubKey]);
   });
 
-  it('HANDLE UNIQUENESS at the fold: a handle another current member holds is refused, deny-wins; a freed handle may be taken', async () => {
+  it('NAMES at the fold: two people may share one; a bot\'s name stays its own (case-blind), deny-wins', async () => {
     const { founder, bob, mallory } = await ids();
+    const { bob: bot } = await ids();
     const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
     const jm = body(mallory, 'join', mallory, { payload: { peerDisplay: 'mal' } });
-    const grab = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob', displayName: 'M' }, parent: jm.hash });
-    let r = foldRoster([jb, jm, grab], { founders: [founder.pubKey] });
-    expect(r.handles[mallory.pubKey], 'the old handle stays').toBe('mal');
-    expect(r.props[mallory.pubKey], 'the whole statement is refused — a collision is not a partial success').toBeUndefined();
-    // bob leaves; the handle is free; mallory may take it now
-    const leave = body(bob, 'leave', bob, { parent: jb.hash });
-    const grab2 = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob' }, parent: grab.hash, deps: [leave.hash] });
-    r = foldRoster([jb, jm, grab, leave, grab2], { founders: [founder.pubKey] });
-    expect(r.handles[mallory.pubKey]).toBe('bob');
-    // …and a member keeping their OWN handle is not a collision with themselves
-    const same = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob', displayName: 'Mal' }, parent: grab2.hash });
-    r = foldRoster([jb, jm, grab, leave, grab2, same], { founders: [founder.pubKey] });
-    expect(r.props[mallory.pubKey]).toEqual({ handle: 'bob', displayName: 'Mal' });
+    const same = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob', displayName: 'M' }, parent: jm.hash });
+    let r = foldRoster([jb, jm, same], { founders: [founder.pubKey] });
+    expect(r.handles[mallory.pubKey], 'a person may take a name another person holds').toBe('bob');
+    expect(r.handles[bob.pubKey]).toBe('bob');
+    // a bot, admitted by the founder; a person's statement that takes its name is refused whole
+    const jbot = body(founder, 'join', bot, { payload: { peerDisplay: 'Huisbot', kind: 'function' } });
+    const grab = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'huisbot', displayName: 'X' }, parent: same.hash, deps: [jbot.hash] });
+    r = foldRoster([jb, jm, same, jbot, grab], { founders: [founder.pubKey] });
+    expect(r.handles[mallory.pubKey], 'the old name stays').toBe('bob');
+    expect(r.props[mallory.pubKey], 'the whole statement is refused').toEqual({ handle: 'bob', displayName: 'M' });
   });
 });
 
@@ -752,30 +749,34 @@ describe('member-props supersession — the fold computes the dead set, and drop
 
   it('a REFUSED statement is never named — its acceptance depends on the history compaction would remove', async () => {
     const { founder, bob, mallory: cato } = await ids();
+    const { bob: bot } = await ids();
     const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
     const jc = body(cato, 'join', cato, { payload: { peerDisplay: 'cato' } });
-    const takeX = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: jb.hash });
+    const jbot = body(founder, 'join', bot, { payload: { peerDisplay: 'x', kind: 'function' } });   // a bot holds x
+    const takeX = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x2' }, parent: jb.hash, deps: [jbot.hash] });
     // The ORDER is the premise, so it is written as causal edges (2026-09-24 — this test was red one run in two): cato
     // claims x HAVING SEEN bob's claim, and bob moves on to y HAVING SEEN cato's refused claim. Without the edges the
     // statements are concurrent and the fold's deterministic tiebreak over the random test keys decided who held x.
     const catoX = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash, deps: [takeX.hash] });
     const bobY = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'y' }, parent: takeX.hash, deps: [catoX.hash] });
-    const r = foldRoster([jb, jc, takeX, catoX, bobY], { founders: [founder.pubKey] });
-    expect(r.handles[cato.pubKey]).toBe('cato');
+    const r = foldRoster([jb, jc, jbot, takeX, catoX, bobY], { founders: [founder.pubKey] });
+    expect(r.handles[cato.pubKey], 'refused: the bot holds x').toBe('cato');
     expect(r.superseded).toEqual([]);   // handle-bearing statements are never dead, refused ones never named
   });
 
   it('REFOLD AGREEMENT: the fold over the log with the dead set TOMBSTONED equals the fold over the whole log — in any order', async () => {
     const { founder, bob, mallory: cato } = await ids();
+    const { bob: bot } = await ids();
     const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
     const jc = body(cato, 'join', cato, { payload: { peerDisplay: 'cato' } });
+    const jbot = body(founder, 'join', bot, { payload: { peerDisplay: 'x', kind: 'function' } });   // a bot holds x
     const b1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B1', personaProperties: { a: 1 } }, parent: jb.hash });
     const b2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B2' }, parent: b1.hash });
-    const bx = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: b2.hash });
-    const c1 = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash });   // refused, bob holds x
+    const bx = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: b2.hash, deps: [jbot.hash] });   // refused, the bot holds x
+    const c1 = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash, deps: [jbot.hash] });   // refused too
     const b3 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B3', personaProperties: { a: 2 } }, parent: bx.hash });
     const c2 = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, displayName: 'C2' }, parent: c1.hash });
-    const all = [jb, jc, b1, b2, bx, c1, b3, c2];
+    const all = [jb, jc, jbot, b1, b2, bx, c1, b3, c2];
     const full = foldRoster(all, { founders: [founder.pubKey] });
     expect(full.superseded).toEqual([b1.hash, b2.hash].sort());
     // COMPACTION IS A TOMBSTONE, NOT A DROP: the dead statement keeps its chain fields (hash · author · parentHash
@@ -786,10 +787,10 @@ describe('member-props supersession — the fold computes the dead set, and drop
     const compacted = foldRoster(all.map((s) => (dead.has(s.hash) ? tomb(s) : s)), { founders: [founder.pubKey] });
     expect(strip(compacted)).toEqual(strip(full));
     expect(compacted.superseded, 'a tombstone is never named again').toEqual([]);
-    // and the collision was real: exactly one of them holds x, and both folds say the same one
+    // and the collision was real: only the bot holds x, and both folds say so
     expect(Object.values(full.handles).filter((h) => h === 'x')).toHaveLength(1);
     // …and a device that received the statements in another order agrees on the dead set too
-    const shuffled = [jc, jb, c1, b2, b1, c2, bx, b3];
+    const shuffled = [jbot, jc, jb, c1, b2, b1, c2, bx, b3];
     expect(foldRoster(shuffled, { founders: [founder.pubKey] }).superseded).toEqual(full.superseded);
   });
 });

@@ -23,7 +23,7 @@ import { releaseUnchanged } from '@onderling/agent-registry';
  *
  * Pure DI: imports NOTHING — every collaborator (store, members, metrics, simulateSync, notifier, the key hook,
  * and the validation helpers `codeRedeemableNow` · `inviteRedemptionVerdict` · `verifyCircleLink` ·
- * `withHandleClaim` · `collectCircleHandles` · `findHandleCollision` · `isCircleAdmin`, plus the
+ * `withHandleClaim` · `isCircleAdmin`, plus the
  * `INVITE_LIMIT_REACHED` constant) is passed in. Byte-identical to the pre-lift skill bodies; the caller's
  * test suite is the safety net.
  */
@@ -255,7 +255,7 @@ export async function redeemMembershipCode({
 export async function verifyMembershipCodeForPeer({
   store, members, metrics, simulateSync, grantKey, emitSpine,
   codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
-  withHandleClaim, collectCircleHandles, findHandleCollision, deriveSealingKey = null,
+  withHandleClaim, deriveSealingKey = null, botNamesIn = null,
 }, { a, from } = {}) {
   if (typeof a.groupId !== 'string' || !a.groupId)
     return { error: 'groupId required' };
@@ -297,14 +297,9 @@ export async function verifyMembershipCodeForPeer({
     && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
     ? a.circleAddress : null;
 
-  // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
-  // handles within a single circle), enforced HERE on the admin/host side —
-  // the authority that owns the circle roster. The joiner's chosen handle
-  // rides the redeem as `peerDisplay`; reject the join if another member of
-  // THIS circle already holds it (case-folded, so `Jan`/`jan` collide),
-  // rather than silently admitting a duplicate. The joiner re-presenting
-  // their OWN handle (a re-send) is not a collision — excluded by
-  // `requesterWebid`. Absent `peerDisplay` = no handle claimed → skip.
+  // The joiner's name rides the redeem as `peerDisplay`. Two people may share a name in a circle (Frits
+  // 2026-11-06: the name is for people; uniqueness stays on the key, and the members list tells two equal
+  // names apart with a small number), so the redeem refuses no name.
   // Signing pubKey for the peer path — the joiner's authenticated identity
   // is `requesterWebid`, which the admin-side basis handler
   // (`makeHandleGroupRedeemRequest`) sets from the AUTHENTICATED NKN
@@ -340,14 +335,18 @@ export async function verifyMembershipCodeForPeer({
     };
   }
 
-  // SERIALISED per (circle, handle) — the uniqueness check and the redemption write are separated by
-  // awaits, so two joiners redeeming the same invite and both claiming `@jan` each read a roster with
-  // no `jan` and each wrote one (story 2.1: three concurrent claims produced three members named jan).
-  // The lock is per (circle, handle), so unrelated joins still run concurrently.
+  // SERIALISED per (circle, name), so the bot-name check below and the write cannot interleave with a second
+  // joiner of the same name; unrelated joins still run concurrently.
   const claimed = await withHandleClaim(store, a.groupId, a.peerDisplay, async () => {
-    if (typeof a.peerDisplay === 'string' && a.peerDisplay) {
-      const takenHandles = await collectCircleHandles({ store, members, groupId: a.groupId });
-      if (findHandleCollision({ candidate: a.peerDisplay, claimantWebid: a.requesterWebid, taken: takenHandles })) {
+    // A BOT'S NAME IS ITS OWN (a bot is addressed by its name in chat). People may share a name, but a joiner named
+    // like a CURRENT bot of this circle (case-blind) is refused here, where the roster is: the roster fold checks a
+    // member's later `member-props` but not a join's name, so this is the front door. `botNamesIn` is the host's
+    // read of the folded roster's function members; absent, nothing is refused.
+    if (typeof a.peerDisplay === 'string' && a.peerDisplay.trim() && typeof botNamesIn === 'function') {
+      const want = a.peerDisplay.trim().toLowerCase();
+      let bots = [];
+      try { bots = (await botNamesIn(a.groupId)) ?? []; } catch { bots = []; }
+      if (bots.some((b) => b && b.webid !== a.requesterWebid && typeof b.handle === 'string' && b.handle.trim().toLowerCase() === want)) {
         return { error: 'handle-taken', reason: 'handle-taken' };
       }
     }

@@ -324,3 +324,13 @@ describe('chatRows — membership notices as rendered projections (2026-08-29)',
     expect(rows.filter((r) => r.actor === 'bot')).toEqual([]);
   });
 });
+
+describe('two members called Jan in the chat', () => {
+  it('the second Jan\'s line reads "Jan · 2" (rows from the one roster normaliser)', async () => {
+    const { normalizeCircleMembers } = await import('@onderling/kring-host/circleMembers');
+    const { stampSenderLabels } = await import('../../src/v2/circleStream.js');
+    const members = normalizeCircleMembers({ members: [{ webid: 'webid:jan1', handle: 'Jan' }, { webid: 'webid:jan2', handle: 'Jan' }] });
+    const rows = stampSenderLabels([{ actor: 'webid:jan1' }, { actor: 'webid:jan2' }], { members, viewerId: 'webid:me' });
+    expect(rows.map((r) => r.senderLabel)).toEqual(['Jan', 'Jan · 2']);
+  });
+});

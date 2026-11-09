@@ -79,18 +79,16 @@ describe('a member\'s own name reaches every roster they are on — member-props
     expect(row?.said?.displayName, 'and nothing it travelled with lands either').toBe(before);
   }, 60_000);
 
-  it('a handle change reaches the rows too; a handle ANOTHER member holds is refused — by the op here (it reads the folded rosters), by the fold everywhere (kernel-tested)', async () => {
-    const r = await bram.agent.callSkill('pinboard', 'setMyHandle', { handle: 'bramdv' });
+  it('a name change reaches the rows too; two people may share a name (2026-11-06): cato takes bram\'s and both rows carry it', async () => {
+    const r = await bram.agent.callSkill('pinboard', 'setMyHandle', { handle: 'Bram dV' });
     expect(r?.error).toBeUndefined();
-    expect(await until(async () => (rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey)?.handle === 'bramdv' ? true : null), { timeout: 20_000, step: 400 }), 'the admin\'s row has bram\'s new handle').toBe(true);
-    // cato tries to take it. The op refuses first — it reads every folded roster it is on, so bram's lane-borne
-    // rename counts (the local cache alone still had bram's join-time handle: measured, this was red). The FOLD is
-    // the rule that binds on every other device (`rosterFold.test.js`, uniqueness deny-wins).
-    const stmt = await cato.agent.callSkill('pinboard', 'setMyHandle', { handle: 'bramdv' });
-    expect(stmt?.error, 'the op refuses a taken handle').toBe('invalid-handle');
-    await settle(2000);
-    expect(rowOf(await readRoster(admin, CIRCLE_A), cato.pubKey)?.handle, 'cato keeps the old handle on the admin\'s roster').toBe('cato');
-    expect(rowOf(await readRoster(bram, CIRCLE_A), cato.pubKey)?.handle, '…and on bram\'s').toBe('cato');
+    expect(await until(async () => (rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey)?.handle === 'Bram dV' ? true : null), { timeout: 20_000, step: 400 }), 'the admin\'s row has bram\'s new name').toBe(true);
+    // cato takes the same name: nothing refuses it, not the op and not the fold (a bot's name is the one exception,
+    // `rosterFold.test.js`); the key tells the two apart, the members list a small number.
+    const stmt = await cato.agent.callSkill('pinboard', 'setMyHandle', { handle: 'Bram dV' });
+    expect(stmt?.error, 'a shared name is accepted').toBeUndefined();
+    expect(await until(async () => (rowOf(await readRoster(admin, CIRCLE_A), cato.pubKey)?.handle === 'Bram dV' ? true : null), { timeout: 20_000, step: 400 }), 'cato\'s row on the admin\'s roster carries the shared name').toBe(true);
+    expect(rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey)?.handle, '…and bram keeps it').toBe('Bram dV');
   }, 60_000);
 
   it('an unchanged save appends nothing (the diff gate)', async () => {

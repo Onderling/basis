@@ -270,10 +270,30 @@ export function normalizeCircleMembers(result) {
     : Array.isArray(result.items) ? result.items
       : Array.isArray(result) ? result
         : [];
-  return raw
+  return withNameNumbers(raw
     .filter((m) => m && typeof m === 'object')
     .map((m) => memberToViewAs(memberFrom(m)))
-    .filter((m) => m.id != null);
+    .filter((m) => m.id != null));
+}
+
+/**
+ * TWO PEOPLE WITH ONE NAME. Since 2026-11-06 a name is for people and two members may share one (uniqueness stays on
+ * the key). The members list then tells them apart the way Frits asked: the avatar, and only on a collision a small
+ * number. The first member with a name (case-blind, in roster order, which every device folds the same way) carries
+ * none; each later one carries `nameNumber` 2, 3, … The reveal ladder paints it ("Jan · 2").
+ *
+ * @param {Array<object>} rows  view-as rows (`{ id, handle, … }`)
+ * @returns {Array<object>}
+ */
+export function withNameNumbers(rows) {
+  const seen = new Map();
+  return rows.map((r) => {
+    const k = typeof r?.handle === 'string' ? r.handle.trim().toLowerCase() : '';
+    if (!k) return r;
+    const n = (seen.get(k) ?? 0) + 1;
+    seen.set(k, n);
+    return n > 1 ? { ...r, nameNumber: n } : r;
+  });
 }
 
 /** Member count from a listGroupMembers result (for launcher tiles). */

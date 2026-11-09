@@ -134,6 +134,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       else body = renderItems(block, styles, onAction);
       break;
     case 'rules':        body = renderRules(block, styles); break;
+    case 'forYou':       body = renderForYou(block, onAction, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
     case 'awaiting':      body = renderAwaiting(block, onAction, styles); break;
     case 'onboarding':   body = <OnboardingCards block={block} onAction={onAction} styles={styles} />; break;
@@ -222,6 +223,36 @@ function renderAwaiting(block, onAction, styles) {
           <Text style={styles.noticeText}>{t(it.labelKey, { count: it.count, name: it.name ?? '' })}</Text>
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+// "Nieuw voor jou" (web parity: circleScreen.js renderForYou): what came in for the person, a tap to its source and a
+// ✕ to set it aside (both mark it read on all their devices), "Alles gelezen" at the foot. Rows come whole from the
+// shared projection; this only paints.
+function renderForYou(block, onAction, styles) {
+  const items = block.content?.items ?? [];
+  return (
+    <View testID="for-you">
+      <Text style={styles.blockTitle}>{t('circle.forYou.title')}</Text>
+      {items.map((row) => (
+        <Pressable key={row.id} style={[styles.noticeRow, styles.forYouRow]} testID={`for-you-${row.kind}`}
+          disabled={typeof onAction !== 'function'}
+          onPress={() => onAction?.({ kind: 'for-you-open', row })}>
+          <Text style={[styles.noticeText, styles.forYouText]} numberOfLines={1}>
+            {`${row.icon ?? ''} ${row.text}`}{row.late ? `  ${t('circle.forYou.late')}` : ''}
+          </Text>
+          <Pressable hitSlop={8} accessibilityLabel={t('circle.forYou.dismiss')} testID={`for-you-dismiss-${row.id}`}
+            onPress={() => onAction?.({ kind: 'for-you-read', rows: [row] })}>
+            <Text style={styles.forYouDismiss}>✕</Text>
+          </Pressable>
+        </Pressable>
+      ))}
+      {items.length > 0 && typeof onAction === 'function' ? (
+        <Pressable testID="for-you-all" onPress={() => onAction({ kind: 'for-you-read', rows: items })}>
+          <Text style={styles.forYouAll}>{t('circle.forYou.all_read')}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -611,6 +642,10 @@ const makeStyles = (theme) => StyleSheet.create({
   noticeSender:        { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
   noticeSenderCompact: { fontSize: 10, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 1 },
   noticeText:          { fontSize: 14, color: theme.color.ink },
+  forYouRow:           { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  forYouText:          { flex: 1 },
+  forYouDismiss:       { fontSize: 14, color: theme.color.inkSoft, paddingHorizontal: 6 },
+  forYouAll:           { fontSize: 13, color: theme.color.accent, marginTop: 6 },
   noticeTextCompact:   { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
   // a row is a CARD: the words, and ONE button (the action its noun declares)

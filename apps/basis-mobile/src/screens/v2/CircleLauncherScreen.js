@@ -736,12 +736,19 @@ export default function CircleLauncherScreen({
   // …and what each row LAST READ here — the rename marker's left-hand side (web parity).
   const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
   const [contactUnread, setContactUnread] = useState({});
+  // …and "Nieuw voor jou" on Vandaag reads the same turns, named by the contact book (web parity)
+  const [contactTurns, setContactTurns] = useState([]);
+  const [contactNameMap, setContactNameMap] = useState({});
   const refreshContactUnread = useCallback(async () => {
     try {
       const turns = (await bundle?.contactChannel?.rehydrateAll?.()) ?? [];
+      setContactTurns(turns);
+      loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames })
+        .then((rows) => setContactNameMap(Object.fromEntries((rows ?? []).filter((r) => r?.contactId && r?.name).map((r) => [r.contactId, r.name]))))
+        .catch(() => {});
       setContactUnread(buildContactUnread({ turns, seenAt: await contactSeen.read(), readIds: readMarks.ids() }));
     } catch { setContactUnread({}); }
-  }, [bundle, contactSeen, readMarks, readTick]);
+  }, [bundle, contactSeen, readMarks, readTick, contactNames]);
   useEffect(() => { refreshContactUnread(); }, [refreshContactUnread]);
   useEffect(() => subscribeContactReplies(() => { refreshContactUnread(); }), [refreshContactUnread]);
   // the feedback door: the contact's row (the one Contacten paints), its thread opened with the draft in the composer
@@ -1337,6 +1344,9 @@ export default function CircleLauncherScreen({
   // landing key changes (the page, the block opened whole, the circles shown, the selves) — not when an input becomes
   // a new object with the same content. Keyed on the objects, the run fired three times per landing, ~2.2 s each on a
   // phone (the refreshed page book, the re-read circle list, the seen-marks).
+  // what "Nieuw voor jou" reads beside the log: the direct-message turns and the contact book's names (read at call time)
+  const forYouRef = useRef({ turns: [], names: {} });
+  forYouRef.current = { turns: contactTurns, names: contactNameMap };
   const vandaagInputs = useRef({});
   vandaagInputs.current = { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs, expandedBlockId };
   const vandaagKey = useMemo(() => vandaagLandingKey({
@@ -1357,6 +1367,9 @@ export default function CircleLauncherScreen({
       // agenda materialised empty. Found by the rename that makes the two waists unmistakable.
       // …and the circles-with-news block counts what the circle tiles count (their 'seen' and 'me')
       hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs, readIds: readMarksRef.current?.ids(),
+        // "Nieuw voor jou" on top (the shared projection, web parity): the direct messages, who they are from, the window
+        forYou: true, t, turns: forYouRef.current.turns, contactName: (id) => forYouRef.current.names[id] ?? null,
+        notifyWindowDays: bundle?.agent?.getParamValue?.('notify.windowDays'),
         ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
@@ -1392,7 +1405,7 @@ export default function CircleLauncherScreen({
     return () => { off(); head.dispose(); if (vandaagHead.current === head) vandaagHead.current = null; };
   }, [bundle, eventLog, materializeVandaagNow]);
   // the circles-with-news block counts what is not yet seen, and the marks live in AsyncStorage, not in a store
-  useEffect(() => { vandaagHead.current?.invalidate(); mijHead?.invalidate(); }, [seenAt, readTick]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { vandaagHead.current?.invalidate(); mijHead?.invalidate(); }, [seenAt, readTick, contactTurns]);   // eslint-disable-line react-hooks/exhaustive-deps
   // MIJ'S HEAD (web parity): Me's blocks kept current by the circles' items, the event log and the agent registry (a
   // profile's facts are the registry's); CircleProfileScreen lands on it with its own reader. Only a TAB landing reads
   // the head as it is (`mijByTab`): every other way into Mij follows an act and reads again.
@@ -2301,6 +2314,13 @@ export default function CircleLauncherScreen({
               onMore={expandedBlockId ? null : setExpandedBlockId}
               onAction={(a) => {
                 if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); }
+                // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
+                else if (a?.kind === 'for-you-open' && a.row) {
+                  readMarks.markRows([a.row]).catch(() => {});
+                  if (a.row.open?.kind === 'thread') { openContactThread({ contactId: a.row.open.id, name: a.row.group?.name ?? null }); setView('contacten'); }
+                  else { const c = circles.find((x) => x.id === a.row.open?.id); if (c) openCircle(c); }
+                }
+                else if (a?.kind === 'for-you-read' && Array.isArray(a.rows)) readMarks.markRows(a.rows).catch(() => {});
                 // an own row (no circle): the "+" sheet opened on it — change it or take it away
                 else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
                 // the onboarding strip's acts: the handle through the profile op, the intro card seen here, begin

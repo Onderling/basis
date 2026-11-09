@@ -9,7 +9,7 @@
  * the resulting per-circle map.
  *
  * Output shape per circleId:
- *   { subtitle: string|null, ts: number, unread: number, kinds: string[] }
+ *   { subtitle: string|null, ts: number, unread: number, kinds: string[], unreadIds: Array<{id, at}> }
  *
  *   subtitle = "<actor>: <text>" when the most-recent event carries both
  *              (e.g. a post / chat-message payload), or null when no
@@ -45,14 +45,15 @@ const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_
  * @param {Object<string,number>} [opts.seenAt={}]  { [circleId]: epochMs }
  * @param {string[]} [opts.myRefs=[]]  this person's refs — their own lines are never unread
  * @param {(key: string) => string} [opts.t]  the translator: a landed item's subtitle names its kind in words
- * @returns {Object<string, {subtitle: string|null, ts: number, unread: number, kinds: string[]}>}
+ * @param {Set<string>} [opts.readIds]  every id the person READ, on any of their devices (`readMarks.js`): never new
+ * @returns {Object<string, {subtitle: string|null, ts: number, unread: number, kinds: string[], unreadIds: Array<{id: string, at: number}>}>}
  */
-export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null } = {}) {
+export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null, readIds = null } = {}) {
   const known = new Set((circles || []).map((c) => c?.id).filter(Boolean));
   const out = {};
   // Seed entries for every known circle so the host can drive layout
   // off a stable keyset even when a circle has zero events.
-  for (const id of known) out[id] = { subtitle: null, ts: 0, unread: 0, kinds: [] };
+  for (const id of known) out[id] = { subtitle: null, ts: 0, unread: 0, kinds: [], unreadIds: [] };
 
   const sorted = [...(events || [])]
     .filter((e) => e && typeof e === 'object')
@@ -76,8 +77,12 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
     // Unread: what someone ELSE said, newer than the host-supplied seenAt.
     const seen = typeof seenAt[cid] === 'number' ? seenAt[cid] : 0;
     // new = LANDED here after I looked (a line the relay held for hours counts once it arrives)
-    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs })) {
+    // …and read on none of my devices (the read set holds the source's id: a landed item's, a line's own)
+    const sourceId = landing ? event.payload.itemId : event.id;
+    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs }) && !(readIds && readIds.has(sourceId))) {
       entry.unread += 1;
+      // what opening the circle marks read: the id with the SOURCE's time (the same on every device)
+      entry.unreadIds.push({ id: sourceId, at: landing ? (event.payload.saidAt ?? event.ts ?? 0) : (event.ts ?? 0) });
       // what is new, by kind (the label a row of news carries): a landed item's own kind, else the line's kind
       const kind = landing ? event.payload.kind : (event.payload?.kind ?? event.type);
       if (typeof kind === 'string' && !entry.kinds.includes(kind)) entry.kinds.push(kind);

@@ -170,13 +170,13 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
  * human lane, since this device last looked), for the page's circles, newest first, capped by the block's limit.
  * `hostOps.seenAt` and `hostOps.myRefs` are what the tiles use; without them every line counts as new once.
  */
-function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [], t = null } = {}) {
+function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [], t = null, readIds = null } = {}) {
   const limit = clampInt(block.config?.limit, 1, 50, 5);
   const base = { blockId: block.id, type: 'circlesUnread', titleKey: 'circle.recipe.block.circlesUnread' };
   if (!eventLog?.query || activeCircleIds.length === 0) return { ...base, status: 'empty', content: { items: [] } };
   const wanted = new Set(activeCircleIds);
   const inPage = (circles ?? []).filter((c) => c?.id && wanted.has(c.id));
-  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [], t });
+  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [], t, readIds });
   const items = inPage
     .map((c) => ({ circleId: c.id, name: c.name ?? null, unread: previews[c.id]?.unread ?? 0, kinds: previews[c.id]?.kinds ?? [], subtitle: previews[c.id]?.subtitle ?? null, ts: previews[c.id]?.ts ?? 0 }))
     .filter((r) => r.unread > 0)

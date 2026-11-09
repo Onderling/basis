@@ -36,6 +36,7 @@ import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-clie
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
 import { landingEntryFor, landingIdOf, markLandingRemoved } from '../../v2/itemLanding.js';
+import { nextReadMarks, readMarksIdOf, NOTIFY_WINDOW_KEY } from '../../v2/readMarks.js';
 import { parseCompanionClaim } from '../../v2/companionClaim.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
@@ -5349,6 +5350,26 @@ export async function createRealHouseholdAgent(opts = {}) {
     return [DataPart(await setPaused(parts?.[0]?.data?.personaId, true))];
   }, { visibility: 'private' });
   hostAgent.register('resumePersona', async ({ parts }) => [DataPart(await setPaused(parts?.[0]?.data?.personaId, false))], { visibility: 'private' });
+  // WHAT THE PERSON READ, ON ALL THEIR DEVICES: one read-marks row per self and group in the own-devices store, carried
+  // to that self's siblings by the own lane (the row's `createdBy` is the self, which picks the lane). A circle's self
+  // is the persona the circle belongs to; a contact's is the one the caller names (the default otherwise).
+  hostAgent.register('markRead', async ({ parts }) => {
+    const { group, read, selfId: asked } = parts?.[0]?.data ?? {};
+    if (typeof group !== 'string' || !group || !Array.isArray(read)) return [DataPart({ ok: false, error: 'group and read required' })];
+    const selfId = typeof asked === 'string' && asked ? asked : profileIdOf(group);
+    const store = await getOwnStore();
+    const id = readMarksIdOf(selfId, group);
+    const next = nextReadMarks((await store.get?.(id)) ?? null, { selfId, group, add: read, windowDays: paramsService.register.valueOf(NOTIFY_WINDOW_KEY) });
+    if (!next) return [DataPart({ ok: true, changed: false })];
+    const by = (selfId !== 'default' ? personas.get(selfId)?.chatId?.pubKey : null) ?? undefined;
+    await store.put(next, by ? { by } : {});
+    return [DataPart({ ok: true, changed: true, count: next.read.length })];
+  }, { visibility: 'private' });
+  hostAgent.register('listReadMarks', async () => {
+    const store = await getOwnStore();
+    const rows = ((await store.list?.()) ?? []).filter((r) => r?.type === 'read-marks');
+    return [DataPart({ ok: true, rows })];
+  }, { visibility: 'private' });
   // REMOVE A PERSONA FROM THIS DEVICE — a ceremony with the phrase (the same proof the revoke asks), scoped to ONE
   // persona: (1) this device's delegation under THAT persona tombstoned — every other self's records untouched; (2) its
   // addresses in that persona's circles retired, as that persona; (3) its row on the private device map removed; (4) then

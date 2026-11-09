@@ -45,10 +45,10 @@
  */
 
 import { CLAIM_FIELDS } from './causalMerge.js';
-import { CANONICAL_FIELD_CLOCKS, OWN_SCOPE_TYPES } from '@onderling/item-types';
+import { CANONICAL_FIELD_CLOCKS, CANONICAL_SET_UNIONS, OWN_SCOPE_TYPES } from '@onderling/item-types';
 
 /** The resolution policies, under their CRDT-system names. */
-export const RESOLUTION = Object.freeze({ CONTENT: 'content', CLAIM: 'claim', SPINE: 'spine', FIELD_CLOCK: 'field-clock' });
+export const RESOLUTION = Object.freeze({ CONTENT: 'content', CLAIM: 'claim', SPINE: 'spine', FIELD_CLOCK: 'field-clock', SET_UNION: 'set-union' });
 
 /** The delivery-reliability tiers — a policy IMPLIES a transport guarantee, so they are declared together. */
 export const DELIVERY = Object.freeze({
@@ -60,6 +60,7 @@ export const DELIVERY = Object.freeze({
 const DELIVERY_FOR = Object.freeze({
   [RESOLUTION.CONTENT]: DELIVERY.BEST_EFFORT,
   [RESOLUTION.FIELD_CLOCK]: DELIVERY.BEST_EFFORT,   // a set heals on the next merge, like content
+  [RESOLUTION.SET_UNION]:   DELIVERY.BEST_EFFORT,   // a grow-only set heals on the next merge (a union never loses)
   [RESOLUTION.CLAIM]:   DELIVERY.AT_LEAST_ONCE,
   [RESOLUTION.SPINE]:   DELIVERY.RELIABLE,
 });
@@ -79,7 +80,7 @@ export function deliveryForResolution(resolution) {
  */
 export const DEFAULT_RESOLUTION = RESOLUTION.CONTENT;
 
-const isResolution = (p) => p === RESOLUTION.CONTENT || p === RESOLUTION.CLAIM || p === RESOLUTION.SPINE || p === RESOLUTION.FIELD_CLOCK;
+const isResolution = (p) => Object.values(RESOLUTION).includes(p);
 
 /**
  * A mutable (item-type, field) → resolution registry with `resolutionOf` / `deliveryOf` accessors (mirrors
@@ -90,6 +91,7 @@ const isResolution = (p) => p === RESOLUTION.CONTENT || p === RESOLUTION.CLAIM |
 export function createResolutionRegistry() {
   const table = new Map();   // itemType -> Map(field -> resolution)
   const clockSets = new Map();   // itemType -> [{ clock, fields }] (the field-clock sets, in declaration order)
+  const unionSets = new Map();   // itemType -> [{ field, key, at, floor }] (the set-union sets)
 
   const put = (itemType, field, resolution) => {
     let m = table.get(itemType);
@@ -121,6 +123,10 @@ export function createResolutionRegistry() {
       if (resolution === RESOLUTION.FIELD_CLOCK) {
         throw new Error(`resolutionRegistry.declare: (${itemType}, ${field}) — a field-clock is declared as a set with its clock, through declareFieldClock(itemType, clock, fields)`);
       }
+      // …and a union set means nothing without its key, its members' time and its floor
+      if (resolution === RESOLUTION.SET_UNION) {
+        throw new Error(`resolutionRegistry.declare: (${itemType}, ${field}) — a set-union is declared with its key, time and floor, through declareSetUnion(itemType, spec)`);
+      }
       put(itemType, field, resolution);
       return api;
     },
@@ -145,6 +151,35 @@ export function createResolutionRegistry() {
       clockSets.set(itemType, sets);
       for (const f of [clock, ...list]) put(itemType, f, RESOLUTION.FIELD_CLOCK);
       return api;
+    },
+
+    /**
+     * Declare a grow-only SET of `itemType` (`spec.field`, an array of members keyed by `spec.key`, each with its own
+     * time `spec.at`) that merges as a UNION whichever row wins the content merge, pruned by the floor `spec.floor`
+     * (merged by its maximum; members before it are dropped). A union needs no clock, so it cannot be out-clocked; it is
+     * still kept to the own-devices types, like the field-clock (one rule for what a person's devices alone may merge).
+     */
+    declareSetUnion(itemType, spec = {}) {
+      if (typeof itemType !== 'string' || !itemType) throw new Error('resolutionRegistry.declareSetUnion: itemType (string) required');
+      if (!OWN_SCOPE_TYPES.includes(itemType)) {
+        throw new Error(`resolutionRegistry.declareSetUnion: "${itemType}" is not an own-devices type (OWN_SCOPE_TYPES)`);
+      }
+      const { field, key, at, floor } = spec ?? {};
+      for (const [n, v] of Object.entries({ field, key, at, floor })) {
+        if (typeof v !== 'string' || !v) throw new Error(`resolutionRegistry.declareSetUnion: (${itemType}) ${n} (string) required`);
+      }
+      const sets = unionSets.get(itemType) ?? [];
+      if (sets.some((x) => x.field === field)) throw new Error(`resolutionRegistry.declareSetUnion: (${itemType}, ${field}) is already a set-union`);
+      sets.push(Object.freeze({ field, key, at, floor }));
+      unionSets.set(itemType, sets);
+      put(itemType, field, RESOLUTION.SET_UNION);
+      put(itemType, floor, RESOLUTION.SET_UNION);
+      return api;
+    },
+
+    /** The set-union sets declared for `itemType` (`[{ field, key, at, floor }]`, a copy; empty when none). */
+    setUnionsOf(itemType) {
+      return (unionSets.get(itemType) ?? []).map((x) => ({ ...x }));
     },
 
     /** The field-clock sets declared for `itemType` (`[{ clock, fields }]`, a copy; empty when none). */
@@ -194,6 +229,10 @@ export function defaultResolutionRegistry() {
   // the field-clock sets the canonical types declare (the type is where a per-field rule is stated)
   for (const [type, sets] of Object.entries(CANONICAL_FIELD_CLOCKS)) {
     for (const s of sets) r.declareFieldClock(type, s.clock, s.fields);
+  }
+  // …and the grow-only sets they declare (a union, pruned by a shared floor)
+  for (const [type, sets] of Object.entries(CANONICAL_SET_UNIONS)) {
+    for (const s of sets) r.declareSetUnion(type, s);
   }
   return r;
 }

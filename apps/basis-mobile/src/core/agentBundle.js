@@ -48,6 +48,7 @@ import { buildHouseholdDataSource } from '../../../basis/src/household/persist.j
 // Calendar cross-peer fan-out — wrap the bundle callSkill so a successful calendar
 // op fans its invite/RSVP envelopes out over the peer transport (web parity).
 import { withCalendarOutbound } from '../../../basis/src/core/handlers/calendarOutbound.js';
+import { createActState, wrapCallSkillWithActState } from '../../../basis/src/v2/actState.js';
 // OBJ-2 membership — shared joiner-side peer-redeem sender (correlated by the bundle's pending-map).
 import { makeSendGroupRedeemRequest } from '../../../basis/src/core/handlers/groupRedeem.js';
 // personas#2 — post-join "share to this circle" sender (member → admin roster-property push).
@@ -871,7 +872,11 @@ export async function bootAgentBundle(opts = {}) {
   // fans its invite/RSVP envelopes out over the peer transport. Gated on the
   // transport being connected; a no-op otherwise. The hook's snapshot lookups
   // use the raw agent.callSkill (no re-entrancy).
-  const callSkill = withCalendarOutbound(agent.callSkill, {
+  // …and EVERY ACT the person takes paints pending · done · failed through the one shared store (actState.js): the
+  // waist is wrapped once here, so a screen invents no Save feedback of its own and a new act gets it for free. App.js
+  // paints `actState.current` (ActStateBar) and notes the person's touches (`noteInteraction`). web ≡ mobile (circleApp).
+  const actState = createActState();
+  const callSkill = wrapCallSkillWithActState(withCalendarOutbound(agent.callSkill, {
     sendPeer: (addr, payload) =>
       (typeof agent.sendPeerMessage === 'function'
         ? agent.sendPeerMessage(addr, payload)
@@ -879,7 +884,7 @@ export async function bootAgentBundle(opts = {}) {
     // transport-NEUTRAL reachability (NKN OR relay) — not peer.status alone.
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     publishEvent: opts.publishEvent,
-  });
+  }), { store: actState, manifestsByOrigin });
 
   // G11 — wire the no-pod key-event fan's transport (circlePods' sink reads these lazily; the sink only
   // fires on a membership change, e.g. a REMOVE → rotation, so wiring here at boot is always in time).
@@ -989,6 +994,8 @@ export async function bootAgentBundle(opts = {}) {
     catalogue,
     manifestsByOrigin,
     callSkill,
+    /** The shared act state (pending · done · failed of the act the person just took) — App.js paints it. */
+    actState,
     agent,
     reconnectPeer,
     /** The relay this device is on right now (null = none). Read live; do not cache across renders. */

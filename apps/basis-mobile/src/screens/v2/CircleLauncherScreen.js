@@ -2525,7 +2525,9 @@ export default function CircleLauncherScreen({
     const broadcastingStore = {
       ...policyStore,
       update: async (cid, next) => {
-        const r = await policyStore.update(cid, next);
+        // Save says what happened (web parity): the policy save is not an op, so the act strip is told by hand
+        const saving = policyStore.update(cid, next);
+        const r = bundle?.actState?.track ? await bundle.actState.track({ appOrigin: 'basis', opId: 'circle-settings-save' }, saving) : await saving;
         // the saved policy goes on the governance lane — every member, and whoever joins later, catches it up
         circlePolicyLane?.state(cid).catch(() => { /* catch-up reconciles */ });
         return r;

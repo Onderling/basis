@@ -30,6 +30,7 @@ import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
 import RestoreFlowModal from './src/screens/v2/RestoreFlowModal.js';
 import { pendingEnrollOffer, restoreFinishApplies } from '../basis/src/v2/enrollOffer.js';
 import RestoreFinishModal from './src/screens/v2/RestoreFinishModal.js';
+import ActStateBar from './src/rn/ActStateBar.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
@@ -655,7 +656,9 @@ export default function App() {
           stored preference, resolves 'system' against the live OS scheme, and
           re-renders on change — the My-data toggle recolours render-time readers live. */}
       <ThemeProvider>
-      <View style={styles.root}>
+      {/* Every touch is noted for the shared act state (actState.js): only an act begun right after one paints its
+          pending · done · failed — background work through the same waist paints nothing. `false`: the touch goes on. */}
+      <View style={styles.root} onStartShouldSetResponderCapture={() => { bundleRef.current?.actState?.noteInteraction?.(); return false; }}>
         {/* ChatScreen stays mounted (peer-wiring keeps routing
             inbound DMs / mesh) but is visually hidden behind the launcher
             overlay.  No "← chat" route reveals it; chat now lives inside
@@ -698,6 +701,8 @@ export default function App() {
           /* no onBack (no chat shell to fall back to) +
              no onChatRoute (the circle view IS the chat, no route). */
         />
+        {/* The act the person just took: pending · done · failed, one shared strip for every op (web parity: cc-act-state). */}
+        <ActStateBar store={bundle?.actState ?? null} />
         <RestoreFlowModal
           visible={restoreFlowPending && !!bundle}
           callSkill={bundle?.callSkill}

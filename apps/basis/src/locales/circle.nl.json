@@ -10059,6 +10059,10 @@
       "assistant_calendarFeed": {
         "text": "Agenda-abonnement",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_windowDays": {
+        "text": "Hoe lang iets nieuws in je nieuws blijft (dagen)",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {

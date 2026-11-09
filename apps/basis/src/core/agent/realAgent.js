@@ -36,7 +36,7 @@ import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-clie
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
 import { landingEntryFor, landingIdOf, markLandingRemoved } from '../../v2/itemLanding.js';
-import { nextReadMarks, readMarksIdOf } from '../../v2/readMarks.js';
+import { nextReadMarks, readMarksIdOf, NOTIFY_WINDOW_KEY } from '../../v2/readMarks.js';
 import { parseCompanionClaim } from '../../v2/companionClaim.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
@@ -5359,7 +5359,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const selfId = typeof asked === 'string' && asked ? asked : profileIdOf(group);
     const store = await getOwnStore();
     const id = readMarksIdOf(selfId, group);
-    const next = nextReadMarks((await store.get?.(id)) ?? null, { selfId, group, add: read });
+    const next = nextReadMarks((await store.get?.(id)) ?? null, { selfId, group, add: read, windowDays: paramsService.register.valueOf(NOTIFY_WINDOW_KEY) });
     if (!next) return [DataPart({ ok: true, changed: false })];
     const by = (selfId !== 'default' ? personas.get(selfId)?.chatId?.pubKey : null) ?? undefined;
     await store.put(next, by ? { by } : {});

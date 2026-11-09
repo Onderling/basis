@@ -12,16 +12,28 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { buildTilePreviews } from './circleTilePreviews.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 
-/** How long a row of news lives (days); the read marks are kept for twice this. */
-export const NOTIFY_WINDOW_DAYS = param({ key: 'notify.windowDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 });
+/**
+ * How long a row of news lives (days); the read marks are kept for twice this. The person's to change, like every
+ * keeping-time (a setting; the register holds the value, `NOTIFY_WINDOW_DAYS` is its default).
+ */
+export const NOTIFY_WINDOW_KEY = 'notify.windowDays';
+export const NOTIFY_WINDOW_DAYS = param({ key: NOTIFY_WINDOW_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 7 });
 const DAY_MS = 86_400_000;
 
 /** The one row of a self's marks in a group. */
 export const readMarksIdOf = (selfId, group) => `read-marks:${selfId || 'default'}:${group}`;
 
-/** The floor below which marks are dropped, for a device whose clock reads `now`. */
-// whole days, so the floor moves once a day and a mark that adds nothing writes nothing
-export const readMarksFloor = (now = Date.now()) => Math.floor(now / DAY_MS) * DAY_MS - 2 * NOTIFY_WINDOW_DAYS * DAY_MS;
+/**
+ * The floor below which marks are dropped, for a device whose clock reads `now` and whose news window is `windowDays`.
+ * Whole days, so the floor moves once a day and a mark that adds nothing writes nothing. The floor follows the WRITING
+ * device's clock and merges by its maximum: a device whose clock runs days ahead raises it for all the person's devices
+ * by that much, which with a two-window horizon and day rounding drops a few marks early at worst (they read as new
+ * once more, nothing is lost).
+ */
+export const readMarksFloor = (now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS) => {
+  const days = Number.isFinite(windowDays) && windowDays > 0 ? windowDays : NOTIFY_WINDOW_DAYS;
+  return Math.floor(now / DAY_MS) * DAY_MS - 2 * days * DAY_MS;
+};
 
 /**
  * The row after adding marks: the existing marks plus the new ones (by id; a mark keeps its first `at`), the floor
@@ -33,10 +45,11 @@ export const readMarksFloor = (now = Date.now()) => Math.floor(now / DAY_MS) * D
  * @param {string} a.group
  * @param {Array<{id: string, at: number}>} a.add
  * @param {number} [a.now]
+ * @param {number} [a.windowDays]  the person's news window (the register's value)
  */
-export function nextReadMarks(existing, { selfId, group, add = [], now = Date.now() } = {}) {
+export function nextReadMarks(existing, { selfId, group, add = [], now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS } = {}) {
   if (typeof group !== 'string' || !group) return null;
-  const floor = Math.max(Number.isFinite(existing?.prunedBefore) ? existing.prunedBefore : 0, readMarksFloor(now));
+  const floor = Math.max(Number.isFinite(existing?.prunedBefore) ? existing.prunedBefore : 0, readMarksFloor(now, windowDays));
   const byId = new Map();
   for (const m of Array.isArray(existing?.read) ? existing.read : []) if (typeof m?.id === 'string' && m.id) byId.set(m.id, m);
   let added = 0;

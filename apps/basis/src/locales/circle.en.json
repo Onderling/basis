@@ -882,6 +882,10 @@
       "chat-message": {
         "text": "Message",
         "doc": "embeds[] chip type label — chat message."
+      },
+      "lend": {
+        "text": "Lending",
+        "doc": "embeds[] chip type label — lending an item (a noticeboard lend post)."
       }
     }
   },
@@ -4080,52 +4084,6 @@
     "empty": {
       "text": "This agent has no skills yet.",
       "doc": "P1 §5 — empty state for the skill list."
-    }
-  },
-  "chatFilter": {
-    "note": {
-      "text": "This only changes what you see here.",
-      "doc": "P1.7 — the filter strip is a reading preference, not a circle setting."
-    },
-    "last_kind": {
-      "text": "That's the last one — turning it off would leave nothing to read.",
-      "doc": "P1.7 — why the final selected kind-chip is disabled."
-    },
-    "kind": {
-      "chat-message": {
-        "text": "Messages",
-        "doc": "P1.7 — kind chip: plain chat."
-      },
-      "task": {
-        "text": "Tasks",
-        "doc": "P1.7 — kind chip."
-      },
-      "ask": {
-        "text": "Questions",
-        "doc": "P1.7 — kind chip."
-      },
-      "offer": {
-        "text": "Offers",
-        "doc": "P1.7 — kind chip."
-      },
-      "lend": {
-        "text": "Lending",
-        "doc": "P1.7 — kind chip."
-      }
-    },
-    "authors": {
-      "all": {
-        "text": "Everyone",
-        "doc": "P1.7 — author chip: people + agents."
-      },
-      "people": {
-        "text": "People",
-        "doc": "P1.7 — author chip: hide agent chatter (Frits' case)."
-      },
-      "agents": {
-        "text": "Agents",
-        "doc": "P1.7 — author chip: only what the agents said."
-      }
     }
   },
   "rules": {

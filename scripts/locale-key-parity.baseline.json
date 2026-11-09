@@ -2,7 +2,6 @@
   "web": [
     "circle.admin.saving",
     "circle.calendar.invited",
-    "circle.chatFilter.last_kind",
     "circle.contacts.added",
     "circle.contacts.deleted",
     "circle.contacts.lens.failed",

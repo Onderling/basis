@@ -203,11 +203,6 @@ import {
 import { createFallbackOffer, fallbackOfferStateIo } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/pinboard';
 import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
-// P1.7 — the VIEWER's own narrowing of the conversation (kinds × people/agents), device-local per
-// circle. The circle's conversationKinds stays the ceiling; this only narrows within it.
-import {
-  applyChatFilter, chatFilterChips, normalizeChatFilter, localStorageChatFilterIo,
-} from '../../src/v2/chatFilter.js';
 // key management: reuse the existing restore wizard
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
@@ -1161,9 +1156,6 @@ const circlePolicyLane = makeCirclePolicyLane({
 // localStorage now; pod io can swap in later without touching callers.
 const recipeStore = localCircleRecipeStore();   // sealed at rest, the recipe and its versions
 
-// P1.7 — the viewer's per-circle chat filter (device-local; nothing is fanned — a filter that told the
-// circle what you skip would be a new leak).
-const chatFilterIo = localStorageChatFilterIo();
 /** This device's global address, or null when the user refuses to publish it. Read per call —
  *  the LIVE register value (the device-params consolidation; pre-boot reads serve the default). */
 const myShareableNknAddr = () => shareableAddress(
@@ -1171,23 +1163,6 @@ const myShareableNknAddr = () => shareableAddress(
   () => circleHouseholdAgent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false,
 );
 
-// Which actors are AGENTS, for the filter's people/agents axis. Read off the Contacten roster the app
-// already keeps (bots are flagged there), refreshed opportunistically; an actor we cannot resolve counts
-// as a PERSON, so an unknown never disappears from someone's conversation.
-let _agentActors = new Set();
-function refreshAgentActors() {
-  loadAllContacts()
-    .then((rows) => {
-      _agentActors = new Set(
-        (rows ?? []).filter((r) => r?.isBot)
-          .flatMap((r) => [r.contactId, r.peerAddr].filter(Boolean)),
-      );
-    })
-    .catch(() => { /* keep the previous set — a roster hiccup must not reshape a conversation */ });
-}
-function isAgentActorInCircle(actor) {
-  return actor != null && _agentActors.has(actor);
-}
 // D1 (§5A) — per-circle action-frequency counter (the quickActions row).
 // Hydrated from localStorage at boot; persists its snapshot on every bump.
 const ACTION_FREQ_KEY = 'cc.actionFrequency';
@@ -7775,45 +7750,33 @@ function showCircle(id, circle, policy) {
       circleSetting: policy?.conversationKinds ?? circle?.conversationKinds ?? null,
       templateKind:  policy?.kind ?? circle?.kind ?? null,
     });
-    // The reader's own filter on top (Frits: "everything should be filterable, even chat itself").
-    // An agent's rows are identified through the Contacten roster the host already holds — this module
-    // owns no roster, and an unresolvable actor counts as a person (never hide people).
-    const viewerFilter = normalizeChatFilter(chatFilterIo.load(id), kinds);
     const rows = withDelivery(
-      applyChatFilter({
-        rows: chatRows({
-          events:    eventLog.query({ excludeMuted: true }),
-          circles:   circlesCache,
-          circleId:  id,
-          kinds,
-          // Membership + governance notices ("you were removed", "you are now an admin", "X joined", "a
-          // decision opened") are RENDERED from the statements on the log by the shared projection; the
-          // translator is what lets it phrase them, and `wants` is the person's per-kind setting (decision 4:
-          // the circle's default, overridden privately).
-          t,
-          wants: noticeWants({ policy, override: _openOverride }),
-          // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
-          excludeActors: circleMutedActors,
-          // Sender labels through the reveal ladder (batch 4): the roster is the authority; the
-          // projector stamps `senderLabel`/`senderLabelKey`, the renderer only paints. `circleRoster`
-          // is null until `loadRoster()` (kicked at open) resolves — rows stay unstamped and the
-          // bubbles show no label for that window, never a wire-claimed name.
-          members:  circleRoster,
-          viewerId: myWebid || null,
-          policy:   policy?.revealPolicy ?? 'pairwise',
-        }),
-        filter: viewerFilter,
-        allowedKinds: kinds,
-        isAgentActor: isAgentActorInCircle,
+      chatRows({
+        events:    eventLog.query({ excludeMuted: true }),
+        circles:   circlesCache,
+        circleId:  id,
+        kinds,
+        // Membership + governance notices ("you were removed", "you are now an admin", "X joined", "a
+        // decision opened") are RENDERED from the statements on the log by the shared projection; the
+        // translator is what lets it phrase them, and `wants` is the person's per-kind setting (decision 4:
+        // the circle's default, overridden privately).
+        t,
+        wants: noticeWants({ policy, override: _openOverride }),
+        // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
+        excludeActors: circleMutedActors,
+        // Sender labels through the reveal ladder (batch 4): the roster is the authority; the
+        // projector stamps `senderLabel`/`senderLabelKey`, the renderer only paints. `circleRoster`
+        // is null until `loadRoster()` (kicked at open) resolves — rows stay unstamped and the
+        // bubbles show no label for that window, never a wire-claimed name.
+        members:  circleRoster,
+        viewerId: myWebid || null,
+        policy:   policy?.revealPolicy ?? 'pairwise',
       }),
       deliveryByMessageId,
     );
     renderCircleView(rootEl, {
       noRelay: !_relayKnownNow,
       circle, rows, t,
-      // P1.7 — the chip model is shared; the shell only renders it and persists the tap.
-      chatFilter: { ...chatFilterChips({ allowedKinds: kinds, filter: viewerFilter }), filter: viewerFilter },
-      onChatFilter: (nextFilter) => { chatFilterIo.save(id, nextFilter); rerender(); },
       // §8 — report another member's message to the admins (a governance `message` report).
       onReportMessage: (msgId, row) => {
         const reason = (globalThis.prompt?.(t('circle.governance.report_reason_prompt')) ?? '') || '';
@@ -10010,7 +9973,6 @@ async function boot() {
   try {
     circlesCache = await loadLauncherCircles();
     registerCirclePresence();   // G13 — the connect-time call may have run before circles were known
-    refreshAgentActors();       // P1.7 — populate the people/agents axis (best-effort, non-blocking)
   } catch (err) {
     console.warn('[circleApp] loadCircles failed', err);
     circlesCache = [];

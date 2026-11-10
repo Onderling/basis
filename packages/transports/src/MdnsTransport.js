@@ -61,6 +61,16 @@ export const helloChallengeMessage = (nD, nL, L, D) => `${HELLO_DOMAIN}|challeng
  */
 export const helloProofMessage = (nD, nL, D, L) => `${HELLO_DOMAIN}|proof|${nD}|${nL}|${D}|${L}`;
 const HANDSHAKE_MS = 10_000;
+/**
+ * A rest key: a random Ed25519 identity for one network visit, in memory only (its vault is a Map that dies with it),
+ * tied to no self and never registered with any security layer, so nothing the agent signs is ever sent as it.
+ */
+async function drawRestKey() {
+  const seed = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(seed);
+  const m = new Map();
+  return AgentIdentity.fromSeed(seed, { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); } });
+}
 function freshNonce() {
   const b = new Uint8Array(24);
   globalThis.crypto.getRandomValues(b);
@@ -102,8 +112,15 @@ export const SERVICE_TYPE = '_onderling';
 
 export class MdnsTransport extends Transport {
   #hostname;
-  #pubKey;
-  #identity;
+  // THE LAN KEY. Everything this transport says on the LAN (the TXT record, the host name, the hello and its
+  // signatures) is said under this key, never under the agent's identity: a room key while a room is open, a rest key
+  // otherwise (random, drawn per network visit, held in memory only, tied to no self).
+  #lanKey;
+  #lan;
+  #lanPinned = false;
+  #fixedHostname;
+  #hostnamePrefix;
+  #applied = null;
   #native;
   #emitter;
 
@@ -134,20 +151,25 @@ export class MdnsTransport extends Transport {
   /**
    * @param {object} opts
    * @param {import('@onderling/core').AgentIdentity} opts.identity
-   * @param {string} [opts.hostname]  — mDNS service name (defaults to pubKey slice)
+   *   The agent's identity: the transport's address in the router. It is never said on the LAN.
+   * @param {import('@onderling/core').AgentIdentity} [opts.lanIdentity] — a LAN key to start with (a room key);
+   *   without one the transport draws a rest key when it first starts
+   * @param {string} [opts.hostname]  — a FIXED mDNS service name (a box that is a fixed place may want one); without
+   *   it the name is `<hostnamePrefix>-<LAN key slice>`, so the name changes with the LAN key and never links visits
+   * @param {string} [opts.hostnamePrefix='dw']
    * @param {object} opts.native      — the backend (see the contract above)
    * @param {{addListener:Function}} opts.emitter — the backend's event source
    */
-  constructor({ identity, hostname = null, native = null, emitter = null }) {
+  constructor({ identity, lanIdentity = null, hostname = null, hostnamePrefix = 'dw', native = null, emitter = null }) {
     if (!identity) throw new Error('MdnsTransport requires identity');
     if (!native || !emitter) throw new Error(
       'MdnsTransport: a `native` backend and an `emitter` are required. On Android construct the subclass '
       + 'from @onderling/react-native, which injects the MdnsModule native module.'
     );
     super({ address: identity.pubKey, identity });
-    this.#pubKey   = identity.pubKey;
-    this.#identity = identity;
-    this.#hostname = hostname ?? `dw-${identity.pubKey.slice(0, 8)}`;
+    this.#fixedHostname  = hostname;
+    this.#hostnamePrefix = hostnamePrefix;
+    if (lanIdentity) { this.#setLan(lanIdentity); this.#lanPinned = true; }
     this.#native   = native;
     this.#emitter  = emitter;
     // THE SENDER IS THE KEY THE CONNECTION PROVED. The challenged hello proves who is on the other end; a frame's
@@ -167,14 +189,45 @@ export class MdnsTransport extends Transport {
   /** Frames dropped because their `_from` was not the key their connection proved. */
   get refusedSenders() { return this.#refusedSenders; }
 
+  /** The key this transport speaks on the LAN right now (null before the first start draws a rest key). */
+  get lanAddress() { return this.#lanKey ?? null; }
+
+  #setLan(identity) {
+    this.#lan      = identity;
+    this.#lanKey   = identity.pubKey;
+    this.#hostname = this.#fixedHostname ?? `${this.#hostnamePrefix}-${identity.pubKey.slice(0, 8)}`;
+  }
+
+  /** A rest key for this network visit, unless a LAN key is pinned (a room). */
+  async #lanReady() {
+    if (!this.#lan) this.#setLan(await drawRestKey());
+  }
+
+  /**
+   * Speak on the LAN under `identity` (a room key) from now on, or, with `null`, under a fresh rest key. A key change
+   * is a new presence: every LAN connection is dropped (each was proven under the old key) and the discoverability
+   * that was applied is applied again under the new key.
+   * @param {import('@onderling/core').AgentIdentity|null} identity
+   */
+  async useLanIdentity(identity = null) {
+    const state = this.#applied;
+    await this.disconnect();
+    this.#lan = null;
+    this.#lanPinned = !!identity;
+    if (identity) this.#setLan(identity);
+    else await this.#lanReady();
+    if (state && state !== DISCOVERABILITY.OFF) await this._applyDiscoverability(state);
+  }
+
   async connect() {
     if (this.#started) return;
+    await this.#lanReady();
     this.#started = true;
     this.#setupEvents();
     console.log('[MdnsTransport] starting service:', this.#hostname, 'type:', SERVICE_TYPE);
     // Time-box the native start so a missing WiFi interface doesn't hang agent.start().
     await Promise.race([
-      this.#native.start(SERVICE_TYPE, this.#hostname, this.#pubKey),
+      this.#native.start(SERVICE_TYPE, this.#hostname, this.#lanKey),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error('MdnsTransport: start timed out (WiFi off?)')), 6_000)
       ),
@@ -207,6 +260,7 @@ export class MdnsTransport extends Transport {
 
   /** @protected */
   async _applyDiscoverability(state) {
+    this.#applied = state;
     if (state === DISCOVERABILITY.OFF) {
       await this.disconnect();
       return DISCOVERABILITY.OFF;
@@ -225,12 +279,13 @@ export class MdnsTransport extends Transport {
       return DISCOVERABILITY.PUBLISH;
     }
 
+    await this.#lanReady();
     this.#setupEvents();
     await this.#native.startDiscovery(SERVICE_TYPE);
     this.#started = true;
 
     if (state === DISCOVERABILITY.PUBLISH) {
-      await this.#native.startAdvertising(SERVICE_TYPE, this.#hostname, this.#pubKey);
+      await this.#native.startAdvertising(SERVICE_TYPE, this.#hostname, this.#lanKey);
       this.#advertising = true;
       return DISCOVERABILITY.PUBLISH;
     }
@@ -254,6 +309,8 @@ export class MdnsTransport extends Transport {
    * short-circuits. Tearing down first is what makes the re-announce actually reach the new network.
    */
   async _reannounce(state) {
+    // A new network is a new visit: an unpinned LAN key is drawn again, so two networks never see one key.
+    if (!this.#lanPinned) { await this.useLanIdentity(null); return this._applyDiscoverability(state); }
     // With the split we can re-publish the service record without touching the data plane — so a Wi-Fi
     // change no longer costs you the connections you already have. Without it, a full restart is the only
     // way to get past `connect()`'s `#started` short-circuit.
@@ -283,6 +340,10 @@ export class MdnsTransport extends Transport {
     this.#pubKeyToConn.clear();
     this.#pending.clear();
     this.#lastActivity.clear();
+    // a handshake in flight was proven under the key being left: it ends here, and its peer may be dialled again
+    for (const hs of this.#handshakes.values()) clearTimeout(hs.timer);
+    this.#handshakes.clear();
+    this.#dialling.clear();
   }
 
   get _pubKeyToConn() { return this.#pubKeyToConn; }
@@ -370,7 +431,7 @@ export class MdnsTransport extends Transport {
       // Peer discovered via mDNS — apply tiebreaker before connecting
       this.#emitter.addListener('MdnsServiceDiscovered', async ({ host, port, pubKey }) => {
         console.log('[MdnsTransport] ServiceDiscovered:', pubKey?.slice(0,12), host, port);
-        if (pubKey === this.#pubKey) { console.log('[MdnsTransport] skipping self'); return; }
+        if (pubKey === this.#lanKey) { console.log('[MdnsTransport] skipping self'); return; }
         // Mapped already: leave a live connection alone — a re-announcement is not a reason for a second socket. But a
         // mapped connection that has gone SILENT past the freshness window may be a dead socket to a peer that
         // restarted (its close can take minutes to reach us), and that peer, now the responder, waits for our dial:
@@ -383,7 +444,7 @@ export class MdnsTransport extends Transport {
         // duplicate sockets, and that can only happen if they can each discover the other. In ghost mode
         // nobody can discover us, so deferring to the peer means waiting for a connection that will never
         // come: we would list the room and connect to only the half of it that sorts above us.
-        if (this.#advertising && this.#pubKey > pubKey) {
+        if (this.#advertising && this.#lanKey > pubKey) {
           console.log('[MdnsTransport] responder side, waiting for inbound');
           return;
         }
@@ -397,7 +458,7 @@ export class MdnsTransport extends Transport {
           // NOT keyed yet: the TXT record's pubKey is a claim until the listener signs our nonce with it
           const nonce = freshNonce();
           this.#startHandshake(connId, { role: 'dialler', peer: pubKey, nonce });
-          await this.#sendFrame(connId, { _mdns_hello: true, _from: this.#pubKey, nonce });
+          await this.#sendFrame(connId, { _mdns_hello: true, _from: this.#lanKey, nonce });
         } catch (err) {
           this.#dialling.delete(pubKey);
           console.warn('[MdnsTransport] connect/hello failed:', err?.message);
@@ -506,19 +567,19 @@ export class MdnsTransport extends Transport {
     // listener: a hello on an inbound connection → challenge it, prove ourselves
     if (f._mdns_hello && this.#pending.has(connId) && !hs) {
       const claimed = typeof f._from === 'string' ? f._from : null;
-      if (!claimed || claimed === this.#pubKey || typeof f.nonce !== 'string') { this.#refuse(connId); return; }
+      if (!claimed || claimed === this.#lanKey || typeof f.nonce !== 'string') { this.#refuse(connId); return; }
       const nonce = freshNonce();
       this.#startHandshake(connId, { role: 'listener', peer: claimed, nonce, theirNonce: f.nonce });
-      const sig = sigB64(this.#identity.sign(helloChallengeMessage(f.nonce, nonce, this.#pubKey, claimed)));
-      this.#sendFrame(connId, { _mdns_challenge: true, _from: this.#pubKey, nonce, sig }).catch(() => this.#refuse(connId));
+      const sig = sigB64(this.#lan.sign(helloChallengeMessage(f.nonce, nonce, this.#lanKey, claimed)));
+      this.#sendFrame(connId, { _mdns_challenge: true, _from: this.#lanKey, nonce, sig }).catch(() => this.#refuse(connId));
       return;
     }
     // dialler: the listener proved its key → key the connection, prove ours
     if (f._mdns_challenge && hs?.role === 'dialler') {
-      const ok = f._from === hs.peer && typeof f.nonce === 'string' && verifies(helloChallengeMessage(hs.nonce, f.nonce, f._from, this.#pubKey), f.sig, f._from);
+      const ok = f._from === hs.peer && typeof f.nonce === 'string' && verifies(helloChallengeMessage(hs.nonce, f.nonce, f._from, this.#lanKey), f.sig, f._from);
       if (!ok) { console.warn('[MdnsTransport] listener did not prove', String(hs.peer).slice(0, 12)); this.#refuse(connId); return; }
       this.#endHandshake(connId);
-      const sig = sigB64(this.#identity.sign(helloProofMessage(hs.nonce, f.nonce, this.#pubKey, hs.peer)));
+      const sig = sigB64(this.#lan.sign(helloProofMessage(hs.nonce, f.nonce, this.#lanKey, hs.peer)));
       this.#sendFrame(connId, { _mdns_proof: true, sig }).catch(() => {});
       const previous = this.#pubKeyToConn.get(hs.peer);
       this.#registerConn(connId, hs.peer);
@@ -527,7 +588,7 @@ export class MdnsTransport extends Transport {
     }
     // listener: the dialler proved its key → key the connection
     if (f._mdns_proof && hs?.role === 'listener') {
-      if (!verifies(helloProofMessage(hs.theirNonce, hs.nonce, hs.peer, this.#pubKey), f.sig, hs.peer)) {
+      if (!verifies(helloProofMessage(hs.theirNonce, hs.nonce, hs.peer, this.#lanKey), f.sig, hs.peer)) {
         console.warn('[MdnsTransport] dialler did not prove', String(hs.peer).slice(0, 12)); this.#refuse(connId); return;
       }
       this.#endHandshake(connId);

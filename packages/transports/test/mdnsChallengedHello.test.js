@@ -24,7 +24,7 @@ describe('the challenged hello', () => {
   const peer = async (discovery, identity) => {
     identity ??= await ident();
     const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
-    const t = new MdnsTransport({ identity, native, emitter });
+    const t = new MdnsTransport({ identity, lanIdentity: identity, native, emitter });   // the LAN key pinned to a known key: this exercises the hello, not the key choice
     open.push(t);
     return { identity, transport: t };
   };
@@ -85,7 +85,7 @@ describe('a challenge is never a proof', () => {
   afterEach(async () => { for (const t of open.splice(0)) await t.disconnect?.().catch?.(() => {}); });
   const peer = async (discovery, identity) => {
     const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
-    const t = new MdnsTransport({ identity, native, emitter });
+    const t = new MdnsTransport({ identity, lanIdentity: identity, native, emitter });   // the LAN key pinned to a known key: this exercises the hello, not the key choice
     open.push(t);
     return t;
   };

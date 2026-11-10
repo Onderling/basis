@@ -23,7 +23,7 @@ describe('mDNS sender binding', () => {
   afterEach(async () => { for (const t of open.splice(0)) await t.disconnect?.().catch?.(() => {}); });
   const device = async (discovery, identity) => {
     const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
-    const t = new MdnsTransport({ identity, native, emitter });
+    const t = new MdnsTransport({ identity, lanIdentity: identity, native, emitter });   // the LAN key pinned to a known key: this exercises the hello, not the key choice
     open.push(t);
     await t.connect();
     return t;

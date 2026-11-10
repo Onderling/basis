@@ -90,7 +90,7 @@ describe('MdnsTransport', () => {
     h.native.close.mockClear();
     h.listeners.clear();
     identity     = await AgentIdentity.generate(new VaultMemory());
-    transport    = new MdnsTransport({ identity });
+    transport    = new MdnsTransport({ identity, lanIdentity: identity });   // LAN key pinned: these exercise the hello
     // real remote identities — a hello is now proven by a signature, so a made-up key cannot answer
     do { hiId = await AgentIdentity.generate(new VaultMemory()); } while (!(hiId.pubKey > identity.pubKey));
     do { loId = await AgentIdentity.generate(new VaultMemory()); } while (!(loId.pubKey < identity.pubKey));

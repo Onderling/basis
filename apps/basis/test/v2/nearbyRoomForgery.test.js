@@ -34,7 +34,7 @@ describe('the Nearby room against a forging neighbour', () => {
       cleanups.push(() => sa.shutdown());
       const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
       // the full chat identity (it signs the LAN handshake) — what the mobile bundle builds its mDNS from
-      const mdns = new MdnsTransport({ identity: sa.agent.identity, native, emitter });
+      const mdns = new MdnsTransport({ identity: sa.agent.identity, lanIdentity: sa.agent.identity, native, emitter });   // pinned until the room speaks as its room key
       await sa.addSecureTransport('mdns', mdns);
       return { name, sa, mdns, key: sa.identity.pubKey };
     };

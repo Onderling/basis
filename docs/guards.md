@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 69
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 70
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -73,6 +73,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `switch-names-its-setting` | — | EVERY SWITCH NAMES WHAT IT SETS. A switch a person can flip that changes nothing is a promise unkept |
 | `theme-tokens` | — | the web design system's drift guards (theme.css regenerates clean; circle.css uses only defined tokens; no … |
 | `typed-commands-reachable` | — | a command a person can TYPE must have a door, in both shells |
+| `ui-copy-dashes` | — | UI COPY IS PLAIN SENTENCES: NO DASH CONSTRUCTIONS |
 | `unbound-names` | — | a Node entry point uses no name that nothing defines |
 | `unconstructed-classes` | — | an exported class that nothing ever `new`s is a liability, not an asset |
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |

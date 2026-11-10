@@ -8069,7 +8069,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (opId === 'shareTargets') return shareTargets();
       const handler = ops[opId];
       if (!handler) return { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
-      const res = await handler(args ?? {});
+      // written AS the self the call is made as (the waist's `actAs`, checked above), as an own note is: it rides that
+      // self's own lane and its row names that self as the maker; a call made as nobody in particular stays the general 'me'
+      const asSelf = actorOf(ctx);
+      const res = await handler(asSelf ? { ...(args ?? {}), actor: asSelf } : (args ?? {}));
       if (res?.ok !== false && (opId === 'updateEvent' || opId === 'cancelEvent')) {
         // the appointment the op resolved (it may have been named by its words)
         try { await reshareOwnEvent(res?.itemId ?? args?.id); } catch (err) { console.warn('[calendar] re-share failed:', err?.message ?? err); }

@@ -108,7 +108,7 @@ describe('who may speak at one of our per-circle addresses', () => {
     auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [member('anna')] });
 
     expect(auth.authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: false, reason: SENDER_REASON.STRANGER });
+      .toMatchObject({ allow: false, stale: true, reason: SENDER_REASON.STRANGER });   // held under the circle, judged once more after a re-read
     expect(auth.refusedStrangers).toBe(1);
   });
 
@@ -264,7 +264,7 @@ describe('ADVERSARIAL — the three ways someone tries to speak in a circle they
 
   it('a stranger is refused, however well they sign', () => {
     expect(auth().authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: false, reason: SENDER_REASON.STRANGER });
+      .toMatchObject({ allow: false, stale: true, reason: SENDER_REASON.STRANGER });
   });
 
   it('a member of circle A is refused in circle B — with EITHER of their keys', () => {
@@ -296,26 +296,42 @@ describe('what it deliberately does NOT refuse', () => {
       .toEqual({ allow: true, reason: SENDER_REASON.NOT_CIRCLE_SCOPED });
   });
 
-  it('an address whose roster we have NEVER read passes, and says so in a number', () => {
-    // THE HONEST DEGRADATION. Refusing here would mean a circle whose roster read has not happened
-    // yet — a cold boot, a circle never opened, a failed skill call — silently drops every message
-    // from every member, which is indistinguishable from the app being broken. So the rule is
-    // "refuse whenever a roster IS known", never on the strength of not knowing.
+  it('a CIRCLE address whose roster we have never read is REFUSED (and counted); a roster read makes it a member check', () => {
+    // Decided 2026-11-10 (the decisions review): the old honest degradation let any signed sender into a circle whose
+    // roster this device had not read. The circle's address is noted when its identity is installed (before any
+    // roster), so "a circle with no roster yet" is known as such and refused; the roster read turns it into the member
+    // check.
     const warned = [];
     const auth = createCircleSenderAuthorization({ onUnknownRoster: (i) => warned.push(i) });
+    auth.noteCircleAddress('circle-a', 'ours-in-circle-a');
+    expect(auth.authorizeSender({ senderKey: 'anybody', ownAddress: 'ours-in-circle-a' }))
+      .toEqual({ allow: false, stale: true, reason: SENDER_REASON.ROSTER_UNKNOWN, bucket: 'circle-a' });
+    expect(auth.unknownRosterRefusals).toBe(1);
+    expect(warned).toEqual([{ ownAddress: 'ours-in-circle-a' }]);
+    auth.recordCircleRoster({ circleId: 'circle-a', ownAddress: 'ours-in-circle-a', members: [provenMember('anna')] });
+    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: 'ours-in-circle-a' }).allow).toBe(true);
+  });
 
-    expect(auth.authorizeSender({ senderKey: 'anybody', ownAddress: 'ours-in-a-circle-we-never-read' }))
-      .toEqual({ allow: true, reason: SENDER_REASON.ROSTER_UNKNOWN });
-    expect(auth.unknownRosterAllowances).toBe(1);
-    expect(warned).toEqual([{ ownAddress: 'ours-in-a-circle-we-never-read' }]);
+  it('an address of ours that is NOT a circle address (a device address, a person key) is not circle traffic', () => {
+    const auth = createCircleSenderAuthorization();
+    expect(auth.authorizeSender({ senderKey: 'a-sibling', ownAddress: 'my-device-address' }))
+      .toEqual({ allow: true, reason: SENDER_REASON.NOT_CIRCLE_SCOPED });
+  });
+
+  it('a circle forgotten (left) is no longer a circle address', () => {
+    const auth = createCircleSenderAuthorization();
+    auth.noteCircleAddress('circle-a', 'ours-in-circle-a');
+    auth.forgetCircleSenders('circle-a');
+    expect(auth.authorizeSender({ senderKey: 'x', ownAddress: 'ours-in-circle-a' }).reason).toBe(SENDER_REASON.NOT_CIRCLE_SCOPED);
   });
 
   it('the unknown-roster warning fires ONCE per address, not once per envelope', () => {
     const warned = [];
     const auth = createCircleSenderAuthorization({ onUnknownRoster: (i) => warned.push(i) });
+    auth.noteCircleAddress('c', 'unread');
     for (let i = 0; i < 5; i++) auth.authorizeSender({ senderKey: 'x', ownAddress: 'unread' });
     expect(warned.length).toBe(1);
-    expect(auth.unknownRosterAllowances).toBe(5);   // the COUNT is per envelope; the noise is not
+    expect(auth.unknownRosterRefusals).toBe(5);   // the COUNT is per envelope; the noise is not
   });
 });
 

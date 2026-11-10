@@ -98,6 +98,9 @@ export const SEC = Object.freeze({
   SENDER_NOT_BOUND:       'SENDER_NOT_BOUND',
   // …and a valid signature by a key no roster vouches for is a valid signature from a stranger.
   SENDER_NOT_AUTHORIZED:  'SENDER_NOT_AUTHORIZED',
+  // The authorizer cannot vouch for the sender YET (its snapshot may be behind): the error carries the authorizer's
+  // opaque `bucket`, and the envelope's dedup entry is released, so the host may hold it and judge it once more.
+  SENDER_STALE:           'SENDER_STALE',
 });
 
 /**
@@ -614,11 +617,21 @@ export class SecurityLayer {
       senderKey,
       from:        env._from,
       to:          env._to,
+      // which envelope: a stale verdict is asked again for the same envelope at its re-judge, so a counter can count
+      // envelopes, not verdicts
+      id:          env._id,
       ownAddress:  this.ownAddressFor(env._to),
       pattern:     env._p,
       // a HI that answers one (`_re`) is the peer's reciprocal; a HI without is their first contact
       answering:   !!env._re || env?.payload?.ack === true,
     });
+    if (!verdict.allow && verdict.stale) {
+      this.#dedup.delete(env._id);   // so the same verified envelope can be judged again, once
+      throw Object.assign(new SecurityError(
+        SEC.SENDER_STALE,
+        `Envelope ${env._id} is validly signed by a key that cannot be vouched for yet (${verdict.reason})`,
+      ), { bucket: verdict.bucket });
+    }
     if (!verdict.allow) {
       this.#refusedUnauthorized += 1;
       throw new SecurityError(

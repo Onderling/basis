@@ -91,7 +91,7 @@ export { SecurityLayer, SecurityError, SEC } from './security/SecurityLayer.js';
 // port the kernel calls and never implements (kernel vs substrate).
 export { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCredential, isEd25519PubKey }
   from './security/senderKey.js';
-export { SENDER_AUTHORIZATION, allowSender, refuseSender, askSenderAuthorizer }
+export { SENDER_AUTHORIZATION, allowSender, refuseSender, staleSender, askSenderAuthorizer }
   from './security/senderAuthorization.js';
 // The internal bus's roster: an in-process layer admits exactly the keys it adopted (`adoptInProcessPeer`).
 export { createInProcessSenderAuthorizer, IN_PROCESS_SENDER }

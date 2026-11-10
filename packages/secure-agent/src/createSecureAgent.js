@@ -222,6 +222,10 @@ function isApplicationError(err) {
 // and a send held from it re-flushes at each of these delays before falling back to the presence flush.
 const YOUNG_ADDRESS_WINDOW_MS = param({ key: 'secureAgent.youngAddressWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: Object.freeze([2_000, 5_000, 10_000]) });
+/** How many stale envelopes one bucket (a circle) may hold while its sender check is refreshed; the oldest goes first. */
+const STALE_PARK_MAX = param({ key: 'secureAgent.staleParkMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
+/** How long a parked stale envelope waits for a refreshed sender check before its bucket is judged once more. */
+const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now
@@ -1413,6 +1417,59 @@ export async function createSecureAgent(opts = {}) {
    *                     RelayTransport, ...) with .on('envelope', …)
    *                     and .sendHello(addr, payload).
    */
+  // ── PARKED, NOT DROPPED, NOT DELIVERED ───────────────────────────────────────────────────────────────────────────
+  // When the sender authorizer answers "stale" (it cannot vouch for this sender YET), the verified envelope waits here
+  // under the authorizer's opaque bucket: no app handler, no ack, no receipt (the transport refused it before any of
+  // those). The host is told (`onParked`) so it can refresh its snapshot, and the bucket is re-judged EXACTLY ONCE when
+  // the host says so (`rejudgeParked`) or at the time limit: accepted → delivered in arrival order; still not → dropped
+  // and counted, never parked a second time. Bounded per bucket, the oldest dropped first; one bucket cannot crowd out
+  // another.
+  const parkOpts = opts.parkStale ?? {};
+  const PARK_MAX = Number.isInteger(parkOpts.max) && parkOpts.max > 0 ? parkOpts.max : STALE_PARK_MAX;
+  const PARK_TTL_MS = Number.isFinite(parkOpts.ttlMs) && parkOpts.ttlMs > 0 ? parkOpts.ttlMs : STALE_PARK_TTL_MS;
+  const parked = new Map();          // bucket → { items: [{ tx, raw }], timer }
+  const rejudging = new Set();       // envelope ids being judged the second (last) time
+  const refusedAtRejudge = new Set(); // …and those of them the second judgement refused (any security error)
+  const parkStats = { parked: 0, droppedOverflow: 0, droppedAfterRejudge: 0, deliveredAfterRejudge: 0 };
+  let onParkedFn = typeof parkOpts.onParked === 'function' ? parkOpts.onParked : null;
+  function parkStale(tx, raw, bucket) {
+    const id = raw?._id;
+    if (typeof bucket !== 'string' || !bucket || typeof id !== 'string') return;
+    if (rejudging.has(id)) { parkStats.droppedAfterRejudge += 1; return; }   // the one second chance is spent
+    let b = parked.get(bucket);
+    if (!b) {
+      b = { items: [], timer: setTimeout(() => rejudgeParked(bucket), PARK_TTL_MS) };
+      b.timer.unref?.();
+      parked.set(bucket, b);
+    }
+    if (b.items.some((it) => it.raw?._id === id)) return;   // the same envelope twice (a relay redelivery)
+    b.items.push({ tx, raw });
+    parkStats.parked += 1;
+    while (b.items.length > PARK_MAX) { b.items.shift(); parkStats.droppedOverflow += 1; }
+    try { onParkedFn?.(bucket); } catch { /* the host's refresh is best-effort; the time limit still re-judges */ }
+  }
+  /** Judge a bucket's parked envelopes once more, in arrival order. */
+  function rejudgeParked(bucket) {
+    const b = parked.get(bucket);
+    if (!b) return 0;
+    parked.delete(bucket);
+    clearTimeout(b.timer);
+    for (const { tx, raw } of b.items) {
+      rejudging.add(raw._id);
+      const before = parkStats.droppedAfterRejudge;
+      let threw = false;
+      try { tx._receive(raw); } catch { threw = true; /* a transport that throws on receive refuses the envelope */ }
+      rejudging.delete(raw._id);
+      const refused = refusedAtRejudge.delete(raw._id) || threw;
+      // stale a second time is counted where it is refused (`parkStale`); refused outright is counted here; only an
+      // envelope no security error stopped counts as delivered
+      if (parkStats.droppedAfterRejudge !== before) continue;
+      if (refused) parkStats.droppedAfterRejudge += 1;
+      else parkStats.deliveredAfterRejudge += 1;
+    }
+    return b.items.length;
+  }
+
   function makeReceiveHandler(tx) {
     // Auto-wire SecurityLayer so every outbound envelope is signed
     // + nacl.box encrypted with a per-peer shared secret.  HI stays
@@ -1424,6 +1481,8 @@ export async function createSecureAgent(opts = {}) {
     // unknown sender, a bad signature, an oversize frame — reached no listener at all, and "refused"
     // was indistinguishable from "never arrived". Same event, same place an app already listens.
     tx.on('security-error', (err, raw) => {
+      if (typeof raw?._id === 'string' && rejudging.has(raw._id)) refusedAtRejudge.add(raw._id);
+      if (err?.code === 'SENDER_STALE') { parkStale(tx, raw, err.bucket); return; }
       try { agent.emit('security-error', err, raw); } catch { /* a listener that throws must not take the receive path down */ }
     });
     // bilateral HI auto-handshake on receive.  When we
@@ -2917,6 +2976,14 @@ export async function createSecureAgent(opts = {}) {
     /** Diagnostic: the addresses this device holds an identity of its own for. */
     get selfIdentityAddresses() { return agent.security?.selfAddresses ?? []; },
 
+    /** Judge one bucket's parked envelopes once more (the host refreshed its snapshot). Returns how many. */
+    rejudgeParked: (bucket) => rejudgeParked(bucket),
+    /** How many envelopes wait in one bucket right now. */
+    parkedCount: (bucket) => parked.get(bucket)?.items.length ?? 0,
+    /** Parking counters: parked, droppedOverflow, droppedAfterRejudge, deliveredAfterRejudge. */
+    get parkStats() { return { ...parkStats }; },
+    /** The host's hook: an envelope was parked under `bucket` (refresh the snapshot, then `rejudgeParked`). */
+    onParked(fn) { onParkedFn = typeof fn === 'function' ? fn : null; },
     /**
      * Decision 1 step 3 — install the ROSTER AUTHORIZE step.
      *

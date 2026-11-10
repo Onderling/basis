@@ -56,6 +56,18 @@ export function refuseSender(reason) {
 }
 
 /**
+ * The sender cannot be vouched for YET: the implementation's snapshot may be behind (a roster not read, a member not on
+ * the roster that was read). `SecurityLayer` turns this into a `SENDER_STALE` refusal carrying `bucket`, an opaque
+ * handle the HOST uses to hold the envelope and judge it again once its snapshot is fresher. The kernel never reads it.
+ * @param {string} reason
+ * @param {string} bucket
+ * @returns {{allow: false, stale: true, reason: string, bucket: string}}
+ */
+export function staleSender(reason, bucket) {
+  return { allow: false, stale: true, reason: String(reason ?? 'stale'), bucket: String(bucket ?? '') };
+}
+
+/**
  * Ask an injected authorizer about one envelope, and normalise whatever comes back.
  *
  * Synchronous by construction: the receive path it sits on is synchronous, and making it async
@@ -86,5 +98,7 @@ export function askSenderAuthorizer(authorizer, context) {
     return refuseSender(SENDER_AUTHORIZATION.AUTHORIZER_UNCLEAR);
   }
   if (typeof verdict.allow !== 'boolean') return refuseSender(SENDER_AUTHORIZATION.AUTHORIZER_UNCLEAR);
-  return verdict.allow ? allowSender(verdict.reason) : refuseSender(verdict.reason);
+  if (verdict.allow) return allowSender(verdict.reason);
+  if (verdict.stale === true && typeof verdict.bucket === 'string' && verdict.bucket) return staleSender(verdict.reason, verdict.bucket);
+  return refuseSender(verdict.reason);
 }

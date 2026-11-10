@@ -90,7 +90,9 @@ describe('the box is revoked while it holds the address', () => {
   const webVaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
   const webRegistry = createMemoryBackend();
   const webLog = new EventLog({ initial: [], muted: [] });
-  const webKeeps = { ...webVaults, registryBackend: webRegistry, deviceLog: webLog, pinboardPersistDb: { path: path.join(webDir, 'pinboard-state.json') } };
+  // …and the circles' own stores (`householdPersistDb`, as the web shell keeps them: circleApp's cc-household-state),
+  // where each circle's roster trail lives since the trail moved into the circle's own store.
+  const webKeeps = { ...webVaults, registryBackend: webRegistry, deviceLog: webLog, pinboardPersistDb: { path: path.join(webDir, 'pinboard-state.json') }, householdPersistDb: { path: path.join(webDir, 'household-items.json') } };
   const beaRef = {};
   const productionBinding = (ref) => rosterBindingVerifier((app, op, args) => ref.node.agent.callSkill(app, op, args));
   /** The web app, booted on its own vaults, on the relay, in its circle — what a shell does on connect: prime,

@@ -8067,9 +8067,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       const handler = ops[opId];
       if (!handler) return { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
       // written AS the self the call is made as (the waist's `actAs`, checked above), as an own note is: it rides that
-      // self's own lane and its row names that self as the maker; a call made as nobody in particular stays the general 'me'
+      // self's own lane and its row names that self as the maker; a call made as nobody in particular stays the general
+      // 'me'. The MAKER comes only from the checked context: on the ops that write the appointment itself, an `actor` a
+      // caller names in the args is dropped, or a local call could make an own appointment as any string the membrane
+      // never checked. An answer or a cancel keeps it: there it names who answered (the peer an RSVP came from).
+      const writesMaker = opId === 'addEvent' || opId === 'updateEvent';
+      const { actor: _named, ...rest } = args ?? {};
       const asSelf = actorOf(ctx);
-      const res = await handler(asSelf ? { ...(args ?? {}), actor: asSelf } : (args ?? {}));
+      const res = await handler(asSelf ? { ...rest, actor: asSelf } : (writesMaker ? rest : (args ?? {})));
       if (res?.ok !== false && (opId === 'updateEvent' || opId === 'cancelEvent')) {
         // the appointment the op resolved (it may have been named by its words)
         try { await reshareOwnEvent(res?.itemId ?? args?.id); } catch (err) { console.warn('[calendar] re-share failed:', err?.message ?? err); }

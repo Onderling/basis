@@ -22,6 +22,7 @@
 //   5. THE BOUNDARY — someone else's phrase does not reach my circles.
 //   6. CONNECTIONS — a granted surface may do exactly the ops that were ticked, and revoke wins.
 import { checker } from './_util.mjs';
+import { phraseWordsInOffer } from '../phraseLeak.mjs';
 import { bootAppCircle, rosterOf, hasMember } from './_app.mjs';
 import { bootRealAgentNode, teardown } from '../../basis/test/support/pairRealAgents.js';
 
@@ -73,11 +74,9 @@ export async function run({ relayUrl }) {
     // and this check could not have caught the thing it exists to catch. It would have gone green through
     // a real leak. So the decoded body is scanned too, and the raw text as well — a leak appended in the
     // clear (a query parameter, a debug hint) is just as bad and shows up only there.
-    const payload = uri.slice(uri.indexOf('://') + 3);
-    let decoded = '';
-    try { decoded = Buffer.from(payload.split(/[?#]/)[0], 'base64').toString('utf8'); } catch { decoded = ''; }
-    const haystack = `${payload}\n${decoded}`.toLowerCase();
-    const leaked = words.filter((w) => w.length >= 5 && haystack.includes(w.toLowerCase()));
+    // …as WHOLE words, in the decoded body and in the clear part after it (`phraseLeak.mjs`): a random base64 run that
+    // spells a phrase word is chance, and a substring scan of it failed CI by chance (2026-11-10)
+    const leaked = phraseWordsInOffer(uri, words);
     check('…not even one of its words', leaked.length === 0, leaked.join(' '));
     check('the offer does carry the circle the new device must reach', (offer?.circles ?? 0) >= 1);
 

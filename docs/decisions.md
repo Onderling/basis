@@ -1337,8 +1337,9 @@ row (bot-only, never fanned); `enrolForgets` keeps its cc-help special case. Led
 
 Three calls from the Saturday sitting. (1) **Relays refer, never host.** A relay forwards a feed ask to the node that
 announced it serves feeds (the companion, the person's always-on device) and never holds or serves a feed itself; a
-desktop relay from the installer is the same relay role; when relay and companion run in one process, the companion
-flag serves the feed. (2) **Feedback ≠ help.** Help is internal to Basis (the help bot, the
+desktop relay from the installer is the same relay role. *Amended 2026-11-10 (Frits):* the relay is its own installer
+and its own process, never in one process with the companion; companion and bot share one process with role flags.
+(2) **Feedback ≠ help.** Help is internal to Basis (the help bot, the
 local deck, L435 as a contact). Feedback is a SEPARATE contact, "Onderling", the maker's agent persona on an always-on
 device (L419), seeded in every install in place of the accidental household-bot card (L397); a feedback door is
 reachable from any place in the app (the gear, the + sheet), and a circle or bot may offer its own feedback command as
@@ -1407,3 +1408,17 @@ and the fold refuses a statement that would give a bot and anyone else one name,
 members with one name are told apart on screen by the avatar and, only on a collision, a small number: the first
 in roster order is "Jan", the next "Jan · 2" (`withNameNumbers` in the roster normaliser, painted by the reveal
 ladder). Ledger: L718.
+
+## 2026-11-10 — The companion is your always-on device, nothing more; node roles are composed per person (Frits)
+
+**The companion is the person's always-on device: nothing more, nothing less.** Its one defining property is that it
+stays online, so the person stays reachable (hold and forward) while their phone or browser is away. It is not a
+privileged broker, matcher or router.
+
+**Functions that only a node can run** (serving a feed, holding a connector to a credential, other Node-only work)
+are separate roles. Their natural home is often the companion, because it is the person's node, but that is a
+default, not a rule: a person may run a plain always-on agent on device A and another agent on device B that serves
+feeds and holds connectors. Which device carries which role is the person's choice. The code keeps these roles
+modular so an agent is composed from them (the SDK side of this repo), while the Basis app stays one app. The relay
+is a separate installer and process (the 2026-10-24 entry, amended today). A relay refers a feed ask to whichever
+node announced it serves feeds, as decided on 2026-10-24; that node need not be the companion.

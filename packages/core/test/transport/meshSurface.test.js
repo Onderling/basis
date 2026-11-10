@@ -49,4 +49,16 @@ describe('the mesh surface — one object from boot, filled in when the transpor
     expect(await s.setLanIdentity(null)).toBe('rest-2');
     expect(mdns.keys).toEqual(['room-1', null]);
   });
+
+  it('the whisper: handed to a LAN transport now, and to one that lands later', async () => {
+    class Lan extends Discovering { whisper = null; useWhisper(fn) { this.whisper = fn; } }
+    const s = createMeshSurface();
+    const secrets = async () => [];
+    s.setLanWhisper(secrets);
+    const mdns = new Lan({ address: 'a', identity: null });
+    await s.setTransports({ mdns });
+    expect(mdns.whisper).toBe(secrets);
+    s.setLanWhisper(null);
+    expect(mdns.whisper).toBeNull();
+  });
 });

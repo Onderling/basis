@@ -524,6 +524,9 @@ export async function bootAgentBundle(opts = {}) {
     subscribeToPeers: (fn) => nearbyPeers.subscribe(fn),
     onError: (err, phase) => console.warn(`[nearby] room key ${phase}:`, err?.message ?? err),
   });
+  // Known people on the LAN (own devices, contacts) find each other by a WHISPER inside the bound channel: the agent
+  // says what this device shares with whom; the surface hands it to the LAN transport.
+  meshSurface.setLanWhisper(() => agent?.lanWhisperSecrets?.() ?? []);
   const nearbyRoom = createNearbyRoomBinding({
     sendPeerMessage: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
     listPeers: () => nearbyPeers.list(),

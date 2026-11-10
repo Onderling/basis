@@ -3254,6 +3254,45 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { return bookRowsOf(await callSkill('pinboard', 'listContacts', {})); } catch { return []; }
   };
   /**
+   * WHAT THIS DEVICE WHISPERS on a LAN connection (the mDNS transport's whisper): one entry per secret it shares with
+   * someone. Own devices first: per running persona, its circle root at the current epoch (the same on every full
+   * device of it; a re-key moves the epoch and the secret), proving THIS device's device address and accepting only a
+   * live device in the persona's device map (a tombstoned one still holds the old root and is refused here). Then
+   * contacts: the Diffie–Hellman of the persona's chat key and the contact's address (both sides hold both keys),
+   * proving the persona's chat key and accepting only that contact's address. Nothing new is stored or shared; the
+   * transport derives each secret from the material under its label and binds nothing without the proof and this rule.
+   */
+  const lanWhisperSecrets = async () => {
+    const out = [];
+    for (const [pid, rt] of personas) {
+      const dev = deviceAddressOf(pid);
+      if (!rt?.circleRoot?.seed || !dev || !rt.deviceDerivationSeed) continue;
+      let devId = null;
+      try { devId = await AgentIdentity.fromSeed(rt.deviceDerivationSeed, new VaultMemory()); } catch { devId = null; }
+      if (!devId || devId.pubKey !== dev) continue;
+      out.push({
+        material: rt.circleRoot.seed, label: `lan-whisper-sibling:${rt.circleRoot.epoch}`, address: dev,
+        sign: (message) => devId.sign(message),
+        accept: async (address) => address !== dev && (await deviceSiblingRowsOf(pid)).some((d) => d.address === address),
+      });
+    }
+    for (const c of await contactRecords()) {
+      const addr = typeof c?.peerAddr === 'string' && c.peerAddr ? c.peerAddr : (typeof c?.pubKey === 'string' ? c.pubKey : null);
+      if (!addr) continue;
+      const me = (personas.get(c?.persona) ?? persona)?.chatId;
+      if (!me?.pubKey || me.pubKey === addr) continue;
+      let material = null;
+      try { material = me.deriveSessionKey(addr); } catch { material = null; }
+      if (!material) continue;
+      out.push({
+        material, label: 'lan-whisper-contact', address: me.pubKey,
+        sign: (message) => me.sign(message),
+        accept: async (address) => address === addr,
+      });
+    }
+    return out;
+  };
+  /**
    * The PERSON an address names: an address this device has bound to an identity (a per-circle or mesh alias) resolves
    * through the same read the roster uses; a mesh address that only the contact record knows resolves through it;
    * anything else is taken as the webid itself. A direct message may go to any of these, and the seal is to the person.
@@ -9697,6 +9736,8 @@ export async function createRealHouseholdAgent(opts = {}) {
      */
     nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
     nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
+    /** What this device whispers on a LAN connection: own devices, then contacts (see lanWhisperSecrets). */
+    lanWhisperSecrets: () => lanWhisperSecrets(),
     /** The current person key's wire address (b64 pubKey), or null. */
     personAddress,
     /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */

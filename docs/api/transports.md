@@ -17,6 +17,18 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 
 ## `src/MdnsTransport.js`
 
+### `lanWhisperSecret`
+
+**Kind:** function · **Import:** `lanWhisperSecret` from `'@onderling/transports/mdns'`
+
+A whisper secret from material two parties already share, under a purpose label. See `mdnsChannel.js`.
+
+### `WHISPER_SLOTS`
+
+**Kind:** constant · **Import:** `WHISPER_SLOTS` from `'@onderling/transports/mdns'`
+
+How many tags each side whispers on a LAN connection: its secrets first, random fillers for the rest, shuffled.
+
 ### `channelEphemeralKeyPair`
 
 **Kind:** function · **Import:** `channelEphemeralKeyPair` from `'@onderling/transports/mdns'`
@@ -117,7 +129,7 @@ exercise:
 A backend with `start` but no `startAdvertising`/`startDiscovery` is honoured as far as it goes and says
 so — see `_applyDiscoverability`.
 
-**Methods:** `useLanIdentity()` · `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `addAddress()` · `_mayCarry()` · `_put()`
+**Methods:** `useLanIdentity()` · `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `addAddress()` · `useWhisper()` · `_defaultSenderFor()` · `_mayCarry()` · `_put()`
 
 ## `src/MqttTransport.js`
 

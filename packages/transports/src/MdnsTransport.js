@@ -161,6 +161,7 @@ export class MdnsTransport extends Transport {
   #theirTags    = new Map();   // connectionId → Set<tag>
   #ownBound     = new Map();   // connectionId → Set<address>
   #peerBound    = new Map();   // connectionId → Set<address>
+  #inbox        = new Map();   // connectionId → the promise of its last opened frame (frames are judged in order)
   // pubKeys being dialled (a second discovery event mid-handshake must not open a second socket)
   #dialling     = new Set();
   // pubKey → ms timestamp of last successful send or inbound frame — used
@@ -468,8 +469,8 @@ export class MdnsTransport extends Transport {
   async addAddress() { return { ok: false, reason: 'the-lan-binds-only-whispered-addresses' }; }
 
   /**
-   * THE WHISPER. `secrets()` answers what this device holds: `[{ secret, address, sign(message) → sig b64,
-   * accept(address) → bool }]` — a secret shared with someone (a persona's sibling secret, a contact's pairwise one),
+   * THE WHISPER. `secrets()` answers what this device holds: `[{ secret | { material, label }, address,
+   * sign(message) → sig (b64 or bytes), accept(address) → bool }]` — a secret shared with someone (a persona's sibling secret, a contact's pairwise one),
    * the address of mine I prove when it matches (signed by that address's key), and my rule for the address the other
    * side proves (a device map with its tombstones, a contact row). Read per connection, after the bound hello.
    * @param {() => Promise<Array<object>>|Array<object>} secrets
@@ -604,36 +605,16 @@ export class MdnsTransport extends Transport {
           }
           try { envelope = parseUntrustedJson(new TextDecoder().decode(plain)); }
           catch (err) { this._frameRefused(err); return; }
-          // the whisper rides the channel and is the transport's own: never passed upstream
-          if (envelope && (envelope._mdns_whisper || envelope._mdns_bind)) {
-            const task = envelope._mdns_whisper ? this.#onWhisper(connectionId, envelope._mdns_whisper) : this.#onBind(connectionId, envelope._mdns_bind);
-            task.catch((err) => this.emit('warn', `MdnsTransport: whisper: ${err?.message ?? err}`));
-            return;
-          }
-        }
-        // THE SENDER BINDING, for every data frame. No row, no route, no DATA: a frame on a connection whose handshake
-        // has not proven a key is dropped and the socket refused (it cannot be replied to — the hello exists so that
-        // nothing arrives from a key nobody proved). A frame claiming another sender than the key its connection proved
-        // is dropped. Both are counted and reported the way a refused envelope is (`security-error`, so the agent warns
-        // once per sender); nothing is ever re-mapped.
-        const mappedPubKey = this.#connToPubKey.get(connectionId);
-        const verdict = this.#checkSender(connectionId, envelope);
-        if (!verdict.ok) {
-          this.#refusedSenders += 1;
-          const unproven = verdict.reason === 'connection-not-proven';
-          const err = Object.assign(
-            new Error(unproven
-              ? 'MdnsTransport: dropped a frame on a connection that has not proven a key'
-              : `MdnsTransport: dropped a frame whose _from is not the key its connection proved (${verdict.reason})`),
-            { code: unproven ? 'CONNECTION_NOT_PROVEN' : 'SENDER_MISMATCH' },
-          );
-          this.emit('security-error', err, envelope);
-          if (unproven) this.#refuse(connectionId);
+          // IN ORDER, per connection: a proof (the whisper's bind) is settled, its rule asked, before the frame after it
+          // is judged; the peer sends its proof first and may speak as the proven address at once
+          const opened = envelope;
+          const prev = this.#inbox.get(connectionId) ?? Promise.resolve();
+          const next = prev.then(() => this.#onOpened(connectionId, opened))
+            .catch((err) => this.emit('warn', `MdnsTransport: ${err?.message ?? err}`));
+          this.#inbox.set(connectionId, next);
           return;
         }
-        if (mappedPubKey) this.#lastActivity.set(mappedPubKey, Date.now());
-
-        try { this._receive(envelope); } catch {}
+        this.#judge(connectionId, envelope);
       }),
 
       // Connection closed — clean up both maps
@@ -775,8 +756,11 @@ export class MdnsTransport extends Transport {
       try { entries = (await this.#whisper?.()) ?? []; } catch { entries = []; }
       const byTag = new Map();
       for (const e of entries.slice(0, slots)) {
-        if (!(e?.secret instanceof Uint8Array) || typeof e.address !== 'string') continue;
-        byTag.set(whisperTag(e.secret, channel.transcript), e);
+        // a secret as given, or derived here from shared material under its purpose label
+        const secret = e?.secret instanceof Uint8Array ? e.secret
+          : (e?.material instanceof Uint8Array && typeof e.label === 'string' ? whisperSecret(e.material, e.label) : null);
+        if (!secret || typeof e.address !== 'string') continue;
+        byTag.set(whisperTag(secret, channel.transcript), e);
       }
       return byTag;
     })();
@@ -805,6 +789,7 @@ export class MdnsTransport extends Transport {
       if (!theirs.has(tag)) continue;
       let sig = null;
       try { sig = await e.sign(bindMessage(channel.transcript, e.address)); } catch { sig = null; }
+      if (sig instanceof Uint8Array) sig = sigB64(sig);
       if (typeof sig !== 'string') continue;
       if (!this.#ownBound.has(connId)) this.#ownBound.set(connId, new Set());
       this.#ownBound.get(connId).add(e.address);
@@ -837,6 +822,7 @@ export class MdnsTransport extends Transport {
 
   /** A connection ended: what the whisper bound on it ends with it. */
   #forgetWhisper(connId) {
+    this.#inbox.delete(connId);
     this.#mine.delete(connId);
     this.#theirTags.delete(connId);
     for (const address of this.#peerBound.get(connId) ?? []) {
@@ -853,6 +839,39 @@ export class MdnsTransport extends Transport {
       const stillProven = [...this.#ownBound.values()].some((set) => set.has(address));
       if (!stillProven) { try { Transport.prototype.removeAddress.call(this, address); } catch { /* best-effort */ } }
     }
+  }
+
+  /** A sealed frame, opened, in its connection's order: the whisper's own frames, or data for the sender binding. */
+  async #onOpened(connectionId, envelope) {
+    if (envelope && envelope._mdns_whisper) return this.#onWhisper(connectionId, envelope._mdns_whisper);
+    if (envelope && envelope._mdns_bind) return this.#onBind(connectionId, envelope._mdns_bind);
+    this.#judge(connectionId, envelope);
+  }
+
+  #judge(connectionId, envelope) {
+    // THE SENDER BINDING, for every data frame. No row, no route, no DATA: a frame on a connection whose handshake
+    // has not proven a key is dropped and the socket refused (it cannot be replied to — the hello exists so that
+    // nothing arrives from a key nobody proved). A frame claiming another sender than the key its connection proved
+    // is dropped. Both are counted and reported the way a refused envelope is (`security-error`, so the agent warns
+    // once per sender); nothing is ever re-mapped.
+    const mappedPubKey = this.#connToPubKey.get(connectionId);
+    const verdict = this.#checkSender(connectionId, envelope);
+    if (!verdict.ok) {
+      this.#refusedSenders += 1;
+      const unproven = verdict.reason === 'connection-not-proven';
+      const err = Object.assign(
+        new Error(unproven
+          ? 'MdnsTransport: dropped a frame on a connection that has not proven a key'
+          : `MdnsTransport: dropped a frame whose _from is not the key its connection proved (${verdict.reason})`),
+        { code: unproven ? 'CONNECTION_NOT_PROVEN' : 'SENDER_MISMATCH' },
+      );
+      this.emit('security-error', err, envelope);
+      if (unproven) this.#refuse(connectionId);
+      return;
+    }
+    if (mappedPubKey) this.#lastActivity.set(mappedPubKey, Date.now());
+
+    try { this._receive(envelope); } catch {}
   }
 
   #registerConn(connId, pubKey) {

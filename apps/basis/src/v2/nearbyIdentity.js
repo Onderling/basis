@@ -17,7 +17,7 @@ import { nearbyLevelFrom, nearbyLevelIsSet, NEARBY_CONTEXT } from './nearbyLevel
  * @param {() => ({id: string, name?: string|null}|null)} [a.roomSelf]  the self this device enters the room as (`nearbyRoomSelf`)
  * @returns {{ myFace: () => Promise<{label: string}|null>, myAddresses: () => Promise<object> }}
  */
-export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNkn = () => false, nknAddress = () => null, roomSelf = () => null } = {}) {
+export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNkn = () => false, nknAddress = () => null, roomSelf = () => null, selfAddress = () => null } = {}) {
   // the room self's offerings as last read (the screen's shared-skills line reads them synchronously)
   let offeringsNow = [];
   return {
@@ -92,8 +92,17 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
       const label = pick('realName') ?? pick('handle');
       return label ? { label } : {};
     },
+    /**
+     * What 'deel je kaart' hands over: the room self's own address (its chat key, the one a contact routes to; the room
+     * only ever saw a room key) and how to reach it (the relay, NKN when the publication lock allows).
+     */
     async myAddresses() {
       const out = {};
+      try {
+        const self = roomSelf?.() ?? null;
+        const addr = self?.asking === true ? null : selfAddress?.(self?.id ?? 'default');
+        if (typeof addr === 'string' && addr) out.address = addr;
+      } catch { /* no address: the card is not shared (see shareReach) */ }
       try { const url = await relayUrl(); if (url) out.relay = { url }; } catch { /* no relay is honest */ }
       try {
         const addr = nknAddress();

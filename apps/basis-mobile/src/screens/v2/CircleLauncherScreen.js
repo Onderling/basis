@@ -22,7 +22,6 @@ import { createReadMarks } from '../../../../basis/src/v2/readMarks.js';
 import { watchCircleChanges } from '../../../../basis/src/v2/headCircleWatch.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
-import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyAsked, markNearbyAsked, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
@@ -1764,46 +1763,25 @@ export default function CircleLauncherScreen({
   const closeCircle = () => { setActiveCircle(null); setSelected(null); setItems([]); setView('list'); };
 
   /**
-   * Open the pairwise channel an answer created — rung 3 of the escalation ladder.
-   *
-   * A TRANSIENT thread, deliberately not written to contacts. Rung 3 is "we are talking now"; rung 4 is
-   * "I can reach you from home", and that is a deliberate exchange of the transport→address map the user
-   * has not made. Persisting a café encounter into the contact list climbs a rung nobody chose.
+   * A card shared in the room made a CONTACT: rung 4, the deliberate exchange (an answer opens no thread). The card
+   * names the person's own address, never the room key it came from, and that is who the contact is: kept in the
+   * peer graph with how to reach them, marked `nearby` so the list can say where you met, and the thread opens and
+   * says so. The ask-back bar lives in the thread screen (ContactThreadScreen), which reads pendingReachFrom.
    */
-  // Rung 4, receive side: their reach is stored like a handed-over business card (only what they chose
-  // to give), the contact row becomes reachable-from-home, and the thread says so. The ask-back bar
-  // itself lives in the thread screen (ContactThreadScreen), which reads pendingReachFrom.
   useEffect(() => {
     const sub = bundle?.nearbyRoom?.subscribeToReach;
     if (typeof sub !== 'function') return undefined;
     return sub((r) => {
-      if (!r?.from) return;
+      if (!r?.address) return;
+      const face = bundle?.nearbyRoom?.presenceOf?.(r.from)?.label ?? r.address.slice(0, 8);
       try {
-        bundle?.peerGraph?.upsert?.({ type: 'native', pubKey: r.from, transports: r.transports, reachable: true, nearby: true })
+        bundle?.peerGraph?.upsert?.({ type: 'native', pubKey: r.address, name: face, transports: r.transports, reachable: true, nearby: true })
           ?.catch?.(() => {});
-      } catch { /* the line below still tells the person */ }
-      const face = bundle?.nearbyRoom?.presenceOf?.(r.from)?.label ?? r.from.slice(0, 8);
-      pushContactReply({ fromAddr: r.from, text: t('circle.nearbyScreen.reach_received', { name: face }) });
+      } catch { /* the thread opens regardless */ }
+      setContactThread({ contactId: r.address, name: face, peerAddr: r.address, seed: [] });
+      setView('contacten');
+      pushContactReply({ fromAddr: r.address, text: t('circle.nearbyScreen.reach_received', { name: face }) });
     });
-  }, [bundle]);
-
-  const openNearbyThread = useCallback((thread, seed = []) => {
-    if (!thread?.peerAddress) return;
-    // Frits, 2026-08-30 (after the two-phone walk): a person you start talking to from the room DOES
-    // become a contact — a row in Contacts that links back to this chat — rather than a thread that
-    // exists only while the screen does. Marked `nearby` so the list can say where you met.
-    try {
-      bundle?.peerGraph?.upsert?.({ type: 'native', pubKey: thread.peerAddress, name: thread.label, reachable: true, nearby: true })
-        ?.catch?.(() => {});
-    } catch { /* the thread opens regardless */ }
-    setContactThread({
-      contactId: thread.peerAddress,
-      name: thread.label,
-      peerAddr: thread.peerAddress,
-      transient: true,
-      seed: seed.map((m, i) => ({ id: `seed-${i}`, ...m })),
-    });
-    setView('contacten');
   }, [bundle]);
 
   // Nearby row actions (Nearby step E, host wiring).
@@ -2696,7 +2674,7 @@ export default function CircleLauncherScreen({
           selvesOn={selvesOn}
           onBack={() => setView('list')}
           onAction={handleNearbyAction}
-          onOpenThread={openNearbyThread}
+
           onJoinInvite={(uri) => setJoinArgs({ invite: uri })}
         />
       </WithTabBar>
@@ -5767,7 +5745,7 @@ function AddRelayForm({ styles, onAdd, addError }) {
 // it is deliberately tied to the React lifecycle rather than to a button, because the failure mode is a
 // user who *thinks* they left. Navigating away, backgrounding, or a crash mid-render all unmount, and all
 // must stop the announcement.
-function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onBack, onAction, onOpenThread, onJoinInvite }) {
+function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onBack, onAction, onJoinInvite }) {
   const [model, setModel] = useState(null);
   // WHO THIS DEVICE ENTERS THE ROOM AS — the switcher's set decides (nearbyIdentity.js); several ticked: the last answer
   // here, else the one question. The bundle's face reads it through the getter handed in here.
@@ -5844,6 +5822,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     ...(bundle?.nearbyRoom?.screenDeps?.() ?? {}),
     allows:             readNearbyAllows(),   // per device, kept across opens
     control:            bundle?.discoverability ?? null,
+    roomKey:            bundle?.nearbyRoomKey ?? null,   // the key spoken on the LAN while in the room
     radio:              { get: readNearbyRadio, set: writeNearbyRadio },   // the persisted radio switch
     subscribeToPeers:   bundle?.nearbyPeers ? (fn) => bundle.nearbyPeers.subscribe(fn) : null,
     subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
@@ -5877,18 +5856,12 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     });
     return () => { try { sub?.remove?.(); } catch { /* best-effort */ } };
   }, [screen]);
-  // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
-  // answerer's side does.
-  useEffect(() => {
-    const sub = bundle?.nearbyRoom?.subscribeToAnswers;
-    if (typeof sub !== 'function') return undefined;
-    return sub((answer) => {
-      if (!answer?.from) return;
-      // The thread opens WITH the answer in it — the reply is the first line, not a lost opening.
-      const face = bundle?.nearbyRoom?.presenceOf?.(answer.from)?.label ?? null;
-      onOpenThread?.(nearbyThreadDescriptor(answer.from, { label: face }), [{ origin: 'bot', text: answer.text ?? '' }]);
-    });
-  }, [bundle, onOpenThread]);
+  // An answer to MY ask stays in the room: the shared screen re-reads (screenDeps) and shows it under the ask.
+  // 'deel je kaart' on an answer: the one way from the room to a contact (the press goes down with it)
+  const shareCard = useCallback(async (from, event) => {
+    const r = await bundle?.nearbyRoom?.shareReach?.(from, { wantBack: true, press: { trigger: 'chip', event: event ?? null } });
+    setNotice(r?.ok ? { key: 'reach_shared_you' } : null);
+  }, [bundle]);
 
   const lastAsk = useRef(null);
   const submitAsk = useCallback(async (text) => {
@@ -5912,10 +5885,9 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     setAnswering(null);
     const r = await screen.answer(askId, text);
     if (!r.ok) { setNotice({ key: 'ask_expired' }); return; }
-    // Say plainly what just happened: answering is the disclosure.
+    // Say plainly what just happened: answering is the disclosure. The answer stays in the room: no thread opens.
     setNotice({ key: 'answer_sent' });
-    if (r.thread) onOpenThread?.(r.thread);
-  }, [screen, answering, onOpenThread]);
+  }, [screen, answering]);
 
   const askAction = useCallback((action, ask) => {
     if (action === 'dismiss-ask') { screen.dismissAsk(ask?.id); return; }
@@ -5947,6 +5919,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       onBack={onBack}
       onAction={onAction}
       onAskAction={askAction}
+      onShareCard={shareCard}
       onToggleAllow={toggleAllow}
       onSubmitCard={submitCard}
       onPrefillCard={() => bundle?.nearbyIdentity?.cardPrefill?.() ?? Promise.resolve({})}
@@ -5983,6 +5956,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
 function NearbyScreen({
   model, roomView = null, onPickRoomSelf = null, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
   answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onPrefillCard, level = null, firstUse = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
+  onShareCard = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -6147,9 +6121,20 @@ function NearbyScreen({
           </Text>
         ) : null}
         {(model?.myAsks ?? []).map((e) => (
-          <Text key={`mine-${e.ask?.id}`} style={styles.rowMeta} testID={`nearby-my-ask-${e.ask?.id}`}>
-            {t('circle.nearbyScreen.my_ask_row', { heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)) })}
-          </Text>
+          <View key={`mine-${e.ask?.id}`}>
+            <Text style={styles.rowMeta} testID={`nearby-my-ask-${e.ask?.id}`}>
+              {t('circle.nearbyScreen.my_ask_row', { heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)) })}
+            </Text>
+            {(e.answers ?? []).map((a) => {
+              const who = a.label ?? String(a.from ?? '').slice(0, 8);
+              return (
+                <View key={`ans-${a.from}`} style={styles.nearbyAsk} testID={`nearby-answer-${e.ask?.id}-${a.from}`}>
+                  <Text style={styles.rowName}>{t('circle.nearbyScreen.answer_row', { name: who, text: a.text ?? '' })}</Text>
+                  <Btn variant="quiet" onPress={(ev) => onShareCard?.(a.from, ev?.nativeEvent ?? null)} testID={`nearby-share-card-${a.from}`} label={t('circle.nearbyScreen.share_card_with', { name: who })} />
+                </View>
+              );
+            })}
+          </View>
         ))}
         {asks.length === 0 ? (
           <Text style={styles.muted}>{t('circle.nearbyScreen.asks_empty')}</Text>

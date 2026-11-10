@@ -1598,6 +1598,24 @@ reads the transports' own report, never the screen's intent, because an older bi
 asked to be quiet — and saying "hidden" over a device that is listed would be the one lie this surface cannot
 afford.
 
+**The LAN speaks only a LAN key.** Nothing on a local network ever carries the person's canonical key, a circle
+address or a device address. At rest the phone speaks a *rest key* (random, drawn per network visit, held in memory,
+registered with nothing, so nothing the agent signs leaves at all); in the Nearby room it speaks a *room key* (derived
+for the self it entered as over a fresh nonce, registered with the agent as one of its identities, never on a relay or
+NKN, forgotten when the view is closed and the room is empty). The gate is where the bytes leave: the mDNS transport
+carries an envelope only when it is from and signed by its LAN key, and a hello that announces another key is refused.
+Each LAN connection is a channel, not just a proven hello: an ephemeral X25519 key in each hello, signed with it, and
+every later frame sealed under keys derived from the hello transcript, so a device that forwards both handshakes can
+neither read nor inject. An answer to an ask stays in the room; the only way from the room to a contact is *deel je
+kaart*, which hands over the self's own address. Known people (own devices, contacts) recognise each other by a
+**whisper** inside the channel: each side sends a fixed number of tags (an HMAC of the connection's transcript under
+each secret it holds: a persona's circle root at its epoch for its own devices, the Diffie–Hellman of two chat keys for a
+contact; random fillers for the rest), so a stranger sees random values that never repeat across connections. A match is
+recognition, not authorisation: the matched side signs the transcript with the address it claims, and the other side
+binds that address to the connection only if its own rule agrees (the device map with its tombstones, the contact
+row). Frames on a connection are judged in order, so a proof is settled before the frame that speaks as it. An address of
+ours is spoken only on the connection where it was proven; a send that names no sender goes out as that address.
+
 **Contact reveals, so contact is minimised.** A sender uses the *fewest* connection points that achieve
 delivery — sequential fallback, sticky on what worked, backing off from what fails — never race-them-all,
 because every point tried is an extra observer. A message with no circle (a direct message) rides the

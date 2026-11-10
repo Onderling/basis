@@ -26,7 +26,8 @@ describe('the Nearby room reaches both shells', () => {
     const src = read('../../web/v2/circleApp.js');
     expect(src).toMatch(/createNearbyScreen\(\{\s*\.\.\.\(ensureNearbyRoom\(\)\?\.screenDeps\(\)/);
     expect(src).toMatch(/\.\.\.\(ensureNearbyRoom\(agent\)\?\.handlers \?\? \{\}\)/);
-    expect(src).toMatch(/subscribeToAnswers\(/);
+    // an answer reaches the screen through screenDeps (the shared controller re-reads), and opens no thread
+    expect(src).not.toMatch(/openNearbyThread\(/);
   });
 
   it('both shells offer the invite-into-the-room door next to the QR (PLAN-nearby §5)', () => {
@@ -40,7 +41,7 @@ describe('the Nearby room reaches both shells', () => {
     expect(bundle).toMatch(/^\s+nearbyRoom,$/m);
     const host = read('../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js');
     expect(host).toMatch(/createNearbyScreen\(\{\s*\.\.\.\(bundle\?\.nearbyRoom\?\.screenDeps\?\.\(\)/);
-    expect(host).toMatch(/subscribeToAnswers/);
+    expect(host).not.toMatch(/openNearbyThread\(/);
     const router = read('../../../basis-mobile/src/screens/ChatScreen.js');
     expect(router).toMatch(/\.\.\.\(bundle\?\.nearbyRoom\?\.handlers \?\? \{\}\)/);
   });

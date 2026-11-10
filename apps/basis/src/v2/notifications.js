@@ -14,6 +14,7 @@ import { eventCircleId } from './circleStream.js';
 import { isItemLanding } from './itemLanding.js';
 import { countsAsUnread, pickText } from './circleTilePreviews.js';
 import { policyChangeLines, policyChangeText, policyPatchBetween } from './policyChangeWords.js';
+import { isAskLive } from './nearbyAsks.js';
 import { itemKindChip, EMBED_TYPE_ICON } from './embedChips.js';
 import { membershipNoticeFor } from './membershipNotices.js';
 import { NOTIFY_WINDOW_DAYS } from './readMarks.js';
@@ -39,6 +40,7 @@ export const FOR_YOU_KEYS = Object.freeze({
   aCircle: 'circle.forYou.a_circle',
   setting: 'circle.forYou.setting',
   assigned: 'circle.forYou.assigned',
+  ask:      'circle.forYou.ask',
   anAdmin: 'circle.forYou.an_admin',
   someone: 'circle.forYou.someone',
 });
@@ -58,6 +60,7 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  * @param {number} [a.now]
  * @param {number} [a.windowDays]
  * @param {(kind: string) => boolean} [a.keepKind]  false drops the kind (the person set it to off)
+ * @param {Array<{ask: object, heard?: number}>} [a.asks]  my live asks in the Nearby room (the room binding's `myAsks()`)
  * @param {boolean} [a.fold]  false: one row per thing, no folding (the banner reads them one by one)
  * @param {(group: {kind: 'circle'|'contact', id: string}) => ({id: string, name?: string|null}|null)} [a.selfOf]
  *        the persona a row is for (its face); the host passes it only when the device holds more than one
@@ -65,7 +68,7 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  */
 export function notificationRows({
   events = [], turns = [], circles = [], contactName = null, viewerIdIn = null, myRefs = [], readIds = null, t,
-  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true, keepKind = null,
+  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true, keepKind = null, asks = [],
 } = {}) {
   if (typeof t !== 'function') return [];
   const mine = new Set(myRefs ?? []);
@@ -157,6 +160,18 @@ export function notificationRows({
       push({ id: e.id, kind: 'setting', group, open, icon: '⚙️', at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
         text: t(FOR_YOU_KEYS.setting, { who: t(FOR_YOU_KEYS.anAdmin), circle: group.name ?? '', change: policyChangeText(lines, t) }) });
     }
+  }
+
+  // MY OPEN QUESTION IN THE ROOM (a live source, not the log): one row while the ask is live, the way back to it from
+  // any tab; the answers themselves arrive as direct messages (their own rows). Set aside, it stays aside.
+  for (const entry of Array.isArray(asks) ? asks : []) {
+    const ask = entry?.ask;
+    if (!ask?.id || !isAskLive(ask, () => now)) continue;
+    const id = `ask:${ask.id}`;
+    if (readIds && readIds.has(id)) continue;
+    const at = Number.isFinite(ask.createdAt) ? ask.createdAt : now;
+    push({ id, kind: 'ask', group: { kind: 'nearby', id: 'room', name: null }, open: { kind: 'nearby', id: 'room' }, icon: '🙋', at, saidAt: at,
+      text: t(FOR_YOU_KEYS.ask, { text: clip(ask.text ?? ''), heard: Number.isFinite(entry.heard) ? entry.heard : 0 }) });
   }
 
   for (const turn of Array.isArray(turns) ? turns : []) {

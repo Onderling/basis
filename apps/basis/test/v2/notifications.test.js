@@ -148,3 +148,13 @@ describe('a setting someone else changed is a row ("Een beheerder zette … uit"
     expect(rows[0].open).toEqual({ kind: 'circle', id: 'c1' });
   });
 });
+
+describe('my open question in the room is a row while it is open (the way back to it)', () => {
+  it('one row per live ask, saying how many heard it, opening Nearby; gone when it is no longer live', () => {
+    const asks = [{ ask: { id: 'a1', text: 'wie heeft een ladder?', createdAt: NOW - 60_000, expiresAt: NOW + 60_000 }, heard: 2 },
+      { ask: { id: 'a0', text: 'oud', createdAt: NOW - 9e6, expiresAt: NOW - 1 }, heard: 1 }];
+    const rows = notificationRows({ asks, circles, t, now: NOW });
+    expect(rows.map((r) => [r.kind, r.id, r.open])).toEqual([['ask', 'ask:a1', { kind: 'nearby', id: 'room' }]]);
+    expect(rows[0].text).toMatch(/^ask .*ladder.*"heard":2/);
+  });
+});

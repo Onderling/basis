@@ -139,6 +139,8 @@ export function forYouRows(hostOps = {}, { muted = new Set(), fold = true } = {}
     // only what arrived inside the news window (by arrival, so a late line is kept): the rest can never be a row
     events: hostOps.eventLog?.query ? hostOps.eventLog.query({ excludeMuted: true, landedSince: nowMs - windowDaysOf(hostOps.notifyWindowDays) * 86_400_000 }) : [],
     turns: hostOps.turns ?? [],
+    // my open questions in the Nearby room (a live source): the way back to them from Today
+    asks: typeof hostOps.myAsks === 'function' ? (hostOps.myAsks() ?? []) : [],
     circles: every, selfOf,
     contactName: hostOps.contactName ?? null,
     viewerIdIn: typeof hostOps.selfIn === 'function' ? hostOps.selfIn : null,

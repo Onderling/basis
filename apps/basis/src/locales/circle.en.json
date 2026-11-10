@@ -10085,6 +10085,10 @@
       "notify_policy_assigned": {
         "text": "Notify: a task given to me",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_ask": {
+        "text": "Notify: my open question in the room",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10357,6 +10361,10 @@
     "assigned": {
       "text": "A task in {{circle}} is yours now",
       "doc": "'Nieuw voor jou': someone else gave the person a task."
+    },
+    "ask": {
+      "text": "Your question: {{text}} \u00b7 heard by {{heard}}",
+      "doc": "'Nieuw voor jou': the person's own open question in the Nearby room, while it is open (the way back to it)."
     },
     "someone": {
       "text": "Someone",

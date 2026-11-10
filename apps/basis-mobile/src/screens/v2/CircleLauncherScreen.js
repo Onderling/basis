@@ -1366,6 +1366,8 @@ export default function CircleLauncherScreen({
       notifyWindowDays: bundle?.agent?.getParamValue?.('notify.windowDays'),
       // the person's table per kind (banner · list · off): off is no row either
       notifyPolicyOf: (kind) => bundle?.agent?.getParamValue?.(notifyPolicyKey(kind)),
+      // my open questions in the Nearby room: the way back to them from Today (web parity)
+      myAsks: () => bundle?.nearbyRoom?.myAsks?.() ?? [],
       // whose circle it is (every persona's rows show, each with its face)
       profileIdOf: (cid) => { try { return bundle?.agent?.profileIdOf?.(cid) ?? 'default'; } catch { return 'default'; } },
       ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
@@ -1402,6 +1404,7 @@ export default function CircleLauncherScreen({
         const o = banner.open;
         if (o?.kind === 'thread') { openContactThread({ contactId: o.id, name: null }); setView('contacten'); }
         else if (o?.kind === 'circle') { const c = (vandaagInputs.current.circles ?? []).find((x) => x?.id === o.id); if (c) openCircle(c); }
+        else if (o?.kind === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
         else setView('screens');
       }}
       style={{ position: 'absolute', top: (insets?.top ?? 0) + 8, left: 16, right: 16, paddingVertical: 10, paddingHorizontal: 14,
@@ -2374,6 +2377,7 @@ export default function CircleLauncherScreen({
                 else if (a?.kind === 'for-you-open' && a.row) {
                   readMarks.markRows([a.row]).catch(() => {});
                   if (a.row.open?.kind === 'thread') { openContactThread({ contactId: a.row.open.id, name: a.row.group?.name ?? null }); setView('contacten'); }
+                  else if (a.row.open?.kind === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
                   else { const c = circles.find((x) => x.id === a.row.open?.id); if (c) openCircle(c); }
                 }
                 else if (a?.kind === 'for-you-read' && Array.isArray(a.rows)) readMarks.markRows(a.rows).catch(() => {});

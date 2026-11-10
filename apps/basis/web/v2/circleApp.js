@@ -4487,6 +4487,8 @@ function forYouHostOps() {
     notifyWindowDays: circleHouseholdAgent?.getParamValue?.('notify.windowDays'),
     // the person's table per kind (banner · list · off): off is no row either
     notifyPolicyOf: (kind) => circleHouseholdAgent?.getParamValue?.(notifyPolicyKey(kind)),
+    // my open questions in the Nearby room: the way back to them from Today
+    myAsks: () => _nearbyRoom?.myAsks?.() ?? [],
     // whose circle it is (every persona's rows show, each with its face)
     profileIdOf: profileIdOfCircle, contactCircleOf: (id) => _contactPairCircle.get(id) ?? null,
     // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
@@ -4520,6 +4522,7 @@ function ensureBanner() {
         const o = b.open;
         if (o?.kind === 'thread') showContactThread(o.id).catch(() => {});
         else if (o?.kind === 'circle') showDetail(o.id);
+        else if (o?.kind === 'nearby') showNearby();
         else _showVandaag().catch(() => {});
       };
     },
@@ -4751,6 +4754,7 @@ function onScreenAction(action) {
   else if (action?.kind === 'for-you-open' && action.row) {
     const marked = readMarks.markRows([action.row]).catch(() => {});
     if (action.row.open?.kind === 'thread') showContactThread(action.row.open.id).catch(() => {});
+    else if (action.row.open?.kind === 'nearby') showNearby();
     else if (action.row.open?.id) showDetail(action.row.open.id);
     else marked.then(() => _showVandaag()).catch(() => {});   // nothing to open (a removal from a circle now gone): it is read, Today again
   }

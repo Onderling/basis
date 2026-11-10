@@ -10091,6 +10091,10 @@
       "notify_policy_assigned": {
         "text": "Melding: een taak voor mij",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_ask": {
+        "text": "Melding: mijn open vraag in de ruimte",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10363,6 +10367,10 @@
     "assigned": {
       "text": "Een taak in {{circle}} is nu van jou",
       "doc": "'Nieuw voor jou': someone else gave the person a task."
+    },
+    "ask": {
+      "text": "Je vraag: {{text}} \u00b7 gehoord door {{heard}}",
+      "doc": "'Nieuw voor jou': the person's own open question in the Nearby room, while it is open (the way back to it)."
     },
     "someone": {
       "text": "Iemand",

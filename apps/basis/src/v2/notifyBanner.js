@@ -15,7 +15,7 @@ export const NOTIFY_BANNER_MS = param({ key: 'notify.bannerMs', scope: PARAM_SCO
 
 export const NOTIFY_POLICIES = Object.freeze(['banner', 'list', 'off']);
 /** The default per row kind (`notificationRows`' kinds). */
-export const NOTIFY_POLICY_DEFAULTS = Object.freeze({ dm: 'banner', removed: 'banner', item: 'list', line: 'list', joined: 'list', setting: 'list', assigned: 'banner' });
+export const NOTIFY_POLICY_DEFAULTS = Object.freeze({ dm: 'banner', removed: 'banner', item: 'list', line: 'list', joined: 'list', setting: 'list', assigned: 'banner', ask: 'list' });
 export const notifyPolicyKey = (kind) => `notify.policy.${kind}`;
 /** The register rows for the table (the settings screen paints them; `paramsService` declares them). */
 export const NOTIFY_POLICY_PARAMS = Object.freeze(Object.entries(NOTIFY_POLICY_DEFAULTS).map(([kind, def]) => ({

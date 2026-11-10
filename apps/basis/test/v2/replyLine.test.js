@@ -105,10 +105,10 @@ describe('the people reads: who does it, whose, who is there on a day', () => {
 
   it('the ceiling: a holder the reader may not name is "someone", never an id — whatever the row carries', () => {
     expect(replyLine({ text: 'lamp', items: [{ text: 'lamp vervangen', heldBy: [{ someone: true }] }] }, { opId: 'listOpen', t }))
-      .toBe('circle.reply.who_held:{"title":"lamp vervangen","who":"circle.reply.who_someone","when":""}');
+      .toBe('circle.reply.who_held:{"title":"lamp vervangen","who":"circle.reply.who_withheld","when":""}');
     // a row that was never put through the reader's ceiling (no `heldBy`): its holders are not named, its ids never said
     const raw = replyLine({ text: 'lamp', items: [{ text: 'lamp vervangen', assignees: ['telegram:7'], state: 'claimed' }] }, { opId: 'listOpen', t });
-    expect(raw).toBe('circle.reply.who_held:{"title":"lamp vervangen","who":"circle.reply.who_someone","when":""}');
+    expect(raw).toBe('circle.reply.who_held:{"title":"lamp vervangen","who":"circle.reply.who_withheld","when":""}');
     expect(raw).not.toContain('telegram:7');
   });
 
@@ -125,7 +125,7 @@ describe('the people reads: who does it, whose, who is there on a day', () => {
       'circle.reply.day_head:{"when":"za 10 okt"}',
       'circle.reply.day_event:{"time":"10:00","title":"tandarts","who":"Ann"}',
       'circle.reply.day_event:{"time":"20:00","title":"feest","who":"circle.reply.who_everyone"}',
-      'circle.reply.day_chore:{"title":"lamp","who":"circle.reply.who_someone"}',
+      'circle.reply.day_chore:{"title":"lamp","who":"circle.reply.who_withheld"}',
       'circle.reply.day_chore:{"title":"ramen","who":"circle.reply.who_nobody"}',
     ]);
     expect(replyLine({ ok: true, day: '2026-10-10', events: [], chores: [] }, { opId: 'weekOverview', t })).toBe('circle.reply.day_none:{"when":"za 10 okt"}');

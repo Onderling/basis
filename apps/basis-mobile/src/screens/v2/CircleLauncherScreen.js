@@ -147,6 +147,7 @@ import { createPeek } from '../../../../basis/src/v2/circlePeek.js';
 import { createAssistantEngine, assistantReplyText } from '../../../../basis/src/v2/assistantEngine.js';
 import { followUpClaim } from '../../../../basis/src/v2/assistantFollowUp.js';
 import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
+import { labelShown } from '../../../../basis/src/v2/personLabel.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
@@ -4917,7 +4918,7 @@ function CircleDetail({
                     <Text style={styles.memberHandle} numberOfLines={1}>
                       {(() => {
                         const l = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' });
-                        return l.primary ?? t(l.primaryKey);   // a member nobody has named is "someone", never their key
+                        return labelShown(l, t);   // a member nobody has named is "Onbekend" (numbered), never their key
                       })()}
                     </Text>
                     {(() => {
@@ -5327,7 +5328,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
   // key. Never a payload-claimed name — that was the leak the old fallback chain carried.
   const sender = row?.senderSelf
     ? null
-    : (row?.senderLabel ?? (row?.senderLabelKey ? t(row.senderLabelKey) : null));
+    : labelShown({ primary: row?.senderLabel, primaryKey: row?.senderLabelKey, primaryNumber: row?.senderLabelNumber }, t);
   // the item's small kind chip (the shared item-kind vocabulary, web parity); plain chat carries none
   const kindChip = itemKindChip(payload.kind);
   const kind = kindChip ? `${kindChip.icon} ${t(kindChip.labelKey)}` : null;

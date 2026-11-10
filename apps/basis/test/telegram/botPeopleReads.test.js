@@ -1,7 +1,7 @@
 /**
  * The people reads on the household bot, end to end: "wie doet de lamp", "wat moet Ann doen", "wie is er zaterdag" —
  * by the deterministic gate and by the model alike, each answered in one worded line, and the names ceiling holding on
- * the way out ("iemand", never an id). Composed as the box composes a household bot (the real agent over the household
+ * the way out ("iemand": the name exists and is withheld; never an id). Composed as the box composes a household bot (the real agent over the household
  * store, the slim catalogue, the door's call, the template's word rules, the real runner admitting its people), in Dutch.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';

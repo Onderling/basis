@@ -43,7 +43,8 @@ test('everything someone else adds is news on Today, by kind; an empty Today nam
   try {
     const p = await pair(B, A, { name: 'Nieuws Kring', re: RE });
     expect(p.joined, 'A joined B\'s circle').toBe(true);
-    expect(await todayNews(A.page), 'nothing new yet, and it says where it looked').toMatch(/Niets nieuws in Nieuws Kring/);
+    // Today refolds after the circle list and its head settle: read until it does, a single read races the join
+    await expect.poll(() => todayNews(A.page), { timeout: 30_000, message: 'nothing new yet, and it says where it looked' }).toMatch(/Niets nieuws in Nieuws Kring/);
 
     await gotoCircles(B.page);
     await openCircleMatching(B.page, RE);
@@ -80,7 +81,7 @@ test('everything someone else adds is news on Today, by kind; an empty Today nam
     await openCircleMatching(A.page, RE);
     await A.page.waitForTimeout(1500);
     await gotoCircles(A.page);   // leaving marks the circle seen
-    expect(await todayNews(A.page), 'nothing new right after looking').toMatch(/Niets nieuws in Nieuws Kring/);
+    await expect.poll(() => todayNews(A.page), { timeout: 30_000, message: 'nothing new right after looking' }).toMatch(/Niets nieuws in Nieuws Kring/);
     await A.page.context().setOffline(false);
     await expect.poll(() => todayNews(A.page), { timeout: 90_000, message: 'a line said before I looked but delivered after is new' }).toMatch(/💬\s*1 nieuw/);
   } finally {

@@ -545,6 +545,8 @@ export class EventLog {
     if (opts.filter) result = result.filter((e) => matchesFilter(e, opts.filter));
     if (typeof opts.since === 'number') result = result.filter((e) => e.ts >= opts.since);
     if (typeof opts.until === 'number') result = result.filter((e) => e.ts <= opts.until);
+    // by ARRIVAL here (`landedAt`), not by the sender's time: a line said long ago and delivered now is inside the bound
+    if (typeof opts.landedSince === 'number') result = result.filter((e) => landedTimeOf(e) >= opts.landedSince);
     if (opts.excludeMuted) {
       result = result.filter((e) => !this.#mutedKeys.has(`${e.app}:${e.type}`));
     }

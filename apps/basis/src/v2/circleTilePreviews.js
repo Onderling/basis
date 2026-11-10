@@ -148,7 +148,8 @@ function landingSubtitle(event, { actorLabel = null, t = null } = {}) {
   return actor ? `${actor}: ${what}` : what;
 }
 
-function pickText(payload) {
+/** The words an event's payload carries (a line's text, a post's body, a title), or null: the tile's and the news rows'. */
+export function pickText(payload) {
   const candidates = [payload.text, payload.body, payload.message, payload.title, payload.label];
   for (const c of candidates) {
     if (typeof c === 'string' && c.trim()) return c.trim();

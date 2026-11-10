@@ -37,7 +37,7 @@ export function blockTitle(block, t) {
  * does not — its cards are the whole of it, and a "more" under them reads as a second "Lees meer".
  */
 export function blockOpensWhole(block) {
-  return block?.status === 'ok' && block?.type !== 'onboarding';
+  return block?.status === 'ok' && block?.type !== 'onboarding' && block?.type !== 'forYou';   // "Nieuw voor jou" is whole already
 }
 
 /** The one quiet line an empty block shows. */

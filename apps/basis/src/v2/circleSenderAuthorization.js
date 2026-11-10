@@ -26,14 +26,14 @@
  * circle's membership (`bindCircleAddressKeysFor` — the one place that holds `{pubKey,
  * circleAddress}` per member). That is a real constraint and it has a real consequence, below.
  *
- * ── The honest degradation, stated rather than buried ───────────────────────────────────────────
- * A circle whose roster this snapshot has never seen is ALLOWED, not refused, and the allowance is
- * counted and warned about. Refusing would mean that any circle whose roster read had not happened
- * yet — a cold boot, a circle never opened, a failed skill call — silently drops every message from
- * every member, which is indistinguishable from the app being broken and is exactly the failure
- * mode Decision 3 shipped with. So the rule is: **refuse whenever a roster IS known, never on the
- * strength of not knowing.** The teeth are real for every circle the app has actually loaded; the
- * gap is real for one it has not, and `unknownRosterAllowances` is how you see it.
+ * ── A circle whose roster is not read yet is REFUSED (decided 2026-11-10) ────────────────────────
+ * Until 2026-11-10 such a circle was ALLOWED and counted ("refuse whenever a roster IS known, never on the strength
+ * of not knowing"), so any signed sender got into a circle this device had not read. Now each of our circle
+ * addresses is NOTED when its identity is installed (`noteCircleAddress`), before any roster, and the priming reads
+ * the rosters BEFORE it installs the identities (circleSecurityPriming.js), so traffic sealed to a circle address
+ * meets either no identity (it does not open) or a roster. A circle address with no roster is refused
+ * (`ROSTER_UNKNOWN`, counted in `unknownRosterRefusals`); the sender's retry lands once the roster is read. An
+ * address of ours that is no circle's (a device address, a person key) is not circle traffic and is not judged here.
  *
  * ── Per-circle signing is ENFORCED, per member, with no flag day (B6) ───────────────────────────
  * A roster row carries the member's canonical `pubKey` AND their per-circle `circleAddress`, and
@@ -103,7 +103,7 @@ export const SENDER_REASON = Object.freeze({
  *   recordCircleRoster: (a: object) => number,
  *   forgetCircleSenders: (circleId: string) => boolean,
  *   circleAddressCount: number,
- *   unknownRosterAllowances: number,
+ *   unknownRosterRefusals: number,
  *   refusedStrangers: number,
  *   refusedCanonicalSigners: number,
  *   canonicalOnlyMembers: number,
@@ -112,6 +112,9 @@ export const SENDER_REASON = Object.freeze({
  */
 export function createCircleSenderAuthorization({
   onUnknownRoster = null, onRefused = null, onCanonicalOnlyMembers = null,
+  // A refusal that a fresher roster might lift (no roster read yet; a sender not on the roster READ): the host re-reads
+  // that circle's roster, so the sender's retry lands once a member is on it. Called on every such refusal.
+  onRosterStale = null,
   // The keys that are OURS right now, read live: the person's current (rotating) person key — held by every
   // device of the person that took part in, or was handed the result of, the last ceremony, and by no revoked
   // one. A message signed with it is ours in every circle, before any roster is consulted; the static profile key
@@ -122,10 +125,16 @@ export function createCircleSenderAuthorization({
   const byOwnAddress = new Map();
   /** circleId → our per-circle address, so a left circle can be dropped by id */
   const addressOfCircle = new Map();
+  /**
+   * our per-circle address → circleId, noted when the circle's identity is installed (before any roster is read): what
+   * makes "one of our CIRCLE addresses, roster not read yet" a known state, refused, rather than mistaken for an address
+   * of ours that is no circle's (a device address, a person key), which is not circle traffic at all.
+   */
+  const circleOfAddress = new Map();
   const warnedUnknown = new Set();
   /** our per-circle address → the transitional-set size we last warned about, so silence means "same" */
   const warnedCanonicalOnly = new Map();
-  let unknownRosterAllowances = 0;
+  let unknownRosterRefusals = 0;
   let refusedStrangers = 0;
   let refusedCanonicalSigners = 0;
 
@@ -201,7 +210,7 @@ export function createCircleSenderAuthorization({
     // Fewer than two keys means we found nobody but ourselves — the same "the read failed" shape.
     if (keys.size < 2) return 0;
     byOwnAddress.set(ownAddress, { circleId: circleId ?? null, keys, refusedCanonical, canonicalOnly });
-    if (circleId) addressOfCircle.set(circleId, ownAddress);
+    if (circleId) { addressOfCircle.set(circleId, ownAddress); circleOfAddress.set(ownAddress, circleId); }
     warnedUnknown.delete(ownAddress);
 
     // Say how big the transition still is — once per size, so a shrink is audible and a steady state
@@ -221,6 +230,8 @@ export function createCircleSenderAuthorization({
 
   /** Drop a circle's roster — it was left. Idempotent. */
   function forgetCircleSenders(circleId) {
+    // a left circle is no circle of ours any more, whether or not its roster was ever read
+    for (const [addr, cid] of circleOfAddress) if (cid === circleId) circleOfAddress.delete(addr);
     const address = addressOfCircle.get(circleId);
     if (!address) return false;
     addressOfCircle.delete(circleId);
@@ -248,12 +259,17 @@ export function createCircleSenderAuthorization({
     }
     const entry = byOwnAddress.get(ownAddress);
     if (!entry) {
-      unknownRosterAllowances += 1;
+      // an address of ours that is no circle's (a device address, a person key, a persona's chat key): not circle
+      // traffic; its own rules (the device map, the contact) apply elsewhere
+      if (!circleOfAddress.has(ownAddress)) return allowSender(SENDER_REASON.NOT_CIRCLE_SCOPED);
+      // one of our CIRCLE addresses whose roster this device has not read: refused, never let in unchecked
+      unknownRosterRefusals += 1;
       if (!warnedUnknown.has(ownAddress)) {
         warnedUnknown.add(ownAddress);
         try { onUnknownRoster?.({ ownAddress }); } catch { /* diagnostics only */ }
       }
-      return allowSender(SENDER_REASON.ROSTER_UNKNOWN);
+      try { onRosterStale?.({ circleId: circleOfAddress.get(ownAddress), ownAddress }); } catch { /* diagnostics only */ }
+      return refuseSender(SENDER_REASON.ROSTER_UNKNOWN);
     }
     if (typeof senderKey === 'string' && entry.keys.has(senderKey)) {
       return allowSender(SENDER_REASON.MEMBER);
@@ -273,17 +289,27 @@ export function createCircleSenderAuthorization({
       return refuseSender(SENDER_REASON.CANONICAL_REFUSED);
     }
     refusedStrangers += 1;
+    try { onRosterStale?.({ circleId: entry.circleId, ownAddress }); } catch { /* diagnostics only */ }
     try { onRefused?.({ ownAddress, circleId: entry.circleId, senderKey, from, pattern, answering, reason: SENDER_REASON.STRANGER }); }
     catch { /* diagnostics only */ }
     return refuseSender(SENDER_REASON.STRANGER);
   }
 
+  /** One of our addresses is circle `circleId`'s (its identity was just installed): known before any roster read. */
+  function noteCircleAddress(circleId, ownAddress) {
+    if (typeof circleId !== 'string' || !circleId || typeof ownAddress !== 'string' || !ownAddress) return false;
+    circleOfAddress.set(ownAddress, circleId);
+    return true;
+  }
+
   return {
     authorizeSender,
     recordCircleRoster,
+    noteCircleAddress,
     forgetCircleSenders,
     get circleAddressCount()      { return byOwnAddress.size; },
-    get unknownRosterAllowances() { return unknownRosterAllowances; },
+    /** envelopes refused because they were sealed to one of our circle addresses whose roster is not read yet. */
+    get unknownRosterRefusals()   { return unknownRosterRefusals; },
     get refusedStrangers()        { return refusedStrangers; },
     /** envelopes refused because a member with a proven per-circle address signed canonically. */
     get refusedCanonicalSigners() { return refusedCanonicalSigners; },

@@ -10,7 +10,8 @@
  *     and mobile's from the substrate — two shells, two different ideas of "my circles".
  *   • Decision 1 (the roster that authorizes senders) was fed ONLY by `feedHouseholdRoster`, whose every
  *     caller was a SCREEN. A circle you had not opened this run had no roster recorded, so its traffic was
- *     accepted **unchecked** — warned once, counted in `unknownRosterAllowances`, but accepted.
+ *     accepted **unchecked** (warned once, counted, but accepted). Since 2026-11-10 such a circle is REFUSED instead
+ *     (`unknownRosterRefusals`), and this primer reads the rosters before it installs the identities.
  *
  * That failure mode is the bad kind: it degrades **open**, it is invisible to tests (which construct the
  * state directly) and invisible to a walk (you open the circle you are testing). Two independent security
@@ -19,7 +20,7 @@
  *
  * ── What it guarantees, and what it does not ─────────────────────────────────────────────────────────────
  * Guarantees: for every circle the SUBSTRATE knows about, the signing identity is installed and the roster
- * snapshot is recorded, before anything depends on either — and identically on both shells, because both
+ * snapshot is recorded (the roster FIRST, so whatever the identity lets open meets it), before anything depends on either — and identically on both shells, because both
  * call this and nothing else.
  *
  * Does not guarantee: freshness. A member added after this ran is not in the snapshot until something feeds
@@ -102,16 +103,7 @@ export async function primeCircleSecurity({ agent, circleIds = null, onWarn = nu
   };
   if (!ids.length) return out;
 
-  // 1. Signing identities first. Without one, nothing sent to that circle's address can be OPENED — so a
-  //    circle with a roster and no identity is deafer than one with neither.
-  try {
-    await agent?.installCircleIdentities?.(ids);
-    out.identitiesInstalled = true;
-  } catch (err) {
-    warn('signing identities failed', err);
-  }
-
-  // 2. Then the rosters — who may speak.
+  // 1. The rosters FIRST: who may speak.
   //
   //    `bindCircleAddressKeysFor`, NOT `feedHouseholdRoster`. The two differ in a way that matters here:
   //    `feedHouseholdRoster` returns early unless `agent.addCirclePeer` exists, so the authorize
@@ -121,7 +113,7 @@ export async function primeCircleSecurity({ agent, circleIds = null, onWarn = nu
   //
   //    Concurrently: each is an independent substrate read, and a slow or broken one must not hold up the
   //    others. `allSettled`, because a circle whose members cannot be read falls back to accepting its
-  //    traffic unchecked — reported, never thrown.
+  //    traffic REFUSED (a known circle address with no roster) — reported, never thrown.
   const results = await Promise.allSettled(
     ids.map((circleId) => bindCircleAddressKeysFor({ agent, circleId })),
   );
@@ -129,9 +121,19 @@ export async function primeCircleSecurity({ agent, circleIds = null, onWarn = nu
     if (r.status === 'fulfilled') out.rostersFed += 1;
     else {
       out.rosterFailures += 1;
-      warn(`roster snapshot failed for ${ids[i]} — its traffic will be accepted unchecked`, r.reason);
+      warn(`roster snapshot failed for ${ids[i]}: its traffic is refused until the roster is read`, r.reason);
     }
   });
+
+  // 2. THEN the signing identities. An identity is what makes traffic sealed to the circle's address OPEN, so it
+  //    comes after the roster: whatever opens meets a roster, or (a circle whose read failed) the refusal of a circle
+  //    address with no roster. Installing an identity also notes the address as that circle's (the authorizer).
+  try {
+    await agent?.installCircleIdentities?.(ids);
+    out.identitiesInstalled = true;
+  } catch (err) {
+    warn('signing identities failed', err);
+  }
 
   // 3. …and saying where WE answer is NOT done here. It is `announceCircleAddresses`, exported below,
   //    and the caller runs it after `registerCircleAddresses` has bound the alias. This block used to

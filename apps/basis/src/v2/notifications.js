@@ -8,10 +8,11 @@
  * and the time it ARRIVED here (`landedAt`, the order and the window); a row whose arrival is far after its sending
  * says so ("kwam later binnen"). More than three rows of one circle or contact fold into one row with a count.
  */
-import { param, PARAM_SCOPE, PARAM_KIND, VIEWER_FACING_SYSTEM_KINDS, entryKind, LANE } from '@onderling/item-store';
+import { param, PARAM_SCOPE, PARAM_KIND, VIEWER_FACING_SYSTEM_KINDS } from '@onderling/item-store';
 import { landedTimeOf } from '../eventLog.js';
 import { eventCircleId } from './circleStream.js';
 import { isItemLanding } from './itemLanding.js';
+import { countsAsUnread, pickText } from './circleTilePreviews.js';
 import { itemKindChip, EMBED_TYPE_ICON } from './embedChips.js';
 import { membershipNoticeFor } from './membershipNotices.js';
 import { NOTIFY_WINDOW_DAYS } from './readMarks.js';
@@ -33,6 +34,7 @@ export const FOR_YOU_KEYS = Object.freeze({
   removed: 'circle.forYou.removed',
   many:    'circle.forYou.many',
   late:    'circle.forYou.late',
+  news:    'circle.forYou.news',
   someone: 'circle.forYou.someone',
 });
 
@@ -74,23 +76,25 @@ export function notificationRows({
     const at = landedTimeOf(e);
     const group = { kind: 'circle', id: cid, name: shown.get(cid) };
     const open = { kind: 'circle', id: cid };
-    if (isItemLanding(e)) {
-      if (mine.has(e.actor) || !fresh(at, e.payload.itemId)) continue;
-      const chip = itemKindChip(e.payload.kind);
-      if (!chip) continue;
-      push({ id: e.payload.itemId, kind: 'item', group, open, icon: chip.icon, at, saidAt: e.payload.saidAt ?? 0,
-        text: t(FOR_YOU_KEYS.item, { kind: t(chip.labelKey), circle: group.name ?? '' }) });
+    // NEWS IS WHAT THE TILE COUNTS: one rule (`countsAsUnread`), so the badge and these rows never disagree; this
+    // file only shapes the row
+    if (countsAsUnread(e, { myRefs: [...mine] })) {
+      const landing = isItemLanding(e);
+      const id = landing ? e.payload.itemId : e.id;
+      if (!fresh(at, id)) continue;
+      const chip = itemKindChip(landing ? e.payload.kind : (e.payload?.kind ?? null));
+      if (landing) {
+        push({ id, kind: 'item', group, open, icon: chip?.icon ?? EMBED_TYPE_ICON['chat-message'], at, saidAt: e.payload.saidAt ?? 0,
+          text: chip ? t(FOR_YOU_KEYS.item, { kind: t(chip.labelKey), circle: group.name ?? '' }) : t(FOR_YOU_KEYS.news, { circle: group.name ?? '' }) });
+        continue;
+      }
+      const text = clip(pickText(e.payload ?? {}) ?? '');
+      push({ id, kind: 'line', group, open, icon: chip?.icon ?? EMBED_TYPE_ICON['chat-message'], at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
+        text: text ? t(FOR_YOU_KEYS.line, { text, circle: group.name ?? '' }) : t(FOR_YOU_KEYS.news, { circle: group.name ?? '' }) });
       continue;
     }
-    if (entryKind(e.type).lane === LANE.HUMAN && e.type === 'chat-message') {
-      const actor = e.actor ?? e.payload?.actor ?? null;
-      if (!actor || mine.has(actor) || actor === 'bot' || !fresh(at, e.id)) continue;
-      const text = clip(e.payload?.text ?? e.payload?.body ?? '');
-      if (!text) continue;
-      push({ id: e.id, kind: 'line', group, open, icon: EMBED_TYPE_ICON['chat-message'], at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
-        text: t(FOR_YOU_KEYS.line, { text, circle: group.name ?? '' }) });
-      continue;
-    }
+    // …and the two rows the tile does NOT count, on purpose: statements about me on the system lane (someone I admitted
+    // joined; I was removed). The tile's badge is what others SAID; these are what happened to me.
     if (VIEWER_FACING_SYSTEM_KINDS.includes(e.type)) {
       // who "you" is: the self this device is in the circle, or any address of mine (the admitting device signs a
       // join with its per-circle address, which is not the self's id: without the set the founder never heard of a join)

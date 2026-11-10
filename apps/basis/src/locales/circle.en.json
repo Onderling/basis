@@ -10298,6 +10298,10 @@
       "text": "arrived later",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
     },
+    "news": {
+      "text": "Something new in {{circle}}",
+      "doc": "'Nieuw voor jou': a row for news in a circle that carries no words of its own (an item kind without a chip, a line without text)."
+    },
     "someone": {
       "text": "Someone",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."

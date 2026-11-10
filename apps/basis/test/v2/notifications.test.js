@@ -10,6 +10,19 @@ const NOW = Date.UTC(2026, 10, 9, 12);
 const circles = [{ id: 'c1', name: 'Straat' }];
 const line = (id, actor, ts, landedAt, text = 'hoi') => ({ id, ts, landedAt, type: 'chat-message', actor, payload: { circleId: 'c1', text } });
 
+describe('one rule for what is news: the tile and "Nieuw voor jou" agree', () => {
+  it('every event the tile counts is a row; the only rows the tile does not count are a join I admitted and my removal', async () => {
+    const { buildTilePreviews } = await import('../../src/v2/circleTilePreviews.js');
+    const botLine = { id: 'b1', ts: NOW - 900, landedAt: NOW - 900, type: 'chat-message', actor: 'bot', payload: { circleId: 'c1', text: 'vuilnis is morgen' } };
+    const myWizard = { id: 'b2', ts: NOW - 800, landedAt: NOW - 800, type: 'chat-message', actor: 'bot', payload: { circleId: 'c1', text: 'welkom', scope: 'self' } };
+    const events = [botLine, myWizard, line('m1', 'b', NOW - 700, NOW - 700), line('m2', 'me', NOW - 600, NOW - 600)];
+    const tile = buildTilePreviews({ events, circles, myRefs: ['me'] }).c1;
+    const rows = notificationRows({ events, circles, myRefs: ['me'], t, now: NOW });
+    expect(rows.map((r) => r.id).sort()).toEqual(tile.unreadIds.map((x) => x.id).sort());
+    expect(rows.map((r) => r.id)).toContain('b1');   // a household bot's line raises the badge, so it is news here too
+  });
+});
+
 describe('notificationRows', () => {
   it('a line, a landed post and a direct message from others are rows, newest arrival first; mine are not', () => {
     const post = { ...landingEntryFor({ circleId: 'c1', item: { id: 'p1', type: 'request', createdAt: NOW - 3000, source: { from: 'b' } }, now: NOW - 2000 }), landedAt: NOW - 2000 };

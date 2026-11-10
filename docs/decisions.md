@@ -1422,3 +1422,19 @@ feeds and holds connectors. Which device carries which role is the person's choi
 modular so an agent is composed from them (the SDK side of this repo), while the Basis app stays one app. The relay
 is a separate installer and process (the 2026-10-24 entry, amended today). A relay refers a feed ask to whichever
 node announced it serves feeds, as decided on 2026-10-24; that node need not be the companion.
+
+## 2026-11-10 — Bots and apps bring their own nouns and words; Basis's screens show what nouns declare (Frits)
+
+**The rule, for every bot and app, the household bot being the first:** a bot or app brings its functions as nouns
+and verbs in its own manifest. Its functions reach people through every surface that projects the manifest: a chat
+(Telegram, the assistant thread behind the "+"), the circle screens, a slash command. Basis's own screens (Today,
+Mij, the "+") never name a noun. A noun DECLARES how it shows (`presents`: label, moment, order, mine) and its own
+words (`names`), and Basis builds its views from those declarations; a person decides per block which nouns appear
+there. A new bot's "chore" therefore needs no change to Basis, and Basis's locale carries no bot vocabulary.
+
+This joins three earlier calls into one. 2026-09-05: the household bot's functions (lists by chat, nudges, a daily
+summary) keep working in Telegram and inside Basis; nothing is deleted. 2026-09-16: household is broken up into
+standard nouns and verbs, the first realm extension; the name stays only as a wizard suggestion. 2026-10-16: the
+facets above are how Basis shows any noun (built). The in-app bot of 2026-09-05 is the assistant thread: it reads
+the same phrases as the Telegram bot from one shared rule set. Mij's "open" count includes unfinished list items.
+The household manifest's device and identity actions move out of it after the alpha (a move, no behaviour change).

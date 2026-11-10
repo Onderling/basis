@@ -2235,6 +2235,17 @@ export async function createSecureAgent(opts = {}) {
    * to a fresh peer races the handshake.
    */
   async function sendToPeer(addr, payload, opts = {}) {
+    // A send that names WHO speaks (`sendAs`, an address of ours) and has no identity behind it is held (when the caller
+    // asked to hold) or refused: never signed with the canonical identity instead, which would hand the circle and
+    // the relay the person's main key, the one link a per-circle address exists to withhold.
+    {
+      const as = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
+      if (as && as !== identity.pubKey && !(typeof agent.security?.selfIdentityFor === 'function' && agent.security.selfIdentityFor(as))) {
+        if (wantsHold(opts)) return enqueueHold(addr, payload, opts, 'send-as-unregistered');
+        throw Object.assign(new Error(`secure-agent: refused, no identity is registered for ${String(as).slice(0, 16)}… (the address this send must speak as)`),
+          { code: 'SEND_AS_UNREGISTERED' });
+      }
+    }
     // A send that speaks as a PERSONA's address leaves on that persona's own sockets — never the default's routes.
     const owner = (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
     if (owner) return sendAsPersona(addr, payload, opts, owner);
@@ -2517,12 +2528,11 @@ export async function createSecureAgent(opts = {}) {
     const sendAs = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
     const sendingIdentity = (sendAs && typeof agent.security?.selfIdentityFor === 'function')
       ? agent.security.selfIdentityFor(sendAs) : null;
-    if (sendAs && !sendingIdentity && typeof console !== 'undefined') {
-      // Named here, where the address is known, rather than surfacing three layers away as "my
-      // messages in this circle never arrive": without the identity we would sign as the canonical
-      // self while claiming the per-circle address, and the recipient would reject every envelope.
-      console.warn(`[secure-agent] no identity registered for own address ${String(sendAs).slice(0, 16)}…`
-        + ' — falling back to the canonical identity; per-circle signing is OFF for this send.');
+    if (sendAs && sendAs !== identity.pubKey && !sendingIdentity) {
+      // The send path refuses this before routing (sendToPeer); here too, for any caller that reaches the handshake
+      // directly: never the canonical identity in place of an address of ours that has no identity behind it.
+      throw Object.assign(new Error(`secure-agent: refused, no identity is registered for ${String(sendAs).slice(0, 16)}…`),
+        { code: 'SEND_AS_UNREGISTERED' });
     }
     // A transport that cannot carry per-circle addresses cannot carry one as the SENDER either: its
     // authenticated wire sender is our canonical address, and it binds the envelope's `_from` to that

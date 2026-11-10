@@ -71,6 +71,18 @@ describe('a stale verdict parks the envelope', () => {
     expect(got).toEqual([]);
   });
 
+  it('refused outright at the re-judge: counted as dropped, never as delivered', async () => {
+    const { receiver, got, ctl, send } = await setup();
+    await send(1);
+    expect(await until(() => receiver.parkedCount('circle-x') === 1)).toBe(true);
+    ctl.mode = 'refuse';
+    receiver.rejudgeParked('circle-x');
+    await wait(50);
+    expect(got).toEqual([]);
+    expect(receiver.parkStats.droppedAfterRejudge).toBe(1);
+    expect(receiver.parkStats.deliveredAfterRejudge).toBe(0);
+  });
+
   it('bounded per bucket, oldest dropped first and counted; another bucket is untouched', async () => {
     const { receiver, ctl, send } = await setup({ parkMax: 3 });
     for (let n = 1; n <= 5; n++) await send(n);

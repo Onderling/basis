@@ -1075,6 +1075,18 @@ distinguished the two. `SecurityLayer` now **warns once, naming the fix**, and k
 memory. That is why the roster has to be assembled ahead of time — and why assembling it as a side effect of
 opening a screen is a real gap rather than a detail.
 
+*Amended 2026-11-10 (Frits, "ok", in the review of the July–September decisions):* **a circle address whose roster
+this device has not read is REFUSED, never allowed.** The old rule (refuse only where a roster IS known, never on the
+strength of not knowing) admitted any well-signed sender into a circle this device had not read yet, counted and
+warned; it is reversed. Because the port is synchronous and a roster can be behind, the port gains a THIRD answer
+beside allow and refuse: `stale`, carrying an opaque bucket the kernel never reads (`staleSender`; the kernel stays
+circle-blind). The secure agent PARKS a stale envelope per bucket, signature verified but not delivered (no handler,
+no acknowledgement, no receipt), at most 64 per bucket for at most 60 s (internal parameters), the oldest dropped first
+and counted. The app answers `stale` for a circle address with no roster read and for a sender not on the roster that
+was read, reads that circle's roster again, and the parked envelopes are judged ONCE more: accepted ones are delivered
+in arrival order, the rest are dropped and counted, nothing is parked twice. Every circle-identity install reads that
+circle's roster, and the boot primer reads rosters before it installs identities.
+
 ---
 
 ## A member is present on ANY of a circle's connection points, not all (2026-08-02, Frits)

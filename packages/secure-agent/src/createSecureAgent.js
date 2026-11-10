@@ -1429,6 +1429,7 @@ export async function createSecureAgent(opts = {}) {
   const PARK_TTL_MS = Number.isFinite(parkOpts.ttlMs) && parkOpts.ttlMs > 0 ? parkOpts.ttlMs : STALE_PARK_TTL_MS;
   const parked = new Map();          // bucket → { items: [{ tx, raw }], timer }
   const rejudging = new Set();       // envelope ids being judged the second (last) time
+  const refusedAtRejudge = new Set(); // …and those of them the second judgement refused (any security error)
   const parkStats = { parked: 0, droppedOverflow: 0, droppedAfterRejudge: 0, deliveredAfterRejudge: 0 };
   let onParkedFn = typeof parkOpts.onParked === 'function' ? parkOpts.onParked : null;
   function parkStale(tx, raw, bucket) {
@@ -1456,9 +1457,15 @@ export async function createSecureAgent(opts = {}) {
     for (const { tx, raw } of b.items) {
       rejudging.add(raw._id);
       const before = parkStats.droppedAfterRejudge;
-      try { tx._receive(raw); } catch { /* a transport that throws on receive refuses the envelope */ }
+      let threw = false;
+      try { tx._receive(raw); } catch { threw = true; /* a transport that throws on receive refuses the envelope */ }
       rejudging.delete(raw._id);
-      if (parkStats.droppedAfterRejudge === before) parkStats.deliveredAfterRejudge += 1;
+      const refused = refusedAtRejudge.delete(raw._id) || threw;
+      // stale a second time is counted where it is refused (`parkStale`); refused outright is counted here; only an
+      // envelope no security error stopped counts as delivered
+      if (parkStats.droppedAfterRejudge !== before) continue;
+      if (refused) parkStats.droppedAfterRejudge += 1;
+      else parkStats.deliveredAfterRejudge += 1;
     }
     return b.items.length;
   }
@@ -1474,6 +1481,7 @@ export async function createSecureAgent(opts = {}) {
     // unknown sender, a bad signature, an oversize frame — reached no listener at all, and "refused"
     // was indistinguishable from "never arrived". Same event, same place an app already listens.
     tx.on('security-error', (err, raw) => {
+      if (typeof raw?._id === 'string' && rejudging.has(raw._id)) refusedAtRejudge.add(raw._id);
       if (err?.code === 'SENDER_STALE') { parkStale(tx, raw, err.bucket); return; }
       try { agent.emit('security-error', err, raw); } catch { /* a listener that throws must not take the receive path down */ }
     });
@@ -2968,6 +2976,14 @@ export async function createSecureAgent(opts = {}) {
     /** Diagnostic: the addresses this device holds an identity of its own for. */
     get selfIdentityAddresses() { return agent.security?.selfAddresses ?? []; },
 
+    /** Judge one bucket's parked envelopes once more (the host refreshed its snapshot). Returns how many. */
+    rejudgeParked: (bucket) => rejudgeParked(bucket),
+    /** How many envelopes wait in one bucket right now. */
+    parkedCount: (bucket) => parked.get(bucket)?.items.length ?? 0,
+    /** Parking counters: parked, droppedOverflow, droppedAfterRejudge, deliveredAfterRejudge. */
+    get parkStats() { return { ...parkStats }; },
+    /** The host's hook: an envelope was parked under `bucket` (refresh the snapshot, then `rejudgeParked`). */
+    onParked(fn) { onParkedFn = typeof fn === 'function' ? fn : null; },
     /**
      * Decision 1 step 3 — install the ROSTER AUTHORIZE step.
      *
@@ -2988,14 +3004,6 @@ export async function createSecureAgent(opts = {}) {
      * @param {((context: object) => {allow: boolean, reason: string})|null} authorizer
      * @returns {boolean} whether an authorizer is now installed
      */
-    /** Judge one bucket's parked envelopes once more (the host refreshed its snapshot). Returns how many. */
-    rejudgeParked: (bucket) => rejudgeParked(bucket),
-    /** How many envelopes wait in one bucket right now. */
-    parkedCount: (bucket) => parked.get(bucket)?.items.length ?? 0,
-    /** Parking counters: parked, droppedOverflow, droppedAfterRejudge, deliveredAfterRejudge. */
-    get parkStats() { return { ...parkStats }; },
-    /** The host's hook: an envelope was parked under `bucket` (refresh the snapshot, then `rejudgeParked`). */
-    onParked(fn) { onParkedFn = typeof fn === 'function' ? fn : null; },
     setSenderAuthorizer(authorizer) {
       if (typeof agent.security?.setSenderAuthorizer !== 'function') return false;
       return agent.security.setSenderAuthorizer(authorizer);

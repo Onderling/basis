@@ -62,6 +62,29 @@ describe('the resting browse', () => {
     expect(await settle(() => H.froms.includes(phone.lanAddress)), 'the second visit dials under the new key').toBe(true);
   });
 
+  it('what is announced (TXT key and host name) follows the LAN key: a room key in, a fresh rest key out, never the canonical', async () => {
+    const inner = createLoopbackDiscovery();
+    const records = [];
+    const discovery = { advertise: (r) => { records.push(r); return inner.advertise(r); }, browse: (b) => inner.browse(b) };
+    const canonical = await ident();
+    const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
+    const phone = new MdnsTransport({ identity: canonical, native, emitter });
+    open.push({ stop: () => phone.disconnect() });
+    await phone.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    const room = await ident();
+    await phone.useLanIdentity(room);
+    await phone.useLanIdentity(null);
+    const said = records.map((r) => ({ key: r.txt?.pubKey, name: r.serviceName }));
+    expect(said).toHaveLength(3);
+    expect(said[1].key, 'in the room: the room key').toBe(room.pubKey);
+    expect(new Set(said.map((x) => x.key)).size, 'three presences, three keys').toBe(3);
+    for (const x of said) {
+      expect(x.key).not.toBe(canonical.pubKey);
+      expect(x.name, 'the host name carries the LAN key\'s slice').toBe(`dw-${x.key.slice(0, 8)}`);
+      expect(x.name).not.toContain(canonical.pubKey.slice(0, 8));
+    }
+  });
+
   it('two phones of one persona on one LAN do not skip each other as self', async () => {
     const discovery = createLoopbackDiscovery();
     // the chat identity is profile-derived: the same seed on every device of the persona

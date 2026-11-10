@@ -108,8 +108,7 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   ../../../../packages/<pkg>`, which `pnpm install` creates from the declared dep. If you can't run a full install
   (the offline store is often incomplete here), materialize the link by hand, mirroring an existing one (e.g.
   `@onderling/redaction`). **Tell:** an import that resolves in one package but throws `ERR_MODULE_NOT_FOUND` in
-  another. *Concrete (2026-07-08):* feedback-split F1 added `@onderling/{core,pod-client,pseudo-pod}` to
-  `apps/feedback-pipeline`; links were materialized by hand pending the next install. *Concrete (2026-07-09):* the
+  another. *Concrete (2026-07-09):* the
   versioning/agents work hand-materialized `@onderling/versioning` into `apps/basis`, `apps/basis-mobile`,
   and `packages/substrate-stack`; `@onderling/substrate-stack` into `apps/{pinboard,tasks-v0,household}`; and
   `@onderling-app/agents` + `@onderling/agent-registry` into `apps/basis` — all pending the next real install.
@@ -252,31 +251,24 @@ since then. **Fix (2026-07-13):** added `@onderling-app/agents` to `metro.config
 an `extraSubpathResolvers` case (package-exports stays disabled). (Added 2026-07-13, mobile feedback parity.)
 
 ### New workspace dep into basis: `@onderling/attribute-charter` (2026-07-16, property-layer Phase 3)
-`apps/basis/src/feedback/charterConsent.js` imports `@onderling/attribute-charter`. It's a pure-JS package
+`apps/basis/src/v2/charterConsent.js` imports `@onderling/attribute-charter`. It's a pure-JS package
 (`@noble/hashes` only), so it bundles fine — BUT the workspace edge wasn't in the lockfile, so materialize the
 link: `apps/basis/node_modules/@onderling/attribute-charter -> ../../../../packages/attribute-charter`.
 **Tell:** `Cannot find module '@onderling/attribute-charter'` from a basis test/build → the symlink is missing
-(a fresh `pnpm install` after the lockfile picks it up also fixes it). Same pattern as the feedback-pipeline edge.
+(a fresh `pnpm install` after the lockfile picks it up also fixes it).
 
 - **The `onderling-feedback` link dep is GONE (2026-09-05).** basis and basis-mobile no longer import the
   sibling feedback repo: feedback is an external bot that reaches basis as a contact. The `link:` entries, the
   Metro resolvers for `onderling-feedback/{public,testing}`, the `eld` watch folder/resolver and the Vite
   external hack were all removed with it. If a build asks for `onderling-feedback` or `eld`, something re-imported
   the bot's code into a shell — that is the drift, not a missing symlink.
-- **Mobile bundle 500s on the feedback chain — TWO missing Metro resolvers (fixed 2026-07-25).** Surfaced when
-  actually bundling for a device. (1) `onderling-feedback/public` had NO hand-resolver (Metro exports-off), so the
-  bundle failed immediately — added `resolveRequest` cases mapping `onderling-feedback/{public,testing}` to the
-  sibling checkout (`../feedback/src/public/index.js`, `../feedback/test/helpers/mock-llm.js`). (2) The `eld`
-  language-detector resolver pointed at `apps/feedback-pipeline/node_modules/eld` (never installed there) — `eld`
-  is HOISTED to the ROOT `node_modules/eld`; repointed the resolver + added `node_modules/eld` to `watchFolders`
-  (else Metro "Failed to get the SHA-1"). With both, `apps/basis-mobile` bundles (2591 modules). Only THEN does the
-  next layer show: the connected **dev-client APK is stale** — missing native modules (ExpoSecureStore →
-  ExpoWebBrowser → expo-auth-session → …). Do NOT shim these one-by-one (cascade + degrades auth/secure-store);
-  **rebuild the dev client** (`expo run:android`) so it carries the app's current native deps.
+- **A stale dev-client APK shows as missing native modules** (ExpoSecureStore → ExpoWebBrowser → expo-auth-session → …).
+  Do NOT shim these one by one (a cascade, and it degrades auth/secure-store): **rebuild the dev client**
+  (`expo run:android`) so it carries the app's current native deps.
 
 ## mDNS: the native module gained a split — an old app binary silently cannot do ghost mode
 
-`MdnsModule` (Android, `packages/react-native/android/src/main/java/com/onderling/mdns/MdnsModule.kt`) used to
+`MdnsModule` (Android, `packages/react-native/android/src/main/java/com/canopy/mdns/MdnsModule.kt`) used to
 expose one `start()` that registered the service AND began browsing. It now also exposes `startAdvertising` /
 `stopAdvertising` / `startDiscovery` / `stopDiscovery`, and `MdnsTransport` feature-detects them via
 `MdnsTransport.supportsSplit()`.
@@ -324,9 +316,6 @@ documented above).
 run the install and check the totals of the neighbouring suites immediately. And note the shells resolve
 `file:` workspace deps as **symlinks** — verify with `ls -la apps/<app>/node_modules/@onderling/core`; a real
 directory there means the tree is broken.
-
-*(A silver lining: running the relink also fixed pre-existing breakage — `apps/pinboard-mobile` went from 3
-failing test files to 940/940, and it had been that way for a while.)*
 
 ## Mobile screens have NO test coverage — `vitest` excludes `src/screens/**`
 
@@ -699,13 +688,6 @@ cwd the `onderling` user cannot stat. Everything that touches "." — docker com
 fails with `stat .: permission denied`, which read as a build failure. The updater now `cd "$BOX_DIR"`s
 before any work; any script a box runs under another user must do the same. The test reproduces it by
 entering a directory, `chmod 000` on it, then exec'ing the script.
-
-### `npm run coverage` prints the snapshot; it does not write it (2026-09-24)
-
-`apps/basis/scripts/surface-coverage.mjs` writes the markdown to STDOUT. `npm run coverage` therefore shows the table
-and leaves `docs/surface-coverage.md` untouched, and the fitness test (`surfaceCoverageFresh`) stays red after a
-manifest change although "coverage was run". Refresh it with
-`node scripts/surface-coverage.mjs > docs/surface-coverage.md` from `apps/basis`.
 
 ## Driving the phone by hand (`adb`) — the traps, collected from the 2026-08-29/30 walks
 

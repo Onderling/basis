@@ -42,7 +42,7 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { b64Encode } from '../src/utils/base64.js';
 import { MdnsTransport } from '../src/transport/MdnsTransport.js';
-import { helloChallengeMessage, helloProofMessage } from '@onderling/transports/mdns';
+import { helloChallengeMessage, helloProofMessage, ephemeralKeyPair, helloTranscript, openChannel } from '@onderling/transports/mdns';
 
 /** Fire a native emitter event into every registered listener. */
 function fireMdns(event, payload) {
@@ -57,20 +57,28 @@ const unb64json = (b64) => JSON.parse(new TextDecoder().decode(Uint8Array.from(a
 const sentOn = (connId) => h.native.send.mock.calls.filter(([c]) => c === connId).map(([, d]) => unb64json(d));
 const until = async (fn) => { for (let i = 0; i < 200; i++) { const v = fn(); if (v) return v; await flush(); } return null; };
 
+/** The far end's channel per connection, so a test can seal what the remote says after the hello. */
+const remoteChannels = new Map();
 /** We dialled `remote` on `connId`: answer our hello with a challenge `remote` really signed. */
 async function proveListener(self, remote, connId = 'conn-1') {
   const hello = await until(() => sentOn(connId).find((f) => f._mdns_hello));
-  const sig = b64Encode(remote.sign(helloChallengeMessage(hello.nonce, 'n-remote', remote.pubKey, self.pubKey)));
-  fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_challenge: true, _from: remote.pubKey, nonce: 'n-remote', sig }) });
-  return hello;
+  const eph = ephemeralKeyPair();
+  const sig = b64Encode(remote.sign(helloChallengeMessage(hello.nonce, 'n-remote', remote.pubKey, self.pubKey, hello.eph, eph.publicKey)));
+  remoteChannels.set(connId, openChannel({ role: 'listener', mySecret: eph.secretKey, theirPublic: hello.eph,
+    transcript: helloTranscript({ D: self.pubKey, L: remote.pubKey, nD: hello.nonce, nL: 'n-remote', eD: hello.eph, eL: eph.publicKey }) }));
+  fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_challenge: true, _from: remote.pubKey, nonce: 'n-remote', eph: eph.publicKey, sig }) });
+  return { ...hello, remoteEph: eph.publicKey };
 }
 
 /** `remote` dialled us on `connId`: hello, then answer our challenge with a proof `remote` really signed. */
 async function proveDialler(self, remote, connId) {
   fireMdns('MdnsClientConnected', { connectionId: connId });
-  fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_hello: true, _from: remote.pubKey, nonce: `n-${connId}` }) });
+  const eph = ephemeralKeyPair();
+  fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_hello: true, _from: remote.pubKey, nonce: `n-${connId}`, eph: eph.publicKey }) });
   const challenge = await until(() => sentOn(connId).find((f) => f._mdns_challenge));
-  const sig = b64Encode(remote.sign(helloProofMessage(`n-${connId}`, challenge.nonce, remote.pubKey, self.pubKey)));
+  const sig = b64Encode(remote.sign(helloProofMessage(`n-${connId}`, challenge.nonce, remote.pubKey, self.pubKey, eph.publicKey, challenge.eph)));
+  remoteChannels.set(connId, openChannel({ role: 'dialler', mySecret: eph.secretKey, theirPublic: challenge.eph,
+    transcript: helloTranscript({ D: remote.pubKey, L: self.pubKey, nD: `n-${connId}`, nL: challenge.nonce, eD: eph.publicKey, eL: challenge.eph }) }));
   fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_proof: true, sig }) });
   return challenge;
 }
@@ -163,12 +171,13 @@ describe('MdnsTransport', () => {
     expect(hello).toMatchObject({ _mdns_hello: true, _from: identity.pubKey });
     expect(typeof hello.nonce).toBe('string');
     expect(transport._hasPeer(remoteHigher), 'the TXT key is a claim until it is proven').toBe(false);
-    await proveListener(identity, hiId);
+    const { remoteEph } = await proveListener(identity, hiId);
     expect(await discovered).toBe(remoteHigher);
     expect(transport._hasPeer(remoteHigher)).toBe(true);
     // and we proved ourselves back, over the listener's nonce
     const proof = await until(() => sentOn('conn-1').find((f) => f._mdns_proof));
-    expect(AgentIdentity.verify(helloProofMessage(hello.nonce, 'n-remote', identity.pubKey, remoteHigher), proof.sig, identity.pubKey)).toBe(true);
+    expect(typeof hello.eph, 'the hello carries an ephemeral channel key').toBe('string');
+    expect(AgentIdentity.verify(helloProofMessage(hello.nonce, 'n-remote', identity.pubKey, remoteHigher, hello.eph, remoteEph), proof.sig, identity.pubKey)).toBe(true);
   });
 
   it('a listener that cannot sign as the key it advertised is never keyed, and the socket is closed', async () => {
@@ -217,12 +226,13 @@ describe('MdnsTransport', () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));
     fireMdns('MdnsClientConnected', { connectionId: 'in-1' });
-    fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_hello: true, _from: remoteLower, nonce: 'n-in-1' }) });
+    const eph = ephemeralKeyPair();
+    fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_hello: true, _from: remoteLower, nonce: 'n-in-1', eph: eph.publicKey }) });
     const challenge = await until(() => sentOn('in-1').find((f) => f._mdns_challenge));
     expect(transport._hasPeer(remoteLower), 'a hello is a claim').toBe(false);
-    // we proved OUR key over the dialler's nonce
-    expect(AgentIdentity.verify(helloChallengeMessage('n-in-1', challenge.nonce, identity.pubKey, remoteLower), challenge.sig, identity.pubKey)).toBe(true);
-    const sig = b64Encode(loId.sign(helloProofMessage('n-in-1', challenge.nonce, remoteLower, identity.pubKey)));
+    // we proved OUR key over the dialler's nonce and both channel keys
+    expect(AgentIdentity.verify(helloChallengeMessage('n-in-1', challenge.nonce, identity.pubKey, remoteLower, eph.publicKey, challenge.eph), challenge.sig, identity.pubKey)).toBe(true);
+    const sig = b64Encode(loId.sign(helloProofMessage('n-in-1', challenge.nonce, remoteLower, identity.pubKey, eph.publicKey, challenge.eph)));
     fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_proof: true, sig }) });
     expect(await discovered).toBe(remoteLower);
     expect(transport._hasPeer(remoteLower)).toBe(true);
@@ -233,9 +243,10 @@ describe('MdnsTransport', () => {
     const discovered = [];
     transport.on('peer-discovered', (k) => discovered.push(k));
     fireMdns('MdnsClientConnected', { connectionId: 'in-9' });
-    fireMdns('MdnsDataReceived', { connectionId: 'in-9', data: b64json({ _mdns_hello: true, _from: remoteLower, nonce: 'n' }) });
+    const eph = ephemeralKeyPair();
+    fireMdns('MdnsDataReceived', { connectionId: 'in-9', data: b64json({ _mdns_hello: true, _from: remoteLower, nonce: 'n', eph: eph.publicKey }) });
     const challenge = await until(() => sentOn('in-9').find((f) => f._mdns_challenge));
-    const sig = b64Encode(hiId.sign(helloProofMessage('n', challenge.nonce, remoteLower, identity.pubKey)));   // a squatter signs
+    const sig = b64Encode(hiId.sign(helloProofMessage('n', challenge.nonce, remoteLower, identity.pubKey, eph.publicKey, challenge.eph)));   // a squatter signs
     fireMdns('MdnsDataReceived', { connectionId: 'in-9', data: b64json({ _mdns_proof: true, sig }) });
     await until(() => h.native.close.mock.calls.length > 0);
     expect(transport._hasPeer(remoteLower)).toBe(false);

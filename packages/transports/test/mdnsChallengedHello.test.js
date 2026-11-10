@@ -11,6 +11,7 @@ import { AgentIdentity } from '@onderling/core';
 import { MdnsTransport, SERVICE_TYPE } from '../src/MdnsTransport.js';
 import { createMdnsNodeBackend, createLoopbackDiscovery } from '../src/mdnsNodeBackend.js';
 import { b64Encode } from '../src/utils/base64.js';
+import { ephemeralKeyPair } from '../src/mdnsChannel.js';
 
 const throwawayVault = () => { const m = new Map(); return { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); } }; };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -105,12 +106,12 @@ describe('a challenge is never a proof', () => {
     s.emitter.addListener('MdnsDataReceived', ({ connectionId, data }) => { frames.set(connectionId, [...(frames.get(connectionId) ?? []), decode(data)]); });
     // 1. S dials A, hellos as B; A challenges with nA
     const toA = await s.native.connect('127.0.0.1', ports[a.pubKey]);
-    await s.native.send(toA, frame({ _mdns_hello: true, _from: b.pubKey, nonce: 'whatever' }));
+    await s.native.send(toA, frame({ _mdns_hello: true, _from: b.pubKey, nonce: 'whatever', eph: ephemeralKeyPair().publicKey }));
     expect(await settle(() => (frames.get(toA) ?? []).some((f) => f._mdns_challenge))).toBe(true);
     const nA = frames.get(toA).find((f) => f._mdns_challenge).nonce;
     // 2. S dials B, hellos as A with nonce = nA; B's challenge signs over nA
     const toB = await s.native.connect('127.0.0.1', ports[b.pubKey]);
-    await s.native.send(toB, frame({ _mdns_hello: true, _from: a.pubKey, nonce: nA }));
+    await s.native.send(toB, frame({ _mdns_hello: true, _from: a.pubKey, nonce: nA, eph: ephemeralKeyPair().publicKey }));
     expect(await settle(() => (frames.get(toB) ?? []).some((f) => f._mdns_challenge))).toBe(true);
     const bSig = frames.get(toB).find((f) => f._mdns_challenge).sig;
     // 3. S forwards B's challenge signature to A as the proof

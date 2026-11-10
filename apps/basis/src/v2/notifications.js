@@ -35,6 +35,7 @@ export const FOR_YOU_KEYS = Object.freeze({
   many:    'circle.forYou.many',
   late:    'circle.forYou.late',
   news:    'circle.forYou.news',
+  aCircle: 'circle.forYou.a_circle',
   someone: 'circle.forYou.someone',
 });
 
@@ -52,13 +53,14 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  * @param {(key: string, vars?: object) => string} a.t
  * @param {number} [a.now]
  * @param {number} [a.windowDays]
+ * @param {boolean} [a.fold]  false: one row per thing, no folding (the banner reads them one by one)
  * @param {(group: {kind: 'circle'|'contact', id: string}) => ({id: string, name?: string|null}|null)} [a.selfOf]
  *        the persona a row is for (its face); the host passes it only when the device holds more than one
  * @returns {Array<{id: string, kind: string, group: {kind: 'circle'|'contact', id: string, name: string|null}, icon: string, text: string, at: number, late: boolean, open: {kind: 'circle'|'thread', id: string}, count?: number, ids: Array<{id: string, at: number}>}>}
  */
 export function notificationRows({
   events = [], turns = [], circles = [], contactName = null, viewerIdIn = null, myRefs = [], readIds = null, t,
-  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null,
+  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true,
 } = {}) {
   if (typeof t !== 'function') return [];
   const mine = new Set(myRefs ?? []);
@@ -72,8 +74,18 @@ export function notificationRows({
   for (const e of Array.isArray(events) ? events : []) {
     if (!e || typeof e !== 'object') continue;
     const cid = eventCircleId(e) ?? e.circleId ?? e.payload?.circleId ?? null;
-    if (!cid || !shown.has(cid)) continue;
+    if (!cid) continue;
     const at = landedTimeOf(e);
+    if (!shown.has(cid)) {
+      // MY REMOVAL outlives the circle: the evict about me lands and the circle leaves my list at once, so it is the
+      // one statement read for a circle no longer shown. It names "a circle" and opens Today (there is no circle to open).
+      const body = e.payload?.body;
+      if (VIEWER_FACING_SYSTEM_KINDS.includes(e.type) && body?.kind === 'evict' && mine.has(body.subject) && fresh(at, e.id)) {
+        push({ id: e.id, kind: 'removed', group: { kind: 'circle', id: cid, name: null }, open: null, icon: '🚪', at,
+          saidAt: typeof e.ts === 'number' ? e.ts : 0, text: t(FOR_YOU_KEYS.removed, { circle: t(FOR_YOU_KEYS.aCircle) }) });
+      }
+      continue;
+    }
     const group = { kind: 'circle', id: cid, name: shown.get(cid) };
     const open = { kind: 'circle', id: cid };
     // NEWS IS WHAT THE TILE COUNTS: one rule (`countsAsUnread`), so the badge and these rows never disagree; this
@@ -127,6 +139,7 @@ export function notificationRows({
 
   // newest arrival first; more than FOLD_AFTER rows of one group fold into one row with a count
   rows.sort((a, b) => b.at - a.at);
+  if (!fold) return rows;
   const byGroup = new Map();
   for (const r of rows) {
     const k = `${r.group.kind}:${r.group.id}`;

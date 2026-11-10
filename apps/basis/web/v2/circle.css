@@ -1606,3 +1606,13 @@
 .circle-screen__for-you-all { margin-top: 6px; background: transparent; border: none; color: var(--accent-ink); cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
 /* Today's circles with news: the name, what is new (icons), the count, with room between them */
 .circle-screen__circles-unread-row > span + span { margin-left: 8px; }
+
+/* THE BANNER: what just came in for you, for a moment at the top (the shared driver decides; this only paints) */
+.cc-banner {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50;
+  max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); font: inherit; text-align: left; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cc-banner[hidden] { display: none; }

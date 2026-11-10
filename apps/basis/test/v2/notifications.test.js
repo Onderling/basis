@@ -49,6 +49,14 @@ describe('notificationRows', () => {
     const rows = notificationRows({ events: [join, evict], circles, viewerIdIn: () => 'me', t, now: NOW });
     expect(rows.map((r) => r.kind)).toEqual(['removed', 'joined']);
   });
+  it('my removal is a row though the circle has already left my list (it opens Today, the circle is gone)', () => {
+    // as the two-browser walk found it: the evict about me lands, the circle leaves listMyCircles at once
+    const evict = { id: 's3', ts: NOW - 50, landedAt: NOW - 50, type: 'membership', circleId: 'gone', payload: { circleId: 'gone', body: { kind: 'evict', subject: 'B-key', author: 'admin' } } };
+    const lineThere = { ...line('m9', 'x', NOW - 40, NOW - 40), payload: { circleId: 'gone', text: 'na je vertrek' } };
+    const rows = notificationRows({ events: [evict, lineThere], circles, myRefs: ['me', 'B-key'], t, now: NOW });
+    expect(rows.map((r) => [r.kind, r.open])).toEqual([['removed', null]]);
+    expect(rows[0].text).toMatch(/a_circle/);
+  });
   it('more than three from one circle fold into one row with a count, carrying every id', () => {
     const ev = [1, 2, 3, 4].map((i) => line(`m${i}`, 'b', NOW - i * 1000, NOW - i * 1000));
     const rows = notificationRows({ events: ev, circles, t, now: NOW });

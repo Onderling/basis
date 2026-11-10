@@ -220,7 +220,8 @@ export {
   addScreen, renameScreen, removeScreen, setActiveScreen, getActiveScreen, updateScreen,
   createUserScreenStore, localStorageScreenIo, localUserScreenStore, SCREEN_VERSIONS_KEY,
 } from './v2/userScreens.js';
-export { materializeScreen } from './v2/userScreenBlocks.js';
+export { materializeScreen, forYouRows } from './v2/userScreenBlocks.js';
+export { createBannerDriver, notifyPolicyKey } from './v2/notifyBanner.js';
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 export { createScreenBlocksCache } from './v2/screenBlocksCache.js';
 export {

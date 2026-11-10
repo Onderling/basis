@@ -10057,6 +10057,26 @@
       "notify_windowDays": {
         "text": "How long something new stays in your news (days)",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_dm": {
+        "text": "Notify: a direct message",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_removed": {
+        "text": "Notify: being removed from a circle",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_item": {
+        "text": "Notify: a new post, task or appointment",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_line": {
+        "text": "Notify: a line in a circle",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_joined": {
+        "text": "Notify: someone joining",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10114,6 +10134,14 @@
       },
       "description": {
         "text": "Only the description",
+        "doc": "A choice on the settings screen."
+      },
+      "banner": {
+        "text": "Show a banner",
+        "doc": "A choice on the settings screen."
+      },
+      "list": {
+        "text": "Only on Today",
         "doc": "A choice on the settings screen."
       },
       "off": {
@@ -10301,6 +10329,14 @@
     "news": {
       "text": "Something new in {{circle}}",
       "doc": "'Nieuw voor jou': a row for news in a circle that carries no words of its own (an item kind without a chip, a line without text)."
+    },
+    "banner_many": {
+      "text": "{{count}} new things for you",
+      "doc": "The in-app banner when several new things arrive at once (the projection's rows, unfolded)."
+    },
+    "a_circle": {
+      "text": "a circle",
+      "doc": "'Nieuw voor jou': the circle a removal row names when the circle has already left the person's list."
     },
     "someone": {
       "text": "Someone",

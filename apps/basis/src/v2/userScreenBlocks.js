@@ -43,6 +43,7 @@ import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
 import { notificationRows, FOR_YOU_KEYS } from './notifications.js';
+import { NOTIFY_WINDOW_DAYS } from './readMarks.js';
 import { tileCircles } from './helpContact.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { isPairCircleId } from './pairCircleId.js';
@@ -98,36 +99,55 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   // "Nieuw voor jou" at the top of the page the shell asks it for (Vandaag), and only when it holds rows: never an
   // empty block. Not a block of the stored page: what is new is not something a person places or removes.
   if (hostOps.forYou === true) {
-    // EVERY persona's circles, ticked or not (a reply to a persona you are not in must not go unnoticed); muted stay
-    // out. With more than one persona on the device each row carries the persona it is for, so the shell paints its face.
-    const held = Array.isArray(hostOps.selfSet?.held) ? hostOps.selfSet.held.filter((p) => p?.id) : [];
-    const every = (hostOps.allCircles ?? hostOps.circles ?? []).filter((c) => c?.id && !muted.has(c.id));
-    const personaById = new Map(held.map((p) => [p.id, p]));
-    const selfOf = held.length > 1 && typeof hostOps.profileIdOf === 'function'
-      ? (group) => {
-        // a circle is its persona's; a contact is filed under its pair circle's persona, without one the default's
-        // (the rule the Contacten switcher filters by, `contactsInSet`)
-        const circleId = group?.kind === 'circle' ? group.id
-          : (typeof hostOps.contactCircleOf === 'function' ? hostOps.contactCircleOf(group?.id) : null);
-        const p = personaById.get(circleId ? (hostOps.profileIdOf(circleId) ?? 'default') : 'default');
-        return p ? { id: p.id, name: p.id === 'default' ? null : (p.name ?? p.id) } : null;
-      }
-      : null;
-    const rows = notificationRows({
-      events: hostOps.eventLog?.query ? hostOps.eventLog.query({ excludeMuted: true }) : [],
-      turns: hostOps.turns ?? [],
-      circles: every, selfOf,
-      contactName: hostOps.contactName ?? null,
-      viewerIdIn: typeof ops.selfIn === 'function' ? ops.selfIn : null,
-      myRefs: hostOps.myRefs ?? [],
-      readIds: hostOps.readIds ?? null,
-      t: hostOps.t,
-      now: typeof hostOps.now === 'function' ? hostOps.now() : Date.now(),
-      windowDays: hostOps.notifyWindowDays,
-    });
+    const rows = forYouRows({ ...hostOps, selfIn: ops.selfIn }, { muted });
     if (rows.length > 0) blocks.unshift({ blockId: 'for-you', type: 'forYou', status: 'ok', titleKey: FOR_YOU_KEYS.title, content: { items: rows } });
   }
   return blocks;
+}
+
+/**
+ * "Nieuw voor jou"'s rows from a shell's host inputs (the event log, the direct-message turns, the circles, the
+ * persona set, the read marks): what Today paints on top and what the banner reads, one call so the two never differ.
+ *
+ * @param {object} hostOps  the materializer's host inputs (`eventLog`, `turns`, `circles`/`allCircles`, `selfSet`,
+ *   `profileIdOf`, `contactCircleOf`, `contactName`, `selfIn`, `myRefs`, `readIds`, `t`, `now`, `notifyWindowDays`)
+ * @param {{ muted?: Set<string>, fold?: boolean }} [o]  fold: false gives one row per thing (the banner's reading)
+ * @returns {object[]}
+ */
+/** The person's news window in days (the register's value), else its default: the projection's own fallback. */
+const windowDaysOf = (d) => (Number.isFinite(d) && d > 0 ? d : NOTIFY_WINDOW_DAYS);
+
+export function forYouRows(hostOps = {}, { muted = new Set(), fold = true } = {}) {
+  const nowMs = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
+  // EVERY persona's circles, ticked or not (a reply to a persona you are not in must not go unnoticed); muted stay
+  // out. With more than one persona on the device each row carries the persona it is for, so the shell paints its face.
+  const held = Array.isArray(hostOps.selfSet?.held) ? hostOps.selfSet.held.filter((p) => p?.id) : [];
+  const every = (hostOps.allCircles ?? hostOps.circles ?? []).filter((c) => c?.id && !muted.has(c.id));
+  const personaById = new Map(held.map((p) => [p.id, p]));
+  const selfOf = held.length > 1 && typeof hostOps.profileIdOf === 'function'
+    ? (group) => {
+      // a circle is its persona's; a contact is filed under its pair circle's persona, without one the default's
+      // (the rule the Contacten switcher filters by, `contactsInSet`)
+      const circleId = group?.kind === 'circle' ? group.id
+        : (typeof hostOps.contactCircleOf === 'function' ? hostOps.contactCircleOf(group?.id) : null);
+      const p = personaById.get(circleId ? (hostOps.profileIdOf(circleId) ?? 'default') : 'default');
+      return p ? { id: p.id, name: p.id === 'default' ? null : (p.name ?? p.id) } : null;
+    }
+    : null;
+  return notificationRows({
+    // only what arrived inside the news window (by arrival, so a late line is kept): the rest can never be a row
+    events: hostOps.eventLog?.query ? hostOps.eventLog.query({ excludeMuted: true, landedSince: nowMs - windowDaysOf(hostOps.notifyWindowDays) * 86_400_000 }) : [],
+    turns: hostOps.turns ?? [],
+    circles: every, selfOf,
+    contactName: hostOps.contactName ?? null,
+    viewerIdIn: typeof hostOps.selfIn === 'function' ? hostOps.selfIn : null,
+    myRefs: hostOps.myRefs ?? [],
+    readIds: hostOps.readIds ?? null,
+    t: hostOps.t,
+    now: nowMs,
+    windowDays: hostOps.notifyWindowDays,
+    fold,
+  });
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */

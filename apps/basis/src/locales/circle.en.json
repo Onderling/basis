@@ -3763,10 +3763,6 @@
       "text": "nothing shown yet",
       "doc": "Summary when neither allow is on."
     },
-    "reach_share": {
-      "text": "Share how to reach me",
-      "doc": "Rung 4: the action in a nearby thread that shares my {transport→address} map (all-or-nothing; the NKN address only if the publication lock allows)."
-    },
     "reach_shared_you": {
       "text": "You shared how to reach you.",
       "doc": "Thread line after sharing."
@@ -3808,8 +3804,8 @@
       "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
     },
     "as_self_caveat": {
-      "text": "That is a name you show, not a separate address: whoever is looking here can tell it comes from the same device.",
-      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+      "text": "The room sees a new key each time. The network still sees your device.",
+      "doc": "Nearby → You here: what the room key does and does not hide. A new key per entry and per self; the network (IP, MAC) still sees the device."
     },
     "first_use_title": {
       "text": "What may this room see of you?",

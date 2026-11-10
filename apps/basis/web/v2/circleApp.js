@@ -3533,9 +3533,9 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     onButtonTap: async (b, _m, ev) => {
       const room = ensureNearbyRoom();
       if (b?.id === 'reach-back-no') { room?.settleReach?.(thread.peerAddr); rerender(); return; }
-      if (b?.id === 'reach-back-yes' || b?.id === 'reach-share') {
-        // the click itself goes down with it: sharing how to reach me happens only from a press on these two
-        const r = await room?.shareReach?.(thread.peerAddr, { wantBack: b.id === 'reach-share', press: { trigger: b.id === 'reach-share' ? 'chip' : 'reach-back-yes', event: ev ?? null } });
+      if (b?.id === 'reach-back-yes') {
+        // the click itself goes down with it: sharing back how to reach me happens only from a press here
+        const r = await room?.shareReach?.(thread.peerAddr, { wantBack: false, press: { trigger: 'reach-back-yes', event: ev ?? null } });
         if (r?.ok) {
           room?.settleReach?.(thread.peerAddr);
           thread.messages.push({ origin: 'user', text: t('circle.nearbyScreen.reach_shared_you') });

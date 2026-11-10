@@ -22,7 +22,6 @@
 
 export const SHELLS = Object.freeze(['web', 'mobile', 'box']);
 
-const P = (file, test = null) => ({ file, ...(test ? { test } : {}), proposed: true });
 const NA = (why) => ({ na: why });
 const BOX_NO_SCREEN = NA('the box paints no screen: this function is a person\'s, on their own device');
 
@@ -31,20 +30,20 @@ export const FUNCTIONS = Object.freeze([
   { id: 'messaging', name: 'Messaging (circle chat, contact threads)', cells: {
     web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'fan-out — a message from A appears in B chat' },   // named by Fable 2026-11-03
     mobile: null,   // circleChatParity is a parity test, not a story on the phone
-    box: P('apps/basis/test/botJoinsCircle.relay.test.js'),
+    box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the circle door: a member who names it is answered' },
   } },
   { id: 'nearby', name: 'Nearby', cells: {
-    web: P('apps/basis/test-browser/nearby-level.spec.js'),
+    web: null,      // nearby-level proves only that the level survives a reload; nobody meets anyone (Fable 2026-11-10)
     mobile: null,   // circlesNearbyParity is a parity test
     box: NA('the box joins no Nearby room in alpha one (a venue room is later)'),
   } },
   { id: 'feedback', name: 'Feedback to the maker', cells: {
-    web: P('apps/basis/test-browser/feedback-path-box.spec.js'),
+    web: { file: 'apps/basis/test-browser/feedback-path-box.spec.js', test: 'a visitor writes to the maker' },
     mobile: null,   // feedbackDoorMobile is a unit of the door
-    box: P('apps/basis/test/alphaFeedbackPath.relay.test.js'),
+    box: { file: 'apps/basis/test/alphaFeedbackPath.relay.test.js', test: 'what the person writes lands on the box' },
   } },
   { id: 'personas', name: 'Personas', cells: {
-    web: P('apps/basis/test-browser/persona-switcher.spec.js'),
+    web: null,      // persona-switcher is one page narrowing its own view; nobody else sees the persona (Fable 2026-11-10)
     mobile: null,   // personaSwitcherParity is a parity test
     // a box enrolled with persona W rejoins W's circle as W (never the general persona) and keeps it through a membership
     // change — named by Fable 2026-11-05
@@ -63,9 +62,9 @@ export const FUNCTIONS = Object.freeze([
   // two pod types are fixme until a web pod sign-in can complete — so the cell stays red until they are green too.
   { id: 'circle-types', name: 'Circle types (normal, central pod, pod-only)', cells: { web: null, mobile: null, box: null } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {
-    web: P('apps/basis/test-browser/circle-view-bot.spec.js'),
+    web: { file: 'apps/basis/test-browser/circle-view-bot.spec.js', test: '"@assistant add X" engages the bot' },
     mobile: null,   // REQUIRED: the assistant on the phone
-    box: P('apps/basis/test/botReplyLines.box.test.js'),
+    box: { file: 'apps/basis/test/botReplyLines.box.test.js', test: 'an add by the word rule is one Telegram line' },
   } },
   // hopping = a member carries for a member (Frits 2026-11-03). Its EVENTUAL half is the catch-up: a member only the
   // LAN reaches pulls a statement from the member who reaches both. The story's LAN is a second relay standing in for
@@ -78,43 +77,47 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'task-sharing', name: 'Task sharing', cells: {
     web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'task-handoff — A adds a task, B claims it' },   // named by Fable 2026-11-03
-    mobile: P('apps/basis-mobile/test/multiCircleSeparation.test.js'),
-    box: P('apps/basis/test/choresOnTheBox.relay.test.js'),
+    mobile: null,   // multiCircleSeparation is one bundle keeping circles apart; nothing is shared (Fable 2026-11-10)
+    box: { file: 'apps/basis/test/choresOnTheBox.relay.test.js', test: 'Ann adds a chore; Bert claims it' },
   } },
   { id: 'asking', name: 'Asking questions', cells: {
-    web: P('apps/basis/test-browser/walk-ask-matches.spec.js'),
-    mobile: P('apps/basis-mobile/e2e/askMatches.test.js'),
+    web: { file: 'apps/basis/test-browser/walk-ask-matches.spec.js', test: 'an ask shows the asker who offers it' },
+    mobile: { file: 'apps/basis-mobile/e2e/askMatches.test.js', test: 'asks the board, and sees Bram under its own ask' },
     box: NA('the box is no person who asks or answers; the question items it carries are covered by task and list sync'),
   } },
   // ── the six that joined alpha one's tested set (Frits 2026-11-03) ───────────────────────────────────────────────
   { id: 'governance', name: 'Governance (proposals, votes, roles, removal, signed reports)', cells: {
-    web: P('apps/basis/test-browser/walk-member-proposes-policy.spec.js'),
+    // the proposal half; roles, removal and signed reports come with the governance-by-role work
+    web: { file: 'apps/basis/test-browser/walk-member-proposes-policy.spec.js', test: 'Save is a proposal; the admin' },
     mobile: null,   // adminRoleControlGreyed is a unit
-    box: P('apps/basis/test-browser/screen-admin-box.spec.js'),
+    // the box OBEYING the circle (screen-admin-box is the admin's screen, not the box) — Fable 2026-11-10
+    box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the box forgets the circle and its record of it goes' },
   } },
   { id: 'lists-agenda', name: 'Lists, agenda, reminders', cells: {
-    web: P('apps/basis/test-browser/vandaag-lists-block.spec.js'),
+    // the item crossing to another member (vandaag-lists-block is one page) — Fable 2026-11-10; the reminder is its own story
+    web: { file: 'apps/basis/test-browser/walk-attach-appointment.spec.js', test: 'an appointment made from it reaches the other member' },
     mobile: null,   // listsBlockOnThePhone is a unit of the block
-    box: P('apps/basis/test/agendaLinkWalk.relay.test.js'),
+    box: { file: 'apps/basis/test/agendaLinkWalk.relay.test.js', test: 'the link carries the agenda' },
   } },
   { id: 'attachments', name: 'Files and media as attachments (circles, contact threads)', cells: {
-    web: P('apps/basis/test-browser/circle-attach-file.spec.js'),
+    // a file crossing to someone (circle-attach-file is one page) — Fable 2026-11-10
+    web: { file: 'apps/basis/test-browser/walk-dm-photo.spec.js', test: 'a camera-sized photo sent to a contact arrives' },
     mobile: null,   // attachmentPicker is a unit
     box: NA('the box renders no files in alpha one; keeping attachments available is later'),
   } },
   { id: 'restore-devices', name: 'Restore and your devices (phrase, second device, revoke)', cells: {
-    web: P('apps/basis/test-browser/walk-own-devices-follow.spec.js'),
-    mobile: P('apps/basis-mobile/test/identityRecoveryJourney.test.js'),   // boots the mobile bundle: same identity, same addresses
-    box: P('apps/basis/test/revokeTheBox.relay.test.js'),
+    web: { file: 'apps/basis/test-browser/walk-own-devices-follow.spec.js', test: 'one person, two devices' },
+    mobile: { file: 'apps/basis-mobile/test/identityRecoveryJourney.test.js', test: 'phrase → fresh install → restore' },   // boots the mobile bundle
+    box: { file: 'apps/basis/test/revokeTheBox.relay.test.js', test: '3 · the ceremony' },
   } },
   { id: 'help-onboarding', name: 'Help and onboarding', cells: {
-    web: P('apps/basis/test-browser/walk-first-five-minutes.spec.js'),
+    web: { file: 'apps/basis/test-browser/walk-first-five-minutes.spec.js', test: 'first five minutes: onboarding, a handle' },
     mobile: null,   // helpCircleOnboarding is a unit
     box: BOX_NO_SCREEN,
   } },
   { id: 'connected-screens', name: 'Connected screens', cells: {
-    web: P('apps/basis/test-browser/screen-connect-box.spec.js'),
+    web: { file: 'apps/basis/test-browser/screen-connect-box.spec.js', test: 'the screen in a browser' },
     mobile: null,   // REQUIRED: the phone approves a screen's code
-    box: P('apps/basis/test/screenConnect.relay.test.js'),
+    box: { file: 'apps/basis/test/screenConnect.relay.test.js', test: '/scherm → a link' },
   } },
 ]);

@@ -830,3 +830,48 @@ served the old pre-bundle: the "red" run passes on the new code. Seen bumping th
 
 **Fix:** move `node_modules/.vite` aside (it regenerates; never delete `node_modules` itself) before each run that must
 load a swapped package, and once more after swapping back.
+
+## Working traps for agents in this checkout (collected 2026-11-10)
+
+Each of these cost at least one session before it was written down. They were kept in the agents' private notes and
+moved here so every agent reads them in one place.
+
+- **A suite is green only when BOTH vitest lines say so.** An empty `describe` left after deleting tests reads
+  `Tests 877 passed` and `Test Files 1 failed` ("No test found in suite"), and CI fails. Summarise with
+  `grep -E "Test Files|Tests "`; after deleting tests, check no `describe` is left empty.
+- **vitest workers grow to ~3 GB each.** With the default worker count and two agents at work the machine ran out of
+  memory and the kernel killed workers and services. Run vitest with `--maxWorkers=2`, one suite or browser run at a
+  time across agents, never during a gradle APK build.
+- **`pgrep -f "<words>"` in a waiter matches the waiter itself**, because its own command line holds the same words,
+  so `while pgrep -f "playwright test"; do …` never ends. Wait on the run's PID (`kill -0 $pid`), a pattern the waiter
+  does not contain (`node .*playwright`), or a log line.
+- **An untracked directory can be live tooling.** A leftover app directory from a rename held another app's real
+  `node_modules`, which the worktree script maps into each new worktree; removing it broke every new worktree for an
+  hour. Grep the worktree script, `scripts/relink-workspace.mjs` and the lockfiles for the path, then move it aside;
+  never `rm -rf` an untracked directory.
+- **The workspace tree is managed, not rotten.** Before calling a dependency a resolution blocker, read
+  `scripts/relink-workspace.mjs` and check the package really imports it (a real `import`, not JSDoc): a pure
+  dependency-injected package "not resolving X" usually means X is not its dependency.
+- **A new mobile import from `@onderling-app/basis` must be exported by `apps/basis/src/index.js`.** The basis suite
+  cannot see the mobile entry's import list; only `apps/basis-mobile`'s `basisIndexExports.test.js` catches it, and on a
+  phone it is a crash. Run `npx vitest run` in `apps/basis-mobile` before the PR.
+- **A change to what a shared screen asks or gates breaks the browser walks, not vitest.** Only the Playwright suites
+  drive the real screens. Grep `apps/basis/test-browser/` for the helpers that walk the screen (`createCircleViaWizard`,
+  `joinFromInvite`, …) and run those specs; grep it for the old labels after a merge-resolve too.
+- **`gh pr merge --auto` merges at once on this repo** when no check is required, so "merge on green" must read
+  `gh pr checks <n>` first, every check including the e2e job. PR CI says nothing about the browser shards, which run
+  only after the merge: read the development run of each merge before the next one.
+- **A bare `git push` from a worktree made without upstream pushes nothing**, and `-q | tail` hides it; the PR then
+  shows checks for its old head. Push with `git push origin HEAD:<branch>`, and before merging compare
+  `gh pr view <n> --json headRefOid` with the local HEAD.
+- **Worktrees share hard-linked `node_modules`; ext4 caps links per file.** With ~60 worktrees the worktree script
+  printed "Too many links" and built an incomplete `node_modules`. Remove each merged PR's worktree
+  (`git worktree remove --force`, `git worktree prune`), and start long-running waiters from the main checkout, not from
+  a worktree that may be removed under them.
+- **Never print a process's or container's environment, even filtered.** A dump filtered on `TOKEN` printed an API
+  key that had to be rotated. Print variable NAMES only (`… | sed 's/=.*//'`) or ask for one known non-secret
+  variable by name; the same for `ps e`, `/proc/*/environ` and `.env` files.
+- **A batch of real model calls spends a shared, finite quota.** One evaluation batch used a provider's monthly token
+  limit and took the live bot's model down, because the test key and the live key were one organisation. Before any
+  batch: estimate tokens (calls × prompt and tool-list size), check the remaining quota, and ask (see also the
+  `LIVE_LLM=1` rule in CLAUDE.md).

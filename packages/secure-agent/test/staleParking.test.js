@@ -29,7 +29,8 @@ async function setup({ parkMax = 64, parkTtlMs = 60_000 } = {}) {
   const sender = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false });
   const receiverTx = new InternalTransport(bus, receiver.identity.pubKey);
   await receiver.addSecureTransport('relay', receiverTx);
-  await sender.addSecureTransport('relay', new InternalTransport(bus, sender.identity.pubKey));
+  const senderTx = new InternalTransport(bus, sender.identity.pubKey);
+  await sender.addSecureTransport('relay', senderTx);
   const circleId = await AgentIdentity.generate(new VaultMemory());
   receiver.registerSelfIdentity(circleId.pubKey, circleId);
   await receiverTx.addAddress(circleId.pubKey);   // the transport answers at the circle address, as the app binds it
@@ -41,7 +42,7 @@ async function setup({ parkMax = 64, parkTtlMs = 60_000 } = {}) {
     return staleSender('roster-not-read', ctl.bucket);
   });
   const send = (n) => sender.peer.sendTo(circleId.pubKey, { subtype: 'probe', n }, FAST).catch(() => {});
-  return { receiver, sender, got, parkedBuckets, ctl, send, circle: circleId.pubKey };
+  return { receiver, sender, senderTx, got, parkedBuckets, ctl, send, circle: circleId.pubKey };
 }
 
 describe('a stale verdict parks the envelope', () => {
@@ -79,6 +80,17 @@ describe('a stale verdict parks the envelope', () => {
     await send(6);
     expect(await until(() => receiver.parkedCount('circle-y') === 1)).toBe(true);
     expect(receiver.parkedCount('circle-x')).toBe(3);
+  });
+
+  it('a parked envelope is not acknowledged: the sender is never told it arrived', async () => {
+    const { receiver, senderTx, ctl, send, circle } = await setup();
+    await send(0);   // the handshake, so the sender can seal to the circle address
+    expect(await until(() => receiver.parkedCount('circle-x') === 1)).toBe(true);
+    const ack = (n) => senderTx.sendAck(circle, { subtype: 'probe', n }, 400).then(() => 'acked', () => 'no-ack');
+    expect(await ack(1), 'parked: no AK reaches the sender').toBe('no-ack');
+    expect(receiver.parkedCount('circle-x')).toBe(2);
+    ctl.mode = 'allow';
+    expect(await ack(2), 'the same path acknowledges an accepted envelope').toBe('acked');
   });
 
   it('at the time limit the bucket is re-judged on its own', async () => {

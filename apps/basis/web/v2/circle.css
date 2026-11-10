@@ -1594,3 +1594,25 @@
 .cc-profile__gear { margin-left: auto; background: none; border: 0; cursor: pointer; font: inherit; font-size: 20px; line-height: 1; padding: 6px; color: var(--ink); }
 .cc-profile__gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cc-profile__topbar { display: flex; justify-content: flex-end; }
+
+/* "Nieuw voor jou" on Today: one quiet row per thing, a ✕ to set it aside, "Alles gelezen" at the foot */
+.circle-screen__for-you-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.circle-screen__for-you-row { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0; }
+.circle-screen__for-you-icon { flex: none; }
+.circle-screen__for-you-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.circle-screen__for-you-face { flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--paper-2); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--ink-soft); }
+.circle-screen__for-you-late { flex: none; font-size: 11px; color: var(--ink-soft); }
+.circle-screen__for-you-dismiss { flex: none; background: transparent; border: none; color: var(--ink-soft); cursor: pointer; font: inherit; padding: 2px 6px; }
+.circle-screen__for-you-all { margin-top: 6px; background: transparent; border: none; color: var(--accent-ink); cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
+/* Today's circles with news: the name, what is new (icons), the count, with room between them */
+.circle-screen__circles-unread-row > span + span { margin-left: 8px; }
+
+/* THE BANNER: what just came in for you, for a moment at the top (the shared driver decides; this only paints) */
+.cc-banner {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50;
+  max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); font: inherit; text-align: left; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cc-banner[hidden] { display: none; }

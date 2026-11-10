@@ -16,6 +16,9 @@ import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
 import { memberLabel } from './mandate.js';
 import { SETTINGS_ENUM_AXES } from './circlePolicy.js';
+import { policyChangeLines, policyChangeText } from './policyChangeWords.js';
+// the words for a policy change live in one small pure module ("Nieuw voor jou" reads them too); re-exported here
+export { policyChangeLines, policyChangeText };
 
 /** The statement kinds the governance lane carries — DERIVED from the manifest's declared `appends` rows
  *  (the declared route: the manifest is the source; the rail enforces it at append AND ingest). They are the
@@ -260,26 +263,6 @@ export function policyProposalNote({ proposals = [], roster = [] } = {}) {
 }
 
 /**
- * What a policy proposal changes, in words: a feature on or off, an axis set to an option (the settings screen's own
- * labels, as locale keys the shell translates in `params`), and the rest counted.
- * @param {object} patch   the proposal's subject (a `policyPatch`)
- * @returns {Array<{key: string, params: object}>}
- */
-export function policyChangeLines(patch = {}) {
-  const lines = [];
-  let other = 0;
-  for (const [k, v] of Object.entries(patch ?? {})) {
-    if (k === 'features' && v && typeof v === 'object') {
-      for (const [f, on] of Object.entries(v)) lines.push({ key: on ? 'circle.settings.change_on' : 'circle.settings.change_off', params: { whatKey: `circle.settings.feat.${f}` } });
-    } else if (SETTINGS_ENUM_AXES.includes(k) && typeof v === 'string') {
-      lines.push({ key: 'circle.settings.change_set', params: { whatKey: `circle.settings.${k}`, toKey: `circle.settings.opt.${v}` } });
-    } else other += 1;
-  }
-  if (other) lines.push({ key: 'circle.settings.change_other', params: { n: other } });
-  return lines;
-}
-
-/**
  * The open policy proposal an ADMIN viewer still has to answer — on their own settings screen ("Bea stelt voor: … ·
  * Overnemen / Afwijzen", the same governance vote) — or null (not an admin, nothing open, already answered).
  * @param {{proposals: object[], roster: object[], myRef: string}} a
@@ -295,12 +278,4 @@ export function policyProposalForAdmin({ proposals = [], roster = [], myRef = nu
   return { proposalId: p.proposalId, who: (by && memberLabel({ ...by, webid: refOf(by) })) || p.by, changes: policyChangeLines(p.subject) };
 }
 
-/** The change lines as one sentence in the viewer's words (`t` the shell's translator). */
-export function policyChangeText(lines = [], t = (k) => k) {
-  return lines.map((l) => t(l.key, {
-    ...l.params,
-    ...(l.params?.whatKey ? { what: t(l.params.whatKey) } : {}),
-    ...(l.params?.toKey ? { to: t(l.params.toKey) } : {}),
-  })).join(', ');
-}
 

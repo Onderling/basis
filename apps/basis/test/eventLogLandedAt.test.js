@@ -44,3 +44,15 @@ describe('the news counts what LANDED since I looked, not what was said since', 
     expect(buildTilePreviews({ events: [legacy], circles: [{ id: 'c1' }], seenAt: { c1: 1000 }, myRefs: [] }).c1.unread).toBe(1);
   });
 });
+
+describe('query by arrival: landedSince', () => {
+  it('keeps what LANDED since the bound, a late arrival of an old line included; drops what landed before', () => {
+    let clock = 1_000;
+    const log = new EventLog({ now: () => clock });
+    log.append({ id: 'early', ts: 900, type: 'chat-message' });
+    clock = 5_000;
+    log.append({ id: 'late', ts: 100, type: 'chat-message' });   // said long ago, delivered now
+    expect(log.query({ landedSince: 2_000 }).map((e) => e.id)).toEqual(['late']);
+    expect(log.query({ since: 2_000 }).map((e) => e.id), 'the sender-time bound would lose it').toEqual([]);
+  });
+});

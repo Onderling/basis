@@ -1044,8 +1044,9 @@ and bad actors, weakest concern to strongest:
   posts, notes, task text) · **claim** (first-wins / immutable-once-set — a task's assignee, a reservation) ·
   **field-clock** (a declared field-set merges by its own `*At` clock, whichever row won — a contact's hidden
   mark on one device and its persona on another both survive; declared on the type, `CANONICAL_FIELD_CLOCKS` in
-  `@onderling/item-types`) · **spine** (deny-wins — membership, roles, keys; enforced by the L3 hash-chain
-  below). (Rich collaborative
+  `@onderling/item-types`) · **set-union** (a grow-only set on an own-devices type, pruned below a shared floor
+  that merges by max — the person's read marks, so read on one device is read on all) · **spine** (deny-wins —
+  membership, roles, keys; enforced by the L3 hash-chain below). (Rich collaborative
   content-merge — sequences, text — lands later with folio versioning.)
 - **L2 · forgery** — every event is signed by the author's **per-circle key** + proof-of-membership, so
   non-members can't inject and members can't forge each other's events.
@@ -1631,8 +1632,9 @@ class** — `short` (housekeeping, drops), `chat` (windowed by the person's one 
 `audit` (never drops — **compacts** into a summary that says how many entries it folded and of what),
 and `record` (membership, chat messages: the entry *is* the record; pruning one would silently rewrite
 history). **Resolution policies** classify every (item-type, field) write: `content` (last-writer-wins,
-the conservative default), `claim` (first-wins, immutable-once-set — a task's assignee), `spine`
-(deny-wins — membership and authority), each implying its delivery tier (best-effort / at-least-once /
+the conservative default), `claim` (first-wins, immutable-once-set — a task's assignee), `field-clock`
+(a declared field-set by its own clock), `set-union` (a grow-only set on an own-devices type, pruned below a
+floor that merges by max — read marks), `spine` (deny-wins — membership and authority), each implying its delivery tier (best-effort / at-least-once /
 reliable). The policy is declared by the app's manifest but **enforced by the receiver** against the
 substrate's table, so a sender cannot shape an item to dodge the intended merge. Item types get the
 standard verbs for free and add their own; new closed vocabularies need a home and a guard before they

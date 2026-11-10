@@ -39,3 +39,23 @@ describe('Vandaag on the phone', () => {
     expect(profile).toMatch(/paddingTop: HEADER_AVATAR_CLEARANCE/);
   });
 });
+
+describe('"Nieuw voor jou" on the phone (web twin: walk-for-you.spec.js)', () => {
+  const web = readFileSync(resolve(__dirname, '../../basis/web/v2/circleApp.js'), 'utf8');
+  it('the painter, its two acts, and the launcher asking for it with the turns and the window', () => {
+    expect(view).toMatch(/case 'forYou':\s+body = renderForYou\(/);
+    expect(view).toMatch(/kind: 'for-you-open', row/);
+    expect(view).toMatch(/kind: 'for-you-read', rows: \[row\]/);
+    expect(view).toMatch(/kind: 'for-you-read', rows: items/);
+    expect(launcher).toMatch(/\.\.\.forYouHostOpsNow\(\),\s*forYou: true/);
+    expect(launcher).toMatch(/t, turns: forYouRef\.current\.turns/);
+    // the banner reads the same rows on both shells (the shared driver; each shell only paints)
+    expect(launcher).toMatch(/createBannerDriver\(\{\s*readRows: \(\) => forYouRows\(forYouHostOpsNow\(\), \{ fold: false \}\)/);
+    expect(web).toMatch(/createBannerDriver\(\{\s*readRows: \(\) => forYouRows\(forYouHostOps\(\), \{ fold: false \}\)/);
+    expect(launcher).toMatch(/a\?\.kind === 'for-you-open'/);
+    expect(launcher).toMatch(/a\?\.kind === 'for-you-read'.*readMarks\.markRows/);
+    // the same acts on web
+    expect(web).toMatch(/action\?\.kind === 'for-you-open'/);
+    expect(web).toMatch(/action\?\.kind === 'for-you-read'/);
+  });
+});

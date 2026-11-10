@@ -10,6 +10,23 @@ read state; the notification projection and "Nieuw voor jou" on Today follow.
 - See which contacts wrote: the count on a contact's row and the sum on the Contacten tab.
 - Read something on one device and have it read on all: opening a circle or a conversation marks what is in it read,
   and the person's other devices stop counting it once the mark arrives.
+- See "Nieuw voor jou" at the top of Today (only when something is there): a new post, task or appointment, a line in
+  a circle, a direct message, someone they admitted joining, their own removal; each row opens the thing, ✕ sets it
+  aside, "Alles gelezen" clears the block; a row that arrived long after it was sent says "kwam later binnen". Rows come
+  from every persona on the device, ticked in the switcher or not, and each carries the face of the persona it is for.
+- Be told while the app is open: a banner at the top for what is addressed to them (a direct message, being removed
+  from a circle), for the personas ticked in the switcher, never while they are already looking at it; several at once
+  are one banner with a count; a tap opens it. Which kinds ring is a setting per kind (`notify.policy.<kind>`:
+  banner, only on Today, or off). Being removed still shows after the circle has left their list.
+- Also under "Nieuw voor jou": a circle setting someone else changed, in the settings screen's own words; a task
+  someone else gave them (a banner by default; a change to its words is not news); their own open question in the
+  Nearby room while it is open, the way back to it from any tab.
+
+The notification projection: `apps/basis/src/v2/notifications.js` (`notificationRows`), prepended to Today by the
+shared screen materializer when the shell asks (`forYou: true`), painted by `renderForYou` on both shells; setting a row
+aside marks its ids read (`createReadMarks().markRows`).
+The banner: `apps/basis/src/v2/notifyBanner.js` (`bannerFor`, `createBannerDriver`) over the same rows (`forYouRows`,
+unfolded), poked by each shell on a log append and a stored direct message; the shells only paint it.
 
 ## Where it lives
 

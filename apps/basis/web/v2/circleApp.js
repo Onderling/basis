@@ -412,7 +412,8 @@ import { createScreenHead } from '../../src/v2/screenHead.js';
 import { watchCircleChanges } from '../../src/v2/headCircleWatch.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderVandaagCustomise } from './vandaagCustomise.js';
-import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
+import { materializeScreen, forYouRows } from '../../src/v2/userScreenBlocks.js';
+import { createBannerDriver, notifyPolicyKey } from '../../src/v2/notifyBanner.js';
 import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
@@ -973,6 +974,9 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
   }
   // The Contacten badge from what this device already holds — a message that landed while the tab was closed.
   refreshContactUnread().then(repaintContactBadge).catch(() => {});
+  // the banner: its first reading seeds what is already here; every log append reads again
+  ensureBanner().poke();
+  eventLog.subscribe(() => { _banner?.poke(); });
 }
 
 // G13 — register this device's per-circle addresses on the connected relay, SCOPED to the relay-diversity
@@ -1851,9 +1855,11 @@ if (typeof window !== 'undefined') {
   window.onderlingCirclePolicy = {
     get: (circleId) => policyStore.get(circleId),
     update: (circleId, patch) => policyStore.update(circleId, patch),
+    // what a settings save does after it writes: state the policy on the lane, so the circle's members get it
+    state: (circleId) => circlePolicyLane.state(circleId),
   };
   // What the "share to this circle" button does, as a seam a walk can drive (the button lives inside a panel).
-  window.onderlingShareToCircle = (circleId, personaId = 'default') => shareCircleRelease(circleId, personaId);
+  window.onderlingShareToCircle =(circleId, personaId = 'default') => shareCircleRelease(circleId, personaId);
   /** Invoke one of the ops the surface offers — the same `{opId, args}` a tap compiles to. */
   window.onderlingDispatch = (opId, args = {}) => (
     typeof circleDispatchReady === 'function'
@@ -3041,9 +3047,17 @@ const contactSeen = makeContactSeenStore({ getItem: (k) => window.localStorage.g
 // contact who renames themselves on the pair roster announces nothing, so the row says what they were until
 // the thread is opened.
 const contactNames = makeContactNameStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
+let _contactTurns = [];
+// each contact's pair circle, noted by every roster read: "Nieuw voor jou" files a direct message under that circle's
+// persona, as the Contacten switcher does
+const _contactPairCircle = new Map();
 async function refreshContactUnread() {
   try {
     const turns = await circleContactChannel?.rehydrateAll?.() ?? [];
+    _contactTurns = turns;   // …and "Nieuw voor jou" on Vandaag reads the same turns, filed under their contact's persona
+    _vandaagHead?.invalidate();
+    _banner?.poke();   // a direct message stored: the banner reads again
+    if (_selfSet.held.length > 1 && turns.some((x) => x?.contactId && !_contactPairCircle.has(x.contactId))) loadAllContacts().then(() => _vandaagHead?.invalidate()).catch(() => {});
     _contactUnread = buildContactUnread({ turns, seenAt: await contactSeen.read(), readIds: readMarks.ids() });
   } catch { _contactUnread = {}; }
   return _contactUnread;
@@ -3133,7 +3147,9 @@ async function contactCardArrived({ contactId, card }) {
 }
 // The one Contacten read (shared with mobile): the graph less aliases and my own addresses, the book, merged, and
 // every contact with a pair roster here named by what they said on it.
-const loadAllContacts = () => loadContactRoster({ peerGraph: circlePeerGraph, agent: _peerAgent, callSkill: rawCallSkill, names: contactNames });
+// every read of the roster also notes each contact's pair circle (`_contactPairCircle`, beside the turns above)
+const loadAllContacts = () => loadContactRoster({ peerGraph: circlePeerGraph, agent: _peerAgent, callSkill: rawCallSkill, names: contactNames })
+  .then((rows) => { for (const r of rows ?? []) if (r?.contactId) _contactPairCircle.set(r.contactId, r.pairCircleId ?? null); return rows; });
 
 /**
  * objective L · Phase 2 — open the OUT-OF-CIRCLE recipient picker overlay. Lists the Contacten roster's
@@ -4458,6 +4474,65 @@ async function _showVandaag({ landing = false } = {}) {
 }
 
 /** Vandaag read from the stores, as the page stands now (the head's one read). */
+/**
+ * What Today's blocks and "Nieuw voor jou" read on this device: the log, the circles (shown and all), the switcher's
+ * set, whose rows are mine, what is read, the direct messages and who they are from, the news window. The banner reads
+ * the same (`forYouRows`), so Today and the banner never disagree.
+ */
+function forYouHostOps() {
+  return {
+    eventLog, circles: circlesShown(), allCircles: circlesCache ?? [],
+    // the switcher's set: own items show when the self that made them is ticked
+    ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
+    myRefs: unreadMyRefs, readIds: readMarks.ids(),
+    t, turns: _contactTurns, contactName: (id) => contactThreads.get(id)?.name ?? null,
+    notifyWindowDays: circleHouseholdAgent?.getParamValue?.('notify.windowDays'),
+    // the person's table per kind (banner · list · off): off is no row either
+    notifyPolicyOf: (kind) => circleHouseholdAgent?.getParamValue?.(notifyPolicyKey(kind)),
+    // my open questions in the Nearby room: the way back to them from Today
+    myAsks: () => _nearbyRoom?.myAsks?.() ?? [],
+    // whose circle it is (every persona's rows show, each with its face)
+    profileIdOf: profileIdOfCircle, contactCircleOf: (id) => _contactPairCircle.get(id) ?? null,
+    // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
+    selfIn: mySelfIn,
+  };
+}
+
+// THE BANNER (the shared driver over the same rows): new, of a banner kind, for a ticked persona, not on screen
+let _banner = null;
+let _bannerEl = null;
+function ensureBanner() {
+  _banner ??= createBannerDriver({
+    readRows: () => forYouRows(forYouHostOps(), { fold: false }),
+    selvesOn: () => (_selfSet.held.length > 1 ? _selfSet.on : null),
+    onSource: (o) => (o?.kind === 'thread' ? _activeContactThread?.contactId === o.id : (o?.kind === 'circle' ? getActiveCircle() === o.id : false)),
+    policyOf: forYouHostOps().notifyPolicyOf,
+    t,
+    show: (b) => {
+      if (!_bannerEl) {
+        _bannerEl = document.createElement('button');
+        _bannerEl.type = 'button';
+        _bannerEl.className = 'cc-banner';
+        _bannerEl.setAttribute('role', 'status');
+        document.body.appendChild(_bannerEl);
+      }
+      _bannerEl.textContent = b.text;
+      _bannerEl.dataset.count = String(b.count);
+      _bannerEl.hidden = false;
+      _bannerEl.onclick = () => {
+        _banner?.dismiss();
+        const o = b.open;
+        if (o?.kind === 'thread') showContactThread(o.id).catch(() => {});
+        else if (o?.kind === 'circle') showDetail(o.id);
+        else if (o?.kind === 'nearby') showNearby();
+        else _showVandaag().catch(() => {});
+      };
+    },
+    hide: () => { if (_bannerEl) _bannerEl.hidden = true; },
+  });
+  return _banner;
+}
+
 async function materializeVandaag() {
   _vandaagReads.materializes += 1;
   const book = _screensBook ?? { screens: [], activeId: null };
@@ -4470,15 +4545,15 @@ async function materializeVandaag() {
     hostOps: {
       // The TARGETED 3-arg waist — materializers call `callSkill('calendar', 'listEvents', …)`.
       callSkill: counted,
-      eventLog, circles: circlesShown(),
-      // the switcher's set: own items show when the self that made them is ticked
-      ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
+      // the log, the circles, the switcher's set, whose rows are mine, what is read: what Today's blocks and
+      // "Nieuw voor jou" (and the banner, `forYouHostOps`) read
+      ...forYouHostOps(),
       // the circles-with-news block counts what the circle tiles count
-      seenAt: readSeenAt(), myRefs: unreadMyRefs, readIds: readMarks.ids(),
-      // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
-      selfIn: mySelfIn,
+      seenAt: readSeenAt(),
+      // "Nieuw voor jou" on top (the shared projection)
+      forYou: true,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-      allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
+      introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
       // the reach card: does this device know any relay (the relay question's own predicate)
       relayKnown: () => relayQuestion.knows(),
     },
@@ -4677,6 +4752,17 @@ function showVandaagCustomise() {
 // what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
 function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
+  // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
+  else if (action?.kind === 'for-you-open' && action.row) {
+    const marked = readMarks.markRows([action.row]).catch(() => {});
+    if (action.row.open?.kind === 'thread') showContactThread(action.row.open.id).catch(() => {});
+    else if (action.row.open?.kind === 'nearby') showNearby();
+    else if (action.row.open?.id) showDetail(action.row.open.id);
+    else marked.then(() => _showVandaag()).catch(() => {});   // nothing to open (a removal from a circle now gone): it is read, Today again
+  }
+  else if (action?.kind === 'for-you-read' && Array.isArray(action.rows)) {
+    readMarks.markRows(action.rows).then(() => _showVandaag()).catch(() => {});
+  }
   // an own row (no circle): the "+" sheet opened on it — change it or take it away
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
   // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin

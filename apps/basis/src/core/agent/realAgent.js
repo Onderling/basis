@@ -35,7 +35,7 @@ import {
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
-import { landingEntryFor, landingIdOf, markLandingRemoved } from '../../v2/itemLanding.js';
+import { landingEntryFor, assignedEntryFor, landingIdOf, markLandingRemoved } from '../../v2/itemLanding.js';
 import { nextReadMarks, readMarksIdOf, NOTIFY_WINDOW_KEY } from '../../v2/readMarks.js';
 import { parseCompanionClaim } from '../../v2/companionClaim.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
@@ -6131,8 +6131,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         // or a claim of a row this device already held is not (yet)
         if (opts.deviceLog) {
           try {
-            const entry = landingEntryFor({ circleId, item, fresh: landing?.fresh !== false, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
-            // once per row: a re-application (a rebuild from the log) is not a second arrival
+            // a task given to me by someone else is its own news (an edit that is); a new task that arrives already
+            // given to me is that, not a second plain landing
+            const assigned = assignedEntryFor({ circleId, item, previous: landing?.previous ?? null, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
+            const entry = assigned ?? landingEntryFor({ circleId, item, fresh: landing?.fresh !== false, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
+            // once per row (per assignment): a re-application (a rebuild from the log) is not a second arrival
             if (entry && !opts.deviceLog.query().some((e) => e.id === entry.id)) opts.deviceLog.append(entry);
           } catch { /* a news mark never fails the merge */ }
         }

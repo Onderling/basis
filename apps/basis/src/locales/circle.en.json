@@ -10061,6 +10061,38 @@
       "notify_windowDays": {
         "text": "How long something new stays in your news (days)",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_dm": {
+        "text": "Notify: a direct message",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_removed": {
+        "text": "Notify: being removed from a circle",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_item": {
+        "text": "Notify: a new post, task or appointment",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_line": {
+        "text": "Notify: a line in a circle",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_joined": {
+        "text": "Notify: someone joining",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_setting": {
+        "text": "Notify: a circle setting changed",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_assigned": {
+        "text": "Notify: a task given to me",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_ask": {
+        "text": "Notify: my open question in the room",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10118,6 +10150,14 @@
       },
       "description": {
         "text": "Only the description",
+        "doc": "A choice on the settings screen."
+      },
+      "banner": {
+        "text": "Show a banner",
+        "doc": "A choice on the settings screen."
+      },
+      "list": {
+        "text": "Only on Today",
         "doc": "A choice on the settings screen."
       },
       "off": {
@@ -10263,6 +10303,80 @@
     "no_point": {
       "text": "No connection point: this message waits.",
       "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
+    }
+  },
+  "forYou": {
+    "title": {
+      "text": "New for you",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "all_read": {
+      "text": "Mark all read",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "item": {
+      "text": "{{kind}} in {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "line": {
+      "text": "{{circle}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dm": {
+      "text": "{{name}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "joined": {
+      "text": "{{name}} joined {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "removed": {
+      "text": "You were removed from {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "many": {
+      "text": "{{count}} new things in {{name}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "late": {
+      "text": "arrived later",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "news": {
+      "text": "Something new in {{circle}}",
+      "doc": "'Nieuw voor jou': a row for news in a circle that carries no words of its own (an item kind without a chip, a line without text)."
+    },
+    "banner_many": {
+      "text": "{{count}} new things for you",
+      "doc": "The in-app banner when several new things arrive at once (the projection's rows, unfolded)."
+    },
+    "a_circle": {
+      "text": "a circle",
+      "doc": "'Nieuw voor jou': the circle a removal row names when the circle has already left the person's list."
+    },
+    "setting": {
+      "text": "{{who}} changed {{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': a circle setting someone else changed, in the settings screen's own words."
+    },
+    "an_admin": {
+      "text": "An admin",
+      "doc": "'Nieuw voor jou': who changed a setting when the reader holds no name for them (only admins can)."
+    },
+    "assigned": {
+      "text": "A task in {{circle}} is yours now",
+      "doc": "'Nieuw voor jou': someone else gave the person a task."
+    },
+    "ask": {
+      "text": "Your question: {{text}} \u00b7 heard by {{heard}}",
+      "doc": "'Nieuw voor jou': the person's own open question in the Nearby room, while it is open (the way back to it)."
+    },
+    "someone": {
+      "text": "Someone",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dismiss": {
+      "text": "Dismiss",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
     }
   }
 }

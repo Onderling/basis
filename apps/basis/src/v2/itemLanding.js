@@ -14,6 +14,7 @@
 import { makeSilentEntry } from '../eventLog.js';
 import { isNoticeboardPostType, noticeboardIntentOf } from '@onderling/item-types';
 import { itemKindChip } from './embedChips.js';
+import { assigneesOf } from '@onderling/item-store';
 
 /** The entry kind (system lane in the entry-kinds dictionary). */
 export const ITEM_LANDED = 'item-landed';
@@ -59,6 +60,32 @@ export function landingEntryFor({ circleId, item, fresh = true, self = null, aut
     id: landingIdOf(circleId, item.id), circleId, kind: ITEM_LANDED, actor: author, ts: now,
     // `saidAt`: the item's own time (when it was written, the same on every device): what a read mark keeps
     payload: { circleId, itemId: item.id, kind, saidAt: saidAtOf(item, now) },
+  });
+}
+
+/**
+ * A task GIVEN TO ME by someone else: the one edit that is news ("Nieuw voor jou", and a banner by default). A
+ * reference like a landing (same entry kind, its own id per assignee and its `reason`), written at the same seam: when
+ * the row as it landed names this device's self in that circle among its assignees and the row before it did not (or
+ * there was none: a task that arrives already given to me). Not when I gave it to myself, not for an edit of its words.
+ *
+ * @param {object} a
+ * @param {string} a.circleId
+ * @param {object} a.item          the row as it landed
+ * @param {object|null} [a.previous]  the row this device held before (null: none)
+ * @param {string|null} [a.self]   the self this device speaks as in that circle
+ * @param {string|null} [a.authorRef]  who said the snapshot (the one who gave it)
+ * @param {number} [a.now]
+ */
+export function assignedEntryFor({ circleId, item, previous = null, self = null, authorRef = null, now = Date.now() } = {}) {
+  if (typeof circleId !== 'string' || !circleId || typeof item?.id !== 'string' || item.type !== 'task') return null;
+  if (typeof self !== 'string' || !self) return null;
+  if (!assigneesOf(item).includes(self) || assigneesOf(previous).includes(self)) return null;
+  const by = typeof authorRef === 'string' && authorRef && authorRef !== 'me' ? authorRef : null;
+  if (!by || by === self) return null;
+  return makeSilentEntry({
+    id: `assigned:${circleId}:${item.id}:${self}`, circleId, kind: ITEM_LANDED, actor: by, ts: now,
+    payload: { circleId, itemId: item.id, kind: 'task', reason: 'assigned', saidAt: now },
   });
 }
 

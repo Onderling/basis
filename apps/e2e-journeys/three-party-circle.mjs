@@ -308,8 +308,8 @@ async function main() {
       const { auth } = await p.send('auth');
       record(`${p.handle} enforces a real membership check`,
         Boolean(auth?.installed) && (auth?.circles ?? 0) >= 1, JSON.stringify(auth));
-      if ((auth?.unknownRosterAllowances ?? 0) > 0) {
-        finding(`${p.handle} accepted ${auth.unknownRosterAllowances} envelope(s) for a circle with NO roster snapshot`);
+      if ((auth?.unknownRosterRefusals ?? 0) > 0) {
+        finding(`${p.handle} held ${auth.unknownRosterRefusals} envelope(s) for a circle whose roster was not read yet (judged again after the read)`);
       }
       if ((auth?.canonicalOnlyMembers ?? 0) > 0) {
         finding(`${p.handle} still holds ${auth.canonicalOnlyMembers} member(s) known ONLY by their global key`);

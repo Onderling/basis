@@ -273,6 +273,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `SkillsPubSub` | class | [`core.md`](core.md#skillspubsub) |
 | `SPINE_STATEMENT_ITEM` | constant | [`core.md`](core.md#spine_statement_item) |
 | `SPINE_STMT_VERSION` | constant | [`core.md`](core.md#spine_stmt_version) |
+| `staleSender` | function | [`core.md`](core.md#stalesender) |
 | `STANDARD_RANKS` | constant | [`core.md`](core.md#standard_ranks) |
 | `StateManager` | class | [`core.md`](core.md#statemanager) |
 | `STATEMENT_DOMAINS` | constant | [`core.md`](core.md#statement_domains) |

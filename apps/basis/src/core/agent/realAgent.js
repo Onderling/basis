@@ -1128,7 +1128,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     ownKeysLive: () => [personAddress(), ...[...personas].filter(([pid]) => pid !== 'default').map(([, rt]) => rt?.personIdentity?.pubKey)].filter(Boolean),
     onUnknownRoster: ({ ownAddress }) => console.warn(
       `[realAgent] no roster recorded for own circle address ${String(ownAddress).slice(0, 12)}… — `
-      + 'traffic to it is ACCEPTED unchecked until this circle\'s membership has been read once.',
+      + 'traffic to it is REFUSED until this circle\'s membership has been read (a read is under way).',
     ),
     // …naming the address it came FROM and the one it was sent TO: a refusal that names only the key sent a
     // diagnosis the wrong way twice (2026-09-19).
@@ -1151,6 +1151,51 @@ export async function createRealHouseholdAgent(opts = {}) {
     ),
   });
   sa.setSenderAuthorizer?.(circleSenders.authorizeSender);
+  // A circle's traffic PARKED as stale (its roster not read, or a sender not on the roster read): read that roster
+  // again, then judge the parked envelopes once more. The secure agent re-judges on its own at its time limit too.
+  sa.onParked?.((circleId) => { rereadCircleRoster(circleId)?.then?.(() => sa.rejudgeParked?.(circleId)); });
+  // A CIRCLE identity of ours, installed: the authorizer learns the address is that circle's BEFORE any roster is read
+  // (so traffic to it is refused until the roster is, never let in unchecked), and the identity is registered with
+  // its self as owner. The one path every circle install takes.
+  const registerCircleSelf = (address, identity, meta) => {
+    try { circleSenders.noteCircleAddress(meta?.circleId, address); } catch { /* the registration below still holds */ }
+    const ok = sa.registerSelfIdentity(address, identity, { owner: ownerFor(meta?.circleId) });
+    // ...and the circle's roster is read now, wherever the install came from (a create, a join, a restore, the boot):
+    // until it is, traffic sealed to this address is refused, never let in unchecked
+    if (ok && meta?.circleId) readCircleRoster(meta.circleId);
+    return ok;
+  };
+  // The roster read needs this agent's surface (`api`, composed at the end of this scope): installs before then are
+  // queued and read the moment it exists.
+  let apiComposed = false;
+  const rostersToRead = new Set();
+  // A park asks for a read that STARTS after it (a read already under way may predate what the park needs, e.g. a
+  // reload's first read before its store was back): one read queued behind the one in flight, shared by every park
+  // that comes meanwhile. No time window: a burst of parks costs at most two reads.
+  const queuedRosterReads = new Map();   // circleId -> the read queued behind the one in flight
+  function rereadCircleRoster(circleId) {
+    if (typeof circleId !== 'string' || !circleId) return Promise.resolve();
+    const inFlight = senderRosterReads.get(circleId);
+    if (!inFlight) return readCircleRoster(circleId);
+    if (!queuedRosterReads.has(circleId)) {
+      queuedRosterReads.set(circleId, inFlight.then(() => { queuedRosterReads.delete(circleId); return readCircleRoster(circleId); }));
+    }
+    return queuedRosterReads.get(circleId);
+  }
+  const senderRosterReads = new Map();   // circleId -> the sender-check roster read under way
+  const readCircleRoster = (circleId) => {
+    if (!apiComposed) { rostersToRead.add(circleId); return Promise.resolve(); }
+    // ONLY the sender check's half of a roster read: the members, recorded as who may speak. Not the peer bindings or
+    // the routing index `bindCircleAddressKeysFor` also writes (those follow their own triggers; moving them to every
+    // install changed which address a circle act is placed at)
+    const read = Promise.resolve()
+      .then(() => api.callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))
+      .then((res) => api.recordCircleSenders?.({ circleId, members: Array.isArray(res?.members) ? res.members : [] }))
+      .catch(() => { /* still stale: the parked traffic is dropped at its re-judge */ })
+      .finally(() => { if (senderRosterReads.get(circleId) === read) senderRosterReads.delete(circleId); });
+    senderRosterReads.set(circleId, read);
+    return read;
+  };
   // Say the wire-facing fact out loud, once, on both shells: the in-process app agents each print a
   // "NO ROSTER AUTHORIZER" warning (they face no wire), and without this line a reader cannot tell
   // whether the one agent that DOES face the wire is guarded. It is — and this is the line that proves
@@ -4374,7 +4419,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       installCircleSigningIdentities({
         circleIds: moved, circleAddressFor, circleIdentityFor,
-        registerSelfIdentity: (address, identity, meta) => sa.registerSelfIdentity(address, identity, { owner: ownerFor(meta?.circleId) }),
+        registerSelfIdentity: registerCircleSelf,
         onFailed: (cid) => console.warn(`[circle-root] no per-circle signing identity for ${cid} after the hand-over`),
       });
     } catch { /* the next boot installs them */ }
@@ -4466,7 +4511,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       installCircleSigningIdentities({
         circleIds: introduced, circleAddressFor, circleIdentityFor,
-        registerSelfIdentity: (address, identity, meta) => sa.registerSelfIdentity(address, identity, { owner: ownerFor(meta?.circleId) }),
+        registerSelfIdentity: registerCircleSelf,
         onFailed: (cid) => console.warn(`[ceremony] no per-circle signing identity for ${cid} after the re-key`),
       });
     } catch (err) { console.warn(`[ceremony] the new per-circle identities were not installed: ${err?.message ?? err}`); }
@@ -5885,7 +5930,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           circleIds: memberCircleIds,
           circleAddressFor,
           circleIdentityFor,
-          registerSelfIdentity: (address, identity, meta) => sa.registerSelfIdentity(address, identity, { owner: ownerFor(meta?.circleId) }),
+          registerSelfIdentity: registerCircleSelf,
           onFailed: (cid) => console.warn(`[restore-open] no per-circle signing identity for ${cid} — messages `
             + 'sealed to its per-circle address cannot be opened until it derives.'),
         });
@@ -6428,7 +6473,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // boot is deliberate: the send path must not depend on a boot step having happened first.
     const sendAs = await useCircleSigningIdentity({
       circleId, circleAddressFor, circleIdentityFor,
-      registerSelfIdentity: (address, id, meta) => sa.registerSelfIdentity(address, id, { owner: ownerFor(meta?.circleId) }),
+      registerSelfIdentity: registerCircleSelf,
     });
     return sa.peer.sendTo(to, envelope, {
       guarantee: 'hold-forward',
@@ -10109,7 +10154,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       circleIds,
       circleAddressFor,
       circleIdentityFor,
-      registerSelfIdentity: (address, id, meta) => sa.registerSelfIdentity(address, id, { owner: ownerFor(meta?.circleId) }),
+      registerSelfIdentity: registerCircleSelf,
       onFailed: (cid) => console.warn(`[realAgent] no per-circle signing identity for ${cid} — this `
         + 'device signs that circle as its global identity, and messages sealed to its per-circle '
         + 'address cannot be opened.'),
@@ -10191,7 +10236,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleSenderAuthorization: () => ({
       installed:               !!sa.senderAuthorizerInstalled,
       circles:                 circleSenders.circleAddressCount,
-      unknownRosterAllowances: circleSenders.unknownRosterAllowances,
+      unknownRosterRefusals:   circleSenders.unknownRosterRefusals,
       refusedStrangers:        circleSenders.refusedStrangers,
       // B6 — the two halves of "is per-circle signing enforced here, and how far is it done?"
       refusedCanonicalSigners: circleSenders.refusedCanonicalSigners,
@@ -10289,6 +10334,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const pid of personas.keys()) writeDeviceLink(pid);
     onPersonaStarted = writeDeviceLink;   // …and a persona that starts later (created here, or handed) writes its own
   }
+  apiComposed = true;
+  for (const cid of rostersToRead) readCircleRoster(cid);
+  rostersToRead.clear();
   selfAgent = api;
   return api;
 }

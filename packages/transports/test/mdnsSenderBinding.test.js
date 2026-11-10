@@ -21,9 +21,11 @@ const ident = async () => AgentIdentity.fromSeed(new Uint8Array(randomBytes(32))
 describe('mDNS sender binding', () => {
   const open = [];
   afterEach(async () => { for (const t of open.splice(0)) await t.disconnect?.().catch?.(() => {}); });
-  const device = async (discovery, identity) => {
+  // a MODIFIED build: it carries whatever it is handed (our own outbound rule is skipped; the receiver's binding is the gate)
+  class Forger extends MdnsTransport { _mayCarry() { return true; } }
+  const device = async (discovery, identity, Kind = MdnsTransport) => {
     const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
-    const t = new MdnsTransport({ identity, lanIdentity: identity, native, emitter });   // the LAN key pinned to a known key: this exercises the hello, not the key choice
+    const t = new Kind({ identity, lanIdentity: identity, native, emitter });   // the LAN key pinned to a known key: this exercises the hello, not the key choice
     open.push(t);
     await t.connect();
     return t;
@@ -34,7 +36,7 @@ describe('mDNS sender binding', () => {
     const [a, m, t] = [await ident(), await ident(), await ident()];
     const T = await device(discovery, t);
     const A = await device(discovery, a);   // the person
-    const M = await device(discovery, m);   // someone else on the Wi-Fi, honest about its own key
+    const M = await device(discovery, m, Forger);   // someone else on the Wi-Fi, honest about its own key
     expect(await settle(() => T.canReach(a.pubKey) && T.canReach(m.pubKey) && M.canReach(t.pubKey)), 'all on the LAN').toBe(true);
     const got = [];
     T.on('envelope', (e) => got.push(e));

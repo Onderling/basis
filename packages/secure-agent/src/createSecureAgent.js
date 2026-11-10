@@ -2369,7 +2369,12 @@ export async function createSecureAgent(opts = {}) {
     // A send AS one of the persona's circle addresses goes out only on a socket that holds that address: on one that does
     // not, the relay would see the persona's own key speak into the circle (and the circle refuses it). None yet → held.
     const speaksAs = typeof opts?.sendAs === 'string' && opts.sendAs !== owner ? opts.sendAs : null;
-    const sockets = [...personaTransports.entries()]
+    // A transport whose OWN address is the one spoken as (the LAN under a persona's room key) is that persona's socket
+    // too, and the only one for that address: a room key never rides a relay.
+    const lan = speaksAs
+      ? [...extraTransports.entries()].filter(([, t]) => t?.address === speaksAs).map(([name, t]) => [name, { tx: t }])
+      : [];
+    const sockets = lan.length ? lan : [...personaTransports.entries()]
       .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)))
       .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs));
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;

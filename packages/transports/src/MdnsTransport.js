@@ -23,7 +23,7 @@
  * Do not construct this directly on a phone. `@onderling/react-native` exports a subclass with the Android
  * MdnsModule already injected (and the `isAvailable()` guard the mesh builder uses).
  */
-import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding } from '@onderling/core';
+import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding, SENDER_KEY_FIELD } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
 import { ephemeralKeyPair, helloTranscript, openChannel } from './mdnsChannel.js';
 // the channel's pieces travel with the transport's wire contract (a backend or a test plays the far end with them)
@@ -204,6 +204,8 @@ export class MdnsTransport extends Transport {
   #setLan(identity) {
     this.#lan      = identity;
     this.#lanKey   = identity.pubKey;
+    // the transport's own address IS the LAN key: what it stamps as `_from`, what it acks as, what it holds
+    this._setAddress(identity.pubKey);
     this.#hostname = this.#fixedHostname ?? `${this.#hostnamePrefix}-${identity.pubKey.slice(0, 8)}`;
   }
 
@@ -422,7 +424,34 @@ export class MdnsTransport extends Transport {
     this.#native.close?.(connId).catch(() => {});
   }
 
+  // ── What the LAN may carry ──────────────────────────────────────────────────
+  //
+  // The agent's security layer signs an envelope as whichever of its identities `_from` names, and as the canonical
+  // identity otherwise. So the gate that keeps the canonical key off the LAN is here, where the bytes leave: an
+  // envelope goes out only FROM the LAN key and SIGNED BY the LAN key. A room key is registered with the security
+  // layer, so a room's envelopes pass; a rest key never is, so at rest nothing the agent signs leaves at all.
+
+  /** The LAN speaks one address of ours, its LAN key: a send as it is a send the agent may route here. */
+  get supportsAliases() { return true; }
+
+  /** The LAN key is the only address of ours this transport carries; nothing is bound beside it. */
+  async addAddress() { return { ok: false, reason: 'the-lan-speaks-only-its-lan-key' }; }
+
+  /**
+   * @protected — may this envelope leave on the LAN? Our own rule for our own sends (a modified build can skip it, so
+   * it is a convention by the enforceability test); what binds is the receiver's sender binding.
+   */
+  _mayCarry(envelope) {
+    if (!this.#lanKey || envelope?._from !== this.#lanKey) return false;
+    const signedBy = envelope?.[SENDER_KEY_FIELD];
+    return signedBy === undefined || signedBy === this.#lanKey;
+  }
+
   async _put(to, envelope) {
+    if (!this._mayCarry(envelope)) {
+      throw Object.assign(new Error('MdnsTransport: refused to carry an envelope not from and signed by the LAN key'),
+        { code: 'NOT_THE_LAN_KEY' });
+    }
     const connId = this.#pubKeyToConn.get(to);
     if (!connId) throw new Error(`MdnsTransport: no connection to ${to}`);
     const channel = this.#channels.get(connId);

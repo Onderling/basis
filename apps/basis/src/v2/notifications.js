@@ -38,6 +38,7 @@ export const FOR_YOU_KEYS = Object.freeze({
   news:    'circle.forYou.news',
   aCircle: 'circle.forYou.a_circle',
   setting: 'circle.forYou.setting',
+  assigned: 'circle.forYou.assigned',
   anAdmin: 'circle.forYou.an_admin',
   someone: 'circle.forYou.someone',
 });
@@ -100,6 +101,12 @@ export function notificationRows({
       const id = landing ? e.payload.itemId : e.id;
       if (!fresh(at, id)) continue;
       const chip = itemKindChip(landing ? e.payload.kind : (e.payload?.kind ?? null));
+      if (landing && e.payload.reason === 'assigned') {
+        // a task given to me (`assignedEntryFor`): its own row, read by the entry's id (one per assignment)
+        push({ id: e.id, kind: 'assigned', group, open, icon: chip?.icon ?? '✅', at, saidAt: e.payload.saidAt ?? 0,
+          text: t(FOR_YOU_KEYS.assigned, { circle: group.name ?? '' }) });
+        continue;
+      }
       if (landing) {
         push({ id, kind: 'item', group, open, icon: chip?.icon ?? EMBED_TYPE_ICON['chat-message'], at, saidAt: e.payload.saidAt ?? 0,
           text: chip ? t(FOR_YOU_KEYS.item, { kind: t(chip.labelKey), circle: group.name ?? '' }) : t(FOR_YOU_KEYS.news, { circle: group.name ?? '' }) });

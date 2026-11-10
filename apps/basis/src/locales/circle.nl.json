@@ -10087,6 +10087,10 @@
       "notify_policy_setting": {
         "text": "Melding: een instelling van een kring is veranderd",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_assigned": {
+        "text": "Melding: een taak voor mij",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10355,6 +10359,10 @@
     "an_admin": {
       "text": "Een beheerder",
       "doc": "'Nieuw voor jou': who changed a setting when the reader holds no name for them (only admins can)."
+    },
+    "assigned": {
+      "text": "Een taak in {{circle}} is nu van jou",
+      "doc": "'Nieuw voor jou': someone else gave the person a task."
     },
     "someone": {
       "text": "Iemand",

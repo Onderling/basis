@@ -17,12 +17,42 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 
 ## `src/MdnsTransport.js`
 
+### `lanWhisperSecret`
+
+**Kind:** function · **Import:** `lanWhisperSecret` from `'@onderling/transports/mdns'`
+
+A whisper secret from material two parties already share, under a purpose label. See `mdnsChannel.js`.
+
+### `WHISPER_SLOTS`
+
+**Kind:** constant · **Import:** `WHISPER_SLOTS` from `'@onderling/transports/mdns'`
+
+How many tags each side whispers on a LAN connection: its secrets first, random fillers for the rest, shuffled.
+
+### `channelEphemeralKeyPair`
+
+**Kind:** function · **Import:** `channelEphemeralKeyPair` from `'@onderling/transports/mdns'`
+
+A fresh ephemeral X25519 key pair for one hello (never stored). See `mdnsChannel.js`.
+
+### `channelTranscript`
+
+**Kind:** function · **Import:** `channelTranscript` from `'@onderling/transports/mdns'`
+
+The hello transcript (both LAN keys, both nonces, both ephemeral keys) a channel is bound to. See `mdnsChannel.js`.
+
+### `openLanChannel`
+
+**Kind:** function · **Import:** `openLanChannel` from `'@onderling/transports/mdns'`
+
+Open one end of a LAN connection's channel once its hello is proven. See `mdnsChannel.js`.
+
 ### `helloChallengeMessage`
 
 **Kind:** function · **Import:** `helloChallengeMessage` from `'@onderling/transports/mdns'`
 
 ```js
-helloChallengeMessage(nD, nL, L, D)
+helloChallengeMessage(nD, nL, L, D, eD, eL)
 ```
 
 The two messages of the challenged hello — built here, never taken from the far end. They differ by ROLE and both
@@ -35,6 +65,8 @@ under any nonce a relay picks.
 - `nL` `string` — the listener's nonce
 - `L` `string` — the listener's pubKey (it signs the challenge)
 - `D` `string` — the dialler's pubKey
+- `eD` `string` — the dialler's ephemeral channel key
+- `eL` `string` — the listener's ephemeral channel key
 
 **Returns:** `string`
 
@@ -43,7 +75,7 @@ under any nonce a relay picks.
 **Kind:** function · **Import:** `helloProofMessage` from `'@onderling/transports/mdns'`
 
 ```js
-helloProofMessage(nD, nL, D, L)
+helloProofMessage(nD, nL, D, L, eD, eL)
 ```
 
 The dialler's proof: signed by the dialler over both nonces (see `helloChallengeMessage`).
@@ -54,6 +86,8 @@ The dialler's proof: signed by the dialler over both nonces (see `helloChallenge
 - `nL` `string`
 - `D` `string` — the dialler's pubKey (it signs the proof)
 - `L` `string` — the listener's pubKey
+- `eD` `string`
+- `eL` `string`
 
 **Returns:** `string`
 
@@ -69,7 +103,7 @@ The DNS-SD service type every Onderling device advertises and browses for. Part 
 
 ```js
 class MdnsTransport extends Transport
-new MdnsTransport({ identity, hostname = null, native = null, emitter = null })
+new MdnsTransport({ identity, lanIdentity = null, hostname = null, hostnamePrefix = 'dw', native = null, emitter = null })
 ```
 
 What a backend must provide. Named here so a second one has a checklist rather than an archaeology
@@ -95,7 +129,7 @@ exercise:
 A backend with `start` but no `startAdvertising`/`startDiscovery` is honoured as far as it goes and says
 so — see `_applyDiscoverability`.
 
-**Methods:** `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `_put()`
+**Methods:** `useLanIdentity()` · `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `addAddress()` · `useWhisper()` · `_defaultSenderFor()` · `_mayCarry()` · `_put()`
 
 ## `src/MqttTransport.js`
 

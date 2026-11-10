@@ -18,7 +18,7 @@ async function until(pred, { timeoutMs = 8_000, everyMs = 50 } = {}) {
   return pred();
 }
 
-describe('companion-node — nearby peers are ROUTED to over mdns', () => {
+describe('companion-node — nearby peers are ROUTED to over mdns, by the LAN key only', () => {
   const nodes = [];
   afterAll(async () => { for (const n of nodes) { try { await n.stop(); } catch { /* */ } } });
 
@@ -32,15 +32,19 @@ describe('companion-node — nearby peers are ROUTED to over mdns', () => {
     expect(a.agent.routing).toBeTruthy();
     expect(a.nearby?.transport).toBeTruthy();
 
-    // Discovery + the mdns hello handshake: each side ends up holding the other as a connected peer.
-    const found = await until(() => a.nearby.transport.connectedPeers().includes(b.identity.pubKey));
+    // Discovery + the mdns hello handshake: each side ends up holding the other as a connected peer, under the
+    // LAN key the other speaks on the LAN (never its canonical key).
+    const bLan = () => b.nearby.transport.lanAddress;
+    const found = await until(() => !!bLan() && a.nearby.transport.connectedPeers().includes(bLan()));
     expect(found, 'a never connected to b over the loopback mdns').toBe(true);
+    expect(a.nearby.transport.connectedPeers(), 'the LAN carries no canonical key').not.toContain(b.identity.pubKey);
 
-    const route = await a.agent.routeFor(b.identity.pubKey);
+    // The host's strategy picks mdns for what the LAN connection holds ...
+    const route = await a.agent.routeFor(bLan());
     expect(route.name).toBe('mdns');
-
-    // And the route is usable: a hello over it registers b's key at a (the thing that timed out on the walk).
-    await a.agent.hello(b.identity.pubKey);
-    expect(a.agent.security?.getPeerKey?.(b.identity.pubKey) ?? true).toBeTruthy();
+    // ... and a stranger's canonical address is not on the LAN: only a known peer's address, bound after a whisper
+    // match on the connection, ever routes there.
+    const canonical = await a.agent.routeFor(b.identity.pubKey).catch(() => null);
+    expect(canonical?.name ?? null).not.toBe('mdns');
   }, 30_000);
 });

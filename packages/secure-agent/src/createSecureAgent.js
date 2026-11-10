@@ -2235,9 +2235,18 @@ export async function createSecureAgent(opts = {}) {
    * to a fresh peer races the handshake.
    */
   async function sendToPeer(addr, payload, opts = {}) {
-    // A send that names WHO speaks (`sendAs`, an address of ours) and has no identity behind it is held (when the caller
-    // asked to hold) or refused: never signed with the canonical identity instead, which would hand the circle and
-    // the relay the person's main key, the one link a per-circle address exists to withhold.
+    // `requireSendAs`: a send that may ONLY speak as `sendAs` (a Nearby room key) is refused outright when no identity
+    // is registered for it: never held (a room message does not outlive the visit), never the canonical identity.
+    if (opts?.requireSendAs === true) {
+      const as = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
+      if (!as || typeof agent.security?.selfIdentityFor !== 'function' || !agent.security.selfIdentityFor(as)) {
+        throw Object.assign(new Error('secure-agent: refused, no identity is registered for the address this send must speak as'),
+          { code: 'SEND_AS_UNREGISTERED' });
+      }
+    }
+    // Every other send that names WHO speaks (`sendAs`, an address of ours) and has no identity behind it is held (when
+    // the caller asked to hold) or refused: never signed with the canonical identity instead, which would hand the
+    // circle and the relay the person's main key, the one link a per-circle address exists to withhold.
     {
       const as = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
       if (as && as !== identity.pubKey && !(typeof agent.security?.selfIdentityFor === 'function' && agent.security.selfIdentityFor(as))) {
@@ -2380,9 +2389,21 @@ export async function createSecureAgent(opts = {}) {
     // A send AS one of the persona's circle addresses goes out only on a socket that holds that address: on one that does
     // not, the relay would see the persona's own key speak into the circle (and the circle refuses it). None yet → held.
     const speaksAs = typeof opts?.sendAs === 'string' && opts.sendAs !== owner ? opts.sendAs : null;
-    const sockets = [...personaTransports.entries()]
+    // A transport whose OWN address is the one spoken as (the LAN under a persona's room key) is that persona's socket
+    // too, and the only one for that address: a room key never rides a relay.
+    const lan = speaksAs
+      ? [...extraTransports.entries()].filter(([, t]) => t?.address === speaksAs).map(([name, t]) => [name, { tx: t }])
+      : [];
+    // A LAN connection where this address of the persona was PROVEN to the peer (a whisper match: a sibling, a contact)
+    // carries it first; the persona's own relay sockets after.
+    const proven = speaksAs && !lan.length
+      ? [...extraTransports.entries()]
+        .filter(([, t]) => t?.address !== speaksAs && t?.holdsAddress?.(speaksAs) === true && t?.canReach?.(addr) === true)
+        .map(([name, t]) => [name, { tx: t }])
+      : [];
+    const sockets = lan.length ? lan : [...proven, ...[...personaTransports.entries()]
       .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)))
-      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs));
+      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs))];
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     // Not sendable now: held on hold-forward, exactly as the general persona's send would be — and every flush re-sends
     // it through `resendHeld`, which keeps it on this persona's own sockets.

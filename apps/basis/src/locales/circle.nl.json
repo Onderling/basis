@@ -3768,10 +3768,6 @@
       "text": "nog niets getoond",
       "doc": "Summary when neither allow is on."
     },
-    "reach_share": {
-      "text": "Deel hoe ik bereikbaar ben",
-      "doc": "Rung 4: the action in a nearby thread that shares my {transport→address} map (all-or-nothing; the NKN address only if the publication lock allows)."
-    },
     "reach_shared_you": {
       "text": "Je hebt gedeeld hoe je bereikbaar bent.",
       "doc": "Thread line after sharing."
@@ -3792,6 +3788,18 @@
       "text": "Nu niet",
       "doc": "Decline the ask-back; the bar goes away, their card stays."
     },
+    "answer_row": {
+      "text": "{{name}} antwoordde: {{text}}",
+      "doc": "Under my ask: an answer that arrived in the room. It opens no thread; sharing my card is the way to a contact."
+    },
+    "share_card_with": {
+      "text": "Deel je kaart met {{name}}",
+      "doc": "On an answer to my ask: hand over how to reach me (my own address, the relay) and ask for theirs. The only way from the room to a contact."
+    },
+    "earlier_in_room": {
+      "text": "Eerder, in de ruimte",
+      "doc": "A contact thread: the header of a kept Nearby visit with this person (shown after a card share; kept on this device only, for the person's chosen number of days)."
+    },
     "my_ask_row": {
       "text": "Jouw vraag · door {{heard}} gehoord · nog {{min}} min",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
@@ -3805,8 +3813,8 @@
       "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
     },
     "as_self_caveat": {
-      "text": "Dat is een naam die je laat zien, geen apart adres: wie hier meekijkt, kan zien dat het van hetzelfde apparaat komt.",
-      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+      "text": "De ruimte ziet elke keer een nieuwe sleutel. Het netwerk ziet nog steeds je apparaat.",
+      "doc": "Nearby → You here: what the room key does and does not hide. A new key per entry and per self; the network (IP, MAC) still sees the device."
     },
     "first_use_title": {
       "text": "Wat mag deze ruimte van je zien?",
@@ -10062,6 +10070,10 @@
       },
       "assistant_calendarFeed": {
         "text": "Agenda-abonnement",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "nearby_keepDays": {
+        "text": "Hoe lang een gesprek in de ruimte op dit apparaat blijft (dagen)",
         "doc": "A setting's label (projected from the parameter register)."
       },
       "notify_windowDays": {

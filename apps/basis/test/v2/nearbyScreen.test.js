@@ -423,14 +423,14 @@ describe('acting on asks (step F)', () => {
     expect(askChannel.broadcast).not.toHaveBeenCalled();
   });
 
-  it('answering goes to the ASKER alone and opens the channel', async () => {
+  it('answering goes to the ASKER alone and opens no direct thread (it stays in the room)', async () => {
     const { screen, askChannel, ask } = withChannel();
     screen.open();
     ask(anAsk());
     await flush();
 
     const r = await screen.answer('ask-1', 'ik heb er een');
-    expect(r).toMatchObject({ ok: true, opensDirectChannel: true, peer: 'asker-addr' });
+    expect(r).toEqual({ ok: true, peer: 'asker-addr' });
     expect(askChannel.sendAnswer).toHaveBeenCalledWith(
       expect.objectContaining({ askId: 'ask-1', text: 'ik heb er een' }), 'asker-addr',
     );
@@ -479,11 +479,27 @@ describe('acting on asks (step F)', () => {
   });
 });
 
-describe('answering hands back a transient thread (rung 3)', () => {
+describe('an answer to my ask redraws the screen (it is shown under the ask)', () => {
+  it('the screen re-reads when an answer lands', async () => {
+    let pushAnswer = null;
+    const screen = createNearbyScreen({
+      subscribeToAnswers: (fn) => { pushAnswer = fn; return () => {}; },
+      myAsks: () => [], t: (k) => k,
+    });
+    let draws = 0;
+    screen.subscribe(() => { draws += 1; });
+    screen.open();
+    const before = draws;
+    pushAnswer({ askId: 'a1', text: 'ik', from: 'room-b' });
+    expect(draws).toBeGreaterThan(before);
+  });
+});
+
+describe('answering opens no thread (the answer stays in the room)', () => {
   const T0 = 1_700_000_000_000;
   const flush = () => new Promise((r) => setTimeout(r, 0));
 
-  it('the answer result carries a TRANSIENT thread for the host to open', async () => {
+  it('the answer result names the asker and carries no thread for the host to open', async () => {
     let pushAsk = null;
     const screen = createNearbyScreen({
       subscribeToAsks: (fn) => { pushAsk = fn; return () => {}; },
@@ -495,7 +511,8 @@ describe('answering hands back a transient thread (rung 3)', () => {
     await flush();
 
     const r = await screen.answer('ask-1', 'ik heb er een');
-    expect(r.thread).toMatchObject({ peerAddress: 'them-addr', transient: true, origin: 'nearby-answer' });
+    expect(r).toEqual({ ok: true, peer: 'them-addr' });
+    expect(r.thread).toBeUndefined();
   });
 });
 

@@ -75,6 +75,18 @@ describe('Today: "Nieuw voor jou" on top, only when it holds rows', () => {
     // one persona on the device: no face to tell rows apart, so none is carried
     const one = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles: both, myRefs: [], forYou: true, t, now: () => NOW } });
     expect(one[0].content.items.every((r) => r.self == null)).toBe(true);
+  });
+  it('a direct message is under the persona the contact is filed under (its pair circle\'s), else the default', async () => {
+    const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
+    const turn = (contactId, messageId, ts) => ({ contactId, origin: 'bot', ts, receivedAt: ts, messageId, text: 'hoi' });
+    const blocks = await materializeScreen({ screen: page, hostOps: {
+      eventLog: { query: () => [] }, circles, myRefs: [], forYou: true, t, now: () => NOW,
+      turns: [turn('bea', 'd1', NOW - 2000), turn('cas', 'd2', NOW - 1000)],
+      selfSet: { on: ['default'], held: [{ id: 'default' }, { id: 'werk', name: 'Werk' }] },
+      profileIdOf: (cid) => (cid === 'pair-bea' ? 'werk' : 'default'),
+      contactCircleOf: (id) => (id === 'bea' ? 'pair-bea' : null),
+    } });
+    expect(blocks[0].content.items.map((r) => [r.id, r.self?.id])).toEqual([['d2', 'default'], ['d1', 'werk']]);
     const nothing = await materializeScreen({ screen: page, hostOps: { eventLog: { query: () => [] }, circles, myRefs: [], forYou: true, t, now: () => NOW } });
     expect(nothing.map((b) => b.type)).toEqual(['circlesUnread']);
   });

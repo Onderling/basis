@@ -3042,11 +3042,15 @@ const contactSeen = makeContactSeenStore({ getItem: (k) => window.localStorage.g
 // the thread is opened.
 const contactNames = makeContactNameStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
 let _contactTurns = [];
+// each contact's pair circle, noted by every roster read: "Nieuw voor jou" files a direct message under that circle's
+// persona, as the Contacten switcher does
+const _contactPairCircle = new Map();
 async function refreshContactUnread() {
   try {
     const turns = await circleContactChannel?.rehydrateAll?.() ?? [];
-    _contactTurns = turns;   // …and "Nieuw voor jou" on Vandaag reads the same turns
+    _contactTurns = turns;   // …and "Nieuw voor jou" on Vandaag reads the same turns, filed under their contact's persona
     _vandaagHead?.invalidate();
+    if (_selfSet.held.length > 1 && turns.some((x) => x?.contactId && !_contactPairCircle.has(x.contactId))) loadAllContacts().then(() => _vandaagHead?.invalidate()).catch(() => {});
     _contactUnread = buildContactUnread({ turns, seenAt: await contactSeen.read(), readIds: readMarks.ids() });
   } catch { _contactUnread = {}; }
   return _contactUnread;
@@ -3136,7 +3140,9 @@ async function contactCardArrived({ contactId, card }) {
 }
 // The one Contacten read (shared with mobile): the graph less aliases and my own addresses, the book, merged, and
 // every contact with a pair roster here named by what they said on it.
-const loadAllContacts = () => loadContactRoster({ peerGraph: circlePeerGraph, agent: _peerAgent, callSkill: rawCallSkill, names: contactNames });
+// every read of the roster also notes each contact's pair circle (`_contactPairCircle`, beside the turns above)
+const loadAllContacts = () => loadContactRoster({ peerGraph: circlePeerGraph, agent: _peerAgent, callSkill: rawCallSkill, names: contactNames })
+  .then((rows) => { for (const r of rows ?? []) if (r?.contactId) _contactPairCircle.set(r.contactId, r.pairCircleId ?? null); return rows; });
 
 /**
  * objective L · Phase 2 — open the OUT-OF-CIRCLE recipient picker overlay. Lists the Contacten roster's
@@ -4482,7 +4488,7 @@ async function materializeVandaag() {
       forYou: true, t, turns: _contactTurns, contactName: (id) => contactThreads.get(id)?.name ?? null,
       notifyWindowDays: circleHouseholdAgent?.getParamValue?.('notify.windowDays'),
       // whose circle it is (every persona's rows show, each with its face)
-      profileIdOf: profileIdOfCircle,
+      profileIdOf: profileIdOfCircle, contactCircleOf: (id) => _contactPairCircle.get(id) ?? null,
       // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
       selfIn: mySelfIn,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card

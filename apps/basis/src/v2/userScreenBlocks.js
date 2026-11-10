@@ -105,8 +105,11 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
     const personaById = new Map(held.map((p) => [p.id, p]));
     const selfOf = held.length > 1 && typeof hostOps.profileIdOf === 'function'
       ? (group) => {
-        if (group?.kind !== 'circle') return null;   // a contact's persona: not known to the projection yet
-        const p = personaById.get(hostOps.profileIdOf(group.id) ?? 'default');
+        // a circle is its persona's; a contact is filed under its pair circle's persona, without one the default's
+        // (the rule the Contacten switcher filters by, `contactsInSet`)
+        const circleId = group?.kind === 'circle' ? group.id
+          : (typeof hostOps.contactCircleOf === 'function' ? hostOps.contactCircleOf(group?.id) : null);
+        const p = personaById.get(circleId ? (hostOps.profileIdOf(circleId) ?? 'default') : 'default');
         return p ? { id: p.id, name: p.id === 'default' ? null : (p.name ?? p.id) } : null;
       }
       : null;

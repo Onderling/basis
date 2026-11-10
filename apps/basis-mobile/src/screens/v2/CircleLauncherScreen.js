@@ -738,13 +738,14 @@ export default function CircleLauncherScreen({
   const [contactUnread, setContactUnread] = useState({});
   // …and "Nieuw voor jou" on Vandaag reads the same turns, named by the contact book (web parity)
   const [contactTurns, setContactTurns] = useState([]);
-  const [contactNameMap, setContactNameMap] = useState({});
+  // each contact's name and pair circle, for "Nieuw voor jou" (a direct message is filed under its pair circle's persona)
+  const [contactBook, setContactBook] = useState({});
   const refreshContactUnread = useCallback(async () => {
     try {
       const turns = (await bundle?.contactChannel?.rehydrateAll?.()) ?? [];
       setContactTurns(turns);
       loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames })
-        .then((rows) => setContactNameMap(Object.fromEntries((rows ?? []).filter((r) => r?.contactId && r?.name).map((r) => [r.contactId, r.name]))))
+        .then((rows) => setContactBook(Object.fromEntries((rows ?? []).filter((r) => r?.contactId).map((r) => [r.contactId, { name: r.name ?? null, pairCircleId: r.pairCircleId ?? null }]))))
         .catch(() => {});
       setContactUnread(buildContactUnread({ turns, seenAt: await contactSeen.read(), readIds: readMarks.ids() }));
     } catch { setContactUnread({}); }
@@ -1345,8 +1346,8 @@ export default function CircleLauncherScreen({
   // a new object with the same content. Keyed on the objects, the run fired three times per landing, ~2.2 s each on a
   // phone (the refreshed page book, the re-read circle list, the seen-marks).
   // what "Nieuw voor jou" reads beside the log: the direct-message turns and the contact book's names (read at call time)
-  const forYouRef = useRef({ turns: [], names: {} });
-  forYouRef.current = { turns: contactTurns, names: contactNameMap };
+  const forYouRef = useRef({ turns: [], book: {} });
+  forYouRef.current = { turns: contactTurns, book: contactBook };
   const vandaagInputs = useRef({});
   vandaagInputs.current = { screensBook, circles, circlesShown, selvesOn, heldSelves, seenAt, unreadMyRefs, expandedBlockId };
   const vandaagKey = useMemo(() => vandaagLandingKey({
@@ -1368,7 +1369,8 @@ export default function CircleLauncherScreen({
       // …and the circles-with-news block counts what the circle tiles count (their 'seen' and 'me')
       hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs, readIds: readMarksRef.current?.ids(),
         // "Nieuw voor jou" on top (the shared projection, web parity): the direct messages, who they are from, the window
-        forYou: true, t, turns: forYouRef.current.turns, contactName: (id) => forYouRef.current.names[id] ?? null,
+        forYou: true, t, turns: forYouRef.current.turns, contactName: (id) => forYouRef.current.book[id]?.name ?? null,
+        contactCircleOf: (id) => forYouRef.current.book[id]?.pairCircleId ?? null,
         notifyWindowDays: bundle?.agent?.getParamValue?.('notify.windowDays'),
         // whose circle it is (every persona's rows show, each with its face)
         profileIdOf: (cid) => { try { return bundle?.agent?.profileIdOf?.(cid) ?? 'default'; } catch { return 'default'; } },

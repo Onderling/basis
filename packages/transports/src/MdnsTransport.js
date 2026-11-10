@@ -23,10 +23,13 @@
  * Do not construct this directly on a phone. `@onderling/react-native` exports a subclass with the Android
  * MdnsModule already injected (and the `isAvailable()` guard the mesh builder uses).
  */
-import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding, SENDER_KEY_FIELD } from '@onderling/core';
+import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding, SENDER_KEY_FIELD, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
 import * as channel from './mdnsChannel.js';
-const { ephemeralKeyPair, helloTranscript, openChannel } = channel;
+const { ephemeralKeyPair, helloTranscript, openChannel, whisperTag, whisperFiller, bindMessage } = channel;
+
+/** How many tags each side whispers on a LAN connection: its secrets first, random fillers for the rest, shuffled. */
+export const WHISPER_SLOTS = param({ key: 'lan.whisper.slots', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 32 });
 
 // The channel's pieces travel with the wire contract, for whoever plays the far end of a hello (a backend, a test).
 /** A fresh ephemeral X25519 key pair for one hello (never stored). See `mdnsChannel.js`. */
@@ -148,6 +151,13 @@ export class MdnsTransport extends Transport {
   #handshakes   = new Map();
   // connectionId → its channel (see mdnsChannel.js): every frame after the hello is sealed and opened here
   #channels     = new Map();
+  // THE WHISPER, per connection (see useWhisper): what I whispered (tag → my secret's entry), what they whispered,
+  // the addresses of mine I proved here, and the addresses of theirs I bound here after their proof.
+  #whisper      = null;
+  #mine         = new Map();   // connectionId → Promise<Map<tag, entry>>
+  #theirTags    = new Map();   // connectionId → Set<tag>
+  #ownBound     = new Map();   // connectionId → Set<address>
+  #peerBound    = new Map();   // connectionId → Set<address>
   // pubKeys being dialled (a second discovery event mid-handshake must not open a second socket)
   #dialling     = new Set();
   // pubKey → ms timestamp of last successful send or inbound frame — used
@@ -197,7 +207,13 @@ export class MdnsTransport extends Transport {
       // FAIL CLOSED: a connection whose handshake has not proven a key refuses the frame — never `null`, which the
       // kernel reads as "this transport has no sender to offer" and lets through with a warning. (The reader below
       // also routes an unkeyed connection's data here; the invariant does not depend on that order.)
-      authenticatedSender: (connectionId) => this.#connToPubKey.get(connectionId) ?? { refuse: 'connection-not-proven' },
+      // the connection's proven LAN key, and every address of theirs the whisper bound to it after their proof
+      authenticatedSender: (connectionId) => {
+        const lan = this.#connToPubKey.get(connectionId);
+        if (!lan) return { refuse: 'connection-not-proven' };
+        const bound = this.#peerBound.get(connectionId);
+        return bound?.size ? [lan, ...bound] : lan;
+      },
       onUnauthenticated:   (message) => this.emit('warn', message),
     });
   }
@@ -363,6 +379,8 @@ export class MdnsTransport extends Transport {
     this.#handshakes.clear();
     this.#dialling.clear();
     this.#channels.clear();
+    for (const connId of [...this.#ownBound.keys(), ...this.#peerBound.keys()]) this.#forgetWhisper(connId);
+    this.#mine.clear(); this.#theirTags.clear();
   }
 
   get _pubKeyToConn() { return this.#pubKeyToConn; }
@@ -379,7 +397,8 @@ export class MdnsTransport extends Transport {
    * never hears it — so a surface that starts late reads this once and then follows the events.
    * @returns {string[]} peer pubKeys
    */
-  connectedPeers() { return [...this.#pubKeyToConn.keys()]; }
+  /** The LAN keys of the live connections: the room. An address a whisper bound is reachable, never a row here. */
+  connectedPeers() { return [...new Set(this.#connToPubKey.values())]; }
 
   _hasPeer(pubKey) {
     return this.#pubKeyToConn.has(pubKey);
@@ -441,32 +460,45 @@ export class MdnsTransport extends Transport {
   /** The LAN speaks one address of ours, its LAN key: a send as it is a send the agent may route here. */
   get supportsAliases() { return true; }
 
-  /** The LAN key is the only address of ours this transport carries; nothing is bound beside it. */
-  async addAddress() { return { ok: false, reason: 'the-lan-speaks-only-its-lan-key' }; }
+  /** Nothing outside binds an address here: only a whisper match, proven on one connection, does (useWhisper). */
+  async addAddress() { return { ok: false, reason: 'the-lan-binds-only-whispered-addresses' }; }
+
+  /**
+   * THE WHISPER. `secrets()` answers what this device holds: `[{ secret, address, sign(message) → sig b64,
+   * accept(address) → bool }]` — a secret shared with someone (a persona's sibling secret, a contact's pairwise one),
+   * the address of mine I prove when it matches (signed by that address's key), and my rule for the address the other
+   * side proves (a device map with its tombstones, a contact row). Read per connection, after the bound hello.
+   * @param {() => Promise<Array<object>>|Array<object>} secrets
+   */
+  useWhisper(secrets) { this.#whisper = typeof secrets === 'function' ? secrets : null; }
 
   /**
    * @protected — may this envelope leave on the LAN? Our own rule for our own sends (a modified build can skip it, so
    * it is a convention by the enforceability test); what binds is the receiver's sender binding.
    */
-  _mayCarry(envelope) {
-    if (!this.#lanKey || envelope?._from !== this.#lanKey) return false;
+  _mayCarry(envelope, connId = null) {
+    // FROM: the LAN key, or an address of mine I proved on THIS connection (a whisper match) — never another
+    const from = envelope?._from;
+    const mine = from === this.#lanKey || (connId != null && this.#ownBound.get(connId)?.has(from) === true);
+    if (!this.#lanKey || !mine) return false;
+    // SIGNED BY that same key (the security layer stamps the real signer; a fallback to another identity is refused)
     const signedBy = envelope?.[SENDER_KEY_FIELD];
-    if (signedBy !== undefined && signedBy !== this.#lanKey) return false;
-    // a hello is plaintext and ANNOUNCES a key: it may announce only the LAN key (a send that did not ask to speak as
-    // the room key would otherwise hand the room the agent's canonical key in the hello it signs as the room)
+    if (signedBy !== undefined && signedBy !== from) return false;
+    // a hello is plaintext and ANNOUNCES a key: it may announce only the key it is from (a send that did not ask to
+    // speak as the room key would otherwise hand the room the agent's canonical key in the hello it signs as the room)
     if (envelope?._p === 'HI') {
       const announced = envelope?.payload?.pubKey;
-      if (announced !== undefined && announced !== this.#lanKey) return false;
+      if (announced !== undefined && announced !== from) return false;
     }
     return true;
   }
 
   async _put(to, envelope) {
-    if (!this._mayCarry(envelope)) {
-      throw Object.assign(new Error('MdnsTransport: refused to carry an envelope not from and signed by the LAN key'),
+    const connId = this.#pubKeyToConn.get(to);
+    if (!this._mayCarry(envelope, connId ?? null)) {
+      throw Object.assign(new Error('MdnsTransport: refused to carry an envelope not from and signed by a key this connection speaks'),
         { code: 'NOT_THE_LAN_KEY' });
     }
-    const connId = this.#pubKeyToConn.get(to);
     if (!connId) throw new Error(`MdnsTransport: no connection to ${to}`);
     const channel = this.#channels.get(connId);
     if (!channel) throw new Error(`MdnsTransport: the connection to ${to} has no channel`);
@@ -555,6 +587,12 @@ export class MdnsTransport extends Transport {
           }
           try { envelope = parseUntrustedJson(new TextDecoder().decode(plain)); }
           catch (err) { this._frameRefused(err); return; }
+          // the whisper rides the channel and is the transport's own: never passed upstream
+          if (envelope && (envelope._mdns_whisper || envelope._mdns_bind)) {
+            const task = envelope._mdns_whisper ? this.#onWhisper(connectionId, envelope._mdns_whisper) : this.#onBind(connectionId, envelope._mdns_bind);
+            task.catch((err) => this.emit('warn', `MdnsTransport: whisper: ${err?.message ?? err}`));
+            return;
+          }
         }
         // THE SENDER BINDING, for every data frame. No row, no route, no DATA: a frame on a connection whose handshake
         // has not proven a key is dropped and the socket refused (it cannot be replied to — the hello exists so that
@@ -585,6 +623,7 @@ export class MdnsTransport extends Transport {
       this.#emitter.addListener('MdnsClientDisconnected', ({ connectionId }) => {
         this.#pending.delete(connectionId);
         this.#channels.delete(connectionId);
+        this.#forgetWhisper(connectionId);
         this.#endHandshake(connectionId);
         const pubKey = this.#connToPubKey.get(connectionId);
         if (pubKey) {
@@ -632,6 +671,7 @@ export class MdnsTransport extends Transport {
   #refuse(connId) {
     this.#endHandshake(connId);
     this.#channels.delete(connId);
+    this.#forgetWhisper(connId);
     this.#pending.delete(connId);
     this.#native.close?.(connId).catch(() => {});
   }
@@ -668,6 +708,7 @@ export class MdnsTransport extends Transport {
       this.#channels.set(connId, channel);
       const previous = this.#pubKeyToConn.get(hs.peer);
       this.#registerConn(connId, hs.peer);
+      this.#startWhisper(connId);
       if (!previous) this.emit('peer-discovered', hs.peer);
       return;
     }
@@ -691,11 +732,110 @@ export class MdnsTransport extends Transport {
       // closed (when both sides dialled at once it is the peer's live inbound) and its late close cannot unmap this.
       const previous = this.#pubKeyToConn.get(hs.peer);
       this.#registerConn(connId, hs.peer);
+      this.#startWhisper(connId);
       if (!previous) this.emit('peer-discovered', hs.peer);
       return;
     }
     // anything else (a frame out of order, a second hello) is a connection that is not following the contract
     this.#refuse(connId);
+  }
+
+  // ── The whisper ─────────────────────────────────────────────────────────────
+
+  async #sendSealed(connId, obj) {
+    const channel = this.#channels.get(connId);
+    if (!channel) return;
+    await this.#sendFrame(connId, { _mdns_box: channel.seal(new TextEncoder().encode(JSON.stringify(obj))) });
+  }
+
+  /** After the bound hello: my tags (one per secret I hold, fillers for the rest, shuffled), sent at once. */
+  #startWhisper(connId) {
+    const channel = this.#channels.get(connId);
+    if (!channel) return;
+    const slots = WHISPER_SLOTS;
+    const mine = (async () => {
+      let entries = [];
+      try { entries = (await this.#whisper?.()) ?? []; } catch { entries = []; }
+      const byTag = new Map();
+      for (const e of entries.slice(0, slots)) {
+        if (!(e?.secret instanceof Uint8Array) || typeof e.address !== 'string') continue;
+        byTag.set(whisperTag(e.secret, channel.transcript), e);
+      }
+      return byTag;
+    })();
+    this.#mine.set(connId, mine);
+    mine.then((byTag) => {
+      const tags = [...byTag.keys()];
+      while (tags.length < slots) tags.push(whisperFiller());
+      for (let i = tags.length - 1; i > 0; i--) {
+        const r = new Uint32Array(1); globalThis.crypto.getRandomValues(r);
+        const j = r[0] % (i + 1); [tags[i], tags[j]] = [tags[j], tags[i]];
+      }
+      return this.#sendSealed(connId, { _mdns_whisper: tags });
+    }).catch(() => {});
+  }
+
+  /** Their tags: for each of mine that matches, prove my address on this connection. */
+  async #onWhisper(connId, tags) {
+    if (!Array.isArray(tags) || tags.length > WHISPER_SLOTS || this.#theirTags.has(connId)) return;
+    const theirs = new Set(tags.filter((t) => typeof t === 'string'));
+    this.#theirTags.set(connId, theirs);
+    this.emit('whisper', [...tags]);
+    const channel = this.#channels.get(connId);
+    const mine = await this.#mine.get(connId);
+    if (!channel || !mine) return;
+    for (const [tag, e] of mine) {
+      if (!theirs.has(tag)) continue;
+      let sig = null;
+      try { sig = await e.sign(bindMessage(channel.transcript, e.address)); } catch { sig = null; }
+      if (typeof sig !== 'string') continue;
+      if (!this.#ownBound.has(connId)) this.#ownBound.set(connId, new Set());
+      this.#ownBound.get(connId).add(e.address);
+      // the base transport's alias set: so a send AS this address is stamped from it (the gate above keeps it to
+      // the connection it was proven on)
+      await Transport.prototype.addAddress.call(this, e.address);
+      await this.#sendSealed(connId, { _mdns_bind: { tag, address: e.address, sig } });
+    }
+  }
+
+  /** Their proof for a tag we both whispered: checked under the address it names, then by my own rule. */
+  async #onBind(connId, b) {
+    const channel = this.#channels.get(connId);
+    const theirs = this.#theirTags.get(connId);
+    const mine = await this.#mine.get(connId);
+    if (!channel || !theirs || !mine || !b || typeof b.tag !== 'string' || typeof b.address !== 'string') return;
+    const e = mine.get(b.tag);
+    if (!e || !theirs.has(b.tag)) return;   // a proof for a tag we did not both whisper binds nothing
+    if (!verifies(bindMessage(channel.transcript, b.address), b.sig, b.address)) return;
+    let ok = false;
+    try { ok = (await e.accept(b.address)) === true; } catch { ok = false; }
+    if (!ok || !this.#channels.has(connId)) return;
+    if (!this.#peerBound.has(connId)) this.#peerBound.set(connId, new Set());
+    this.#peerBound.get(connId).add(b.address);
+    const previous = this.#pubKeyToConn.get(b.address);
+    this.#pubKeyToConn.set(b.address, connId);
+    this.#lastActivity.set(b.address, Date.now());
+    if (previous !== connId) this.emit('peer-discovered', b.address);
+  }
+
+  /** A connection ended: what the whisper bound on it ends with it. */
+  #forgetWhisper(connId) {
+    this.#mine.delete(connId);
+    this.#theirTags.delete(connId);
+    for (const address of this.#peerBound.get(connId) ?? []) {
+      if (this.#pubKeyToConn.get(address) === connId) {
+        this.#pubKeyToConn.delete(address);
+        this.#lastActivity.delete(address);
+        this.emit('peer-disconnected', address);
+      }
+    }
+    this.#peerBound.delete(connId);
+    const own = this.#ownBound.get(connId) ?? new Set();
+    this.#ownBound.delete(connId);
+    for (const address of own) {
+      const stillProven = [...this.#ownBound.values()].some((set) => set.has(address));
+      if (!stillProven) { try { Transport.prototype.removeAddress.call(this, address); } catch { /* best-effort */ } }
+    }
   }
 
   #registerConn(connId, pubKey) {

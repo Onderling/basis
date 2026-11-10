@@ -75,3 +75,51 @@ export function openChannel({ role, mySecret, theirPublic, transcript }) {
     },
   };
 }
+
+// ── The whisper ─────────────────────────────────────────────────────────────────────────────────────────────────
+//
+// After the bound hello each side sends a fixed number of tags: one per secret it holds, the rest random fillers,
+// shuffled. A tag is an HMAC of the connection's transcript under the secret, so it matches only on the same secret
+// AND the same connection: a stranger sees random values, and a tag from one connection means nothing on the next.
+
+const WHISPER_DOMAIN = 'onderling-lan-whisper-v1';
+const HMAC_BLOCK = 128;   // SHA-512's block size
+
+function hmacSha512(key, message) {
+  let k = key.length > HMAC_BLOCK ? nacl.hash(key) : key;
+  const padded = new Uint8Array(HMAC_BLOCK);
+  padded.set(k);
+  const inner = new Uint8Array(HMAC_BLOCK + message.length);
+  const outer = new Uint8Array(HMAC_BLOCK + 64);
+  for (let i = 0; i < HMAC_BLOCK; i++) { inner[i] = padded[i] ^ 0x36; outer[i] = padded[i] ^ 0x5c; }
+  inner.set(message, HMAC_BLOCK);
+  outer.set(nacl.hash(inner), HMAC_BLOCK);
+  k = null;
+  return nacl.hash(outer);
+}
+
+/**
+ * The whisper tag for one secret on one connection.
+ * @param {Uint8Array} secret      a secret two parties hold (32 bytes or more)
+ * @param {Uint8Array} transcript  the connection's hello transcript
+ * @returns {string} 32 bytes, b64
+ */
+export function whisperTag(secret, transcript) {
+  const domain = enc(WHISPER_DOMAIN);
+  const m = new Uint8Array(domain.length + transcript.length);
+  m.set(domain, 0); m.set(transcript, domain.length);
+  return b64Encode(hmacSha512(secret, m).subarray(0, 32));
+}
+
+/** A random value shaped like a tag: what fills the slots a device has no secret for. */
+export function whisperFiller() { return b64Encode(nacl.randomBytes(32)); }
+
+/**
+ * What a matched side signs with the address it claims: the transcript and the address, so the proof is for this
+ * connection only and names what it binds.
+ * @param {Uint8Array} transcript
+ * @param {string} address
+ */
+export function bindMessage(transcript, address) {
+  return `${WHISPER_DOMAIN}|bind|${b64Encode(transcript)}|${address}`;
+}

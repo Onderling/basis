@@ -40,6 +40,7 @@ import { chatComposerVisible } from '../../src/v2/circleTabs.js';
 import { alphaViewModes } from '../../src/v2/alphaSurface.js';
 import { deliveryPresentation } from '../../src/v2/deliverySettings.js';
 import { revealedMemberLabel } from '../../src/v2/circleViewAs.js';
+import { labelShown } from '../../src/v2/personLabel.js';
 import { renderMandateLegibility } from './mandatePicker.js';
 // media — the sealed media-card chip renders via the existing shared
 // domAdapter branch (renderToDom → renderMediaCard), NOT a re-implementation.
@@ -780,7 +781,7 @@ function renderLedenTab(body, { members = null, unreachable = null, selfWebid = 
     row.appendChild(face);
     const primary = document.createElement('span');
     primary.className = 'circle-view__member-primary';
-    primary.textContent = label.primary ?? tr(label.primaryKey);
+    primary.textContent = labelShown(label, tr);
     row.appendChild(primary);
 
     // The real name as a secondary line — only when this viewer may actually see it.

@@ -280,16 +280,24 @@ export function normalizeCircleMembers(result) {
  * TWO PEOPLE WITH ONE NAME. Since 2026-11-06 a name is for people and two members may share one (uniqueness stays on
  * the key). The members list then tells them apart the way Frits asked: the avatar, and only on a collision a small
  * number. The first member with a name (case-blind, in roster order, which every device folds the same way) carries
- * none; each later one carries `nameNumber` 2, 3, … The reveal ladder paints it ("Jan · 2").
+ * none; each later one carries `nameNumber` 2, 3, … The reveal ladder paints it ("Jan · 2"). People with no name at all
+ * are numbered the same way among themselves (`unnamedNumber`: "Onbekend", "Onbekend · 2").
  *
  * @param {Array<object>} rows  view-as rows (`{ id, handle, … }`)
  * @returns {Array<object>}
  */
 export function withNameNumbers(rows) {
   const seen = new Map();
+  let unnamed = 0;
   return rows.map((r) => {
     const k = typeof r?.handle === 'string' ? r.handle.trim().toLowerCase() : '';
-    if (!k) return r;
+    if (!k) {
+      // NO NAME AT ALL (no handle, no released name): "Onbekend", and the later ones in roster order "Onbekend · 2", …
+      // the same way, so two unnamed people in one view are told apart (the ladder paints `unnamedNumber`)
+      if (typeof r?.realName === 'string' && r.realName.trim()) return r;
+      unnamed += 1;
+      return unnamed > 1 ? { ...r, unnamedNumber: unnamed } : r;
+    }
     const n = (seen.get(k) ?? 0) + 1;
     seen.set(k, n);
     return n > 1 ? { ...r, nameNumber: n } : r;

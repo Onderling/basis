@@ -55,4 +55,18 @@ describe("an own appointment made AS a persona (the waist's actAs)", () => {
     const ev = (await createOwnDevicesStore({ dataSource: ds }).listByType('calendar-event')).find((e) => e.title === 'naamloos');
     expect(ev?.createdBy, 'a named actor in the args is ignored on the own calendar').toBe('me');
   });
+  it('an answer keeps the actor it names (the peer it came from), even when the call is made as a persona', async () => {
+    const { VaultMemory } = await import('@onderling/vault');
+    const ds = memoryDataSource();
+    const a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
+    const made = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
+    const werk = a.persona(made.id).chatId.pubKey;
+    const when = new Date(Date.now() + 86_400_000).toISOString().slice(0, 16);
+    const op = plusOp('calendar.calendar-event', { title: 'koffie', when });
+    const added = await a.callSkill(op.app, op.opId, op.args, { actAs: werk });
+    const id = added?.itemId ?? (await createOwnDevicesStore({ dataSource: ds }).listByType('calendar-event')).find((e) => e.title === 'koffie')?.id;
+    expect((await a.callSkill('calendar', 'rsvpAccept', { id, actor: 'peer-address-x' }, { actAs: werk }))?.ok).not.toBe(false);
+    const rsvps = await createOwnDevicesStore({ dataSource: ds }).listByType('rsvp');
+    expect(rsvps.map((r) => r.by), 'the answer is the peer\'s, not my persona\'s').toContain('peer-address-x');
+  });
 });

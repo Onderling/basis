@@ -8074,7 +8074,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const writesMaker = opId === 'addEvent' || opId === 'updateEvent';
       const { actor: _named, ...rest } = args ?? {};
       const asSelf = actorOf(ctx);
-      const res = await handler(asSelf ? { ...rest, actor: asSelf } : (writesMaker ? rest : (args ?? {})));
+      const res = await handler(writesMaker ? (asSelf ? { ...rest, actor: asSelf } : rest) : (args ?? {}));
       if (res?.ok !== false && (opId === 'updateEvent' || opId === 'cancelEvent')) {
         // the appointment the op resolved (it may have been named by its words)
         try { await reshareOwnEvent(res?.itemId ?? args?.id); } catch (err) { console.warn('[calendar] re-share failed:', err?.message ?? err); }

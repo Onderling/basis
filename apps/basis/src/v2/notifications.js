@@ -13,6 +13,7 @@ import { landedTimeOf } from '../eventLog.js';
 import { eventCircleId } from './circleStream.js';
 import { isItemLanding } from './itemLanding.js';
 import { countsAsUnread, pickText } from './circleTilePreviews.js';
+import { policyChangeLines, policyChangeText, policyPatchBetween } from './policyChangeWords.js';
 import { itemKindChip, EMBED_TYPE_ICON } from './embedChips.js';
 import { membershipNoticeFor } from './membershipNotices.js';
 import { NOTIFY_WINDOW_DAYS } from './readMarks.js';
@@ -36,6 +37,8 @@ export const FOR_YOU_KEYS = Object.freeze({
   late:    'circle.forYou.late',
   news:    'circle.forYou.news',
   aCircle: 'circle.forYou.a_circle',
+  setting: 'circle.forYou.setting',
+  anAdmin: 'circle.forYou.an_admin',
   someone: 'circle.forYou.someone',
 });
 
@@ -72,6 +75,7 @@ export function notificationRows({
   const selfFor = (group) => (typeof selfOf === 'function' ? (selfOf(group) ?? null) : null);
   const push = (r) => rows.push({ ...r, self: selfFor(r.group), late: r.saidAt > 0 && r.at - r.saidAt > LATE_AFTER_MS, ids: [{ id: r.id, at: r.saidAt || r.at }] });
 
+  const policies = new Map();   // circleId → its policy-update statements
   for (const e of Array.isArray(events) ? events : []) {
     if (!e || typeof e !== 'object') continue;
     const cid = eventCircleId(e) ?? e.circleId ?? e.payload?.circleId ?? null;
@@ -106,6 +110,11 @@ export function notificationRows({
         text: text ? t(FOR_YOU_KEYS.line, { text, circle: group.name ?? '' }) : t(FOR_YOU_KEYS.news, { circle: group.name ?? '' }) });
       continue;
     }
+    // a circle setting: collected per circle, named below by what changed between two versions
+    if (e.type === 'governance' && e.payload?.body?.kind === 'policy-update') {
+      (policies.get(cid) ?? policies.set(cid, []).get(cid)).push({ e, at, group, open });
+      continue;
+    }
     // …and the two rows the tile does NOT count, on purpose: statements about me on the system lane (someone I admitted
     // joined; I was removed). The tile's badge is what others SAID; these are what happened to me.
     if (VIEWER_FACING_SYSTEM_KINDS.includes(e.type)) {
@@ -124,6 +133,22 @@ export function notificationRows({
         text: kind === 'joined'
           ? t(FOR_YOU_KEYS.joined, { name: hit.args?.name ?? t(FOR_YOU_KEYS.someone), circle: group.name ?? '' })
           : t(FOR_YOU_KEYS.removed, { circle: group.name ?? '' }) });
+    }
+  }
+
+  // A SETTING SOMEONE ELSE CHANGED: each version against the one before it (the first version is the circle being
+  // made, not a change), in the settings screen's own words. Only admin-signed statements reach this log (the lane's
+  // receiver check), so "Een beheerder" is true when the reader holds no name for them.
+  for (const list of policies.values()) {
+    const byVersion = list.filter((x) => Number.isFinite(x.e.payload.body.payload?.version)).sort((a, b) => a.e.payload.body.payload.version - b.e.payload.body.payload.version);
+    for (let i = 1; i < byVersion.length; i += 1) {
+      const { e, at, group, open } = byVersion[i];
+      const body = e.payload.body;
+      if (mine.has(body.author) || !fresh(at, e.id)) continue;
+      const lines = policyChangeLines(policyPatchBetween(byVersion[i - 1].e.payload.body.payload?.policy, body.payload?.policy));
+      if (!lines.length) continue;
+      push({ id: e.id, kind: 'setting', group, open, icon: '⚙️', at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
+        text: t(FOR_YOU_KEYS.setting, { who: t(FOR_YOU_KEYS.anAdmin), circle: group.name ?? '', change: policyChangeText(lines, t) }) });
     }
   }
 

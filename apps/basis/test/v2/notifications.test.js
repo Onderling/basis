@@ -134,3 +134,17 @@ describe('the person\'s table decides what is a row: banner > list > off', () =>
     expect(rows('off').map((r) => r.id)).toEqual([]);
   });
 });
+
+describe('a setting someone else changed is a row ("Een beheerder zette … uit")', () => {
+  const pu = (id, author, version, policy, at) => ({ id, ts: at, landedAt: at, type: 'governance', circleId: 'c1',
+    payload: { circleId: 'c1', body: { kind: 'policy-update', author, payload: { policy, version } } } });
+  it('the change between two versions, in the settings screen\'s own words; the first version and my own changes are no row', () => {
+    const v1 = pu('p1', 'admin', 1, { features: { roster: true }, revealPolicy: 'pairwise' }, NOW - 3000);
+    const v2 = pu('p2', 'admin', 2, { features: { roster: false }, revealPolicy: 'pairwise' }, NOW - 2000);
+    const mine = pu('p3', 'me', 3, { features: { roster: false }, revealPolicy: 'open' }, NOW - 1000);
+    const rows = notificationRows({ events: [v1, v2, mine], circles, myRefs: ['me'], t, now: NOW });
+    expect(rows.map((r) => [r.kind, r.id])).toEqual([['setting', 'p2']]);
+    expect(rows[0].text).toMatch(/^setting .*change_off/);
+    expect(rows[0].open).toEqual({ kind: 'circle', id: 'c1' });
+  });
+});

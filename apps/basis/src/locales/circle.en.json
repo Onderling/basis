@@ -10077,6 +10077,10 @@
       "notify_policy_joined": {
         "text": "Notify: someone joining",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_setting": {
+        "text": "Notify: a circle setting changed",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10337,6 +10341,14 @@
     "a_circle": {
       "text": "a circle",
       "doc": "'Nieuw voor jou': the circle a removal row names when the circle has already left the person's list."
+    },
+    "setting": {
+      "text": "{{who}} changed {{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': a circle setting someone else changed, in the settings screen's own words."
+    },
+    "an_admin": {
+      "text": "An admin",
+      "doc": "'Nieuw voor jou': who changed a setting when the reader holds no name for them (only admins can)."
     },
     "someone": {
       "text": "Someone",

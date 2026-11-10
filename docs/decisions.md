@@ -1408,3 +1408,17 @@ and the fold refuses a statement that would give a bot and anyone else one name,
 members with one name are told apart on screen by the avatar and, only on a collision, a small number: the first
 in roster order is "Jan", the next "Jan · 2" (`withNameNumbers` in the roster normaliser, painted by the reveal
 ladder). Ledger: L718.
+
+## 2026-11-10 — The companion is your always-on device, nothing more; node roles are composed per person (Frits)
+
+**The companion is the person's always-on device: nothing more, nothing less.** Its one defining property is that it
+stays online, so the person stays reachable (hold and forward) while their phone or browser is away. It is not a
+privileged broker, matcher or router.
+
+**Functions that only a node can run** (serving a feed, holding a connector to a credential, other Node-only work)
+are separate roles. Their natural home is often the companion, because it is the person's node, but that is a
+default, not a rule: a person may run a plain always-on agent on device A and another agent on device B that serves
+feeds and holds connectors. Which device carries which role is the person's choice. The code keeps these roles
+modular so an agent is composed from them (the SDK side of this repo), while the Basis app stays one app. The relay
+is a separate installer and process (the 2026-10-24 entry, amended today). A relay refers a feed ask to whichever
+node announced it serves feeds, as decided on 2026-10-24; that node need not be the companion.

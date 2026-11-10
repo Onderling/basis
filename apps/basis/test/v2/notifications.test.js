@@ -123,3 +123,14 @@ describe('a join I admitted, signed with my per-circle address', () => {
     expect(rows[0].text).toContain('Cas');
   });
 });
+
+describe('the person\'s table decides what is a row: banner > list > off', () => {
+  it('banner and list keep the row on Today; off drops it from "Nieuw voor jou"', async () => {
+    const { forYouRows } = await import('../../src/v2/userScreenBlocks.js');
+    const turns = [{ contactId: 'bea', origin: 'bot', ts: NOW - 1000, receivedAt: NOW - 1000, messageId: 'd1', text: 'hallo' }];
+    const rows = (policy) => forYouRows({ eventLog: { query: () => [] }, circles, turns, myRefs: [], t, now: () => NOW, notifyPolicyOf: (k) => (k === 'dm' ? policy : undefined) });
+    expect(rows('banner').map((r) => r.id)).toEqual(['d1']);
+    expect(rows('list').map((r) => r.id)).toEqual(['d1']);
+    expect(rows('off').map((r) => r.id)).toEqual([]);
+  });
+});

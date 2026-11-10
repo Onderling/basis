@@ -53,6 +53,7 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  * @param {(key: string, vars?: object) => string} a.t
  * @param {number} [a.now]
  * @param {number} [a.windowDays]
+ * @param {(kind: string) => boolean} [a.keepKind]  false drops the kind (the person set it to off)
  * @param {boolean} [a.fold]  false: one row per thing, no folding (the banner reads them one by one)
  * @param {(group: {kind: 'circle'|'contact', id: string}) => ({id: string, name?: string|null}|null)} [a.selfOf]
  *        the persona a row is for (its face); the host passes it only when the device holds more than one
@@ -60,7 +61,7 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  */
 export function notificationRows({
   events = [], turns = [], circles = [], contactName = null, viewerIdIn = null, myRefs = [], readIds = null, t,
-  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true,
+  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true, keepKind = null,
 } = {}) {
   if (typeof t !== 'function') return [];
   const mine = new Set(myRefs ?? []);
@@ -139,6 +140,8 @@ export function notificationRows({
 
   // newest arrival first; more than FOLD_AFTER rows of one group fold into one row with a count
   rows.sort((a, b) => b.at - a.at);
+  // the person's table: a kind set to off is no row at all (filtered before folding, so a count never includes it)
+  if (typeof keepKind === 'function') { for (let i = rows.length - 1; i >= 0; i -= 1) if (!keepKind(rows[i].kind)) rows.splice(i, 1); }
   if (!fold) return rows;
   const byGroup = new Map();
   for (const r of rows) {

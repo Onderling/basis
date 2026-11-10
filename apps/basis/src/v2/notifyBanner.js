@@ -25,6 +25,16 @@ export const NOTIFY_POLICY_PARAMS = Object.freeze(Object.entries(NOTIFY_POLICY_D
 export const BANNER_KEYS = Object.freeze({ many: 'circle.forYou.banner_many' });
 
 /**
+ * A kind's rung on the person's ladder: banner (a banner and a row) > list (a row on Today only) > off (neither; the
+ * circle tile's badge and the unread in the circle stay, that is where unread lives). The register's value, else the
+ * kind's default, else list.
+ */
+export function policyFor(kind, policyOf = null) {
+  const v = typeof policyOf === 'function' ? policyOf(kind) : null;
+  return NOTIFY_POLICIES.includes(v) ? v : (NOTIFY_POLICY_DEFAULTS[kind] ?? 'list');
+}
+
+/**
  * One reading: which rows are new since the last one, and the banner they make (or none).
  *
  * @param {object} a
@@ -42,10 +52,7 @@ export const BANNER_KEYS = Object.freeze({ many: 'circle.forYou.banner_many' });
 export function bannerFor({ rows = [], known = null, since = 0, selvesOn = null, onSource = null, policyOf = null, t } = {}) {
   const ids = new Set((Array.isArray(rows) ? rows : []).map((r) => r?.id).filter(Boolean));
   if (known == null) return { banner: null, known: ids };
-  const policy = (kind) => {
-    const v = typeof policyOf === 'function' ? policyOf(kind) : null;
-    return NOTIFY_POLICIES.includes(v) ? v : (NOTIFY_POLICY_DEFAULTS[kind] ?? 'list');
-  };
+  const policy = (kind) => policyFor(kind, policyOf);
   const ticked = Array.isArray(selvesOn) && selvesOn.length ? new Set(selvesOn) : null;
   const fresh = rows.filter((r) => r?.id && !known.has(r.id)
     && !(Number.isFinite(r.at) && r.at < since)

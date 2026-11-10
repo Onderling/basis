@@ -4485,6 +4485,8 @@ function forYouHostOps() {
     myRefs: unreadMyRefs, readIds: readMarks.ids(),
     t, turns: _contactTurns, contactName: (id) => contactThreads.get(id)?.name ?? null,
     notifyWindowDays: circleHouseholdAgent?.getParamValue?.('notify.windowDays'),
+    // the person's table per kind (banner · list · off): off is no row either
+    notifyPolicyOf: (kind) => circleHouseholdAgent?.getParamValue?.(notifyPolicyKey(kind)),
     // whose circle it is (every persona's rows show, each with its face)
     profileIdOf: profileIdOfCircle, contactCircleOf: (id) => _contactPairCircle.get(id) ?? null,
     // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
@@ -4500,7 +4502,7 @@ function ensureBanner() {
     readRows: () => forYouRows(forYouHostOps(), { fold: false }),
     selvesOn: () => (_selfSet.held.length > 1 ? _selfSet.on : null),
     onSource: (o) => (o?.kind === 'thread' ? _activeContactThread?.contactId === o.id : (o?.kind === 'circle' ? getActiveCircle() === o.id : false)),
-    policyOf: (kind) => circleHouseholdAgent?.getParamValue?.(notifyPolicyKey(kind)),
+    policyOf: forYouHostOps().notifyPolicyOf,
     t,
     show: (b) => {
       if (!_bannerEl) {

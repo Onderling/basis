@@ -44,6 +44,7 @@ import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlock
 import { buildTilePreviews } from './circleTilePreviews.js';
 import { notificationRows, FOR_YOU_KEYS } from './notifications.js';
 import { NOTIFY_WINDOW_DAYS } from './readMarks.js';
+import { policyFor } from './notifyBanner.js';
 import { tileCircles } from './helpContact.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { isPairCircleId } from './pairCircleId.js';
@@ -147,6 +148,8 @@ export function forYouRows(hostOps = {}, { muted = new Set(), fold = true } = {}
     now: nowMs,
     windowDays: hostOps.notifyWindowDays,
     fold,
+    // the person's table (`notify.policy.<kind>`): off = not a row here either
+    keepKind: (kind) => policyFor(kind, hostOps.notifyPolicyOf) !== 'off',
   });
 }
 

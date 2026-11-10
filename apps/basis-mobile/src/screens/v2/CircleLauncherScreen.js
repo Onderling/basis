@@ -1364,6 +1364,8 @@ export default function CircleLauncherScreen({
       t, turns: forYouRef.current.turns, contactName: (id) => forYouRef.current.book[id]?.name ?? null,
       contactCircleOf: (id) => forYouRef.current.book[id]?.pairCircleId ?? null,
       notifyWindowDays: bundle?.agent?.getParamValue?.('notify.windowDays'),
+      // the person's table per kind (banner · list · off): off is no row either
+      notifyPolicyOf: (kind) => bundle?.agent?.getParamValue?.(notifyPolicyKey(kind)),
       // whose circle it is (every persona's rows show, each with its face)
       profileIdOf: (cid) => { try { return bundle?.agent?.profileIdOf?.(cid) ?? 'default'; } catch { return 'default'; } },
       ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),

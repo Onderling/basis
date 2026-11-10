@@ -362,7 +362,7 @@ export class EventLog {
    * @returns {number}
    */
   setRetention(patch = {}) {
-    for (const k of ['short', 'chat', 'audit']) {
+    for (const k of ['short', 'chat', 'audit', 'room']) {
       if (typeof patch?.[k] === 'number' && patch[k] >= 0) this.#retention[k] = patch[k];
     }
     const dropped = this.prune();

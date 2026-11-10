@@ -22,7 +22,7 @@
  * @param {object}  [opts.enable]               — { ble, mdns, relay } booleans, all default true
  * @param {string}  [opts.relayUrl]             — ws://|wss:// relay URL (relay built only when set)
  * @param {number}  [opts.mdnsTimeoutMs=6000]   — mDNS pre-connect timeout
- * @param {string}  [opts.hostnamePrefix='dw']  — mDNS hostname prefix (`<prefix>-<pubKey[0..8]>`)
+ * @param {string}  [opts.hostnamePrefix='dw']  — mDNS hostname prefix (`<prefix>-<LAN key[0..8]>`)
  * @param {object}  [opts.permissions]          — pre-fetched perms (skips a second prompt); else requested here
  * @param {string}  [opts.bleDiscoverability='browse'] — BLE's OWN initial state, defaulting TIGHTER than
  *   the rest (Nearby step J / R1+R2). mDNS is confined to a LAN; BLE advertising has no boundary, so it
@@ -78,7 +78,8 @@ export async function buildMeshTransports({
     try {
       mdns = new MdnsTransport({
         identity,
-        hostname: `${hostnamePrefix}-${identity.pubKey.slice(0, 8)}`,
+        // the name follows the LAN key (a rest key, a room key), never the agent's: a canonical slice would link visits
+        hostnamePrefix,
       });
     } catch (e) {
       _warn('MdnsTransport init failed:', e);

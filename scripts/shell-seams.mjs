@@ -164,7 +164,8 @@ export const SEAMS = Object.freeze([
   // shell. The box composed none until 2026-10-08 and ran on the built-in defaults: the same numbers today, but a
   // window the register changed would have reached web and mobile and never the box — where the bot's turns age out.
   { id: 'retention-window', pattern: /setRetention(?:\?\.)?\(retentionFromDays\(/, why: 'the windowed log classes (plumbing, the bot\'s turns, the trail\'s detail) age out on the window the register holds, on every device' },
-  { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
+  // (the shared inbound wiring, src/v2/inboundWiring.js, builds the lane table: a shell composing it composes this seam)
+  { id: 'lane-table',            pattern: /buildCircleLanes\(|buildInboundWiring\(/,               why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
   // it on the governance change (live fan + catch-up), and serves its head at catch-up — the box above all, the
   // always-on member a joiner catches up from after the lane's audit window has aged the statement out.
@@ -265,7 +266,7 @@ export const SEAMS = Object.freeze([
   { id: 'feedback-offer-asks-first', pattern: /confirmFeedbackOffer:/, shells: ['web', 'mobile'], why: 'a feedback door without the confirm cannot add the contact at all — and a shell that seeds instead adds it with no tap' },
   // Who answered a post is recorded where the answer lands: every shell hands the threaded-chat handler the agent's
   // noteAnswer. A shell without it shows the answer in the thread but never offers the poster "accept" for it.
-  { id: 'records-who-answered', pattern: /noteAnswer:/, why: 'an answer to a post lands in the thread but its sender is never recorded as a responder, so the poster cannot accept it' },
+  { id: 'records-who-answered', pattern: /noteAnswer:|buildInboundWiring\(/, why: 'an answer to a post lands in the thread but its sender is never recorded as a responder, so the poster cannot accept it' },
   // An enrolled device is named in the person's own device list by the model this shell reads (the phone's, the
   // browser's): the agent records it as the delegation label when the person typed none. The box names itself 'box'.
   // THE PATTERN NAMES THE SUPPLYING ARROW (`enrolDeviceName: () =>`), not the option name: mobile's bundle passes the

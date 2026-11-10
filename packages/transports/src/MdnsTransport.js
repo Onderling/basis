@@ -25,7 +25,16 @@
  */
 import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding, SENDER_KEY_FIELD } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
-import { ephemeralKeyPair, helloTranscript, openChannel } from './mdnsChannel.js';
+import * as channel from './mdnsChannel.js';
+const { ephemeralKeyPair, helloTranscript, openChannel } = channel;
+
+// The channel's pieces travel with the wire contract, for whoever plays the far end of a hello (a backend, a test).
+/** A fresh ephemeral X25519 key pair for one hello (never stored). See `mdnsChannel.js`. */
+export const channelEphemeralKeyPair = ephemeralKeyPair;
+/** The hello transcript (both LAN keys, both nonces, both ephemeral keys) a channel is bound to. See `mdnsChannel.js`. */
+export const channelTranscript = helloTranscript;
+/** Open one end of a LAN connection's channel once its hello is proven. See `mdnsChannel.js`. */
+export const openLanChannel = openChannel;
 import { parseUntrustedJson } from '@onderling/core';
 
 /**
@@ -646,12 +655,17 @@ export class MdnsTransport extends Transport {
         && verifies(helloChallengeMessage(hs.nonce, f.nonce, f._from, this.#lanKey, hs.eph.publicKey, f.eph), f.sig, f._from);
       if (!ok) { console.warn('[MdnsTransport] listener did not prove', String(hs.peer).slice(0, 12)); this.#refuse(connId); return; }
       this.#endHandshake(connId);
+      // the channel first: a key that cannot key a channel gets no proof from us
+      let channel;
+      try {
+        channel = openChannel({
+          role: 'dialler', mySecret: hs.eph.secretKey, theirPublic: f.eph,
+          transcript: helloTranscript({ D: this.#lanKey, L: hs.peer, nD: hs.nonce, nL: f.nonce, eD: hs.eph.publicKey, eL: f.eph }),
+        });
+      } catch (err) { console.warn('[MdnsTransport] no channel:', err?.message); this.#refuse(connId); return; }
       const sig = sigB64(this.#lan.sign(helloProofMessage(hs.nonce, f.nonce, this.#lanKey, hs.peer, hs.eph.publicKey, f.eph)));
       this.#sendFrame(connId, { _mdns_proof: true, sig }).catch(() => {});
-      this.#channels.set(connId, openChannel({
-        role: 'dialler', mySecret: hs.eph.secretKey, theirPublic: f.eph,
-        transcript: helloTranscript({ D: this.#lanKey, L: hs.peer, nD: hs.nonce, nL: f.nonce, eD: hs.eph.publicKey, eL: f.eph }),
-      }));
+      this.#channels.set(connId, channel);
       const previous = this.#pubKeyToConn.get(hs.peer);
       this.#registerConn(connId, hs.peer);
       if (!previous) this.emit('peer-discovered', hs.peer);
@@ -664,10 +678,14 @@ export class MdnsTransport extends Transport {
       }
       this.#endHandshake(connId);
       this.#pending.delete(connId);
-      this.#channels.set(connId, openChannel({
-        role: 'listener', mySecret: hs.eph.secretKey, theirPublic: hs.theirEph,
-        transcript: helloTranscript({ D: hs.peer, L: this.#lanKey, nD: hs.theirNonce, nL: hs.nonce, eD: hs.theirEph, eL: hs.eph.publicKey }),
-      }));
+      let channel;
+      try {
+        channel = openChannel({
+          role: 'listener', mySecret: hs.eph.secretKey, theirPublic: hs.theirEph,
+          transcript: helloTranscript({ D: hs.peer, L: this.#lanKey, nD: hs.theirNonce, nL: hs.nonce, eD: hs.theirEph, eL: hs.eph.publicKey }),
+        });
+      } catch (err) { console.warn('[MdnsTransport] no channel:', err?.message); this.#refuse(connId); return; }
+      this.#channels.set(connId, channel);
       // A hello on a NEW connection from a peer we already map: the new socket is the live one (a peer that restarted
       // dials again before its dead socket's close reaches us). Re-map rather than ignore; the old connection is NOT
       // closed (when both sides dialled at once it is the peer's live inbound) and its late close cannot unmap this.

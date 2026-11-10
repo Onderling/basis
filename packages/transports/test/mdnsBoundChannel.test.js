@@ -80,3 +80,13 @@ describe('the bound channel', () => {
     expect(got.slice(injected).some((e) => e.forged), 'B delivers nothing the forwarder wrote').toBe(false);
   });
 });
+
+describe('the channel refuses a key that pins its secret', () => {
+  it('a low-order ephemeral key (the shared secret is all zeros) opens no channel', async () => {
+    const { openChannel, ephemeralKeyPair, helloTranscript } = await import('../src/mdnsChannel.js');
+    const mine = ephemeralKeyPair();
+    const zero = b64Encode(new Uint8Array(32));   // a low-order point: X25519 with it yields an all-zero secret
+    const transcript = helloTranscript({ D: 'd', L: 'l', nD: 'n1', nL: 'n2', eD: mine.publicKey, eL: zero });
+    expect(() => openChannel({ role: 'dialler', mySecret: mine.secretKey, theirPublic: zero, transcript })).toThrow(/low-order|all-zero/);
+  });
+});

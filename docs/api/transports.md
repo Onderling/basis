@@ -12,11 +12,28 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 - `'@onderling/transports'`
 - `'@onderling/transports/mdns'`
 - `'@onderling/transports/mdns-node'`
-- `'@onderling/transports/mdns-channel'`
 - `'@onderling/transports/mdns-dnssd'`
 - `'@onderling/transports/utils/base64'`
 
 ## `src/MdnsTransport.js`
+
+### `channelEphemeralKeyPair`
+
+**Kind:** function · **Import:** `channelEphemeralKeyPair` from `'@onderling/transports/mdns'`
+
+A fresh ephemeral X25519 key pair for one hello (never stored). See `mdnsChannel.js`.
+
+### `channelTranscript`
+
+**Kind:** function · **Import:** `channelTranscript` from `'@onderling/transports/mdns'`
+
+The hello transcript (both LAN keys, both nonces, both ephemeral keys) a channel is bound to. See `mdnsChannel.js`.
+
+### `openLanChannel`
+
+**Kind:** function · **Import:** `openLanChannel` from `'@onderling/transports/mdns'`
+
+Open one end of a LAN connection's channel once its hello is proven. See `mdnsChannel.js`.
 
 ### `helloChallengeMessage`
 
@@ -273,50 +290,6 @@ React Native need an injected `rtcLib` polyfill. Use `RendezvousTransport.isSupp
 guard instantiation where WebRTC globals may be missing.
 
 **Methods:** `connect()` · `disconnect()` · `connectToPeer()` · `hasOpenChannelTo()` · `canReach()` · `_put()`
-
-## `src/mdnsChannel.js`
-
-### `ephemeralKeyPair`
-
-**Kind:** function · **Import:** `ephemeralKeyPair` from `'@onderling/transports/mdns-channel'`
-
-```js
-ephemeralKeyPair()
-```
-
-A fresh ephemeral X25519 key pair for one handshake. Never stored.
-
-### `helloTranscript`
-
-**Kind:** function · **Import:** `helloTranscript` from `'@onderling/transports/mdns-channel'`
-
-```js
-helloTranscript({ D, L, nD, nL, eD, eL })
-```
-
-The transcript: one hash over what the hello fixed, in a fixed order (dialler first).
-
-**Returns:** `Uint8Array` — 32 bytes
-
-### `openChannel`
-
-**Kind:** function · **Import:** `openChannel` from `'@onderling/transports/mdns-channel'`
-
-```js
-openChannel({ role, mySecret, theirPublic, transcript })
-```
-
-Open the channel on one end once the hello is proven.
-
-**Parameters**
-
-- `p` `object`
-- `p.role` `'dialler'|'listener'`
-- `p.mySecret` `Uint8Array` — this side's ephemeral secret
-- `p.theirPublic` `string` — the other side's ephemeral public key (b64)
-- `p.transcript` `Uint8Array` — `helloTranscript(...)`
-
-**Returns:** `{transcript: Uint8Array, seal: (bytes: Uint8Array) => string, open: (b64: string) => Uint8Array|null}`
 
 ## `src/mdnsDnsSdDiscovery.js`
 

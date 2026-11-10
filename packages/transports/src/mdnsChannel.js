@@ -55,6 +55,9 @@ const counterNonce = (n) => {
  */
 export function openChannel({ role, mySecret, theirPublic, transcript }) {
   const shared = nacl.scalarMult(mySecret, b64Decode(theirPublic));
+  // a low-order ephemeral key makes the shared secret all zeros whatever our key is (nacl does not reject it): such a
+  // channel would be keyed by the transcript alone, which anyone on the wire can compute
+  if (shared.every((b) => b === 0)) throw new Error('mdnsChannel: a low-order ephemeral key (all-zero shared secret)');
   const d2l = keyFor(shared, transcript, 'dialler-to-listener');
   const l2d = keyFor(shared, transcript, 'listener-to-dialler');
   const [sendKey, recvKey] = role === 'dialler' ? [d2l, l2d] : [l2d, d2l];

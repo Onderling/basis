@@ -2235,6 +2235,15 @@ export async function createSecureAgent(opts = {}) {
    * to a fresh peer races the handshake.
    */
   async function sendToPeer(addr, payload, opts = {}) {
+    // `requireSendAs`: a send that may ONLY speak as `sendAs` (a Nearby room key) is refused when no identity is
+    // registered for it, never sent as the canonical identity instead (the general fallback below only warns).
+    if (opts?.requireSendAs === true) {
+      const as = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
+      if (!as || typeof agent.security?.selfIdentityFor !== 'function' || !agent.security.selfIdentityFor(as)) {
+        throw Object.assign(new Error('secure-agent: refused, no identity is registered for the address this send must speak as'),
+          { code: 'SEND_AS_UNREGISTERED' });
+      }
+    }
     // A send that speaks as a PERSONA's address leaves on that persona's own sockets — never the default's routes.
     const owner = (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
     if (owner) return sendAsPersona(addr, payload, opts, owner);

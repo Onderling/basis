@@ -261,7 +261,7 @@ describe('the room outlives the screen, and re-tells itself to a newcomer', () =
       listPeers: () => [{ pubKey: 'x' }], myAddress: () => room, now,
     });
     await b.askChannel.broadcast(createAsk({ text: 'q', from: 'me', now }).ask);
-    expect(sent).toEqual([{ to: 'x', opts: { sendAs: 'room-key-1' } }]);
+    expect(sent).toEqual([{ to: 'x', opts: { sendAs: 'room-key-1', requireSendAs: true, guarantee: 'now' } }]);
     room = null;   // out of the room
     const r = await b.askChannel.broadcast(createAsk({ text: 'q2', from: 'me', now }).ask);
     expect(sent.length, 'nothing sent without a room key (never as the agent\'s own key)').toBe(1);

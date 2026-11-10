@@ -152,7 +152,9 @@ export function createNearbyRoomBinding({
   const sendAsRoom = (address, payload) => {
     const me = roomAddressNow();
     if (!me) return Promise.reject(Object.assign(new Error('not in the room: no room key'), { code: 'NOT_IN_ROOM' }));
-    return sendPeerMessage(address, payload, { sendAs: me });
+    // requireSendAs: refused, never sent as the agent's own key, if the room identity is already gone (a leave in
+    // flight); guarantee 'now': a room message is never held for later, it does not outlive the visit
+    return sendPeerMessage(address, payload, { sendAs: me, requireSendAs: true, guarantee: 'now' });
   };
   const inRoom = (from) => typeof from === 'string' && !!from && peersNow().some((p) => peerId(p) === from);
 

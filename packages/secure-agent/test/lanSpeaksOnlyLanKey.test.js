@@ -95,6 +95,31 @@ describe('the LAN speaks only its LAN key, at the agent', () => {
     expect(heard.some((e) => e.includes(phone.canonical)), 'the canonical key never reached the room').toBe(false);
   }, 30_000);
 
+  it('a room send whose room identity is gone is REFUSED: nothing leaves, never the canonical identity instead', async () => {
+    const discovery = createLoopbackDiscovery();
+    const otherRoom = await ident();
+    const other = await device(discovery, { lanIdentity: otherRoom });
+    expect(other.sa.registerSelfIdentity(otherRoom.pubKey, otherRoom)).toBe(true);
+    const heard = [];
+    other.mdns.on('envelope', (e) => heard.push(e));
+    other.mdns.on('security-error', (_err, e) => { if (e) heard.push(e); });
+    await other.mdns.setDiscoverability(DISCOVERABILITY.PUBLISH);
+
+    const roomIdentity = await ident();
+    const phone = await device(discovery, { lanIdentity: roomIdentity });
+    const room = roomIdentity.pubKey;
+    expect(phone.sa.registerSelfIdentity(room, roomIdentity)).toBe(true);
+    await phone.mdns.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    expect(await until(() => phone.mdns.canReach(other.mdns.lanAddress)), 'on the LAN').toBe(true);
+
+    phone.sa.forgetSelfIdentity(room);   // leaving, mid-flight: the room identity is gone
+    const r = phone.sa.peer.sendTo(other.mdns.lanAddress, { subtype: 'nearby-presence', presence: { label: 'Ada' } },
+      { sendAs: room, requireSendAs: true, firstSendTimeoutMs: 600, retryDelays: [] });
+    await expect(r).rejects.toMatchObject({ code: 'SEND_AS_UNREGISTERED' });
+    await wait(300);
+    expect(heard, 'nothing left').toEqual([]);
+  }, 30_000);
+
   it('a PERSONA in the room: its room key still speaks over the LAN, never on the persona\'s relay sockets', async () => {
     const discovery = createLoopbackDiscovery();
     const got = [];

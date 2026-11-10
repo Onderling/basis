@@ -108,7 +108,7 @@ describe('who may speak at one of our per-circle addresses', () => {
     auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [member('anna')] });
 
     expect(auth.authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: false, reason: SENDER_REASON.STRANGER });
+      .toMatchObject({ allow: false, stale: true, reason: SENDER_REASON.STRANGER });   // held under the circle, judged once more after a re-read
     expect(auth.refusedStrangers).toBe(1);
   });
 
@@ -264,7 +264,7 @@ describe('ADVERSARIAL — the three ways someone tries to speak in a circle they
 
   it('a stranger is refused, however well they sign', () => {
     expect(auth().authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: false, reason: SENDER_REASON.STRANGER });
+      .toMatchObject({ allow: false, stale: true, reason: SENDER_REASON.STRANGER });
   });
 
   it('a member of circle A is refused in circle B — with EITHER of their keys', () => {
@@ -305,7 +305,7 @@ describe('what it deliberately does NOT refuse', () => {
     const auth = createCircleSenderAuthorization({ onUnknownRoster: (i) => warned.push(i) });
     auth.noteCircleAddress('circle-a', 'ours-in-circle-a');
     expect(auth.authorizeSender({ senderKey: 'anybody', ownAddress: 'ours-in-circle-a' }))
-      .toEqual({ allow: false, reason: SENDER_REASON.ROSTER_UNKNOWN });
+      .toEqual({ allow: false, stale: true, reason: SENDER_REASON.ROSTER_UNKNOWN, bucket: 'circle-a' });
     expect(auth.unknownRosterRefusals).toBe(1);
     expect(warned).toEqual([{ ownAddress: 'ours-in-circle-a' }]);
     auth.recordCircleRoster({ circleId: 'circle-a', ownAddress: 'ours-in-circle-a', members: [provenMember('anna')] });

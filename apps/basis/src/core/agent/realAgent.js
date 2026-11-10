@@ -1143,8 +1143,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The transition, said out loud (B6). These members are still accepted on their canonical key
     // because refusing them would make them undeliverable rather than pseudonymous — a shrinking
     // set, not an open door, and the only way to know which it is in practice is to print it.
-    // a refusal a fresher roster might lift: read the circle's roster again (at most once per window per circle)
-    onRosterStale: ({ circleId }) => rereadCircleRoster(circleId),
     onCanonicalOnlyMembers: ({ circleId, count, of }) => console.warn(
       `[realAgent] ${count} of ${of} member(s) of ${circleId ?? 'a circle'} have no PROVEN per-circle `
       + 'address, so their canonical identity key is still accepted there — linkable across circles. '
@@ -1152,6 +1150,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     ),
   });
   sa.setSenderAuthorizer?.(circleSenders.authorizeSender);
+  // A circle's traffic PARKED as stale (its roster not read, or a sender not on the roster read): read that roster
+  // again, then judge the parked envelopes once more. The secure agent re-judges on its own at its time limit too.
+  sa.onParked?.((circleId) => { rereadCircleRoster(circleId)?.then?.(() => sa.rejudgeParked?.(circleId)); });
   // A CIRCLE identity of ours, installed: the authorizer learns the address is that circle's BEFORE any roster is read
   // (so traffic to it is refused until the roster is, never let in unchecked), and the identity is registered with
   // its self as owner. The one path every circle install takes.
@@ -1167,18 +1168,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // queued and read the moment it exists.
   let apiComposed = false;
   const rostersToRead = new Set();
-  const ROSTER_REREAD_MS = 1500;
-  const lastReread = new Map();   // circleId -> ms
+  // A park asks for a read that STARTS after it (a read already under way may predate what the park needs, e.g. a
+  // reload's first read before its store was back): one read queued behind the one in flight, shared by every park
+  // that comes meanwhile. No time window: a burst of parks costs at most two reads.
+  const queuedRosterReads = new Map();   // circleId -> the read queued behind the one in flight
   function rereadCircleRoster(circleId) {
-    if (typeof circleId !== 'string' || !circleId) return;
-    const now = Date.now();
-    if (now - (lastReread.get(circleId) ?? 0) < ROSTER_REREAD_MS) return;
-    lastReread.set(circleId, now);
-    readCircleRoster(circleId);
+    if (typeof circleId !== 'string' || !circleId) return Promise.resolve();
+    const inFlight = senderRosterReads.get(circleId);
+    if (!inFlight) return readCircleRoster(circleId);
+    if (!queuedRosterReads.has(circleId)) {
+      queuedRosterReads.set(circleId, inFlight.then(() => { queuedRosterReads.delete(circleId); return readCircleRoster(circleId); }));
+    }
+    return queuedRosterReads.get(circleId);
   }
+  const senderRosterReads = new Map();   // circleId -> the sender-check roster read under way
   const readCircleRoster = (circleId) => {
-    if (!apiComposed) { rostersToRead.add(circleId); return; }
-    Promise.resolve().then(() => bindCircleAddressKeysFor({ agent: api, circleId })).catch(() => { /* refused until a later read */ });
+    if (!apiComposed) { rostersToRead.add(circleId); return Promise.resolve(); }
+    const read = Promise.resolve().then(() => bindCircleAddressKeysFor({ agent: api, circleId }))
+      .catch(() => { /* still stale: the parked traffic is dropped at its re-judge */ })
+      .finally(() => { if (senderRosterReads.get(circleId) === read) senderRosterReads.delete(circleId); });
+    senderRosterReads.set(circleId, read);
+    return read;
   };
   // Say the wire-facing fact out loud, once, on both shells: the in-process app agents each print a
   // "NO ROSTER AUTHORIZER" warning (they face no wire), and without this line a reader cannot tell
@@ -10250,9 +10260,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const pid of personas.keys()) writeDeviceLink(pid);
     onPersonaStarted = writeDeviceLink;   // …and a persona that starts later (created here, or handed) writes its own
   }
-  selfAgent = api;
   apiComposed = true;
   for (const cid of rostersToRead) readCircleRoster(cid);
   rostersToRead.clear();
+  selfAgent = api;
   return api;
 }

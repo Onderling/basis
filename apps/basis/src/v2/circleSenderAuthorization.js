@@ -72,7 +72,7 @@
  */
 
 import { circleSigningKeyOf, hasProvenCircleAddress } from './circleAddressKeys.js';
-import { allowSender, refuseSender } from '@onderling/core';
+import { allowSender, refuseSender, staleSender } from '@onderling/core';
 
 /** Verdict reasons. Diagnostics only — nothing branches on these but a human reading a log. */
 export const SENDER_REASON = Object.freeze({
@@ -112,9 +112,6 @@ export const SENDER_REASON = Object.freeze({
  */
 export function createCircleSenderAuthorization({
   onUnknownRoster = null, onRefused = null, onCanonicalOnlyMembers = null,
-  // A refusal that a fresher roster might lift (no roster read yet; a sender not on the roster READ): the host re-reads
-  // that circle's roster, so the sender's retry lands once a member is on it. Called on every such refusal.
-  onRosterStale = null,
   // The keys that are OURS right now, read live: the person's current (rotating) person key — held by every
   // device of the person that took part in, or was handed the result of, the last ceremony, and by no revoked
   // one. A message signed with it is ours in every circle, before any roster is consulted; the static profile key
@@ -135,6 +132,15 @@ export function createCircleSenderAuthorization({
   /** our per-circle address → the transitional-set size we last warned about, so silence means "same" */
   const warnedCanonicalOnly = new Map();
   let unknownRosterRefusals = 0;
+  // an envelope judged stale is judged once more (its re-judge): it is counted the first time only
+  const counted = new Set();
+  const firstTime = (id) => {
+    if (typeof id !== 'string' || !id) return true;
+    if (counted.has(id)) return false;
+    counted.add(id);
+    if (counted.size > 4096) counted.delete(counted.values().next().value);
+    return true;
+  };
   let refusedStrangers = 0;
   let refusedCanonicalSigners = 0;
 
@@ -245,7 +251,7 @@ export function createCircleSenderAuthorization({
    *
    * @param {object} context  `{ senderKey, from, to, ownAddress, pattern }`
    */
-  function authorizeSender({ senderKey, from, ownAddress, pattern = null, answering = false } = {}) {
+  function authorizeSender({ senderKey, from, ownAddress, pattern = null, answering = false, id = null } = {}) {
     // Not addressed to one of our per-circle identities ⇒ not circle traffic. Contact and pairing
     // live here, and trust-on-first-use is the right answer for them — it is the only answer that
     // lets a stranger ever become a contact.
@@ -263,13 +269,14 @@ export function createCircleSenderAuthorization({
       // traffic; its own rules (the device map, the contact) apply elsewhere
       if (!circleOfAddress.has(ownAddress)) return allowSender(SENDER_REASON.NOT_CIRCLE_SCOPED);
       // one of our CIRCLE addresses whose roster this device has not read: refused, never let in unchecked
-      unknownRosterRefusals += 1;
+      if (firstTime(id)) unknownRosterRefusals += 1;
       if (!warnedUnknown.has(ownAddress)) {
         warnedUnknown.add(ownAddress);
         try { onUnknownRoster?.({ ownAddress }); } catch { /* diagnostics only */ }
       }
-      try { onRosterStale?.({ circleId: circleOfAddress.get(ownAddress), ownAddress }); } catch { /* diagnostics only */ }
-      return refuseSender(SENDER_REASON.ROSTER_UNKNOWN);
+      // STALE, not a plain refusal: the envelope is held (the secure agent parks it under the circle) and judged once
+      // more after the roster is read; still unknown then, it is dropped
+      return staleSender(SENDER_REASON.ROSTER_UNKNOWN, circleOfAddress.get(ownAddress));
     }
     if (typeof senderKey === 'string' && entry.keys.has(senderKey)) {
       return allowSender(SENDER_REASON.MEMBER);
@@ -288,11 +295,12 @@ export function createCircleSenderAuthorization({
       } catch { /* diagnostics only */ }
       return refuseSender(SENDER_REASON.CANONICAL_REFUSED);
     }
-    refusedStrangers += 1;
-    try { onRosterStale?.({ circleId: entry.circleId, ownAddress }); } catch { /* diagnostics only */ }
+    if (firstTime(id)) refusedStrangers += 1;
     try { onRefused?.({ ownAddress, circleId: entry.circleId, senderKey, from, pattern, answering, reason: SENDER_REASON.STRANGER }); }
     catch { /* diagnostics only */ }
-    return refuseSender(SENDER_REASON.STRANGER);
+    // STALE: the roster READ may be behind (a member who joined since); held and judged once more after a re-read,
+    // then dropped if still not on it (an evicted member, a stranger)
+    return staleSender(SENDER_REASON.STRANGER, entry.circleId);
   }
 
   /** One of our addresses is circle `circleId`'s (its identity was just installed): known before any roster read. */

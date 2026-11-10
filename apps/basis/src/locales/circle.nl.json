@@ -9779,6 +9779,10 @@
       "text": "jou",
       "doc": "The reader themselves among the people of a chore or an appointment (\"is van jou\")."
     },
+    "who_withheld": {
+      "text": "iemand",
+      "doc": "A person whose name the household's names setting withholds (the bot's sentences): the name exists, the reader may not see it. Not 'Onbekend', which says no name is known."
+    },
     "who_someone": {
       "text": "Onbekend",
       "doc": "A person the reader may not name (the household's names setting): never their id."

@@ -3954,6 +3954,25 @@ The sender may not. `SecurityLayer` turns this into a `SENDER_NOT_AUTHORIZED` re
 
 **Returns:** `{allow: false, reason: string}`
 
+### `staleSender`
+
+**Kind:** function · **Import:** `staleSender` from `'@onderling/core'`
+
+```js
+staleSender(reason, bucket)
+```
+
+The sender cannot be vouched for YET: the implementation's snapshot may be behind (a roster not read, a member not on
+the roster that was read). `SecurityLayer` turns this into a `SENDER_STALE` refusal carrying `bucket`, an opaque
+handle the HOST uses to hold the envelope and judge it again once its snapshot is fresher. The kernel never reads it.
+
+**Parameters**
+
+- `reason` `string`
+- `bucket` `string`
+
+**Returns:** `{allow: false, stale: true, reason: string, bucket: string}`
+
 ### `askSenderAuthorizer`
 
 **Kind:** function · **Import:** `askSenderAuthorizer` from `'@onderling/core'`

@@ -38,7 +38,9 @@ import { calendarManifest } from '../../../calendar/manifest.js';
 import { tasksManifest } from '../../../tasks-v0/manifest.js';
 import { householdManifest } from '../../../household/manifest.js';
 import { effectiveCircleIds, isAllCircles } from './userScreens.js';
-import { circleRows } from './circleStream.js';
+import { circleRows, memberLabelFor } from './circleStream.js';
+import { normalizeCircleMembers } from '@onderling/kring-host/circleMembers';
+import { SOMEONE_LABEL_KEY } from './personLabel.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
@@ -100,7 +102,11 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   // "Nieuw voor jou" at the top of the page the shell asks it for (Vandaag), and only when it holds rows: never an
   // empty block. Not a block of the stored page: what is new is not something a person places or removes.
   if (hostOps.forYou === true) {
-    const rows = forYouRows({ ...hostOps, selfIn: ops.selfIn }, { muted });
+    let rows = forYouRows({ ...hostOps, selfIn: ops.selfIn }, { muted });
+    // a setting row names who changed it: read the roster of just those circles (through the waist), label through
+    // the reveal ladder, read the rows again with the names
+    const named = await settingActorLabels(rows, { callSkill: hostOps.callSkill, selfIn: ops.selfIn, t: hostOps.t });
+    if (named) rows = forYouRows({ ...hostOps, selfIn: ops.selfIn, actorLabel: named }, { muted });
     if (rows.length > 0) blocks.unshift({ blockId: 'for-you', type: 'forYou', status: 'ok', titleKey: FOR_YOU_KEYS.title, content: { items: rows } });
   }
   return blocks;
@@ -115,6 +121,26 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
  * @param {{ muted?: Set<string>, fold?: boolean }} [o]  fold: false gives one row per thing (the banner's reading)
  * @returns {object[]}
  */
+/**
+ * The names a setting row needs: the roster of each circle that has one, read once through the waist and labelled by
+ * the reveal ladder (`memberLabelFor`; "Onbekend" for a member with no name to show). Null when no row needs one.
+ */
+async function settingActorLabels(rows, { callSkill, selfIn = null, t = null } = {}) {
+  const cids = [...new Set((rows ?? []).filter((r) => r.kind === 'setting').map((r) => r.group?.id).filter(Boolean))];
+  if (!cids.length || typeof callSkill !== 'function') return null;
+  const members = new Map();
+  await Promise.all(cids.map(async (cid) => {
+    const r = await Promise.resolve(callSkill('pinboard', 'listGroupMembers', { groupId: cid })).catch(() => null);
+    members.set(cid, normalizeCircleMembers(r));
+  }));
+  return (cid, ref) => {
+    const label = memberLabelFor(ref, { members: members.get(cid) ?? [], viewerId: typeof selfIn === 'function' ? selfIn(cid) : null });
+    if (label) return label;
+    const known = (members.get(cid) ?? []).some((m) => m?.id === ref);
+    return known && typeof t === 'function' ? t(SOMEONE_LABEL_KEY) : null;
+  };
+}
+
 /** The person's news window in days (the register's value), else its default: the projection's own fallback. */
 const windowDaysOf = (d) => (Number.isFinite(d) && d > 0 ? d : NOTIFY_WINDOW_DAYS);
 
@@ -150,6 +176,7 @@ export function forYouRows(hostOps = {}, { muted = new Set(), fold = true } = {}
     now: nowMs,
     windowDays: hostOps.notifyWindowDays,
     fold,
+    actorLabel: typeof hostOps.actorLabel === 'function' ? hostOps.actorLabel : null,
     // the person's table (`notify.policy.<kind>`): off = not a row here either
     keepKind: (kind) => policyFor(kind, hostOps.notifyPolicyOf) !== 'off',
   });

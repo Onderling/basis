@@ -158,3 +158,17 @@ describe('my open question in the room is a row while it is open (the way back t
     expect(rows[0].text).toMatch(/^ask .*ladder.*"heard":2/);
   });
 });
+
+describe('the setting row names who changed it (the roster, through the reveal ladder)', () => {
+  it('Today reads the roster of a circle with a setting row and names the admin; without a name, the ladder\'s word', async () => {
+    const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
+    const pu = (id, version, policy, at) => ({ id, ts: at, landedAt: at, type: 'governance', circleId: 'c1',
+      payload: { circleId: 'c1', body: { kind: 'policy-update', author: 'bea-key', payload: { policy, version } } } });
+    const log = { query: () => [pu('p1', 1, { features: { roster: true } }, NOW - 2000), pu('p2', 2, { features: { roster: false } }, NOW - 1000)] };
+    const page = { id: 's', name: 'Vandaag', circleFilter: null, blocks: [{ id: 'x', type: 'circlesUnread', config: {} }] };
+    const callSkill = async (app, op) => (app === 'pinboard' && op === 'listGroupMembers' ? { members: [{ webid: 'bea-key', handle: 'Bea', role: 'admin' }] } : null);
+    const blocks = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles, myRefs: ['me'], forYou: true, t, now: () => NOW, callSkill, selfIn: () => 'me' } });
+    const row = blocks[0].content.items.find((r) => r.kind === 'setting');
+    expect(row.text).toMatch(/"who":"Bea"/);
+  });
+});

@@ -61,6 +61,7 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  * @param {number} [a.windowDays]
  * @param {(kind: string) => boolean} [a.keepKind]  false drops the kind (the person set it to off)
  * @param {Array<{ask: object, heard?: number}>} [a.asks]  my live asks in the Nearby room (the room binding's `myAsks()`)
+ * @param {(circleId: string, ref: string) => string|null} [a.actorLabel]  who someone is in a circle (the roster's label)
  * @param {boolean} [a.fold]  false: one row per thing, no folding (the banner reads them one by one)
  * @param {(group: {kind: 'circle'|'contact', id: string}) => ({id: string, name?: string|null}|null)} [a.selfOf]
  *        the persona a row is for (its face); the host passes it only when the device holds more than one
@@ -68,7 +69,7 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  */
 export function notificationRows({
   events = [], turns = [], circles = [], contactName = null, viewerIdIn = null, myRefs = [], readIds = null, t,
-  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true, keepKind = null, asks = [],
+  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null, fold = true, keepKind = null, asks = [], actorLabel = null,
 } = {}) {
   if (typeof t !== 'function') return [];
   const mine = new Set(myRefs ?? []);
@@ -158,7 +159,7 @@ export function notificationRows({
       const lines = policyChangeLines(policyPatchBetween(byVersion[i - 1].e.payload.body.payload?.policy, body.payload?.policy));
       if (!lines.length) continue;
       push({ id: e.id, kind: 'setting', group, open, icon: '⚙️', at, saidAt: typeof e.ts === 'number' ? e.ts : 0,
-        text: t(FOR_YOU_KEYS.setting, { who: t(FOR_YOU_KEYS.anAdmin), circle: group.name ?? '', change: policyChangeText(lines, t) }) });
+        text: t(FOR_YOU_KEYS.setting, { who: (typeof actorLabel === 'function' ? actorLabel(group.id, body.author) : null) ?? t(FOR_YOU_KEYS.anAdmin), circle: group.name ?? '', change: policyChangeText(lines, t) }) });
     }
   }
 

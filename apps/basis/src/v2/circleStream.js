@@ -324,7 +324,8 @@ export function stampSenderLabels(rows, { members = [], viewerId = null, policy 
       ...row,
       senderSelf: false,
       senderLabel: label.primary,
-      senderLabelKey: label.primaryKey,   // a member with no name to show is "someone", never their key
+      senderLabelKey: label.primaryKey,   // a member with no name to show is "Onbekend", never their key
+      senderLabelNumber: label.primaryNumber,   // …numbered when several unnamed people are in one circle
     };
   });
 }

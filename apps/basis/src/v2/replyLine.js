@@ -297,12 +297,16 @@ function dayFact(result) {
   return { family, lines };
 }
 
-/** People in the person's words: "jou", a name, "iemand" (once, however many), joined as their language joins a list. */
+/**
+ * People in the person's words: "jou", a name, "iemand" (once, however many), joined as their language joins a list.
+ * A holder without a name here is one the household's names setting withholds (the name exists; this reader may not
+ * see it): "iemand" (`who_withheld`), never "Onbekend", which says no name is known at all.
+ */
 function peopleWords(who, t) {
   if (who === 'everyone') return t('circle.reply.who_everyone');
   const words = [];
   for (const p of who ?? []) {
-    const w = p?.you ? t('circle.reply.who_you') : (typeof p?.name === 'string' && p.name ? p.name : t('circle.reply.who_someone'));
+    const w = p?.you ? t('circle.reply.who_you') : (typeof p?.name === 'string' && p.name ? p.name : t('circle.reply.who_withheld'));
     if (!words.includes(w)) words.push(w);
   }
   try { return new Intl.ListFormat(dateLocaleOf(t), { type: 'conjunction' }).format(words); } catch { return words.join(', '); }

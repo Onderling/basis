@@ -1185,7 +1185,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   const senderRosterReads = new Map();   // circleId -> the sender-check roster read under way
   const readCircleRoster = (circleId) => {
     if (!apiComposed) { rostersToRead.add(circleId); return Promise.resolve(); }
-    const read = Promise.resolve().then(() => bindCircleAddressKeysFor({ agent: api, circleId }))
+    // ONLY the sender check's half of a roster read: the members, recorded as who may speak. Not the peer bindings or
+    // the routing index `bindCircleAddressKeysFor` also writes (those follow their own triggers; moving them to every
+    // install changed which address a circle act is placed at)
+    const read = Promise.resolve()
+      .then(() => api.callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))
+      .then((res) => api.recordCircleSenders?.({ circleId, members: Array.isArray(res?.members) ? res.members : [] }))
       .catch(() => { /* still stale: the parked traffic is dropped at its re-judge */ })
       .finally(() => { if (senderRosterReads.get(circleId) === read) senderRosterReads.delete(circleId); });
     senderRosterReads.set(circleId, read);

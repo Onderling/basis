@@ -46,18 +46,21 @@
  * `nearby-*` payload is delivered only if its wire `from` is someone the surface lists right now.
  * Enforceable here because the list is ours (enforceability.md).
  *
- * The room address is the wire's address for now (`myAddress`): on mDNS the TXT record already names the
- * key. The per-session ephemeral address of PLAN-nearby §3 is rung-4 work, recorded, not faked here.
+ * The room address is the ROOM KEY (`myAddress`, nearbyRoomKey.js): a key drawn for this entry and this self, the
+ * only key the LAN hears from this device while it is in the room. Every room payload is sent AS it.
  */
 import { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE } from './nearbyAskChannel.js';
 import { isAskLive } from './nearbyAsks.js';
 import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE, ASKS_MAX_KEPT } from './nearbyRoom.js';
 import { receiveInvite, isInviteLive, prepareBroadcastInvite, INVITE_MESSAGE } from './nearbyInvites.js';
 import { receiveReceipt, deliveryAfterSend } from './deliveryState.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 export const PRESENCE_MESSAGE = 'nearby-presence';
 export const PRESENCE_MAX_LABEL = 40;
 export const REACH_MESSAGE = 'nearby-reach';
+/** How many answers to one of my asks the room keeps (the first ones; an ask is short-lived). */
+export const ANSWERS_KEPT = param({ key: 'nearby.answers.maxKept', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
 const REACH_MAX_URL = 200;
 const REACH_MAX_ADDR = 120;
 
@@ -79,12 +82,14 @@ export function receiveReach(payload, fromAddress, now = () => Date.now()) {
   const raw = payload.reach;
   if (!raw || typeof raw !== 'object') return null;
   const transports = {};
+  const address = typeof raw.address === 'string' ? raw.address.trim().slice(0, REACH_MAX_ADDR) : '';
+  if (!address) return null;   // a card without the person's own address names nobody to add
   const url = typeof raw.transports?.relay?.url === 'string' ? raw.transports.relay.url.trim().slice(0, REACH_MAX_URL) : '';
   if (url) transports.relay = { url };
   const nkn = typeof raw.transports?.nkn?.address === 'string' ? raw.transports.nkn.address.trim().slice(0, REACH_MAX_ADDR) : '';
   if (nkn) transports.nkn = { address: nkn };
   if (Object.keys(transports).length === 0) return null;
-  return Object.freeze({ from: fromAddress ?? null, transports, wantBack: raw.wantBack === true, at: now() });
+  return Object.freeze({ from: fromAddress ?? null, address, transports, wantBack: raw.wantBack === true, at: now() });
 }
 
 /**
@@ -118,10 +123,12 @@ export function receivePresence(payload, fromAddress, now = () => Date.now()) {
 
 /**
  * @param {object} deps
- * @param {(address: string, payload: object) => Promise<*>} deps.sendPeerMessage  the agent's peer send
+ * @param {(address: string, payload: object, opts: {sendAs: string}) => Promise<*>} deps.sendPeerMessage  the agent's
+ *   peer send; every room payload goes out with `sendAs` = the room key
  * @param {() => Array<{pubKey?: string, id?: string}>} deps.listPeers            the room's current peers
  * @param {(fn: (peers: Array) => void) => (() => void)} [deps.subscribeToPeers]  arrivals → newcomer sync
- * @param {() => string|null} [deps.myAddress]   what the peer sees as `from` — the wire's answer
+ * @param {() => string|null} [deps.myAddress]   the room key this device speaks in the room (null = not in the room:
+ *   nothing is sent)
  * @param {() => ({label?: string}|null)|Promise<{label?: string}|null>} [deps.myFace]  the face I present
  * @param {() => number} [deps.now]
  * @param {(err: Error, phase: string) => void} [deps.onError]
@@ -139,6 +146,14 @@ export function createNearbyRoomBinding({
   const report = (err, phase) => { try { onError?.(err, phase); } catch { /* diagnostics only */ } };
   const peerId = (p) => p?.pubKey ?? p?.id ?? null;
   const peersNow = () => { try { return listPeers() ?? []; } catch { return []; } };
+  // EVERY room send speaks as the room key, and none goes out without one: a room payload signed by the agent's own
+  // key would hand a stranger in the room the person's canonical address (the LAN transport refuses it anyway).
+  const roomAddressNow = () => { try { return myAddress() ?? null; } catch { return null; } };
+  const sendAsRoom = (address, payload) => {
+    const me = roomAddressNow();
+    if (!me) return Promise.reject(Object.assign(new Error('not in the room: no room key'), { code: 'NOT_IN_ROOM' }));
+    return sendPeerMessage(address, payload, { sendAs: me });
+  };
   const inRoom = (from) => typeof from === 'string' && !!from && peersNow().some((p) => peerId(p) === from);
 
   // ── The held room ─────────────────────────────────────────────────────────────────────────────────────
@@ -148,11 +163,15 @@ export function createNearbyRoomBinding({
   const presence    = new Map();   // from → { label }
   const pendingReach = new Map();  // from → the reach they sent (held until the shell shows/acts on it)
   const mine = { asks: new Map(), card: null, invites: new Map() };   // what I said, for newcomers
+  // Answers to MY asks stay in the room (they open no direct thread): askId → [{ from, text, receivedAt }]. And the room
+  // key a shared card came from, by the address it named, so 'share back' goes to the room key it was asked on.
+  const answersToMine = new Map();
+  const roomKeyOfCard = new Map();   // card address → the room key it arrived from
 
   const sweep = () => {
     const listed = new Set(peersNow().map(peerId));
     for (const [id, ask] of heldAsks) if (!isAskLive(ask, now)) heldAsks.delete(id);
-    for (const [id, ask] of mine.asks) if (!isAskLive(ask, now)) mine.asks.delete(id);
+    for (const [id, ask] of mine.asks) if (!isAskLive(ask, now)) { mine.asks.delete(id); answersToMine.delete(id); }
     for (const [cid, inv] of heldInvites) if (!isInviteLive(inv, now)) heldInvites.delete(cid);
     for (const [cid, inv] of mine.invites) if (!isInviteLive(inv, now)) mine.invites.delete(cid);
     for (const from of heldCards.keys()) if (!listed.has(from)) heldCards.delete(from);
@@ -177,7 +196,7 @@ export function createNearbyRoomBinding({
         if (!heard.has(msgId)) heard.set(msgId, new Set());
         try { if (deliveryMap?.get?.(msgId) == null) deliveryMap?.set?.(msgId, deliveryAfterSend()); } catch { /* the map is a mirror */ }
       }
-      return sendPeerMessage(address, stamped);
+      return sendAsRoom(address, stamped);
     },
     now,
     onError,
@@ -248,16 +267,29 @@ export function createNearbyRoomBinding({
   };
   const handlers = {
     [ASK_MESSAGE]:      gated((from, payload) => land('ask',      askChannel.receiveAsk(payload, from), from, payload)),
-    [ANSWER_MESSAGE]:   gated((from, payload) => { const a = askChannel.receiveAnswer(payload, from); if (a) { deliver('answer', a); confirm(from, payload); } }),
+    [ANSWER_MESSAGE]:   gated((from, payload) => {
+      const a = askChannel.receiveAnswer(payload, from);
+      if (!a) return;
+      // held under MY ask (an answer to an ask I did not put out is nobody's): the asker reads it under 'Jouw vraag'
+      if (mine.asks.has(a.askId)) {
+        const list = answersToMine.get(a.askId) ?? [];
+        if (list.length < ANSWERS_KEPT && !list.some((x) => x.from === a.from)) list.push({ from: a.from, text: a.text, receivedAt: a.receivedAt });
+        answersToMine.set(a.askId, list);
+      }
+      deliver('answer', a);
+      confirm(from, payload);
+    }),
     [CARD_MESSAGE]:     gated((from, payload) => land('card',     receiveCard(payload, from, now), from, payload)),
     [CHAT_MESSAGE]:     gated((from, payload) => land('chat',     receiveChatMessage(payload, from, now), from, payload)),
     [INVITE_MESSAGE]:   gated((from, payload) => land('invite',   receiveInvite(payload, from, now), from, payload)),
     [PRESENCE_MESSAGE]: gated((from, payload) => land('presence', receivePresence(payload, from, now))),
-    // Deliberately NOT gated on the room: the exchange is begun nearby, but the answer ("share back")
-    // may come after one side left the café — refusing it then would break the very act the rung is for.
+    // Not gated on the peer list: the answer ("share back") may land just after the other side's row went. It still
+    // arrives on a room key, so it is a room exchange: both sides are in the room (the room key is the only key the
+    // LAN carries). The card names the person's OWN address: that, not the room key, is who the contact is.
     [REACH_MESSAGE]: (from, payload) => {
       const r = receiveReach(payload, from, now);
       if (!r) return;
+      roomKeyOfCard.set(r.address, from);
       if (r.wantBack) pendingReach.set(from, r);   // only an ask-back needs settling; a plain share is a gift
       deliver('reach', r);
       confirm(from, payload);
@@ -267,7 +299,7 @@ export function createNearbyRoomBinding({
   // ── Newcomers ─────────────────────────────────────────────────────────────────────────────────────────
   const known = new Set();
   const sendTo = async (address, payload, phase) => {
-    try { await sendPeerMessage(address, payload); } catch (err) { report(err, phase); }
+    try { await sendAsRoom(address, payload); } catch (err) { report(err, phase); }
   };
   async function greet(address) {
     let face = null;
@@ -318,6 +350,8 @@ export function createNearbyRoomBinding({
         subscribeToInvites:  this.subscribeToInvites,
         subscribeToPresence: this.subscribeToPresence,
         subscribeToHeard:    (fn) => this.subscribeToHeard(fn),
+        // an answer to my ask is shown under it (myAsks): the screen re-reads when one lands
+        subscribeToAnswers:  this.subscribeToAnswers,
         myAsks:              () => this.myAsks(),
         myRoomAddress:       this.myRoomAddress,
       };
@@ -348,6 +382,8 @@ export function createNearbyRoomBinding({
      * decides what "all" is, the publication lock included). `wantBack: true` asks them to share back.
      */
     async shareReach(toAddress, { wantBack = true, press = null } = {}) {
+      // 'share back' from a contact made by a card goes to the room key that card came from
+      toAddress = roomKeyOfCard.get(toAddress) ?? toAddress;
       // The share IS the disclosure, so it takes the press it came from: the Share chip, or "share back" on an
       // ask-back — with the event the shell received (a browser's synthetic click is not one). Anything else — a
       // call derived from a landing, a stray handler — is refused and said (2026-10-30: two shares nobody pressed).
@@ -358,9 +394,10 @@ export function createNearbyRoomBinding({
       let mine = null;
       try { mine = await (typeof myAddresses === 'function' ? myAddresses() : null); } catch { mine = null; }
       const transports = mine && typeof mine === 'object' ? mine : {};
-      if (Object.keys(transports).length === 0) { said(false, 'nothing-to-share'); return { ok: false, reason: 'nothing-to-share' }; }
+      if (!transports.address || Object.keys(transports).length < 2) { said(false, 'nothing-to-share'); return { ok: false, reason: 'nothing-to-share' }; }
       try {
-        await sendPeerMessage(toAddress, { subtype: REACH_MESSAGE, msgId: `reach:${now()}`, reach: { transports, wantBack } });
+        const { address, ...ways } = transports;
+        await sendAsRoom(toAddress, { subtype: REACH_MESSAGE, msgId: `reach:${now()}`, reach: { address, transports: ways, wantBack } });
         pendingReach.delete(toAddress);   // answering their ask-back settles it
         said(true);
         return { ok: true, transports };
@@ -397,8 +434,9 @@ export function createNearbyRoomBinding({
       return { announced, label };
     },
     /** A reach this peer sent that the shell has not settled yet (show "share back?" while this is set). */
-    pendingReachFrom: (from) => pendingReach.get(from) ?? null,
-    settleReach: (from) => { pendingReach.delete(from); },
+    // by the room key it came from, or by the address the card named (the contact's thread holds that one)
+    pendingReachFrom: (from) => pendingReach.get(roomKeyOfCard.get(from) ?? from) ?? null,
+    settleReach: (from) => { pendingReach.delete(roomKeyOfCard.get(from) ?? from); },
     subscribeToReach(fn) { return subscribe('reach')(fn); },
     /** The shell's receipt sender goes here — the SAME one chat uses. */
     setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; },
@@ -421,8 +459,13 @@ export function createNearbyRoomBinding({
     /** My live asks with their heard counts — what the ask row renders. */
     myAsks() {
       sweep();
-      return [...mine.asks.values()].map((ask) => ({ ask, heard: heard.get(ask.id)?.size ?? 0 }));
+      return [...mine.asks.values()].map((ask) => ({
+        ask, heard: heard.get(ask.id)?.size ?? 0,
+        answers: (answersToMine.get(ask.id) ?? []).map((a) => ({ ...a, label: presence.get(a.from)?.label ?? null })),
+      }));
     },
+    /** The room key a card with this address came from (where 'share back' goes), or null. */
+    roomKeyOfCard: (address) => roomKeyOfCard.get(address) ?? null,
     subscribeToHeard(fn) { if (typeof fn !== 'function') return () => {}; heardSubs.add(fn); return () => { heardSubs.delete(fn); }; },
     /** Diagnostics / tests. */
     heldAsks:  () => { sweep(); return [...heldAsks.values()]; },
@@ -434,7 +477,7 @@ export function createNearbyRoomBinding({
       try { unsubscribePeers?.(); } catch { /* best-effort */ }
       for (const s of Object.values(subs)) s.clear();
       heldAsks.clear(); heldCards.clear(); heldInvites.clear(); presence.clear(); known.clear();
-      heard.clear(); heardSubs.clear(); pendingReach.clear();
+      heard.clear(); heardSubs.clear(); pendingReach.clear(); answersToMine.clear(); roomKeyOfCard.clear();
     },
   };
 }

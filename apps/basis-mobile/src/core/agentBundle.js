@@ -60,6 +60,7 @@ import { sendA2ATask } from '@onderling/core';
 // mDNS-only and blind to BLE.
 import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
+import { createNearbyRoomKey } from '../../../basis/src/v2/nearbyRoomKey.js';
 import { createNearbyIdentity } from '../../../basis/src/v2/nearbyIdentity.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
 import { readNearbyRadio } from './nearbyAllowsStore.js';
@@ -507,12 +508,27 @@ export async function bootAgentBundle(opts = {}) {
     shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
     nknAddress: () => agent?.peer?.address ?? null,
     roomSelf: () => nearbyRoomSelfRef.current(),   // set by the Nearby screen (it holds the switcher's set)
+    // the room self's own address (its chat key): what a shared card names
+    selfAddress: (selfId) => agent?.nearbyRoomOwnerOf?.(selfId) ?? null,
+  });
+  // The room KEY (nearbyRoomKey.js): the one key this device speaks on the LAN while in the room, a fresh one per
+  // entry, owned by the room self; the mesh surface carries it to the LAN transport, never a relay.
+  const nearbyRoomKey = createNearbyRoomKey({
+    roomSelf: () => nearbyRoomSelfRef.current(),
+    identityFor: (selfId, namespace) => agent.nearbyRoomIdentityFor(selfId, namespace),
+    ownerOf: (selfId) => agent?.nearbyRoomOwnerOf?.(selfId) ?? null,
+    registerSelfIdentity: (address, identity, o) => agent?.sa?.registerSelfIdentity?.(address, identity, o) === true,
+    forgetSelfIdentity: (address) => agent?.sa?.forgetSelfIdentity?.(address),
+    setLanIdentity: (identity) => meshSurface.setLanIdentity(identity),
+    listPeers: () => nearbyPeers.list(),
+    subscribeToPeers: (fn) => nearbyPeers.subscribe(fn),
+    onError: (err, phase) => console.warn(`[nearby] room key ${phase}:`, err?.message ?? err),
   });
   const nearbyRoom = createNearbyRoomBinding({
-    sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
+    sendPeerMessage: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
     listPeers: () => nearbyPeers.list(),
     subscribeToPeers: (fn) => nearbyPeers.subscribe(fn),   // a newcomer is told the room as it stands
-    myAddress: () => agent?.sa?.agent?.identity?.pubKey ?? null,
+    myAddress: () => nearbyRoomKey.address(),   // the room key; null = not in the room, nothing is sent
     // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
     // shell hands in only where its face choice lives (nearbyAllowsStore) and how it reaches its relay and NKN address.
     myFace: () => nearbyIdentity.myFace(),
@@ -1050,7 +1066,8 @@ export async function bootAgentBundle(opts = {}) {
     nearbyRoom,
     nearbyIdentity,
     /** The Nearby screen hands in who this device enters the room as (`() => ({id, name}|null)`). */
-    setNearbyRoomSelf: (fn) => { nearbyRoomSelfRef.current = typeof fn === 'function' ? fn : () => null; },
+    setNearbyRoomSelf: (fn) => { nearbyRoomSelfRef.current = typeof fn === 'function' ? fn : () => null; nearbyRoomKey.selfChanged(); },
+    nearbyRoomKey,
     attachPeerWiring,
     dispose: async () => {
       try { contactSkills.dispose(); } catch { /* defensive */ }

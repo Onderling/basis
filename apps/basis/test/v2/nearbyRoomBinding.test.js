@@ -253,11 +253,26 @@ describe('the room outlives the screen, and re-tells itself to a newcomer', () =
     expect(b.heldCards()).toHaveLength(0);
   });
 
+  it('every room payload goes out AS the room key; with no room key nothing goes out at all', async () => {
+    const sent = [];
+    let room = 'room-key-1';
+    const b = createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload, opts) => { sent.push({ to, opts }); return { delivered: true }; },
+      listPeers: () => [{ pubKey: 'x' }], myAddress: () => room, now,
+    });
+    await b.askChannel.broadcast(createAsk({ text: 'q', from: 'me', now }).ask);
+    expect(sent).toEqual([{ to: 'x', opts: { sendAs: 'room-key-1' } }]);
+    room = null;   // out of the room
+    const r = await b.askChannel.broadcast(createAsk({ text: 'q2', from: 'me', now }).ask);
+    expect(sent.length, 'nothing sent without a room key (never as the agent\'s own key)').toBe(1);
+    expect(r).toMatchObject({ sent: 0, failed: 1 });
+  });
+
   it('reach counts what the transport handed over, not what was attempted', async () => {
     let n = 0;
     const b = createNearbyRoomBinding({
       sendPeerMessage: async () => ({ delivered: (n++ % 2) === 0 }),
-      listPeers: () => [{ pubKey: 'x' }, { pubKey: 'y' }, { pubKey: 'z' }], now,
+      listPeers: () => [{ pubKey: 'x' }, { pubKey: 'y' }, { pubKey: 'z' }], myAddress: () => 'room-me', now,
     });
     const r = await b.askChannel.broadcast(createAsk({ text: 'q', from: 'me', now }).ask);
     expect(r).toMatchObject({ sent: 3, failed: 0, reached: 2, peers: 3 });
@@ -328,8 +343,9 @@ describe('rung 4 — the deliberate reach exchange', () => {
       listPeers: () => [{ pubKey: other }], myAddress: () => addr, now,
       myAddresses: () => mine,
     });
-    nodes.a = make('a', 'b', { relay: { url: 'wss://relay.a' }, nkn: { address: 'nkn-a' } });
-    nodes.b = make('b', 'a', { relay: { url: 'wss://relay.b' } });
+    // 'a' and 'b' are ROOM keys; the cards name each person's own address ('A-self', 'B-self')
+    nodes.a = make('a', 'b', { address: 'A-self', relay: { url: 'wss://relay.a' }, nkn: { address: 'nkn-a' } });
+    nodes.b = make('b', 'a', { address: 'B-self', relay: { url: 'wss://relay.b' } });
     return nodes;
   }
 
@@ -340,12 +356,14 @@ describe('rung 4 — the deliberate reach exchange', () => {
     const r = await a.shareReach('b', { press: { trigger: 'chip', event: {} } });
     expect(r.ok).toBe(true);
     expect(atB).toHaveLength(1);
-    expect(atB[0]).toMatchObject({ from: 'a', wantBack: true, transports: { relay: { url: 'wss://relay.a' }, nkn: { address: 'nkn-a' } } });
-    expect(b.pendingReachFrom('a')).toBeTruthy();
-    const back = await b.shareReach('a', { wantBack: false, press: { trigger: 'reach-back-yes', event: {} } });
+    // the card names a's OWN address: that is the contact, never the room key 'a' it came from
+    expect(atB[0]).toMatchObject({ from: 'a', address: 'A-self', wantBack: true, transports: { relay: { url: 'wss://relay.a' }, nkn: { address: 'nkn-a' } } });
+    expect(b.pendingReachFrom('A-self'), 'the contact thread asks by the address').toBeTruthy();
+    // 'share back' from the contact's thread (keyed by the address) goes to the room key the card came from
+    const back = await b.shareReach('A-self', { wantBack: false, press: { trigger: 'reach-back-yes', event: {} } });
     expect(back.ok).toBe(true);
-    expect(b.pendingReachFrom('a')).toBeNull();               // answering settles the ask
-    expect(atA[0]).toMatchObject({ from: 'b', wantBack: false, transports: { relay: { url: 'wss://relay.b' } } });
+    expect(b.pendingReachFrom('A-self')).toBeNull();          // answering settles the ask
+    expect(atA[0]).toMatchObject({ from: 'b', address: 'B-self', wantBack: false, transports: { relay: { url: 'wss://relay.b' } } });
   });
 
   it('a share happens only from a press on the chip; every attempt is logged with its trigger', async () => {
@@ -355,7 +373,7 @@ describe('rung 4 — the deliberate reach exchange', () => {
     const a = createNearbyRoomBinding({
       sendPeerMessage: async (to, payload) => { sent.push(payload); return { delivered: true }; },
       listPeers: () => [{ pubKey: 'b' }], myAddress: () => 'a', now,
-      myAddresses: () => ({ relay: { url: 'wss://relay.a' } }), onShare: (rec) => logged.push(rec),
+      myAddresses: () => ({ address: 'A-self', relay: { url: 'wss://relay.a' } }), onShare: (rec) => logged.push(rec),
     });
     expect(await a.shareReach('b')).toMatchObject({ ok: false, reason: 'no-press' });
     expect(await a.shareReach('b', { press: { trigger: 'somewhere' , event: {} } })).toMatchObject({ ok: false, reason: 'no-press' });
@@ -371,17 +389,44 @@ describe('rung 4 — the deliberate reach exchange', () => {
   it('the answer still lands after the sender left the room (the rung is not proximity-gated)', async () => {
     const b = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [], now });
     const seen = []; b.subscribeToReach((r) => seen.push(r));
-    expect(b.onPeerMessage('a', { subtype: 'nearby-reach', reach: { transports: { relay: { url: 'wss://x' } }, wantBack: false } })).toBe(true);
+    expect(b.onPeerMessage('a', { subtype: 'nearby-reach', reach: { address: 'A-self', transports: { relay: { url: 'wss://x' } }, wantBack: false } })).toBe(true);
     expect(seen).toHaveLength(1);
     expect(b.pendingReachFrom('a')).toBeNull();               // a gift needs no settling — no ask-back bar
   });
 
   it('a reach with nothing usable in it is refused; sharing with nothing to share says so', async () => {
     const { b } = reachPair();
+    const seen = []; b.subscribeToReach((r) => seen.push(r));
     expect(b.onPeerMessage('a', { subtype: 'nearby-reach', reach: { transports: {} } })).toBe(true);
     expect(b.pendingReachFrom('a')).toBeNull();
+    // a card that names no address of its own names nobody to add (the room key is not a contact)
+    expect(b.onPeerMessage('a', { subtype: 'nearby-reach', reach: { transports: { relay: { url: 'wss://x' } }, wantBack: true } })).toBe(true);
+    expect(seen, 'no contact from a card without an address').toEqual([]);
     const none = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [{ pubKey: 'x' }], now });
     expect(await none.shareReach('x', { press: { trigger: 'chip', event: {} } })).toMatchObject({ ok: false, reason: 'nothing-to-share' });
+  });
+});
+
+describe('an answer stays in the room (it opens no thread, makes no contact)', () => {
+  it('an answer to my ask is held under my ask, with the answerer\'s face; an answer to an ask I did not put out is nobody\'s', async () => {
+    const { a, b, arrive } = (() => {
+      const nodes = {}; const feeds = {}; const peers = { a: [], b: [] };
+      const make = (addr) => createNearbyRoomBinding({
+        sendPeerMessage: async (to, payload) => { nodes[to]?.onPeerMessage(addr, JSON.parse(JSON.stringify(payload))); return { delivered: true }; },
+        listPeers: () => peers[addr], subscribeToPeers: (fn) => { feeds[addr] = fn; return () => {}; },
+        myAddress: () => addr, myFace: () => ({ label: addr === 'a' ? 'Anna' : 'Bram' }), now,
+      });
+      nodes.a = make('a'); nodes.b = make('b');
+      return { ...nodes, arrive: async (who, other) => { peers[who] = [{ pubKey: other }]; feeds[who]?.(peers[who]); await nodes[who].settled(); } };
+    })();
+    await arrive('a', 'b'); await arrive('b', 'a');
+    const { ask } = createAsk({ text: 'wie heeft een ladder?', from: 'a', now });
+    await a.askChannel.broadcast(ask);
+    await b.askChannel.sendAnswer({ askId: ask.id, text: 'ik', from: 'b', createdAt: now() }, 'a');
+    const mine = a.myAsks();
+    expect(mine[0].answers).toEqual([{ from: 'b', text: 'ik', receivedAt: expect.any(Number), label: 'Bram' }]);
+    await b.askChannel.sendAnswer({ askId: 'not-mine', text: 'x', from: 'b', createdAt: now() }, 'a');
+    expect(a.myAsks()[0].answers).toHaveLength(1);
   });
 });
 
@@ -402,7 +447,7 @@ describe('the face picker (L63)', () => {
     let label = 'Frits';
     const b = createNearbyRoomBinding({
       sendPeerMessage: async (to, payload) => { sent.push({ to, payload }); },
-      listPeers: () => [{ pubKey: 'x' }, { pubKey: 'y' }],
+      listPeers: () => [{ pubKey: 'x' }, { pubKey: 'y' }], myAddress: () => 'room-me',
       myFace: () => (label ? { label } : null), now,
     });
     expect(await b.announceFace()).toEqual({ announced: 2, label: 'Frits' });

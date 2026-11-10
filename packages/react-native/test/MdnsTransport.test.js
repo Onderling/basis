@@ -42,7 +42,8 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { b64Encode } from '../src/utils/base64.js';
 import { MdnsTransport } from '../src/transport/MdnsTransport.js';
-import { helloChallengeMessage, helloProofMessage, ephemeralKeyPair, helloTranscript, openChannel } from '@onderling/transports/mdns';
+import { helloChallengeMessage, helloProofMessage } from '@onderling/transports/mdns';
+import { ephemeralKeyPair, helloTranscript, openChannel } from '@onderling/transports/mdns-channel';
 
 /** Fire a native emitter event into every registered listener. */
 function fireMdns(event, payload) {

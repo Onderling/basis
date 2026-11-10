@@ -9690,6 +9690,13 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (opts?.asPerson) return speakAsPerson(targetAddress, payload, opts);
       return sendCircleScoped(targetAddress, payload, opts);
     },
+    /**
+     * A Nearby room identity for `selfId` (a profile id; one this device does not run = its primary self), derived
+     * for one entry over `namespace` ('nearby:<nonce>'), and the self's chat key that owns it at the secure agent.
+     * Kept nowhere: the room key controller registers it and forgets it on leave.
+     */
+    nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
+    nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
     /** The current person key's wire address (b64 pubKey), or null. */
     personAddress,
     /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */

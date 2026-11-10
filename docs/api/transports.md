@@ -12,6 +12,7 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 - `'@onderling/transports'`
 - `'@onderling/transports/mdns'`
 - `'@onderling/transports/mdns-node'`
+- `'@onderling/transports/mdns-channel'`
 - `'@onderling/transports/mdns-dnssd'`
 - `'@onderling/transports/utils/base64'`
 
@@ -22,7 +23,7 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 **Kind:** function · **Import:** `helloChallengeMessage` from `'@onderling/transports/mdns'`
 
 ```js
-helloChallengeMessage(nD, nL, L, D)
+helloChallengeMessage(nD, nL, L, D, eD, eL)
 ```
 
 The two messages of the challenged hello — built here, never taken from the far end. They differ by ROLE and both
@@ -35,6 +36,8 @@ under any nonce a relay picks.
 - `nL` `string` — the listener's nonce
 - `L` `string` — the listener's pubKey (it signs the challenge)
 - `D` `string` — the dialler's pubKey
+- `eD` `string` — the dialler's ephemeral channel key
+- `eL` `string` — the listener's ephemeral channel key
 
 **Returns:** `string`
 
@@ -43,7 +46,7 @@ under any nonce a relay picks.
 **Kind:** function · **Import:** `helloProofMessage` from `'@onderling/transports/mdns'`
 
 ```js
-helloProofMessage(nD, nL, D, L)
+helloProofMessage(nD, nL, D, L, eD, eL)
 ```
 
 The dialler's proof: signed by the dialler over both nonces (see `helloChallengeMessage`).
@@ -54,6 +57,8 @@ The dialler's proof: signed by the dialler over both nonces (see `helloChallenge
 - `nL` `string`
 - `D` `string` — the dialler's pubKey (it signs the proof)
 - `L` `string` — the listener's pubKey
+- `eD` `string`
+- `eL` `string`
 
 **Returns:** `string`
 
@@ -69,7 +74,7 @@ The DNS-SD service type every Onderling device advertises and browses for. Part 
 
 ```js
 class MdnsTransport extends Transport
-new MdnsTransport({ identity, hostname = null, native = null, emitter = null })
+new MdnsTransport({ identity, lanIdentity = null, hostname = null, hostnamePrefix = 'dw', native = null, emitter = null })
 ```
 
 What a backend must provide. Named here so a second one has a checklist rather than an archaeology
@@ -95,7 +100,7 @@ exercise:
 A backend with `start` but no `startAdvertising`/`startDiscovery` is honoured as far as it goes and says
 so — see `_applyDiscoverability`.
 
-**Methods:** `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `_put()`
+**Methods:** `useLanIdentity()` · `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `addAddress()` · `_mayCarry()` · `_put()`
 
 ## `src/MqttTransport.js`
 
@@ -268,6 +273,50 @@ React Native need an injected `rtcLib` polyfill. Use `RendezvousTransport.isSupp
 guard instantiation where WebRTC globals may be missing.
 
 **Methods:** `connect()` · `disconnect()` · `connectToPeer()` · `hasOpenChannelTo()` · `canReach()` · `_put()`
+
+## `src/mdnsChannel.js`
+
+### `ephemeralKeyPair`
+
+**Kind:** function · **Import:** `ephemeralKeyPair` from `'@onderling/transports/mdns-channel'`
+
+```js
+ephemeralKeyPair()
+```
+
+A fresh ephemeral X25519 key pair for one handshake. Never stored.
+
+### `helloTranscript`
+
+**Kind:** function · **Import:** `helloTranscript` from `'@onderling/transports/mdns-channel'`
+
+```js
+helloTranscript({ D, L, nD, nL, eD, eL })
+```
+
+The transcript: one hash over what the hello fixed, in a fixed order (dialler first).
+
+**Returns:** `Uint8Array` — 32 bytes
+
+### `openChannel`
+
+**Kind:** function · **Import:** `openChannel` from `'@onderling/transports/mdns-channel'`
+
+```js
+openChannel({ role, mySecret, theirPublic, transcript })
+```
+
+Open the channel on one end once the hello is proven.
+
+**Parameters**
+
+- `p` `object`
+- `p.role` `'dialler'|'listener'`
+- `p.mySecret` `Uint8Array` — this side's ephemeral secret
+- `p.theirPublic` `string` — the other side's ephemeral public key (b64)
+- `p.transcript` `Uint8Array` — `helloTranscript(...)`
+
+**Returns:** `{transcript: Uint8Array, seal: (bytes: Uint8Array) => string, open: (b64: string) => Uint8Array|null}`
 
 ## `src/mdnsDnsSdDiscovery.js`
 

@@ -33,4 +33,20 @@ describe('the mesh surface — one object from boot, filled in when the transpor
     expect(mdns.applied).toEqual(['browse']);
     expect(s.discoverability.state).toBe('browse');
   });
+
+  it('the LAN key: asked before the transport lands, applied when it lands; null goes back to a rest key', async () => {
+    class Lan extends Discovering {
+      keys = [];
+      lanAddress = 'rest-1';
+      async useLanIdentity(identity) { this.keys.push(identity?.pubKey ?? null); this.lanAddress = identity?.pubKey ?? 'rest-2'; }
+    }
+    const s = createMeshSurface();
+    expect(await s.setLanIdentity({ pubKey: 'room-1' }), 'no LAN transport yet').toBeNull();
+    const mdns = new Lan({ address: 'a', identity: null });
+    await s.setTransports({ mdns });
+    expect(mdns.keys, 'the room key asked during boot is spoken once the transport lands').toEqual(['room-1']);
+    expect(s.lanAddress()).toBe('room-1');
+    expect(await s.setLanIdentity(null)).toBe('rest-2');
+    expect(mdns.keys).toEqual(['room-1', null]);
+  });
 });

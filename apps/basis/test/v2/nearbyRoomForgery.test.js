@@ -29,29 +29,35 @@ describe('the Nearby room against a forging neighbour', () => {
 
   it('M speaking as A is dropped at the LAN, counted, never reaches the room, and rebinds nobody; A still speaks', async () => {
     const discovery = createLoopbackDiscovery();
-    const device = async (name, onPeerMessage = null) => {
+    // M is a MODIFIED build: it carries whatever its agent hands it (our own outbound rule skipped)
+    class Forger extends MdnsTransport { _mayCarry() { return true; } }
+    const device = async (name, onPeerMessage = null, Kind = MdnsTransport) => {
       const sa = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false, ...(onPeerMessage ? { onPeerMessage } : {}) });
       cleanups.push(() => sa.shutdown());
+      // in the room: the LAN speaks the room key, registered as one of the agent's identities (nearbyRoomKey.js)
+      const roomId = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), new VaultMemory());
       const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
-      // the full chat identity (it signs the LAN handshake) — what the mobile bundle builds its mDNS from
-      const mdns = new MdnsTransport({ identity: sa.agent.identity, lanIdentity: sa.agent.identity, native, emitter });   // pinned until the room speaks as its room key
+      const mdns = new Kind({ identity: sa.agent.identity, lanIdentity: roomId, native, emitter });
+      sa.registerSelfIdentity(roomId.pubKey, roomId);
       await sa.addSecureTransport('mdns', mdns);
-      return { name, sa, mdns, key: sa.identity.pubKey };
+      return { name, sa, mdns, key: roomId.pubKey, canonical: sa.identity.pubKey };
     };
 
     // T, with the real room binding fed from its secure agent's inbound — what the shells' peer routers do
     let room = null;
     const T = await device('T', ({ from, payload }) => { room?.onPeerMessage(from, payload); });
     const A = await device('A');
-    const M = await device('M');
+    const M = await device('M', null, Forger);
+    const heardOnTheLan = [];   // every envelope T's LAN connection opened, from anyone
+    T.mdns.on('envelope', (e) => heardOnTheLan.push(JSON.stringify(e)));
     room = createNearbyRoomBinding({
-      sendPeerMessage: (addr, payload) => T.sa.peer.sendTo(addr, payload),
+      sendPeerMessage: (addr, payload, opts) => T.sa.peer.sendTo(addr, payload, opts),
       listPeers: () => [A, M].filter((d) => T.mdns.canReach(d.key)).map((d) => ({ pubKey: d.key })),
       myAddress: () => T.key,
     });
     expect(await until(() => T.mdns.canReach(A.key) && T.mdns.canReach(M.key) && M.mdns.canReach(T.key)), 'all three on the LAN').toBe(true);
 
-    // M re-addresses its own transport as A: its agent now signs (with M's key) and stamps `from A` — over M's socket
+    // M re-addresses its own transport as A's room key: its agent signs (with M's key) and stamps `from A` — over M's socket
     M.mdns._setAddress(A.key);
     await M.sa.peer.sendTo(T.key, { subtype: 'nearby-presence', presence: { label: 'Ada (forged)' } }, { firstSendTimeoutMs: 800, retryDelays: [] }).catch(() => {});
     await wait(300);
@@ -59,12 +65,19 @@ describe('the Nearby room against a forging neighbour', () => {
     // behaviour first: what the room heard, and whose key A's address now holds
     expect(room.presenceOf(A.key), 'the room never heard "A" from M').toBeNull();
     const heldForA = T.sa.agent.security.getPeerKey(A.key);
-    expect(heldForA === M.key, 'nobody rebinds: A\'s address is never M\'s key').toBe(false);
+    expect(heldForA === M.canonical, 'nobody rebinds: A\'s address is never M\'s key').toBe(false);
     expect(T.mdns.refusedSenders, 'dropped and counted at the LAN').toBeGreaterThan(0);
 
-    // A, honest, speaks for itself — and is heard
-    await A.sa.peer.sendTo(T.key, { subtype: 'nearby-presence', presence: { label: 'Ada' } });
+    // A, honest, speaks for itself AS its room key — and is heard
+    await A.sa.peer.sendTo(T.key, { subtype: 'nearby-presence', presence: { label: 'Ada' } }, { sendAs: A.key });
     expect(await until(() => room.presenceOf(A.key)?.label === 'Ada'), 'A\'s own word reaches the room').toBe(true);
-    expect(T.sa.agent.security.getPeerKey(A.key), 'A\'s address holds A\'s key').toBe(A.key);
+    expect(T.sa.agent.security.getPeerKey(A.key), 'A\'s address holds A\'s room key').toBe(A.key);
+
+    // and nothing T's LAN connection opened names A's or T's canonical key: the room sees room keys only
+    expect(heardOnTheLan.length).toBeGreaterThan(0);
+    for (const e of heardOnTheLan) {
+      expect(e.includes(A.canonical), 'no canonical key of A in what the room received').toBe(false);
+      expect(e.includes(T.canonical), 'nor T\'s own').toBe(false);
+    }
   }, 30_000);
 });

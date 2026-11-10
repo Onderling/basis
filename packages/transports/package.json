@@ -21,6 +21,7 @@
     ".": "./src/index.js",
     "./mdns": "./src/MdnsTransport.js",
     "./mdns-node": "./src/mdnsNodeBackend.js",
+    "./mdns-channel": "./src/mdnsChannel.js",
     "./mdns-dnssd": "./src/mdnsDnsSdDiscovery.js",
     "./utils/base64": "./src/utils/base64.js"
   },

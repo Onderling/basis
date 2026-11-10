@@ -1598,6 +1598,18 @@ reads the transports' own report, never the screen's intent, because an older bi
 asked to be quiet — and saying "hidden" over a device that is listed would be the one lie this surface cannot
 afford.
 
+**The LAN speaks only a LAN key.** Nothing on a local network ever carries the person's canonical key, a circle
+address or a device address. At rest the phone speaks a *rest key* (random, drawn per network visit, held in memory,
+registered with nothing, so nothing the agent signs leaves at all); in the Nearby room it speaks a *room key* (derived
+for the self it entered as over a fresh nonce, registered with the agent as one of its identities, never on a relay or
+NKN, forgotten when the view is closed and the room is empty). The gate is where the bytes leave: the mDNS transport
+carries an envelope only when it is from and signed by its LAN key, and a hello that announces another key is refused.
+Each LAN connection is a channel, not just a proven hello: an ephemeral X25519 key in each hello, signed with it, and
+every later frame sealed under keys derived from the hello transcript, so a device that forwards both handshakes can
+neither read nor inject. An answer to an ask stays in the room; the only way from the room to a contact is *deel je
+kaart*, which hands over the self's own address. Known people (own devices, contacts) do not recognise each other on
+the LAN by any key it can see: until the whisper bound to the channel is built, their traffic rides the relay.
+
 **Contact reveals, so contact is minimised.** A sender uses the *fewest* connection points that achieve
 delivery — sequential fallback, sticky on what worked, backing off from what fails — never race-them-all,
 because every point tried is an extra observer. A message with no circle (a direct message) rides the

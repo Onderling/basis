@@ -26,7 +26,7 @@ import { createProximitySession, nearbyActions } from './circleProximity.js';
 import { makeNearbySessionAdapter }      from './nearbyDiscoverability.js';
 import { createNetworkChangeWatcher }    from './networkChangeWatcher.js';
 import {
-  evaluateIncomingAsk, isAskLive, askActions, createAsk, answerAsk, nearbyThreadDescriptor,
+  evaluateIncomingAsk, isAskLive, askActions, createAsk, answerAsk,
 } from './nearbyAsks.js';
 import {
   roomAllows, createCard, createChatMessage, createRoomChat, CARD_MESSAGE, CHAT_MESSAGE,
@@ -129,9 +129,13 @@ export function createNearbyScreen({
   subscribeToInvites = null,
   subscribeToPresence = null,
   subscribeToHeard = null,
+  subscribeToAnswers = null,
   myAsks = null,
   invitePublish = null,
   myRoomAddress = () => null,
+  // The room KEY's lifecycle (nearbyRoomKey.js): the view opening enters the room, closing it leaves once the room is
+  // empty, the radio off leaves. Absent ⇒ a host with no LAN (no room key to speak).
+  roomKey = null,
   getDrivers = null,
   roomLevel = null,
   levelChosen = () => false,
@@ -167,9 +171,14 @@ export function createNearbyScreen({
     // The radio switch outranks the screen: opening the view must never turn a switched-off radio on.
     startAdvertising: () => {
       if (radioIsOff()) return;
+      roomKey?.viewOpened?.()?.catch?.((err) => { try { onError?.(err, 'room-key'); } catch { /* diagnostics only */ } });
       announceOrQuiet();
     },
-    stopAdvertising:  () => { if (radioIsOff()) return; adapter.stopAdvertising(); },
+    stopAdvertising:  () => {
+      roomKey?.viewClosed?.()?.catch?.(() => { /* reported by the room key */ });
+      if (radioIsOff()) return;
+      adapter.stopAdvertising();
+    },
     subscribe:        subscribeToPeers ?? undefined,
     onError,
   });
@@ -214,6 +223,7 @@ export function createNearbyScreen({
   const faces = new Map();   // peer → { label } from nearby-presence
   let unsubscribePresence = null;
   let unsubscribeHeard = null;
+  let unsubscribeAnswers = null;
   const chat = createRoomChat();
   let unsubscribeCards = null;
   let unsubscribeChat = null;
@@ -433,6 +443,11 @@ export function createNearbyScreen({
         try { unsubscribeHeard = subscribeToHeard(() => emit()) ?? null; }
         catch (err) { unsubscribeHeard = null; try { onError?.(err, 'subscribeToHeard'); } catch { /* */ } }
       }
+      // an answer to my ask stays in the room: it is shown under the ask (myAsks), so the screen re-reads when one lands
+      if (typeof subscribeToAnswers === 'function' && !unsubscribeAnswers) {
+        try { unsubscribeAnswers = subscribeToAnswers(() => emit()) ?? null; }
+        catch (err) { unsubscribeAnswers = null; try { onError?.(err, 'subscribeToAnswers'); } catch { /* */ } }
+      }
       if (typeof subscribeToPresence === 'function' && !unsubscribePresence) {
         try {
           unsubscribePresence = subscribeToPresence((face) => {
@@ -475,7 +490,7 @@ export function createNearbyScreen({
       // strangers needed is a quiet record of where someone has been.
       asks.clear();
       for (const [unsub, name] of [
-        [unsubscribeCards, 'cards'], [unsubscribeChat, 'chat'], [unsubscribeInvites, 'invites'], [unsubscribePresence, 'presence'], [unsubscribeHeard, 'heard'],
+        [unsubscribeCards, 'cards'], [unsubscribeChat, 'chat'], [unsubscribeInvites, 'invites'], [unsubscribePresence, 'presence'], [unsubscribeHeard, 'heard'], [unsubscribeAnswers, 'answers'],
       ]) {
         if (!unsub) continue;
         try { unsub(); } catch (err) { try { onError?.(err, `unsubscribe:${name}`); } catch { /* */ } }
@@ -485,6 +500,7 @@ export function createNearbyScreen({
       unsubscribeInvites = null;
       unsubscribePresence = null;
       unsubscribeHeard = null;
+      unsubscribeAnswers = null;
       cards.clear();
       roomInvites.clear();
       chat.clear();     // leaving the room forgets the conversation — there is no history to come back to
@@ -527,8 +543,8 @@ export function createNearbyScreen({
     setRadio(v) {
       if (v !== 'on' && v !== 'off') return;
       try { radio?.set?.(v); } catch (err) { try { onError?.(err, 'setRadio'); } catch { /* diagnostics only */ } }
-      if (v === 'off') adapter.radioOff();
-      else if (session.isOpen()) announceOrQuiet();
+      if (v === 'off') { roomKey?.leave?.()?.catch?.(() => { /* reported by the room key */ }); adapter.radioOff(); }
+      else if (session.isOpen()) { roomKey?.viewOpened?.()?.catch?.(() => { /* reported by the room key */ }); announceOrQuiet(); }
       else adapter.radioOn();
       emit();
     },
@@ -572,14 +588,9 @@ export function createNearbyScreen({
       // Answering is a one-way door for THIS ask: I have already revealed myself, so it leaves the room.
       asks.delete(askId);
       emit();
-      // The host opens this. It is TRANSIENT by construction — answering climbs to rung 3 (a pairwise
-      // channel), not rung 4 (a contact you can reach from home).
-      return {
-        ok: true,
-        opensDirectChannel: true,
-        peer: entry.ask.from,
-        thread: nearbyThreadDescriptor(entry.ask.from),
-      };
+      // An answer opens NO direct thread: it went to the asker's room key and stays in the room (the asker reads it
+      // under their ask). The only way to a contact is 'deel je kaart', which hands over the person's own address.
+      return { ok: true, peer: entry.ask.from };
     },
 
     /** The per-device allows, as they stand. */

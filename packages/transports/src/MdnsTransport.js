@@ -26,8 +26,6 @@
 import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding, SENDER_KEY_FIELD } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
 import { ephemeralKeyPair, helloTranscript, openChannel } from './mdnsChannel.js';
-// the channel's pieces travel with the transport's wire contract (a backend or a test plays the far end with them)
-export { ephemeralKeyPair, helloTranscript, openChannel };
 import { parseUntrustedJson } from '@onderling/core';
 
 /**
@@ -444,7 +442,14 @@ export class MdnsTransport extends Transport {
   _mayCarry(envelope) {
     if (!this.#lanKey || envelope?._from !== this.#lanKey) return false;
     const signedBy = envelope?.[SENDER_KEY_FIELD];
-    return signedBy === undefined || signedBy === this.#lanKey;
+    if (signedBy !== undefined && signedBy !== this.#lanKey) return false;
+    // a hello is plaintext and ANNOUNCES a key: it may announce only the LAN key (a send that did not ask to speak as
+    // the room key would otherwise hand the room the agent's canonical key in the hello it signs as the room)
+    if (envelope?._p === 'HI') {
+      const announced = envelope?.payload?.pubKey;
+      if (announced !== undefined && announced !== this.#lanKey) return false;
+    }
+    return true;
   }
 
   async _put(to, envelope) {

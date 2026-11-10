@@ -74,6 +74,27 @@ describe('the LAN speaks only its LAN key, at the agent', () => {
     expect(got[0].from).not.toBe(phone.canonical);
   }, 30_000);
 
+  it('in a room, a send that does not ask to speak as the room key carries nothing: its hello would name the canonical key', async () => {
+    const discovery = createLoopbackDiscovery();
+    const otherRoom = await ident();
+    const other = await device(discovery, { lanIdentity: otherRoom });
+    expect(other.sa.registerSelfIdentity(otherRoom.pubKey, otherRoom)).toBe(true);
+    const heard = [];
+    other.mdns.on('envelope', (e) => heard.push(JSON.stringify(e)));
+    other.mdns.on('security-error', (_err, e) => { if (e) heard.push(JSON.stringify(e)); });
+    await other.mdns.setDiscoverability(DISCOVERABILITY.PUBLISH);
+
+    const roomIdentity = await ident();
+    const phone = await device(discovery, { lanIdentity: roomIdentity });
+    expect(phone.sa.registerSelfIdentity(roomIdentity.pubKey, roomIdentity)).toBe(true);
+    await phone.mdns.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    expect(await until(() => phone.mdns.canReach(other.mdns.lanAddress)), 'on the LAN').toBe(true);
+
+    await phone.sa.peer.sendTo(other.mdns.lanAddress, { hi: 'there' }, { firstSendTimeoutMs: 600, retryDelays: [] }).catch(() => {});
+    await wait(300);
+    expect(heard.some((e) => e.includes(phone.canonical)), 'the canonical key never reached the room').toBe(false);
+  }, 30_000);
+
   it('a PERSONA in the room: its room key still speaks over the LAN, never on the persona\'s relay sockets', async () => {
     const discovery = createLoopbackDiscovery();
     const got = [];

@@ -398,11 +398,6 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
           </Pressable>
         </View>
       ) : null}
-      {contact?.transient && !pendingReach ? (
-        <Pressable onPress={(e) => shareReach(true, 'chip', e?.nativeEvent ?? null)} accessibilityRole="button" testID="reach-share" style={styles.skillChip ?? styles.send}>
-          <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_share')}</Text>
-        </Pressable>
-      ) : null}
       {/* The typed door: what this peer offers, while the command word is being typed. */}
       {suggestions.length > 0 && (
         <View style={styles.suggest} testID="contact-thread-suggest">

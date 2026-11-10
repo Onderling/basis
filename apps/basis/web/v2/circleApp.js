@@ -770,7 +770,6 @@ import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 import { createNearbyIdentity, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
 import { nearbyFirstUse, nearbyAskedKey } from '../../src/v2/nearbyLevel.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
-import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
@@ -1653,11 +1652,14 @@ function ensureNearbyRoom(agent = _peerAgent) {
     shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
     nknAddress: () => agent?.peer?.address ?? null,
     roomSelf: () => nearbyRoomSelfNow().self,
+    // the room self's own address (its chat key): what a shared card names
+    selfAddress: (selfId) => agent?.nearbyRoomOwnerOf?.(selfId) ?? null,
   });
   _nearbyRoom = createNearbyRoomBinding({
-    sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
+    sendPeerMessage: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
     listPeers: () => [],
-    myAddress: () => agent.identity?.pubKey ?? agent.peer?.address ?? null,
+    // the web has no LAN, so it is never in a room: no room key, and the binding sends nothing as one
+    myAddress: () => null,
     deliveryMap: deliveryStateMap,   // the SAME map chat's receipts advance
     // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
     // shell hands in only where its face choice lives and how it reaches its relay and NKN address.
@@ -1665,24 +1667,16 @@ function ensureNearbyRoom(agent = _peerAgent) {
     myAddresses: () => _nearbyIdentity.myAddresses(),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
-  // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
-  // answerer's side does.
-  // Rung 4, receive side: store what they chose to give, and say so in the thread.
+  // An answer to MY ask stays in the room (the Nearby screen shows it under the ask); it opens no thread.
+  // Rung 4, receive side: a card names the person's OWN address. That address, never the room key it came from, is the
+  // contact: store what they chose to give, and open the thread with them, which says so.
   _nearbyRoom.subscribeToReach((r) => {
-    if (!r?.from) return;
-    try {
-      circlePeerGraph?.upsert?.({ type: 'native', pubKey: r.from, transports: r.transports, reachable: true, nearby: true })
-        ?.catch?.(() => {});
-    } catch { /* the line below still tells the person */ }
-    const face = _nearbyRoom.presenceOf?.(r.from)?.label ?? String(r.from).slice(0, 8);
-    const th = contactThreads.get(r.from);
+    if (!r?.address) return;
+    const face = _nearbyRoom.presenceOf?.(r.from)?.label ?? String(r.address).slice(0, 8);
+    openNearbyContact(r.address, face, r.transports);
+    const th = contactThreads.get(r.address);
     if (th) { th.messages.push({ origin: 'bot', text: t('circle.nearbyScreen.reach_received', { name: face }) }); }
-    if (_activeContactThread?.contactId === r.from) _activeContactThread.rerender();
-  });
-  _nearbyRoom.subscribeToAnswers((answer) => {
-    if (!answer?.from) return;
-    const face = _nearbyRoom.presenceOf?.(answer.from)?.label ?? null;
-    openNearbyThread(nearbyThreadDescriptor(answer.from, { label: face }), [{ origin: 'bot', text: answer.text ?? '' }]);
+    if (_activeContactThread?.contactId === r.address) _activeContactThread.rerender();
   });
   return _nearbyRoom;
 }
@@ -3520,9 +3514,6 @@ async function showContactThread(contactId, { draft = '' } = {}) {
         { id: 'reach-back-yes', label: t('circle.nearbyScreen.reach_back_yes') },
         { id: 'reach-back-no', label: t('circle.nearbyScreen.reach_back_no') },
       ] });
-      else if (thread.transient) extra.push({ origin: 'bot', text: '', buttons: [
-        { id: 'reach-share', label: t('circle.nearbyScreen.reach_share') },
-      ] });
       return [...thread.messages, ...extra];
     })(),
     skills, busy, error, t,
@@ -4167,6 +4158,12 @@ function showNearby() {
       draw(nearbyScreen.model());
     },
     onAskAction: handleNearbyAskAction,
+    // 'deel je kaart' on an answer to my ask: the one way from the room to a contact (the click goes down with it)
+    onShareCard: async (from, ev) => {
+      const r = await _nearbyRoom?.shareReach?.(from, { wantBack: true, press: { trigger: 'chip', event: ev ?? null } });
+      notice = r?.ok ? { key: 'reach_shared_you' } : null;
+      draw(nearbyScreen.model());
+    },
     level: roomLevel,
     firstUse,
     onLevelChange: changeLevel,
@@ -4201,15 +4198,9 @@ function showNearby() {
     const r = await nearbyScreen.answer(ask?.id, text.trim());
     if (!r.ok) { notice = { key: 'ask_expired' }; draw(nearbyScreen.model()); return; }
 
+    // the answer stays in the room: no thread opens (the only way to a contact is a shared card)
     notice = { key: 'answer_sent' };
     draw(nearbyScreen.model());
-    if (r.thread) {
-      const face = _nearbyRoom?.presenceOf?.(r.peer)?.label ?? null;
-      openNearbyThread({ ...r.thread, label: face ?? r.thread.label }, [
-        ...(ask?.text ? [{ origin: 'bot', text: ask.text }] : []),
-        { origin: 'user', text: text.trim() },
-      ]);
-    }
   }
 
   nearbyScreen.subscribe(draw);
@@ -4221,31 +4212,19 @@ function showNearby() {
 }
 
 /**
- * Open the pairwise channel an answer created — rung 3 of the escalation ladder.
- *
- * Seeded straight into the in-memory thread cache and NOT written to contacts. That is the whole
- * distinction: rung 3 is "we are talking now", rung 4 is "I can reach you from home", and the second is a
- * deliberate exchange of the transport→address map that the user has not made yet. Saving a café encounter
- * into the contact list would climb a rung nobody chose.
+ * A card shared in the room made a CONTACT: rung 4, the deliberate exchange. The card names the person's own address
+ * (never the room key it came from), and that is who the contact is: kept in the peer graph with how to reach them,
+ * marked `nearby` so the list can say where you met, and the thread with them opens.
  */
-function openNearbyThread(thread, seed = []) {
-  if (!thread?.peerAddress) return;
-  if (!contactThreads.has(thread.peerAddress)) {
-    contactThreads.set(thread.peerAddress, {
-      name: thread.label, peerAddr: thread.peerAddress, messages: [], transient: true,
-    });
-  }
-  // The thread opens WITH its first lines (the ask, the answer), not as an empty box after the fact.
-  const t = contactThreads.get(thread.peerAddress);
-  for (const m of seed) t.messages.push({ origin: m.origin ?? 'bot', text: m.text ?? '' });
-  // Frits, 2026-08-30: a person you start talking to from the room becomes a contact row that links back
-  // to this chat. Marked `nearby` so the list can say where you met.
+function openNearbyContact(address, label, transports = null) {
+  if (!address) return;
+  if (!contactThreads.has(address)) contactThreads.set(address, { name: label, peerAddr: address, messages: [] });
   try {
-    circlePeerGraph?.upsert?.({ type: 'native', pubKey: thread.peerAddress, name: thread.label, reachable: true, nearby: true })
+    circlePeerGraph?.upsert?.({ type: 'native', pubKey: address, name: label, ...(transports ? { transports } : {}), reachable: true, nearby: true })
       ?.catch?.(() => {});
   } catch { /* the thread opens regardless */ }
   closeNearby();
-  showContactThread(thread.peerAddress);
+  showContactThread(address);
 }
 
 // The room face: 'name' (default) · 'handle' · 'none' — per device, like the allows.

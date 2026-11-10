@@ -116,10 +116,10 @@ describe('the peer source the nearby surface subscribes to', () => {
     let seen = false;
     for (let i = 0; i < 60 && !seen; i++) {
       await wait(25);
-      seen = rows.at(-1)?.some((p) => p.pubKey === phoneish.transport.address);
+      seen = rows.at(-1)?.some((p) => p.pubKey === phoneish.transport.lanAddress);
     }
     expect(seen).toBe(true);
-    expect(rows.at(-1).find((p) => p.pubKey === phoneish.transport.address).source).toBe('mdns');
+    expect(rows.at(-1).find((p) => p.pubKey === phoneish.transport.lanAddress).source).toBe('mdns');
 
     unsubscribe();
     await laptop.stop();

@@ -114,6 +114,7 @@ import { createProfileFactsSync, routeProfileFactsBySender } from '../../v2/prof
 import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPeersSync.js';
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
+import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -3292,6 +3293,51 @@ export async function createRealHouseholdAgent(opts = {}) {
   const personSeedFor = (version) => (persona.personKey?.version === version ? persona.personKey.seed : (persona.personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
   const contactRecords = async () => {
     try { return bookRowsOf(await callSkill('pinboard', 'listContacts', {})); } catch { return []; }
+  };
+  /**
+   * WHAT THIS DEVICE WHISPERS on a LAN connection (the mDNS transport's whisper): one entry per secret it shares with
+   * someone. Own devices first: per running persona, its circle root at the current epoch (the same on every full
+   * device of it; a re-key moves the epoch and the secret), proving THIS device's device address and accepting only a
+   * live device in the persona's device map (a tombstoned one still holds the old root and is refused here). Then
+   * contacts: the Diffie–Hellman of the persona's chat key and the contact's address (both sides hold both keys),
+   * proving the persona's chat key and accepting only that contact's address. Nothing new is stored or shared; the
+   * transport derives each secret from the material under its label and binds nothing without the proof and this rule.
+   */
+  const lanWhisperSecrets = async ({ lanSelf = null } = {}) => {
+    // IN A ROOM only the room self whispers: another persona's secret there would be proven on the connection that
+    // speaks this self's room key, linking the two. At rest (no persona face shown) every persona's secrets.
+    const only = lanSelf == null ? null : (personas.has(lanSelf) ? lanSelf : primaryId);
+    const out = [];
+    for (const [pid, rt] of personas) {
+      if (only && pid !== only) continue;
+      const dev = deviceAddressOf(pid);
+      if (!rt?.circleRoot?.seed || !dev || !rt.deviceDerivationSeed) continue;
+      let devId = null;
+      try { devId = await AgentIdentity.fromSeed(rt.deviceDerivationSeed, new VaultMemory()); } catch { devId = null; }
+      if (!devId || devId.pubKey !== dev) continue;
+      out.push({
+        material: rt.circleRoot.seed, label: `lan-whisper-sibling:${rt.circleRoot.epoch}`, address: dev,
+        sign: (message) => devId.sign(message),
+        accept: async (address) => address !== dev && (await deviceSiblingRowsOf(pid)).some((d) => d.address === address),
+      });
+    }
+    for (const c of await contactRecords()) {
+      const addr = typeof c?.peerAddr === 'string' && c.peerAddr ? c.peerAddr : (typeof c?.pubKey === 'string' ? c.pubKey : null);
+      if (!addr) continue;
+      const pid = personas.has(c?.persona) ? c.persona : primaryId;
+      if (only && pid !== only) continue;
+      const me = personas.get(pid)?.chatId;
+      if (!me?.pubKey || me.pubKey === addr) continue;
+      let material = null;
+      try { material = me.deriveSessionKey(addr); } catch { material = null; }
+      if (!material) continue;
+      out.push({
+        material, label: 'lan-whisper-contact', address: me.pubKey,
+        sign: (message) => me.sign(message),
+        accept: async (address) => address === addr,
+      });
+    }
+    return out;
   };
   /**
    * The PERSON an address names: an address this device has bound to an identity (a per-circle or mesh alias) resolves
@@ -7439,6 +7485,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       // The transport mode applies LIVE too — the register is the one home, this hook the one
       // application point (shells and builtins just set-param).
+      // the kept Nearby conversations' window applies LIVE (a shortened one drops at once)
+      if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === KEEP_DAYS_KEY) {
+        try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(args.value) }); } catch { /* the register still holds the value */ }
+      }
       if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === 'transport.mode'
           && ['nkn', 'relay', 'both'].includes(args?.value)) {
         try { sa.setTransportMode?.(args.value); } catch { /* the register still holds the value */ }
@@ -9218,6 +9268,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   } catch { /* the default stands */ }
 
+  // the kept Nearby conversations' window, as the person set it
+  try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(paramsService.register.valueOf(KEEP_DAYS_KEY)) }); } catch { /* the default stands */ }
+
   // THE A2A SURFACE — the declared ops, projected onto the agent peers can reach (2026-08-19).
   //
   // An agent could already invoke another agent's skill over A2A, with capability tokens and revocation,
@@ -9730,6 +9783,22 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (opts?.asPerson) return speakAsPerson(targetAddress, payload, opts);
       return sendCircleScoped(targetAddress, payload, opts);
     },
+    /**
+     * A Nearby room identity for `selfId` (a profile id; one this device does not run = its primary self), derived
+     * for one entry over `namespace` ('nearby:<nonce>'), and the self's chat key that owns it at the secure agent.
+     * Kept nowhere: the room key controller registers it and forgets it on leave.
+     */
+    nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
+    nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
+    /** The Nearby room's `keep` port for the current visit (nearbyKept.js), over this device's log; null without one. */
+    nearbyKeeper: (visitId) => (opts.deviceLog ? makeRoomKeeper({
+      eventLog: opts.deviceLog, visitId,
+      keepDays: () => paramsService.register.valueOf(KEEP_DAYS_KEY),
+    }) : null),
+    /** 'Earlier, in the room' for a contact: the kept visits their card linked to their address. */
+    earlierInTheRoom: (address) => (opts.deviceLog ? earlierInTheRoom(opts.deviceLog.query(), address) : []),
+    /** What this device whispers on a LAN connection: own devices, then contacts (see lanWhisperSecrets). */
+    lanWhisperSecrets: (o) => lanWhisperSecrets(o),
     /** The current person key's wire address (b64 pubKey), or null. */
     personAddress,
     /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */

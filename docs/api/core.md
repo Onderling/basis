@@ -4876,7 +4876,7 @@ interaction primitives (sendOneWay/sendAck/request/respond/sendHello), reply
 correlation, auto-ACK of AS envelopes, SecurityLayer wiring, and receive-handler
 dispatch. See the file header for the full port contract.
 
-**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `holdsAddress()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_frameRefused()` · `_receive()` · `appMessageIdFor()` · `_send()` · `_awaitReply()`
+**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_defaultSenderFor()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `holdsAddress()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_frameRefused()` · `_receive()` · `appMessageIdFor()` · `_send()` · `_awaitReply()`
 
 ## `src/transport/discoverability.js`
 
@@ -5059,9 +5059,9 @@ the peer source. One object, both shells, no duplicate.
 **Parameters**
 
 - `[opts]` `object`
-- `[opts.onDegraded]` `(report: object) => void` — forwarded to the control
+- `[opts.onDegraded]` `(report: object) => void` — forwarded to the control THE LAN KEY is a property of the surface too (`setLanIdentity`): what a LAN transport says on the network is a room key while a room is open and a rest key otherwise, and an app asks for that here, never of the transport. A key asked for before the transport lands is applied when it lands.
 
-**Returns:** `{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void> }`
+**Returns:** `{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void>, setLanIdentity: (identity: object|null, o?: {self?: string}) => Promise<string|null>, lanAddress: () => string|null, setLanWhisper: (secrets: Function|null) => void }`
 
 ## `src/transport/nearbyPeers.js`
 

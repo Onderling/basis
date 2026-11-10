@@ -1,7 +1,7 @@
 /**
  * The people reads on the household bot, end to end: "wie doet de lamp", "wat moet Ann doen", "wie is er zaterdag" —
  * by the deterministic gate and by the model alike, each answered in one worded line, and the names ceiling holding on
- * the way out ("iemand", never an id). Composed as the box composes a household bot (the real agent over the household
+ * the way out ("Onbekend", never an id). Composed as the box composes a household bot (the real agent over the household
  * store, the slim catalogue, the door's call, the template's word rules, the real runner admitting its people), in Dutch.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -107,7 +107,7 @@ describe('the household bot\'s people reads', () => {
     expect(await say('2', 'is er iets over drie dagen')).toEqual(dayLines('Ann'));
   });
 
-  it('the ceiling on the way out: under names:none a member reads "iemand", never an id; naming someone is refused', async () => {
+  it('the ceiling on the way out: under names:none a member reads "Onbekend", never an id; naming someone is refused', async () => {
     await names('none');
     try {
       const said = [
@@ -116,8 +116,8 @@ describe('the household bot\'s people reads', () => {
         ...(await say('2', 'hoe druk is Ann')),
       ];
       expect(said).toEqual([
-        `Klusje 'lamp vervangen' is van iemand, ${dayWords(X)}.`,
-        ...dayLines('iemand'),
+        `Klusje 'lamp vervangen' is van Onbekend, ${dayWords(X)}.`,
+        ...dayLines('Onbekend'),
         'Namen zijn hier niet zichtbaar: je kunt alleen je eigen klusjes opvragen.',
       ]);
       expect(said.join('\n')).not.toMatch(/telegram:|Ann/);

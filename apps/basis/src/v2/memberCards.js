@@ -45,6 +45,7 @@ import {
 } from '@onderling/agent-registry';
 import { splitViewAsAttributes, viewAsCounts } from './viewAsAttributes.js';
 import { VIEWER_KINDS, revealedMemberLabel } from './circleViewAs.js';
+import { labelShown } from './personLabel.js';
 
 /**
  * The label on a member's "view as" chip: what the reveal ladder shows of them (their name in the circle, else a
@@ -54,8 +55,7 @@ import { VIEWER_KINDS, revealedMemberLabel } from './circleViewAs.js';
  * @returns {string}
  */
 export function viewerChipLabel(member, t) {
-  const l = revealedMemberLabel(member);
-  return l.primary ?? t(l.primaryKey);
+  return labelShown(revealedMemberLabel(member), t);
 }
 
 /**

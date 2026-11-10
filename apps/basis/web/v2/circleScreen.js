@@ -24,6 +24,7 @@
  */
 
 import { blockEmptyLine, blockOpensWhole } from '../../src/v2/blockTitle.js';
+import { labelShown } from '../../src/v2/personLabel.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
@@ -352,7 +353,7 @@ function renderNoticeboard(section, block, tr) {
     // Stamped by `materializeNoticeboard` through the reveal ladder (batch 4) — paint only.
     const sender = row?.senderSelf
       ? null
-      : (row?.senderLabel ?? (row?.senderLabelKey ? tr(row.senderLabelKey) : null));
+      : labelShown({ primary: row?.senderLabel, primaryKey: row?.senderLabelKey, primaryNumber: row?.senderLabelNumber }, tr);
     if (sender) {
       const s = document.createElement('span');
       s.className = 'circle-screen__noticeboard-sender';

@@ -1600,6 +1600,7 @@
 .circle-screen__for-you-row { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0; }
 .circle-screen__for-you-icon { flex: none; }
 .circle-screen__for-you-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.circle-screen__for-you-face { flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--paper-2); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--ink-soft); }
 .circle-screen__for-you-late { flex: none; font-size: 11px; color: var(--ink-soft); }
 .circle-screen__for-you-dismiss { flex: none; background: transparent; border: none; color: var(--ink-soft); cursor: pointer; font: inherit; padding: 2px 6px; }
 .circle-screen__for-you-all { margin-top: 6px; background: transparent; border: none; color: var(--accent-ink); cursor: pointer; font: inherit; font-size: 13px; padding: 0; }

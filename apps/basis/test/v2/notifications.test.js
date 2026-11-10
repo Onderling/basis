@@ -43,7 +43,7 @@ describe('notificationRows', () => {
     expect(rows[0]).toMatchObject({ kind: 'many', count: 4 });
     expect(rows[0].ids.map((x) => x.id).sort()).toEqual(['m1', 'm2', 'm3', 'm4']);
   });
-  it('a circle not shown (another persona not ticked) gives no rows', () => {
+  it('a circle the host does not hand (muted) gives no rows', () => {
     expect(notificationRows({ events: [line('m1', 'b', NOW, NOW)], circles: [], t, now: NOW })).toEqual([]);
   });
 });
@@ -58,6 +58,23 @@ describe('Today: "Nieuw voor jou" on top, only when it holds rows', () => {
     expect(asked[0].content.items[0].id).toBe('m1');
     const notAsked = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles, myRefs: [], t, now: () => NOW } });
     expect(notAsked.map((b) => b.type)).toEqual(['circlesUnread']);
+  });
+  it('rows for EVERY persona on the device, ticked or not, each carrying the persona it is for', async () => {
+    const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
+    const both = [{ id: 'c1', name: 'Straat' }, { id: 'c2', name: 'Werk Test' }];
+    const lineIn = (id, cid, ts) => ({ id, ts, landedAt: ts, type: 'chat-message', actor: 'b', payload: { circleId: cid, text: 'hoi' } });
+    const log = { query: () => [lineIn('m1', 'c1', NOW - 2000), lineIn('m2', 'c2', NOW - 1000)] };
+    const blocks = await materializeScreen({ screen: page, hostOps: {
+      eventLog: log, circles: [both[0]], allCircles: both, myRefs: [], forYou: true, t, now: () => NOW,
+      selfSet: { on: ['default'], held: [{ id: 'default' }, { id: 'werk', name: 'Werk' }] },
+      profileIdOf: (cid) => (cid === 'c2' ? 'werk' : 'default'),
+    } });
+    const rows = blocks[0].content.items;
+    expect(rows.map((r) => [r.id, r.self?.id])).toEqual([['m2', 'werk'], ['m1', 'default']]);
+    expect(rows[0].self).toMatchObject({ name: 'Werk' });
+    // one persona on the device: no face to tell rows apart, so none is carried
+    const one = await materializeScreen({ screen: page, hostOps: { eventLog: log, circles: both, myRefs: [], forYou: true, t, now: () => NOW } });
+    expect(one[0].content.items.every((r) => r.self == null)).toBe(true);
     const nothing = await materializeScreen({ screen: page, hostOps: { eventLog: { query: () => [] }, circles, myRefs: [], forYou: true, t, now: () => NOW } });
     expect(nothing.map((b) => b.type)).toEqual(['circlesUnread']);
   });

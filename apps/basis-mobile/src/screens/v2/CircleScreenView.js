@@ -30,6 +30,7 @@ import { featureActionLabelKey } from '@onderling-app/basis';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, newsKindIcons } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
+import FaceView from './FaceView.js';
 import { t } from '../../core/localisation.js';
 import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
@@ -242,6 +243,12 @@ function renderForYou(block, onAction, styles) {
           <Text style={[styles.noticeText, styles.forYouText]} numberOfLines={1}>
             {`${row.icon ?? ''} ${row.text}`}{row.late ? `  ${t('circle.forYou.late')}` : ''}
           </Text>
+          {row.self ? (
+            // the persona the row is for, when the device holds more than one: its face (web parity)
+            <View accessibilityLabel={row.self.name ?? t('circle.switcher.you')} testID={`for-you-self-${row.self.id}`}>
+              <FaceView row={{ name: row.self.name ?? t('circle.switcher.you') }} size={22} />
+            </View>
+          ) : null}
           <Pressable hitSlop={8} accessibilityLabel={t('circle.forYou.dismiss')} testID={`for-you-dismiss-${row.id}`}
             onPress={() => onAction?.({ kind: 'for-you-read', rows: [row] })}>
             <Text style={styles.forYouDismiss}>✕</Text>

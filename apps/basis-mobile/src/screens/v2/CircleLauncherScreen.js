@@ -1370,6 +1370,8 @@ export default function CircleLauncherScreen({
         // "Nieuw voor jou" on top (the shared projection, web parity): the direct messages, who they are from, the window
         forYou: true, t, turns: forYouRef.current.turns, contactName: (id) => forYouRef.current.names[id] ?? null,
         notifyWindowDays: bundle?.agent?.getParamValue?.('notify.windowDays'),
+        // whose circle it is (every persona's rows show, each with its face)
+        profileIdOf: (cid) => { try { return bundle?.agent?.profileIdOf?.(cid) ?? 'default'; } catch { return 'default'; } },
         ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },

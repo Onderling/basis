@@ -98,11 +98,22 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   // "Nieuw voor jou" at the top of the page the shell asks it for (Vandaag), and only when it holds rows: never an
   // empty block. Not a block of the stored page: what is new is not something a person places or removes.
   if (hostOps.forYou === true) {
-    const shown = new Set(activeCircleIds);
+    // EVERY persona's circles, ticked or not (a reply to a persona you are not in must not go unnoticed); muted stay
+    // out. With more than one persona on the device each row carries the persona it is for, so the shell paints its face.
+    const held = Array.isArray(hostOps.selfSet?.held) ? hostOps.selfSet.held.filter((p) => p?.id) : [];
+    const every = (hostOps.allCircles ?? hostOps.circles ?? []).filter((c) => c?.id && !muted.has(c.id));
+    const personaById = new Map(held.map((p) => [p.id, p]));
+    const selfOf = held.length > 1 && typeof hostOps.profileIdOf === 'function'
+      ? (group) => {
+        if (group?.kind !== 'circle') return null;   // a contact's persona: not known to the projection yet
+        const p = personaById.get(hostOps.profileIdOf(group.id) ?? 'default');
+        return p ? { id: p.id, name: p.id === 'default' ? null : (p.name ?? p.id) } : null;
+      }
+      : null;
     const rows = notificationRows({
       events: hostOps.eventLog?.query ? hostOps.eventLog.query({ excludeMuted: true }) : [],
       turns: hostOps.turns ?? [],
-      circles: (hostOps.circles ?? []).filter((c) => c?.id && shown.has(c.id)),
+      circles: every, selfOf,
       contactName: hostOps.contactName ?? null,
       viewerIdIn: typeof ops.selfIn === 'function' ? ops.selfIn : null,
       myRefs: hostOps.myRefs ?? [],

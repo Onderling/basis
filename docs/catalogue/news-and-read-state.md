@@ -12,7 +12,8 @@ read state; the notification projection and "Nieuw voor jou" on Today follow.
   and the person's other devices stop counting it once the mark arrives.
 - See "Nieuw voor jou" at the top of Today (only when something is there): a new post, task or appointment, a line in
   a circle, a direct message, someone they admitted joining, their own removal; each row opens the thing, ✕ sets it
-  aside, "Alles gelezen" clears the block; a row that arrived long after it was sent says "kwam later binnen".
+  aside, "Alles gelezen" clears the block; a row that arrived long after it was sent says "kwam later binnen". Rows come
+  from every persona on the device, ticked in the switcher or not, and each carries the face of the persona it is for.
 
 The notification projection: `apps/basis/src/v2/notifications.js` (`notificationRows`), prepended to Today by the
 shared screen materializer when the shell asks (`forYou: true`), painted by `renderForYou` on both shells; setting a row

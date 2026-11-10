@@ -50,11 +50,13 @@ const clip = (s) => { const x = String(s ?? '').replace(/\s+/g, ' ').trim(); ret
  * @param {(key: string, vars?: object) => string} a.t
  * @param {number} [a.now]
  * @param {number} [a.windowDays]
+ * @param {(group: {kind: 'circle'|'contact', id: string}) => ({id: string, name?: string|null}|null)} [a.selfOf]
+ *        the persona a row is for (its face); the host passes it only when the device holds more than one
  * @returns {Array<{id: string, kind: string, group: {kind: 'circle'|'contact', id: string, name: string|null}, icon: string, text: string, at: number, late: boolean, open: {kind: 'circle'|'thread', id: string}, count?: number, ids: Array<{id: string, at: number}>}>}
  */
 export function notificationRows({
   events = [], turns = [], circles = [], contactName = null, viewerIdIn = null, myRefs = [], readIds = null, t,
-  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS,
+  now = Date.now(), windowDays = NOTIFY_WINDOW_DAYS, selfOf = null,
 } = {}) {
   if (typeof t !== 'function') return [];
   const mine = new Set(myRefs ?? []);
@@ -62,7 +64,8 @@ export function notificationRows({
   const since = now - (Number.isFinite(windowDays) && windowDays > 0 ? windowDays : NOTIFY_WINDOW_DAYS) * DAY_MS;
   const fresh = (at, id) => at >= since && !(readIds && readIds.has(id));
   const rows = [];
-  const push = (r) => rows.push({ ...r, late: r.saidAt > 0 && r.at - r.saidAt > LATE_AFTER_MS, ids: [{ id: r.id, at: r.saidAt || r.at }] });
+  const selfFor = (group) => (typeof selfOf === 'function' ? (selfOf(group) ?? null) : null);
+  const push = (r) => rows.push({ ...r, self: selfFor(r.group), late: r.saidAt > 0 && r.at - r.saidAt > LATE_AFTER_MS, ids: [{ id: r.id, at: r.saidAt || r.at }] });
 
   for (const e of Array.isArray(events) ? events : []) {
     if (!e || typeof e !== 'object') continue;

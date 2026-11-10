@@ -4481,6 +4481,8 @@ async function materializeVandaag() {
       // "Nieuw voor jou" on top (the shared projection): the direct messages and who they are from, the news window
       forYou: true, t, turns: _contactTurns, contactName: (id) => contactThreads.get(id)?.name ?? null,
       notifyWindowDays: circleHouseholdAgent?.getParamValue?.('notify.windowDays'),
+      // whose circle it is (every persona's rows show, each with its face)
+      profileIdOf: profileIdOfCircle,
       // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
       selfIn: mySelfIn,
       // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card

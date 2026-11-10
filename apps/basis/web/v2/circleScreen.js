@@ -24,6 +24,7 @@
  */
 
 import { blockEmptyLine, blockOpensWhole } from '../../src/v2/blockTitle.js';
+import { paintFace } from './faceView.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
@@ -280,6 +281,17 @@ function renderForYou(section, block, tr, onAction) {
     text.className = 'circle-screen__for-you-text';
     text.textContent = row.text;
     li.append(icon, text);
+    // the persona the row is for, when the device holds more than one: its face (the initial, as on every person row)
+    if (row.self) {
+      const who = row.self.name ?? tr('circle.switcher.you');
+      const face = document.createElement('span');
+      face.className = 'circle-screen__for-you-face';
+      face.dataset.self = row.self.id;
+      face.title = who;
+      face.setAttribute('aria-label', who);
+      paintFace(face, { name: who });
+      li.appendChild(face);
+    }
     if (row.late) {
       const late = document.createElement('span');
       late.className = 'circle-screen__for-you-late';

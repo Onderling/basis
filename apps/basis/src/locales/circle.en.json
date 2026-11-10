@@ -3791,6 +3791,10 @@
       "text": "Share your card with {{name}}",
       "doc": "On an answer to my ask: hand over how to reach me (my own address, the relay) and ask for theirs. The only way from the room to a contact."
     },
+    "earlier_in_room": {
+      "text": "Earlier, in the room",
+      "doc": "A contact thread: the header of a kept Nearby visit with this person (shown after a card share; kept on this device only, for the person's chosen number of days)."
+    },
     "my_ask_row": {
       "text": "Your ask · heard by {{heard}} · {{min}} min left",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
@@ -10060,6 +10064,10 @@
       },
       "assistant_calendarFeed": {
         "text": "Calendar subscription",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "nearby_keepDays": {
+        "text": "How long a conversation in the room stays on this device (days)",
         "doc": "A setting's label (projected from the parameter register)."
       },
       "notify_windowDays": {

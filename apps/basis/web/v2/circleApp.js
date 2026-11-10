@@ -770,6 +770,7 @@ import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 import { createNearbyIdentity, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
 import { nearbyFirstUse, nearbyAskedKey } from '../../src/v2/nearbyLevel.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
+import { earlierRoomMessages } from '../../src/v2/nearbyKept.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
@@ -1660,6 +1661,11 @@ function ensureNearbyRoom(agent = _peerAgent) {
     listPeers: () => [],
     // the web has no LAN, so it is never in a room: no room key, and the binding sends nothing as one
     myAddress: () => null,
+    // ...and keeps nothing (no visit); the port is the same as the phone's, so the shells do not differ in shape
+    keep: {
+      line: (x) => circleHouseholdAgent?.nearbyKeeper?.(() => null)?.line(x),
+      card: (x) => circleHouseholdAgent?.nearbyKeeper?.(() => null)?.card(x),
+    },
     deliveryMap: deliveryStateMap,   // the SAME map chat's receipts advance
     // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
     // shell hands in only where its face choice lives and how it reaches its relay and NKN address.
@@ -3514,7 +3520,10 @@ async function showContactThread(contactId, { draft = '' } = {}) {
         { id: 'reach-back-yes', label: t('circle.nearbyScreen.reach_back_yes') },
         { id: 'reach-back-no', label: t('circle.nearbyScreen.reach_back_no') },
       ] });
-      return [...thread.messages, ...extra];
+      // a Nearby visit this person's card linked: 'earlier, in the room', kept on this device only
+      let earlier = [];
+      try { earlier = earlierRoomMessages(circleHouseholdAgent?.earlierInTheRoom?.(thread.peerAddr) ?? [], t); } catch { earlier = []; }
+      return [...earlier, ...thread.messages, ...extra];
     })(),
     skills, busy, error, t,
     floor: floor ? { label: t('circle.contacts.presend_floor') } : null,

@@ -132,18 +132,22 @@ export function receivePresence(payload, fromAddress, now = () => Date.now()) {
  * @param {() => ({label?: string}|null)|Promise<{label?: string}|null>} [deps.myFace]  the face I present
  * @param {() => number} [deps.now]
  * @param {(err: Error, phase: string) => void} [deps.onError]
+ * @param {{line: Function, card: Function}} [deps.keep]  what this device keeps of a room conversation (nearbyKept.js):
+ *   `line({peer, who, text})` (peer = THEIR room key, null for what I said to the room) and `card({peer, address})`
  * @param {(record: {kind: 'reach-share', trigger: 'chip'|'reach-back-yes'|'none', ok: boolean, reason?: string, at: number}) => void} [deps.onShare]
  *   every attempt to share how to reach me, with what pressed it (the shell's diagnostics; default: the console)
  */
 export function createNearbyRoomBinding({
   sendPeerMessage, listPeers = () => [], subscribeToPeers = null, myAddress = () => null, myFace = null,
-  now = () => Date.now(), onError = null, deliveryMap: deliveryMapInput = null, myAddresses = null,
+  now = () => Date.now(), onError = null, deliveryMap: deliveryMapInput = null, myAddresses = null, keep = null,
   onShare = (rec) => { try { console.info(`[reach-share] trigger=${rec.trigger} ok=${rec.ok}${rec.reason ? ` reason=${rec.reason}` : ''}`); } catch { /* diagnostics only */ } },
 } = {}) {
   let deliveryMap = deliveryMapInput;
   if (typeof sendPeerMessage !== 'function') throw new TypeError('nearbyRoomBinding: sendPeerMessage required');
 
   const report = (err, phase) => { try { onError?.(err, phase); } catch { /* diagnostics only */ } };
+  // the device's own record of the conversation (the person's setting decides whether and how long); never sent
+  const kept = (fn, arg) => { try { keep?.[fn]?.(arg); } catch (err) { report(err, `keep:${fn}`); } };
   const peerId = (p) => p?.pubKey ?? p?.id ?? null;
   const peersNow = () => { try { return listPeers() ?? []; } catch { return []; } };
   // EVERY room send speaks as the room key, and none goes out without one: a room payload signed by the agent's own
@@ -211,23 +215,33 @@ export function createNearbyRoomBinding({
   askChannel.broadcast = async (ask) => {
     const r = await broadcastRaw(ask);
     if (ask?.id && isAskLive(ask, now)) mine.asks.set(ask.id, ask);
+    if (ask?.text) kept('line', { peer: null, who: 'me', text: ask.text });
     return r;
   };
   askChannel.broadcastKind = async (subtype, body) => {
     const r = await broadcastKindRaw(subtype, body);
+    if (subtype === CHAT_MESSAGE && body?.message?.text) kept('line', { peer: null, who: 'me', text: body.message.text });
     if (subtype === CARD_MESSAGE && body?.card) mine.card = body.card;
     if (subtype === INVITE_MESSAGE && body?.invite?.circleId) mine.invites.set(body.invite.circleId, body.invite);
     return r;
   };
   askChannel.sendAnswer = async (answer, toAddress) => {
+    const theirs = answer?.askId ? heldAsks.get(answer.askId) : null;
     const r = await sendAnswerRaw(answer, toAddress);
+    if (r?.ok) {
+      // their question and my answer: the start of what a card share later attaches to the contact
+      if (theirs?.text) kept('line', { peer: toAddress, who: 'them', text: theirs.text });
+      if (answer?.text) kept('line', { peer: toAddress, who: 'me', text: answer.text });
+    }
     if (r?.ok && answer?.askId) heldAsks.delete(answer.askId);
     return r;
   };
 
   // ── Subscribers ───────────────────────────────────────────────────────────────────────────────────────
   const subs = { ask: new Set(), answer: new Set(), card: new Set(), chat: new Set(), invite: new Set(), presence: new Set(), reach: new Set() };
-  // Chat is LIVE-ONLY by Frits' call (2026-08-31): "don't record anything, they just miss out."
+  // Chat is LIVE-ONLY on the SCREEN by Frits' call (2026-08-31): "don't record anything, they just miss out." The
+  // device's own kept record (Frits 2026-11-09, `keep`, the person's setting) is not a replay: it is shown only in a
+  // contact's thread, after a card share.
   const replay = { ask: () => [...heldAsks.values()], card: () => [...heldCards.values()], chat: () => [],
     invite: () => [...heldInvites.values()], presence: () => [...presence.values()], answer: () => [],
     reach: () => [...pendingReach.values()] };
@@ -274,6 +288,7 @@ export function createNearbyRoomBinding({
       if (!a) return;
       // held under MY ask (an answer to an ask I did not put out is nobody's): the asker reads it under 'Jouw vraag'
       if (mine.asks.has(a.askId)) {
+        kept('line', { peer: a.from, who: 'them', text: a.text });
         const list = answersToMine.get(a.askId) ?? [];
         if (list.length < ANSWERS_KEPT && !list.some((x) => x.from === a.from)) list.push({ from: a.from, text: a.text, receivedAt: a.receivedAt });
         answersToMine.set(a.askId, list);
@@ -282,7 +297,11 @@ export function createNearbyRoomBinding({
       confirm(from, payload);
     }),
     [CARD_MESSAGE]:     gated((from, payload) => land('card',     receiveCard(payload, from, now), from, payload)),
-    [CHAT_MESSAGE]:     gated((from, payload) => land('chat',     receiveChatMessage(payload, from, now), from, payload)),
+    [CHAT_MESSAGE]:     gated((from, payload) => {
+      const m = receiveChatMessage(payload, from, now);
+      if (m?.text) kept('line', { peer: from, who: 'them', text: m.text });
+      land('chat', m, from, payload);
+    }),
     [INVITE_MESSAGE]:   gated((from, payload) => land('invite',   receiveInvite(payload, from, now), from, payload)),
     [PRESENCE_MESSAGE]: gated((from, payload) => land('presence', receivePresence(payload, from, now))),
     // Not gated on the peer list: the answer ("share back") may land just after the other side's row went. It still
@@ -292,6 +311,7 @@ export function createNearbyRoomBinding({
       const r = receiveReach(payload, from, now);
       if (!r) return;
       roomKeyOfCard.set(r.address, from);
+      kept('card', { peer: from, address: r.address });   // the kept visit now belongs to this person's thread
       if (r.wantBack) pendingReach.set(from, r);   // only an ask-back needs settling; a plain share is a gift
       deliver('reach', r);
       confirm(from, payload);

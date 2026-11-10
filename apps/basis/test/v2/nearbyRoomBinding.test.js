@@ -493,3 +493,32 @@ describe('the face picker (L63)', () => {
       .toMatchObject({ label: null });
   });
 });
+
+describe('what this device keeps of a room conversation (the keep port)', () => {
+  it('room chat both ways, my ask, the answer to it, and the card link: each kept once, peers named by room key', async () => {
+    const nodes = {}; const kept = { a: [], b: [] };
+    const make = (addr, other, mine) => createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload) => { nodes[to]?.onPeerMessage(addr, JSON.parse(JSON.stringify(payload))); return { delivered: true }; },
+      listPeers: () => [{ pubKey: other }], myAddress: () => addr, now, myAddresses: () => mine,
+      keep: { line: (x) => kept[addr].push({ line: x }), card: (x) => kept[addr].push({ card: x }) },
+    });
+    nodes.a = make('a', 'b', { address: 'A-self', relay: { url: 'wss://relay.a' } });
+    nodes.b = make('b', 'a', { address: 'B-self', relay: { url: 'wss://relay.b' } });
+    const { ask } = createAsk({ text: 'wie heeft een ladder?', from: 'a', now });
+    await nodes.a.askChannel.broadcast(ask);
+    await nodes.b.askChannel.sendAnswer({ askId: ask.id, text: 'ik', from: 'b', createdAt: now() }, 'a');
+    await nodes.a.askChannel.broadcastKind('nearby-chat', { message: { id: 'm1', text: 'top', from: 'a', createdAt: now() } });
+    await nodes.a.shareReach('b', { press: { trigger: 'chip', event: {} } });
+    expect(kept.a).toEqual([
+      { line: { peer: null, who: 'me', text: 'wie heeft een ladder?' } },
+      { line: { peer: 'b', who: 'them', text: 'ik' } },
+      { line: { peer: null, who: 'me', text: 'top' } },
+    ]);
+    expect(kept.b).toEqual([
+      { line: { peer: 'a', who: 'them', text: 'wie heeft een ladder?' } },
+      { line: { peer: 'a', who: 'me', text: 'ik' } },
+      { line: { peer: 'a', who: 'them', text: 'top' } },
+      { card: { peer: 'a', address: 'A-self' } },
+    ]);
+  });
+});

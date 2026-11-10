@@ -532,6 +532,11 @@ export async function bootAgentBundle(opts = {}) {
     listPeers: () => nearbyPeers.list(),
     subscribeToPeers: (fn) => nearbyPeers.subscribe(fn),   // a newcomer is told the room as it stands
     myAddress: () => nearbyRoomKey.address(),   // the room key; null = not in the room, nothing is sent
+    // what this device keeps of a room conversation (the person's setting), filed under the current visit
+    keep: {
+      line: (x) => agent?.nearbyKeeper?.(() => nearbyRoomKey.visitId())?.line(x),
+      card: (x) => agent?.nearbyKeeper?.(() => nearbyRoomKey.visitId())?.card(x),
+    },
     // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
     // shell hands in only where its face choice lives (nearbyAllowsStore) and how it reaches its relay and NKN address.
     myFace: () => nearbyIdentity.myFace(),

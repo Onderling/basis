@@ -28,7 +28,7 @@
  * @param {(fn: (peers: Array) => void) => (() => void)} [deps.subscribeToPeers]
  * @param {(err: Error, phase: string) => void} [deps.onError]
  * @returns {{ viewOpened: () => Promise<void>, viewClosed: () => Promise<void>, selfChanged: () => Promise<void>,
- *   leave: () => Promise<void>, address: () => string|null }}
+ *   leave: () => Promise<void>, address: () => string|null, visitId: () => string|null }}
  */
 export function createNearbyRoomKey({
   roomSelf, identityFor, ownerOf, registerSelfIdentity, forgetSelfIdentity, setLanIdentity,
@@ -38,7 +38,7 @@ export function createNearbyRoomKey({
     throw new TypeError('nearbyRoomKey: identityFor and setLanIdentity are required');
   }
   const report = (err, phase) => { try { onError?.(err, phase); } catch { /* diagnostics only */ } };
-  let entered = null;   // { selfId, address }
+  let entered = null;   // { selfId, address, visitId }
   let viewOpen = false;
   let queue = Promise.resolve();
   // every change runs after the one before it: an open and a close in quick succession must not interleave
@@ -76,7 +76,10 @@ export function createNearbyRoomKey({
       report(new Error('the room key could not be registered with the agent'), 'register');
       return;
     }
-    entered = { selfId, address };
+    // the visit id: what a kept conversation is filed under (random, never derived from the key or the nonce)
+    const vb = new Uint8Array(12);
+    globalThis.crypto.getRandomValues(vb);
+    entered = { selfId, address, visitId: Array.from(vb, (b) => b.toString(16).padStart(2, '0')).join('') };
     await setLanIdentity(identity, { self: selfId });   // the whisper then offers only this self's secrets
   };
 
@@ -100,5 +103,7 @@ export function createNearbyRoomKey({
     leave() { return serial(leaveNow); },
     /** The room key spoken right now, or null when the device is not in the room. */
     address() { return entered?.address ?? null; },
+    /** This entry's visit id (what a kept conversation is filed under), or null outside the room. */
+    visitId() { return entered?.visitId ?? null; },
   };
 }

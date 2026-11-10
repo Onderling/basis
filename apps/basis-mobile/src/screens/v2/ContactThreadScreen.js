@@ -12,6 +12,7 @@ import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
+import { earlierRoomMessages } from '../../../../basis/src/v2/nearbyKept.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
@@ -92,8 +93,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         const a = await channel.rehydrate(contactId);
         const b = (peerAddr && peerAddr !== contactId) ? await channel.rehydrate(peerAddr) : [];
         const durable = [...a, ...b].sort((x, y) => (x.ts ?? 0) - (y.ts ?? 0));
-        if (!alive || durable.length === 0) return;
-        setMessages((prev) => (prev.length ? prev : durable.map((m) => ({
+        // a Nearby visit this person's card linked: 'earlier, in the room', kept on this device only
+        let earlier = [];
+        try { earlier = earlierRoomMessages(bundle?.agent?.earlierInTheRoom?.(peerAddr ?? contactId) ?? [], t); } catch { earlier = []; }
+        if (!alive || (durable.length === 0 && earlier.length === 0)) return;
+        setMessages((prev) => (prev.length ? prev : [...earlier, ...durable].map((m) => ({
           id: mkId(), origin: m.origin, text: m.text ?? '',
           ...(m.messageId ? { messageId: m.messageId } : {}),   // the id the turn was sent under: what its chip is keyed by
           ...(m.buttons ? { buttons: m.buttons } : {}),

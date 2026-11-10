@@ -114,6 +114,7 @@ import { createProfileFactsSync, routeProfileFactsBySender } from '../../v2/prof
 import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPeersSync.js';
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
+import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -7444,6 +7445,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       // The transport mode applies LIVE too — the register is the one home, this hook the one
       // application point (shells and builtins just set-param).
+      // the kept Nearby conversations' window applies LIVE (a shortened one drops at once)
+      if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === KEEP_DAYS_KEY) {
+        try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(args.value) }); } catch { /* the register still holds the value */ }
+      }
       if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === 'transport.mode'
           && ['nkn', 'relay', 'both'].includes(args?.value)) {
         try { sa.setTransportMode?.(args.value); } catch { /* the register still holds the value */ }
@@ -9223,6 +9228,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   } catch { /* the default stands */ }
 
+  // the kept Nearby conversations' window, as the person set it
+  try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(paramsService.register.valueOf(KEEP_DAYS_KEY)) }); } catch { /* the default stands */ }
+
   // THE A2A SURFACE — the declared ops, projected onto the agent peers can reach (2026-08-19).
   //
   // An agent could already invoke another agent's skill over A2A, with capability tokens and revocation,
@@ -9742,6 +9750,13 @@ export async function createRealHouseholdAgent(opts = {}) {
      */
     nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
     nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
+    /** The Nearby room's `keep` port for the current visit (nearbyKept.js), over this device's log; null without one. */
+    nearbyKeeper: (visitId) => (opts.deviceLog ? makeRoomKeeper({
+      eventLog: opts.deviceLog, visitId,
+      keepDays: () => paramsService.register.valueOf(KEEP_DAYS_KEY),
+    }) : null),
+    /** 'Earlier, in the room' for a contact: the kept visits their card linked to their address. */
+    earlierInTheRoom: (address) => (opts.deviceLog ? earlierInTheRoom(opts.deviceLog.query(), address) : []),
     /** What this device whispers on a LAN connection: own devices, then contacts (see lanWhisperSecrets). */
     lanWhisperSecrets: (o) => lanWhisperSecrets(o),
     /** The current person key's wire address (b64 pubKey), or null. */

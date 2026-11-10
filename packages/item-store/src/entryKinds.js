@@ -43,6 +43,8 @@ export const RETAIN = Object.freeze({
   // Not a log class — a STORE row kept aside so it can be put back for a while (a removed list, an entry in the trash)
   // and dropped unread past its window. One window for every keep-aside (30 days to restore, Frits on 2026-10-05).
   KEEP_ASIDE: 'keepAside',
+  // A Nearby room conversation this device chose to keep (the person's setting, default 7 days), then dropped.
+  ROOM: 'room',
 });
 
 /*
@@ -135,6 +137,13 @@ export const ENTRY_KINDS = Object.freeze({
   // itself so an external append cannot rewrite it (the log's own compactor merges internally, not via
   // append); never pruned — a summary that expires would be the silent forgetting it exists to prevent.
   'audit-summary':   K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
+
+  // ── the Nearby room, kept on this device (nearbyKept.js) ──────────────────
+  // A line of a room conversation (the other side named by THEIR room key) and the link a shared card makes from that
+  // room key to the person's address. Written by this device about itself: never carried, never accepted from a peer,
+  // never a wake, never painted as a conversation line (the contact thread projects them as one 'earlier' block).
+  'nearby-line':     K(LANE.SYSTEM, false, RETAIN.ROOM, false, LOCAL_BINDING),
+  'nearby-card':     K(LANE.SYSTEM, false, RETAIN.ROOM, false, LOCAL_BINDING),
 });
 
 /**
@@ -193,6 +202,7 @@ export const RETENTION_DEFAULTS = Object.freeze({
   [RETAIN.SHORT]: param({ key: 'retention.short', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 }),    // pure plumbing — roster pings, delivery state
   [RETAIN.CHAT]:  param({ key: 'retention.chat',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // content whose durable head lives elsewhere
   [RETAIN.AUDIT]: param({ key: 'retention.audit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // governance, reports, the agent trail — DETAIL window (key events moved to RECORD — the chain never drops)
+  [RETAIN.ROOM]: param({ key: 'retention.room', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 }),   // a kept Nearby room conversation; the person's `nearby.keepDays` sets the live window
   [RETAIN.KEEP_ASIDE]: param({ key: 'retention.keepAside', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 24 * 60 * 60 * 1000 }),   // a removed list or an entry in the trash, restorable, then dropped by the lists' sweep
 });
 

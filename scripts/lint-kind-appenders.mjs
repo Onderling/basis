@@ -48,6 +48,8 @@ export const APPENDERS = {
   'delivery-state':  { file: 'apps/basis/src/v2/chatRail.js', needle: "'delivery-state'" },
   // the landing of a row someone else wrote: written at the items rail's applied hook in the shared agent
   'item-landed':     { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'landingEntryFor' },
+  'nearby-line':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: LINE_KIND' },
+  'nearby-card':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: CARD_KIND' },
   'intention-done':  { file: 'apps/basis/src/v2/intentionRunner.js', needle: 'INTENTION_DONE_KIND' },
   'key-event':       { file: 'apps/basis/src/v2/keyRail.js', needle: 'KEY_LANE' },
   membership:        { file: 'apps/basis/src/v2/membershipRail.js', needle: 'MEMBERSHIP_LANE' },

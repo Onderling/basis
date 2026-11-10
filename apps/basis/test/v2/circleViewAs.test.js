@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { VIEWER_KINDS, viewAsDirectory, revealedMemberLabel } from '../../src/v2/circleViewAs.js';
+import { labelShown } from '../../src/v2/personLabel.js';
 
 // `realName` is RELEASE-sourced (the member's own per-circle disclosure); `released` states the
 // fact. Carol has a name in her local display cache (`ownDisplayName`) but released nothing —
@@ -102,5 +103,22 @@ describe('a shared name shows its number', () => {
   it('"Jan · 2" for the second Jan; the first is just "Jan"', () => {
     expect(revealedMemberLabel({ id: 'w3', handle: 'jan', nameNumber: 2 }).primary).toBe('jan · 2');
     expect(revealedMemberLabel({ id: 'w1', handle: 'Jan' }).primary).toBe('Jan');
+  });
+});
+
+describe('people without a name read "Onbekend", numbered like shared names', () => {
+  const KEY = 'q9bpb8oCkV76kzWfPksh5wDMyNsWkd5w7L9YastJ9NM';
+  const t = (k) => ({ 'circle.reply.who_someone': 'Onbekend' })[k] ?? k;
+  it('in roster order: the first unnamed is "Onbekend", the next "Onbekend · 2"; a named member in between is not counted', async () => {
+    const { normalizeCircleMembers } = await import('@onderling/kring-host');
+    const rows = normalizeCircleMembers({ members: [{ webid: `${KEY}a` }, { webid: 'w-jan', handle: 'Jan' }, { webid: `${KEY}b` }] });
+    const shown = rows.map((m) => labelShown(revealedMemberLabel(m), t));
+    expect(shown).toEqual(['Onbekend', 'Jan', 'Onbekend · 2']);
+  });
+  it('the locale says "Onbekend" / "Unknown", in both languages', async () => {
+    const nl = (await import('../../src/locales/circle.nl.json')).default;
+    const en = (await import('../../src/locales/circle.en.json')).default;
+    expect(nl.reply.who_someone.text).toBe('Onbekend');
+    expect(en.reply.who_someone.text).toBe('Unknown');
   });
 });

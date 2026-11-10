@@ -84,7 +84,7 @@ export function viewAsDirectory({ members = [], viewer = {}, policy = 'pairwise'
  *
  * @param {CircleMember} member
  * @param {{viewerId?:string|null, policy?:'open'|'pairwise'}} [opts]
- * @returns {{primary:string|null, primaryKey:string|null, secondary:string|null, revealed:boolean}}
+ * @returns {{primary:string|null, primaryKey:string|null, primaryNumber:number|null, secondary:string|null, revealed:boolean}}
  *   `primary` is always safe to render, or null — then paint `t(primaryKey)` ("someone"); `secondary` is the real
  *   name ONLY when it may be shown.
  */
@@ -106,6 +106,8 @@ export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwis
     revealed,
     primary,
     primaryKey: primary == null ? SOMEONE_LABEL_KEY : null,
+    // a later one of several unnamed people in one view: "Onbekend · 2" (`labelShown` paints it)
+    primaryNumber: primary == null && Number.isInteger(m.unnamedNumber) && m.unnamedNumber > 1 ? m.unnamedNumber : null,
     secondary: (revealed && realName && handle) ? realName : null,
   };
 }

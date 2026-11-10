@@ -7151,7 +7151,7 @@
       "doc": "One row of the blocked list: the name the person saw when they blocked, and the day. Never the key."
     },
     "muted_row_unnamed": {
-      "text": "Iemand (geblokkeerd {{date}})",
+      "text": "Onbekend (geblokkeerd {{date}})",
       "doc": "A block kept without a name (made before names were kept, or from /block with a bare address)."
     },
     "unmute": {
@@ -9780,7 +9780,7 @@
       "doc": "The reader themselves among the people of a chore or an appointment (\"is van jou\")."
     },
     "who_someone": {
-      "text": "iemand",
+      "text": "Onbekend",
       "doc": "A person the reader may not name (the household's names setting): never their id."
     },
     "who_everyone": {

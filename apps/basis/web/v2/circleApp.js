@@ -1855,6 +1855,8 @@ if (typeof window !== 'undefined') {
   window.onderlingCirclePolicy = {
     get: (circleId) => policyStore.get(circleId),
     update: (circleId, patch) => policyStore.update(circleId, patch),
+    // what a settings save does after it writes: state the policy on the lane, so the circle's members get it
+    state: (circleId) => circlePolicyLane.state(circleId),
   };
   // What the "share to this circle" button does, as a seam a walk can drive (the button lives inside a panel).
   window.onderlingShareToCircle =(circleId, personaId = 'default') => shareCircleRelease(circleId, personaId);

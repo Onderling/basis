@@ -18,6 +18,9 @@ read state; the notification projection and "Nieuw voor jou" on Today follow.
   from a circle), for the personas ticked in the switcher, never while they are already looking at it; several at once
   are one banner with a count; a tap opens it. Which kinds ring is a setting per kind (`notify.policy.<kind>`:
   banner, only on Today, or off). Being removed still shows after the circle has left their list.
+- Also under "Nieuw voor jou": a circle setting someone else changed, in the settings screen's own words; a task
+  someone else gave them (a banner by default; a change to its words is not news); their own open question in the
+  Nearby room while it is open, the way back to it from any tab.
 
 The notification projection: `apps/basis/src/v2/notifications.js` (`notificationRows`), prepended to Today by the
 shared screen materializer when the shell asks (`forYou: true`), painted by `renderForYou` on both shells; setting a row

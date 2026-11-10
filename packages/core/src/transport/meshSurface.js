@@ -21,12 +21,13 @@ import { createNearbyPeerSource } from './nearbyPeers.js';
  * asked for before the transport lands is applied when it lands.
  *
  * @returns {{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void>,
- *   setLanIdentity: (identity: object|null) => Promise<string|null>, lanAddress: () => string|null,
+ *   setLanIdentity: (identity: object|null, o?: {self?: string}) => Promise<string|null>, lanAddress: () => string|null,
  *   setLanWhisper: (secrets: Function|null) => void }}
  */
 export function createMeshSurface({ onDegraded = null } = {}) {
   let current = {};
   let lanIdentity = null;   // the room key asked for; null = a rest key
+  let lanSelf = null;       // whose room key it is
   let lanWhisper = null;    // what this device whispers on a LAN connection (the agent's secrets)
   const lanTransports = () => Object.values(current).filter((t) => typeof t?.useLanIdentity === 'function');
   const whisperTransports = () => Object.values(current).filter((t) => typeof t?.useWhisper === 'function');
@@ -44,7 +45,7 @@ export function createMeshSurface({ onDegraded = null } = {}) {
     async setTransports(next = {}) {
       current = Object.fromEntries(Object.entries(next ?? {}).filter(([, t]) => t));
       for (const t of whisperTransports()) { try { t.useWhisper(lanWhisper); } catch { /* reported by the transport */ } }
-      if (lanIdentity) for (const t of lanTransports()) { try { await t.useLanIdentity(lanIdentity); } catch { /* reported by the transport */ } }
+      if (lanIdentity) for (const t of lanTransports()) { try { await t.useLanIdentity(lanIdentity, { self: lanSelf }); } catch { /* reported by the transport */ } }
       try { await discoverability.settle(); } catch { /* the control reports its own failures */ }
       try { nearbyPeers.rebind(); } catch { /* a peer source with no watchers has nothing to rebind */ }
     },
@@ -53,9 +54,10 @@ export function createMeshSurface({ onDegraded = null } = {}) {
      * is a new presence: the LAN connections made under the old key end. Resolves to the LAN address now spoken (null
      * while no LAN transport is there; the key is applied when one lands).
      */
-    async setLanIdentity(identity = null) {
+    async setLanIdentity(identity = null, { self = null } = {}) {
       lanIdentity = identity ?? null;
-      for (const t of lanTransports()) await t.useLanIdentity(lanIdentity);
+      lanSelf = lanIdentity ? self : null;
+      for (const t of lanTransports()) await t.useLanIdentity(lanIdentity, { self: lanSelf });
       try { nearbyPeers.rebind(); } catch { /* nothing watching */ }
       return lanTransports()[0]?.lanAddress ?? null;
     },

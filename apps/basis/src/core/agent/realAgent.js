@@ -3262,9 +3262,13 @@ export async function createRealHouseholdAgent(opts = {}) {
    * proving the persona's chat key and accepting only that contact's address. Nothing new is stored or shared; the
    * transport derives each secret from the material under its label and binds nothing without the proof and this rule.
    */
-  const lanWhisperSecrets = async () => {
+  const lanWhisperSecrets = async ({ lanSelf = null } = {}) => {
+    // IN A ROOM only the room self whispers: another persona's secret there would be proven on the connection that
+    // speaks this self's room key, linking the two. At rest (no persona face shown) every persona's secrets.
+    const only = lanSelf == null ? null : (personas.has(lanSelf) ? lanSelf : primaryId);
     const out = [];
     for (const [pid, rt] of personas) {
+      if (only && pid !== only) continue;
       const dev = deviceAddressOf(pid);
       if (!rt?.circleRoot?.seed || !dev || !rt.deviceDerivationSeed) continue;
       let devId = null;
@@ -3279,7 +3283,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const c of await contactRecords()) {
       const addr = typeof c?.peerAddr === 'string' && c.peerAddr ? c.peerAddr : (typeof c?.pubKey === 'string' ? c.pubKey : null);
       if (!addr) continue;
-      const me = (personas.get(c?.persona) ?? persona)?.chatId;
+      const pid = personas.has(c?.persona) ? c.persona : primaryId;
+      if (only && pid !== only) continue;
+      const me = personas.get(pid)?.chatId;
       if (!me?.pubKey || me.pubKey === addr) continue;
       let material = null;
       try { material = me.deriveSessionKey(addr); } catch { material = null; }
@@ -9737,7 +9743,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
     nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
     /** What this device whispers on a LAN connection: own devices, then contacts (see lanWhisperSecrets). */
-    lanWhisperSecrets: () => lanWhisperSecrets(),
+    lanWhisperSecrets: (o) => lanWhisperSecrets(o),
     /** The current person key's wire address (b64 pubKey), or null. */
     personAddress,
     /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */

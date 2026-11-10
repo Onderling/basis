@@ -5061,7 +5061,7 @@ the peer source. One object, both shells, no duplicate.
 - `[opts]` `object`
 - `[opts.onDegraded]` `(report: object) => void` — forwarded to the control THE LAN KEY is a property of the surface too (`setLanIdentity`): what a LAN transport says on the network is a room key while a room is open and a rest key otherwise, and an app asks for that here, never of the transport. A key asked for before the transport lands is applied when it lands.
 
-**Returns:** `{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void>, setLanIdentity: (identity: object|null) => Promise<string|null>, lanAddress: () => string|null, setLanWhisper: (secrets: Function|null) => void }`
+**Returns:** `{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void>, setLanIdentity: (identity: object|null, o?: {self?: string}) => Promise<string|null>, lanAddress: () => string|null, setLanWhisper: (secrets: Function|null) => void }`
 
 ## `src/transport/nearbyPeers.js`
 

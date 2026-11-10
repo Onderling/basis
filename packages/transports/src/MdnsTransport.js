@@ -137,6 +137,7 @@ export class MdnsTransport extends Transport {
   #lanKey;
   #lan;
   #lanPinned = false;
+  #lanSelf = null;   // whose room key the LAN key is (null at rest): the whisper offers only that self's secrets
   #fixedHostname;
   #agentAddress;   // the agent's own (canonical) address: said on a connection only when a whisper proved it there
   #hostnamePrefix;
@@ -247,12 +248,14 @@ export class MdnsTransport extends Transport {
    * is a new presence: every LAN connection is dropped (each was proven under the old key) and the discoverability
    * that was applied is applied again under the new key.
    * @param {import('@onderling/core').AgentIdentity|null} identity
+   * @param {{self?: string|null}} [o]  whose room key it is (the whisper then offers only that self's secrets)
    */
-  async useLanIdentity(identity = null) {
+  async useLanIdentity(identity = null, { self = null } = {}) {
     const state = this.#applied;
     await this.disconnect();
     this.#lan = null;
     this.#lanPinned = !!identity;
+    this.#lanSelf = identity && typeof self === 'string' && self ? self : null;
     if (identity) this.#setLan(identity);
     else await this.#lanReady();
     if (state && state !== DISCOVERABILITY.OFF) await this._applyDiscoverability(state);
@@ -469,7 +472,8 @@ export class MdnsTransport extends Transport {
   async addAddress() { return { ok: false, reason: 'the-lan-binds-only-whispered-addresses' }; }
 
   /**
-   * THE WHISPER. `secrets()` answers what this device holds: `[{ secret | { material, label }, address,
+   * THE WHISPER. `secrets({ lanSelf })` answers what this device holds (in a room, `lanSelf` names the room self and
+   * only its secrets may be offered; null at rest): `[{ secret | { material, label }, address,
    * sign(message) → sig (b64 or bytes), accept(address) → bool }]` — a secret shared with someone (a persona's sibling secret, a contact's pairwise one),
    * the address of mine I prove when it matches (signed by that address's key), and my rule for the address the other
    * side proves (a device map with its tombstones, a contact row). Read per connection, after the bound hello.
@@ -753,7 +757,7 @@ export class MdnsTransport extends Transport {
     const slots = WHISPER_SLOTS;
     const mine = (async () => {
       let entries = [];
-      try { entries = (await this.#whisper?.()) ?? []; } catch { entries = []; }
+      try { entries = (await this.#whisper?.({ lanSelf: this.#lanSelf })) ?? []; } catch { entries = []; }
       const byTag = new Map();
       for (const e of entries.slice(0, slots)) {
         // a secret as given, or derived here from shared material under its purpose label

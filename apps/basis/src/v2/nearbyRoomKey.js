@@ -22,7 +22,8 @@
  * @param {(selfId: string) => string|null} deps.ownerOf  the self's chat key (who owns the room key at the agent)
  * @param {(address: string, identity: object, o?: object) => boolean} deps.registerSelfIdentity
  * @param {(address: string) => boolean} deps.forgetSelfIdentity
- * @param {(identity: object|null) => Promise<string|null>} deps.setLanIdentity  the mesh surface's affordance
+ * @param {(identity: object|null, o?: {self: string}) => Promise<string|null>} deps.setLanIdentity  the mesh surface's
+ *   affordance (it is told whose room key it is)
  * @param {() => Array} [deps.listPeers]
  * @param {(fn: (peers: Array) => void) => (() => void)} [deps.subscribeToPeers]
  * @param {(err: Error, phase: string) => void} [deps.onError]
@@ -76,7 +77,7 @@ export function createNearbyRoomKey({
       return;
     }
     entered = { selfId, address };
-    await setLanIdentity(identity);
+    await setLanIdentity(identity, { self: selfId });   // the whisper then offers only this self's secrets
   };
 
   if (typeof subscribeToPeers === 'function') {

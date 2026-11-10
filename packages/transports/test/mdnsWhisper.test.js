@@ -80,6 +80,26 @@ describe('the whisper', () => {
     expect(A.canReach(revoked.pubKey), 'A never binds the revoked device').toBe(false);
   });
 
+  it('the whisper asks for the secrets of the self the LAN key belongs to: none at rest, the room self in a room', async () => {
+    const discovery = createLoopbackDiscovery();
+    const asked = [];
+    const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
+    const A = new MdnsTransport({ identity: await ident(), native, emitter });
+    A.useWhisper(async (o) => { asked.push(o?.lanSelf ?? null); return []; });
+    open.push(A);
+    const B = await device(discovery, []);
+    await B.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    await A.setDiscoverability(DISCOVERABILITY.BROWSE);
+    expect(await settle(() => asked.length >= 1), 'at rest').toBe(true);
+    expect(asked[0]).toBeNull();
+    await A.useLanIdentity(await ident(), { self: 'werk' });
+    expect(await settle(() => asked.length >= 2), 'in the room').toBe(true);
+    expect(asked.at(-1)).toBe('werk');
+    await A.useLanIdentity(null);
+    expect(await settle(() => asked.length >= 3), 'back at rest').toBe(true);
+    expect(asked.at(-1)).toBeNull();
+  });
+
   it('tags are bound to the connection: the same secret gives unrelated tags on two transcripts', () => {
     const s = new Uint8Array(randomBytes(32));
     const H1 = new Uint8Array(randomBytes(32)); const H2 = new Uint8Array(randomBytes(32));

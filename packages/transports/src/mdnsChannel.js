@@ -123,3 +123,15 @@ export function whisperFiller() { return b64Encode(nacl.randomBytes(32)); }
 export function bindMessage(transcript, address) {
   return `${WHISPER_DOMAIN}|bind|${b64Encode(transcript)}|${address}`;
 }
+
+/**
+ * A whisper SECRET from material two parties already share (a persona's circle root on each of its devices; the
+ * Diffie–Hellman of two chat keys for a contact), under a label that names what it is for, so one material never
+ * yields the same secret for two purposes.
+ * @param {Uint8Array} material
+ * @param {string} label   e.g. 'lan-whisper-sibling:<epoch>', 'lan-whisper-contact'
+ * @returns {Uint8Array} 32 bytes
+ */
+export function whisperSecret(material, label) {
+  return hmacSha512(material, enc(`${WHISPER_DOMAIN}|secret|${label}`)).subarray(0, 32);
+}

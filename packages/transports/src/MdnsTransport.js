@@ -26,7 +26,9 @@
 import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding, SENDER_KEY_FIELD, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
 import * as channel from './mdnsChannel.js';
-const { ephemeralKeyPair, helloTranscript, openChannel, whisperTag, whisperFiller, bindMessage } = channel;
+const { ephemeralKeyPair, helloTranscript, openChannel, whisperTag, whisperFiller, bindMessage, whisperSecret } = channel;
+/** A whisper secret from material two parties already share, under a purpose label. See `mdnsChannel.js`. */
+export const lanWhisperSecret = whisperSecret;
 
 /** How many tags each side whispers on a LAN connection: its secrets first, random fillers for the rest, shuffled. */
 export const WHISPER_SLOTS = param({ key: 'lan.whisper.slots', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 32 });
@@ -136,6 +138,7 @@ export class MdnsTransport extends Transport {
   #lan;
   #lanPinned = false;
   #fixedHostname;
+  #agentAddress;   // the agent's own (canonical) address: said on a connection only when a whisper proved it there
   #hostnamePrefix;
   #applied = null;
   #native;
@@ -193,6 +196,7 @@ export class MdnsTransport extends Transport {
       + 'from @onderling/react-native, which injects the MdnsModule native module.'
     );
     super({ address: identity.pubKey, identity });
+    this.#agentAddress = identity.pubKey;
     this.#fixedHostname  = hostname;
     this.#hostnamePrefix = hostnamePrefix;
     if (lanIdentity) { this.#setLan(lanIdentity); this.#lanPinned = true; }
@@ -471,6 +475,19 @@ export class MdnsTransport extends Transport {
    * @param {() => Promise<Array<object>>|Array<object>} secrets
    */
   useWhisper(secrets) { this.#whisper = typeof secrets === 'function' ? secrets : null; }
+
+  /**
+   * @protected — a send that names no sender, to an address a whisper bound: it goes out as the address of mine I
+   * proved on that connection (the agent's own one first). To a LAN key (the room): the LAN key, as the base does.
+   */
+  _defaultSenderFor(to) {
+    const connId = typeof to === 'string' ? this.#pubKeyToConn.get(to) : null;
+    if (!connId || !this.#peerBound.get(connId)?.has(to)) return null;
+    const own = this.#ownBound.get(connId);
+    if (!own?.size) return null;
+    if (own.has(this.#agentAddress)) return this.#agentAddress;
+    return own.size === 1 ? [...own][0] : null;
+  }
 
   /**
    * @protected — may this envelope leave on the LAN? Our own rule for our own sends (a modified build can skip it, so

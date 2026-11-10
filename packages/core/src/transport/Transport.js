@@ -218,6 +218,14 @@ export class Transport extends Emitter {
   /** @protected adapters override: start listening at `address`. `opts.sign` proves it is ours. */
   async _bindAddress(_address, _opts) {}
 
+  /**
+   * @protected — the address of ours a send to `to` goes out as when the caller names none. `null` (the default) = the
+   * primary. An adapter whose connections each speak their own keys (the LAN) answers per peer.
+   * @param {string|null} _to
+   * @returns {string|null}
+   */
+  _defaultSenderFor(_to) { return null; }
+
   /** @protected adapters override: stop listening at `address`. */
   _unbindAddress(_address) {}
 
@@ -405,9 +413,15 @@ export class Transport extends Emitter {
    * @param {string|null|undefined} claimed
    * @returns {string|Promise<string>} the address to stamp as `_from`
    */
-  #senderFor(claimed, { wait = true } = {}) {
+  #senderFor(claimed, { wait = true, to = null } = {}) {
     const asked = typeof claimed === 'string' && claimed ? claimed : null;
-    if (!asked || asked === this.#address || this.#aliases.has(asked)) return asked ?? this.#address;
+    if (!asked) {
+      // no sender named: the adapter may name the one it speaks to THIS peer (a LAN connection speaks only the keys it
+      // proved there); otherwise the primary, as always
+      const own = typeof this._defaultSenderFor === 'function' ? this._defaultSenderFor(to) : null;
+      return typeof own === 'string' && own && this.holdsAddress(own) ? own : this.#address;
+    }
+    if (asked === this.#address || this.#aliases.has(asked)) return asked;
     // An ANSWER (`wait: false`) names an address the far end chose (`_to` on what it sent us): it never waits — a hostile
     // or stale `_to` must not park a timer and a waiter. Only our own outbound sends wait for an address being bound.
     if (!wait) return this.#refuse(asked);
@@ -443,7 +457,7 @@ export class Transport extends Emitter {
    * `opts.from` — send AS one of our extra addresses (see `#senderFor`).
    */
   async sendOneWay(to, payload, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload));
   }
 
@@ -456,7 +470,7 @@ export class Transport extends Emitter {
    * `sendOneWay(to, payload)` for transports that don't use the hint.
    */
   async publishOneWay(to, topic, payload, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload, { topic }));
   }
 
@@ -465,7 +479,7 @@ export class Transport extends Emitter {
    * Resolves with the AK envelope on success, rejects on timeout.
    */
   async sendAck(to, payload, timeout = ACK_TIMEOUT, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     const env = mkEnvelope(P.AS, typeof from === 'string' ? from : await from, to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
@@ -475,7 +489,7 @@ export class Transport extends Emitter {
    * Resolves with the RS envelope on success, rejects on timeout.
    */
   async request(to, payload, timeout = REQ_TIMEOUT, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     const env = mkEnvelope(P.RQ, typeof from === 'string' ? from : await from, to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
@@ -484,7 +498,7 @@ export class Transport extends Emitter {
    * RS — send a reply to a previous RQ.
    */
   async respond(to, replyToId, payload, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     await this._send(to, mkEnvelope(P.RS, typeof from === 'string' ? from : await from, to, payload, { re: replyToId }));
   }
 
@@ -512,7 +526,7 @@ export class Transport extends Emitter {
     // attacker-influenced; a bad value can at worst make an answer wait and fail, never claim an address that is not
     // ours and never speak as the primary to it.
     // an ANSWER (it names the HI it answers, `re`) speaks as an address the far end chose: refused at once if not held
-    const held = this.#senderFor(opts.from, { wait: !opts.re });
+    const held = this.#senderFor(opts.from, { wait: !opts.re, to });
     const from = typeof held === 'string' ? held : await held;
     // `opts.re` — the `_id` of the HI this one ANSWERS.
     //

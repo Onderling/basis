@@ -142,3 +142,31 @@ describe('the LAN speaks only its LAN key, at the agent', () => {
     expect(got[0].from).toBe(room);
   }, 30_000);
 });
+
+describe('known people on the LAN: the whisper, at the agent', () => {
+  it('two contacts whisper-match; a direct message naming no sender crosses the LAN from the person\'s own address', async () => {
+    const { lanWhisperSecret } = await import('@onderling/transports/mdns');
+    const discovery = createLoopbackDiscovery();
+    const got = [];
+    const A = await device(discovery);
+    const B = await device(discovery, { onPeerMessage: (m) => got.push(m) });
+    const contactOf = (me, them) => ({
+      secret: lanWhisperSecret(me.sa.agent.identity.deriveSessionKey(them.canonical), 'lan-whisper-contact'),
+      address: me.canonical,
+      sign: (message) => Buffer.from(me.sa.agent.identity.sign(message)).toString('base64'),
+      accept: async (address) => address === them.canonical,
+    });
+    A.mdns.useWhisper(async () => [contactOf(A, B)]);
+    B.mdns.useWhisper(async () => [contactOf(B, A)]);
+    const onLan = [];
+    B.mdns.on('envelope', (e) => onLan.push(e?._from));
+    await B.mdns.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    await A.mdns.setDiscoverability(DISCOVERABILITY.BROWSE);
+    expect(await until(() => A.mdns.canReach(B.canonical) && B.mdns.canReach(A.canonical)), 'bound both ways by the whisper').toBe(true);
+
+    await A.sa.peer.sendTo(B.canonical, { hi: 'contact' });
+    expect(await until(() => got.some((m) => m.payload?.hi === 'contact')), 'the DM arrived').toBe(true);
+    expect(got.find((m) => m.payload?.hi === 'contact').from).toBe(A.canonical);
+    expect(onLan, 'it crossed the LAN').toContain(A.canonical);
+  }, 30_000);
+});

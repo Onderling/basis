@@ -2383,9 +2383,16 @@ export async function createSecureAgent(opts = {}) {
     const lan = speaksAs
       ? [...extraTransports.entries()].filter(([, t]) => t?.address === speaksAs).map(([name, t]) => [name, { tx: t }])
       : [];
-    const sockets = lan.length ? lan : [...personaTransports.entries()]
+    // A LAN connection where this address of the persona was PROVEN to the peer (a whisper match: a sibling, a contact)
+    // carries it first; the persona's own relay sockets after.
+    const proven = speaksAs && !lan.length
+      ? [...extraTransports.entries()]
+        .filter(([, t]) => t?.address !== speaksAs && t?.holdsAddress?.(speaksAs) === true && t?.canReach?.(addr) === true)
+        .map(([name, t]) => [name, { tx: t }])
+      : [];
+    const sockets = lan.length ? lan : [...proven, ...[...personaTransports.entries()]
       .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)))
-      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs));
+      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs))];
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     // Not sendable now: held on hold-forward, exactly as the general persona's send would be — and every flush re-sends
     // it through `resendHeld`, which keeps it on this persona's own sockets.

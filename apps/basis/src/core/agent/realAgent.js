@@ -1165,16 +1165,18 @@ export async function createRealHouseholdAgent(opts = {}) {
    * one chosen, and the outcome. Every emulator or phone failure then names its branch without a new instrument.
    */
   async function wireSend(to, payload, sendOpts = {}, decision = null) {
-    let explained = null;
-    try { explained = await sa.peer.explainRoute?.(to, sendOpts?.scope ?? null) ?? null; } catch { explained = null; }
+    // the route the send TOOK, reported by the send itself; the candidates are explained only when nothing took it (a
+    // recomputed route beside a delivered send could name a branch the send did not take)
+    let taken = null;
+    const explain = async () => { try { return await sa.peer.explainRoute?.(to, sendOpts?.scope ?? null) ?? null; } catch { return null; } };
     let result;
     try {
-      result = await sa.peer.sendTo(to, payload, sendOpts);
+      result = await sa.peer.sendTo(to, payload, { ...sendOpts, onRouteTaken: (kind) => { taken = kind; } });
     } catch (err) {
-      try { structuredLog.warn('agent', 'send.decision', { ...sendDecisionFields(decision, explained, null), outcome: 'threw' }); } catch { /* the log never breaks a send */ }
+      try { structuredLog.warn('agent', 'send.decision', { ...sendDecisionFields(decision, await explain(), null, taken), outcome: 'threw' }); } catch { /* the log never breaks a send */ }
       throw err;
     }
-    try { structuredLog.info('agent', 'send.decision', sendDecisionFields(decision, explained, result ?? {})); } catch { /* the log never breaks a send */ }
+    try { structuredLog.info('agent', 'send.decision', sendDecisionFields(decision, taken ? null : await explain(), result ?? {}, taken)); } catch { /* the log never breaks a send */ }
     return result;
   }
   // A circle's traffic PARKED as stale (its roster not read, or a sender not on the roster read): read that roster
@@ -6673,7 +6675,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `chat.send` transport (pinboard's own in-process agent) never had. The pinboard skill builds a
     // conforming `circle-chat-message` envelope and calls this per recipient; a briefly-offline
     // member has the message HELD and flushed on reconnect, exactly like a task/noticeboard fan.
-    reliableSend: (to, envelope, sendOpts = {}) => sendCircleScoped(to, envelope, sendOpts),
+    // through the send gate like every other send: the fan names its circle, and the gate holds that against the roster
+    reliableSend: (to, envelope, sendOpts = {}) => peerSend(to, envelope, sendOpts),
     // Connectivity Phase 3 — LIVE shared-pod key-custody seams (host-injected by circleApp over each
     // circle's per-circle StorageBackend + its live group-key {seal,open}). All keyed by circleId so the
     // ONE pinboard agent resolves each circle's member-side custody per call (invariant #6):

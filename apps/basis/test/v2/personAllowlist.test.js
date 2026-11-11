@@ -24,6 +24,10 @@ describe('the person-key allowlist: data, one reason per entry, most specific fi
     expect(personAllowedBy(undefined).allowedBy).toBe('none');
   });
 
+  it('a contact reached through the identity link (their other device) records card-via-device', () => {
+    expect(personAllowedBy({ contact: { webid: 'x' }, viaDevice: true })).toEqual({ allowedBy: 'contact-card', origin: 'card-via-device' });
+  });
+
   it('a contact allow says WHERE the row came from', () => {
     expect(personAllowedBy({ contact: { webid: 'x', bot: true } })).toEqual({ allowedBy: 'contact-card', origin: 'bot' });
     expect(personAllowedBy({ inviteExchange: 'answer' })).toEqual({ allowedBy: 'invite-exchange', side: 'answer' });

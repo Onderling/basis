@@ -44,9 +44,9 @@ export const PERSON_ALLOWLIST = Object.freeze([
   }),
   Object.freeze({
     id: 'contact-card',
-    reason: 'a person in this self\'s contact book (not hidden, not deleted): an address the person chose to keep, so speaking to it as the person links nothing new',
+    reason: 'a person in this self\'s contact book (not hidden, not deleted), at an address the row names or one the identity link PROVES is theirs (a contact\'s other device): an address the person chose to keep, so speaking to it as the person links nothing new',
     matches: (f) => !!f?.contact,
-    detail: (f) => ({ origin: contactOriginOf(f.contact) }),
+    detail: (f) => ({ origin: f.viaDevice === true ? 'card-via-device' : contactOriginOf(f.contact) }),
   }),
   Object.freeze({
     id: 'address-fallback',

@@ -6571,13 +6571,28 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** What this device holds about a person-path address: an open invite exchange, a kept contact, the fallback setting. */
   async function personSendFacts(to) {
     const inviteExchangeSide = inviteExchange.take(to);
-    let contact = null;
-    if (!inviteExchangeSide) {
-      // a hidden row never matches; a deleted row is a hidden one (a delete is a hide that also left the pair circle),
-      // and one that came back is unhidden and kept again
-      try { contact = (await rawContacts()).find((c) => c && !c.hidden && (c.webid === to || c.peerAddr === to || c.pubKey === to)) ?? null; } catch { contact = null; }
-    }
-    return { inviteExchange: inviteExchangeSide, contact, addressFallback: addressFallbackOn() };
+    const kept = inviteExchangeSide ? null : await keptContactOf(to);
+    return { inviteExchange: inviteExchangeSide, contact: kept?.row ?? null, viaDevice: kept?.via === 'device', addressFallback: addressFallbackOn() };
+  }
+  /**
+   * A contact the person KEPT, for `address`: a non-hidden book row naming it (`via: 'card'`), or, through the device-local
+   * identity link (the address → its person's canonical key, as the redeem handler resolves a sender), a non-hidden row for
+   * that person: a contact's OTHER device (`via: 'device'`). A hidden row never matches; a deleted row is a hidden one (a
+   * delete is a hide that also left the pair circle), and one that came back is unhidden and kept again. Null otherwise.
+   * The ONE answer to "did the person choose this address" for the send gate and the delivery receipt alike.
+   */
+  async function keptContactOf(address) {
+    if (typeof address !== 'string' || !address) return null;
+    let rows = [];
+    try { rows = await rawContacts(); } catch { return null; }
+    const names = (c, a) => c && !c.hidden && (c.webid === a || c.peerAddr === a || c.pubKey === a || c.personKey?.pubKey === a);
+    const direct = rows.find((c) => names(c, address));
+    if (direct) return { row: direct, via: 'card' };
+    let id = address;
+    try { id = sa.resolver?.pubKeyForAddr?.(address) || address; } catch { id = address; }
+    if (id === address) return null;
+    const viaId = rows.find((c) => names(c, id));
+    return viaId ? { row: viaId, via: 'device' } : null;
   }
   // "A POST MATCHES WHAT I OFFER" — judged here, on this device, against the drivers of kind 'offering' of the self this
   // device is in that circle (a persona's circle is the persona's; no circle = the default), by the one driver matcher.

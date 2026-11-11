@@ -29,9 +29,9 @@ import {
 import {
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, getActiveCircle,
   renderReply, isQrUri,
-  // E3 — record-panel auto-refresh after a mutation.
+  // record-panel auto-refresh after a mutation.
   itemRefFromReply, REFRESHABLE_VERBS,
-  // E2 — bulk fan-out (`/done all`).
+  // bulk fan-out (`/done all`).
   executeBulkDispatch, lastListingItems,
 } from '@onderling-app/basis';
 
@@ -225,7 +225,7 @@ export default function ChatScreen({
     callSkill: bundle?.callSkill ?? null, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor,
     shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t,
   });
-  // E5 — record/mini-page "⤢ Open in full": holds the reply shown in
+  // record/mini-page "⤢ Open in full": holds the reply shown in
   // the full-height detail modal, or null when closed.
   const [expandedRecord, setExpandedRecord] = useState(null);
   // The per-circle policy store (shared AsyncStorage prefix with the launcher) — the create wizard
@@ -664,7 +664,7 @@ export default function ChatScreen({
         args:      dispatch.args,
       });
       let rendered;
-      let replyForRefresh = null;   // E3 — captured reply → itemRef for panel refresh
+      let replyForRefresh = null;   // captured reply → itemRef for panel refresh
       if (dispatch.kind === 'ready') {
         // F1 (5.3) — bind item-creating dispatches to the open circle
         // so a task / post created while a circle is active lands in
@@ -742,7 +742,7 @@ export default function ChatScreen({
           });
         }
       } else if (dispatch.kind === 'bulk') {
-        // E2 — `/done all`: resolve candidate ids from the freshest
+        // `/done all`: resolve candidate ids from the freshest
         // list in this thread (prefer the same app), fan-out via
         // executeBulkDispatch, render the summary.  Mobile has no
         // filter-router, so cross-thread propagation is the action
@@ -795,7 +795,7 @@ export default function ChatScreen({
           .reduce((n, it) => n + (it.buttons?.length ?? 0), 0),
       });
 
-      // E3 — store the source on every refreshable-shape reply (lists +
+      // store the source on every refreshable-shape reply (lists +
       // record / mini-page / embed panels) so it can be re-fetched.  The
       // verb gate at refresh time still protects against re-running a
       // mutation-sourced panel.
@@ -817,7 +817,7 @@ export default function ChatScreen({
         return next;
       });
 
-      // E3 — when this dispatch was a MUTATION that changed an item,
+      // when this dispatch was a MUTATION that changed an item,
       // auto-refresh any open record/mini-page/embed panel in OTHER
       // threads showing that item (mirrors web's onPanelStale path,
       // which excludes the dispatching thread).  Fire-and-forget.
@@ -1443,10 +1443,10 @@ export default function ChatScreen({
             // joinGroupWizard's cross-instance
             // fallback (membershipCode-with-adminPeerAddr).  Constructed
             // inline so it closes over the live agent + pendingMap.
-            // OBJ-2 — the BUNDLE's shared sender (same pending-map the response handler resolves against,
+            // the bundle's shared redeem sender (same pending-map the response handler resolves against,
             // and the same one the v2 launcher uses), so classic + v2 joins both correlate.
             sendPeerRedeem={bootState.kind === 'ready' ? bootState.bundle.sendPeerRedeem : undefined}
-            // J-CP1 — be on the circle's endpoint BEFORE the redeem (same seams the v2 launcher passes).
+            // a join whose circle lives on another relay: be on the circle's endpoint BEFORE the redeem (same seams the v2 launcher passes).
             // This host is where a TAPPED INVITE LINK lands, and it is precisely the host that has NOT been
             // told which relay the invite names: without these two the redeem goes out over whatever
             // transport this device happens to have, waits out a handshake timeout, and the join fails or
@@ -1484,7 +1484,7 @@ export default function ChatScreen({
             getMyPeerAddr={() => bootState.kind === 'ready'
               ? (bootState.bundle.agent?.peer?.address ?? null)
               : null}
-            // N1+E8 — persist the create wizard's chosen policy (incl. the
+            // persist the create wizard's chosen policy (incl. the
             // neighbourhood chat-off default) onto the new circle, reusing the same
             // AsyncStorage policy store the launcher reads.  Only consumed
             // by CreateGroupWizardModal; other wizards ignore it.
@@ -1565,7 +1565,7 @@ export default function ChatScreen({
         t={t}
       />
 
-      {/* E5 — record/mini-page "⤢ Open in full" detail modal. */}
+      {/* record/mini-page "⤢ Open in full" detail modal. */}
       <RecordDetailModal
         visible={!!expandedRecord}
         record={expandedRecord}
@@ -1668,10 +1668,10 @@ export default function ChatScreen({
 
 /* ── message bubble ─────────────────────────────────────────────── */
 
-// E1 — notification severity → left-accent colour.
+// notification severity → left-accent colour.
 const NOTIFICATION_ACCENTS = { info: '#4a78b0', success: '#3f8f5b', warning: '#b08a2e', error: '#b04a4a' };
 
-// E1 — human-readable byte size (B / KB / MB / GB).
+// human-readable byte size (B / KB / MB / GB).
 function formatFileSize(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return '';
   if (bytes < 1024) return `${bytes} B`;
@@ -1788,7 +1788,7 @@ function MessageBubble({ msg, onButtonTap, onFollowUpTap, onQuickReplyTap, onFor
     const recFollowUps = Array.isArray(r.followUps) ? r.followUps : null;
     return (
       <View style={[styles.bubble, styles.bubbleBot, styles.bubbleList]} testID={`bubble-bot-record-${msg.id}`}>
-        {/* E5 — header row: title + "⤢ Open in full" detail affordance. */}
+        {/* header row: title + "⤢ Open in full" detail affordance. */}
         {(r.title || recordCanExpand(r)) && (
           <View style={styles.recordHeaderRow}>
             {r.title ? <Text style={[styles.briefSectionLabel, styles.recordHeaderTitle]}>{r.title}</Text> : <View style={{ flex: 1 }} />}
@@ -2207,7 +2207,7 @@ const styles = StyleSheet.create({
   bubblePending:    { fontStyle: 'italic', color: '#666' },
   bubbleErrorText:  { fontSize: 14, color: '#b00' },
   bubbleList:       { paddingVertical: 6 },
-  // E1 — notification + file bubbles.
+  // notification + file bubbles.
   bubbleNotification: { borderLeftWidth: 4, paddingLeft: 10 },
   notificationTitle:  { fontSize: 14, fontWeight: '700', color: '#333', marginBottom: 2 },
   bubbleFile:         { borderWidth: 1, borderColor: '#d9d9d9' },

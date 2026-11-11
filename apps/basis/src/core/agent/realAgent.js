@@ -5058,7 +5058,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     const mirror = await ensureCircleMirror(id);
     const fresh = isNewCirclePeer(id, pubKey);
     await mirror.addPeer(pubKey); await persistCirclePeers(id);
+    // the person scanned this key's pairing code: its ONE request may leave on the person key (the gate's invite exchange)
+    const release = inviteExchange.expectPairing(pubKey);
     try { await peerSend(pubKey, { __pairReq: { addr: chatId.pubKey, circleId: id } }); } catch { /* best-effort */ }
+    finally { release(); }
     if (fresh) republishCircleItemsToNewPeer(id).catch(() => {});
     return mirror.listPeers?.() ?? [];
   }

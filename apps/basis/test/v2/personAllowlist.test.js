@@ -131,6 +131,15 @@ describe('createInviteExchange: one redeem\'s two sends, bounded, never standing
     expect(ix.take('peer')).toBe(null);
   });
 
+  it('PAIRING: a scanned pairing code opens one exchange to the scanned key, closed by its release', () => {
+    const ix = createInviteExchange({ now: clock().now });
+    const release = ix.expectPairing('scanned');
+    expect(ix.take('scanned')).toBe('pairing');
+    release();
+    expect(ix.take('scanned')).toBe(null);
+    expect(personAllowedBy({ inviteExchange: 'pairing' })).toEqual({ allowedBy: 'invite-exchange', side: 'pairing' });
+  });
+
   it('refuses an empty address', () => {
     const ix = createInviteExchange({ now: clock().now });
     expect(() => ix.answerProvenRequest('')).not.toThrow();

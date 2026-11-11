@@ -8,13 +8,15 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { phoneWiringSource, readPhoneScreen } from '../support/phoneWiringSource.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(HERE, rel), 'utf8');
-// The phone sets the hook through the shared inbound wiring (src/v2/inboundWiring.js), asked with `noticeboardLanded: true`.
-const chatScreen = read('../../../basis-mobile/src/screens/ChatScreen.js');
-const viaWiring = /buildInboundWiring\(/.test(chatScreen) && /noticeboardLanded: true/.test(chatScreen);
-const SHELLS = { web: read('../../web/v2/circleApp.js'), mobile: viaWiring ? chatScreen + read('../../src/v2/inboundWiring.js') : chatScreen };
+// The phone sets the hook through the shared inbound wiring (src/v2/inboundWiring.js), asked with `noticeboardLanded: true`
+// — read through the phone's whole composition (screen → src/core → the shared map).
+const phone = phoneWiringSource();
+const viaWiring = /buildInboundWiring\(/.test(phone) && /noticeboardLanded: true/.test(phone);
+const SHELLS = { web: read('../../web/v2/circleApp.js'), mobile: viaWiring ? phone : readPhoneScreen() };
 
 describe('one carry for noticeboard posts', () => {
   for (const [shell, src] of Object.entries(SHELLS)) {

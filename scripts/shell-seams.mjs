@@ -285,7 +285,7 @@ export const SEAMS = Object.freeze([
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

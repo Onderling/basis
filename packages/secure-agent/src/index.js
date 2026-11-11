@@ -38,6 +38,9 @@ export {
 
 // peer identity resolver
 
+// the one comparison form of a connection point (a relay url): the scope and the app compare points through it
+export { pointKey, samePoint } from './pointKey.js';
+
 // signed activity / audit log
 export { loadAuditLog, AuditLog, AUDIT_VERSION } from './auditLog.js';
 

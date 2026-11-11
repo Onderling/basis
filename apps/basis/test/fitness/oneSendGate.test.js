@@ -47,11 +47,16 @@ function sourceFiles() {
   return out;
 }
 
-/** Lines that CALL peer.sendTo (a comment that names it is not a call). */
+/**
+ * Lines that REACH peer.sendTo: a call, but also a reference that routes around a call-only match (`send: sa.peer.sendTo`,
+ * `sa.peer.sendTo.bind(…)`, a bare `peer.sendTo`) and `sendTo` destructured from a `.peer` (`const { sendTo } = sa.peer`).
+ * A comment that names it is not a use.
+ */
+const REACHES = [/\bpeer\??\.sendTo\b/, /\{[^}]*\bsendTo\b[^}]*\}\s*=\s*[A-Za-z_$][\w$.?]*\.peer\b/];
 function sendToCalls(src) {
   return src.split('\n')
     .map((line, i) => ({ line, n: i + 1 }))
-    .filter(({ line }) => /\.peer\??\.sendTo\(/.test(line) && !/^\s*(\/\/|\*)/.test(line));
+    .filter(({ line }) => REACHES.some((re) => re.test(line)) && !/^\s*(\/\/|\*)/.test(line));
 }
 
 describe('one send gate: no peer.sendTo( outside it', () => {
@@ -73,6 +78,18 @@ describe('one send gate: no peer.sendTo( outside it', () => {
       offenders.push(...calls.map((c) => `${rel}:${c.n}  ${c.line.trim().slice(0, 100)}`));
     }
     expect(offenders, 'send through the agent\'s peerSend (realAgent), not the secure agent directly').toEqual([]);
+  });
+
+  it('the pattern catches the ways around a call-only match (self-test)', () => {
+    for (const line of [
+      'const send = sa.peer.sendTo;',
+      'deps = { send: sa.peer.sendTo.bind(sa.peer) };',
+      'await peer?.sendTo(to, p);',
+      'const { sendTo } = sa.peer;',
+      'const { connect, sendTo: s } = agent.sa.peer;',
+    ]) expect(sendToCalls(line).length, line).toBe(1);
+    expect(sendToCalls('// sa.peer.sendTo is the wire call')).toEqual([]);
+    expect(sendToCalls('peerSend(to, payload)')).toEqual([]);
   });
 
   it('each declared exception is still where its reason says', () => {

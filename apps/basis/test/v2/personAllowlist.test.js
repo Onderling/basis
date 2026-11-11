@@ -90,6 +90,43 @@ describe('createInviteExchange: one redeem\'s two sends, bounded, never standing
     expect(ix.take('c')).toBe('answer');
   });
 
+  it('JOINER: two redeems open at once to ONE inviter (two codes from one admin): the first answer does not close the second', () => {
+    const ix = createInviteExchange({ now: clock().now });
+    const releaseFirst = ix.expectFromInviter('admin');
+    const releaseSecond = ix.expectFromInviter('admin');
+    releaseFirst();
+    expect(ix.take('admin'), 'the second redeem is still open').toBe('joiner');
+    releaseFirst();   // a release is idempotent: calling it twice does not close the other redeem
+    expect(ix.take('admin')).toBe('joiner');
+    releaseSecond();
+    expect(ix.take('admin')).toBe(null);
+  });
+
+  it('INVITER: a well-formed request that did NOT prove its code earns one refusal reply, consumed once', () => {
+    const ix = createInviteExchange({ now: clock().now });
+    ix.refuseParsedRequest('joiner-addr');
+    expect(ix.take('joiner-addr')).toBe('refusal');
+    expect(ix.take('joiner-addr')).toBe(null);
+  });
+
+  it('INVITER: a request that proved its code turns its registration into the answer', () => {
+    const ix = createInviteExchange({ now: clock().now });
+    ix.refuseParsedRequest('joiner-addr');
+    ix.answerProvenRequest('joiner-addr');
+    expect(ix.take('joiner-addr')).toBe('answer');
+    expect(ix.take('joiner-addr')).toBe(null);
+  });
+
+  it('an address that is both an inviter I am redeeming with and a joiner I answer keeps both', () => {
+    const ix = createInviteExchange({ now: clock().now });
+    const release = ix.expectFromInviter('peer');
+    ix.answerProvenRequest('peer');
+    expect(ix.take('peer')).toBe('answer');
+    expect(ix.take('peer')).toBe('joiner');
+    release();
+    expect(ix.take('peer')).toBe(null);
+  });
+
   it('refuses an empty address', () => {
     const ix = createInviteExchange({ now: clock().now });
     expect(() => ix.answerProvenRequest('')).not.toThrow();

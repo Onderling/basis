@@ -9870,6 +9870,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     inviteExchange: Object.freeze({
       expectFromInviter: (address) => inviteExchange.expectFromInviter(address),
       answerProvenRequest: (address) => inviteExchange.answerProvenRequest(address),
+      refuseParsedRequest: (address) => inviteExchange.refuseParsedRequest(address),
     }),
     /** The Nearby room's `keep` port for the current visit (nearbyKept.js), over this device's log; null without one. */
     nearbyKeeper: (visitId) => (opts.deviceLog ? makeRoomKeeper({

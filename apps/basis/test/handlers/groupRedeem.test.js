@@ -57,6 +57,25 @@ describe('makeHandleGroupRedeemRequest', () => {
     });
   });
 
+  it('registers its ONE person-key reply BEFORE sending it: the answer for a proven request, the refusal otherwise, nothing for garbage', async () => {
+    const order = [];
+    const inviteExchange = {
+      answerProvenRequest: vi.fn((a) => order.push(`answer:${a}`)),
+      refuseParsedRequest: vi.fn((a) => order.push(`refusal:${a}`)),
+    };
+    const sendPeer = vi.fn(async () => { order.push('send'); });
+    await makeHandleGroupRedeemRequest(reqDeps({ inviteExchange, sendPeer }))('peer-A', validRequest());
+    expect(order).toEqual(['answer:peer-A', 'send']);
+
+    order.length = 0;
+    await makeHandleGroupRedeemRequest(reqDeps({ inviteExchange, sendPeer, callSkill: vi.fn(async () => ({ error: 'invalid code' })) }))('peer-B', validRequest());
+    expect(order).toEqual(['refusal:peer-B', 'send']);
+
+    order.length = 0;
+    await makeHandleGroupRedeemRequest(reqDeps({ inviteExchange, sendPeer }))('peer-C', { requestId: 'r' });
+    expect(order, 'a malformed request is turned away and earns no reply').toEqual([]);
+  });
+
   it('forwards substrate error in the reply', async () => {
     const d = reqDeps({ callSkill: vi.fn(async () => ({ error: 'invalid code' })) });
     const handle = makeHandleGroupRedeemRequest(d);

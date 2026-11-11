@@ -60,8 +60,8 @@ export function makeHandleGroupRedeemRequest({
   // The sender's CANONICAL key (the device-local identity link: a per-circle address → the person's chat key). A code
   // bound to one person is checked against this, resolved here from the verified sender — never read from the body.
   identityOf = null,
-  // The agent's invite-exchange registrations (`agent.inviteExchange`): the answer to a request that PROVED its code may
-  // go back on the person key, once (the send gate's person-key allowlist). Not given = the answer is no allowed case.
+  // The agent's invite-exchange registrations (`agent.inviteExchange`): the one reply to a well-formed request (its answer
+  // when it proved its code, else its refusal) may go back on the person key (the send gate's person-key allowlist).
   inviteExchange = null,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
@@ -133,8 +133,12 @@ export function makeHandleGroupRedeemRequest({
       reply = { error: err?.message ?? String(err) };
     }
     try {
-      // only a request that proved its code earns the one answer on the person key; a refusal is no allowed case
-      if (reply.ok) { try { inviteExchange?.answerProvenRequest?.(fromAddr); } catch { /* the gate then records 'none' */ } }
+      // the one reply on the person key: the answer when the request proved its code, else the refusal (the request was
+      // well-formed: garbage is turned away above and earns nothing)
+      try {
+        if (reply.ok) inviteExchange?.answerProvenRequest?.(fromAddr);
+        else inviteExchange?.refuseParsedRequest?.(fromAddr);
+      } catch { /* the gate then records 'none' */ }
       await sendPeer(fromAddr, {
         type:    'p2p-chat',
         subtype: 'group-redeem-response',

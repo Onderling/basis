@@ -38,8 +38,8 @@ export const INVITE_EXCHANGE_MAX = param({ key: 'sendGate.inviteExchangeMax', sc
 export const PERSON_ALLOWLIST = Object.freeze([
   Object.freeze({
     id: 'invite-exchange',
-    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one answer to the request that proved that code (the invite names the inviter\'s cross-circle id by decision, so this buys no link)',
-    matches: (f) => f?.inviteExchange === 'joiner' || f?.inviteExchange === 'answer',
+    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal) (the invite names the inviter\'s cross-circle id by decision, so this buys no link)',
+    matches: (f) => f?.inviteExchange === 'joiner' || f?.inviteExchange === 'answer' || f?.inviteExchange === 'refusal',
     detail: (f) => ({ side: f.inviteExchange }),
   }),
   Object.freeze({
@@ -83,45 +83,64 @@ export function contactOriginOf(row) {
 }
 
 /**
- * THE INVITE EXCHANGE's two person-key sends, registered by the redeem code itself and nothing else: the JOINER's request
- * to the address on the invite it is redeeming (for that redeem's lifetime, released on its answer, timeout or error), and
- * the INVITER's one answer to the address a request proved its code from (consumed by that one reply). Bounded in count
- * and in time; never a standing allow.
+ * THE INVITE EXCHANGE's person-key sends, registered by the redeem code itself and nothing else: the JOINER's request to
+ * the address on the invite it is redeeming (for that redeem's lifetime, released on its answer, timeout, error or failed
+ * send), and the INVITER's ONE reply to a well-formed request: the answer when the request proved its code, the refusal
+ * when it did not (each consumed by that reply). Bounded in count and in time; never a standing allow.
+ *
+ * One registration per redeem: two redeems open at once to one inviter (two codes from one admin) are counted, so the
+ * first answer does not close the second. A reply is consumed on the gate's FIRST pass: every shell hands the redeem
+ * handler `agent.sendPeerMessage`, one call is one pass, and hold-forward redelivery happens below the gate (the secure
+ * agent's queue), so nothing re-enters it for the same reply.
  */
 export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVITE_EXCHANGE_LIFETIME_MS, max = INVITE_EXCHANGE_MAX } = {}) {
-  /** address → { side, until, n } (n = how many open registrations of the joiner side) */
-  const open = new Map();
-  const sweep = () => { const t = now(); for (const [a, e] of open) if (e.until <= t) open.delete(a); };
-  const bound = () => { while (open.size > max) open.delete(open.keys().next().value); };
-  const put = (address, side) => {
-    open.delete(address);   // re-insert: the newest goes last, so the bound drops the oldest
-    open.set(address, { side, until: now() + lifetimeMs });
-    bound();
+  /** address → { n, until }: redeems open toward that inviter */
+  const joiners = new Map();
+  /** address → { side: 'answer'|'refusal', until }: the one reply owed to that joiner */
+  const replies = new Map();
+  const sweep = () => {
+    const t = now();
+    for (const m of [joiners, replies]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
+  };
+  const bound = (m) => { while (m.size > max) m.delete(m.keys().next().value); };
+  const reply = (address, side) => {
+    if (typeof address !== 'string' || !address) return;
+    sweep();
+    replies.delete(address);   // re-insert: the newest goes last, so the bound drops the oldest
+    replies.set(address, { side, until: now() + lifetimeMs });
+    bound(replies);
   };
   return {
-    /** JOINER: the redeem is about to send to the invite's address. Returns the release (answer, timeout, error). */
+    /** JOINER: a redeem is about to send to the invite's address. Returns its release (idempotent). */
     expectFromInviter(address) {
       if (typeof address !== 'string' || !address) return () => {};
       sweep();
-      put(address, 'joiner');
-      return () => { if (open.get(address)?.side === 'joiner') open.delete(address); };
+      const e = joiners.get(address);
+      joiners.delete(address);
+      joiners.set(address, { n: (e?.n ?? 0) + 1, until: now() + lifetimeMs });
+      bound(joiners);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        const cur = joiners.get(address);
+        if (!cur) return;
+        if (cur.n <= 1) joiners.delete(address); else cur.n -= 1;
+      };
     },
-    /** INVITER: a request from `address` just proved its code; its ONE answer may go back on the person key. */
-    answerProvenRequest(address) {
-      if (typeof address !== 'string' || !address) return;
-      sweep();
-      put(address, 'answer');
-    },
-    /** The gate asks, once per send: 'joiner' | 'answer' (now consumed) | null. */
+    /** INVITER: a well-formed request from `address` did not prove its code; its ONE refusal may go back. */
+    refuseParsedRequest(address) { reply(address, 'refusal'); },
+    /** INVITER: a request from `address` proved its code; its ONE answer may go back (replaces a refusal registration). */
+    answerProvenRequest(address) { reply(address, 'answer'); },
+    /** The gate asks, once per send: 'answer' | 'refusal' (now consumed) | 'joiner' | null. */
     take(address) {
       if (typeof address !== 'string' || !address) return null;
       sweep();
-      const e = open.get(address);
-      if (!e) return null;
-      if (e.side === 'answer') open.delete(address);
-      return e.side;
+      const r = replies.get(address);
+      if (r) { replies.delete(address); return r.side; }
+      return joiners.has(address) ? 'joiner' : null;
     },
-    get size() { sweep(); return open.size; },
+    get size() { sweep(); return joiners.size + replies.size; },
   };
 }
 

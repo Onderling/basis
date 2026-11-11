@@ -31,6 +31,26 @@ const stubNknLib = {
   MultiClient: class { constructor() {} on() {} close() {} },
 };
 
+/**
+ * NKN UP, reaching nobody — the emulator's case (the phone is on live NKN, its peer is not): the client connects and
+ * accepts every send, which goes nowhere. `sent` lists each destination, so a story can say what left over NKN.
+ * @returns {{ MultiClient: Function, sent: string[] }}
+ */
+export function liveNknStub() {
+  const sent = [];
+  return {
+    sent,
+    MultiClient: class {
+      constructor() { this.addr = `nkn.${Math.random().toString(16).slice(2, 12)}`; }
+      on(ev, cb) { if (ev === 'connect') setTimeout(() => cb(), 20); }
+      onConnect(cb) { setTimeout(() => cb(), 20); }
+      onMessage() {}
+      async send(to) { sent.push(String(to)); return null; }
+      close() {}
+    },
+  };
+}
+
 const until = async (pred, { timeoutMs, what }) => {
   const t0 = Date.now();
   for (;;) {
@@ -46,18 +66,22 @@ const until = async (pred, { timeoutMs, what }) => {
  * @param {string} p.name           a label (also the device name recorded at enrolment)
  * @param {string} p.relayUrl       the test relay (`startJourneyRelay().url`)
  * @param {number} [p.connectTimeoutMs=20000]
+ * @param {object} [p.nknLib]  the NKN module the phone gets (default: a client that never connects); a story about routing
+ *   passes `liveNknStub()` to have NKN up — the emulator's case — and read what was sent over it
  * @returns {Promise<object>} the node: { name, bundle, agent, callSkill, address, eventLog, deliveryMap, landed, dispose }
  *   `address` is the phone's chat key, the address a peer sends to. `landed` records what the screen would paint:
  *   `contactReplies` (the contact-thread inbox), `mainBubbles` (calendar lines), `unrouted` (envelopes the router
  *   handed to the default handler), `catchUpOffers` (the consent question; allowed by default, as a tap would).
  */
-export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000 }) {
+export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000, nknLib = stubNknLib }) {
   if (!name || !relayUrl) throw new Error('bootMobileNode: name and relayUrl are required');
   vi.resetModules();
   const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
   const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
   const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
   const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
+  // imported in THIS phone's module graph (a later boot resets the registry; a lazy import would get the other phone's)
+  const { feedHouseholdRoster } = await import('../../../basis/src/v2/householdRosterPairing.js');
   const { subscribeContactReplies } = await import('../../src/core/contactReplyInbox.js');
   const pods = await import('../../src/core/circlePods.js');
   const { asyncStorageMappingsStore, MAPPINGS_DEVICE } = await import('../../src/core/mappingsStoreRN.js');
@@ -157,7 +181,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
       try { eventLog.append({ ...e, id: e.id ?? `mob-${Date.now()}-${(eventSeq += 1).toString(36)}`, ts: e.ts ?? Date.now() }); }
       catch { /* defensive */ }
     },
-    nknLib: stubNknLib,   // test-only: NKN never dials (see the head of this file)
+    nknLib,   // test-only: by default NKN never dials (see the head of this file)
   });
 
   // ── what App.js does once the bundle is up ───────────────────────────────────────────────────────────────────
@@ -236,7 +260,13 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     /** Queue the next file the phone's picker returns ({ name, type, size, dataB64 }). */
     pickNext: (file) => { picks.push(file); },
     /** Which circle the launcher has open (the lists write there). */
-    openCircle: (circleId) => { openCircle = circleId; },
+    /** Open a circle as the launcher does (CircleLauncherScreen's openCircle): it becomes the one the lists write to,
+     *  and its members are paired (feedHouseholdRoster: their circle addresses bound to their keys). Awaited here; the
+     *  launcher fires it and moves on. */
+    openCircle: async (circleId) => {
+      openCircle = circleId;
+      try { await feedHouseholdRoster({ agent: bundle.agent, circleId }); } catch { /* best-effort, as the launcher */ }
+    },
     async dispose() {
       unsubscribe?.();
       await bundle.dispose?.();

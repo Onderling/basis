@@ -8,12 +8,17 @@
  *     consumers, the circle pods, the registry backend). `phoneBootParity.test.js` holds this file to App.js's list;
  *   - the receive path is the phone's own composition, `buildPhoneInboundWiring` (src/core/phoneInboundWiring.js) —
  *     the function ChatScreen calls — with the screen's paint replaced by recorders;
+ *   - the ops on the waist are the phone's own mount, `mountPhoneAppOps` (src/core/phoneAppOps.js) — the function the
+ *     launcher calls — with the platform (picker, scanner, dialogs) recorded, and the picker fed by the story;
  *   - the relay is the one the phone's settings name: written into ITS storage before boot, dialled by the boot's own
  *     connect (no second dial from here).
  *
  * Two departures, both below the phone's code:
- *   - NKN never dials: `nknLib` is a stub client that never connects (the bundle's own test seam, `opts.nknLib`, the
- *     one bootSmoke uses), so delivery runs over the relay alone, as on a phone whose NKN is down;
+ *   - NKN is UP and reaches nobody (`liveNknStub()`, through the bundle's own test seam `opts.nknLib`): it connects and
+ *     accepts every send, so a message routing wrongly would take it and be lost — as on the emulator, where the phone
+ *     is on live NKN and its test peer is not. A seam that removed NKN would hide every routing bug of that kind (one
+ *     did: the Ask thread's unscoped turn passed here and failed on the emulator, 2026-11-11). `node.nkn.sent` lists
+ *     what left over it. A story that needs NKN ABSENT passes `nknLib: absentNknStub` and says why;
  *   - each phone gets its OWN module graph (`vi.resetModules()` before its imports). A phone is its own process: the
  *     AsyncStorage stub, the circle pods' vault and producers, every module-level store are per phone here too. Two
  *     phones sharing one graph would share all of that and prove nothing about two devices.
@@ -24,10 +29,30 @@
  */
 import { vi } from 'vitest';
 
-const stubNknLib = {
-  // never emits 'connect': the NKN leg stays down and routing uses the relay
+/** NKN ABSENT: a client that never emits 'connect', so the NKN leg stays down. Only for a story that needs it gone. */
+export const absentNknStub = {
   MultiClient: class { constructor() {} on() {} close() {} },
 };
+
+/**
+ * NKN UP, reaching nobody — the emulator's case (the phone is on live NKN, its peer is not): the client connects and
+ * accepts every send, which goes nowhere. `sent` lists each destination, so a story can say what left over NKN.
+ * @returns {{ MultiClient: Function, sent: string[] }}
+ */
+export function liveNknStub() {
+  const sent = [];
+  return {
+    sent,
+    MultiClient: class {
+      constructor() { this.addr = `nkn.${Math.random().toString(16).slice(2, 12)}`; }
+      on(ev, cb) { if (ev === 'connect') setTimeout(() => cb(), 20); }
+      onConnect(cb) { setTimeout(() => cb(), 20); }
+      onMessage() {}
+      async send(to) { sent.push(String(to)); return null; }
+      close() {}
+    },
+  };
+}
 
 const until = async (pred, { timeoutMs, what }) => {
   const t0 = Date.now();
@@ -44,17 +69,23 @@ const until = async (pred, { timeoutMs, what }) => {
  * @param {string} p.name           a label (also the device name recorded at enrolment)
  * @param {string} p.relayUrl       the test relay (`startJourneyRelay().url`)
  * @param {number} [p.connectTimeoutMs=20000]
- * @returns {Promise<object>} the node: { name, bundle, agent, callSkill, address, eventLog, deliveryMap, landed, dispose }
+ * @param {object} [p.nknLib]  the NKN module the phone gets (default: a fresh `liveNknStub()`, NKN up and reaching
+ *   nobody; `absentNknStub` for a story that needs NKN gone)
+ * @returns {Promise<object>} the node: { name, bundle, agent, callSkill, address, eventLog, deliveryMap, landed, nkn, dispose }
+ *   `nkn.sent` = every destination sent over NKN (empty for the absent stub).
  *   `address` is the phone's chat key, the address a peer sends to. `landed` records what the screen would paint:
  *   `contactReplies` (the contact-thread inbox), `mainBubbles` (calendar lines), `unrouted` (envelopes the router
  *   handed to the default handler), `catchUpOffers` (the consent question; allowed by default, as a tap would).
  */
-export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000 }) {
+export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000, nknLib = liveNknStub() }) {
   if (!name || !relayUrl) throw new Error('bootMobileNode: name and relayUrl are required');
   vi.resetModules();
   const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
   const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
   const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
+  const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
+  // imported in THIS phone's module graph (a later boot resets the registry; a lazy import would get the other phone's)
+  const { feedHouseholdRoster } = await import('../../../basis/src/v2/householdRosterPairing.js');
   const { subscribeContactReplies } = await import('../../src/core/contactReplyInbox.js');
   const pods = await import('../../src/core/circlePods.js');
   const { asyncStorageMappingsStore, MAPPINGS_DEVICE } = await import('../../src/core/mappingsStoreRN.js');
@@ -154,7 +185,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
       try { eventLog.append({ ...e, id: e.id ?? `mob-${Date.now()}-${(eventSeq += 1).toString(36)}`, ts: e.ts ?? Date.now() }); }
       catch { /* defensive */ }
     },
-    nknLib: stubNknLib,   // test-only: NKN never dials (see the head of this file)
+    nknLib,   // test-only: NKN up and reaching nobody by default (see the head of this file)
   });
 
   // ── what App.js does once the bundle is up ───────────────────────────────────────────────────────────────────
@@ -192,6 +223,27 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     onPeerMessage: makePeerRouter({ handlers, defaultHandler: (env) => { landed.unrouted.push(env); } }),
   });
 
+  // ── what the launcher mounts: the phone's own ops on the waist (src/core/phoneAppOps.js), its platform recorded ─
+  // The file picker is the story's: `node.pickNext(file)` hands the next pick the shape the phone's picker returns
+  // ({ name, type, size, dataB64 }); with nothing queued a pick is a cancel, as a person backing out of the picker.
+  const picks = [];
+  const asked = { qrScans: 0, feedback: [], personCards: [] };
+  let openCircle = null;
+  mountPhoneAppOps({
+    agent: bundle.agent, catalogue: bundle.catalogue, callSkill: bundle.callSkill, t, eventLog,
+    activeCircle: () => openCircle,
+    platform: {
+      openFilePicker: async () => picks.shift() ?? null,
+      openQrScanner: () => { asked.qrScans += 1; },
+      openFeedback: (a) => { asked.feedback.push(a); },
+      confirmFeedbackOffer: async () => true,   // the person taps yes
+      feedbackCard: null,
+      appVersion: 'test',
+      currentScreen: () => null,
+      showPersonCard: (card) => { asked.personCards.push(card); },
+    },
+  });
+
   // ── on the relay: the boot's own connect, awaited ────────────────────────────────────────────────────────────
   // (`agent.relay` names the primary relay but carries no socket state; the per-relay list does)
   const onRelay = () => (bundle.agent?.relays?.list?.() ?? []).some((r) => r.url === relayUrl && r.connected === true);
@@ -203,11 +255,26 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     agent: bundle.agent,
     callSkill: bundle.callSkill,
     address: bundle.agent?.identity?.chat?.pubKey ?? null,
+    // the same key under the name the relay-test helpers read (`createCircle`, `joinExistingCircle`), so a phone can
+    // stand in any of their roles
+    pubKey: bundle.agent?.identity?.chat?.pubKey ?? null,
     eventLog,
     deliveryMap,
     storage: AsyncStorage,
     flags,
     landed,
+    nkn: { sent: nknLib.sent ?? [] },
+    asked,
+    /** Queue the next file the phone's picker returns ({ name, type, size, dataB64 }). */
+    pickNext: (file) => { picks.push(file); },
+    /** Which circle the launcher has open (the lists write there). */
+    /** Open a circle as the launcher does (CircleLauncherScreen's openCircle): it becomes the one the lists write to,
+     *  and its members are paired (feedHouseholdRoster: their circle addresses bound to their keys). Awaited here; the
+     *  launcher fires it and moves on. */
+    openCircle: async (circleId) => {
+      openCircle = circleId;
+      try { await feedHouseholdRoster({ agent: bundle.agent, circleId }); } catch { /* best-effort, as the launcher */ }
+    },
     async dispose() {
       unsubscribe?.();
       await bundle.dispose?.();

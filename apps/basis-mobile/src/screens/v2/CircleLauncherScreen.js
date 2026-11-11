@@ -197,13 +197,11 @@ import { readInviteUsage, joinedSince, memberIdsOf } from '../../../../basis/src
 import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
-import { listsManifest } from '../../../../lists/manifest.js';
-import { makeListsOps } from '../../../../basis/src/v2/listsOps.js';
 import { pickRowText } from '../../../../basis/src/v2/rowText.js';
 import { makeOpAvailability } from '../../../../basis/src/v2/opAvailability.js';
 import { composerReplyToStream } from '../../../../basis/src/v2/composerReply.js';
 import { cardSummary } from '../../../../basis/src/v2/cardSummary.js';
-import { buildMobileLocalBuiltins } from '../../core/hostOps.js';
+import { mountPhoneAppOps } from '../../core/phoneAppOps.js';   // the lists + basis's ops on the waist, composed once
 import { openFilePicker as openMobileFilePicker } from '../../core/filePicker.js';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { buildCircleInviteUri } from '../../../../basis/src/v2/circleInvite.js';
@@ -223,7 +221,7 @@ import { scopePinboardCallSkill } from '../../../../basis/src/v2/circlePinboardS
 // Sealed media (2026-07-11): the per-circle media composition is SHARED src/ (platform-neutral,
 // no DOM). Mobile reuses it verbatim — same seal path as web's pinboard noticeboard — so a noticeboard
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
-import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
+import { circleMediaBucket, getCircleMediaComposition, circlePictureResolver } from '../../core/circleMedia.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { resolveSealedThumbUri } from '../../core/mijHost.js';
@@ -364,45 +362,9 @@ const circleSearchVectorStore = (AsyncStorage && typeof AsyncStorage.getItem ===
   ? sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-circle-rag' }))
   : createMemoryBackend();
 
-// Sealed media (2026-07-11) — mirror web circleApp.js: ONE DEV bucket per app session
-// (in-memory; the real S3/R2 swap point is recorded in circleMediaGateway.js), and the
-// per-circle sealed-media composition cached so the session ACL's grants persist across
-// re-opens. A p0/p1 circle (no seal strategy) composes to `null` → sealed-only: the wrapper
-// refuses attachments and the 📎 affordance stays hidden (NO unsealed fallback). This is the
-// SHARED composition both platforms use — reused, not reimplemented in the shell.
-const circleMediaBucket = makeDevMediaBucket();
-const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
-// One circle's picture opener, bound lazily (web parity: circleApp's `circlePictureResolver`). A roster row's picture
-// is sealed to ITS circle, a contact's to the pair circle — so a paint site names the circle and gets the opener here.
-// Cached per circle so a FaceView's `resolvePicture` keeps its identity across renders.
-const circlePictureResolvers = new Map();
-function circlePictureResolver(circleId, policy) {
-  if (typeof circleId !== 'string' || !circleId) return null;
-  if (!circlePictureResolvers.has(circleId)) {
-    circlePictureResolvers.set(circleId, async (ref) => {
-      const comp = await getCircleMediaComposition(circleId, policy).catch(() => null);
-      return resolveSealedThumbUri(ref, comp?.mediaGateway?.opener);
-    });
-  }
-  return circlePictureResolvers.get(circleId);
-}
-function getCircleMediaComposition(circleId, policy) {
-  if (!circleId) return Promise.resolve(null);
-  if (!circleMediaCompositions.has(circleId)) {
-    circleMediaCompositions.set(circleId, createCircleMediaComposition({
-      circleId,
-      getSealStrategy: () => getCircleSealStrategy(circleId, policy),
-      localActor: getCircleActorWebId() || 'me',
-      bucket: circleMediaBucket,
-    }).catch(() => null).then((c) => {
-      // "none" is not kept: a policy that arrives later (the circle's posture on the governance lane) may make this
-      // circle able to seal, and the next ask should find out rather than reuse the old answer.
-      if (!c) circleMediaCompositions.delete(circleId);
-      return c;
-    }));
-  }
-  return circleMediaCompositions.get(circleId);
-}
+// Sealed media: the per-circle composition (ONE dev bucket per app session, the compositions cached per circle) lives
+// in src/core/circleMedia.js, so the Node phone reaches the same one; `getCircleMediaComposition` and
+// `circlePictureResolver` are imported from there.
 
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions
 // row.  Module singleton (shared across circle opens), hydrated once from
@@ -1045,52 +1007,36 @@ export default function CircleLauncherScreen({
       await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason });
     } catch { /* best-effort */ }
   }, [selected, bundle, eventLog, policyStore]);
-  // basis's ops → the waist, with the seams this shell has. Web mounts the same handlers through its
-  // own picker and panels; what differs between the platforms is exactly this argument list.
-  //
-  // No thread seams: the v2 shell has no thread surface, so `help-with` refuses in its own words rather
-  // than opening a thread nothing paints — the same answer web gives.
+  // The ops this phone mounts on the waist (the lists, basis's own), composed once in src/core/phoneAppOps.js — the
+  // same function the Node phone calls. This screen hands in exactly its platform: how it picks a file, scans a code,
+  // asks the person, opens the feedback thread.
   useEffect(() => {
     const agent = bundle?.agent;
-    if (typeof agent?.mountAppOps !== 'function') return;   // older composition — the agent's default serves
-    // The composable LISTS on the waist — the SHARED handlers (`src/v2/listsOps.js`), web parity by
-    // construction rather than by a second copy. This hands them the three things only a running shell
-    // has: which store, which translator, which circle is open.
-    try {
-      agent.mountAppOps('lists', makeListsOps({
-        storeFor: (circleId) => agent.circleStoreFor?.(circleId),
-        t,
-        activeCircle: () => selectedIdRef.current,
-        localActor: 'me',
-      }), listsManifest);
-    } catch { /* older composition */ }
-    agent.mountAppOps('basis', buildMobileLocalBuiltins({
-      agent,
-      catalogue:  bundle?.catalogue,
-      callSkill:  bundle?.callSkill,
-      t,
-      eventLog,
-      podAuth,
-      sessionRef,
-      openFilePicker: openMobileFilePicker,
-      // The camera IS this platform's answer for `scanQr`; the modal's own parser decides what a code
-      // means. An invite routes into the join wizard, as a scan from anywhere else on this screen does.
-      openQrScanner: () => setJoinScanOpen(true),
-      // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
-      openFeedback: ({ webid, draft }) => { openFeedbackThread(webid, draft).catch(() => {}); },
-      // adding the feedback contact is the person's own tap: the offer says who receives what, and only yes adds it
-      confirmFeedbackOffer: ({ title, line }) => new Promise((resolve) => {
-        Alert.alert(title, line, [
-          { text: t('circle.confirm.cancel'), style: 'cancel', onPress: () => resolve(false) },
-          { text: t('circle.confirm.accept'), onPress: () => resolve(true) },
-        ], { cancelable: true, onDismiss: () => resolve(false) });
-      }),
-      feedbackCard: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD ?? null,
-      appVersion: Constants.expoConfig?.extra?.appVersion ?? '',
-      currentScreen: () => feedbackScreenRef.current?.() ?? null,
-      // the person's clock shows them a card (their week): this platform's alert, until they close it
-      showPersonCard: (card) => Alert.alert(card.title, [...(card.lines?.length ? card.lines : [t('circle.profile.planned_none')]), '', card.note].join('\n'), [{ text: t('circle.profile.week_card_close') }]),
-    }));
+    const mounted = mountPhoneAppOps({
+      agent, catalogue: bundle?.catalogue, callSkill: bundle?.callSkill, t, eventLog, podAuth, sessionRef,
+      activeCircle: () => selectedIdRef.current,
+      platform: {
+        openFilePicker: openMobileFilePicker,
+        // The camera IS this platform's answer for `scanQr`; the modal's own parser decides what a code
+        // means. An invite routes into the join wizard, as a scan from anywhere else on this screen does.
+        openQrScanner: () => setJoinScanOpen(true),
+        // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
+        openFeedback: ({ webid, draft }) => { openFeedbackThread(webid, draft).catch(() => {}); },
+        // adding the feedback contact is the person's own tap: the offer says who receives what, and only yes adds it
+        confirmFeedbackOffer: ({ title, line }) => new Promise((resolve) => {
+          Alert.alert(title, line, [
+            { text: t('circle.confirm.cancel'), style: 'cancel', onPress: () => resolve(false) },
+            { text: t('circle.confirm.accept'), onPress: () => resolve(true) },
+          ], { cancelable: true, onDismiss: () => resolve(false) });
+        }),
+        feedbackCard: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD ?? null,
+        appVersion: Constants.expoConfig?.extra?.appVersion ?? '',
+        currentScreen: () => feedbackScreenRef.current?.() ?? null,
+        // the person's clock shows them a card (their week): this platform's alert, until they close it
+        showPersonCard: (card) => Alert.alert(card.title, [...(card.lines?.length ? card.lines : [t('circle.profile.planned_none')]), '', card.note].join('\n'), [{ text: t('circle.profile.week_card_close') }]),
+      },
+    });
+    if (!mounted) return;   // older composition — the agent's default serves
     // THE PERSON'S CLOCK: their own planned rows (their week on Saturday), run while the app is in front — it stops in the
     // background (the OS decides there; an always-on device of theirs delivers on time)
     if (!personClockRef.current) {

@@ -1064,6 +1064,7 @@ async function respondToItemCore(scope, a, ctx) {
   let toStableId = null;
   // A post read from its circle's own store names its poster by webid only (no carrier stamped a sender key on it):
   // the poster's key is on the circle's roster, which is where a co-member's address is known.
+  let sendTo = null;   // where the answer travels, when it is not `toPubKey` (a circle post: the poster's circle address)
   const circleOfPost = post.source?.groupId
     ?? (Array.isArray(post.source?.targets) ? post.source.targets.find((t) => t?.kind === 'group' && typeof t.groupId === 'string')?.groupId : null)
     ?? null;
@@ -1078,6 +1079,9 @@ async function respondToItemCore(scope, a, ctx) {
     try {
       const roster = (await listGroupMembersCore(scope, { groupId: circleOfPost }, { from: asSelf }))?.members ?? [];
       const row = roster.find((m) => m && m.webid === toWebid);
+      // the answer goes to the poster's address IN this circle (the circle's traffic), never their person key; the
+      // person key stays what the shell opens the thread under
+      sendTo = row?.circleAddress ?? null;
       toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
     } catch { /* not on the roster: no address, and no guess */ }
   }
@@ -1100,11 +1104,13 @@ async function respondToItemCore(scope, a, ctx) {
   const r = await chat.send({
     toStableId,
     toWebid,
-    toPubKey,
+    toPubKey: sendTo ?? toPubKey,
     threadId,
     body:     a.body,
     subtype:  'chat-message',
     ...(sendAs ? { sendAs } : {}),
+    // an answer to a CIRCLE post is that circle's traffic (its self, its points), never the person path
+    ...(circleOfPost ? { circleId: circleOfPost } : {}),
   });
   if (!r.ok) return { error: r.reason };
 

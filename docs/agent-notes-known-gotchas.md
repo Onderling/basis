@@ -778,6 +778,16 @@ screen, so only the emulator showed it. A crash under Detox looks like "not visi
 the screenshot: read `adb logcat -d -b crash` first. `apps/basis-mobile/test/accessibilityRolesAndroid.test.js` reads the
 allowed roles from React Native's Android source and holds every role the phone paints to them.
 
+## One relay under two names silently loses a circle's scope (emulator walks, 2026-11-11)
+
+The emulator reaches the host as `10.0.2.2`; a harness peer on the host reaches the same relay as `127.0.0.1`. When the
+peer dials, announces and invites under its own spelling, the phone records the circle's point as `ws://127.0.0.1:…`, its
+own socket (`ws://10.0.2.2:…`) no longer matches that point by url, the circle-scoped route rules it ineligible, a second
+socket "beside" the point cannot connect from inside the emulator, and the send falls to NKN — reported as delivered,
+received by nobody. It looks exactly like a lost message in the product. A harness peer must dial, announce and invite
+under the SAME name the phone uses: `e2e/support/relayPeer.mjs` uses the host's LAN address for both. Name such a branch
+with the route's own reasoning (the candidates, each one's url, eligibility and `canReach`), not by reading.
+
 ## Building a mobile APK to verify a fix: three traps (2026-10-09)
 
 Each one produced an APK that did not carry the code it was built to test.

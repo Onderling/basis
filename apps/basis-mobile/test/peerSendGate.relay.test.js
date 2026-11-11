@@ -64,4 +64,26 @@ describe('the send gate: what the device knows decides the route', () => {
     const landed = await until(() => anna.landed.unrouted.some((e) => e?.payload?.n === 2), 1500);
     expect(landed).toBe(false);
   }, 30_000);
+
+  // THE PERSON KEY'S ALLOWLIST, recorded (not yet enforced): every person-path send says which entry let it through.
+  const personDecisions = (node) => node.copyLog().split('\n')
+    .filter((l) => l.includes('agent/send.decision') && l.includes('"kind":"person"'))
+    .map((l) => JSON.parse(l.slice(l.indexOf('{'))));
+
+  it('the join\'s two person-key sends are the invite exchange: Bob\'s request as the joiner, Anna\'s one answer', () => {
+    expect(personDecisions(bob).some((r) => r.allowedBy === 'invite-exchange' && r.side === 'joiner'),
+      `Bob's person decisions: ${JSON.stringify(personDecisions(bob))}`).toBe(true);
+    expect(personDecisions(anna).some((r) => r.allowedBy === 'invite-exchange' && r.side === 'answer'),
+      `Anna's person decisions: ${JSON.stringify(personDecisions(anna))}`).toBe(true);
+  });
+
+  it('a person-path send to a co-member\'s person key, kept nowhere as a contact, is recorded as allowedBy none', async () => {
+    // Anna's person key: Bob reaches it (the join bound it), but holds it as no contact, no invite, no fallback. (A send to
+    // an address NOBODY has registered never settles and writes no record, before this change too: a pass-2 blind spot.)
+    const before = personDecisions(bob).length;
+    await bob.agent.sendPeerMessage(anna.pubKey, { subtype: 'gate-probe', n: 3 }, { guarantee: 'now' }).catch(() => {});
+    await until(() => personDecisions(bob).length > before, 10_000);
+    const fresh = personDecisions(bob).slice(before);
+    expect(fresh.at(-1), `no new person decision: ${JSON.stringify(fresh)}`).toMatchObject({ kind: 'person', allowedBy: 'none' });
+  }, 30_000);
 });

@@ -712,6 +712,8 @@ if (relayUrl) {
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     // the box holds no pod session, so a pod-backed circle's redeem names no pod WebID: it joins without a pod grant
     podWebId: () => null,
+    // the request to the invite's address may leave on the person key for this redeem (the send gate's invite exchange)
+    inviteExchange: agent.inviteExchange ?? null,
   });
   // After a join: presence in the new circle (the per-circle address on the relay, the announce) and the lanes'
   // catch-up — `registerCirclePresence` is defined below and runs at connect; a join later re-runs it for the one circle.
@@ -782,6 +784,8 @@ if (relayUrl) {
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
         signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
         propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
+        // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
+        inviteExchange: agent.inviteExchange ?? null,
         logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} },
       }),
       'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap: pendingPeerRedeems }),

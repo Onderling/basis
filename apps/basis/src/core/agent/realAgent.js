@@ -43,7 +43,7 @@ import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
-import { createCircleAddressIndex, decidePeerSend, sendDecisionFields } from '../../v2/peerSendGate.js';
+import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange } from '../../v2/peerSendGate.js';
 import { log as structuredLog } from '@onderling/logger';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
@@ -2552,7 +2552,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // before the send, whatever the boot order — as the person address is
       await registerDeviceAddresses().catch(() => {});
       const { circleId: _c, ...rest } = o;   // eslint-disable-line no-unused-vars
-      return wireSend(to, payload, { ...rest, sendAs: from }, { kind: 'sibling', circleId: null, reason: 'device-map' });
+      return wireSend(to, payload, { ...rest, sendAs: from }, { kind: 'sibling', circleId: null, reason: 'device-map', allowedBy: 'own-device' });
     }
     // Nothing else: a device not in this self's device map is no sibling of it yet (the device-map carry, or the enrol
     // offer's introduction, makes it one). There is no circle path — every full device of the self presents the same
@@ -6530,6 +6530,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       ...(sendAs ? { sendAs } : {}),
     }, decision);
   }
+  // the invite exchange's two person-key sends, registered by the redeem code only (groupRedeem.js), read by the gate
+  const inviteExchange = createInviteExchange();
   /**
    * THE SEND GATE — the one point every app-level peer send goes through (`sendPeerMessage`, the household mirror's
    * fan, the roster seed, the connection grant, the surface nudge, the pairing request, the linked-bot revocation, the
@@ -6561,7 +6563,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `asPerson`: speak as the current PERSON key of the circle's self (an enrolling device's first requests). A self
     // without a person key does not speak at all (`no-person-key`): never its chat key.
     if (decision.kind === 'as-person') return speakAsPerson(to, payload, o, decision);
-    return sendCircleScoped(to, payload, decision.circleId ? { ...o, circleId: decision.circleId } : o, decision);
+    // THE PERSON KEY'S ALLOWLIST (peerSendGate.js): which entry lets this send leave on the person key, from what this
+    // device holds about `to`. RECORDED today (allowedBy in the decision record); held as 'unknown-address' once enforced.
+    const sent = decision.kind === 'person' ? { ...decision, ...(await personSendFacts(to).then(personAllowedBy, () => ({ allowedBy: 'none' }))) } : decision;
+    return sendCircleScoped(to, payload, decision.circleId ? { ...o, circleId: decision.circleId } : o, sent);
+  }
+  /** What this device holds about a person-path address: an open invite exchange, a kept contact, the fallback setting. */
+  async function personSendFacts(to) {
+    const inviteExchangeSide = inviteExchange.take(to);
+    let contact = null;
+    if (!inviteExchangeSide) {
+      // a hidden row never matches; a deleted row is a hidden one (a delete is a hide that also left the pair circle),
+      // and one that came back is unhidden and kept again
+      try { contact = (await rawContacts()).find((c) => c && !c.hidden && (c.webid === to || c.peerAddr === to || c.pubKey === to)) ?? null; } catch { contact = null; }
+    }
+    return { inviteExchange: inviteExchangeSide, contact, addressFallback: addressFallbackOn() };
   }
   // "A POST MATCHES WHAT I OFFER" — judged here, on this device, against the drivers of kind 'offering' of the self this
   // device is in that circle (a persona's circle is the persona's; no circle = the default), by the one driver matcher.
@@ -9850,6 +9866,11 @@ export async function createRealHouseholdAgent(opts = {}) {
      */
     nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
     nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
+    // the invite exchange's registrations, for the redeem code (groupRedeem.js) only; the gate alone reads them
+    inviteExchange: Object.freeze({
+      expectFromInviter: (address) => inviteExchange.expectFromInviter(address),
+      answerProvenRequest: (address) => inviteExchange.answerProvenRequest(address),
+    }),
     /** The Nearby room's `keep` port for the current visit (nearbyKept.js), over this device's log; null without one. */
     nearbyKeeper: (visitId) => (opts.deviceLog ? makeRoomKeeper({
       eventLog: opts.deviceLog, visitId,

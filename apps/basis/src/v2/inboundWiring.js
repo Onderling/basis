@@ -108,6 +108,8 @@ export function buildInboundWiring({
       circleAddressFor: (gid) => agent?.circleAddressFor?.(gid) ?? null,
       signCircleAddress: (gid, addr) => agent?.signCircleLink?.(gid, gid, addr) ?? null,
       propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
+      // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
+      inviteExchange: agent?.inviteExchange ?? null,
       logger,
     }),
     ...(pendingRedeems ? { 'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap: pendingRedeems }) } : {}),

@@ -100,6 +100,11 @@ export const SEAMS = Object.freeze([
   // persona on its own socket and announces its person key. A shell that built the redeem without it would join every
   // circle as the default, whatever the person picked (2026-10-10).
   { id: 'redeem-as-circle-self', pattern: /circleSelfFor:\s*\(gid\)\s*=>\s*agent\.circleSelf/, why: 'a circle joined as a persona is joined AS it, from every shell' },
+  // THE INVITE EXCHANGE on the person key: the send gate's person-key allowlist lets the joiner's request to the invite's
+  // address, and the inviter's one answer to a request that proved its code, leave on the person key, from what the redeem
+  // code registers with the agent. A shell that builds the redeem without it records 'none' for its joins (and, once the
+  // gate enforces, holds them). Mobile's handler comes from the shared inbound wiring; its sender is agentBundle's.
+  { id: 'redeem-invite-exchange', pattern: /inviteExchange:\s*agent\.inviteExchange/, why: 'a join\'s two person-key sends are an allowed case on every shell, registered by the redeem itself' },
   // Each self on its own sockets: a persona's circle registers its per-circle address (and the persona's person address)
   // on the persona's OWN relay sockets, never the default's — or replies to it land on the default's socket and the
   // relay sees two selves on one connection (2026-10-10).

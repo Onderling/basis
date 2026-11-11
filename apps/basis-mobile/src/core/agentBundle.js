@@ -946,6 +946,8 @@ export async function bootAgentBundle(opts = {}) {
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     // a pod-backed circle's redeem tells the admitting admin which pod WebID to grant (web parity)
     podWebId: () => opts.podWebId?.() ?? null,
+    // the request to the invite's address may leave on the person key for this redeem (the send gate's invite exchange)
+    inviteExchange: agent.inviteExchange ?? null,
   });
   pairSeams.sendPeerRedeem = sendPeerRedeem;
 

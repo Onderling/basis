@@ -788,6 +788,12 @@ received by nobody. It looks exactly like a lost message in the product. A harne
 under the SAME name the phone uses: `e2e/support/relayPeer.mjs` uses the host's LAN address for both. Name such a branch
 with the route's own reasoning (the candidates, each one's url, eligibility and `canReach`), not by reading.
 
+Since the send gate: points compare by `pointKey` (`@onderling/secure-agent`), so SPELLINGS of one relay match (a trailing
+slash, the host's case, a written-out default port, http(s) for ws(s)). Two NAMES for one host (an IP and a domain,
+`10.0.2.2` and `127.0.0.1`) still do not: that needs a lookup the routing layer must not make. Every send now writes one
+`agent/send.decision` record (copy-log door, logcat on a test build): a scoped send that found no eligible transport
+because of this reads `"reason":"point-mismatch"` with each candidate as `kind:why:reach`.
+
 ## Building a mobile APK to verify a fix: three traps (2026-10-09)
 
 Each one produced an APK that did not carry the code it was built to test.

@@ -97,6 +97,7 @@ import {
 import { loadAuditLog }       from './auditLog.js';
 import { chunkPayloadForRoute, makeChunkReassembler } from './peerChunking.js';
 import { createSeenInboundRing } from './seenInbound.js';
+import { pointKey } from './pointKey.js';
 
 /**
  * @typedef {object} CreateSecureAgentOpts
@@ -2170,12 +2171,47 @@ export async function createSecureAgent(opts = {}) {
    * be made VISIBLE by the caller rather than left as silent holding.
    */
   function eligibleUnderScope(transport, scope) {
-    if (!transport) return false;
-    if (scope?.requireAliasCapable && transport.supportsAliases !== true) return false;
-    const points = Array.isArray(scope?.points) ? scope.points.filter(Boolean) : [];
-    if (points.length === 0) return true;
-    const url = typeof transport.url === 'string' && transport.url ? transport.url : null;
-    return url ? points.includes(url) : true;
+    return whyUnderScope(transport, scope) === 'ok';
+  }
+  /** Why a transport is (not) eligible under a scope: 'ok' · 'no-aliases' · 'point-mismatch'. Points compare by
+   *  `pointKey`, never as raw strings: one relay reaches us under several spellings, and a raw comparison made a
+   *  circle's traffic skip its own relay. */
+  function whyUnderScope(transport, scope) {
+    if (!transport) return 'absent';
+    if (scope?.requireAliasCapable && transport.supportsAliases !== true) return 'no-aliases';
+    const points = Array.isArray(scope?.points) ? scope.points.map(pointKey).filter(Boolean) : [];
+    if (points.length === 0) return 'ok';
+    const url = typeof transport.url === 'string' && transport.url ? pointKey(transport.url) : null;
+    return !url || points.includes(url) ? 'ok' : 'point-mismatch';
+  }
+  /** A transport's KIND for a record a person may read: never its name when the name carries a url. */
+  function kindOf(transport, name = null) {
+    if (transport && transport === relayTransport) return 'relay';
+    if (transport && transport === peerTransport) return 'nkn';
+    const n = name ?? [...extraTransports.entries()].find(([, t]) => t === transport)?.[0] ?? null;
+    if (typeof n !== 'string' || !n) return 'other';
+    if (n.startsWith(RELAY_NAME_PREFIX) || (transport && typeof transport.url === 'string' && transport.url)) return 'relay';
+    return /^[a-z][a-z0-9-]{0,15}$/i.test(n) ? n.toLowerCase() : 'other';
+  }
+  /**
+   * THE ROUTE DECISION, DESCRIBED — what `route` would choose for `addr` under `scope`, and why each candidate was or
+   * was not eligible, without sending. By transport KIND and short codes only (no address, no url), so the app's
+   * send gate can write it into a log a person may hand over: every failure then names its branch.
+   *
+   * @returns {Promise<{scoped: boolean, chosen: string|null, candidates: Array<{kind: string, eligible: boolean, why: string, reach: boolean}>}>}
+   */
+  async function explainRoute(addr, scope = null) {
+    const reachable = (t) => (typeof t?.canReach !== 'function' ? true : t.canReach(addr) === true);
+    const candidates = [relayTransport, ...extraTransports.values(), peerTransport].filter(Boolean).map((t) => {
+      const why = scope ? whyUnderScope(t, scope) : 'ok';
+      return { kind: kindOf(t), eligible: why === 'ok', why, reach: reachable(t) };
+    });
+    let chosen = null;
+    try {
+      const sel = await route(addr, scope);
+      chosen = sel ? kindOf(sel.transport, sel.name) : null;
+    } catch { chosen = null; }
+    return { scoped: !!scope, chosen, candidates };
   }
 
   async function route(addr, scope = null) {
@@ -2201,8 +2237,11 @@ export async function createSecureAgent(opts = {}) {
         console.info(`[secure-agent] "${name}" cannot carry per-circle addresses — under the accepted fallback, `
           + `${String(addr).slice(0, 16)}… goes to the person's own address ${String(target).slice(0, 16)}…`);
       } else if (pick.supportsAliases !== true && typeof console !== 'undefined') {
-        console.warn(`[secure-agent] "${name}" cannot carry per-circle addresses and no identity is bound to `
-          + `${String(addr).slice(0, 16)}… — sending to the alias itself, which may reach nobody`);
+        // Said as what it is: this device holds no person identity FOR THIS ADDRESS (no roster bound it here). It is
+        // not a claim about the address itself; a person's own key reads the same way, and the old wording ("no
+        // identity is bound") sent a diagnosis after a mapping that was never missing.
+        console.warn(`[secure-agent] "${name}" cannot carry per-circle addresses, and this device knows no person `
+          + `behind ${String(addr).slice(0, 16)}… to send to instead; sending to that address as given, which may reach nobody`);
       }
       return { name, transport: pick, address: await addressFor(target, name) };
     }
@@ -3036,6 +3075,8 @@ export async function createSecureAgent(opts = {}) {
       connect: connectPeer,
       sendTo:  sendToPeer,
       invoke:  invokePeer,
+      /** The route decision for `addr` under `scope`, described by kind without sending (see `explainRoute`). */
+      explainRoute,
       /** The skills other agents' task requests reach here (`acceptPeerSkillCalls`); [] when the route is off. */
       callableSkills: () => (peerSkillCalls ? peerSkillCalls.reachableSkills() : []),
       /** Whether other agents' task requests are taken at all (the composition's `acceptPeerSkillCalls`). Off → a call

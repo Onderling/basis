@@ -102,7 +102,10 @@ export const FUNCTIONS = Object.freeze([
   { id: 'attachments', name: 'Files and media as attachments (circles, contact threads)', cells: {
     // a file crossing to someone (circle-attach-file is one page) — Fable 2026-11-10
     web: { file: 'apps/basis/test-browser/walk-dm-photo.spec.js', test: 'a camera-sized photo sent to a contact arrives' },
-    mobile: null,   // attachmentPicker is a unit
+    // the phone's own "+" op (mountPhoneAppOps) sends a file into a contact thread; the other phone stores the same
+    // bytes through its own wiring (Fable 2026-11-11). A CIRCLE file's bytes cannot cross yet on any shell: one
+    // in-memory media bucket per session (the real bucket is not built); a plain circle offers no file entry at all.
+    mobile: { file: 'apps/basis-mobile/test/attachmentsMobile.relay.test.js', test: "Anna's thread '+' sends a file; Bob's phone stores the same bytes in his thread with her" },
     box: NA('the box renders no files in alpha one; keeping attachments available is later'),
   } },
   { id: 'restore-devices', name: 'Restore and your devices (phrase, second device, revoke)', cells: {

@@ -47,7 +47,9 @@ export function createCircleAddressIndex() {
         if (selfWebid && m?.webid === selfWebid) continue;
         for (const a of circleAddressSetOf(m)) next.add(a);
       }
-      // an empty read is far more likely a failed skill call than a circle with nobody else in it: keep what we had
+      // an empty read is far more likely a failed skill call than a circle with nobody else in it: keep what we had.
+      // A removed member's address therefore leaves at the circle's NEXT non-empty read (which replaces the whole set),
+      // or when the circle is left (`forget`).
       if (next.size === 0) return 0;
       drop(circleId);
       byCircle.set(circleId, next);
@@ -59,11 +61,18 @@ export function createCircleAddressIndex() {
       return next.size;
     },
     forget(circleId) { drop(circleId); },
-    /** The one circle this address is a member's circle address in, or null (none, or more than one). */
-    circleOf(address) {
+    /**
+     * What this device knows about `address`: `{ circleId }` (a member's circle address in exactly one of my circles),
+     * `{ ambiguous: true }` (two or more of my circles claim it: KNOWN to be a circle address, so never the person
+     * path), or null (not a circle address I know of).
+     */
+    lookup(address) {
       const cs = byAddress.get(address);
-      return cs && cs.size === 1 ? cs.values().next().value : null;
+      if (!cs || cs.size === 0) return null;
+      return cs.size === 1 ? { circleId: cs.values().next().value } : { ambiguous: true };
     },
+    /** The one circle this address is a member's circle address in, or null (unknown, or ambiguous). */
+    circleOf(address) { return this.lookup(address)?.circleId ?? null; },
     get size() { return byAddress.size; },
   };
 }
@@ -74,15 +83,20 @@ export function createCircleAddressIndex() {
  * @param {object} a
  * @param {string} a.to
  * @param {object} [a.opts]     the caller's send options (`circleId`, `sendAs`, `asPerson`)
- * @param {(address: string) => string|null} a.circleOf
+ * @param {(address: string) => ({circleId: string}|{ambiguous: true}|null)} a.circleOf  the index's `lookup`
  * @returns {{kind: string, circleId: string|null, reason: string, refuse?: true}}
  */
 export function decidePeerSend({ to, opts = {}, circleOf } = {}) {
   if (opts?.asPerson) return { kind: 'as-person', circleId: null, reason: 'as-person' };
   if (typeof opts?.sendAs === 'string' && opts.sendAs) return { kind: 'as-given', circleId: null, reason: 'caller-sendas' };
   const named = typeof opts?.circleId === 'string' && opts.circleId ? opts.circleId : null;
-  let hit = null;
-  try { hit = typeof circleOf === 'function' ? circleOf(to) : null; } catch { hit = null; }
+  let known = null;
+  try { known = typeof circleOf === 'function' ? circleOf(to) : null; } catch { known = null; }
+  // KNOWN to be a circle address, but two of my circles claim it: refused. The person path would hand my canonical key
+  // to a circle address, the one link per-circle addressing exists to withhold; guessing a circle could sign as the
+  // wrong self. Per-circle addresses are derived per circle, so a double claim is a fault to surface, not to route.
+  if (known?.ambiguous) return { kind: 'circle-member', circleId: null, reason: 'circle-ambiguous', refuse: true };
+  const hit = known?.circleId ?? null;
   if (hit) {
     if (named && named !== hit) return { kind: 'circle-member', circleId: null, reason: 'circle-mismatch', refuse: true };
     return { kind: 'circle-member', circleId: hit, reason: 'roster-hit' };

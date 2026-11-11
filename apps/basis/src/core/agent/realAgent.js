@@ -6530,7 +6530,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         return sendToSibling(to, payload, rest, self);
       }
     }
-    const decision = decidePeerSend({ to, opts: o, circleOf: (a) => circleAddressIndex.circleOf(a) });
+    const decision = decidePeerSend({ to, opts: o, circleOf: (a) => circleAddressIndex.lookup(a) });
     if (decision.refuse) {
       const refused = { held: false, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: decision.reason };
       try { structuredLog.warn('agent', 'send.decision', sendDecisionFields(decision, null, refused)); } catch { /* the log never breaks a send */ }

@@ -41,18 +41,25 @@ describe('createCircleAddressIndex: a member\'s per-circle address → its circl
     expect(ix.circleOf('bram@c1')).toBe(null);
   });
 
-  it('one address claimed by two circles answers neither (ambiguous is not a route)', () => {
+  it('one address claimed by two circles is AMBIGUOUS, which is not the same as unknown', () => {
     const ix = createCircleAddressIndex();
     ix.recordRoster('c1', rows({ webid: 'bram', circleAddress: 'x' }));
     ix.recordRoster('c2', rows({ webid: 'bram', circleAddress: 'x' }));
     expect(ix.circleOf('x')).toBe(null);
+    expect(ix.lookup('x')).toEqual({ ambiguous: true });
+    expect(ix.lookup('nobody')).toBe(null);
     ix.forget('c2');
     expect(ix.circleOf('x')).toBe('c1');
+    expect(ix.lookup('x')).toEqual({ circleId: 'c1' });
   });
 });
 
 describe('decidePeerSend: what the device KNOWS decides the path', () => {
-  const circleOf = (a) => ({ 'bram@c1': 'c1' }[a] ?? null);
+  const circleOf = (a) => ({ 'bram@c1': { circleId: 'c1' }, 'twice@': { ambiguous: true } }[a] ?? null);
+  it('an address two of my circles both claim is REFUSED: never the person path toward a known circle address', () => {
+    expect(decidePeerSend({ to: 'twice@', opts: {}, circleOf })).toEqual({ kind: 'circle-member', circleId: null, reason: 'circle-ambiguous', refuse: true });
+    expect(decidePeerSend({ to: 'twice@', opts: { circleId: 'c1' }, circleOf })).toEqual({ kind: 'circle-member', circleId: null, reason: 'circle-ambiguous', refuse: true });
+  });
   it('a member\'s circle address → that circle\'s scope, even when the caller named no circle', () => {
     expect(decidePeerSend({ to: 'bram@c1', opts: {}, circleOf })).toEqual({ kind: 'circle-member', circleId: 'c1', reason: 'roster-hit' });
   });

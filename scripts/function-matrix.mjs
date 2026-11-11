@@ -29,7 +29,9 @@ export const FUNCTIONS = Object.freeze([
   // ── alpha one's ten (Frits 2026-10-30) ───────────────────────────────────────────────────────────────────────────
   { id: 'messaging', name: 'Messaging (circle chat, contact threads)', cells: {
     web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'fan-out — a message from A appears in B chat' },   // named by Fable 2026-11-03
-    mobile: null,   // circleChatParity is a parity test, not a story on the phone
+    // a Detox walk on the emulator (the D form: run before each release, not in CI): join by invite, a circle line each
+    // way, a contact thread each way, each side read from its own store (Fable's brief 2026-11-10)
+    mobile: { file: 'apps/basis-mobile/e2e/messaging.test.js', test: "the phone's answer in the thread reaches Bram's stored thread" },
     box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the circle door: a member who names it is answered' },
   } },
   { id: 'nearby', name: 'Nearby', cells: {

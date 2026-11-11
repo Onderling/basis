@@ -27,6 +27,7 @@
  */
 import { startJourneyRelay } from '../../../basis/test/support/testRelay.js';
 import readline from 'node:readline';
+import { networkInterfaces } from 'node:os';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, teardown, sendCircleChat, readRoster,
 } from '../../../basis/test/support/pairRealAgents.js';
@@ -43,14 +44,26 @@ const say = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
 const circleName = arg('circle', 'Walk Kring');
 const offering = arg('offering');
 const handle = arg('handle', 'bram');
-// how the phone reaches the host: 10.0.2.2 on the Android emulator; a real phone on the LAN needs the host's address
-const phoneHost = arg('phone-host', '10.0.2.2');
+// ONE NAME FOR THE RELAY, used by everyone. A relay a deployment runs has one public name; here the host's relay was
+// `127.0.0.1` to this peer and `10.0.2.2` (the emulator's alias for the host) to the phone, so the two recorded the same
+// relay under two urls. A circle's points carry the peer's spelling, the phone's socket did not match it, and routing
+// fell to live NKN — a harness artefact that looked like a lost message (found by instrumenting the route, 2026-11-11).
+// So both sides dial the host's LAN address, which the emulator reaches too. `--phone-host` overrides it; 10.0.2.2 is
+// only a last resort (the host cannot dial it, so the two names come back).
+const lanAddress = () => {
+  for (const list of Object.values(networkInterfaces())) {
+    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) return a.address;
+  }
+  return null;
+};
+const phoneHost = arg('phone-host', lanAddress() ?? '10.0.2.2');
 const talk = process.argv.includes('--talk');
 
 const relay = await startJourneyRelay();
-say({ step: 'relay', url: relay.url });
+const relayUrl = phoneHost === '10.0.2.2' ? relay.url : `ws://${phoneHost}:${new URL(relay.url).port}`;
+say({ step: 'relay', url: relayUrl });
 const peer = await bootRealAgentNode(handle, { itemsLane: true, contactChannel: talk });
-await connectNodesOverRelay([peer], { relayUrl: relay.url });
+await connectNodesOverRelay([peer], { relayUrl });
 
 const groupId = `walk-${Date.now().toString(36)}`;
 await createCircle(peer, { groupId, name: circleName });

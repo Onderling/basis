@@ -9,15 +9,15 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { phoneWiringSource } from '../../basis/test/support/phoneWiringSource.js';
 
 const here = (p) => resolve(__dirname, p);
 const read = (p) => readFileSync(here(p), 'utf8');
 
 describe('reply-to-post surface parity', () => {
   const webApp    = read('../../basis/web/v2/circleApp.js');
-  // The phone's router is the shared inbound wiring once ChatScreen builds through it: its handler map is read there.
-  const chatScreen = read('../src/screens/ChatScreen.js');
-  const mobileApp = chatScreen + (/buildInboundWiring\(/.test(chatScreen) ? read('../../basis/src/v2/inboundWiring.js') : '');
+  // The phone's router is read through its whole composition: screen → src/core/phoneInboundWiring.js → the shared map.
+  const mobileApp = phoneWiringSource();
   const webThread    = read('../../basis/web/v2/contactThread.js');
   const mobileThread = read('../src/screens/v2/ContactThreadScreen.js');
   const mobileBoard  = read('../src/screens/v2/CircleNoticeboard.js');

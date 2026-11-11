@@ -27,6 +27,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { readPhoneCore } from '../support/phoneWiringSource.js';
 
 const dir = (p) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -75,7 +76,11 @@ const WIRING = readFileSync(dir('../../src/v2/inboundWiring.js'), 'utf8');
 const BOX   = readFileSync(dir('../../bin/device-runner.mjs'), 'utf8');
 
 const webBlock    = region(WEB,    /const peerMessageRouter = makePeerRouter\(\{/, /\n\s*defaultHandler/);
-const mobileBlock = region(MOBILE, /const buildPeerWiring = useCallback/,           /const defaultHandler/);
+// The phone's block is the screen's builder plus the phone's own composition it calls (src/core/phoneInboundWiring.js);
+// the shared map (WIRING) is added by `routedBy` below, as for web.
+const mobileScreenBlock = region(MOBILE, /const buildPeerWiring = useCallback/, /const defaultHandler/);
+const PHONE_CORE = readPhoneCore();
+const mobileBlock = /buildPhoneInboundWiring\(/.test(mobileScreenBlock) ? `${mobileScreenBlock}\n${PHONE_CORE}` : mobileScreenBlock;
 
 describe('FITNESS — both shells route the same peer-message subtypes', () => {
   it('finds both compositions', () => {
@@ -146,11 +151,17 @@ describe('FITNESS — the phone builds its inbound wiring through the shared mod
   // A handler map inside a SCREEN is logic in a shell (invariant 1) and a third copy of what web and the box compose
   // (invariant 3). The phone's screen hands the shared wiring its paint callbacks and builds no handler of its own.
   const OWN_HANDLER = /\b(makeHandle[A-Z]\w*|makeCircle\w*PeerHandler|buildCircleLanes)\(/g;
-  it('ChatScreen calls buildInboundWiring', () => {
-    expect(mobileBlock, 'ChatScreen does not build through src/v2/inboundWiring.js').toMatch(/buildInboundWiring\(/);
+  it('ChatScreen builds through the phone composition, and that through the shared map', () => {
+    // the phone's composition sits in src/core so the Node harness boots the SAME wiring the screen attaches
+    expect(mobileScreenBlock, 'ChatScreen does not build through src/core/phoneInboundWiring.js').toMatch(/buildPhoneInboundWiring\(/);
+    expect(PHONE_CORE, 'the phone composition does not build through src/v2/inboundWiring.js').toMatch(/buildInboundWiring\(/);
   });
-  it('ChatScreen constructs no inbound handler itself (the default chat bubble is the one exception)', () => {
+  it('the phone constructs no inbound handler itself (the default chat bubble is the one exception)', () => {
     const own = [...mobileBlock.matchAll(OWN_HANDLER)].map((m) => m[1]).filter((n) => n !== 'makeHandleChatMessage');
-    expect(own, 'handlers ChatScreen still builds itself — move them into the shared wiring').toEqual([]);
+    expect(own, 'handlers the phone still builds itself — move them into the shared wiring').toEqual([]);
+  });
+  it('the phone composition takes the screen\'s paint and imports no screen code', () => {
+    // a React Native import here would stop the Node harness from booting it — and would be paint in the wrong place
+    expect(PHONE_CORE).not.toMatch(/from 'react-native'|from 'react'|\/screens\//);
   });
 });

@@ -281,7 +281,6 @@
     "pinboard.postRequest",
     "pinboard.recordCircleAddressAnnouncement",
     "pinboard.recordGroupRulesUpdate",
-    "pinboard.recordPeerIntro",
     "pinboard.recordRemoteRedemption",
     "pinboard.recordRosterSeed",
     "pinboard.redeemMembershipCode",

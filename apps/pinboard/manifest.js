@@ -1349,22 +1349,6 @@ export const pinboardManifest = {
 
     // ── Reaching each other ─────────────────────────────────────────
     {
-      id:   'recordPeerIntro', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      // A peer announcing itself with an address. Recorded, not trusted: the address still has to prove
-      // itself against the roster before anything is sent to it.
-      params: [
-        { name: 'groupId',      kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'peerAddr',     kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'peerDisplay',  kind: 'string' },
-      ],
-      resolves: [{ field: 'peerAddr', policy: 'content' }],
-      surfaces: {
-        chat: { hint: "Record a peer's introduction (address + display name) for a circle." },
-        ui:   { control: 'page' },
-      },
-    },
-    {
       id:   'addContactFromQr', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'person' },
       params: [

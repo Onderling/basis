@@ -12,7 +12,7 @@ function reqDeps(overrides = {}) {
   return {
     callSkill: vi.fn(async () => ({ codeId: 'c-1', validUntil: 9999999999 })),
     sendPeer:  vi.fn(async () => {}),
-    propagateMeshIntros: vi.fn(async () => ({})),
+    propagateCircleAddresses: vi.fn(async () => ({})),
     publishEvent: vi.fn(),
     logger:    { info: () => {}, warn: () => {}, error: () => {} },
     ...overrides,
@@ -37,7 +37,7 @@ describe('makeHandleGroupRedeemRequest', () => {
     expect(d.callSkill).not.toHaveBeenCalled();
   });
 
-  it('verifies code + sends OK response + fires propagateMeshIntros on success', async () => {
+  it('verifies code + sends OK response + hands over circle addresses on success', async () => {
     const d = reqDeps();
     const handle = makeHandleGroupRedeemRequest(d);
     await handle('peer-A', validRequest({ shareCard: true, peerDisplay: 'Anne' }));
@@ -50,11 +50,9 @@ describe('makeHandleGroupRedeemRequest', () => {
     expect(d.sendPeer).toHaveBeenCalledWith('peer-A', expect.objectContaining({
       subtype: 'group-redeem-response', ok: true,
     }));
-    // Microtask flush so the propagateMeshIntros fire-and-forget settles.
+    // Microtask flush so the fire-and-forget hand-over settles.
     await new Promise((r) => setTimeout(r, 0));
-    expect(d.propagateMeshIntros).toHaveBeenCalledWith({
-      groupId: 'g-1', newPeerAddr: 'peer-A', newPeerDisplay: 'Anne', newPeerShared: true,
-    });
+    expect(d.propagateCircleAddresses).toHaveBeenCalledWith({ circleId: 'g-1', newMemberWebid: 'peer-A' });
   });
 
   it('registers its ONE person-key reply BEFORE sending it: the answer for a proven request, the refusal otherwise, nothing for garbage', async () => {
@@ -83,7 +81,7 @@ describe('makeHandleGroupRedeemRequest', () => {
     expect(d.sendPeer).toHaveBeenCalledWith('peer-A', expect.objectContaining({
       subtype: 'group-redeem-response', error: 'invalid code',
     }));
-    expect(d.propagateMeshIntros).not.toHaveBeenCalled();
+    expect(d.propagateCircleAddresses).not.toHaveBeenCalled();
   });
 
   it('captures thrown callSkill error in the reply', async () => {

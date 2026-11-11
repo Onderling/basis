@@ -187,7 +187,6 @@ export function buildPhoneInboundWiring({
     },
     notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
     sharedWithMeStore,
-    peerIntro: true,
     noticeboardLanded: true,
   });
   // Hand the bundle the catch-ups, so a join made from any screen pulls the circle's lanes (`onCircleJoined`).

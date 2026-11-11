@@ -104,7 +104,11 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
   const stopWaiting = () => { if (waiting) { clearTimer(waiting); waiting = null; } };
   // while it waits for its grant, the screen says now and then that it is there (see SCREEN_WAITING_SUBTYPE)
   let greeting = null;
-  const greet = () => { if (granted || !sa || !parsed.ok) return Promise.resolve(); return Promise.resolve(sa.peer.sendTo(parsed.botAddress, { subtype: SCREEN_WAITING_SUBTYPE })).catch(() => { /* the next one may reach */ }); };
+  // THE SCREEN'S ONE SEND: this view runs its OWN secure agent (`makeAgent`), not a person's agent, and speaks to one
+  // party only, the bot it was opened for. It has no circles and no roster, so the agent's send gate (`peerSend`,
+  // realAgent) has nothing to decide here; one point keeps it countable (the fitness test names this exception).
+  const sendToBot = (payload) => sa.peer.sendTo(parsed.botAddress, payload);
+  const greet = () => { if (granted || !sa || !parsed.ok) return Promise.resolve(); return Promise.resolve(sendToBot({ subtype: SCREEN_WAITING_SUBTYPE })).catch(() => { /* the next one may reach */ }); };
   const keepGreeting = () => { greeting = setTimer(() => { greeting = null; if (granted) return; greet(); keepGreeting(); }, SCREEN_WAITING_EVERY_MS); };
   const stopGreeting = () => { if (greeting) { clearTimer(greeting); greeting = null; } };
   // the bot's nudge: something in the household changed (it names nothing; the screen reads again)
@@ -163,13 +167,13 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
       keepGreeting();
       // inside Telegram: the launch data Telegram signed is the proof — no code to pick
       if (parsed.launchMode) {
-        await sa.peer.sendTo(parsed.botAddress, { subtype: SCREEN_OFFER_SUBTYPE, launch: { initData: parsed.initData, k: viewPubKey, n: parsed.nonce } });
+        await sendToBot({ subtype: SCREEN_OFFER_SUBTYPE, launch: { initData: parsed.initData, k: viewPubKey, n: parsed.nonce } });
         return { code: null, launched: true };
       }
       const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label });
       const code = await screenCode(viewPubKey, parsed.nonce);
       if (parsed.pasteMode) return { code, offer };   // nothing sent: the person carries the offer to their own chat
-      await sa.peer.sendTo(parsed.botAddress, { subtype: SCREEN_OFFER_SUBTYPE, offer });
+      await sendToBot({ subtype: SCREEN_OFFER_SUBTYPE, offer });
       return { code };
     },
 

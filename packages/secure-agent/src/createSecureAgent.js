@@ -1059,7 +1059,9 @@ export async function createSecureAgent(opts = {}) {
       }
       q.delete(key);   // a slot: the newest supersedes (re-set below keeps it at the young end)
     }
-    q.set(key, { payload, opts: sendOpts, ts: Date.now() });
+    // a held entry keeps the send's terms, not its caller's callback (the send that asked for it has already answered)
+    const { onRouteTaken: _cb, ...heldOpts } = sendOpts ?? {};   // eslint-disable-line no-unused-vars
+    q.set(key, { payload, opts: heldOpts, ts: Date.now() });
     // Per-peer cap — a Map iterates in insertion order, so the first key IS the oldest.
     while (holdMaxPerPeer > 0 && q.size > holdMaxPerPeer) {
       const [oldestKey, oldest] = q.entries().next().value;
@@ -2506,7 +2508,8 @@ export async function createSecureAgent(opts = {}) {
    */
   async function sendAsPersona(addr, payload, opts, owner) {
     if (await isPeerMuted(addr)) throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
-    const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points) : null;
+    // points compare by pointKey, as the general route does: one relay under two spellings is one point
+    const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points.map(pointKey).filter(Boolean)) : null;
     // A send AS one of the persona's circle addresses goes out only on a socket that holds that address: on one that does
     // not, the relay would see the persona's own key speak into the circle (and the circle refuses it). None yet → held.
     const speaksAs = typeof opts?.sendAs === 'string' && opts.sendAs !== owner ? opts.sendAs : null;
@@ -2523,7 +2526,7 @@ export async function createSecureAgent(opts = {}) {
         .map(([name, t]) => [name, { tx: t }])
       : [];
     const sockets = lan.length ? lan : [...proven, ...[...personaTransports.entries()]
-      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)))
+      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(pointKey(e.url))))
       .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs))];
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     // Not sendable now: held on hold-forward, exactly as the general persona's send would be — and every flush re-sends
@@ -2536,7 +2539,7 @@ export async function createSecureAgent(opts = {}) {
     for (const [key, e] of sockets) {
       try {
         const r = await _sendOverRoute(addr, payload, { name: key, transport: e.tx, address: addr }, opts);
-        if (r?.delivered !== false) return { held: false, delivered: true, msgId, result: r };
+        if (r?.delivered !== false) { routeTaken(opts, e.tx, key); return { held: false, delivered: true, msgId, result: r }; }
         last = { held: false, delivered: false, msgId, reason: r?.reason ?? 'not-delivered', persona: owner };
       } catch (err) {
         if (isApplicationError(err)) throw err;
@@ -2544,6 +2547,13 @@ export async function createSecureAgent(opts = {}) {
       }
     }
     return holdOr(last);
+  }
+
+  /** Tell the caller which KIND of route carried its send (`opts.onRouteTaken`), so a record names the route TAKEN, not
+   *  one recomputed beside the send. Called once, only when a transport took the message; never with a url. */
+  function routeTaken(opts, transport, name) {
+    if (typeof opts?.onRouteTaken !== 'function') return;
+    try { opts.onRouteTaken(kindOf(transport, name)); } catch { /* the caller's record never breaks a send */ }
   }
 
   async function _sendWithFailover(addr, payload, opts = {}) {
@@ -2602,7 +2612,7 @@ export async function createSecureAgent(opts = {}) {
           if (isApplicationError(err)) throw err;   // a refusal is a refusal on every relay
           lastErr = err; continue;
         }
-        if (res?.delivered) return res;
+        if (res?.delivered) { routeTaken(opts, transport, name); return res; }
         lastResult = res ?? lastResult;
       }
       // Nobody acked: the peer is offline, or on a relay this device does not hold. The hold-forward
@@ -2628,7 +2638,9 @@ export async function createSecureAgent(opts = {}) {
       tried.add(sel.name);
 
       try {
-        return await _sendOverRoute(addr, payload, sel, opts);
+        const res = await _sendOverRoute(addr, payload, sel, opts);
+        if (res?.held !== true && res?.delivered !== false) routeTaken(opts, sel.transport, sel.name);
+        return res;
       } catch (err) {
         lastErr = err;
         // Application/skill error → never re-route (a different transport

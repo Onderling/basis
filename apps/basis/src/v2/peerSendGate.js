@@ -111,15 +111,17 @@ export function decidePeerSend({ to, opts = {}, circleOf } = {}) {
  * address, a circle id or a payload. A scoped send that found no eligible transport because a relay did not match the
  * circle's points says `point-mismatch`, the one reason a person can fix by naming the relay the same way.
  */
-export function sendDecisionFields(decision, explained = null, result = null) {
+export function sendDecisionFields(decision, explained = null, result = null, taken = null) {
   const out = {
     kind: decision?.kind ?? 'unknown',
     scope: decision?.circleId ? 'circle' : 'none',
     reason: decision?.reason ?? 'unknown',
   };
+  // the route the send TOOK, as the send itself reported it; the candidates are explained only when nothing took it
+  if (typeof taken === 'string' && taken) out.chosen = taken;
   const cands = Array.isArray(explained?.candidates) ? explained.candidates : [];
   if (explained) {
-    out.chosen = explained.chosen ?? 'none';
+    if (!out.chosen) out.chosen = explained.chosen ?? 'none';
     cands.slice(0, 4).forEach((c, i) => { out[`t${i}`] = `${c.kind}:${c.why}:${c.reach ? 'reach' : 'noreach'}`; });
     out.candidates = cands.length;
     if (explained.scoped && !explained.chosen && cands.some((c) => c.why === 'point-mismatch')) out.reason = 'point-mismatch';

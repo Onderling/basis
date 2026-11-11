@@ -60,6 +60,28 @@ describe('the scope compares points by pointKey, not by raw string', () => {
   });
 });
 
+describe('onRouteTaken — the route a send TOOK, from the send itself', () => {
+  it('a delivered scoped send reports the kind of the transport that carried it', async () => {
+    const { anna, bram } = await pair({ socketUrl: 'wss://relay.example.org' });
+    const taken = [];
+    const r = await anna.peer.sendTo(bram.identity.pubKey, { subtype: 'circle', text: 'hoi' },
+      { ...HOLD, scope: { points: ['wss://relay.example.org'], requireAliasCapable: true }, onRouteTaken: (k) => taken.push(k) });
+    expect(r.delivered).toBe(true);
+    expect(taken).toEqual(['relay']);
+    await anna.shutdown(); await bram.shutdown();
+  });
+
+  it('a held send reports no route (nothing carried it)', async () => {
+    const { anna, bram } = await pair({ socketUrl: 'wss://relay.example.org' });
+    const taken = [];
+    const r = await anna.peer.sendTo(bram.identity.pubKey, { subtype: 'circle', text: 'hoi' },
+      { ...HOLD, scope: { points: ['wss://elsewhere.example.org'], requireAliasCapable: true }, onRouteTaken: (k) => taken.push(k) });
+    expect(r.held).toBe(true);
+    expect(taken).toEqual([]);
+    await anna.shutdown(); await bram.shutdown();
+  });
+});
+
 describe('explainRoute — the decision, by kind, without sending', () => {
   it('names each candidate with why it is (not) eligible and whether it reaches, and the one chosen', async () => {
     const { anna, bram } = await pair({ socketUrl: 'wss://relay.example.org' });

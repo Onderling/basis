@@ -99,7 +99,7 @@ describe('messaging on the phone — a circle round trip and a contact round tri
       // name the branch: did nothing arrive, did it fall to no handler, or was it refused?
       peer.send({ do: 'dump' });
       const dump = await peer.next('dump', () => true, 10_000).catch(() => null);
-      throw new Error(`${err.message}\nBram holds: ${JSON.stringify(dump)}`);
+      throw new Error(`${err.message}\nBram holds: ${JSON.stringify(dump)}\nBram is: ${JSON.stringify(ready.addresses)}`);
     }
   });
 });

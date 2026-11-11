@@ -76,7 +76,15 @@ const invite = await buildCircleInviteUri({
   relayUrl: `ws://${phoneHost}:${port}`,
 });
 if (invite?.error) { say({ step: 'error', error: invite.error }); process.exit(1); }
-say({ step: 'ready', invite: invite.uri, circleId: groupId, circleName });
+say({
+  step: 'ready', invite: invite.uri, circleId: groupId, circleName,
+  // which address is which, so a walk can name the one a phone used (a short prefix each)
+  addresses: {
+    chatKey: String(peer.pubKey ?? '').slice(0, 12),
+    circleSelf: String(peer.agent.circleSelf?.(groupId)?.webid ?? '').slice(0, 12),
+    circleAddress: String(peer.agent.circleAddressFor?.(groupId) ?? '').slice(0, 12),
+  },
+});
 
 if (talk) {
   // HEARING: what landed in the peer's own stores (its chat log, its stored contact threads), polled — the same

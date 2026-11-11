@@ -43,6 +43,12 @@ export const PERSON_ALLOWLIST = Object.freeze([
     detail: (f) => ({ side: f.inviteExchange }),
   }),
   Object.freeze({
+    id: 'granted',
+    reason: 'a view (a screen) this self granted access to, live in its grant set: the grant is the person\'s own act, so its nudges speak to it as the person',
+    matches: (f) => typeof f?.granted === 'string' && !!f.granted,
+    detail: (f) => ({ grantKind: f.granted }),
+  }),
+  Object.freeze({
     id: 'contact-card',
     reason: 'a person in this self\'s contact book (not hidden, not deleted), at an address the row names or one the identity link PROVES is theirs (a contact\'s other device): an address the person chose to keep, so speaking to it as the person links nothing new',
     matches: (f) => !!f?.contact,
@@ -267,6 +273,7 @@ export function sendDecisionFields(decision, explained = null, result = null, ta
   if (typeof decision?.allowedBy === 'string') out.allowedBy = decision.allowedBy;
   if (typeof decision?.origin === 'string') out.origin = decision.origin;
   if (typeof decision?.side === 'string') out.side = decision.side;
+  if (typeof decision?.grantKind === 'string') out.grantKind = decision.grantKind;
   // the route the send TOOK, as the send itself reported it; the candidates are explained only when nothing took it
   if (typeof taken === 'string' && taken) out.chosen = taken;
   const cands = Array.isArray(explained?.candidates) ? explained.candidates : [];

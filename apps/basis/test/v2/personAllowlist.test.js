@@ -28,6 +28,12 @@ describe('the person-key allowlist: data, one reason per entry, most specific fi
     expect(personAllowedBy({ contact: { webid: 'x' }, viaDevice: true })).toEqual({ allowedBy: 'contact-card', origin: 'card-via-device' });
   });
 
+  it('a view this self granted is allowed as granted, before a contact match, with its grant kind', () => {
+    expect(personAllowedBy({ granted: 'view', contact: { webid: 'x' } })).toEqual({ allowedBy: 'granted', grantKind: 'view' });
+    const ids = PERSON_ALLOWLIST.map((e) => e.id);
+    expect(ids.indexOf('granted')).toBeLessThan(ids.indexOf('contact-card'));
+  });
+
   it('a contact allow says WHERE the row came from', () => {
     expect(personAllowedBy({ contact: { webid: 'x', bot: true } })).toEqual({ allowedBy: 'contact-card', origin: 'bot' });
     expect(personAllowedBy({ inviteExchange: 'answer' })).toEqual({ allowedBy: 'invite-exchange', side: 'answer' });

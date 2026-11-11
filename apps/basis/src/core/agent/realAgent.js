@@ -6574,8 +6574,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** What this device holds about a person-path address: an open invite exchange, a kept contact, the fallback setting. */
   async function personSendFacts(to) {
     const inviteExchangeSide = inviteExchange.take(to);
-    const kept = inviteExchangeSide ? null : await keptContactOf(to);
-    return { inviteExchange: inviteExchangeSide, contact: kept?.row ?? null, viaDevice: kept?.via === 'device', addressFallback: addressFallbackOn() };
+    // a view this self granted (its grant set names the view's key): the grant is the fact
+    let granted = null;
+    if (!inviteExchangeSide) {
+      for (const set of allGrantSets()) {
+        try { await set.ready; if (set.grants.list().some((g) => g.viewPubKey === to)) { granted = 'view'; break; } } catch { /* next */ }
+      }
+    }
+    const kept = (inviteExchangeSide || granted) ? null : await keptContactOf(to);
+    return { inviteExchange: inviteExchangeSide, granted, contact: kept?.row ?? null, viaDevice: kept?.via === 'device', addressFallback: addressFallbackOn() };
   }
   /**
    * A contact the person KEPT, for `address`: a non-hidden book row naming it (`via: 'card'`), or, through the device-local

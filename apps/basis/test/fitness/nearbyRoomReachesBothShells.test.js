@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createNearbyRoomBinding, NEARBY_ROOM_SUBTYPES } from '../../src/v2/nearbyRoomBinding.js';
+import { phoneWiringSource } from '../support/phoneWiringSource.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(HERE, rel), 'utf8');
@@ -42,11 +43,12 @@ describe('the Nearby room reaches both shells', () => {
     const host = read('../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js');
     expect(host).toMatch(/createNearbyScreen\(\{\s*\.\.\.\(bundle\?\.nearbyRoom\?\.screenDeps\?\.\(\)/);
     expect(host).not.toMatch(/openNearbyThread\(/);
-    const router = read('../../../basis-mobile/src/screens/ChatScreen.js');
-    // the router spreads the room's handlers itself, or hands the room to the shared inbound wiring, which spreads them
+    // the phone's router spreads the room's handlers itself, or hands the room to the shared inbound wiring, which
+    // spreads them (read through the phone's whole composition: screen → src/core → the shared map)
+    const router = phoneWiringSource();
     if (/buildInboundWiring\(/.test(router)) {
       expect(router).toMatch(/nearbyRoom: bundle\?\.nearbyRoom/);
-      expect(read('../../src/v2/inboundWiring.js')).toMatch(/\.\.\.\(nearbyRoom\?\.handlers \?\? \{\}\)/);
+      expect(router).toMatch(/\.\.\.\(nearbyRoom\?\.handlers \?\? \{\}\)/);
     } else expect(router).toMatch(/\.\.\.\(bundle\?\.nearbyRoom\?\.handlers \?\? \{\}\)/);
   });
 });

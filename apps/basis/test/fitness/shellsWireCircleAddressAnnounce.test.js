@@ -22,6 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { phoneWiringSource } from '../support/phoneWiringSource.js';
 
 const dir = (p) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -52,9 +53,9 @@ const SEAMS = [
 
 describe('FITNESS — per-circle address announcing is wired by every shell', () => {
   for (const { name, file } of SHELLS) {
-    // A shell that builds through the shared inbound wiring (src/v2/inboundWiring.js) wires what the wiring wires.
-    const own = readFileSync(file, 'utf8');
-    const source = /buildInboundWiring\(/.test(own) ? own + readFileSync(dir('../../src/v2/inboundWiring.js'), 'utf8') : own;
+    // A shell that builds through the shared inbound wiring (src/v2/inboundWiring.js) wires what the wiring wires —
+    // the phone through its own composition first (screen → src/core → the shared map).
+    const source = phoneWiringSource(readFileSync(file, 'utf8'));
     for (const [seam, why] of SEAMS) {
       it(`${name} wires \`${seam}\``, () => {
         expect(source.includes(seam), `${name} is missing \`${seam}\` — ${why}`).toBe(true);

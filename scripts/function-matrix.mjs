@@ -71,10 +71,12 @@ export const FUNCTIONS = Object.freeze([
   // hopping = a member carries for a member (Frits 2026-11-03). Its EVENTUAL half is the catch-up: a member only the
   // LAN reaches pulls a statement from the member who reaches both. The story's LAN is a second relay standing in for
   // mDNS, and it boots the shared agent composition rather than a browser or the device-runner — named for web and box
-  // by Fable 2026-11-03 on that basis. The mobile cell is an mDNS story on the phones (later). The LIVE push is not built.
+  // by Fable 2026-11-03 on that basis. The mobile cell (Fable's brief 2026-11-10): the same story with a PHONE as the
+  // member who reaches both and serves — the phone's own bundle and inbound wiring (test/support/mobileNode.js). The live
+  // mDNS hop between two phones stays a step of the two-phone walk. The LIVE push is not built.
   { id: 'hopping', name: 'Hopping', cells: {
     web: { file: 'apps/basis/test/lanCatchUpCarriesAStatement.relay.test.js', test: 'holds his statement after her catch-up with Anna' },
-    mobile: null,
+    mobile: { file: 'apps/basis-mobile/test/lanCatchUpCarriesAStatement.mobile.relay.test.js', test: "holds his statement after her catch-up with Anna's phone" },
     box: { file: 'apps/basis/test/lanCatchUpCarriesAStatement.relay.test.js', test: 'holds his statement after her catch-up with Anna' },
   } },
   { id: 'task-sharing', name: 'Task sharing', cells: {
@@ -104,7 +106,10 @@ export const FUNCTIONS = Object.freeze([
   { id: 'attachments', name: 'Files and media as attachments (circles, contact threads)', cells: {
     // a file crossing to someone (circle-attach-file is one page) — Fable 2026-11-10
     web: { file: 'apps/basis/test-browser/walk-dm-photo.spec.js', test: 'a camera-sized photo sent to a contact arrives' },
-    mobile: null,   // attachmentPicker is a unit
+    // the phone's own "+" op (mountPhoneAppOps) sends a file into a contact thread; the other phone stores the same
+    // bytes through its own wiring (Fable 2026-11-11). A CIRCLE file's bytes cannot cross yet on any shell: one
+    // in-memory media bucket per session (the real bucket is not built); a plain circle offers no file entry at all.
+    mobile: { file: 'apps/basis-mobile/test/attachmentsMobile.relay.test.js', test: "Anna's thread '+' sends a file; Bob's phone stores the same bytes in his thread with her" },
     box: NA('the box renders no files in alpha one; keeping attachments available is later'),
   } },
   { id: 'restore-devices', name: 'Restore and your devices (phrase, second device, revoke)', cells: {

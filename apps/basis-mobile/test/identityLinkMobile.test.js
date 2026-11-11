@@ -18,6 +18,7 @@ import { sharedCircleLocale } from '@onderling-app/basis';
 import { buildCircleLanes } from '../../basis/src/v2/circleLanes.js';
 import { createIdentityLinks } from '../../basis/src/v2/identityLinkView.js';
 import { encodeLinkStartLink, IDENTITY_LINK_SUBTYPE } from '../../basis/src/v2/identityLink.js';
+import { phoneWiringSource } from '../../basis/test/support/phoneWiringSource.js';
 
 const src = (p) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
 const MYDATA = src('../src/screens/v2/CircleMyDataScreen.js');
@@ -35,7 +36,7 @@ describe('the identity link on the phone', () => {
     const identityLinks = createIdentityLinks({ signOffer: async () => ({ offer: 'onderling-koppel:x', nonce: 'n'.repeat(32), root: 'ROOT' }), selfRoots: () => ['ROOT'], callSkill });
     const lanes = buildCircleLanes({ agent: { identityLinks, sendPeerMessage: async () => {} } });
     // the phone's router spreads the lane table, directly or through the shared inbound wiring (which spreads it)
-    expect(CHAT).toMatch(/\.\.\.lanes\.handlers|\.\.\.circleLanes\.handlers|buildInboundWiring\(/);
+    expect(phoneWiringSource(CHAT)).toMatch(/\.\.\.lanes\.handlers|\.\.\.circleLanes\.handlers|buildInboundWiring\(/);
     const made = await identityLinks.view(encodeLinkStartLink('https://basis.example/app', { botAddress: 'BOT', botName: '@huisbot' })).offer();
     expect(made.ok).toBe(true);
     lanes.handlers[IDENTITY_LINK_SUBTYPE]('BOT', { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: 'BOT', row: 'telegram:42', root: 'ROOT' } });

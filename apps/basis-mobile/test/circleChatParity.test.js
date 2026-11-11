@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { phoneWiringSource } from '../../basis/test/support/phoneWiringSource.js';
 
 // Circle-chat receive/fan parity fitness — pins two fixes so the drift cannot recur:
 //
@@ -35,8 +36,9 @@ describe('circle chat — no inbox, card-fan parity (web ≡ mobile)', () => {
     // table rather than the subtype. `shellsRouteTheSameSubtypes` holds the table itself to routing
     // CHAT_STATEMENT_BROADCAST, and holds both shells to spreading it.
     // …and since the inbound wiring (src/v2/inboundWiring.js) the screen builds the table through it, which spreads it
-    expect(chatScreen).toMatch(/buildCircleLanes|buildInboundWiring\(/);
-    expect(chatScreen).toMatch(/\.\.\.lanes\.handlers|buildInboundWiring\(/);
+    // (read through the phone's whole composition: screen → src/core/phoneInboundWiring.js → the shared map)
+    expect(phoneWiringSource()).toMatch(/buildCircleLanes|buildInboundWiring\(/);
+    expect(phoneWiringSource()).toMatch(/\.\.\.lanes\.handlers|buildInboundWiring\(/);
   });
 
   it('BOTH shells thread `card` through the shared circle fan helper', () => {

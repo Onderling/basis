@@ -103,8 +103,12 @@ export function makeKeyEventLogSink({ groupId = null, resolveRecipientAddrs, sen
       }
       // The direct peer fan: the log-less degrade (no lane, so no statement to hand the waist), and
       // the fallback for a composition that wires no `fanStatement`.
+      // It names the circle it fans for, so the app's send gate takes the circle's route (its self, its points), never
+      // the person path: key traffic under the person key is refused by every member inside a circle.
+      const cid = groupId ?? event.groupId ?? null;
+      const opts = cid ? { ...(sendOptions ?? {}), circleId: cid } : sendOptions;
       await Promise.all(addrs.map((addr) =>
-        Promise.resolve(sendPeer(addr, payload, sendOptions)).catch(() => { /* best-effort per recipient */ })));
+        Promise.resolve(sendPeer(addr, payload, opts)).catch(() => { /* best-effort per recipient */ })));
     },
   };
 }

@@ -9575,6 +9575,8 @@ async function boot() {
       signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
       // a pod-backed circle's redeem tells the admitting admin which pod WebID to grant
       podWebId: () => circleOwnerWebId,
+      // the request to the invite's address may leave on the person key for this redeem (the send gate's invite exchange)
+      inviteExchange: agent.inviteExchange ?? null,
     });
     // when signed in, route pinboard's items to the user's REAL pod (parity with
     // folio/calendar; reuses pinboard's already-built pod-routing write-through). Best-effort.
@@ -9847,6 +9849,8 @@ async function boot() {
             // a code bound to one person is theirs from any of their addresses (the canonical chat key)
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
             publishEvent: publishEventToLog,
+            // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
+            inviteExchange: agent.inviteExchange ?? null,
             // …and return OUR per-circle address for the circle being joined, proven the same way the
             // joiner proves theirs, so per-circle addressing works in both directions from the join on.
             circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,

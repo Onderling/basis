@@ -60,6 +60,9 @@ export function makeHandleGroupRedeemRequest({
   // The sender's CANONICAL key (the device-local identity link: a per-circle address → the person's chat key). A code
   // bound to one person is checked against this, resolved here from the verified sender — never read from the body.
   identityOf = null,
+  // The agent's invite-exchange registrations (`agent.inviteExchange`): the one reply to a well-formed request (its answer
+  // when it proved its code, else its refusal) may go back on the person key (the send gate's person-key allowlist).
+  inviteExchange = null,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -130,6 +133,12 @@ export function makeHandleGroupRedeemRequest({
       reply = { error: err?.message ?? String(err) };
     }
     try {
+      // the one reply on the person key: the answer when the request proved its code, else the refusal (the request was
+      // well-formed: garbage is turned away above and earns nothing)
+      try {
+        if (reply.ok) inviteExchange?.answerProvenRequest?.(fromAddr);
+        else inviteExchange?.refuseParsedRequest?.(fromAddr);
+      } catch { /* the gate then records 'none' */ }
       await sendPeer(fromAddr, {
         type:    'p2p-chat',
         subtype: 'group-redeem-response',
@@ -230,6 +239,9 @@ export function makeSendGroupRedeemRequest({
   // circle, and only to the admin the request goes to: their pod's read grant has to name it.
   podWebId = null,
   sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = 30_000, logger = console,
+  // The agent's invite-exchange registrations (`agent.inviteExchange`): the request to the invite's address may leave on
+  // the person key for this redeem's lifetime (the send gate's person-key allowlist), released on answer/timeout/error.
+  inviteExchange = null,
 } = {}) {
   if (typeof sendPeer !== 'function') {
     throw new Error('makeSendGroupRedeemRequest: sendPeer required');
@@ -294,6 +306,8 @@ export function makeSendGroupRedeemRequest({
       try { const w = await podWebId(); ownPodWebId = (typeof w === 'string' && /^https?:\/\//.test(w)) ? w : null; } catch { ownPodWebId = null; }
     }
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    let release = () => {};
+    try { release = inviteExchange?.expectFromInviter?.(adminPeerAddr) ?? release; } catch { /* the gate then records 'none' */ }
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pendingMap.delete(requestId);
@@ -301,6 +315,8 @@ export function makeSendGroupRedeemRequest({
       }, timeoutMs);
       pendingMap.set(requestId, { resolve, reject, timer });
     });
+    // the exchange is open while the redeem is: its answer, its timeout and its error all close it
+    promise.then(release, release);
     try {
       const request = {
         type:    'p2p-chat',
@@ -330,6 +346,7 @@ export function makeSendGroupRedeemRequest({
         try { clearTimeout(entry.timer); } catch { /* defensive */ }
         pendingMap.delete(requestId);
       }
+      release();
       logger.warn?.('[group-redeem] send failed', adminPeerAddr, err);
       throw new Error(`Failed to reach admin over NKN: ${err?.message ?? err}`);
     }

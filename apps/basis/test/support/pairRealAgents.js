@@ -71,7 +71,7 @@ import {
   makeSendGroupRedeemRequest,
   makeHandleGroupRedeemResponse,
 } from '../../src/core/handlers/groupRedeem.js';
-import { makePropagateMeshIntros, makeHandleCirclePeerIntro } from '../../src/core/handlers/meshIntros.js';
+import { makeHandleCirclePeerIntro } from '../../src/core/handlers/meshIntros.js';
 // B2 — the exact per-circle address announcing wiring both shells use.
 import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
@@ -197,7 +197,6 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
 
   const pendingMap = new Map();
-  const propagateMeshIntros = makePropagateMeshIntros({ callSkill, sendPeer, logger: QUIET });
   // The circle chat's device log — what the chat rail below lands each verified statement on (the shells' wiring).
   const chatEventLog = new EventLog({ initial: [], muted: [] });
   // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
@@ -258,6 +257,24 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const returned = [];               // hidden contacts a landed turn brought back (the shells' `onReturned`), in order
   // the pair roster (L105), composed as both shells do — the redeem sender is built below, late-bound
   const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
+  // The post-join step EVERY join runs, as both shells compose it (web `circleOnJoined`, mobile `onCircleJoined`): register
+  // this device's per-circle address, bind the others', PULL the circle's lanes, then announce. One function, handed to the
+  // pair roster below AND to `joinExistingCircle`'s wizard join. Without it on the wizard join, this device's per-circle
+  // address was never on the bus, so the admin's membership fan to it was held unreachable and a co-member never learned a
+  // later joiner; the harness's mesh introductions hid that (no shell sends them).
+  const onJoined = async ({ circleId }) => {
+    const r = await makeCircleReachable({
+      agent, circleId,
+      // the presence half as the shells run it: this device's per-circle address (and the person address) bound on
+      // its transport, so a message to it over the pair roster can land — `bindCircleAddresses`, for this node
+      registerCirclePresence: () => pairSeams.bindSelf?.(circleId),
+      pullLanes: (cid) => pairSeams.membershipCatchUp?.requestCircle(cid, { callSkill: (a, o, g) => callSkill(a, o, g) }),
+    });
+    // …and ANNOUNCE (the shells' presence step does: prime, then announce) — this device's address with its ceremony
+    // commitment, which is what lets the other side fold this person's rotations
+    try { await announceOwnCircleAddress({ agent, circleId, logger: QUIET }); } catch { /* the next boot re-announces */ }
+    return r;
+  };
   const pairRoster = createPairRoster({
     selfWebid: pubKey,
     selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,   // as the shells compose it
@@ -265,21 +282,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
     signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
-    // the post-join step as the shells run it: register, bind, and PULL the circle's lanes (the join statement that
-    // carries this device's own key, the founder's create) — the catch-up is built below, late-bound
-    onJoined: async ({ circleId }) => {
-      const r = await makeCircleReachable({
-        agent, circleId,
-        // the presence half as the shells run it: this device's per-circle address (and the person address) bound on
-        // its transport, so a message to it over the pair roster can land — `bindCircleAddresses`, for this node
-        registerCirclePresence: () => pairSeams.bindSelf?.(circleId),
-        pullLanes: (cid) => pairSeams.membershipCatchUp?.requestCircle(cid, { callSkill: (a, o, g) => callSkill(a, o, g) }),
-      });
-      // …and ANNOUNCE (the shells' presence step does: prime, then announce) — this device's address with its ceremony
-      // commitment, which is what lets the other side fold this person's rotations
-      try { await announceOwnCircleAddress({ agent, circleId, logger: QUIET }); } catch { /* the next boot re-announces */ }
-      return r;
-    },
+    // the post-join step as the shells run it (above): register, bind, PULL the circle's lanes, announce
+    onJoined,
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid, logger: QUIET }),
     // the handle this person joins under, as the shells read it (their own whoAmI handle), not the node's label
@@ -345,9 +349,10 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
     [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
     [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,
-    // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
+    // ADMIN side: verify the joiner's code + reply, then hand over circle addresses (no mesh intros: no shell sends them).
     'group-redeem-request': makeHandleGroupRedeemRequest({
-      callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
+      callSkill, sendPeer, logger: QUIET,
+      inviteExchange: agent.inviteExchange ?? null,   // as both shells: the one answer to a proven request
       onAdmitted: (a) => pairRoster.onAdmitted(a),
       // a code bound to one person is theirs from any of their addresses (the canonical chat key), as the shells pass it
       identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
@@ -478,6 +483,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
     pendingMap,
+    inviteExchange: agent.inviteExchange ?? null,   // as both shells: the request to the invite's address
     currentPersonKey: () => agent.personKey?.() ?? null,   // as both shells: the first person key rides the join
     circleAddressFor: agent.circleAddressFor,
     // …and prove it (web ≡ mobile ≡ harness): a fresh per-circle address is signed with its own key.
@@ -501,7 +507,10 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, onJoined,
+    // this device's presence in a circle: its per-circle address bound on its transport (the shells' `registerCirclePresence`)
+    registerPresence: (cid) => pairSeams.bindSelf?.(cid),
+    keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
   // a re-key moved this persona's circle addresses: register them as the shells do
   agent.onCircleRootMoved?.(async ({ circleIds }) => { await bindCircleAddresses([node], circleIds); });
@@ -725,6 +734,10 @@ export async function createCircle(admin, { groupId = 'peer-circle', name = 'Pee
   state.purpose = purpose;
   const { result: created, state: outState } = await createGroupFinalSubmit({ state, callSkill: adminCallSkill });
   if (!created) throw new Error(`createGroupV2 failed: ${outState?.submitError ?? 'unknown'}`);
+  // the founder's presence in the new circle, as both shells register it once the launcher reloads after a create
+  // (web: the create wizard's onDispatched → registerCirclePresence; mobile: the launcher's load). Without it the
+  // founder's per-circle address is not on the bus and its membership fan cannot leave as the circle.
+  await admin.registerPresence?.(groupId);
   return { created, groupId };
 }
 
@@ -752,6 +765,8 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
     // joiner silently skipped the registry record the restore/enroll paths read.
     circleAddressFor: (cid) => joiner.agent.circleAddressFor?.(cid) ?? null,
     signCircleLink: (src, dst, addr) => joiner.agent.signCircleLink?.(src, dst, addr) ?? null,
+    // the host's post-join step, as both shells hand it to the wizard (register, bind, pull, announce)
+    onJoined: joiner.onJoined,
   });
   return { invite, joined, groupId };
 }

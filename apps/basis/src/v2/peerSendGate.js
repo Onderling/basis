@@ -17,6 +17,132 @@
  * The transport layer never learns that a circle exists; the circle travels down as points (the scope).
  */
 import { circleAddressSetOf } from './circleAddressKeys.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+/**
+ * How long one invite exchange's send stays allowed on the person key: outlives the joiner's 30 s redeem timeout, so the
+ * request and its retries match, and an answer the inviter never sent does not stand.
+ */
+export const INVITE_EXCHANGE_LIFETIME_MS = param({ key: 'sendGate.inviteExchangeLifetimeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+/** At most this many invite exchanges are open at once on a device; past it the oldest goes. */
+export const INVITE_EXCHANGE_MAX = param({ key: 'sendGate.inviteExchangeMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 16 });
+
+/**
+ * THE PERSON KEY'S ALLOWLIST. A send that is no circle's and no own device's leaves on the person key ONLY for one of
+ * these reasons; anything else is 'none' (recorded today; held as 'unknown-address' once the gate enforces it). Data, in
+ * one place: a new case is an entry here with its reason, never a silent fallback. Each entry answers from FACTS the agent
+ * hands in (what this device holds), never from a caller's option, so no caller can name an entry for itself. Ordered
+ * most specific first, the person's address-fallback setting LAST, so `allowedBy` names the real reason.
+ * (Own devices are decided before the gate and recorded as 'own-device'.)
+ */
+export const PERSON_ALLOWLIST = Object.freeze([
+  Object.freeze({
+    id: 'invite-exchange',
+    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal) (the invite names the inviter\'s cross-circle id by decision, so this buys no link)',
+    matches: (f) => f?.inviteExchange === 'joiner' || f?.inviteExchange === 'answer' || f?.inviteExchange === 'refusal',
+    detail: (f) => ({ side: f.inviteExchange }),
+  }),
+  Object.freeze({
+    id: 'contact-card',
+    reason: 'a person in this self\'s contact book (not hidden, not deleted): an address the person chose to keep, so speaking to it as the person links nothing new',
+    matches: (f) => !!f?.contact,
+    detail: (f) => ({ origin: contactOriginOf(f.contact) }),
+  }),
+  Object.freeze({
+    id: 'address-fallback',
+    reason: 'the person turned on "rather routed over my one key than undeliverable": their choice, so the last resort',
+    matches: (f) => f?.addressFallback === true,
+  }),
+]);
+
+/**
+ * Which allowlist entry lets a person-key send through, from the facts the agent holds about `to`.
+ * @param {{inviteExchange?: 'joiner'|'answer'|null, contact?: object|null, addressFallback?: boolean}} [facts]
+ * @returns {{allowedBy: string, origin?: string, side?: string}}
+ */
+export function personAllowedBy(facts = {}) {
+  for (const e of PERSON_ALLOWLIST) {
+    let hit = false;
+    try { hit = e.matches(facts ?? {}) === true; } catch { hit = false; }
+    if (hit) return { allowedBy: e.id, ...(e.detail ? e.detail(facts) : {}) };
+  }
+  return { allowedBy: 'none' };
+}
+
+/**
+ * Where a contact-book row came from, read off the fields it carries: a bot's row, an identity link, the pair roster's
+ * row for a contact's pair circle, or a card scan / deliberate add (the book does not tell those two apart today).
+ * @param {object} row
+ * @returns {'bot'|'link'|'pair-roster'|'card-or-add'}
+ */
+export function contactOriginOf(row) {
+  if (row?.bot === true) return 'bot';
+  if (row?.linkedRow || Number.isFinite(row?.linkedAt)) return 'link';
+  if (typeof row?.pairCircleId === 'string' && row.pairCircleId) return 'pair-roster';
+  return 'card-or-add';
+}
+
+/**
+ * THE INVITE EXCHANGE's person-key sends, registered by the redeem code itself and nothing else: the JOINER's request to
+ * the address on the invite it is redeeming (for that redeem's lifetime, released on its answer, timeout, error or failed
+ * send), and the INVITER's ONE reply to a well-formed request: the answer when the request proved its code, the refusal
+ * when it did not (each consumed by that reply). Bounded in count and in time; never a standing allow.
+ *
+ * One registration per redeem: two redeems open at once to one inviter (two codes from one admin) are counted, so the
+ * first answer does not close the second. A reply is consumed on the gate's FIRST pass: every shell hands the redeem
+ * handler `agent.sendPeerMessage`, one call is one pass, and hold-forward redelivery happens below the gate (the secure
+ * agent's queue), so nothing re-enters it for the same reply.
+ */
+export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVITE_EXCHANGE_LIFETIME_MS, max = INVITE_EXCHANGE_MAX } = {}) {
+  /** address → { n, until }: redeems open toward that inviter */
+  const joiners = new Map();
+  /** address → { side: 'answer'|'refusal', until }: the one reply owed to that joiner */
+  const replies = new Map();
+  const sweep = () => {
+    const t = now();
+    for (const m of [joiners, replies]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
+  };
+  const bound = (m) => { while (m.size > max) m.delete(m.keys().next().value); };
+  const reply = (address, side) => {
+    if (typeof address !== 'string' || !address) return;
+    sweep();
+    replies.delete(address);   // re-insert: the newest goes last, so the bound drops the oldest
+    replies.set(address, { side, until: now() + lifetimeMs });
+    bound(replies);
+  };
+  return {
+    /** JOINER: a redeem is about to send to the invite's address. Returns its release (idempotent). */
+    expectFromInviter(address) {
+      if (typeof address !== 'string' || !address) return () => {};
+      sweep();
+      const e = joiners.get(address);
+      joiners.delete(address);
+      joiners.set(address, { n: (e?.n ?? 0) + 1, until: now() + lifetimeMs });
+      bound(joiners);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        const cur = joiners.get(address);
+        if (!cur) return;
+        if (cur.n <= 1) joiners.delete(address); else cur.n -= 1;
+      };
+    },
+    /** INVITER: a well-formed request from `address` did not prove its code; its ONE refusal may go back. */
+    refuseParsedRequest(address) { reply(address, 'refusal'); },
+    /** INVITER: a request from `address` proved its code; its ONE answer may go back (replaces a refusal registration). */
+    answerProvenRequest(address) { reply(address, 'answer'); },
+    /** The gate asks, once per send: 'answer' | 'refusal' (now consumed) | 'joiner' | null. */
+    take(address) {
+      if (typeof address !== 'string' || !address) return null;
+      sweep();
+      const r = replies.get(address);
+      if (r) { replies.delete(address); return r.side; }
+      return joiners.has(address) ? 'joiner' : null;
+    },
+    get size() { sweep(); return joiners.size + replies.size; },
+  };
+}
 
 /**
  * Member per-circle address → circleId, from the roster reads the agent already makes (the sender check's read),
@@ -117,6 +243,10 @@ export function sendDecisionFields(decision, explained = null, result = null, ta
     scope: decision?.circleId ? 'circle' : 'none',
     reason: decision?.reason ?? 'unknown',
   };
+  // which person-key allowlist entry let it through (or 'none'), and a contact row's origin / the exchange's side: codes
+  if (typeof decision?.allowedBy === 'string') out.allowedBy = decision.allowedBy;
+  if (typeof decision?.origin === 'string') out.origin = decision.origin;
+  if (typeof decision?.side === 'string') out.side = decision.side;
   // the route the send TOOK, as the send itself reported it; the candidates are explained only when nothing took it
   if (typeof taken === 'string' && taken) out.chosen = taken;
   const cands = Array.isArray(explained?.candidates) ? explained.candidates : [];

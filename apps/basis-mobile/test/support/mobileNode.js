@@ -8,6 +8,8 @@
  *     consumers, the circle pods, the registry backend). `phoneBootParity.test.js` holds this file to App.js's list;
  *   - the receive path is the phone's own composition, `buildPhoneInboundWiring` (src/core/phoneInboundWiring.js) —
  *     the function ChatScreen calls — with the screen's paint replaced by recorders;
+ *   - the ops on the waist are the phone's own mount, `mountPhoneAppOps` (src/core/phoneAppOps.js) — the function the
+ *     launcher calls — with the platform (picker, scanner, dialogs) recorded, and the picker fed by the story;
  *   - the relay is the one the phone's settings name: written into ITS storage before boot, dialled by the boot's own
  *     connect (no second dial from here).
  *
@@ -55,6 +57,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
   const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
   const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
+  const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
   const { subscribeContactReplies } = await import('../../src/core/contactReplyInbox.js');
   const pods = await import('../../src/core/circlePods.js');
   const { asyncStorageMappingsStore, MAPPINGS_DEVICE } = await import('../../src/core/mappingsStoreRN.js');
@@ -192,6 +195,27 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     onPeerMessage: makePeerRouter({ handlers, defaultHandler: (env) => { landed.unrouted.push(env); } }),
   });
 
+  // ── what the launcher mounts: the phone's own ops on the waist (src/core/phoneAppOps.js), its platform recorded ─
+  // The file picker is the story's: `node.pickNext(file)` hands the next pick the shape the phone's picker returns
+  // ({ name, type, size, dataB64 }); with nothing queued a pick is a cancel, as a person backing out of the picker.
+  const picks = [];
+  const asked = { qrScans: 0, feedback: [], personCards: [] };
+  let openCircle = null;
+  mountPhoneAppOps({
+    agent: bundle.agent, catalogue: bundle.catalogue, callSkill: bundle.callSkill, t, eventLog,
+    activeCircle: () => openCircle,
+    platform: {
+      openFilePicker: async () => picks.shift() ?? null,
+      openQrScanner: () => { asked.qrScans += 1; },
+      openFeedback: (a) => { asked.feedback.push(a); },
+      confirmFeedbackOffer: async () => true,   // the person taps yes
+      feedbackCard: null,
+      appVersion: 'test',
+      currentScreen: () => null,
+      showPersonCard: (card) => { asked.personCards.push(card); },
+    },
+  });
+
   // ── on the relay: the boot's own connect, awaited ────────────────────────────────────────────────────────────
   // (`agent.relay` names the primary relay but carries no socket state; the per-relay list does)
   const onRelay = () => (bundle.agent?.relays?.list?.() ?? []).some((r) => r.url === relayUrl && r.connected === true);
@@ -208,6 +232,11 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     storage: AsyncStorage,
     flags,
     landed,
+    asked,
+    /** Queue the next file the phone's picker returns ({ name, type, size, dataB64 }). */
+    pickNext: (file) => { picks.push(file); },
+    /** Which circle the launcher has open (the lists write there). */
+    openCircle: (circleId) => { openCircle = circleId; },
     async dispose() {
       unsubscribe?.();
       await bundle.dispose?.();

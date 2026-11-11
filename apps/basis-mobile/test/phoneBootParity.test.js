@@ -72,3 +72,18 @@ describe('FITNESS — the phone in Node passes the phone\'s boot options', () =>
     expect(Object.keys(NODE_ONLY).filter((k) => !node.has(k) || app.has(k)), 'listed as Node-only, but it is not').toEqual([]);
   });
 });
+
+describe('FITNESS — the phone in Node composes what the screens compose, through the same src/core functions', () => {
+  const launcher = read('../src/screens/v2/CircleLauncherScreen.js');
+  const chat = read('../src/screens/ChatScreen.js');
+  const node = read('./support/mobileNode.js');
+  it('the ops on the waist: the launcher and the Node phone both mount through mountPhoneAppOps', () => {
+    expect(launcher).toMatch(/mountPhoneAppOps\(/);
+    expect(node).toMatch(/mountPhoneAppOps\(/);
+    expect(launcher, 'the launcher mounts an op table of its own beside the shared one').not.toMatch(/mountAppOps\(/);
+  });
+  it('the receive path: ChatScreen and the Node phone both build through buildPhoneInboundWiring', () => {
+    expect(chat).toMatch(/buildPhoneInboundWiring\(/);
+    expect(node).toMatch(/buildPhoneInboundWiring\(/);
+  });
+});

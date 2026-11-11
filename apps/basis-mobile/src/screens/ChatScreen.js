@@ -456,7 +456,7 @@ export default function ChatScreen({
     // a circle bubble on web). The default handler below (the main-thread bubble) stays the screen's.
     const { handlers, lanes } = buildPhoneInboundWiring({
       bundle, agent, callSkill, contactChannel,
-      // OBJ-2 — the BUNDLE's shared map (so a v2-launcher join correlates here too); ref is the fallback.
+      // the bundle's shared redeem map, so a join made from the launcher correlates here too; the ref is the fallback
       pendingRedeems: pendingPeerRedeems ?? pendingPeerRedeemsRef.current,
       sharedWithMeStore: sharedWithMeStore ?? null,
       eventLog: eventLogRef.current, deliveryStateMap, chatStoredReceipt, onCirclesChanged,

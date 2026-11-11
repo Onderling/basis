@@ -158,7 +158,7 @@ export function buildPhoneInboundWiring({
     // a contact's turn and a person's message land in the thread and the open thread screen
     contactChannel,
     onContactReply: (turn) => { landContactTurn(turn); pushContactReply(turn); },
-    // OBJ-2 — the BUNDLE's shared map (so a v2-launcher join correlates here too).
+    // the bundle's shared redeem map, so a join made from the launcher correlates here too
     pendingRedeems,
     // a member admitted into a PAIR circle is its co-admin (the pair roster's rule); the launcher re-reads its circles
     // (an admin's own admission is a local write, so the membership lane's signal never fires for it)

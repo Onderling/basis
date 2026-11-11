@@ -23,7 +23,9 @@ export default function ActStateBar({ store = null, topInset = 0 }) {
   return (
     <Pressable
       style={[styles.bar, { top: topInset + 6 }, line.state === 'failed' ? styles.failed : line.state === 'done' ? styles.done : styles.pending]}
-      accessibilityRole="status"
+      // Android knows no "status" role and throws when the view paints (test/accessibilityRolesAndroid.test.js): a
+      // running or ended act is announced through the live region as text; a failed one as an alert
+      accessibilityRole={line.state === 'failed' ? 'alert' : 'text'}
       accessibilityLiveRegion="polite"
       testID={`act-state-${line.state}`}
       onPress={() => store?.dismiss?.()}

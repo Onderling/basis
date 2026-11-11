@@ -769,6 +769,15 @@ Found writing `apps/basis-mobile/e2e/walkFixes20261008.test.js`; each cost a run
 - **Verify by logcat, not by guessing**: `adb logcat -d -s ReactNativeJS | grep -E "\[link\]|addContactFromQr"` shows
   whether the link drained and whether the add ran.
 
+## An accessibility role Android does not know closes the app (2026-11-11)
+
+React Native on Android maps `accessibilityRole` onto a native enum and throws `IllegalArgumentException: Invalid
+accessibility role value: …` when the view paints, so the app dies at that moment. The act strip used `"status"` (a
+valid web ARIA role, not an Android one), and the first act after joining a circle closed the app; vitest never paints a
+screen, so only the emulator showed it. A crash under Detox looks like "not visible within …" with the home screen in
+the screenshot: read `adb logcat -d -b crash` first. `apps/basis-mobile/test/accessibilityRolesAndroid.test.js` reads the
+allowed roles from React Native's Android source and holds every role the phone paints to them.
+
 ## Building a mobile APK to verify a fix: three traps (2026-10-09)
 
 Each one produced an APK that did not carry the code it was built to test.

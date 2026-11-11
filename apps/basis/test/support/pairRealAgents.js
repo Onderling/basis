@@ -795,6 +795,10 @@ export function memberOpener(node, groupId) {
 
 // Hold-forward on: a key-event/content send to an offline member is HELD (not lost), then flushed on reconnect.
 const SEALED_SEND = { hold: true, firstSendTimeoutMs: 0, retryDelays: [] };
+/** A member's address IN the circle, as the shells fan circle traffic (to the member's per-circle address, scoped to the
+ *  circle): never their person key, which a circle refuses for in-circle traffic. Falls back to the person key only for a
+ *  node that has no per-circle address for the circle at all. */
+const memberCircleAddress = (n, groupId) => n.agent.circleAddressFor?.(groupId) ?? n.pubKey;
 
 /** Emit a key-event THROUGH THE LANE (sign + chain + append on the emitter's device log), refresh the
  *  emitter's store from the lane projection, and fan the STATEMENT to each recipient node over the real
@@ -804,7 +808,7 @@ async function emitAndFanKeyEvent(from, toNodes, groupId, event) {
   if (!statement) throw new Error('emitAndFanKeyEvent: the key lane refused to sign (no circle signer?)');
   await projectKeyEventsIntoStore({ rail: from.agent.keyRail, store: from.keyEventStore, circleId: groupId });
   await Promise.all(toNodes.map((n) =>
-    from.agent.sendPeerMessage(n.pubKey, { subtype: KEY_STATEMENT_BROADCAST, circleId: groupId, event: statement }, SEALED_SEND)));
+    from.agent.sendPeerMessage(memberCircleAddress(n, groupId), { subtype: KEY_STATEMENT_BROADCAST, circleId: groupId, event: statement }, { ...SEALED_SEND, circleId: groupId })));
   return statement;
 }
 
@@ -829,7 +833,7 @@ export async function postSealed({ admin, members = [], groupId, text }) {
   if (!groupKey) throw new Error('postSealed: the admin holds no current group key to seal with');
   const env = sealForAudience(text, { groupKey }, { audience: 'circle' });
   await Promise.all(members.map((n) =>
-    admin.agent.sendPeerMessage(n.pubKey, { type: 'sealed-content', subtype: 'sealed-content', groupId, env }, SEALED_SEND)));
+    admin.agent.sendPeerMessage(memberCircleAddress(n, groupId), { type: 'sealed-content', subtype: 'sealed-content', groupId, env }, { ...SEALED_SEND, circleId: groupId })));
   return env;
 }
 

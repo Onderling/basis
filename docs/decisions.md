@@ -1450,3 +1450,20 @@ standard nouns and verbs, the first realm extension; the name stays only as a wi
 facets above are how Basis shows any noun (built). The in-app bot of 2026-09-05 is the assistant thread: it reads
 the same phrases as the Telegram bot from one shared rule set. Mij's "open" count includes unfinished list items.
 The household manifest's device and identity actions move out of it after the alpha (a move, no behaviour change).
+
+## 2026-11-11 — One send gate: the address decides the circle, and every send says why it went where it went (Frits, Fable)
+
+Every app-level peer message leaves through one function in the agent (`peerSend`, realAgent), and below it one wire
+call. The gate decides by what this device KNOWS, not by what a caller remembered to pass: a member's per-circle
+address in one of my circles is that circle's traffic (my circle self, the circle's connection points), whether or not
+the caller named the circle; a caller's circle that disagrees with the roster is refused; my own devices are reached as
+siblings; anything else keeps the person path, so a first message to a new card still goes. The transport layer still
+never learns that a circle exists: the circle travels down as points (architecture §4, "Per-peer is not enough for a
+circle"). Before this, the circle was an optional extra beside a raw address and ~40 callers could forget it; such a
+send was reported delivered and refused at the other end.
+
+Each send writes ONE record (`agent/send.decision`, codes and scalars only, never an address or a circle id): what the
+gate decided, each candidate transport by kind with why it is or is not eligible and whether it reaches, the one chosen,
+and the outcome. It shows in the copy-log door and, on a test build, in logcat, so a failure on a phone names its branch
+without a new instrument. Connection points compare in one form (`samePoint`): spellings of one relay match, two names
+for one host do not.

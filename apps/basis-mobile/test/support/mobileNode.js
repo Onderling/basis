@@ -98,6 +98,8 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const { EventLog } = await import('../../../basis/src/eventLog.js');
   const { makeGiveUpConsumers } = await import('../../../basis/src/v2/deliveryGiveUp.js');
   const { makeCircleMembraneOpts, makeCircleGroupsIndex } = await import('../../../basis/src/v2/circleMembrane.js');
+  // THIS phone's copy-log door: each phone has its own module graph (the reset above), so its own log ring buffer
+  const { logReportView } = await import('../../../basis/src/log/logReport.js');
   const { sealedLocalBackend } = await import('../../../basis/src/v2/localStoreSeal.js');
   const { backendSnapshotIo } = await import('../../../basis/src/v2/eventLogPersistence.js');
   const { createSettingsPodMedium } = await import('../../../basis/src/v2/settingsPodMedium.js');
@@ -220,7 +222,9 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     },
   });
   bundle.attachPeerWiring({
-    onPeerMessage: makePeerRouter({ handlers, defaultHandler: (env) => { landed.unrouted.push(env); } }),
+    // the router hands a default handler (from, payload), not the envelope: recorded as `{ from, payload }` (this read
+    // `(env)` and kept only the sender's address, so a story could count unrouted frames but never say what they were)
+    onPeerMessage: makePeerRouter({ handlers, defaultHandler: (from, payload) => { landed.unrouted.push({ from, payload }); } }),
   });
 
   // ── what the launcher mounts: the phone's own ops on the waist (src/core/phoneAppOps.js), its platform recorded ─
@@ -265,6 +269,8 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     landed,
     nkn: { sent: nknLib.sent ?? [] },
     asked,
+    /** The text this phone's "copy log" door shows (its own ring buffer; codes and scalars only). */
+    copyLog: () => logReportView({ at: Date.now() }).text,
     /** Queue the next file the phone's picker returns ({ name, type, size, dataB64 }). */
     pickNext: (file) => { picks.push(file); },
     /** Which circle the launcher has open (the lists write there). */

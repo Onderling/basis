@@ -232,16 +232,18 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
   /* ── Adversarial ─────────────────────────────────────────────────────────────────────────── */
 
   it('ADVERSARIAL: a MEMBER signing canonically at a per-circle address is REFUSED', async () => {
-    // The change, proved. `sendPeerMessage` carries no `sendAs`, so this envelope is signed by the
-    // admin's canonical identity — a real member of this circle, declining per-circle signing, on
-    // the real send path. Every cryptographic check passes; the roster refuses it anyway, because
-    // that member has proved they can sign per-circle and the leak is therefore not on offer.
+    // The change, proved. This envelope is signed by the admin's canonical identity — a real member of
+    // this circle, declining per-circle signing. Every cryptographic check passes; the roster refuses it
+    // anyway, because that member has proved they can sign per-circle and the leak is therefore not on offer.
+    // Sent BELOW the app's send gate (the raw secure agent), as an adversary would: the app itself can no
+    // longer produce this envelope, since `sendPeerMessage` to a member's circle address now leaves as the
+    // circle's self whether or not the caller names the circle (peerSendGate.js).
     const bramInA = bram.agent.circleAddressFor(CIRCLE_A);
     expect(typeof bramInA).toBe('string');
 
     const before = bram.agent.circleSenderAuthorization();
     const text = `canonical-in-circle-${rnd()}`;
-    await admin.agent.sendPeerMessage(bramInA, chatEnvelope(CIRCLE_A, text));
+    await admin.agent.sa.peer.sendTo(bramInA, chatEnvelope(CIRCLE_A, text), { guarantee: 'hold-forward' });
     await settle(1500);
 
     const after = bram.agent.circleSenderAuthorization();

@@ -34,7 +34,8 @@ describe('the identity link on the phone', () => {
     };
     const identityLinks = createIdentityLinks({ signOffer: async () => ({ offer: 'onderling-koppel:x', nonce: 'n'.repeat(32), root: 'ROOT' }), selfRoots: () => ['ROOT'], callSkill });
     const lanes = buildCircleLanes({ agent: { identityLinks, sendPeerMessage: async () => {} } });
-    expect(CHAT).toMatch(/\.\.\.lanes\.handlers|\.\.\.circleLanes\.handlers/);
+    // the phone's router spreads the lane table, directly or through the shared inbound wiring (which spreads it)
+    expect(CHAT).toMatch(/\.\.\.lanes\.handlers|\.\.\.circleLanes\.handlers|buildInboundWiring\(/);
     const made = await identityLinks.view(encodeLinkStartLink('https://basis.example/app', { botAddress: 'BOT', botName: '@huisbot' })).offer();
     expect(made.ok).toBe(true);
     lanes.handlers[IDENTITY_LINK_SUBTYPE]('BOT', { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: 'BOT', row: 'telegram:42', root: 'ROOT' } });

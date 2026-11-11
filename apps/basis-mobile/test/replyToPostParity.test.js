@@ -15,7 +15,9 @@ const read = (p) => readFileSync(here(p), 'utf8');
 
 describe('reply-to-post surface parity', () => {
   const webApp    = read('../../basis/web/v2/circleApp.js');
-  const mobileApp = read('../src/screens/ChatScreen.js');
+  // The phone's router is the shared inbound wiring once ChatScreen builds through it: its handler map is read there.
+  const chatScreen = read('../src/screens/ChatScreen.js');
+  const mobileApp = chatScreen + (/buildInboundWiring\(/.test(chatScreen) ? read('../../basis/src/v2/inboundWiring.js') : '');
   const webThread    = read('../../basis/web/v2/contactThread.js');
   const mobileThread = read('../src/screens/v2/ContactThreadScreen.js');
   const mobileBoard  = read('../src/screens/v2/CircleNoticeboard.js');

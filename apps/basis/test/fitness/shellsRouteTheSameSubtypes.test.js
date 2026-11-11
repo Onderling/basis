@@ -70,6 +70,8 @@ function subtypesOf(block) {
 }
 
 const LANES = readFileSync(dir('../../src/v2/circleLanes.js'), 'utf8');
+/** The ONE inbound wiring (`src/v2/inboundWiring.js`): the handler map every shell composes, built once. */
+const WIRING = readFileSync(dir('../../src/v2/inboundWiring.js'), 'utf8');
 const BOX   = readFileSync(dir('../../bin/device-runner.mjs'), 'utf8');
 
 const webBlock    = region(WEB,    /const peerMessageRouter = makePeerRouter\(\{/, /\n\s*defaultHandler/);
@@ -84,10 +86,12 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
   it('both shells spread the SHARED lane table — the one thing nothing after it could catch', () => {
     // A shell that stopped spreading this would lose every signed lane in a single edit, and the
     // comparison below would go on passing, because it compares the two remainders to each other.
-    expect(webBlock,    'web no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
-    expect(mobileBlock, 'mobile no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
-    expect(WEB,    'web does not import buildCircleLanes').toContain('buildCircleLanes');
-    expect(MOBILE, 'mobile does not import buildCircleLanes').toContain('buildCircleLanes');
+    const spreads = /\.\.\.\w*[Ll]anes\.handlers|buildInboundWiring\(/;
+    expect(WIRING, 'the shared inbound wiring no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
+    expect(webBlock,    'web no longer spreads the lane table').toMatch(spreads);
+    expect(mobileBlock, 'mobile no longer spreads the lane table').toMatch(spreads);
+    expect(WEB,    'web builds neither the lane table nor the shared wiring').toMatch(/buildCircleLanes|buildInboundWiring/);
+    expect(MOBILE, 'mobile builds neither the lane table nor the shared wiring').toMatch(/buildCircleLanes|buildInboundWiring/);
   });
 
   it('a REPORT is received through the shared table on every shell, the box included — never a shell\'s own route', () => {
@@ -95,11 +99,14 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
     expect(subtypesOf(LANES).has('circle-report-broadcast'), 'the shared lane table routes reports').toBe(true);
     expect(subtypesOf(webBlock).has('circle-report-broadcast'), 'web routes reports itself').toBe(false);
     expect(subtypesOf(mobileBlock).has('circle-report-broadcast'), 'mobile routes reports itself').toBe(false);
+    expect(subtypesOf(WIRING).has('circle-report-broadcast'), 'the shared wiring routes reports itself').toBe(false);
     expect(BOX, 'the box no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
   });
 
-  const web = subtypesOf(webBlock);
-  const mobile = subtypesOf(mobileBlock);
+  /** What a composition routes: its own block, plus the shared wiring's map when it builds through it. */
+  const routedBy = (block) => new Set([...subtypesOf(block), ...(/buildInboundWiring\(/.test(block) ? subtypesOf(WIRING) : [])]);
+  const web = routedBy(webBlock);
+  const mobile = routedBy(mobileBlock);
 
   it('routes on mobile everything web routes', () => {
     const missing = [...web].filter((s) => !mobile.has(s) && !KNOWN_DIFFERENCES[s]);
@@ -132,5 +139,18 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
       'the shared table routes no catch-up at all — an offline device would never converge').toBeGreaterThan(1);
     expect(web.size,    'subtypes the web shell answers itself').toBeGreaterThan(8);
     expect(mobile.size, 'subtypes the mobile shell answers itself').toBeGreaterThan(8);
+  });
+});
+
+describe('FITNESS — the phone builds its inbound wiring through the shared module, never in a screen', () => {
+  // A handler map inside a SCREEN is logic in a shell (invariant 1) and a third copy of what web and the box compose
+  // (invariant 3). The phone's screen hands the shared wiring its paint callbacks and builds no handler of its own.
+  const OWN_HANDLER = /\b(makeHandle[A-Z]\w*|makeCircle\w*PeerHandler|buildCircleLanes)\(/g;
+  it('ChatScreen calls buildInboundWiring', () => {
+    expect(mobileBlock, 'ChatScreen does not build through src/v2/inboundWiring.js').toMatch(/buildInboundWiring\(/);
+  });
+  it('ChatScreen constructs no inbound handler itself (the default chat bubble is the one exception)', () => {
+    const own = [...mobileBlock.matchAll(OWN_HANDLER)].map((m) => m[1]).filter((n) => n !== 'makeHandleChatMessage');
+    expect(own, 'handlers ChatScreen still builds itself — move them into the shared wiring').toEqual([]);
   });
 });

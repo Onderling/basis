@@ -52,7 +52,9 @@ const SEAMS = [
 
 describe('FITNESS — per-circle address announcing is wired by every shell', () => {
   for (const { name, file } of SHELLS) {
-    const source = readFileSync(file, 'utf8');
+    // A shell that builds through the shared inbound wiring (src/v2/inboundWiring.js) wires what the wiring wires.
+    const own = readFileSync(file, 'utf8');
+    const source = /buildInboundWiring\(/.test(own) ? own + readFileSync(dir('../../src/v2/inboundWiring.js'), 'utf8') : own;
     for (const [seam, why] of SEAMS) {
       it(`${name} wires \`${seam}\``, () => {
         expect(source.includes(seam), `${name} is missing \`${seam}\` — ${why}`).toBe(true);

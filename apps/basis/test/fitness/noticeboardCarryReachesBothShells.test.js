@@ -11,7 +11,10 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(HERE, rel), 'utf8');
-const SHELLS = { web: read('../../web/v2/circleApp.js'), mobile: read('../../../basis-mobile/src/screens/ChatScreen.js') };
+// The phone sets the hook through the shared inbound wiring (src/v2/inboundWiring.js), asked with `noticeboardLanded: true`.
+const chatScreen = read('../../../basis-mobile/src/screens/ChatScreen.js');
+const viaWiring = /buildInboundWiring\(/.test(chatScreen) && /noticeboardLanded: true/.test(chatScreen);
+const SHELLS = { web: read('../../web/v2/circleApp.js'), mobile: viaWiring ? chatScreen + read('../../src/v2/inboundWiring.js') : chatScreen };
 
 describe('one carry for noticeboard posts', () => {
   for (const [shell, src] of Object.entries(SHELLS)) {

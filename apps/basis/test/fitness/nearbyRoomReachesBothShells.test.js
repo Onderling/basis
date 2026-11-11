@@ -43,6 +43,10 @@ describe('the Nearby room reaches both shells', () => {
     expect(host).toMatch(/createNearbyScreen\(\{\s*\.\.\.\(bundle\?\.nearbyRoom\?\.screenDeps\?\.\(\)/);
     expect(host).not.toMatch(/openNearbyThread\(/);
     const router = read('../../../basis-mobile/src/screens/ChatScreen.js');
-    expect(router).toMatch(/\.\.\.\(bundle\?\.nearbyRoom\?\.handlers \?\? \{\}\)/);
+    // the router spreads the room's handlers itself, or hands the room to the shared inbound wiring, which spreads them
+    if (/buildInboundWiring\(/.test(router)) {
+      expect(router).toMatch(/nearbyRoom: bundle\?\.nearbyRoom/);
+      expect(read('../../src/v2/inboundWiring.js')).toMatch(/\.\.\.\(nearbyRoom\?\.handlers \?\? \{\}\)/);
+    } else expect(router).toMatch(/\.\.\.\(bundle\?\.nearbyRoom\?\.handlers \?\? \{\}\)/);
   });
 });

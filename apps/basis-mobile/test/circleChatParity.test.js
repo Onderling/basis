@@ -34,8 +34,9 @@ describe('circle chat — no inbox, card-fan parity (web ≡ mobile)', () => {
     // built once in `src/v2/circleLanes.js` and spread into both shells, so this screen names the
     // table rather than the subtype. `shellsRouteTheSameSubtypes` holds the table itself to routing
     // CHAT_STATEMENT_BROADCAST, and holds both shells to spreading it.
-    expect(chatScreen).toMatch(/buildCircleLanes/);
-    expect(chatScreen).toMatch(/\.\.\.lanes\.handlers/);
+    // …and since the inbound wiring (src/v2/inboundWiring.js) the screen builds the table through it, which spreads it
+    expect(chatScreen).toMatch(/buildCircleLanes|buildInboundWiring\(/);
+    expect(chatScreen).toMatch(/\.\.\.lanes\.handlers|buildInboundWiring\(/);
   });
 
   it('BOTH shells thread `card` through the shared circle fan helper', () => {

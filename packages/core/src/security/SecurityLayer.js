@@ -671,6 +671,18 @@ export class SecurityLayer {
       if (env._p === P.HI) {
         this.#peers.set(env._from, senderKey);
         this.#noteEstablished(env._id, env._from);
+      } else if (verdict.allow && typeof verdict.bucket === 'string' && verdict.bucket) {
+        // SENT TO ONE OF OUR SCOPED (circle) ADDRESSES, from an address whose key we have not bound YET. The roster may
+        // simply be ahead of the binding (a member's address learned a moment later), so this is "cannot vouch yet",
+        // not "a stranger": released for ONE more judgement and refused as stale under that bucket, so the host parks
+        // it UNREAD and re-judges it through this whole check once a roster read binds the key. Not admitted by parking;
+        // still unbound at the re-judge, it is dropped. Anything not to a scoped address of ours is refused below, as
+        // before. (Found: a founder's post dropped at a joiner that bound her circle address a moment later.)
+        this.#dedup.delete(env._id);
+        throw Object.assign(new SecurityError(
+          SEC.SENDER_STALE,
+          `Envelope ${env._id} comes from "${env._from}", whose key is not bound here yet (held for one more judgement)`,
+        ), { bucket: verdict.bucket, staleReason: 'unbound-sender' });
       } else {
         throw new SecurityError(
           SEC.UNKNOWN_SENDER,

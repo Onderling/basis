@@ -1179,7 +1179,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
   // A circle's traffic PARKED as stale (its roster not read, or a sender not on the roster read): read that roster
   // again, then judge the parked envelopes once more. The secure agent re-judges on its own at its time limit too.
-  sa.onParked?.((circleId) => { rereadCircleRoster(circleId)?.then?.(() => sa.rejudgeParked?.(circleId)); });
+  // …and an envelope to one of our circle addresses from a member address whose KEY is not bound here yet ('unbound-sender')
+  // waits for the other half of a roster read: binding the members' addresses to their keys (`bindCircleAddressKeysFor`,
+  // which records the senders from the same rows). One trigger for both reasons; the re-judge runs the full check.
+  sa.onParked?.((circleId, info) => {
+    const refresh = info?.reason === 'unbound-sender' ? rebindCircleKeys(circleId) : rereadCircleRoster(circleId);
+    Promise.resolve(refresh).catch(() => {}).then(() => sa.rejudgeParked?.(circleId));
+  });
+  // what happened to parked input, in the log a person can hand over (codes only: never an address, an id or a circle)
+  sa.onParkEvent?.(({ kind, reason, cause } = {}) => {
+    try { structuredLog[kind === 'admit' || kind === 'park' ? 'info' : 'warn']('agent', `park.${kind}`, { reason, ...(cause ? { cause } : {}) }); } catch { /* never breaks receive */ }
+  });
+  // one bind per circle in flight: a burst of parks shares it (the parks are re-judged after it either way)
+  const rebindsInFlight = new Map();
+  function rebindCircleKeys(circleId) {
+    if (!apiComposed) return rereadCircleRoster(circleId);   // before the surface exists, the queued sender read is all there is
+    if (rebindsInFlight.has(circleId)) return rebindsInFlight.get(circleId);
+    const p = bindCircleAddressKeysFor({ agent: api, circleId }).catch(() => null)
+      .finally(() => rebindsInFlight.delete(circleId));
+    rebindsInFlight.set(circleId, p);
+    return p;
+  }
   // A CIRCLE identity of ours, installed: the authorizer learns the address is that circle's BEFORE any roster is read
   // (so traffic to it is refused until the roster is, never let in unchecked), and the identity is registered with
   // its self as owner. The one path every circle install takes.

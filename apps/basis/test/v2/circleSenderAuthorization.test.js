@@ -36,7 +36,7 @@ describe('who may speak at one of our per-circle addresses', () => {
     })).toBeGreaterThanOrEqual(2);
 
     expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
+      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER, bucket: 'circle' });
   });
 
   it('…and may NOT fall back to their canonical identity — that is the enforcement (B6)', () => {
@@ -83,9 +83,9 @@ describe('who may speak at one of our per-circle addresses', () => {
     auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna] });
 
     expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
+      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER, bucket: 'circle' });
     expect(auth.authorizeSender({ senderKey: 'anna-second-device-in-circle', ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
+      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER, bucket: 'circle' });
     // …while the canonical key stays refused (B6) and a stranger stays a stranger.
     expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: false, reason: SENDER_REASON.CANONICAL_REFUSED });
@@ -435,7 +435,7 @@ describe('our own CURRENT person key is admitted live — before any roster, in 
     const auth = createCircleSenderAuthorization({ ownKeysLive: () => current });
     auth.recordCircleRoster({ circleId: 'k', ownAddress: OURS_IN_CIRCLE, members: [], selfKeys: ['our-circle-key'] });
     expect(auth.authorizeSender({ senderKey: 'person-key-v1', ownAddress: OURS_IN_CIRCLE }))
-      .toEqual({ allow: true, reason: SENDER_REASON.OWN_KEY });
+      .toEqual({ allow: true, reason: SENDER_REASON.OWN_KEY, bucket: 'k' });
     expect(auth.authorizeSender({ senderKey: 'our-canonical-key', ownAddress: OURS_IN_CIRCLE }).allow, 'the static profile key is not on the list').toBe(false);
     // a rotation: the new version is ours at once, the old one no longer
     current = ['person-key-v2'];

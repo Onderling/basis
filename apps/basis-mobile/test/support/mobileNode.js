@@ -227,6 +227,9 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     agent: bundle.agent,
     callSkill: bundle.callSkill,
     address: bundle.agent?.identity?.chat?.pubKey ?? null,
+    // the same key under the name the relay-test helpers read (`createCircle`, `joinExistingCircle`), so a phone can
+    // stand in any of their roles
+    pubKey: bundle.agent?.identity?.chat?.pubKey ?? null,
     eventLog,
     deliveryMap,
     storage: AsyncStorage,

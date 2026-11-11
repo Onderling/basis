@@ -47,8 +47,8 @@ function oneAtATimeFor(store, key, fn) {
  * wins) and may only UPDATE a row that already exists — a stranger cannot
  * announce themselves into a circle. The LOCAL path (the peer bridge, which
  * substitutes the authenticated envelope sender, and the admin relaying a
- * member's announcement on) may name a member and may create their row: the same
- * carrier position `recordPeerIntro` already occupies.
+ * member's announcement on) may name a member and may create their row: the
+ * join-time relay of a proven address, which only the local side can carry.
  *
  * It PATCHES the durable trail rather than appending a second row, because
  * `deriveRoster` merges trail rows first-non-null-wins: a second row carrying a

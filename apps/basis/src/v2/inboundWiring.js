@@ -28,7 +28,6 @@ import { makeHandleCalendarCancel } from '../core/handlers/calendarCancel.js';
 import { makeHandleFileShare } from '../core/handlers/fileShare.js';
 import { makeHandleThreadedChat } from '../core/handlers/threadedChat.js';
 import { makeHandleSharedCopy } from '../core/handlers/sharedCopyReceive.js';
-import { makeHandleCirclePeerIntro } from '../core/handlers/meshIntros.js';
 import { makeHandleCirclePost } from '../core/handlers/circlePost.js';
 import { landedNoticeboardHandler } from './noticeboardCarry.js';
 
@@ -55,7 +54,6 @@ import { landedNoticeboardHandler } from './noticeboardCarry.js';
  * @param {Function|null} [o.deliverToContactThread] where a peer's file or post reply lands; null → neither entry
  * @param {Function} [o.notePeer]          a first file or reply makes the sender a contact row
  * @param {object|null} [o.sharedWithMeStore] the shared-with-me store; null → no `shared-copy`
- * @param {boolean} [o.peerIntro]          register `circle-peer-intro`
  * @param {boolean} [o.noticeboardLanded]  a noticeboard post another member made, landed through the items lane, resonates
  *   here (the circle-post handler, for the self this device is in that circle)
  * @param {object} [o.logger]
@@ -69,7 +67,7 @@ export function buildInboundWiring({
   applyIncomingReceipt = null, nearbyRoom = null,
   recipe = null, rules = null, calendar = null,
   deliverToContactThread = null, notePeer = () => {},
-  sharedWithMeStore = null, peerIntro = false, noticeboardLanded = false,
+  sharedWithMeStore = null, noticeboardLanded = false,
   logger = console,
 } = {}) {
   if (noticeboardLanded) {
@@ -117,7 +115,6 @@ export function buildInboundWiring({
     'circle-address-announce': makeCircleAddressAnnouncePeerHandler({
       agent, logger, ...(typeof grantSealedAudience === 'function' ? { grantSealedAudience } : {}),
     }),
-    ...(peerIntro ? { 'circle-peer-intro': makeHandleCirclePeerIntro({ callSkill }) } : {}),
     // delivery honesty — the peer's app stored our message (the room confirms with the same receipt)
     ...(typeof applyIncomingReceipt === 'function' ? {
       'delivery-receipt': (from, payload) => { nearbyRoom?.onReceipt?.(from, payload); applyIncomingReceipt(payload, from); },

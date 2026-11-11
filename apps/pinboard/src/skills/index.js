@@ -2732,51 +2732,6 @@ export function buildSkills({
     }),
 
     /**
-     * recordPeerIntro({groupId, peerAddr, peerDisplay?})
-     *   — (2026-05-24). Joiner-side mirror for a mesh
-     *   introduction.  Admin propagates each consenting member's
-     *   address; the receiver calls this skill to write a local
-     *   `membership-redemption` item with `channel: 'intro'`.
-     *   listGroupRoster's existing filter picks it up so the
-     *   recipient can fan-out posts directly to the introduced
-     *   peer (mesh topology) instead of relaying via admin.
-     *
-     *   Idempotent — skips when an intro for the same peer
-     *   already exists for the group.
-     */
-    defineSkill('recordPeerIntro', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId)
-        return { error: 'groupId required' };
-      if (typeof a.peerAddr !== 'string' || !a.peerAddr)
-        return { error: 'peerAddr required' };
-      if (a.peerAddr === from) return { ok: true, skipped: 'self' };
-      const all = await store.listOpen({ type: 'membership-redemption' });
-      const dup = all.find(i =>
-        i?.source?.groupId === a.groupId
-          && i?.source?.redeemedBy === a.peerAddr
-          && i?.source?.channel === 'intro',
-      );
-      if (dup) return { ok: true, skipped: 'duplicate' };
-      const [item] = await store.addItems([{
-        type:       'membership-redemption',
-        text:       `${a.peerAddr} introduced for ${a.groupId}`,
-        source:     {
-          groupId:     a.groupId,
-          redeemedBy:  a.peerAddr,
-          peerDisplay: typeof a.peerDisplay === 'string' ? a.peerDisplay : null,
-          channel:     'intro',
-          introducedAt: Date.now(),
-        },
-        visibility: 'household',
-      }], { actor: from });
-      return { ok: true, introId: item.id, _sync: simulateSync() };
-    }, {
-      description: 'Joiner-side mirror: record a mesh introduction for another circle member.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * recordCircleAddressAnnouncement({groupId, memberWebid?, circleAddress, circleAddressProof})
      *   — the RECEIVE half of per-circle address announcing (B2, 2026-08-02).
      *
@@ -2797,7 +2752,7 @@ export function buildSkills({
      *   that already exists — a stranger cannot announce themselves into a circle. The LOCAL path
      *   (the peer bridge, which substitutes the authenticated envelope sender, and the admin
      *   relaying a member's announcement on) may name a member and may create their row: that is
-     *   the same carrier position `recordPeerIntro` already occupies.
+     *   the join-time relay of a proven address, which only the local side can carry.
      *
      *   It PATCHES the durable trail rather than appending a second row, because
      *   `deriveRoster` merges trail rows first-non-null-wins: a second row carrying a NEW address

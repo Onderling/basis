@@ -26,7 +26,6 @@ const every = () => ({
   deliverToContactThread: vi.fn(),
   sharedWithMeStore: { add: vi.fn() },
   govRail: { ingest: vi.fn() },
-  peerIntro: true,
 });
 
 describe('the inbound wiring', () => {
@@ -40,7 +39,7 @@ describe('the inbound wiring', () => {
   it('with every hook: every shared entry is there', () => {
     const { handlers } = buildInboundWiring({ agent: {}, callSkill: vi.fn(), ...every() });
     for (const k of ['contact-msg', 'contact-reply', 'group-redeem-request', 'group-redeem-response', 'circle-address-announce',
-      'circle-peer-intro', 'delivery-receipt', 'circle-recipe-broadcast', 'circle-rules-broadcast', 'calendar-invite',
+      'delivery-receipt', 'circle-recipe-broadcast', 'circle-rules-broadcast', 'calendar-invite',
       'calendar-rsvp', 'calendar-cancel', 'file-share', 'chat-message', 'shared-copy', 'circle-governance-broadcast', 'nearby-chat']) {
       expect(typeof handlers[k], k).toBe('function');
     }

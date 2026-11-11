@@ -44,7 +44,6 @@ const KNOWN_DIFFERENCES = {
   // all (`circle-post` DID have a shared sender — realAgent fans it on postRequest — and web now receives it too; the
   // `help-with-*` card route was deleted 2026-10-19: the poster accepts on the request). Deleting it from mobile is the
   // parity move; until someone does, it is recorded here rather than hidden.
-  'circle-peer-intro':    'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
 };
 
 /** The handler-map region of each composition: from the router/builder start to `defaultHandler`. */

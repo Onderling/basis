@@ -7,9 +7,9 @@
  *
  *   - `makeHandleGroupRedeemRequest` (ADMIN side) — verifies a
  *     joiner's membership code via `pinboard.verifyMembershipCodeForPeer`
- *     + replies with `group-redeem-response`.  On success, fires
- *     `propagateMeshIntros` so newly-consenting members see each
- *     other's addresses.  The reply also carries the ADMIN's OWN
+ *     + replies with `group-redeem-response`.  On success, hands the
+ *     circle the newcomer's proven per-circle address and the newcomer
+ *     the circle's (`propagateCircleAddresses`).  The reply also carries the ADMIN's OWN
  *     per-circle address + proof — see `ownProvenCircleAddress`.
  *
  *   - `makeHandleGroupRedeemResponse` (JOINER side) — looks up the
@@ -21,7 +21,6 @@
  * @param {object} args
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
  * @param {(addr: string, payload: object) => Promise<*>}                  args.sendPeer
- * @param {(args: {groupId: string, newPeerAddr: string, newPeerDisplay?: string, newPeerShared?: boolean}) => Promise<*>} [args.propagateMeshIntros]
  * @param {(args: {circleId: string, newMemberWebid: string}) => Promise<*>} [args.propagateCircleAddresses]
  *   B2 — hand the circle the newcomer's PROVEN per-circle address, and the newcomer the circle's.
  *   The admin is the only party that can reach both sides at this moment; see
@@ -53,7 +52,7 @@ export async function ownDisplayInCircle(groupId, { callSkill, circleAddressFor 
 
 export function makeHandleGroupRedeemRequest({
   ownDisplayFor = null,
-  callSkill, sendPeer, propagateMeshIntros, propagateCircleAddresses, publishEvent,
+  callSkill, sendPeer, propagateCircleAddresses, publishEvent,
   circleAddressFor, signCircleAddress, logger = console,
   // After a member is ADMITTED: the pair roster promotes its co-member to admin (`pairRoster.js`); best-effort.
   onAdmitted = null,
@@ -165,14 +164,6 @@ export function makeHandleGroupRedeemRequest({
       if (reply.ok && typeof onAdmitted === 'function') {
         Promise.resolve(onAdmitted({ circleId: groupId, newMemberWebid: fromAddr }))
           .catch((err) => logger.warn?.('[pair-roster] post-admit step failed', err?.message ?? err));
-      }
-      if (reply.ok && typeof propagateMeshIntros === 'function') {
-        propagateMeshIntros({
-          groupId,
-          newPeerAddr:    fromAddr,
-          newPeerDisplay: peerDisplay,
-          newPeerShared:  !!shareCard,
-        }).catch((err) => logger.warn?.('[mesh-intro] propagation failed', err));
       }
     } catch (err) {
       logger.error?.('[peer] group-redeem-response send failed', err);

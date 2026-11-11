@@ -11,7 +11,6 @@
     "./core-manifests": "./src/core/manifests/mockManifests.js",
     "./core-qrSchemes": "./src/core/qrSchemes.js",
     "./core-handlers/catchUp": "./src/core/handlers/catchUp.js",
-    "./core-handlers/meshIntros": "./src/core/handlers/meshIntros.js",
     "./core-localBuiltins": "./src/core/localBuiltins.js",
     "./core-realAgent": "./src/core/agent/realAgent.js",
     "./parser": "./src/parser.js",

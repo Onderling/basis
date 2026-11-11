@@ -227,6 +227,9 @@ const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', s
 const STALE_PARK_MAX = param({ key: 'secureAgent.staleParkMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
 /** How long a parked stale envelope waits for a refreshed sender check before its bucket is judged once more. */
 const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+/** How many bytes of parked envelopes one bucket (a circle) may hold; parked input is unauthenticated, so it is capped by
+ *  size as well as by count, the oldest going first. */
+const STALE_PARK_MAX_BYTES = param({ key: 'secureAgent.staleParkMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_048_576 });
 
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now
@@ -1428,34 +1431,54 @@ export async function createSecureAgent(opts = {}) {
   const parkOpts = opts.parkStale ?? {};
   const PARK_MAX = Number.isInteger(parkOpts.max) && parkOpts.max > 0 ? parkOpts.max : STALE_PARK_MAX;
   const PARK_TTL_MS = Number.isFinite(parkOpts.ttlMs) && parkOpts.ttlMs > 0 ? parkOpts.ttlMs : STALE_PARK_TTL_MS;
-  const parked = new Map();          // bucket → { items: [{ tx, raw }], timer }
+  // TWO REASONS, ONE PARK: 'stale-roster' (the sender check cannot vouch for the key yet) and 'unbound-sender' (an
+  // envelope to one of our circle addresses from an address whose key is not bound here yet). Same structure, same caps,
+  // same host trigger, same single re-judge through the FULL check: parking admits nothing.
+  const PARK_MAX_BYTES = Number.isInteger(parkOpts.maxBytes) && parkOpts.maxBytes > 0 ? parkOpts.maxBytes : STALE_PARK_MAX_BYTES;
+  const parked = new Map();          // bucket → { items: [{ tx, raw, reason, size }], bytes, timer }
   const rejudging = new Set();       // envelope ids being judged the second (last) time
   const refusedAtRejudge = new Set(); // …and those of them the second judgement refused (any security error)
-  const parkStats = { parked: 0, droppedOverflow: 0, droppedAfterRejudge: 0, deliveredAfterRejudge: 0 };
+  const parkStats = { parked: 0, droppedOverflow: 0, droppedAfterRejudge: 0, deliveredAfterRejudge: 0, unboundSender: 0, droppedOversize: 0 };
   let onParkedFn = typeof parkOpts.onParked === 'function' ? parkOpts.onParked : null;
-  function parkStale(tx, raw, bucket) {
+  // what happened to parked input, by code (no ids, no addresses): park · overflow · admit · drop, and how the re-judge
+  // came (`host` = a roster read asked for it, `ttl` = the time limit, i.e. expiry)
+  let onParkEventFn = typeof parkOpts.onEvent === 'function' ? parkOpts.onEvent : null;
+  const parkEvent = (e) => { try { onParkEventFn?.(e); } catch { /* the host's record never breaks the receive path */ } };
+  const sizeOf = (raw) => { try { return JSON.stringify(raw).length; } catch { return PARK_MAX_BYTES + 1; } };
+  function parkStale(tx, raw, bucket, reason = 'stale-roster') {
     const id = raw?._id;
     if (typeof bucket !== 'string' || !bucket || typeof id !== 'string') return;
-    if (rejudging.has(id)) { parkStats.droppedAfterRejudge += 1; return; }   // the one second chance is spent
+    if (rejudging.has(id)) { parkStats.droppedAfterRejudge += 1; parkEvent({ kind: 'drop', reason, cause: 'stale-again' }); return; }   // the one second chance is spent
+    const size = sizeOf(raw);
+    if (size > PARK_MAX_BYTES) { parkStats.droppedOversize += 1; parkEvent({ kind: 'overflow', reason, cause: 'oversize' }); return; }
     let b = parked.get(bucket);
     if (!b) {
-      b = { items: [], timer: setTimeout(() => rejudgeParked(bucket), PARK_TTL_MS) };
+      b = { items: [], bytes: 0, timer: setTimeout(() => rejudgeParked(bucket, 'ttl'), PARK_TTL_MS) };
       b.timer.unref?.();
       parked.set(bucket, b);
     }
     if (b.items.some((it) => it.raw?._id === id)) return;   // the same envelope twice (a relay redelivery)
-    b.items.push({ tx, raw });
+    b.items.push({ tx, raw, reason, size });
+    b.bytes += size;
     parkStats.parked += 1;
-    while (b.items.length > PARK_MAX) { b.items.shift(); parkStats.droppedOverflow += 1; }
-    try { onParkedFn?.(bucket); } catch { /* the host's refresh is best-effort; the time limit still re-judges */ }
+    if (reason === 'unbound-sender') parkStats.unboundSender += 1;
+    parkEvent({ kind: 'park', reason });
+    while (b.items.length > PARK_MAX || b.bytes > PARK_MAX_BYTES) {
+      const cause = b.items.length > PARK_MAX ? 'count' : 'bytes';
+      const out = b.items.shift();
+      b.bytes -= out?.size ?? 0;
+      parkStats.droppedOverflow += 1;
+      parkEvent({ kind: 'overflow', reason: out?.reason ?? reason, cause });
+    }
+    try { onParkedFn?.(bucket, { reason }); } catch { /* the host's refresh is best-effort; the time limit still re-judges */ }
   }
-  /** Judge a bucket's parked envelopes once more, in arrival order. */
-  function rejudgeParked(bucket) {
+  /** Judge a bucket's parked envelopes once more, in arrival order. `trigger`: 'host' (a roster read) or 'ttl' (expiry). */
+  function rejudgeParked(bucket, trigger = 'host') {
     const b = parked.get(bucket);
     if (!b) return 0;
     parked.delete(bucket);
     clearTimeout(b.timer);
-    for (const { tx, raw } of b.items) {
+    for (const { tx, raw, reason } of b.items) {
       rejudging.add(raw._id);
       const before = parkStats.droppedAfterRejudge;
       let threw = false;
@@ -1465,8 +1488,8 @@ export async function createSecureAgent(opts = {}) {
       // stale a second time is counted where it is refused (`parkStale`); refused outright is counted here; only an
       // envelope no security error stopped counts as delivered
       if (parkStats.droppedAfterRejudge !== before) continue;
-      if (refused) parkStats.droppedAfterRejudge += 1;
-      else parkStats.deliveredAfterRejudge += 1;
+      if (refused) { parkStats.droppedAfterRejudge += 1; parkEvent({ kind: 'drop', reason, cause: trigger === 'ttl' ? 'expired' : 'refused' }); }
+      else { parkStats.deliveredAfterRejudge += 1; parkEvent({ kind: 'admit', reason, cause: trigger }); }
     }
     return b.items.length;
   }
@@ -1483,7 +1506,7 @@ export async function createSecureAgent(opts = {}) {
     // was indistinguishable from "never arrived". Same event, same place an app already listens.
     tx.on('security-error', (err, raw) => {
       if (typeof raw?._id === 'string' && rejudging.has(raw._id)) refusedAtRejudge.add(raw._id);
-      if (err?.code === 'SENDER_STALE') { parkStale(tx, raw, err.bucket); return; }
+      if (err?.code === 'SENDER_STALE') { parkStale(tx, raw, err.bucket, err.staleReason === 'unbound-sender' ? 'unbound-sender' : 'stale-roster'); return; }
       try { agent.emit('security-error', err, raw); } catch { /* a listener that throws must not take the receive path down */ }
     });
     // bilateral HI auto-handshake on receive.  When we
@@ -3023,6 +3046,8 @@ export async function createSecureAgent(opts = {}) {
     get parkStats() { return { ...parkStats }; },
     /** The host's hook: an envelope was parked under `bucket` (refresh the snapshot, then `rejudgeParked`). */
     onParked(fn) { onParkedFn = typeof fn === 'function' ? fn : null; },
+    /** The host's record of parked input: `({ kind: park|overflow|admit|drop, reason, cause })`, codes only. */
+    onParkEvent(fn) { onParkEventFn = typeof fn === 'function' ? fn : null; },
     /**
      * Decision 1 step 3 — install the ROSTER AUTHORIZE step.
      *

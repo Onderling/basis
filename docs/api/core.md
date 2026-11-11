@@ -3927,7 +3927,7 @@ Verdict reasons this module produces on its own. Implementations supply their ow
 **Kind:** function · **Import:** `allowSender` from `'@onderling/core'`
 
 ```js
-allowSender(reason)
+allowSender(reason, bucket)
 ```
 
 The sender may speak here.
@@ -3935,8 +3935,9 @@ The sender may speak here.
 **Parameters**
 
 - `reason` `string` — why — carried into diagnostics, never into a decision
+- `[bucket]` `string` — for traffic to one of the implementation's scoped addresses (a circle's), the same opaque bucket a stale verdict would carry. It decides nothing about THIS sender; it lets `SecurityLayer` park, rather than drop, an envelope to that address whose sender address has no key bound yet (see `SENDER_STALE`).
 
-**Returns:** `{allow: true, reason: string}`
+**Returns:** `{allow: true, reason: string, bucket?: string}`
 
 ### `refuseSender`
 

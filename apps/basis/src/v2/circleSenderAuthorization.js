@@ -261,7 +261,8 @@ export function createCircleSenderAuthorization({
     if (typeof senderKey === 'string' && typeof ownKeysLive === 'function') {
       let own = [];
       try { own = ownKeysLive() ?? []; } catch { own = []; }
-      if (own.includes(senderKey)) return allowSender(SENDER_REASON.OWN_KEY);
+      // the circle rides along (when the address is a circle's): an own key whose address is not bound yet parks there
+      if (own.includes(senderKey)) return allowSender(SENDER_REASON.OWN_KEY, circleOfAddress.get(ownAddress));
     }
     const entry = byOwnAddress.get(ownAddress);
     if (!entry) {
@@ -279,7 +280,8 @@ export function createCircleSenderAuthorization({
       return staleSender(SENDER_REASON.ROSTER_UNKNOWN, circleOfAddress.get(ownAddress));
     }
     if (typeof senderKey === 'string' && entry.keys.has(senderKey)) {
-      return allowSender(SENDER_REASON.MEMBER);
+      // the circle rides along: a member whose ADDRESS is not bound to this key yet parks under it, never dropped
+      return allowSender(SENDER_REASON.MEMBER, entry.circleId ?? undefined);
     }
     // A MEMBER, signing as their canonical self in a circle where they have proved a per-circle
     // identity (B6). Refused like a stranger — the point is that the leak is not available — but

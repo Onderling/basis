@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  PERSON_ALLOWLIST, personAllowedBy, contactOriginOf, createInviteExchange,
+  PERSON_ALLOWLIST, personAllowedBy, contactOriginOf, createInviteExchange, exchangeKindOf,
   INVITE_EXCHANGE_LIFETIME_MS, INVITE_EXCHANGE_MAX, sendDecisionFields,
 } from '../../src/v2/peerSendGate.js';
 
@@ -62,11 +62,11 @@ describe('createInviteExchange: one redeem\'s two sends, bounded, never standing
     const c = clock();
     const ix = createInviteExchange({ now: c.now });
     const release = ix.expectFromInviter('admin');
-    expect(ix.take('admin')).toBe('joiner');
-    expect(ix.take('admin'), 'a retry within the same redeem still matches').toBe('joiner');
-    expect(ix.take('someone-else')).toBe(null);
+    expect(ix.take('admin', { kind: 'joiner' })).toBe('joiner');
+    expect(ix.take('admin', { kind: 'joiner' }), 'a retry within the same redeem still matches').toBe('joiner');
+    expect(ix.take('someone-else', { kind: 'joiner' })).toBe(null);
     release();
-    expect(ix.take('admin')).toBe(null);
+    expect(ix.take('admin', { kind: 'joiner' })).toBe(null);
   });
 
   it('JOINER: an entry nobody released ends at its lifetime', () => {
@@ -74,14 +74,14 @@ describe('createInviteExchange: one redeem\'s two sends, bounded, never standing
     const ix = createInviteExchange({ now: c.now, lifetimeMs: 100 });
     ix.expectFromInviter('admin');
     c.tick(101);
-    expect(ix.take('admin')).toBe(null);
+    expect(ix.take('admin', { kind: 'joiner' })).toBe(null);
   });
 
   it('INVITER: the answer to a proven request is consumed by the first reply; a second reply is none', () => {
     const ix = createInviteExchange({ now: clock().now });
     ix.answerProvenRequest('joiner-addr');
-    expect(ix.take('joiner-addr')).toBe('answer');
-    expect(ix.take('joiner-addr')).toBe(null);
+    expect(ix.take('joiner-addr', { kind: 'reply' })).toBe('answer');
+    expect(ix.take('joiner-addr', { kind: 'reply' })).toBe(null);
   });
 
   it('INVITER: an answer never sent ends at its lifetime', () => {
@@ -89,15 +89,15 @@ describe('createInviteExchange: one redeem\'s two sends, bounded, never standing
     const ix = createInviteExchange({ now: c.now, lifetimeMs: 100 });
     ix.answerProvenRequest('j');
     c.tick(101);
-    expect(ix.take('j')).toBe(null);
+    expect(ix.take('j', { kind: 'reply' })).toBe(null);
   });
 
   it('is bounded: past the bound the oldest entry goes', () => {
     const ix = createInviteExchange({ now: clock().now, max: 2 });
     ix.answerProvenRequest('a'); ix.answerProvenRequest('b'); ix.answerProvenRequest('c');
-    expect(ix.take('a')).toBe(null);
-    expect(ix.take('b')).toBe('answer');
-    expect(ix.take('c')).toBe('answer');
+    expect(ix.take('a', { kind: 'reply' })).toBe(null);
+    expect(ix.take('b', { kind: 'reply' })).toBe('answer');
+    expect(ix.take('c', { kind: 'reply' })).toBe('answer');
   });
 
   it('JOINER: two redeems open at once to ONE inviter (two codes from one admin): the first answer does not close the second', () => {
@@ -105,51 +105,51 @@ describe('createInviteExchange: one redeem\'s two sends, bounded, never standing
     const releaseFirst = ix.expectFromInviter('admin');
     const releaseSecond = ix.expectFromInviter('admin');
     releaseFirst();
-    expect(ix.take('admin'), 'the second redeem is still open').toBe('joiner');
+    expect(ix.take('admin', { kind: 'joiner' }), 'the second redeem is still open').toBe('joiner');
     releaseFirst();   // a release is idempotent: calling it twice does not close the other redeem
-    expect(ix.take('admin')).toBe('joiner');
+    expect(ix.take('admin', { kind: 'joiner' })).toBe('joiner');
     releaseSecond();
-    expect(ix.take('admin')).toBe(null);
+    expect(ix.take('admin', { kind: 'joiner' })).toBe(null);
   });
 
   it('INVITER: a well-formed request that did NOT prove its code earns one refusal reply, consumed once', () => {
     const ix = createInviteExchange({ now: clock().now });
     ix.refuseParsedRequest('joiner-addr');
-    expect(ix.take('joiner-addr')).toBe('refusal');
-    expect(ix.take('joiner-addr')).toBe(null);
+    expect(ix.take('joiner-addr', { kind: 'reply' })).toBe('refusal');
+    expect(ix.take('joiner-addr', { kind: 'reply' })).toBe(null);
   });
 
   it('INVITER: a request that proved its code turns its registration into the answer', () => {
     const ix = createInviteExchange({ now: clock().now });
     ix.refuseParsedRequest('joiner-addr');
     ix.answerProvenRequest('joiner-addr');
-    expect(ix.take('joiner-addr')).toBe('answer');
-    expect(ix.take('joiner-addr')).toBe(null);
+    expect(ix.take('joiner-addr', { kind: 'reply' })).toBe('answer');
+    expect(ix.take('joiner-addr', { kind: 'reply' })).toBe(null);
   });
 
   it('an address that is both an inviter I am redeeming with and a joiner I answer keeps both', () => {
     const ix = createInviteExchange({ now: clock().now });
     const release = ix.expectFromInviter('peer');
     ix.answerProvenRequest('peer');
-    expect(ix.take('peer')).toBe('answer');
-    expect(ix.take('peer')).toBe('joiner');
+    expect(ix.take('peer', { kind: 'reply' })).toBe('answer');
+    expect(ix.take('peer', { kind: 'joiner' })).toBe('joiner');
     release();
-    expect(ix.take('peer')).toBe(null);
+    expect(ix.take('peer', { kind: 'joiner' })).toBe(null);
   });
 
   it('PAIRING: a scanned pairing code opens one exchange to the scanned key, closed by its release', () => {
     const ix = createInviteExchange({ now: clock().now });
     const release = ix.expectPairing('scanned');
-    expect(ix.take('scanned')).toBe('pairing');
+    expect(ix.take('scanned', { kind: 'pairing' })).toBe('pairing');
     release();
-    expect(ix.take('scanned')).toBe(null);
+    expect(ix.take('scanned', { kind: 'pairing' })).toBe(null);
     expect(personAllowedBy({ inviteExchange: 'pairing' })).toEqual({ allowedBy: 'invite-exchange', side: 'pairing' });
   });
 
   it('refuses an empty address', () => {
     const ix = createInviteExchange({ now: clock().now });
     expect(() => ix.answerProvenRequest('')).not.toThrow();
-    expect(ix.take('')).toBe(null);
+    expect(ix.take('', { kind: 'reply' })).toBe(null);
   });
 });
 
@@ -160,5 +160,32 @@ describe('the decision record carries allowedBy (codes only)', () => {
     expect(f.origin).toBe('pair-roster');
     expect(sendDecisionFields({ kind: 'own-device', circleId: null, reason: 'device-map', allowedBy: 'own-device' }).allowedBy).toBe('own-device');
     expect(sendDecisionFields({ kind: 'circle-member', circleId: 'c', reason: 'roster-hit' }).allowedBy).toBeUndefined();
+  });
+});
+
+describe('createInviteExchange: a send uses only the registration of ITS side (take by payload subtype)', () => {
+  const clock = () => { let t = 1_000; return { now: () => t }; };
+  it('the side is named by the payload: a redeem request, a redeem answer, a pairing request, or none', () => {
+    expect(exchangeKindOf({ subtype: 'group-redeem-request' })).toBe('joiner');
+    expect(exchangeKindOf({ subtype: 'group-redeem-response' })).toBe('reply');
+    expect(exchangeKindOf({ __pairReq: { addr: 'x' } })).toBe('pairing');
+    expect(exchangeKindOf({ subtype: 'contact-msg' })).toBe(null);
+    expect(exchangeKindOf(null)).toBe(null);
+  });
+  it('an address that is BOTH (two devices inviting each other): the joiner\'s request does not use up the reply', () => {
+    const ix = createInviteExchange({ now: clock().now });
+    ix.expectFromInviter('peer');
+    ix.answerProvenRequest('peer');
+    expect(ix.take('peer', { kind: 'joiner' })).toBe('joiner');
+    expect(ix.take('peer', { kind: 'reply' }), 'the reply registration is still there').toBe('answer');
+    expect(ix.take('peer', { kind: 'reply' })).toBe(null);
+  });
+  it('a contact message to an address with an open redeem is NOT the exchange (it was recorded as joiner)', () => {
+    const ix = createInviteExchange({ now: clock().now });
+    ix.expectFromInviter('bot');
+    ix.expectPairing('bot');
+    expect(ix.take('bot', { kind: null })).toBe(null);
+    expect(ix.take('bot')).toBe(null);
+    expect(ix.take('bot', { kind: 'pairing' })).toBe('pairing');
   });
 });

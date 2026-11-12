@@ -315,7 +315,7 @@ export const SHELLS = Object.freeze([
 /** Gaps a shell is known to have, each with what closes it. Remove the entry when the seam lands. */
 export const BASELINE = Object.freeze([
   // the phone's fast check is a native module (its own row, after the box and the web); until then tweetnacl behind the rule
-  { shell: 'mobile', seam: 'signature-equation', closes: 'the phone native signature check (ledger L835)' },
+  { shell: 'mobile', seam: 'signature-equation', closes: 'plans/briefs/BRIEF-L619-fast-start-build-2026-11-12.md (the phone native signature check)' },
 ]);
 
 /** Source with comments removed — a comment that EXPLAINS a seam is not the seam. */

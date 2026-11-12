@@ -1089,6 +1089,9 @@ and counted. The app answers `stale` for a circle address with no roster read an
 was read, reads that circle's roster again, and the parked envelopes are judged ONCE more: accepted ones are delivered
 in arrival order, the rest are dropped and counted, nothing is parked twice. Every circle-identity install reads that
 circle's roster, and the boot primer reads rosters before it installs identities.
+*Amended 2026-11-12 (Fable, keeping the decision; the fast start):* every install still reads its circle's roster, but
+the reads run in turn, not all at once: one at a time, giving the thread back between them, the circle on screen first;
+a held message moves its circle first (its read starts at once). Nothing is let in unchecked.
 
 ---
 
@@ -1556,3 +1559,39 @@ already answered from memory. What may be remembered, and what may not:
   a read that computes a chain, a fork or a lane's head over the whole lane keeps checking the whole lane.
 
 Ledger: L619, L821.
+
+## 2026-11-12 — One strict rule for a valid signature; no remembered verdicts (Frits, the L619 fast-start brief)
+
+**One rule.** Ed25519 libraries disagree on crafted signatures: on the 12 published edge-case vectors tweetnacl (what
+every device ran) accepted seven, node:crypto and WebCrypto five, libsodium one. A faster check on one device would
+then accept what another refuses, and a member could split a circle's roster. So every signature check in the platform
+applies one rule first, as byte checks: S < L, the key and R canonically encoded and not of small order, then the
+cofactorless equation (`verifyEd25519Strict`, rule set `ed25519-strict-1`, written out in
+`docs/conventions/signed-bodies.md`, the vectors in `@onderling/core/conformance`). It accepts less than before and
+nothing an honest signer makes. It ships on all three shells at once, by construction (it is in `AgentIdentity.verify`
+and the three checks that called the library directly), and before any device uses a faster check behind it.
+
+**No remembered verdicts.** A "this signature checked out" mark that survives a restart (verify-once step C1, or the
+same for membership and keys) is not built: stored chat is never re-verified on read, so it saved nothing; the
+signed lanes are covered by checking each signature once per process (the shared memo) and, later, by checking a
+circle when it is first needed; and a remembered mark would travel with a history restore, a verdict from another
+device. Ledger: L619, L829.
+
+## 2026-11-12 — Compacting superseded member properties is paused until a tombstone can prove itself (Frits's brief)
+
+A device compacts a `member-props` statement the roster fold calls dead into a tombstone: chain fields kept, payload
+and signature gone. The tombstone keeps the causal edge on the device that made it, but a member who joins LATER
+cannot accept it (nothing to verify), so it lacks that parent, and the fold skips a missing parent: the late joiner
+gives the author's later statements a lower causal depth. Proven (`apps/basis/test/v2/lateJoinerFoldOrder.test.js`):
+an admin who evicts a member right after seeing their newest name folds as an eviction on the devices that were there,
+and as no eviction on a device that joined later. Two devices of one circle, two rosters, nobody misbehaving.
+
+So compaction is OFF (`COMPACT_SUPERSEDED_PROPS` in `apps/basis/src/v2/membershipRail.js`): dead statements stay
+whole, are served to late joiners like any other, and every device folds the same. The price: the log keeps old
+member properties (a face thumbnail per change). It turns back on with the statement format whose signature covers a
+header that a tombstone keeps, so a tombstone proves itself and can be sent on. The decision to pause on a red finding
+was set in advance in the L619 fast-start brief (Frits, 2026-11-12). What the pause does NOT undo: tombstones made
+before it stay on the devices that ran with compaction on, and nothing serves a tombstone (a catch-up sends only what
+it can vouch for), so a member who joins such a circle later still lacks those parents. That is pre-launch state with
+no compatibility owed: the alpha starts from fresh circles (and the statement format change founds every circle again).
+Ledger: L827, L833.

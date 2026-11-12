@@ -62,7 +62,7 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS } from '../../v2/membershipRail.js';
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS, COMPACT_SUPERSEDED_PROPS } from '../../v2/membershipRail.js';
 import { makeLateRecipientRetell } from '../../v2/membershipLateRecipient.js'; // the membership rider — statements ride the device log
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
@@ -327,6 +327,7 @@ import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/ap
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 import { makeIsKnownPeer }                  from '../../v2/knownPeer.js';
 import { parseUntrustedJson } from '@onderling/core';
+import { createTimeSlice } from '@onderling/core';
 import { createInProcessSenderAuthorizer } from '@onderling/core';
 
 // Deterministic seed for the real household store.  Three open items across
@@ -1213,9 +1214,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const registerCircleSelf = (address, identity, meta) => {
     try { circleSenders.noteCircleAddress(meta?.circleId, address); } catch { /* the registration below still holds */ }
     const ok = sa.registerSelfIdentity(address, identity, { owner: ownerFor(meta?.circleId) });
-    // ...and the circle's roster is read now, wherever the install came from (a create, a join, a restore, the boot):
-    // until it is, traffic sealed to this address is refused, never let in unchecked
-    if (ok && meta?.circleId) readCircleRoster(meta.circleId);
+    // ...and the circle's roster is read, wherever the install came from (a create, a join, a restore, the boot), IN
+    // TURN: one read at a time, never all circles at once; until it is, traffic sealed to this address is held (parked),
+    // never let in unchecked, and a held message moves its circle first (rereadCircleRoster)
+    if (ok && meta?.circleId) scheduleRosterRead(meta.circleId);
     return ok;
   };
   // The roster read needs this agent's surface (`api`, composed at the end of this scope): installs before then are
@@ -1228,12 +1230,51 @@ export async function createRealHouseholdAgent(opts = {}) {
   const queuedRosterReads = new Map();   // circleId -> the read queued behind the one in flight
   function rereadCircleRoster(circleId) {
     if (typeof circleId !== 'string' || !circleId) return Promise.resolve();
+    takeOffTheLine(circleId);   // read now: it no longer waits its turn
     const inFlight = senderRosterReads.get(circleId);
     if (!inFlight) return readCircleRoster(circleId);
     if (!queuedRosterReads.has(circleId)) {
       queuedRosterReads.set(circleId, inFlight.then(() => { queuedRosterReads.delete(circleId); return readCircleRoster(circleId); }));
     }
     return queuedRosterReads.get(circleId);
+  }
+  // THE ROSTER READ LINE (fast start): every circle-identity install schedules its circle's read here, and the line
+  // reads them ONE AT A TIME, giving the thread back between reads, instead of all at once at a start (each read is the
+  // circle's full proved fold). A park reads its circle at once and takes it off the line; a shell moves the circle on
+  // screen to the front (`readCircleRosterFirst`). The decision of 2026-11-10 stands: every install reads its roster,
+  // in turn. `opts.rosterReadLineGate(circleId)` is a TEST seam on the line only (a walk holds one circle back).
+  const rosterReadLine = [];
+  let rosterLineRunning = false;
+  function takeOffTheLine(circleId) {
+    const i = rosterReadLine.indexOf(circleId);
+    if (i >= 0) rosterReadLine.splice(i, 1);
+  }
+  /** The circle on screen: its read goes to the front of the line (it is read next, or now if the line is idle). */
+  function readCircleRosterFirst(circleId) {
+    if (typeof circleId !== 'string' || !circleId || !rosterReadLine.includes(circleId)) return;
+    takeOffTheLine(circleId);
+    rosterReadLine.unshift(circleId);
+    runRosterLine();
+  }
+  function scheduleRosterRead(circleId) {
+    if (typeof circleId !== 'string' || !circleId) return;
+    if (!rosterReadLine.includes(circleId)) rosterReadLine.push(circleId);
+    runRosterLine();
+  }
+  function runRosterLine() {
+    if (rosterLineRunning || !apiComposed) return;
+    rosterLineRunning = true;
+    const slice = createTimeSlice();
+    (async () => {
+      while (rosterReadLine.length) {
+        await slice();
+        const circleId = rosterReadLine[0];
+        if (typeof opts.rosterReadLineGate === 'function') { try { await opts.rosterReadLineGate(circleId); } catch { /* the gate never stops the line */ } }
+        if (rosterReadLine[0] !== circleId) continue;   // a park read it meanwhile, or the order changed
+        rosterReadLine.shift();
+        try { await readCircleRoster(circleId); } catch { /* still unread: a park reads it again */ }
+      }
+    })().finally(() => { rosterLineRunning = false; if (rosterReadLine.length) runRosterLine(); });
   }
   const senderRosterReads = new Map();   // circleId -> the sender-check roster read under way
   const readCircleRoster = (circleId) => {
@@ -6289,7 +6330,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
     // between here and the fold has to learn a new name.
-    membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
+    // PAUSED (COMPACT_SUPERSEDED_PROPS): a late joiner cannot accept a tombstone and would fold a different roster
+    membershipRead.compact = async (circleId, hashes) => {
+      if (!COMPACT_SUPERSEDED_PROPS) return 0;
+      try { return membershipRail.compact(circleId, hashes); } catch { return 0; }
+    };
     // …and a statement that travelled with the act that caused it (the admin's join on a redeem reply) lands the same road
     // a fanned one does: the rail's full ingest gate (verify + declared kind + key↔ref binding), never a direct write.
     membershipRead.ingest = async (circleId, statement) => { try { return await membershipRail.ingest(circleId, statement); } catch { return { ok: false }; } };
@@ -10486,6 +10531,8 @@ export async function createRealHouseholdAgent(opts = {}) {
      * is a defect, not a design", and a second store is how a feature comes to reach no peer at all.
      */
     circleStoreFor: (circleId) => householdService.stores.getStore(circleId),
+    /** The circle a shell has on screen: its roster is read next (the start queue calls it first). */
+    readCircleRosterFirst: (circleId) => readCircleRosterFirst(circleId),
     /** Diagnostics for `/security-status`: how strong this device's membership check actually is. */
     circleSenderAuthorization: () => ({
       installed:               !!sa.senderAuthorizerInstalled,
@@ -10589,8 +10636,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     onPersonaStarted = writeDeviceLink;   // …and a persona that starts later (created here, or handed) writes its own
   }
   apiComposed = true;
-  for (const cid of rostersToRead) readCircleRoster(cid);
+  for (const cid of rostersToRead) scheduleRosterRead(cid);
   rostersToRead.clear();
+  runRosterLine();
   selfAgent = api;
   return api;
 }

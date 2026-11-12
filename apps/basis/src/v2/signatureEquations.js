@@ -10,7 +10,8 @@
  *   • the WEB: WebCrypto is asynchronous, so the synchronous check stays tweetnacl and the BATCH is WebCrypto: a read
  *     hands its statements to the memo's `checkBatch` first, and the synchronous checks after it are answered from
  *     memory. Chunked, so a long batch gives the thread back between chunks;
- *   • the PHONE: a native module, later (its own row); until then tweetnacl behind the rule.
+ *   • the PHONE: libsodium's C over JSI (react-native-libsodium, pinned), synchronous, handed in by the app's entry.
+ *     The glue checks no lengths: the rule in front guarantees 64 and 32 bytes before it is reached.
  *
  * The platform's crypto is handed IN (the box passes `node:crypto`, the web `crypto.subtle`), so this shared module
  * imports nothing platform-specific.
@@ -70,6 +71,26 @@ export function webCryptoEquation(subtle, { yieldToThread = () => new Promise((r
       return out;
     },
   };
+}
+
+/**
+ * libsodium's Ed25519 check (the phone: react-native-libsodium over JSI), synchronous. Measured on a mid-range Android
+ * phone (2026-11-12): ~0.07 ms a check, against ~59 ms in tweetnacl.
+ * @param {{ crypto_sign_verify_detached: (sig: Uint8Array, msg: Uint8Array, key: Uint8Array) => boolean }} sodium
+ */
+export function libsodiumEquation(sodium) {
+  return {
+    name: 'libsodium-jsi',
+    verify: (msg, sig, key) => sodium.crypto_sign_verify_detached(sig, msg, key) === true,
+  };
+}
+
+/**
+ * Install the phone's equation (libsodium over JSI). Returns what `useSignatureEquation` said.
+ * @param {object} sodium  `react-native-libsodium`
+ */
+export async function installPhoneSignatureEquation(sodium) {
+  try { return await useSignatureEquation(libsodiumEquation(sodium)); } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; }
 }
 
 /**

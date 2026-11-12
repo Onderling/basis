@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { EventLog } from '../src/eventLog.js';
 
 const requestsOf = async (node, persona = null) => (await node.agent.callSkill('pinboard', 'listMessageRequests', persona ? { persona } : {}))?.requests ?? [];
@@ -30,6 +30,9 @@ describe('each persona decides who may write to it first', () => {
     O = phone.agent.persona(onderlingId);
     await phone.agent.sa.relays.add(relay.url, { identity: O.chatId, awaitReady: true });
     expect(await phone.agent.setFirstMessages('open', { persona: onderlingId })).toBe('open');
+    // the writers hold the cards they write to: Onderling's (the persona's own card) and the person's
+    await addCardOf(stranger, null, { payload: (await phone.agent.callSkill('pinboard', 'getContactShareQr', { persona: onderlingId }))?.payload });
+    await addCardOf(other, phone);
   }, 120_000);
   afterAll(async () => { await teardown(phone, stranger, other); await relay?.close?.(); });
 

@@ -45,6 +45,9 @@ describe('a phone in Node, over a real relay', () => {
     // Bob chose Anna (her card in his book): a first message from someone he did not choose is a request instead
     const card = (await anna.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
     expect((await bob.agent.callSkill('pinboard', 'addContactFromQr', { payload: card }))?.error ?? null).toBe(null);
+    // …and Anna holds Bob's card: she writes to someone she chose
+    const bobCard = (await bob.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+    expect((await anna.agent.callSkill('pinboard', 'addContactFromQr', { payload: bobCard }))?.error ?? null).toBe(null);
     const text = `hallo bob ${Date.now()}`;
     const { sent } = anna.bundle.contactChannel.sendTurn({ peerAddr: bob.address, threadId: bob.address, text });
     await sent;

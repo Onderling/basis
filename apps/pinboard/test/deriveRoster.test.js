@@ -6,10 +6,10 @@
  * covers: founder-without-a-redemption, the joiner learning the admin via
  * `confirmedBy`, display-field left-join, and key backfill from the trail.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { signSpine, AgentIdentity, deriveCircleAddress, signCircleLinkFromSeed, Bootstrap } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { deriveRoster } from '../src/lib/deriveRoster.js';
+import { deriveRoster, proveLinksAhead } from '../src/lib/deriveRoster.js';
 
 const redemption = (over = {}) => ({
   type: 'membership-redemption',
@@ -617,5 +617,41 @@ describe('a roster derived again and again checks each member\'s link signature 
       const bad = { founderWebids: ['A'], founderFacts: { A: { groupId: 'g-memo', circleAddress: addr, circleAddressProof: otherProof } } };
       for (let i = 0; i < 3; i++) expect(deriveRoster(bad).find((m) => m.webid === 'A').circleAddress ?? null).toBe(null);
     } finally { spy.mockRestore(); }
+  });
+});
+
+describe('the link proofs a roster read checks are checked ahead, giving the thread back (fast start, the 100 ms rule)', () => {
+  const seedOf = (n) => new Uint8Array(32).fill(100 + n);
+  const addrOf = (n) => deriveCircleAddress(seedOf(n), 'g7');
+  const proofOf = (n) => signCircleLinkFromSeed(seedOf(n), 'g7', 'g7', addrOf(n));
+  const args = () => ({
+    redemptions: [1, 2, 3, 4, 5, 6].map((n) => redemption({ groupId: 'g7', redeemedBy: `M${n}`, circleAddress: addrOf(n), circleAddressProof: proofOf(n) })),
+    founderWebids: ['F'],
+    founderFacts: { F: { groupId: 'g7', circleAddress: addrOf(9), circleAddressProof: proofOf(9) } },
+  });
+
+  it('after the ahead pass the fold checks nothing again: the two agree on which proofs there are', async () => {
+    const a = args();
+    await proveLinksAhead(a);
+    const spy = vi.spyOn(AgentIdentity, 'verify');
+    try {
+      const roster = deriveRoster(a);
+      expect(roster.filter((m) => m.circleAddress).length).toBe(7);
+      expect(spy.mock.calls.length, 'the fold checked a proof the ahead pass did not').toBe(0);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('seven proofs whose checks take ~30 ms each: no stretch of more than 100 ms', async () => {
+    const real = AgentIdentity.verify.bind(AgentIdentity);
+    const spy = vi.spyOn(AgentIdentity, 'verify').mockImplementation((m, s, k) => { const end = Date.now() + 30; while (Date.now() < end) { /* a slow phone */ } return real(m, s, k); });
+    const a = args();
+    a.redemptions = a.redemptions.map((r, i) => ({ ...r, source: { ...r.source, circleAddress: deriveCircleAddress(new Uint8Array(32).fill(150 + i), 'g7'), circleAddressProof: signCircleLinkFromSeed(new Uint8Array(32).fill(150 + i), 'g7', 'g7', deriveCircleAddress(new Uint8Array(32).fill(150 + i), 'g7')) } }));
+    let last = Date.now(); let worst = 0; let running = true;
+    const tick = () => { const t = Date.now(); worst = Math.max(worst, t - last); last = t; if (running) setTimeout(tick, 0); };
+    setTimeout(tick, 0);
+    await new Promise((r) => { setTimeout(r, 5); });
+    last = Date.now();
+    try { await proveLinksAhead(a); } finally { running = false; spy.mockRestore(); }
+    expect(worst, 'the ahead pass held the thread').toBeLessThan(100);
   });
 });

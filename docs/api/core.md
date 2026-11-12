@@ -4823,6 +4823,33 @@ list, or query to it.
 
 **Methods:** `getSource()` · `addSource()` · `removeSource()` · `read()` · `write()` · `delete()` · `list()` · `query()`
 
+## `src/timeSlice.js`
+
+### `TIME_SLICE_MS`
+
+**Kind:** constant · **Import:** `TIME_SLICE_MS` from `'@onderling/core'`
+
+How long one stretch of work may hold the thread before it gives it back (the start target: never above 100 ms).
+
+### `createTimeSlice`
+
+**Kind:** function · **Import:** `createTimeSlice` from `'@onderling/core'`
+
+```js
+createTimeSlice({ budgetMs = TIME_SLICE_MS, now = () => Date.now(), yieldFn = giveBack } = {})
+```
+
+One slice for one piece of long work (a read): call the returned function at every step.
+
+**Parameters**
+
+- `[o]` `object`
+- `[o.budgetMs]` `number` — a stretch longer than this yields
+- `[o.now]` `() => number`
+- `[o.yieldFn]` `() => Promise<void>` — how to give the thread back (default: one macrotask)
+
+**Returns:** `() => Promise<void>`
+
 ## `src/transport/InternalTransport.js`
 
 ### `InternalBus`

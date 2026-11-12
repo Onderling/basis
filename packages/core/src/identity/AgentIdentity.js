@@ -27,6 +27,7 @@ import ed2curve   from 'ed2curve';
 import { hkdf }   from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
+import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
 import { mnemonicToSeed, seedToMnemonic } from './Mnemonic.js';
 
 const { convertPublicKey, convertKeyPair } = ed2curve;
@@ -293,7 +294,8 @@ export class AgentIdentity {
   static verify(data, sig, pubKeyB64) {
     if (typeof data === 'string') data = new TextEncoder().encode(data);
     if (typeof sig  === 'string') sig  = b64decode(sig);
-    return nacl.sign.detached.verify(data, sig, b64decode(pubKeyB64));
+    // the platform's ONE check: the strict byte rule, then the equation (crypto/ed25519Strict.js)
+    return verifyEd25519Strict(data, sig, b64decode(pubKeyB64));
   }
 
   // ── Asymmetric encryption ──────────────────────────────────────────────────

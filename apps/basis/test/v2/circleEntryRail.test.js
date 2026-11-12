@@ -219,7 +219,7 @@ describe('the rail — compact (tombstones on the fold\'s word)', () => {
     return log;
   }
   const MKINDS = ['join', 'member-props'];
-  const mrail = (log, me) => makeCircleEntryRail({ eventLog: log, signerFor: async () => ({ identity: me.identity, ref: me.ref }), entryKind: 'membership', declaredKinds: MKINDS });
+  const mrail = (log, me) => makeCircleEntryRail({ eventLog: log, signerFor: async () => ({ identity: me.identity, ref: me.ref }), entryKind: 'membership', declaredKinds: MKINDS, compactableKinds: ['member-props'] });
 
   it('a tombstoned statement keeps its chain fields and its place, loses its content, and is never resurrected', async () => {
     const log = fakeEventLogWithCompact();

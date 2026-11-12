@@ -21,6 +21,7 @@ import nacl from 'tweetnacl';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
+import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { VaultMemory } from '@onderling/vault';
 import { parseUntrustedJson } from '../security/untrustedJson.js';
@@ -119,7 +120,7 @@ export function verifyPersonKeyChain(links, known) {
     if (!next) return cur;
     if (typeof next.pubKey !== 'string' || !next.pubKey || typeof next.sig !== 'string' || next.prevVersion !== cur.version) return null;
     let ok = false;
-    try { ok = nacl.sign.detached.verify(personKeyLinkMessage(next), b64decode(next.sig), linkKey); } catch { ok = false; }
+    try { ok = verifyEd25519Strict(personKeyLinkMessage(next), b64decode(next.sig), linkKey); } catch { ok = false; }
     if (!ok) return null;
     cur = { version: next.version, pubKey: next.pubKey, linkKeyPub: known.linkKeyPub };
   }

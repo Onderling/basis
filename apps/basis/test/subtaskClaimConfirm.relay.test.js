@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, pairCircle, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, pairCircle, until, teardown, sendInCircle } from './support/pairRealAgents.js';
 
 const CIRCLE_ID = 'relay-race-chores';
 const WARM = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
@@ -27,8 +27,8 @@ const listTasks = async (node, circleId) => {
 const taskById = async (node, circleId, id) => (await listTasks(node, circleId)).find((t) => t.id === id) ?? null;
 
 async function warm(from, to) {
-  const w = await from.agent.sendPeerMessage(
-    to.pubKey, { type: 'p2p-chat', subtype: 'chat-message', msgId: `warm-${to.label}`, body: 'warm' }, WARM,
+  const w = await sendInCircle(from, to, CIRCLE_ID,
+    { type: 'p2p-chat', subtype: 'chat-message', msgId: `warm-${to.label}`, body: 'warm' }, WARM,
   );
   await until(() => to.received.find((m) => m.payload?.body === 'warm'), { timeout: 15000 });
   return w;

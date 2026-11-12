@@ -970,3 +970,14 @@ export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now
   if (!res) return { error: 'no-circle-signer' };
   return node.agent.callSkill('pinboard', 'broadcastCircleChatStatement', { groupId, event: res.statement, msgId, ts });
 }
+
+
+/**
+ * A test's own message to a circle MEMBER, sent the way the product sends circle traffic: to the member's per-circle
+ * address in that circle, the circle named, so the send gate scopes it to the circle (never the person key to a
+ * member who is not a contact). For warm-ups and test chats inside a paired circle.
+ */
+export async function sendInCircle(from, to, circleId, payload, opts = {}) {
+  const address = to.agent.circleAddressFor(circleId);
+  return from.agent.sendPeerMessage(address, payload, { ...opts, circleId });
+}

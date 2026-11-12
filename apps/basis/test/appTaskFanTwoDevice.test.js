@@ -43,8 +43,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 
 import {
   bootRealAgentNode, connectAgentsOverBus, pairCircle,
-  until, teardown,
-} from './support/pairRealAgents.js';
+  until, teardown, sendInCircle } from './support/pairRealAgents.js';
 
 // A shared circle whose tasks both devices should see.
 const CIRCLE_ID = 'shared-chores';
@@ -92,8 +91,8 @@ describe('a task created on one device reaches another device\'s TASKS store (th
 
     // Warm the handshake while both are online (so delivery is deterministic, not a
     // first-contact HI failure).
-    const warm = await A.agent.sendPeerMessage(
-      B.pubKey, { type: 'p2p-chat', subtype: 'chat-message', msgId: 'warm-1', body: 'warm' }, WARM,
+    const warm = await sendInCircle(A, B, CIRCLE_ID,
+      { type: 'p2p-chat', subtype: 'chat-message', msgId: 'warm-1', body: 'warm' }, WARM,
     );
     expect(warm.held, 'online send delivers immediately (not held)').toBe(false);
     await until(() => B.received.find((m) => m.payload?.body === 'warm'));

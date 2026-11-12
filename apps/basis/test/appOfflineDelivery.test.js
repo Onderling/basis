@@ -44,6 +44,10 @@ describe('offline delivery guarantee — sender-hold + presence-flush (two real 
     [A, B] = await Promise.all([bootRealAgentNode('A'), bootRealAgentNode('B')]);
     await connectAgentsOverBus(A, B);
     await pairCircle(A, B, { groupId: 'peer-circle', name: 'Peer Circle', handle: 'peerbee' });
+    // A writes to B's PERSON key: B is A's contact, added through the real door (B's card), as a person does before
+    // writing someone directly (the send gate lets the person key speak to a kept contact).
+    const bCard = (await B.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+    expect((await A.agent.callSkill('pinboard', 'addContactFromQr', { payload: bCard }))?.error ?? null).toBe(null);
 
     // Warm the handshake while both are online so the later hold path isn't
     // just a first-contact HI failure (an online send delivers immediately).

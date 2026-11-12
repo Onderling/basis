@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 71
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 72
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -29,6 +29,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `codenames` | — | no internal PLANNING CODENAMES in public code comments or docs |
 | `content-classification` | — | every durable STORE a shell builds is classified in `enrolForgets.js` |
 | `css-tokens` | — | every `var(--name)` in ANY web file (all of apps/basis/web: style.css, inline `cssText` in the JS) is one a… |
+| `decisions` | — | docs/decisions.md is in date order, and every decision docs/architecture.md cites is in it |
 | `default-literal` | — | PRIMARY |
 | `dep-boundaries` | — | Dependency-boundary fitness function — CLAUDE.md invariant #5 |
 | `disclosure-exit` | G-A1 | the Agent membrane's disclosure gate is the ONLY exit for identity |

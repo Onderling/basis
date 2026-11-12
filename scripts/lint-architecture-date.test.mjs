@@ -13,6 +13,9 @@ describe('lint-architecture-date', () => {
     expect(architectureDateProblems(doc('2026-11-12'), doc('2026-11-12'), '2026-11-12')).toEqual([]);
     expect(architectureDateProblems(doc('2026-11-12', 'new'), doc('2026-11-05', 'old'), '2026-11-12')).toEqual([]);
   });
+  it('is quiet for a second change on the day the base is dated', () => {
+    expect(architectureDateProblems(doc('2026-11-12', 'new'), doc('2026-11-12', 'old'), '2026-11-12')).toEqual([]);
+  });
   it('is red when the file changed and the date did not move', () => {
     expect(architectureDateProblems(doc('2026-11-05', 'new'), doc('2026-11-05', 'old'), '2026-11-12').join('\n')).toMatch(/did not move/);
   });

@@ -100,6 +100,9 @@ const ITEM_TYPES = [
   'post',
   'contact',
   'member',
+  //  - 'message-request' — a first message from someone not chosen, held beside the book until the person answers
+  //    (listMessageRequests / ignoreMessageRequest appliesTo). Canonical in `@onderling/item-types`, own-devices only.
+  'message-request',
 ];
 
 // The trio that renders on the noticeboard (ask / offer / lend) — used as
@@ -143,6 +146,8 @@ export const pinboardManifest = {
     // sitting of its own.
     contact:       { atoms: ['add', 'list', 'submit'] },
     member:        { atoms: ['add', 'list'] },
+    // a request is listed and answered; it is never added by the person (the door holds it) nor merged into a view
+    'message-request': { atoms: ['list', 'submit'] },
   },
 
   operations: [
@@ -648,6 +653,36 @@ export const pinboardManifest = {
         slash: { command: '/hide-contact', body: 'flags' },
         chat:  { reply: 'text', hint: 'hide a contact from Contacten, or show them again' },
         ui:    { control: 'button', labelKey: 'circle.button.pinboard.setContactHidden' },
+      },
+    },
+    // ── Requests (Frits 2026-11-12) ──
+    // A first message from someone the person did not choose is a REQUEST, held beside the book (never in it) until the
+    // person accepts, ignores or blocks it. Requests are per self, on the own-devices store, so they reach every device
+    // of the person. Blocking is basis's block set (`mute`, /block).
+    {
+      id:   'listMessageRequests', visibility: 'authenticated', group: 'data', verb: 'list',
+      appliesTo: { type: 'message-request' },
+      params: [
+        { name: 'persona', kind: 'string', required: false },
+        { name: 'state',   kind: 'enum', of: ['open', 'ignored'], required: false },
+      ],
+      surfaces: {
+        slash: { command: '/requests', body: 'flags' },
+        chat:  { reply: 'list', hint: 'list first messages from people you did not choose' },
+      },
+    },
+    {
+      id:   'ignoreMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'state', policy: 'content' }],   // the newer write wins between the person's devices; a later turn keeps the mark
+      params: [
+        { name: 'from',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/ignore-request', body: 'flags' },
+        chat:  { reply: 'text', hint: 'ignore a request: it stays and can still be accepted' },
       },
     },
     {

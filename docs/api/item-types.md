@@ -464,6 +464,20 @@ Every caller wants both halves, and the half that used to be checked alone (`typ
 'subtask-request'`) was checking a type that no longer exists, so it silently answered no
 everywhere. Exported from the type's own package because both apps and other packages ask.
 
+## `src/types/messageRequest.js`
+
+### `MESSAGE_REQUEST_STATES`
+
+**Kind:** constant · **Import:** `MESSAGE_REQUEST_STATES` from `'@onderling/item-types'`
+
+The states a held request can be in: open (new to the person) or ignored (kept, no longer new).
+
+### `MESSAGE_REQUEST_SET_UNION`
+
+**Kind:** constant · **Import:** `MESSAGE_REQUEST_SET_UNION` from `'@onderling/item-types'`
+
+The type's set-union declaration: the held turns, keyed by message id, timed by the sender, pruned by the floor.
+
 ## `src/types/readMarks.js`
 
 ### `READ_MARKS_SET_UNION`

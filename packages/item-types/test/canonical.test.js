@@ -60,6 +60,7 @@ describe('Canonical types — registration via default registry', () => {
       'media',
       'membership-code',
       'membership-redemption',
+      'message-request',
       'neighbourhood-job',
       'note',
       'offer',

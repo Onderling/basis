@@ -4136,6 +4136,29 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
+    // ── Requests: first messages from people not chosen (lib/MessageRequests.js) ──
+    /** listMessageRequests({persona?, state?}) — this self's requests, newest last turn first. */
+    defineSkill('listMessageRequests', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { requests: [] };
+      const state = a.state === 'open' || a.state === 'ignored' ? a.state : null;
+      return { requests: await bundle.messageRequests.list({ persona: a.persona ?? null, state }) };
+    }, {
+      description: 'List first messages from people you did not choose, waiting for your answer (open and ignored).',
+      visibility:  'authenticated',
+    }),
+
+    /** ignoreMessageRequest({from, persona?}) — kept, marked; later turns still land; still acceptable. */
+    defineSkill('ignoreMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { error: 'no-contacts' };
+      const request = await bundle.messageRequests.ignore(a.from, { persona: a.persona ?? null });
+      return request ? { request } : { error: 'no-such-request' };
+    }, {
+      description: 'Ignore a request: it stays, marked, and can still be accepted. The sender sees nothing different.',
+      visibility:  'authenticated',
+    }),
+
     /** setContactPersona({webid, persona, revealPreset?, personaAt?}) — what a contact sees of you (L125). */
     defineSkill('setContactPersona', async ({ parts }) => {
       const a = dataArgs(parts);

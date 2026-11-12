@@ -235,6 +235,9 @@ export function createContactBook({ store = null, selfFor = null } = {}) {
     listContacts,
     listContactsByTag,
     listContactsByMinTrust,
+    /** The own-devices store the book writes to (the host's, or its in-memory one standalone): the store the message
+     *  requests share, so a request and the contact it becomes live side by side. */
+    ownStore:      getStore,
   };
 }
 

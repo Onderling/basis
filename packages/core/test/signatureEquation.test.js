@@ -23,9 +23,9 @@ describe('useSignatureEquation: a faster equation is taken only if it agrees', (
     expect(signatureEquationName()).toBe('tweetnacl');
   });
 
-  it('takes an equation that agrees on the vectors and on honest and tampered signatures', () => {
+  it('takes an equation that agrees on the vectors and on honest and tampered signatures', async () => {
     let calls = 0;
-    const r = useSignatureEquation({ name: 'counting', verify: (m, s, k) => { calls += 1; return naclEq(m, s, k); } });
+    const r = await useSignatureEquation({ name: 'counting', verify: (m, s, k) => { calls += 1; return naclEq(m, s, k); } });
     expect(r).toMatchObject({ ok: true, name: 'counting' });
     expect(signatureEquationName()).toBe('counting');
     const kp = nacl.sign.keyPair();
@@ -35,27 +35,27 @@ describe('useSignatureEquation: a faster equation is taken only if it agrees', (
     expect(calls).toBe(before + 1);
   });
 
-  it('refuses one that says yes to everything (the honest-tamper check), and keeps the current one', () => {
-    const r = useSignatureEquation({ name: 'yes-man', verify: () => true });
+  it('refuses one that says yes to everything (the honest-tamper check), and keeps the current one', async () => {
+    const r = await useSignatureEquation({ name: 'yes-man', verify: () => true });
     expect(r.ok).toBe(false);
     expect(signatureEquationName()).toBe('tweetnacl');
   });
 
-  it('refuses one that says no to everything', () => {
-    expect(useSignatureEquation({ name: 'no-man', verify: () => false }).ok).toBe(false);
+  it('refuses one that says no to everything', async () => {
+    expect((await useSignatureEquation({ name: 'no-man', verify: () => false })).ok).toBe(false);
     expect(signatureEquationName()).toBe('tweetnacl');
   });
 
-  it('the byte rule stays in front: a crafted S + L never reaches the equation', () => {
+  it('the byte rule stays in front: a crafted S + L never reaches the equation', async () => {
     const seen = [];
-    useSignatureEquation({ name: 'spy', verify: (m, s, k) => { seen.push(s[63]); return naclEq(m, s, k); } });
+    await useSignatureEquation({ name: 'spy', verify: (m, s, k) => { seen.push(s[63]); return naclEq(m, s, k); } });
     seen.length = 0;
     expect(ed25519Disagreements(verifyEd25519Strict)).toEqual([]);
   });
 
-  it('null goes back to tweetnacl', () => {
-    useSignatureEquation({ name: 'counting', verify: naclEq });
-    useSignatureEquation(null);
+  it('null goes back to tweetnacl', async () => {
+    await useSignatureEquation({ name: 'counting', verify: naclEq });
+    await useSignatureEquation(null);
     expect(signatureEquationName()).toBe('tweetnacl');
   });
 });
@@ -63,11 +63,12 @@ describe('useSignatureEquation: a faster equation is taken only if it agrees', (
 describe('the batch check fills the memo', () => {
   it('an async equation answers a batch; the sync reads after it are answered from memory', async () => {
     let batchCalls = 0;
-    useSignatureEquation({
+    await useSignatureEquation({
       name: 'async-batch',
       verify: naclEq,
       verifyBatch: async (items) => { batchCalls += 1; return items.map(({ msg, sig, key }) => naclEq(msg, sig, key)); },
     });
+    batchCalls = 0;   // the install vetted the batch once; count the reads only
     const id = await AgentIdentity.generate(new VaultMemory());
     const msgs = ['een', 'twee', 'drie'];
     const sigs = msgs.map((m) => AgentIdentity.b64encode?.(id.sign(m)) ?? Buffer.from(id.sign(m)).toString('base64url'));
@@ -104,7 +105,7 @@ describe('the batch check fills the memo', () => {
 describe('the installed equation is reached only behind the byte rule', () => {
   it('a signature that is not 64 bytes or a key that is not 32 never reaches it (a native equation reads fixed lengths)', async () => {
     const lengths = [];
-    useSignatureEquation({ name: 'length-spy', verify: (m, s, k) => { lengths.push([s.length, k.length]); return nacl.sign.detached.verify(m, s, k); } });
+    await useSignatureEquation({ name: 'length-spy', verify: (m, s, k) => { lengths.push([s.length, k.length]); return nacl.sign.detached.verify(m, s, k); } });
     lengths.length = 0;
     const kp = nacl.sign.keyPair();
     const msg = new TextEncoder().encode('x');
@@ -115,5 +116,25 @@ describe('the installed equation is reached only behind the byte rule', () => {
     expect(lengths).toEqual([]);
     expect(verifyEd25519Strict(msg, sig, kp.publicKey)).toBe(true);
     expect(lengths).toEqual([[64, 32]]);
+  });
+});
+
+describe('a BATCH equation is vetted by the kernel itself, through the batch', () => {
+  it('a batch that accepts edge-case vector 4 (a cofactored check) is refused, and tweetnacl stays', async () => {
+    const { ED25519_EDGE_VECTORS } = await import('../src/conformance/ed25519Conformance.js');
+    const hex = (h) => Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16)));
+    const v4sig = hex(ED25519_EDGE_VECTORS[4][2]);
+    const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+    const r = await useSignatureEquation({
+      name: 'cofactored-batch',
+      verifyBatch: async (items) => items.map(({ msg, sig, key }) => same(sig, v4sig) || nacl.sign.detached.verify(msg, sig, key)),
+    });
+    expect(r).toMatchObject({ ok: false, reason: 'batch-disagrees-on-vectors' });
+    expect(signatureEquationName()).toBe('tweetnacl');
+  });
+
+  it('a batch that agrees is installed', async () => {
+    const r = await useSignatureEquation({ name: 'good-batch', verifyBatch: async (items) => items.map(({ msg, sig, key }) => nacl.sign.detached.verify(msg, sig, key)) });
+    expect(r).toMatchObject({ ok: true, name: 'good-batch' });
   });
 });

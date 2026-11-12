@@ -289,7 +289,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
   };
   // THE SIGNATURE CHECK: node:crypto behind the one strict rule (taken only if it agrees on the edge-case vectors and on an
   // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
-  { const eq = installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
+  { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
   try {
     const forgot = await runPendingForget({
       markerVault: vault,

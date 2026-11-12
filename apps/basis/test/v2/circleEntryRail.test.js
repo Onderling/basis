@@ -335,11 +335,12 @@ describe('the rail — a read checks ahead in one batch where the fast check is 
     const { useSignatureEquation } = await import('@onderling/core');
     const nacl = (await import('tweetnacl')).default;
     let batches = 0;
-    useSignatureEquation({
+    await useSignatureEquation({
       name: 'test-batch',
       verify: (m, s, k) => nacl.sign.detached.verify(m, s, k),
       verifyBatch: async (items) => { batches += 1; return items.map(({ msg, sig, key }) => nacl.sign.detached.verify(msg, sig, key)); },
     });
+    batches = 0;   // the install vetted the batch once; count the read only
     try {
       const log = fakeEventLog();
       const me = await member('webid:me');

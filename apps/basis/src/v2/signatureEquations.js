@@ -16,7 +16,7 @@
  * imports nothing platform-specific.
  */
 import nacl from 'tweetnacl';
-import { useSignatureEquation, strictSignatureShapeOk, ED25519_EDGE_VECTORS, ED25519_ACCEPTED } from '@onderling/core';
+import { useSignatureEquation } from '@onderling/core';
 
 // The DER prefix of an Ed25519 public key in SubjectPublicKeyInfo form; the 32 key bytes follow it.
 const SPKI_ED25519_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]);
@@ -73,44 +73,19 @@ export function webCryptoEquation(subtle, { yieldToThread = () => new Promise((r
 }
 
 /**
- * Does WebCrypto have Ed25519 here, answering like the rule on an honest and a tampered signature? (The vectors are
- * checked by `useSignatureEquation` on the synchronous path; the batch is checked here, once, because it is async.)
- * @param {SubtleCrypto} subtle
- * @returns {Promise<boolean>}
- */
-export async function webCryptoBatchAgrees(subtle) {
-  try {
-    const kp = nacl.sign.keyPair();
-    const msg = new TextEncoder().encode('onderling webcrypto self-test');
-    const sig = nacl.sign.detached(msg, kp.secretKey);
-    const tampered = new Uint8Array(msg); tampered[0] ^= 1;
-    const eq = webCryptoEquation(subtle);
-    const r = await eq.verifyBatch([{ msg, sig, key: kp.publicKey }, { msg: tampered, sig, key: kp.publicKey }]);
-    if (!(r[0] === true && r[1] === false)) return false;
-    // the twelve edge-case vectors through the batch, the byte rule in front as the platform runs it
-    const hex = (h) => Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16)));
-    const vs = ED25519_EDGE_VECTORS.map(([m, k, sg]) => ({ msg: hex(m), sig: hex(sg), key: hex(k) }));
-    const shaped = vs.map((v) => strictSignatureShapeOk(v.sig, v.key));
-    const answers = await eq.verifyBatch(vs.filter((_, i) => shaped[i]));
-    let j = 0;
-    return vs.every((_, i) => (shaped[i] ? answers[j++] === true : false) === ED25519_ACCEPTED.includes(i));
-  } catch { return false; }
-}
-
-/**
  * Install the box's equation (node:crypto). Returns what `useSignatureEquation` said (it keeps tweetnacl on a refusal).
  * @param {object} nodeCrypto  `node:crypto`
  */
-export function installBoxSignatureEquation(nodeCrypto) {
-  try { return useSignatureEquation(nodeCryptoEquation(nodeCrypto)); } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; }
+export async function installBoxSignatureEquation(nodeCrypto) {
+  try { return await useSignatureEquation(nodeCryptoEquation(nodeCrypto)); } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; }
 }
 
 /**
- * Install the web's equation (WebCrypto's batch), after its self-test; with no Ed25519 in this browser, or a different
- * answer, tweetnacl stays.
+ * Install the web's equation (WebCrypto's batch); the kernel vets the batch itself. With no Ed25519 in this browser, or
+ * a different answer, tweetnacl stays.
  * @param {SubtleCrypto|null|undefined} subtle
  */
 export async function installWebSignatureEquation(subtle) {
-  if (!subtle || !(await webCryptoBatchAgrees(subtle))) return { ok: false, reason: 'no-ed25519-in-webcrypto' };
+  if (!subtle) return { ok: false, reason: 'no-webcrypto' };
   return useSignatureEquation(webCryptoEquation(subtle));
 }

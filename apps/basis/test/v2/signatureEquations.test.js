@@ -6,13 +6,13 @@ import nodeCrypto from 'node:crypto';
 import nacl from 'tweetnacl';
 import { useSignatureEquation, signatureEquationName, verifyEd25519StrictBatch, AgentIdentity } from '@onderling/core';
 import { ed25519Disagreements } from '@onderling/core/conformance';
-import { nodeCryptoEquation, webCryptoEquation, webCryptoBatchAgrees, installBoxSignatureEquation, installWebSignatureEquation } from '../../src/v2/signatureEquations.js';
+import { nodeCryptoEquation, webCryptoEquation, installBoxSignatureEquation, installWebSignatureEquation } from '../../src/v2/signatureEquations.js';
 
 afterEach(() => { useSignatureEquation(null); });
 
 describe('the box: node:crypto behind the rule', () => {
-  it('is taken, agrees on the vectors, and answers honest and tampered signatures as tweetnacl does', () => {
-    expect(installBoxSignatureEquation(nodeCrypto)).toMatchObject({ ok: true, name: 'node-crypto' });
+  it('is taken, agrees on the vectors, and answers honest and tampered signatures as tweetnacl does', async () => {
+    expect(await installBoxSignatureEquation(nodeCrypto)).toMatchObject({ ok: true, name: 'node-crypto' });
     expect(signatureEquationName()).toBe('node-crypto');
     const eq = nodeCryptoEquation(nodeCrypto);
     for (let i = 0; i < 20; i += 1) {
@@ -43,7 +43,6 @@ describe('the web: WebCrypto batch behind the rule', () => {
   const subtle = globalThis.crypto?.subtle;
 
   it('the batch self-test passes where WebCrypto has Ed25519, and the batch answers like the rule', async () => {
-    expect(await webCryptoBatchAgrees(subtle)).toBe(true);
     expect(await installWebSignatureEquation(subtle)).toMatchObject({ ok: true, name: 'webcrypto-batch' });
     const items = [];
     for (let i = 0; i < 130; i += 1) {

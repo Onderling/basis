@@ -122,11 +122,11 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     expect(run?.relay, 'the run header does not name the wire it joined').toBeTruthy();
   });
 
-  it('asks every lane for what it missed while it was off', async () => {
-    // The kicks are deliberately staggered over the first few seconds, so this waits for them rather
-    // than assuming they have already run — the difference between a slow kick and no kick at all is
-    // the whole point of checking.
-    const EXPECTED = ['governance', 'membership', 'grants', 'known-peers', 'tasks', 'chat'];
+  it('runs the start queue: asks my own devices for what it missed, and every circle it is in (here: none)', async () => {
+    // The start queue runs a few seconds after the start, so this waits for it rather than assuming it already ran —
+    // the difference between a slow ask and no ask at all is the whole point of checking. This box is in no circle,
+    // so no lane is asked per circle; the queue's own record says how many circles it covered.
+    const EXPECTED = ['grants', 'known-peers', 'person-key', 'profile-facts', 'own-store', 'primary-device', 'circle-follow'];
     const kicks = await until(
       async () => {
         const lanes = walkLog(dataDir).filter((e) => e.kind === 'catch-up-kick').map((e) => e.lane);
@@ -140,5 +140,8 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     for (const lane of EXPECTED) {
       expect(kicks, `nothing pulled the ${lane} lane on reconnect`).toContain(lane);
     }
+    const run = await until(async () => walkLog(dataDir).find((e) => e.kind === 'start-queue') ?? null, { timeout: 20_000, step: 500 });
+    expect(run, 'the start queue never finished').toBeTruthy();
+    expect(run.circles).toBe(0);
   }, 30_000);
 });

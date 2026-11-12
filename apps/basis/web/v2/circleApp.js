@@ -244,7 +244,7 @@ import { hostFrameOf } from '../../src/v2/hostFrame.js';
 import { renderPersonCard } from './personCard.js';
 import { createPersonClock, webAppState } from '../../src/v2/personClock.js';
 import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.js';
-import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
+import { contactCardFromLink, loadShareMyContact, sharedLinkState, sharedLinkWords, withdrawSharedLink } from '../../src/v2/contactCardLink.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
@@ -4886,10 +4886,14 @@ async function showMij({ landing = false } = {}) {
 // Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card pinboard makes
 // (`getContactShareQr` — webid, key, name, the address I am written to, my relay), painted three ways. The LINK is
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
+// Every showing mints a NEW link (L806, Frits 2026-11-12): its first opener reaches me directly, anyone after is a
+// request; the panel says the link's state and offers to withdraw it (a fresh link is shown after).
 async function showShareMyContact() {
   hideTabBar();
-  const { payload, link, qr } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
-  renderShareMyContact(rootEl, { payload, link, qr, t, onBack: showMij });
+  const { payload, link, qr, token } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
+  const linkState = token ? sharedLinkWords(await sharedLinkState({ callSkill: rawCallSkill, token }), { t, lang: currentLang() }) : null;
+  const onWithdraw = token ? async () => { await withdrawSharedLink({ callSkill: rawCallSkill, token }); await showShareMyContact(); } : null;
+  renderShareMyContact(rootEl, { payload, link, qr, linkState, onWithdraw, t, onBack: showMij });
 }
 
 // SILENT out-of-circle delivery — the "shared with me" inbox (a Mij sub-screen). Reads the

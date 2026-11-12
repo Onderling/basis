@@ -5,7 +5,7 @@
  * link, a bare hash, the raw `onderling-contact://` code.
  */
 import { describe, it, expect } from 'vitest';
-import { contactCardLink, contactCardFromLink, loadShareMyContact, decodeContactCard, cardNamesSender, CONTACT_LINK_PARAM } from '../../src/v2/contactCardLink.js';
+import { contactCardLink, contactCardFromLink, loadShareMyContact, decodeContactCard, cardNamesSender, CONTACT_LINK_PARAM, SHARED_LINK_TOKEN_PARAM, sharedLinkState, sharedLinkWords, withdrawSharedLink } from '../../src/v2/contactCardLink.js';
 import { encodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 
 const CARD = 'onderling-contact://eyJ3ZWJpZCI6Ind4In0';
@@ -46,11 +46,74 @@ describe('loadShareMyContact — what the panel shows, for both shells', () => {
     const callSkill = async (app, op) => (app === 'pinboard' && op === 'getContactShareQr' ? { payload: CARD } : {});
     const LINK = `https://onderling.org/basis/#${CONTACT_LINK_PARAM}=eyJ3ZWJpZCI6Ind4In0`;
     // the QR is the LINK when there is one — a camera opens it; the in-app scanner reads it too (2026-09-21)
-    expect(await loadShareMyContact({ callSkill, appUrl: 'https://onderling.org/basis/' })).toEqual({ payload: CARD, link: LINK, qr: LINK, qrEncodes: 'link' });
+    expect(await loadShareMyContact({ callSkill, appUrl: 'https://onderling.org/basis/' })).toEqual({ payload: CARD, link: LINK, qr: LINK, qrEncodes: 'link', token: null });
     // …and the raw code without an app url — only the in-app scanner reads that
-    expect(await loadShareMyContact({ callSkill })).toEqual({ payload: CARD, link: null, qr: CARD, qrEncodes: 'code' });
-    expect(await loadShareMyContact({ callSkill: async () => ({ error: 'no identity' }) })).toEqual({ payload: null, link: null, qr: null, qrEncodes: null });
-    expect(await loadShareMyContact({ callSkill: async () => { throw new Error('down'); } })).toEqual({ payload: null, link: null, qr: null, qrEncodes: null });
+    expect(await loadShareMyContact({ callSkill })).toEqual({ payload: CARD, link: null, qr: CARD, qrEncodes: 'code', token: null });
+    expect(await loadShareMyContact({ callSkill: async () => ({ error: 'no identity' }) })).toEqual({ payload: null, link: null, qr: null, qrEncodes: null, token: null });
+    expect(await loadShareMyContact({ callSkill: async () => { throw new Error('down'); } })).toEqual({ payload: null, link: null, qr: null, qrEncodes: null, token: null });
+  });
+});
+
+describe('a shared link carries a one-time token beside the card (L806: its first opener is let on)', () => {
+  const TOKEN = 'AAAAAAAAAAAAAAAAAAAAAA';
+  it('the token rides the fragment after the card, and comes back out of a link; a link without one gives none', () => {
+    const r = contactCardLink('https://onderling.org/basis/', CARD, TOKEN);
+    expect(r).toEqual({ ok: true, link: `https://onderling.org/basis/#${CONTACT_LINK_PARAM}=eyJ3ZWJpZCI6Ind4In0&${SHARED_LINK_TOKEN_PARAM}=${TOKEN}` });
+    expect(contactCardFromLink(r.link)).toEqual({ ok: true, payload: CARD, token: TOKEN });
+    expect(contactCardFromLink(`#${SHARED_LINK_TOKEN_PARAM}=${TOKEN}&contact=eyJ3ZWJpZCI6Ind4In0`)).toEqual({ ok: true, payload: CARD, token: TOKEN });
+    // a token that is not base64url is dropped (the card still stands); the raw code carries none
+    expect(contactCardFromLink('#contact=eyJ3ZWJpZCI6Ind4In0&t=bad*token')).toEqual({ ok: true, payload: CARD });
+    expect(contactCardFromLink(CARD)).toEqual({ ok: true, payload: CARD });
+  });
+  it('the panel mints a NEW token for every showing and puts it in the link only (the code is the bare card)', async () => {
+    let n = 0;
+    const calls = [];
+    const callSkill = async (app, op, args) => {
+      calls.push([app, op, args]);
+      if (op === 'getContactShareQr') return { payload: CARD };
+      if (op === 'mintSharedCard') return { token: `tok${(n += 1)}AAAAAAAAAAAAAAAAAAA`, expiresAt: 1 };
+      return {};
+    };
+    const a = await loadShareMyContact({ callSkill, appUrl: 'https://onderling.org/basis/' });
+    const b = await loadShareMyContact({ callSkill, appUrl: 'https://onderling.org/basis/' });
+    expect(a.token).toBe('tok1AAAAAAAAAAAAAAAAAAA');
+    expect(b.token).toBe('tok2AAAAAAAAAAAAAAAAAAA');
+    expect(contactCardFromLink(a.link).token).toBe(a.token);
+    expect(a.qr).toBe(a.link);
+    expect(a.payload).toBe(CARD);
+    // without a link nothing is minted: a token nobody can carry would only use up the bound
+    const c = await loadShareMyContact({ callSkill });
+    expect(c.token).toBeNull();
+    expect(calls.filter(([, op]) => op === 'mintSharedCard')).toHaveLength(2);
+  });
+  it('a mint that fails leaves the link as it was (its opener is then a request, as before)', async () => {
+    const callSkill = async (app, op) => (op === 'getContactShareQr' ? { payload: CARD } : { error: 'no-contacts' });
+    const r = await loadShareMyContact({ callSkill, appUrl: 'https://onderling.org/basis/' });
+    expect(r).toMatchObject({ payload: CARD, token: null, link: `https://onderling.org/basis/#${CONTACT_LINK_PARAM}=eyJ3ZWJpZCI6Ind4In0` });
+  });
+});
+
+describe('the shared link\'s state, as the panel says it (both shells)', () => {
+  const TOKEN = 'BBBBBBBBBBBBBBBBBBBBBB';
+  const listing = (links) => async (app, op) => (op === 'listSharedCards' ? { links } : {});
+  const t = (k, v) => (v?.date ? `${k}:${v.date}` : k);
+  it('not used yet, used (on which day), or gone; and the words for it', async () => {
+    expect(await sharedLinkState({ callSkill: listing([{ token: TOKEN, state: 'unused', usedAt: null }]), token: TOKEN })).toEqual({ state: 'unused', usedAt: null });
+    const used = await sharedLinkState({ callSkill: listing([{ token: TOKEN, state: 'used', usedAt: Date.UTC(2026, 10, 14, 12) }]), token: TOKEN });
+    expect(used).toEqual({ state: 'used', usedAt: Date.UTC(2026, 10, 14, 12) });
+    expect(await sharedLinkState({ callSkill: listing([]), token: TOKEN })).toEqual({ state: 'gone', usedAt: null });
+    expect(await sharedLinkState({ callSkill: listing([]), token: null })).toEqual({ state: 'gone', usedAt: null });
+    expect(sharedLinkWords({ state: 'unused' }, { t })).toBe('circle.shareContact.link_unused');
+    expect(sharedLinkWords(used, { t, lang: 'en', tz: 'UTC' })).toBe('circle.shareContact.link_used:14 Nov');
+    expect(sharedLinkWords(used, { t, lang: 'nl', tz: 'UTC' })).toBe('circle.shareContact.link_used:14 nov');
+    expect(sharedLinkWords({ state: 'gone' }, { t })).toBeNull();
+  });
+  it('withdraw asks pinboard to drop exactly that link', async () => {
+    const calls = [];
+    const callSkill = async (app, op, args) => { calls.push([app, op, args]); return { withdrawn: true }; };
+    expect(await withdrawSharedLink({ callSkill, token: TOKEN })).toBe(true);
+    expect(calls).toEqual([['pinboard', 'withdrawSharedCard', { token: TOKEN }]]);
+    expect(await withdrawSharedLink({ callSkill, token: null })).toBe(false);
   });
 });
 

@@ -326,7 +326,32 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
     circleIds: async () => (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [],
     membersOf,
   });
-  return withNameMarkers(coNamed, names);
+  const linkNamed = await nameLinkOpeners(coNamed, {
+    links: async () => (await callSkill('pinboard', 'listSharedCards', {}))?.links ?? [],
+  });
+  return withNameMarkers(linkNamed, names);
+}
+
+/**
+ * THE FIRST OPENER OF MY SHARED LINK, NAMED (L806): someone who opened a link I shared and wrote is on a thread before I
+ * answer, but not in my book, so no row of the book names them. The link kept the card their first turn carried; a row
+ * that has no name of its own (its name is its key) takes that card's name, as a request shows the name its card gives.
+ * A row with a name keeps it.
+ */
+export async function nameLinkOpeners(rows = [], { links = null } = {}) {
+  if (typeof links !== 'function') return rows;
+  // the links are read only when a row has no name of its own: a book read where every row is named costs nothing more
+  const unnamedRow = (r) => r && (!r.name || r.name === r.contactId || r.name === r.peerAddr);
+  if (!rows.some(unnamedRow)) return rows;
+  let used = [];
+  try { used = ((await links()) ?? []).filter((l) => l?.state === 'used' && typeof l.usedBy === 'string' && typeof l.usedByName === 'string' && l.usedByName); } catch { used = []; }
+  if (!used.length) return rows;
+  const nameOf = new Map(used.map((l) => [l.usedBy, l.usedByName]));
+  return rows.map((r) => {
+    const n = r ? (nameOf.get(r.contactId) ?? nameOf.get(r.peerAddr) ?? null) : null;
+    if (!n) return r;
+    return unnamedRow(r) ? { ...r, name: n } : r;
+  });
 }
 
 /**

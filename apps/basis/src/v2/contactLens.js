@@ -14,7 +14,14 @@
  * time for a circle that is founded only at the first exchange — and the founding then says a release that
  * already honours it.
  */
-import { decodeContactCard } from './contactCardLink.js';
+import { decodeContactCard, contactCardFromLink, CONTACT_SCHEME } from './contactCardLink.js';
+
+/** The card a payload is: the payload itself, or the card a shared link carries. */
+const cardOf = (p) => {
+  if (typeof p !== 'string' || p.trim().startsWith(CONTACT_SCHEME)) return p;
+  const o = contactCardFromLink(p);
+  return o.ok ? o.payload : p;
+};
 import { pairCircleIdFor } from './pairCircleId.js';
 import { DEFAULT_PERSONA, personaOfContact } from './contactPersona.js';
 import { personaPresetKeys } from './memberCards.js';
@@ -60,7 +67,9 @@ export function presetFromDisclosure(ctx) {
  * persona and your usual level. `null` when the payload is not a contact card (the shell adds nothing).
  * @returns {Promise<null|{payload: string, webid: string, name: string, personas: Array<{id,name}>, persona: string, revealPreset: string, presets: string[]}>}
  */
-export async function contactAddSheetModel({ payload, callSkill } = {}) {
+export async function contactAddSheetModel({ payload: given, callSkill } = {}) {
+  // a shared link (card + one-time token) is read as its card here; the add keeps the token (`addContactAs`)
+  const payload = cardOf(given);
   const card = decodeContactCard(payload);
   if (!card) return null;
   const [personas, revealPreset] = await Promise.all([
@@ -83,14 +92,19 @@ export async function contactAddSheetModel({ payload, callSkill } = {}) {
  * FIRST, so whatever founds that circle later says a release that already honours it; then the row is written
  * with the persona. A level that fails to set does not stop the add — the default disclosure is strict.
  */
-export async function addContactAs({ callSkill, payload, persona = DEFAULT_PERSONA, revealPreset = null, pairCircleIdOf = null, adoptPoint = null } = {}) {
+export async function addContactAs({ callSkill, payload: given, persona = DEFAULT_PERSONA, revealPreset = null, pairCircleIdOf = null, adoptPoint = null, linkToken: tokenGiven = null } = {}) {
+  // a shared link: its card is added, its one-time token kept with the contact (L806); a bare card carries none
+  const opened = typeof given === 'string' && !given.trim().startsWith(CONTACT_SCHEME) ? contactCardFromLink(given) : null;
+  const payload = opened?.ok ? opened.payload : given;
+  const linkToken = tokenGiven ?? (opened?.ok ? opened.token ?? null : null);
   const card = decodeContactCard(payload);
   const chosen = typeof persona === 'string' && persona ? persona : DEFAULT_PERSONA;
   const pairId = card ? await pairIdFor(card.webid, { pairCircleIdOf, callSkill }) : null;
   if (pairId && revealPreset) {
     await applyJoinRevealState({ state: { persona: chosen, revealPreset }, callSkill, contextId: pairId }).catch(() => {});
   }
-  const r = await callSkill('pinboard', 'addContactFromQr', { payload, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
+  // a card that came from a shared link keeps its one-time token: the first turn to them carries it (L806)
+  const r = await callSkill('pinboard', 'addContactFromQr', { payload, persona: chosen, ...(revealPreset ? { revealPreset } : {}), ...(typeof linkToken === 'string' && linkToken ? { linkToken } : {}) });
   // a device with no relay of its own adopts the point the card brought (the host's `adoptInheritedPoint`), said once
   if (r?.contact && typeof adoptPoint === 'function') {
     try { const a = await adoptPoint(r.contact); if (a?.say) return { ...r, adoptedSay: a.say }; } catch { /* the contact is added regardless */ }

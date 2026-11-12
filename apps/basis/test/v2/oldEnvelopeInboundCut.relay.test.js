@@ -5,13 +5,17 @@
  * at the router, is counted as refused, and nothing is written — from a member and from a stranger alike. Beside it, a
  * stranger's `__pairReq` must not make the agent hand it the circle's items.
  * Three real nodes on a real relay: two members, one stranger on the relay who is in no circle.
+ * The sends skip the SENDER's gate on purpose (`sendBypassingTheGate`): this measures the RECEIVER's refusal of shapes
+ * our own gate would never let leave, as an attacker's client (which has no gate) would send them.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { startJourneyRelay } from '../support/testRelay.js';
-import { bootAppCircle, untilTrue } from '../../../e2e-journeys/journeys/_app.mjs';
+import { bootAppCircle, untilTrue, sendBypassingTheGate } from '../../../e2e-journeys/journeys/_app.mjs';
 
 const CIRCLE = 'old-envelope-cut';
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+const WHY = 'the receiver\'s refusal of an old or a stranger\'s shape is what is measured';
+const raw = (node, to, payload) => sendBypassingTheGate(node, to, payload, { reason: WHY });
 
 describe('the old envelope wire, inbound', () => {
   let relay; let circle;
@@ -27,9 +31,9 @@ describe('the old envelope wire, inbound', () => {
     const envelope = (marker) => ({ __ntfyEnv: { v: 1, kind: 'item-upsert', timestamp: new Date().toISOString(), ref, payload: { forged: marker } } });
 
     // (a) a member sends it
-    await bram.agent.sendPeerMessage(anne.pubKey, envelope('from-a-member'));
+    await raw(bram, anne.pubKey, envelope('from-a-member'));
     // (b) a stranger on the relay sends it
-    await eve.agent.sendPeerMessage(anne.pubKey, envelope('from-a-stranger'));
+    await raw(eve, anne.pubKey, envelope('from-a-stranger'));
     expect(await untilTrue(async () => (anne.agent.inboundRefusals()['old-envelope'] ?? 0) >= 2, 15_000), `refusals: ${JSON.stringify(anne.agent.inboundRefusals())}`).toBe(true);
     const after = await anne.agent.readLocalPod(ref).catch(() => null);
     expect(JSON.stringify(after ?? null)).not.toMatch(/forged|from-a-/);
@@ -43,20 +47,20 @@ describe('the old envelope wire, inbound', () => {
     const bramHeard = [];
     const bramLive = bram._routerRef.fn;
     bram._routerRef.fn = (env) => { bramHeard.push(JSON.stringify(env?.payload ?? null)); return bramLive?.(env); };
-    await eve.agent.sendPeerMessage(anne.pubKey, { __pairReq: { addr: eve.pubKey, circleId: CIRCLE } });
+    await raw(eve, anne.pubKey, { __pairReq: { addr: eve.pubKey, circleId: CIRCLE } });
     expect(await untilTrue(async () => (anne.agent.inboundRefusals()['pair-request-stranger'] ?? 0) >= 1, 15_000), `refusals: ${JSON.stringify(anne.agent.inboundRefusals())}`).toBe(true);
     await sleep(3000);
     expect(JSON.stringify(anne.agent.listHouseholdPeers(CIRCLE)), 'the peer list grew on a stranger\'s say-so').toBe(peersBefore);
     expect(bramHeard.filter((h) => /al-bestaand-item/.test(h)), 'a stranger made the box re-fan the circle').toEqual([]);
     bram._routerRef.fn = bramLive;
-    await bram.agent.sendPeerMessage(anne.pubKey, { __pairReq: { addr: bram.pubKey, circleId: CIRCLE } });
+    await raw(bram, anne.pubKey, { __pairReq: { addr: bram.pubKey, circleId: CIRCLE } });
     expect(await untilTrue(async () => anne.agent.listHouseholdPeers(CIRCLE).includes(bram.pubKey), 15_000), 'a member\'s pair request is honoured').toBe(true);
 
     // (c) a stranger's pair request, then a new item in the circle: nothing of the circle reaches the stranger
     const heard = [];
     const live = eve._routerRef.fn;
     eve._routerRef.fn = (env) => { heard.push(JSON.stringify(env?.payload ?? null)); return live?.(env); };
-    await eve.agent.sendPeerMessage(anne.pubKey, { __pairReq: { addr: eve.pubKey, circleId: CIRCLE } });
+    await raw(eve, anne.pubKey, { __pairReq: { addr: eve.pubKey, circleId: CIRCLE } });
     await sleep(3000);
     await anne.agent.callSkill('tasks', 'addTask', { text: 'de heg knippen-geheim', circleId: CIRCLE });
     await sleep(4000);

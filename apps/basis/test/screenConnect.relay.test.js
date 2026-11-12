@@ -9,6 +9,7 @@
  * granted (the kernel's own task exchange, carried on both secure channels): as the person, only the declared
  * params, refused for a key that was not granted, and refused once the person drops the screen.
  */
+import { sendBypassingTheGate } from '../../e2e-journeys/journeys/_app.mjs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
@@ -38,6 +39,9 @@ const answerYes = async (ann, peerAddr, code, said) => {
 };
 const botSaid = async (node) => (await node.contactThreadChannel.rehydrateAll()).filter((t) => t.origin === 'bot').map((t) => t.text);
 
+// the screen view speaks through its OWN secure agent (screenView's sendToBot, the gate's declared exception); a test
+// node stands in for it here, so its offer goes the same way: around the app agent's gate
+const SCREEN_WHY = 'a test node stands in for the screen view, which sends through its own secure agent';
 describe('a person connects a screen to the bot over the relay', () => {
   let relay; let dataDir; let child; let out = ''; let ann; let screen;
   // every walk-log line of the runner (it writes walk-log-*.jsonl in its data dir) whose kind names the screen, the
@@ -93,7 +97,7 @@ describe('a person connects a screen to the bot over the relay', () => {
 
     // the screen: its own key, the link's nonce, its offer to the bot's address over the relay
     const viewPubKey = screen.pubKey;
-    await screen.agent.sendPeerMessage(link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey, relayUrl: relay.url, nonce: link.nonce, label: 'laptop' }) });
+    await sendBypassingTheGate(screen, link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey, relayUrl: relay.url, nonce: link.nonce, label: 'laptop' }) }, { reason: SCREEN_WHY });
     // nothing is granted until Ann says yes, privately, to the code the screen shows
     expect(await answerYes(ann, card.peerAddr, await screenCode(viewPubKey, link.nonce), () => botSaid(ann)), `no question with the code:\n${out.slice(-1500)}`).toBe(true);
     const grant = await until(async () => screen.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
@@ -126,7 +130,7 @@ describe('a person connects a screen to the bot over the relay', () => {
 
     // the same nonce again: not granted a second time
     const before = screen.received.filter((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE).length;
-    await screen.agent.sendPeerMessage(link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey, relayUrl: relay.url, nonce: link.nonce }) });
+    await sendBypassingTheGate(screen, link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey, relayUrl: relay.url, nonce: link.nonce }) }, { reason: SCREEN_WHY });
     await new Promise((r) => setTimeout(r, 3000));
     expect(screen.received.filter((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE).length).toBe(before);
   }, 150_000);
@@ -144,7 +148,7 @@ describe('a person connects a screen to the bot over the relay', () => {
     const thief = await bootRealAgentNode('thief');
     await connectNodesOverRelay([view, thief], { relayUrl: relay.url });
     try {
-      await view.agent.sendPeerMessage(link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey: view.pubKey, relayUrl: relay.url, nonce: link.nonce }) });
+      await sendBypassingTheGate(view, link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey: view.pubKey, relayUrl: relay.url, nonce: link.nonce }) }, { reason: SCREEN_WHY });
       expect(await answerYes(ann, card.peerAddr, await screenCode(view.pubKey, link.nonce), () => botSaid(ann))).toBe(true);
       const grant = await until(async () => view.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
       expect(grant, `no grant reached the screen — the view heard: ${heard(view)}; the box's walk log:\n${walkWhy()}\n— its output:\n${out.slice(-1500)}`).toBeTruthy();

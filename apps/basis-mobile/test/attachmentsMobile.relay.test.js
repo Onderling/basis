@@ -39,6 +39,9 @@ describe('attachments on the phone — a file into a contact thread crosses to t
     // Bob chose Anna (her card in his book): a file from someone he did not choose is refused (a request holds none)
     const card = (await anna.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
     expect((await bob.agent.callSkill('pinboard', 'addContactFromQr', { payload: card }))?.error ?? null).toBe(null);
+    // …and Anna holds Bob's card: she writes to someone she chose
+    const bobCard = (await bob.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+    expect((await anna.agent.callSkill('pinboard', 'addContactFromQr', { payload: bobCard }))?.error ?? null).toBe(null);
   }, 90_000);
   afterAll(async () => { await anna?.dispose(); await bob?.dispose(); await relay?.close(); });
 

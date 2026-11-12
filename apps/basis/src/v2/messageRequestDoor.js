@@ -16,6 +16,9 @@
  *     'known': the turn goes on as a known one does.
  *   - NOT KNOWN, but a member of one of the persona's circles and the persona lets them write (`isMember`) → 'member':
  *     a thread, but no contact row until the person answers (answering is choosing).
+ *   - NOT KNOWN, but the FIRST OPENER of a link the persona shared (L806): the turn carries the link's token and uses it
+ *     (`useLink`), or a later turn of theirs while the link's use names them (`letOnByLink`) → 'member', as above.
+ *     Anyone after the first opener (the link is used), or a withdrawn or expired link → decided as any stranger's.
  *   - past the budgets, or a turn the request refuses (no card on a new request, a card naming someone else, a file) →
  *     'dropped', with a count line (kind + reason, never who).
  * A blocked sender never reaches this door: the secure agent's block set drops them below every channel.
@@ -36,7 +39,7 @@ import { createInboundAdmission } from './inboundAdmission.js';
  * @returns {(m: {contactId: string, fromAddr: string, text?: string, card?: string|null, messageId?: string, ts?: number, file?: boolean, policy?: 'request'|'open'}) =>
  *   Promise<'known'|'member'|'held'|'dropped'>}
  */
-export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = null, hold, count = null, now = Date.now } = {}) {
+export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = null, useLink = null, letOnByLink = null, hold, count = null, now = Date.now } = {}) {
   if (typeof isKnown !== 'function') throw new TypeError('createMessageRequestDoor: isKnown is required');
   if (typeof hold !== 'function') throw new TypeError('createMessageRequestDoor: hold is required');
   const said = (reason) => { try { count?.({ kind: 'message-request-dropped', reason }); } catch { /* a count never breaks a turn */ } };
@@ -44,10 +47,18 @@ export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = nu
   // a request, below), and a known peer is admitted without a question
   const admission = createInboundAdmission({ admit: async () => ({ known: true }), isKnown, answered: iWrote, open: true, count, now });
 
-  return async function decide({ contactId, fromAddr, text = '', card = null, messageId = null, ts = null, file = false, policy = 'request', to = null } = {}) {
+  return async function decide({ contactId, fromAddr, text = '', card = null, messageId = null, ts = null, file = false, policy = 'request', to = null, linkToken = null } = {}) {
     const r = await admission({ contactId, fromAddr, text, messageId, channel: 'contact' });
     if (!r.admitted) return 'dropped';   // the admission said its own count line
     if (!r.stranger || policy === 'open') return 'known';
+    // a shared link's first opener: their first turn uses the link, their later turns pass while its use names them
+    const by = contactId || fromAddr;
+    if (linkToken && typeof useLink === 'function') {
+      try { if ((await useLink({ token: linkToken, by, to, ...(card ? { card } : {}) }))?.ok === true) return 'member'; } catch { /* decided as a stranger's */ }
+    }
+    if (typeof letOnByLink === 'function') {
+      try { if ((await letOnByLink({ by, to })) === true) return 'member'; } catch { /* decided as a stranger's */ }
+    }
     let member = false;
     try { member = typeof isMember === 'function' && (await isMember({ contactId, fromAddr, to })) === true; } catch { member = false; }
     if (member) return 'member';

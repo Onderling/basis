@@ -355,6 +355,14 @@
     "link_copied": {
       "text": "Link gekopieerd.",
       "doc": "The invite on web, when the browser has no share sheet: the link went to the clipboard."
+    },
+    "expired_code": {
+      "text": "Deze uitnodiging is niet meer geldig. Vraag wie je uitnodigde om een nieuwe.",
+      "doc": "The inviter's device refused the join: the code is unknown, expired or rotated away (`invalid-or-expired-code`)."
+    },
+    "join_refused": {
+      "text": "De kring liet je niet binnen met deze uitnodiging. Vraag wie je uitnodigde om een nieuwe.",
+      "doc": "The inviter's device refused the join for a reason it does not name (`join-refused`, the catch-all of the closed refusal set)."
     }
   },
   "members": {
@@ -9196,7 +9204,7 @@
       "doc": "Heading of the share panel under Mij."
     },
     "hint": {
-      "text": "Laat de QR scannen, of stuur de link. Wie hem opent, heeft jou als contact en kan je direct een bericht sturen. Er staat geen geheim in.",
+      "text": "Laat de QR scannen, of stuur de link. Elke keer dat je dit scherm opent, is er een nieuwe link: de eerste die hem opent kan je direct een bericht sturen; wie daarna komt, staat bij je verzoeken.",
       "doc": "What the QR/link does and does not do. Plain Dutch; no \"kaart\"."
     },
     "code_label": {
@@ -9218,6 +9226,18 @@
     "share": {
       "text": "Delen…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    },
+    "link_unused": {
+      "text": "Nog niet gebruikt",
+      "doc": "State of the shared link on the share panel: nobody has opened it and written yet (Frits 2026-11-12)."
+    },
+    "link_used": {
+      "text": "Gebruikt op {{date}}",
+      "doc": "State of the shared link: its first opener wrote on {{date}} (day + short month); anyone after them is a request (Frits 2026-11-12)."
+    },
+    "link_withdraw": {
+      "text": "Link intrekken",
+      "doc": "Button on the share panel: the link stops letting its opener write directly; a new link is shown (Frits 2026-11-12)."
     }
   },
   "tasks": {

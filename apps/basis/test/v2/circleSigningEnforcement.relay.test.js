@@ -31,6 +31,7 @@
  * anything and were therefore the likeliest permanent exception to an enforcement built on join
  * proofs. Two devices' views of them are checked, because they differ.
  */
+import { sendBypassingTheGate } from '../../../e2e-journeys/journeys/_app.mjs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startJourneyRelay } from '../support/testRelay.js';
 import {
@@ -270,7 +271,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
 
     const before = cato.agent.circleSenderAuthorization();
     const text = `wrong-circle-${rnd()}`;
-    await bram.agent.sendPeerMessage(catoInB, chatEnvelope(CIRCLE_B, text));
+    await sendBypassingTheGate(bram, catoInB, chatEnvelope(CIRCLE_B, text), { reason: 'the receiver refuses a chat signed for another circle; our gate would never send it' });
     await settle(1500);
 
     const after = cato.agent.circleSenderAuthorization();

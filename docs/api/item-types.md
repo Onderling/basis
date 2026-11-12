@@ -157,6 +157,14 @@ The canonical types that declare a grow-only set merging as a UNION (`set-union`
 member's key and time, and the floor that prunes it the same way on every device. Read by the item store's default
 resolution registry, like the field-clock sets above.
 
+### `CANONICAL_CLAIMS`
+
+**Kind:** constant · **Import:** `CANONICAL_CLAIMS` from `'@onderling/item-types'`
+
+The canonical types beside `task` whose claim cluster resolves FIRST-WINS (the item store's `claim` channel), by
+type name. Read by the item store's default resolution registry. The claim fold speaks the task claim vocabulary
+(`assignee`, `claimedAt`, …), so such a type writes its claim in those fields.
+
 ### `LISTS_TYPES`
 
 **Kind:** constant · **Import:** `LISTS_TYPES` from `'@onderling/item-types'`

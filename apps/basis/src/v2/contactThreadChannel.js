@@ -173,6 +173,8 @@ export function createContactThreadChannel({
     isKnown: (key) => messageRequests.isKnown(key),
     iWrote: wroteTo,
     isMember: (m) => (typeof messageRequests.isMember === 'function' ? messageRequests.isMember(m) : false),
+    useLink: typeof messageRequests.useLink === 'function' ? (m) => messageRequests.useLink(m) : null,
+    letOnByLink: typeof messageRequests.letOnByLink === 'function' ? (m) => messageRequests.letOnByLink(m) : null,
     hold: (turn) => messageRequests.hold(turn),
     now,
   }));
@@ -423,15 +425,22 @@ export function createContactThreadChannel({
       if (typeof myCard === 'function' && (!self || self.personaId) && !cardSentTo.has(cardKey(peerAddr, self))) {
         try { const c = await myCard(self?.personaId ?? null); if (typeof c === 'string' && c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
       }
+      // A SHARED LINK'S TOKEN (L806): the contact came from a link they shared, so the first turn to them carries its
+      // one-time token, INSIDE THE SEAL ONLY (never in the clear), and the row drops it once the turn has left.
+      let linkToken = null;
+      if (typeof messageRequests?.linkTokenFor === 'function' && typeof sealFor === 'function') {
+        try { const tk = await messageRequests.linkTokenFor(peerAddr); linkToken = typeof tk === 'string' && tk ? tk : null; } catch { linkToken = null; }
+      }
+      let tokenSealed = false;
       // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
       // pair roster's material with it: an invite is a join secret).
       // (the seal is the self's: a persona's contact is sealed from the persona's person key — `sealFor` resolves it)
       if (typeof sealFor === 'function') {
         try {
-          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}), ...(envelope.extras.auth ? { auth: envelope.extras.auth } : {}) };
+          const content = { text: floored.text, ...(linkToken ? { linkToken } : {}), ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}), ...(envelope.extras.auth ? { auth: envelope.extras.auth } : {}) };
           const s = await sealFor(peerAddr, content);
           // Sealed: the code travels inside the box only (it admits whoever holds it), and the turn's proof with it.
-          if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; delete envelope.extras.auth; }
+          if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; delete envelope.extras.auth; tokenSealed = !!linkToken; }
         } catch { /* unsealed, as before */ }
       }
       const res = await core.deliver(envelope, {
@@ -440,6 +449,7 @@ export function createContactThreadChannel({
           : (self?.sendAs ? { sendOpts: { sendAs: self.sendAs } } : {})),
       });
       if (cardOnBoard) cardSentTo.add(cardKey(peerAddr, self));   // it left (delivered or held): they have it
+      if (tokenSealed && !res?.error) { try { await messageRequests.linkTokenSent?.(peerAddr); } catch { /* the next turn carries it again; the door lets the same opener on twice */ } }
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       // the fan carries a persona's contact to THAT persona's devices only (the agent's fan is per self)
@@ -698,6 +708,8 @@ export function createContactThreadChannel({
       let admission = typeof payload.admission === 'string' ? payload.admission : null;
       // A linked person's proof over this turn (their device's statement) — for a bot's door to check, never trusted here.
       let auth = payload.auth && typeof payload.auth === 'object' ? payload.auth : null;
+      // a shared link's one-time token: read from INSIDE the seal only (L806)
+      let linkToken = null;
       if (payload.sealed && typeof payload.sealed === 'object') {
         // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
         const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
@@ -708,11 +720,12 @@ export function createContactThreadChannel({
         if (typeof content.card === 'string') card = content.card;
         if (typeof content.admission === 'string') admission = content.admission;
         if (content.auth && typeof content.auth === 'object') auth = content.auth;
+        if (typeof content.linkToken === 'string' && content.linkToken) linkToken = content.linkToken;
       }
       // THE DOOR, before anything is kept: a sender the person did not choose is held as a request, and nothing below
       // runs for them (no card into the book, no pair roster, no thread turn, no receipt)
       if (messageRequests) {
-        const verdict = await decideAtDoor({ contactId: resolveId(fromAddr), fromAddr, text, card, messageId: payload.messageId ?? null, ts: Number.isFinite(payload.ts) ? payload.ts : null, to: ctx?.to ?? null });
+        const verdict = await decideAtDoor({ contactId: resolveId(fromAddr), fromAddr, text, card, messageId: payload.messageId ?? null, ts: Number.isFinite(payload.ts) ? payload.ts : null, to: ctx?.to ?? null, linkToken });
         if (verdict !== 'known' && verdict !== 'member') { try { onDoor?.({ verdict }); } catch { /* a count never breaks a turn */ } return; }
         // a circle member writing first: a thread, but NOT a contact until the person answers. Their card waits for that
         // answer (bounded, in memory: a later turn carries it again); the pair roster is left until they are a contact.

@@ -191,7 +191,7 @@ describe('receiving an announcement', () => {
 
     // The address became sealable…
     expect(log.registered).toContainEqual({
-      address: addressOf(3), pubKey: BRAM, opts: { signingKey: addressOf(3) },
+      address: addressOf(3), pubKey: BRAM, opts: { signingKey: addressOf(3), proven: true },   // an announcement is recorded only on its verified proof
     });
     // …and the same key became ALLOWED TO SPEAK. Without this, bram is now addressable and every
     // envelope he sends is refused with SENDER_NOT_AUTHORIZED — a failure that appears only later.

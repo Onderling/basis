@@ -35,11 +35,23 @@ catalogue's baseline and moves here as it is written up.
   the contact channel on every shell (seam `contact-channel-requests`); the agent's `messageRequests` answers the
   persona's policy for the address a turn arrived on. Accept: `apps/basis/src/v2/messageRequestAccept.js`. The policy:
   the profile property `firstMessages` (`packages/agent-registry/src/firstMessages.js`).
+- Shared contact links: `shared-card` rows on the same store, one per link handed out, for the persona shared as:
+  `apps/pinboard/src/lib/SharedCards.js` (type `packages/item-types/src/types/sharedCard.js`, own-devices). Each
+  "Share my contact" mints a new 128-bit token; its first opener is let on, anyone after is a request. The use is a
+  first-wins claim (the store's claim channel), so the person's devices agree on one opener. Bounded by internal params:
+  how long a link lives, how many unused links a persona keeps. The link carries the token in its fragment after the
+  card (`apps/basis/src/v2/contactCardLink.js`); the opener's contact row keeps it (`linkToken`) and the first turn to
+  them carries it inside the person seal, then drops it. The door (`messageRequestDoor.js`, `useLink` / `letOnByLink`
+  on the agent's `messageRequests`) gives the first opener the circle member's treatment: a thread, no book row until
+  the person answers; Contacten names them from the card their turn carried (`nameLinkOpeners`). Reachable by a link
+  lasts as long as the link: an opener the person never answered is a requester again once the link's row expires
+  (30 days; an expired row goes on the next share), so answering is what keeps them.
 - The block set: the secure agent's (`packages/secure-agent/src/mute.js`, enforced in `createSecureAgent.js` at the
   hello gate, on receive and on send), reached through basis's `mute` / `unmute` / `muted` ops.
 
 <!-- catalogue-ops
 pinboard: holdMessageRequest listMessageRequests acceptMessageRequest ignoreMessageRequest removeMessageRequest
+pinboard: mintSharedCard listSharedCards withdrawSharedCard useSharedCard clearContactLinkToken
 -->
 
 ## Proof

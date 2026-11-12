@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 
-import { bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, sendInCircle } from './support/pairRealAgents.js';
 
 const CIRCLE_ID = 'shared-chores-claim';
 const WARM = { hold: true, firstSendTimeoutMs: 2000, retryDelays: [] };
@@ -32,8 +32,8 @@ const listTasks = async (node, circleId) => {
 const taskById = async (node, circleId, id) => (await listTasks(node, circleId)).find((t) => t.id === id) ?? null;
 
 async function warm(from, to) {
-  const w = await from.agent.sendPeerMessage(
-    to.pubKey, { type: 'p2p-chat', subtype: 'chat-message', msgId: `warm-${to.label}`, body: 'warm' }, WARM,
+  const w = await sendInCircle(from, to, CIRCLE_ID,
+    { type: 'p2p-chat', subtype: 'chat-message', msgId: `warm-${to.label}`, body: 'warm' }, WARM,
   );
   expect(w.held, 'online send delivers immediately').toBe(false);
   await until(() => to.received.find((m) => m.payload?.body === 'warm'));

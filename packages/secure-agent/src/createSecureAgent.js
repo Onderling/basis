@@ -463,6 +463,8 @@ export async function createSecureAgent(opts = {}) {
     get hasMemberMap() { return !!resolverMemberMap; },
     get hasSecurity()  { return !!agent.security; },
     pubKeyForAddr,
+    /** The person behind `addr` ONLY when they proved the address (no host hook, no crypto-layer fallback), else null. */
+    provenPubKeyForAddr: (addr) => (typeof addr === 'string' && addr ? (provenIdentityOf.get(addr) ?? null) : null),
     resolveByAddr:     resolveMemberByAddr,
     resolveByPubKey:   async (pubKey)   => (pubKey && resolverMemberMap?.resolveByPubKey   ? resolverMemberMap.resolveByPubKey(pubKey)     : null),
     resolveByWebid:    async (webid)    => (webid && resolverMemberMap?.resolveByWebid     ? resolverMemberMap.resolveByWebid(webid)       : null),
@@ -989,6 +991,10 @@ export async function createSecureAgent(opts = {}) {
   // the unlinkability we want on the wire and exactly the wrong answer for "flush what I held for
   // them". So the identity link lives here, on the device, where it is nobody else's to see.
   const peerIdentityOf = new Map();
+  // …and the subset of those links the person PROVED (the circle-link signature, checked before the roster row was
+  // written): `registerPeerAddress(…, { proven: true })`. Sealing uses every link; a decision that trusts "this address
+  // is my contact's other device" (the person key's allowlist) reads only these, with no fallback.
+  const provenIdentityOf = new Map();
 
   /** Does this send opt in to the hold-forward delivery guarantee? */
   function wantsHold(sendOpts) {
@@ -2989,6 +2995,8 @@ export async function createSecureAgent(opts = {}) {
         if (!set) { set = new Set(); peerAliases.set(pubKey, set); }
         set.add(address);
         peerIdentityOf.set(address, pubKey);
+        // a binding is proven only as it is made now: a later unproven one replaces an earlier proof
+        if (opts?.proven === true) provenIdentityOf.set(address, pubKey); else provenIdentityOf.delete(address);
       }
       return true;
     },
@@ -3089,6 +3097,7 @@ export async function createSecureAgent(opts = {}) {
       // signing key, which is not the person (see `peerIdentityOf`).
       const pubKey = peerIdentityOf.get(address) ?? agent.security.getPeerKey?.(address) ?? null;
       peerIdentityOf.delete(address);
+      provenIdentityOf.delete(address);
       agent.security.unregisterPeer(address);
       if (pubKey) {
         const set = peerAliases.get(pubKey);

@@ -8,7 +8,7 @@
  * book) lands in the thread as before.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { bootRealAgentNode, connectNodesOverBus, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverBus, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { isPairCircleId } from '../src/v2/pairCircleId.js';
 import { acceptMessageRequest } from '../src/v2/messageRequestAccept.js';
 
@@ -26,6 +26,9 @@ describe('a stranger\'s first message is a request, not a contact', () => {
     carol = await bootRealAgentNode('carol', { contactChannel: true });
     dave = await bootRealAgentNode('dave', { contactChannel: true });
     await connectNodesOverBus([anna, bob, carol, dave]);
+    // whoever writes holds the card of whom they write to (a scan, a shared card): the door is about the RECEIVER, who
+    // did not choose them
+    for (const [who, of] of [[anna, bob], [carol, bob], [bob, dave]]) await addCardOf(who, of);
   }, 90_000);
   afterAll(async () => { await teardown(anna, bob, carol, dave); });
 
@@ -73,6 +76,8 @@ describe('a stranger\'s first message is a request, not a contact', () => {
     await bob.contactThreadChannel.sendTurn({ peerAddr: dave.pubKey, text: 'dag Dave', messageId: 'bob-1' });
     // on Dave's side Bob is a stranger: his turn is a request there
     expect(await until(async () => ((await requestsOf(dave)).some((q) => q.from === bob.pubKey) ? true : null), { timeout: 15_000, step: 100 })).toBe(true);
+    // Dave answers by accepting (answering is choosing): Bob's card goes into his book, so he may write to Bob
+    expect((await acceptMessageRequest({ callSkill: (a, o, x) => dave.agent.callSkill(a, o, x), channel: dave.contactThreadChannel, from: bob.pubKey }))?.accepted).toBe(true);
     await dave.contactThreadChannel.sendTurn({ peerAddr: bob.pubKey, text: 'dag Bob', messageId: 'dave-1' });
     expect(await until(async () => ((await threadOf(bob, dave.pubKey)).some((t) => t.text === 'dag Bob') ? true : null), { timeout: 15_000, step: 100 })).toBe(true);
     expect((await requestsOf(bob)).map((q) => q.from)).not.toContain(dave.pubKey);

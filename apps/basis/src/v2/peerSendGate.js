@@ -89,6 +89,22 @@ export function contactOriginOf(row) {
 }
 
 /**
+ * WHICH SIDE OF THE EXCHANGE a payload is, read off the payload itself: the joiner's redeem request, the inviter's
+ * reply (its answer or refusal), a scanned pairing code's request, or none. The gate asks the exchange for THAT side
+ * only, so a send of one side never uses up another side's registration (an address that is both, two devices inviting
+ * each other), and a send that is no part of it (a contact message to an address with an open redeem) is not named so.
+ * @param {object|null} payload
+ * @returns {'joiner'|'reply'|'pairing'|null}
+ */
+export function exchangeKindOf(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  if (payload.subtype === 'group-redeem-request') return 'joiner';
+  if (payload.subtype === 'group-redeem-response') return 'reply';
+  if (payload.__pairReq && typeof payload.__pairReq === 'object') return 'pairing';
+  return null;
+}
+
+/**
  * THE INVITE EXCHANGE's person-key sends, registered by the redeem code itself and nothing else: the JOINER's request to
  * the address on the invite it is redeeming (for that redeem's lifetime, released on its answer, timeout, error or failed
  * send), and the INVITER's ONE reply to a well-formed request: the answer when the request proved its code, the refusal
@@ -157,14 +173,22 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
     refuseParsedRequest(address) { reply(address, 'refusal'); },
     /** INVITER: a request from `address` proved its code; its ONE answer may go back (replaces a refusal registration). */
     answerProvenRequest(address) { reply(address, 'answer'); },
-    /** The gate asks, once per send: 'answer' | 'refusal' (now consumed) | 'joiner' | null. */
-    take(address) {
-      if (typeof address !== 'string' || !address) return null;
+    /**
+     * The gate asks, once per send, for the side the payload IS (`exchangeKindOf`): 'joiner' | 'answer' | 'refusal' (a
+     * reply, now consumed) | 'pairing' | null. No kind: no part of the exchange, so null.
+     */
+    take(address, { kind = null } = {}) {
+      if (typeof address !== 'string' || !address || !kind) return null;
       sweep();
-      const r = replies.get(address);
-      if (r) { replies.delete(address); return r.side; }
-      if (joiners.has(address)) return 'joiner';
-      return pairings.has(address) ? 'pairing' : null;
+      if (kind === 'reply') {
+        const r = replies.get(address);
+        if (!r) return null;
+        replies.delete(address);
+        return r.side;
+      }
+      if (kind === 'joiner') return joiners.has(address) ? 'joiner' : null;
+      if (kind === 'pairing') return pairings.has(address) ? 'pairing' : null;
+      return null;
     },
     get size() { sweep(); return joiners.size + replies.size + pairings.size; },
   };

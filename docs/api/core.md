@@ -487,6 +487,43 @@ Uses vitest's expect, so it must run inside a vitest test.
 - `[opts.label='DataSource']` `string`
 - `[opts.supportsQuery=false]` `boolean` — also exercise `query()`.
 
+## `src/conformance/ed25519Conformance.js`
+
+### `ED25519_EDGE_VECTORS`
+
+**Kind:** constant · **Import:** `ED25519_EDGE_VECTORS` from `'@onderling/core/conformance'`
+
+Ed25519 conformance: the 12 published edge-case vectors and the answer the platform's strict rule gives on each.
+
+Source: ed25519-speccheck (github.com/novifinancial/ed25519-speccheck, cases.json, fetched 2026-11-12), the vectors of
+"Taming the many EdDSAs" (Chalkias, Garillot, Nikolaenko, 2020). Each is [message, public key, signature] in hex.
+Under the platform's rule (`crypto/ed25519Strict.js`, rule set 'ed25519-strict-1') exactly case 3 is valid.
+
+An adapter that checks signatures faster (a native module, node:crypto, WebCrypto) proves it gives the same answer
+by running `ed25519Disagreements(verify)` and expecting an empty list. Runner-agnostic: no test framework needed.
+
+### `ED25519_ACCEPTED`
+
+**Kind:** constant · **Import:** `ED25519_ACCEPTED` from `'@onderling/core/conformance'`
+
+The vector indexes that are VALID under the strict rule.
+
+### `ed25519Disagreements`
+
+**Kind:** function · **Import:** `ed25519Disagreements` from `'@onderling/core/conformance'`
+
+```js
+ed25519Disagreements(verify)
+```
+
+Where a check disagrees with the rule on the vectors.
+
+**Parameters**
+
+- `verify` `(msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean`
+
+**Returns:** `Array<{ index: number, expected: boolean, got: boolean }>`
+
 ## `src/conformance/storageBackendConformance.js`
 
 ### `REQUIRED_STORAGE_BACKEND_METHODS`

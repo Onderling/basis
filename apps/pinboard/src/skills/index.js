@@ -4194,6 +4194,16 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
+    /** removeMessageRequest({from, persona?}) — the request goes without becoming a contact (the block act). */
+    defineSkill('removeMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { error: 'no-contacts' };
+      return (await bundle.messageRequests.remove(a.from, { persona: a.persona ?? null })) ? { removed: a.from } : { error: 'no-such-request' };
+    }, {
+      description: 'Remove a message request without accepting it (the block act from Contacten).',
+      visibility:  'authenticated',
+    }),
+
     /** ignoreMessageRequest({from, persona?}) — kept, marked; later turns still land; still acceptable. */
     defineSkill('ignoreMessageRequest', async ({ parts }) => {
       const a = dataArgs(parts);

@@ -17,6 +17,7 @@
  * screen and companion offers), and the catch-up kicks on connect.
  */
 import { buildCircleLanes } from './circleLanes.js';
+import { blockedFirst, blockedAll } from './directDoors.js';
 import { makeCircleGovernancePeerHandler } from './circleLogReceiver.js';
 import { makeCircleRecipePeerHandler } from './circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler } from './circleRulesReceiver.js';
@@ -85,7 +86,8 @@ export function buildInboundWiring({
     // the signed lanes and the personal ones, from the one lane table
     ...lanes.handlers,
     // the Nearby room's inbound side — asks, answers, cards, room chat, broadcast invites
-    ...(nearbyRoom?.handlers ?? {}),
+    // the Nearby room: people in the same room, direct contact (not a circle): a block refuses them
+    ...blockedAll((a) => agent?.messageRequests?.isBlocked?.(a), nearbyRoom?.handlers ?? {}),
     // a live governance statement, verified at this device's rail (the catch-up alone would leave a device behind until
     // its next reconnect); a landed decision reaches my other devices through the lane table's carrier
     ...(govRail ? {
@@ -95,12 +97,12 @@ export function buildInboundWiring({
     } : {}),
     // a contact's turn and a person's message, through the shared channel
     ...(contactChannel && typeof onContactReply === 'function' ? {
-      [contactChannel.subtypes.in]:  contactChannel.replyHandler(onContactReply),
-      [contactChannel.subtypes.out]: contactChannel.messageHandler(onContactMessage ?? onContactReply),
+      [contactChannel.subtypes.in]:  blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), contactChannel.replyHandler(onContactReply)),
+      [contactChannel.subtypes.out]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), contactChannel.messageHandler(onContactMessage ?? onContactReply)),
     } : {}),
     // the join handshake: the admin verifies a redeem, admits, returns its own proven per-circle address and hands the
     // circle the newcomer's (nobody else can: a fresh joiner cannot address the other members yet)
-    'group-redeem-request': makeHandleGroupRedeemRequest({
+    'group-redeem-request': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemRequest({
       callSkill, sendPeer, publishEvent, identityOf: personOf,
       ...(typeof onAdmitted === 'function' ? { onAdmitted } : {}),
       circleAddressFor: (gid) => agent?.circleAddressFor?.(gid) ?? null,
@@ -109,15 +111,15 @@ export function buildInboundWiring({
       // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
       inviteExchange: agent?.inviteExchange ?? null,
       logger,
-    }),
-    ...(pendingRedeems ? { 'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap: pendingRedeems }) } : {}),
+    })),
+    ...(pendingRedeems ? { 'group-redeem-response': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemResponse({ pendingMap: pendingRedeems })) } : {}),
     // a member's proven per-circle address (every announcement carries its own proof, so the sender is not trusted)
     'circle-address-announce': makeCircleAddressAnnouncePeerHandler({
       agent, logger, ...(typeof grantSealedAudience === 'function' ? { grantSealedAudience } : {}),
     }),
     // delivery honesty — the peer's app stored our message (the room confirms with the same receipt)
     ...(typeof applyIncomingReceipt === 'function' ? {
-      'delivery-receipt': (from, payload) => { nearbyRoom?.onReceipt?.(from, payload); applyIncomingReceipt(payload, from); },
+      'delivery-receipt': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => { nearbyRoom?.onReceipt?.(from, payload); applyIncomingReceipt(payload, from); }),
     } : {}),
     ...(recipe?.pendingStore ? {
       'circle-recipe-broadcast': makeCircleRecipePeerHandler({ pendingStore: recipe.pendingStore, dedup: recipe.dedup ?? new Set(), logger }),
@@ -126,13 +128,13 @@ export function buildInboundWiring({
       'circle-rules-broadcast': makeCircleRulesPeerHandler({ pendingStore: rules.pendingStore, dedup: rules.dedup ?? new Set(), logger }),
     } : {}),
     ...(calendar ? {
-      'calendar-invite': makeHandleCalendarInvite({ callSkill, publishEvent, addMainBubble: calendar.addMainBubble ?? (() => {}) }),
-      'calendar-rsvp':   makeHandleCalendarRsvp({ callSkill, publishEvent }),
-      'calendar-cancel': makeHandleCalendarCancel({ callSkill, publishEvent }),
+      'calendar-invite': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleCalendarInvite({ callSkill, publishEvent, addMainBubble: calendar.addMainBubble ?? (() => {}) })),
+      'calendar-rsvp':   blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleCalendarRsvp({ callSkill, publishEvent })),
+      'calendar-cancel': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleCalendarCancel({ callSkill, publishEvent })),
     } : {}),
     // a peer's file, and a reply to one of OUR noticeboard posts, land in THAT SENDER's contact thread
     ...(typeof deliverToContactThread === 'function' ? {
-      'file-share': makeHandleFileShare({
+      'file-share': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleFileShare({
         deliverToThread: ({ contactId, fromAddr, file, messageId, ts, sealed }) =>
           deliverToContactThread({ contactId, fromAddr, text: '', file, messageId, ts, ...(sealed ? { sealed } : {}) }),
         identityOf: personOf,
@@ -142,18 +144,18 @@ export function buildInboundWiring({
         isKnownSender: (contactId, fromAddr, to) => (contactChannel?.knownSender ? contactChannel.knownSender(contactId, fromAddr, to) : true),
         notePeer,
         publishEvent,
-      }),
-      'chat-message': makeHandleThreadedChat({
+      })),
+      'chat-message': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           deliverToContactThread({ contactId, fromAddr, text, messageId, ts, replyTo }),
         notePeer,
         identityOf: personOf,
         noteAnswer: (addr, requestId) => agent?.noteAnswer?.(addr, requestId),
         isKnownSender: (contactId, fromAddr, to) => (contactChannel?.knownSender ? contactChannel.knownSender(contactId, fromAddr, to) : true),
-      }),
+      })),
     } : {}),
     // a sealed copy pushed straight to us lands in the per-person "shared with me" store
-    ...(sharedWithMeStore ? { 'shared-copy': makeHandleSharedCopy({ store: sharedWithMeStore, publishEvent }) } : {}),
+    ...(sharedWithMeStore ? { 'shared-copy': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleSharedCopy({ store: sharedWithMeStore, publishEvent })) } : {}),
   };
   return { handlers, lanes };
 }

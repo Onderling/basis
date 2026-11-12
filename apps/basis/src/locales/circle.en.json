@@ -6066,8 +6066,38 @@
       "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
     },
     "blocked": {
-      "text": "Blocked",
+      "text": "Blocked on this device",
       "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
+    },
+    "requests": {
+      "title": {
+        "text": "Requests",
+        "doc": "Heading of the requests section at the top of Contacten: first messages from people the person did not choose."
+      },
+      "says": {
+        "text": "Says they are {{name}}",
+        "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {{name}} is that name."
+      },
+      "no_name": {
+        "text": "Someone without a name",
+        "doc": "A request row whose sender's card gives no name."
+      },
+      "accept": {
+        "text": "Accept",
+        "doc": "Accept a request: the sender becomes a contact and their messages move into the thread."
+      },
+      "ignore": {
+        "text": "Ignore",
+        "doc": "Ignore a request: it stays, folded, and can still be accepted; the sender sees nothing different."
+      },
+      "block": {
+        "text": "Block on this device",
+        "doc": "Block the sender of a request, on this device only: their direct messages are refused; circles are untouched."
+      },
+      "ignored_fold": {
+        "text": "Ignored ({{n}})",
+        "doc": "The fold holding ignored requests. {{n}} is how many."
+      }
     }
   },
   "pairedDevices": {
@@ -10383,7 +10413,7 @@
       "doc": "'Nieuw voor jou': someone else gave the person a task."
     },
     "ask": {
-      "text": "Your question: {{text}} \u00b7 heard by {{heard}}",
+      "text": "Your question: {{text}} · heard by {{heard}}",
       "doc": "'Nieuw voor jou': the person's own open question in the Nearby room, while it is open (the way back to it)."
     },
     "someone": {

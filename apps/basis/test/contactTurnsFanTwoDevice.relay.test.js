@@ -161,7 +161,9 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
     // device's per-circle address there, and the phone gets it by the contact-turn carry.
     const pairId = await until(async () => (await alwaysOn.agent.pairRouteFor?.(bea.pubKey))?.circleId ?? null, { timeout: 20000, step: 200 });
     expect(pairId, 'the always-on device holds no pair roster with Bea').toMatch(/^pair-/);
-    expect(await bea.agent.pairRouteFor(phone.pubKey), 'Bea\'s route to Anna').toMatchObject({ to: alwaysOn.agent.circleAddressFor(pairId), circleId: pairId });
+    // Bea's side forms its half of the pair roster asynchronously too (the invite, the join): wait for it as for Anna's
+    const beaRoute = await until(async () => { const r = await bea.agent.pairRouteFor(phone.pubKey); return r?.circleId ? r : null; }, { timeout: 20000, step: 200 });
+    expect(beaRoute, 'Bea\'s route to Anna').toMatchObject({ to: alwaysOn.agent.circleAddressFor(pairId), circleId: pairId });
     // The phone claims the primary DEVICE: the relay registrations move (the profile + person addresses); the pair
     // roster's route does not — Bea's DM still lands on the always-on device, and the phone still gets it by the carry.
     const claim = await phone.agent.claimPrimaryDevice();

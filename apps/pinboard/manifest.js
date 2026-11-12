@@ -147,7 +147,7 @@ export const pinboardManifest = {
     contact:       { atoms: ['add', 'list', 'submit'] },
     member:        { atoms: ['add', 'list'] },
     // a request is held by the door (`add`, self only, internal), listed and answered; never merged into a view
-    'message-request': { atoms: ['add', 'list', 'submit'] },
+    'message-request': { atoms: ['add', 'list', 'submit', 'remove'] },
   },
 
   operations: [
@@ -704,6 +704,19 @@ export const pinboardManifest = {
         { name: 'from',         kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'persona',      kind: 'string', required: false },
         { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
+      ],
+      surfaces: { internal: true },
+    },
+    {
+      // A request goes without becoming a contact: the block act (the sender onto this device's block list, the request
+      // off every device of the person). Not typed: blocking from a request is the Contacten section's button.
+      id:   'removeMessageRequest', visibility: 'authenticated', verb: 'remove',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      params: [
+        { name: 'from',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona', kind: 'string', required: false },
       ],
       surfaces: { internal: true },
     },

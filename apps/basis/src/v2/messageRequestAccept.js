@@ -25,3 +25,44 @@ export async function acceptMessageRequest({ callSkill, channel, from, persona =
   }
   return { accepted: true, contact: r.contact ?? null, turns: turns.length };
 }
+
+/**
+ * The Contacten requests section's rows, from `listMessageRequests`: the name the sender's card SAYS (unverified, null
+ * when it names none), the first line they wrote, how many turns are held, and whether the person ignored it. In the
+ * order given (newest last turn first, as the list returns them).
+ * @param {Array<object>} requests
+ * @returns {Array<{from: string, name: string|null, firstLine: string, count: number, ignored: boolean}>}
+ */
+export function messageRequestRows(requests = []) {
+  return (Array.isArray(requests) ? requests : []).filter((q) => q && typeof q.from === 'string' && q.from).map((q) => {
+    const turns = Array.isArray(q.turns) ? q.turns : [];
+    const first = turns.find((x) => typeof x?.text === 'string' && x.text.trim()) ?? null;
+    return {
+      from: q.from,
+      name: typeof q.name === 'string' && q.name.trim() ? q.name.trim() : null,
+      firstLine: first ? first.text.split('\n')[0].trim() : '',
+      count: turns.length,
+      ignored: q.state === 'ignored',
+    };
+  });
+}
+
+/** Ignore a request: it stays, marked, still acceptable; the sender sees nothing different. */
+export async function ignoreMessageRequest({ callSkill, from, persona = null } = {}) {
+  if (typeof callSkill !== 'function' || typeof from !== 'string' || !from) return { ignored: false, reason: 'not-composed' };
+  const r = await callSkill('pinboard', 'ignoreMessageRequest', { from, ...(persona ? { persona } : {}) });
+  return r?.request ? { ignored: true } : { ignored: false, reason: r?.error ?? 'no-answer' };
+}
+
+/**
+ * Block the sender of a request, on this device: onto the block list (direct contact only: their direct messages are
+ * refused from now on; a circle is untouched), with the name their card said, and the request goes (on every device of
+ * the person: an own-devices write).
+ */
+export async function blockFromRequest({ callSkill, from, name = null, persona = null } = {}) {
+  if (typeof callSkill !== 'function' || typeof from !== 'string' || !from) return { blocked: false, reason: 'not-composed' };
+  const b = await callSkill('basis', 'mute', { peer: from, ...(name ? { label: name } : {}) });
+  if (b && b.ok === false) return { blocked: false, reason: b.error ?? 'refused' };
+  await callSkill('pinboard', 'removeMessageRequest', { from, ...(persona ? { persona } : {}) });
+  return { blocked: true };
+}

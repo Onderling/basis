@@ -29,7 +29,7 @@ export const INVITE_EXCHANGE_MAX = param({ key: 'sendGate.inviteExchangeMax', sc
 
 /**
  * THE PERSON KEY'S ALLOWLIST. A send that is no circle's and no own device's leaves on the person key ONLY for one of
- * these reasons; anything else is 'none' (recorded today; held as 'unknown-address' once the gate enforces it). Data, in
+ * these reasons; anything else is 'none', and the send is HELD as 'unknown-address' (createHeldSends) until this device learns who it is. Data, in
  * one place: a new case is an entry here with its reason, never a silent fallback. Each entry answers from FACTS the agent
  * hands in (what this device holds), never from a caller's option, so no caller can name an entry for itself. Ordered
  * most specific first, the person's address-fallback setting LAST, so `allowedBy` names the real reason.
@@ -55,6 +55,11 @@ export const PERSON_ALLOWLIST = Object.freeze([
     detail: (f) => ({ origin: f.viaDevice === true ? 'card-via-device' : contactOriginOf(f.contact) }),
   }),
   Object.freeze({
+    id: 'circle-member',
+    reason: 'a member of one of my circles, at the person address their row names on a roster THIS device read (never their say-so): every member\'s row shows that address to the circle, so speaking to it as the person links nothing new; the sending side of "people in my circles may write to me" (Frits 2026-11-12)',
+    matches: (f) => typeof f?.circleMember === 'string' && !!f.circleMember,
+  }),
+  Object.freeze({
     id: 'address-fallback',
     reason: 'the person turned on "rather routed over my one key than undeliverable": their choice, so the last resort',
     matches: (f) => f?.addressFallback === true,
@@ -63,7 +68,7 @@ export const PERSON_ALLOWLIST = Object.freeze([
 
 /**
  * Which allowlist entry lets a person-key send through, from the facts the agent holds about `to`.
- * @param {{inviteExchange?: 'joiner'|'answer'|null, contact?: object|null, addressFallback?: boolean}} [facts]
+ * @param {{inviteExchange?: 'joiner'|'answer'|null, contact?: object|null, circleMember?: string|null, addressFallback?: boolean}} [facts]
  * @returns {{allowedBy: string, origin?: string, side?: string}}
  */
 export function personAllowedBy(facts = {}) {
@@ -115,6 +120,49 @@ export function exchangeKindOf(payload) {
  * handler `agent.sendPeerMessage`, one call is one pass, and hold-forward redelivery happens below the gate (the secure
  * agent's queue), so nothing re-enters it for the same reply.
  */
+/**
+ * How long a person-key send with no allowlist reason waits for this device to learn who the address is (a contact
+ * landing, a roster read): a card being added or a roster arriving takes seconds, not hours.
+ */
+export const HELD_SEND_LIFETIME_MS = param({ key: 'sendGate.heldSendLifetimeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60_000 });
+/** At most this many such sends wait at once on a device; past it the oldest goes. */
+export const HELD_SEND_MAX = param({ key: 'sendGate.heldSendMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
+/** How often the held sends are judged again while any wait (a contact can land through any op; a timer catches all). */
+export const HELD_SEND_RECHECK_MS = param({ key: 'sendGate.heldSendRecheckMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3_000 });
+
+/**
+ * THE HELD SENDS: a person-key send that no allowlist entry names ('unknown-address') waits here instead of leaving on
+ * the person key. Bounded (the oldest goes past `max`) and never standing (an entry ends at its lifetime, counted from
+ * its FIRST hold, also when it is put back after a re-judge). `onEnded(entry, 'expired'|'evicted')` reports an end.
+ * The agent takes them all when it learns something (a roster read, the recheck tick), judges each again and puts back
+ * the ones still unknown.
+ */
+export function createHeldSends({ now = () => Date.now(), lifetimeMs = HELD_SEND_LIFETIME_MS, max = HELD_SEND_MAX, onEnded = null } = {}) {
+  let held = [];
+  const end = (e, why) => { try { onEnded?.(e, why); } catch { /* a report never breaks the hold */ } };
+  const place = (e) => {
+    held.push(e);
+    while (held.length > max) end(held.shift(), 'evicted');
+  };
+  return {
+    hold({ to, payload, opts = {}, since = null } = {}) {
+      const e = { to, payload, opts, since: Number.isFinite(since) ? since : now() };
+      place(e);
+      return e;
+    },
+    putBack(e) { if (e) place(e); },
+    take() {
+      const t = now();
+      const all = held; held = [];
+      return all.filter((e) => {
+        if (t - e.since > lifetimeMs) { end(e, 'expired'); return false; }
+        return true;
+      });
+    },
+    get size() { return held.length; },
+  };
+}
+
 export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVITE_EXCHANGE_LIFETIME_MS, max = INVITE_EXCHANGE_MAX } = {}) {
   /** address → { n, until }: redeems open toward that inviter */
   const joiners = new Map();
@@ -207,21 +255,29 @@ export function createCircleAddressIndex() {
   const byCircle = new Map();
   /** address → Set<circleId> */
   const byAddress = new Map();
+  /** circleId → Set<webid> and webid → Set<circleId>: the members' PERSON addresses, as their rows name them */
+  const webidsByCircle = new Map();
+  const byWebid = new Map();
+  const unindex = (map, key, circleId) => {
+    const cs = map.get(key);
+    if (cs) { cs.delete(circleId); if (cs.size === 0) map.delete(key); }
+  };
   const drop = (circleId) => {
-    for (const a of byCircle.get(circleId) ?? []) {
-      const cs = byAddress.get(a);
-      if (cs) { cs.delete(circleId); if (cs.size === 0) byAddress.delete(a); }
-    }
+    for (const a of byCircle.get(circleId) ?? []) unindex(byAddress, a, circleId);
     byCircle.delete(circleId);
+    for (const w of webidsByCircle.get(circleId) ?? []) unindex(byWebid, w, circleId);
+    webidsByCircle.delete(circleId);
   };
   return {
     /** @returns {number} how many addresses the circle now has here (0 = nothing recorded, the old entries kept) */
     recordRoster(circleId, members, { selfWebid = null } = {}) {
       if (typeof circleId !== 'string' || !circleId) return 0;
       const next = new Set();
+      const webids = new Set();
       for (const m of Array.isArray(members) ? members : []) {
         if (selfWebid && m?.webid === selfWebid) continue;
         for (const a of circleAddressSetOf(m)) next.add(a);
+        if (typeof m?.webid === 'string' && m.webid) webids.add(m.webid);
       }
       // an empty read is far more likely a failed skill call than a circle with nobody else in it: keep what we had.
       // A removed member's address therefore leaves at the circle's NEXT non-empty read (which replaces the whole set),
@@ -234,7 +290,19 @@ export function createCircleAddressIndex() {
         if (!cs) { cs = new Set(); byAddress.set(a, cs); }
         cs.add(circleId);
       }
+      webidsByCircle.set(circleId, webids);
+      for (const w of webids) {
+        let cs = byWebid.get(w);
+        if (!cs) { cs = new Set(); byWebid.set(w, cs); }
+        cs.add(circleId);
+      }
       return next.size;
+    },
+    /** A circle of mine whose roster read names `address` as a member's PERSON address (webid), or null; `accept`
+     *  narrows it (the agent passes "a circle of the self that speaks", so a persona's circle never opens another self). */
+    memberCircleOf(address, { accept = null } = {}) {
+      for (const c of byWebid.get(address) ?? []) if (!accept || accept(c)) return c;
+      return null;
     },
     forget(circleId) { drop(circleId); },
     /**

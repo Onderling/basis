@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PERSON_ALLOWLIST, personAllowedBy, contactOriginOf, createInviteExchange, exchangeKindOf,
   INVITE_EXCHANGE_LIFETIME_MS, INVITE_EXCHANGE_MAX, sendDecisionFields,
+  createHeldSends, HELD_SEND_MAX, HELD_SEND_LIFETIME_MS, createCircleAddressIndex,
 } from '../../src/v2/peerSendGate.js';
 
 describe('the person-key allowlist: data, one reason per entry, most specific first', () => {
@@ -187,5 +188,69 @@ describe('createInviteExchange: a send uses only the registration of ITS side (t
     expect(ix.take('bot', { kind: null })).toBe(null);
     expect(ix.take('bot')).toBe(null);
     expect(ix.take('bot', { kind: 'pairing' })).toBe('pairing');
+  });
+});
+
+describe('createHeldSends: a person-key send with no reason waits, bounded, never standing', () => {
+  it('the bound and the lifetime are params, not literals', () => {
+    expect(HELD_SEND_MAX).toBeGreaterThan(0);
+    expect(HELD_SEND_LIFETIME_MS).toBeGreaterThan(0);
+  });
+
+  it('takes what is held, and an entry put back keeps its first time', () => {
+    let t = 1000;
+    const h = createHeldSends({ now: () => t, lifetimeMs: 100, max: 4 });
+    h.hold({ to: 'a', payload: { msgId: 'm1' }, opts: {} });
+    expect(h.size).toBe(1);
+    const [e] = h.take();
+    expect(h.size).toBe(0);
+    t = 1050; h.putBack(e);
+    t = 1101;
+    expect(h.take(), 'the put-back entry kept its first time and ended at its lifetime').toEqual([]);
+  });
+
+  it('an entry past its lifetime is dropped and reported', () => {
+    let t = 0; const ended = [];
+    const h = createHeldSends({ now: () => t, lifetimeMs: 10, max: 4, onEnded: (e, why) => ended.push([e.payload.msgId, why]) });
+    h.hold({ to: 'a', payload: { msgId: 'm1' } });
+    t = 11;
+    expect(h.take()).toEqual([]);
+    expect(ended).toEqual([['m1', 'expired']]);
+  });
+
+  it('is bounded: past the bound the oldest goes, reported', () => {
+    const ended = [];
+    const h = createHeldSends({ now: () => 0, lifetimeMs: 10, max: 2, onEnded: (e, why) => ended.push([e.payload.msgId, why]) });
+    for (const id of ['m1', 'm2', 'm3']) h.hold({ to: 'a', payload: { msgId: id } });
+    expect(h.size).toBe(2);
+    expect(ended).toEqual([['m1', 'evicted']]);
+  });
+});
+
+describe('a circle member at the person address their roster row names (people in my circles may write to me)', () => {
+  it('is allowed as circle-member, after a kept contact and before the fallback', () => {
+    expect(personAllowedBy({ circleMember: 'buren' })).toEqual({ allowedBy: 'circle-member' });
+    const ids = PERSON_ALLOWLIST.map((e) => e.id);
+    expect(ids.indexOf('contact-card')).toBeLessThan(ids.indexOf('circle-member'));
+    expect(ids.indexOf('circle-member')).toBeLessThan(ids.indexOf('address-fallback'));
+  });
+
+  it('the roster index knows a member by the webid their row names, never my own, and forgets it with the circle', () => {
+    const ix = createCircleAddressIndex();
+    ix.recordRoster('buren', [{ webid: 'ME', circleAddress: 'meC' }, { webid: 'ANN', circleAddress: 'annC' }], { selfWebid: 'ME' });
+    expect(ix.memberCircleOf('ANN')).toBe('buren');
+    expect(ix.memberCircleOf('ME')).toBe(null);
+    expect(ix.memberCircleOf('annC'), 'a circle address is not a person address').toBe(null);
+    ix.forget('buren');
+    expect(ix.memberCircleOf('ANN')).toBe(null);
+  });
+});
+
+describe('circle-member is narrowed to the circles of the self that speaks', () => {
+  it('accept filters the circles a webid is a member of', () => {
+    const ix = createCircleAddressIndex();
+    ix.recordRoster('werk', [{ webid: 'ANN', circleAddress: 'annW' }]);
+    expect(ix.memberCircleOf('ANN', { accept: (c) => c !== 'werk' }), 'a persona circle opened the general key').toBe(null);
+    expect(ix.memberCircleOf('ANN', { accept: (c) => c === 'werk' })).toBe('werk');
   });
 });

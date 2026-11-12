@@ -166,6 +166,7 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { acceptMessageRequest } from '../../src/v2/messageRequestAccept.js';
 import { createPairRoster } from '../../src/v2/pairRoster.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
@@ -2447,6 +2448,10 @@ function buildCircleBot(agent) {
   });
   if (typeof window !== 'undefined') {
     window.onderlingContactChannel = circleContactChannel;
+    // accept a message request: the shared act (the held card into the book, the held turns onto the thread); the
+    // Contacten requests section calls the same function
+    window.onderlingAcceptRequest = (from, opts = {}) => acceptMessageRequest({ callSkill: rawCallSkill, channel: circleContactChannel, from, ...opts })
+      .then((r) => { if (r?.accepted && r.turns > 0) noteNewContactTurn(from, 'bot'); return r; });   // the held turns are new: the tab and the row say so
     window.onderlingPeers = circlePeerGraph;   // debug / e2e seam (roster + journey-A tests seed/inspect peers)
     // e2e seam: what this device resolves an address to, and which addresses it counts as its own — the two reads
     // that decide whether a peer-graph record is a row in Contacten (a walk's red names the filter, not a guess).

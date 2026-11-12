@@ -26,6 +26,10 @@ test('a stranger\'s first five minutes: onboarding, a handle, a note, their card
     const seeded = await page.evaluate(async (payload) => window.onderlingCall('pinboard', 'addContactFromQr', { payload }), feedbackCard);
     const feedbackId = seeded?.contact?.webid ?? null;
     expect(feedbackId, `the seed adds the feedback contact: ${JSON.stringify(seeded).slice(0, 200)}`).toBeTruthy();
+    // the feedback persona takes anyone's first word (its policy is OPEN); without it a tester's first message is a
+    // message request the maker accepts
+    const opened = await F.page.evaluate(async () => window.onderlingCall('agents', 'setProfileProperty', { id: 'default', key: 'firstMessages', value: 'open' }));
+    expect(opened?.ok, JSON.stringify(opened)).toBe(true);
 
     // STEP 1 — the app opens on Vandaag with the first steps
     await expect(page.locator('.circle-vandaag__head'), 'the app opens on Vandaag').toBeVisible({ timeout: 30_000 });

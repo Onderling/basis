@@ -24,9 +24,10 @@ describe('createSignatureMemo', () => {
     expect(real.calls).toHaveLength(3);
     expect(memo.size).toBe(0);
   });
-  it('bounded: the least recently used goes first', () => {
+  it('bounded by BYTES: the least recently used goes first', () => {
     const real = counting(() => true);
-    const memo = createSignatureMemo({ max: 2, verify: real.verify });
+    const one = createSignatureMemo({ verify: real.verify }); one.verify('a', 's', 'k');
+    const memo = createSignatureMemo({ maxBytes: one.bytes * 2, verify: real.verify });
     memo.verify('a', 's', 'k'); memo.verify('b', 's', 'k');
     memo.verify('a', 's', 'k');            // a is now the most recent
     memo.verify('c', 's', 'k');            // evicts b
@@ -34,5 +35,40 @@ describe('createSignatureMemo', () => {
     real.calls.length = 0;
     memo.verify('a', 's', 'k'); expect(real.calls).toHaveLength(0);
     memo.verify('b', 's', 'k'); expect(real.calls).toHaveLength(1);
+  });
+
+  it('the bound holds a second read of 9,000 statements with no check (the default, real-sized entries)', () => {
+    const real = counting(() => true);
+    const memo = createSignatureMemo({ verify: real.verify });
+    const key = 'K'.repeat(43); const sig = (i) => `${i}`.padStart(86, 'S');
+    const msg = (i) => `{"body":${i}}`.padEnd(2000, ' ');   // a real stored statement is ~2 KB
+    for (let i = 0; i < 9000; i++) memo.verify(msg(i), sig(i), key);
+    real.calls.length = 0;
+    for (let i = 0; i < 9000; i++) memo.verify(msg(i), sig(i), key);
+    expect(real.calls, 'the second read checked again').toHaveLength(0);
+  });
+
+  it('the message part of the key is its digest: an entry costs the same for a 2 KB statement as for a short one', () => {
+    const a = createSignatureMemo({ verify: () => true }); a.verify('x', 's', 'k');
+    const b = createSignatureMemo({ verify: () => true }); b.verify('x'.repeat(4000), 's', 'k');
+    expect(b.bytes).toBe(a.bytes);
+  });
+
+  it('the key names the VERIFIER: a circle-link "true" is not a plain-signature "true" over the same bytes', () => {
+    const real = counting(() => true);
+    const memo = createSignatureMemo({ verify: real.verify });
+    const link = memo.verifierFor('circle-link');
+    expect(link('m', 's', 'k')).toBe(true);
+    expect(memo.verify('m', 's', 'k')).toBe(true);
+    expect(real.calls, 'the plain check reused the link verdict').toHaveLength(2);
+    expect(link('m', 's', 'k')).toBe(true);
+    expect(real.calls).toHaveLength(2);
+  });
+
+  it('nothing but a passed real check writes the memo (the API has no setter)', () => {
+    const memo = createSignatureMemo({ verify: () => false });
+    expect(Object.keys(memo).sort()).toEqual(['bytes', 'size', 'verifierFor', 'verify']);
+    memo.verify('m', 's', 'k');
+    expect(memo.size).toBe(0);
   });
 });

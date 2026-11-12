@@ -233,10 +233,17 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
   if (typeof circleIdentityFor !== 'function') return null;
   const railRef = { current: null };
   // the lane's own statements by hash, for the retired-address cut (a chain walk reads them, it verifies nothing)
+  // …built ONCE per circle while the log is unchanged (a read binds every statement, and each binding asked for it again)
+  const chains = new Map();   // circleId → { version, lookup }
   const chainFor = (circleId) => {
+    const version = typeof eventLog?.version === 'number' ? eventLog.version : null;
+    const had = chains.get(circleId);
+    if (had && version !== null && had.version === version) return had.lookup;
     const byHash = new Map();
     try { for (const x of railRef.current?.storedStatements?.(circleId) ?? []) if (x?.body?.hash) byHash.set(x.body.hash, x.body); } catch { /* none */ }
-    return (h) => byHash.get(h) ?? null;
+    const lookup = (h) => byHash.get(h) ?? null;
+    if (version !== null) chains.set(circleId, { version, lookup });
+    return lookup;
   };
   const rail = makeCircleEntryRail({
     eventLog,

@@ -208,6 +208,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `PingScheduler` | class | [`core.md`](core.md#pingscheduler) |
 | `PodCapabilityToken` | class | [`core.md`](core.md#podcapabilitytoken) |
 | `PolicyEngine` | class | [`core.md`](core.md#policyengine) |
+| `processSignatureMemo` | function | [`core.md`](core.md#processsignaturememo) |
 | `publish` | function | [`core.md`](core.md#publish) |
 | `publishes` | function | [`core.md`](core.md#publishes) |
 | `pullPeerList` | function | [`core.md`](core.md#pullpeerlist) |

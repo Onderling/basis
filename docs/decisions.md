@@ -1537,7 +1537,7 @@ and the stranger budgets are the defence there. Ledger: L806, L807, L808.
 
 ## 2026-11-12 — A signature verdict is remembered only in memory, once per process; nothing persisted, nothing from another device (Frits)
 
-What a start costs on a phone is first-time signature checks (measured on a Samsung A33: one Ed25519 check in pure
+What a start costs on a phone is first-time signature checks (measured on a mid-range Android phone: one Ed25519 check in pure
 JavaScript is about 61 ms, and a start with 18 circles does about 90 of them in its first 15 seconds). Repeats were
 already answered from memory. What may be remembered, and what may not:
 

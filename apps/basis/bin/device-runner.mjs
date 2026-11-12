@@ -137,6 +137,7 @@ import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } fr
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
 import { installBoxSignatureEquation } from '../src/v2/signatureEquations.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
+import { runStartQueue, startQueueSiblings } from '../src/v2/startQueue.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { blockedFirst } from '../src/v2/directDoors.js';
@@ -935,39 +936,23 @@ if (relayUrl) {
     else if (s.overDay > 0) console.log(`device-runner: ${s.overDay} change(s) have waited over a day for the main device.`);
   }).catch(() => {});
 
-  // The reconnect kicks: pull what arrived while this device was down, on every lane that has one.
-  const kick = (cu, label, ms) => {
-    if (!cu) return;
-    setTimeout(() => {
-      const p = typeof cu.requestFromSiblings === 'function'
-        ? cu.requestFromSiblings()
-        : cu.requestAll({ callSkill });
-      Promise.resolve(p).catch(() => { /* the live fan keeps it current either way */ });
-      walkLog({ kind: 'catch-up-kick', lane: label });
-    }, ms);
-  };
-  kick(lanes.catchUps.gov, 'governance', 2000);
-  kick(lanes.catchUps.membership, 'membership', 2500);
-  kick(agent.grantsCatchUp, 'grants', 2500);
-  kick(agent.knownPeersSync, 'known-peers', 2500);
-  kick(agent.personKeySync, 'person-key', 2500);
-  kick(agent.profileFactsSync, 'profile-facts', 2500);
-  // the person's own store: what a sibling wrote while this box was off
-  kick(agent.ownStoreSync, 'own-store', 2500);
-  // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and
-  // at boot by asking, as both shells do. (Found by the shell-seams guard on its first run, 2026-09-19.)
+  // THE START QUEUE (shared, startQueue.js): what arrived while this device was down, every lane's catch-up and every
+  // own-device ask, in one order and one step at a time (web and the phone run the same queue; the box has no screen,
+  // so no circle goes first). Each step is logged as it starts, and the run once with how many circles it covered.
+  const LANE_LOG = { membership: 'membership', gov: 'governance', key: 'keys', task: 'tasks', chat: 'chat' };
   setTimeout(() => {
-    agent.primaryDevice?.requestFromSiblings?.().catch(() => { /* the carry brings a later claim either way */ });
-    walkLog({ kind: 'catch-up-kick', lane: 'primary-device' });
-  }, 2600);
+    runStartQueue({
+      catchUps: lanes.catchUps,
+      siblings: startQueueSiblings(agent),
+      callSkill,
+      onStep: (st) => walkLog({ kind: 'catch-up-kick', lane: st?.sibling ?? LANE_LOG[st?.lane] ?? st?.lane, ...(st?.circleId ? { circle: String(st.circleId).slice(0, 12) } : {}) }),
+    }).then((r) => walkLog({ kind: 'start-queue', circles: r.circles, steps: r.steps, failed: r.failed })).catch(() => {});
+  }, 2000);
   // The circles the person's other devices are in that this box is not (founded or joined while it was down).
   setTimeout(() => {
     agent.circleFollowSync?.requestFromSiblings?.().catch(() => { /* the carry brings a later one either way */ });
     walkLog({ kind: 'catch-up-kick', lane: 'circle-follow' });
   }, 2700);
-  kick(lanes.catchUps.task, 'tasks', 3000);
-  kick(lanes.catchUps.chat, 'chat', 3500);
-  kick(lanes.catchUps.key, 'keys', 3500);
 }
 
 // ── Telegram, only if a token is here ───────────────────────────────────────────────────────────

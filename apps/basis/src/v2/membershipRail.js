@@ -18,6 +18,17 @@ import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the r
 /** The statement kinds the membership lane carries — DERIVED from the manifest's declared appends. */
 export const MEMBERSHIP_RAIL_KINDS = entryKindRegistryFromManifests(membershipManifest).kindsFor(MEMBERSHIP_LANE);
 
+/**
+ * COMPACTION OF SUPERSEDED MEMBER PROPERTIES IS PAUSED (2026-11-12, docs/decisions.md). A tombstone keeps the chain
+ * edge on the device that made it, but it carries no signature, so a member who joins LATER cannot accept it and lacks
+ * that parent; the fold skips a missing parent, so the late joiner gives the author's later statements a lower causal
+ * depth and can order two acts differently: proven by `test/v2/lateJoinerFoldOrder.test.js`, where the devices that
+ * were there fold a member evicted and the late joiner folds them still in. Until a tombstone can prove itself (the
+ * statement format where the signature covers a header that a tombstone keeps), nothing is compacted: the log keeps
+ * superseded properties (an old picture per change). The rail's `compact` stays, tested, for when this turns back on.
+ */
+export const COMPACT_SUPERSEDED_PROPS = false;
+
 /** The wire subtypes for the membership lane's fan + catch-up (the governance pair's sibling). */
 export const MEMBERSHIP_BROADCAST = 'circle-membership-broadcast';
 export const MEMBERSHIP_CATCHUP_SUBTYPES = Object.freeze({
@@ -250,6 +261,8 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
+    // the only statements the roster fold calls dead (`superseded`: member properties a later one replaced)
+    compactableKinds: ['member-props'],
     verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, {
       circleIdentityFor, ownCeremonyCommitmentFor, chainFor,
       storedFor: (circleId) => { try { return railRef.current?.storedStatements?.(circleId) ?? []; } catch { return []; } },

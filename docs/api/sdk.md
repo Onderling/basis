@@ -83,6 +83,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `createSenderBinding` | function | [`core.md`](core.md#createsenderbinding) |
 | `createSignatureMemo` | function | [`core.md`](core.md#createsignaturememo) |
 | `createSpineAppender` | function | [`core.md`](core.md#createspineappender) |
+| `createTimeSlice` | function | [`core.md`](core.md#createtimeslice) |
 | `DataPart` | function | [`core.md`](core.md#datapart) |
 | `DataSource` | class | [`core.md`](core.md#datasource) |
 | `DataSourceAccessDeniedError` | class | [`core.md`](core.md#datasourceaccessdeniederror) |
@@ -296,6 +297,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `TIER_LEVEL` | constant | [`core.md`](core.md#tier_level) |
 | `tierForRouteVia` | function | [`core.md`](core.md#tierforroutevia) |
 | `tierForTransport` | function | [`core.md`](core.md#tierfortransport) |
+| `TIME_SLICE_MS` | constant | [`core.md`](core.md#time_slice_ms) |
 | `tokenAgentKeyFor` | function | [`core.md`](core.md#tokenagentkeyfor) |
 | `tokenGate` | function | [`core.md`](core.md#tokengate) |
 | `TokenRegistry` | class | [`core.md`](core.md#tokenregistry) |

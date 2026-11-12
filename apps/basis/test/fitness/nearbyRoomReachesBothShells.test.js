@@ -26,7 +26,8 @@ describe('the Nearby room reaches both shells', () => {
   it('web: the screen gets screenDeps() and the peer router spreads handlers', () => {
     const src = read('../../web/v2/circleApp.js');
     expect(src).toMatch(/createNearbyScreen\(\{\s*\.\.\.\(ensureNearbyRoom\(\)\?\.screenDeps\(\)/);
-    expect(src).toMatch(/\.\.\.\(ensureNearbyRoom\(agent\)\?\.handlers \?\? \{\}\)/);
+    // spread through the block check (the room is direct contact: a block refuses them)
+    expect(src).toMatch(/\.\.\.blockedAll\([^\n]*ensureNearbyRoom\(agent\)\?\.handlers \?\? \{\}\)/);
     // an answer reaches the screen through screenDeps (the shared controller re-reads), and opens no thread
     expect(src).not.toMatch(/openNearbyThread\(/);
   });
@@ -48,7 +49,7 @@ describe('the Nearby room reaches both shells', () => {
     const router = phoneWiringSource();
     if (/buildInboundWiring\(/.test(router)) {
       expect(router).toMatch(/nearbyRoom: bundle\?\.nearbyRoom/);
-      expect(router).toMatch(/\.\.\.\(nearbyRoom\?\.handlers \?\? \{\}\)/);
+      expect(router).toMatch(/\.\.\.blockedAll\([^\n]*nearbyRoom\?\.handlers \?\? \{\}\)/);
     } else expect(router).toMatch(/\.\.\.\(bundle\?\.nearbyRoom\?\.handlers \?\? \{\}\)/);
   });
 });

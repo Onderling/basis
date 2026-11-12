@@ -6,7 +6,7 @@
  */
 
 export { createAgentRegistry, PROFILE_KINDS, withRegistryWriteLock }  from './src/AgentRegistry.js';
-export { FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY, firstMessagesOf } from './src/firstMessages.js';
+export { FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY, firstMessagesOf, CIRCLE_MEMBERS_KEY, circleMembersMayWriteOf } from './src/firstMessages.js';
 export { makeActorResolver }    from './src/makeActorResolver.js';
 export {
   registryResourceUri,

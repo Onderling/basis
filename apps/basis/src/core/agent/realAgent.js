@@ -187,7 +187,7 @@ import {
   isRequestable,
   effectiveProperties,
   profileFactsOf, withProfileFacts, factsDiffer, nextFactsAt, stampChangedFacts,
-  firstMessagesOf, FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY,
+  firstMessagesOf, FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY, CIRCLE_MEMBERS_KEY, circleMembersMayWriteOf,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -746,7 +746,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     ...[deviceBindingOf(persona)].filter(Boolean),
   ];
   const secureAgentRef = { current: null };   // late-bound: the secure agent is created further down this scope
-  const isKnownPeerRef = { current: null };   // the wire gate's "do I know this caller" (makeIsKnownPeer), bound once its sources exist
+  const isKnownPeerRef = { current: null };
+  // the contact door's "known": the same sources WITHOUT circle members (whether a member may write first is the
+  // persona's own setting, over its own circles: `messageRequests.isMember`)
+  const isKnownDirectRef = { current: null };   // the wire gate's "do I know this caller" (makeIsKnownPeer), bound once its sources exist
   const registerPersonIdentity = () => {
     const sa2 = secureAgentRef.current;
     if (!sa2 || !persona.personIdentity) return;
@@ -2332,8 +2335,24 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const [pid, rt] of personas) if (rt?.chatId?.pubKey === key || rt?.chatId?.pubKey === addr) return pid;
     return null;
   };
-  /** The same, filing what cannot be placed under the primary (a held request still has a self to live in). */
-  const personaOfOwnAddress = (addr) => personaOwning(addr) ?? primaryId;
+  /**
+   * The same, for any address of mine a turn can arrive on: a persona's chat identity, or one of my PER-CIRCLE
+   * addresses (a member asking at my circle address, the Ask door), which names the persona that circle belongs to.
+   */
+  const personaOwningAny = async (addr) => {
+    const direct = personaOwning(addr);
+    if (direct || typeof addr !== 'string' || !addr) return direct;
+    let ids = [];
+    try { ids = ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean); } catch { ids = []; }
+    for (const cid of ids) {
+      let mine = null;
+      try { mine = circleAddressFor(cid); } catch { mine = null; }
+      if (mine && mine === addr) return profileIdOf(cid);
+    }
+    return null;
+  };
+  /** Filing what cannot be placed under the primary (a held request still has a self to live in). */
+  const personaOfOwnAddress = async (addr) => (await personaOwningAny(addr)) ?? primaryId;
   const rosterSiblingRowsOfDefault = async () => (!personas.has('default') ? [] : siblingDevices({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
@@ -3424,6 +3443,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     myCircleIds: async () => ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => typeof id === 'string' && id),
     rosterOf: async (circleId) => (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [],
+    contacts: contactRecords,
+  });
+  isKnownDirectRef.current = makeIsKnownPeer({
+    isSelf: isOwnAddress,
+    ownDeviceAddresses: async () => (await Promise.all([...personas.keys()].map((pid) => deviceSiblingRowsOf(pid).catch(() => []))))
+      .flat().map((d) => d?.address).filter(Boolean),
     contacts: contactRecords,
   });
   /** A contact's row in the contact book, by their webid or by an address of theirs. */
@@ -9609,15 +9634,30 @@ export async function createRealHouseholdAgent(opts = {}) {
       // FAIL CLOSED: an address that names none of my personas by its own identity (or none) is 'request', never the
       // primary's policy, so a device whose primary is open does not let on a turn it cannot place
       policy: async (to = null) => {
-        const pid = personaOwning(to);
+        const pid = await personaOwningAny(to);
         if (!pid) return 'request';
         try { return firstMessagesOf(await agentsRegistryRef?.lookup?.(pid)); } catch { return 'request'; }
       },
-      isKnown: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
+      isKnown: (key) => (isKnownDirectRef.current ? isKnownDirectRef.current(key) : false),
+      // A MEMBER OF ONE OF THIS PERSONA'S CIRCLES (the address the turn arrived on names the persona), seen on this
+      // device's own roster, and the persona lets its circle members write first. Fails closed: no persona, no.
+      isMember: async ({ contactId = null, fromAddr = null, to = null } = {}) => {
+        const pid = await personaOwningAny(to);
+        if (!pid) return false;
+        try { if (!circleMembersMayWriteOf(await agentsRegistryRef?.lookup?.(pid))) return false; } catch { return false; }
+        const general = (id) => id === primaryId || id === profileIdOf(null);   // the general persona, as profileIdOf names it
+        const mine = async () => ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])
+          .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((cid) => typeof cid === 'string' && cid)
+          .filter((cid) => !isPairCircleId(cid))
+          .filter((cid) => { const owner = profileIdOf(cid); return owner === pid || (general(owner) && general(pid)); });
+        const inThem = makeIsKnownPeer({ myCircleIds: mine, rosterOf: async (cid) => (await callSkill('pinboard', 'listGroupMembers', { groupId: cid }))?.members ?? [] });
+        for (const k of [fromAddr, contactId]) if (k && (await inThem(k))) return true;
+        return false;
+      },
       // filed under the persona the turn was written to (its `to`), never another
       hold: async ({ to = null, ...turn } = {}) => {
-        const pid = personaOfOwnAddress(to);
-        const args = pid === primaryId ? turn : { ...turn, persona: pid };
+        const pid = await personaOfOwnAddress(to);
+        const args = (pid === primaryId || pid === profileIdOf(null)) ? turn : { ...turn, persona: pid };
         return (await callSkill('pinboard', 'holdMessageRequest', args)) ?? { held: false, reason: 'no-answer' };
       },
     }),
@@ -10123,6 +10163,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       const r = await callSkill('agents', 'setProfileProperty', { id: pid, key: FIRST_MESSAGES_KEY, value: policy });
       if (r && r.ok === false) throw new Error(`setFirstMessages: ${r.reason ?? 'refused'}`);
       return firstMessagesOf(await agentsRegistryRef?.lookup?.(pid));
+    },
+    /** Set whether this persona's circle members may write to it first (`circleMembersMayWrite`, its profile record). */
+    setCircleMembersMayWrite: async (on, { persona = null } = {}) => {
+      if (typeof on !== 'boolean') throw new Error('setCircleMembersMayWrite: on must be true or false');
+      const pid = persona && personas.has(persona) ? persona : primaryId;
+      if (persona && pid !== persona) throw new Error(`setCircleMembersMayWrite: no persona ${persona} on this device`);
+      const r = await callSkill('agents', 'setProfileProperty', { id: pid, key: CIRCLE_MEMBERS_KEY, value: on });
+      if (r && r.ok === false) throw new Error(`setCircleMembersMayWrite: ${r.reason ?? 'refused'}`);
+      return circleMembersMayWriteOf(await agentsRegistryRef?.lookup?.(pid));
     },
     markFunctionProfile: async () => {
       if (!agentsRegistryRef || typeof agentsRegistryRef.updateKind !== 'function') throw new Error('markFunctionProfile: no profile registry');

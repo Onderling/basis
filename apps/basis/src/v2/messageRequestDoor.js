@@ -14,6 +14,8 @@
  *     no thread turn, no receipt: the person accepts, ignores or blocks.
  *   - NOT KNOWN, within the budgets, to a persona whose policy is 'open' (anyone may write; a bot's by default) →
  *     'known': the turn goes on as a known one does.
+ *   - NOT KNOWN, but a member of one of the persona's circles and the persona lets them write (`isMember`) → 'member':
+ *     a thread, but no contact row until the person answers (answering is choosing).
  *   - past the budgets, or a turn the request refuses (no card on a new request, a card naming someone else, a file) →
  *     'dropped', with a count line (kind + reason, never who).
  * A blocked sender never reaches this door: the secure agent's block set drops them below every channel.
@@ -32,9 +34,9 @@ import { createInboundAdmission } from './inboundAdmission.js';
  * @param {(e: {kind: string, reason: string}) => void} [a.count]
  * @param {() => number} [a.now]
  * @returns {(m: {contactId: string, fromAddr: string, text?: string, card?: string|null, messageId?: string, ts?: number, file?: boolean, policy?: 'request'|'open'}) =>
- *   Promise<'known'|'held'|'dropped'>}
+ *   Promise<'known'|'member'|'held'|'dropped'>}
  */
-export function createMessageRequestDoor({ isKnown, iWrote = null, hold, count = null, now = Date.now } = {}) {
+export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = null, hold, count = null, now = Date.now } = {}) {
   if (typeof isKnown !== 'function') throw new TypeError('createMessageRequestDoor: isKnown is required');
   if (typeof hold !== 'function') throw new TypeError('createMessageRequestDoor: hold is required');
   const said = (reason) => { try { count?.({ kind: 'message-request-dropped', reason }); } catch { /* a count never breaks a turn */ } };
@@ -46,6 +48,9 @@ export function createMessageRequestDoor({ isKnown, iWrote = null, hold, count =
     const r = await admission({ contactId, fromAddr, text, messageId, channel: 'contact' });
     if (!r.admitted) return 'dropped';   // the admission said its own count line
     if (!r.stranger || policy === 'open') return 'known';
+    let member = false;
+    try { member = typeof isMember === 'function' && (await isMember({ contactId, fromAddr, to })) === true; } catch { member = false; }
+    if (member) return 'member';
     let held;
     try {
       held = await hold({ from: contactId || fromAddr, messageId: messageId || `${fromAddr}:${now()}`, ts: Number.isFinite(ts) ? ts : now(), text: String(text ?? ''), ...(card ? { card } : {}), ...(file ? { file: true } : {}), ...(to ? { to } : {}) });

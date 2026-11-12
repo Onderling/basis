@@ -1405,6 +1405,24 @@ firstMessagesOf(entry)
 
 The policy a registry entry stands for: its own property, else what its kind implies.
 
+### `CIRCLE_MEMBERS_KEY`
+
+**Kind:** constant · **Import:** `CIRCLE_MEMBERS_KEY` from `'@onderling/agent-registry'`
+
+"PEOPLE IN MY CIRCLES MAY WRITE TO ME" (Frits 2026-11-12): a member of one of THIS persona's circles may write to it
+privately and gets a thread (not a contact row: they become a contact when the person answers). Off: their first
+private message is a request like anyone's. The profile's own property `circleMembersMayWrite`, a boolean; absent: ON.
+
+### `circleMembersMayWriteOf`
+
+**Kind:** function · **Import:** `circleMembersMayWriteOf` from `'@onderling/agent-registry'`
+
+```js
+circleMembersMayWriteOf(entry)
+```
+
+Whether a registry entry's persona lets its circle members write first: its own property, else on.
+
 ## `src/governedRequest.js`
 
 ### `DEFAULT_GOVERNED_POLICY`

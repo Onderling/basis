@@ -39,13 +39,17 @@ catalogue's baseline and moves here as it is written up.
   `apps/pinboard/src/lib/SharedCards.js` (type `packages/item-types/src/types/sharedCard.js`, own-devices). Each
   "Share my contact" mints a new 128-bit token; its first opener is let on, anyone after is a request. The use is a
   first-wins claim (the store's claim channel), so the person's devices agree on one opener. Bounded by internal params:
-  how long a link lives, how many unused links a persona keeps.
+  how long a link lives, how many unused links a persona keeps. The link carries the token in its fragment after the
+  card (`apps/basis/src/v2/contactCardLink.js`); the opener's contact row keeps it (`linkToken`) and the first turn to
+  them carries it inside the person seal, then drops it. The door (`messageRequestDoor.js`, `useLink` / `letOnByLink`
+  on the agent's `messageRequests`) gives the first opener the circle member's treatment: a thread, no book row until
+  the person answers; Contacten names them from the card their turn carried (`nameLinkOpeners`).
 - The block set: the secure agent's (`packages/secure-agent/src/mute.js`, enforced in `createSecureAgent.js` at the
   hello gate, on receive and on send), reached through basis's `mute` / `unmute` / `muted` ops.
 
 <!-- catalogue-ops
 pinboard: holdMessageRequest listMessageRequests acceptMessageRequest ignoreMessageRequest removeMessageRequest
-pinboard: mintSharedCard listSharedCards withdrawSharedCard useSharedCard
+pinboard: mintSharedCard listSharedCards withdrawSharedCard useSharedCard clearContactLinkToken
 -->
 
 ## Proof

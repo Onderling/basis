@@ -28,5 +28,8 @@ export const SHARED_CARD_SCHEMA = {
     // the use, as a first-wins claim (the claim channel's field names): who used it and when
     assignee:  { type: 'string', minLength: 1 },
     claimedAt: { type: 'number' },
+    // the card the first opener's turn carried (`onderling-contact://…`): names their thread until the person answers.
+    // Plain content beside the claim, so a reader takes its name only when the card names the claim's winner.
+    card:      { type: 'string', minLength: 1 },
   },
 };

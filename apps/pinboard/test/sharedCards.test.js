@@ -5,6 +5,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createSharedCards, SHARED_CARD_TTL_MS, SHARED_CARDS_UNUSED_MAX } from '../src/lib/SharedCards.js';
 import { createContactBook } from '../src/lib/ContactBook.js';
 import { createCircleStores, memoryDataSource } from '@onderling/item-store';
+import { encodeContactCard } from '../src/lib/contactCard.js';
+
+const cardOf = (webid, displayName) => `onderling-contact://${encodeContactCard({ webid, pubKey: webid, displayName })}`;
 
 const ownStore = () => createCircleStores({ dataSource: memoryDataSource(), rootPrefix: 'mem://own/' }).getStore('own-devices');
 
@@ -89,5 +92,14 @@ describe('shared contact links: one per sharing moment, used once', () => {
     await other.put(fromA, { origin: true, sync: false });
     expect(await links.usedBy(token)).toBe('bob');
     expect(await linksB.usedBy(token)).toBe('bob');                           // B now knows its opener lost
+  });
+
+  it('the first opener is named by the card their turn carried, and only when that card names them', async () => {
+    const { token } = await links.mint();
+    await links.use({ token, by: 'bob', card: cardOf('bob', 'Bea') });
+    expect((await links.list())[0]).toMatchObject({ usedBy: 'bob', usedByName: 'Bea' });
+    const other = await links.mint();
+    await links.use({ token: other.token, by: 'carol', card: cardOf('mallory', 'Not Carol') });   // a card naming someone else
+    expect((await links.list()).find((l) => l.token === other.token)).toMatchObject({ usedBy: 'carol', usedByName: null });
   });
 });

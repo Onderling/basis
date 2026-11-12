@@ -137,3 +137,36 @@ describe('a card that rides a message is taken only when it names the sender (20
     expect(cardNamesSender('', 'bea-webid')).toBeNull();
   });
 });
+
+describe('a shared link scanned in the app, or opened as a deep link, keeps its token through the shared add (L806)', () => {
+  it('the scanner keeps the whole link when it carries a token; the add splits it into the card and the token', async () => {
+    const { routeScan } = await import('../../src/v2/scanRoute.js');
+    const { addContactAs, contactAddSheetModel } = await import('../../src/v2/contactLens.js');
+    const TOKEN = 'CCCCCCCCCCCCCCCCCCCCCC';
+    const CARD = 'onderling-contact://' + encodeContactCard({ webid: 'wx', pubKey: 'wx', displayName: 'W' });
+    const link = contactCardLink('https://onderling.org/basis/', CARD, TOKEN).link;
+    const r = routeScan(link);
+    expect(r.kind).toBe('contact');
+    expect(r.needs.payload).toBe(link);
+    // a link without a token is read as its card, as before
+    expect(routeScan(contactCardLink('https://onderling.org/basis/', CARD).link).needs.payload).toBe(CARD);
+    const calls = [];
+    const callSkill = async (app, op, args) => { calls.push([op, args]); return op === 'addContactFromQr' ? { contact: { webid: 'wx' } } : {}; };
+    await addContactAs({ callSkill, payload: link });
+    expect(calls.find(([op]) => op === 'addContactFromQr')[1]).toMatchObject({ payload: CARD, linkToken: TOKEN });
+    expect((await contactAddSheetModel({ payload: link, callSkill }))?.payload).toBe(CARD);
+  });
+});
+
+describe('Contacten names the first opener of my shared link from the card their turn carried (L806)', () => {
+  it('an unnamed row takes the name; a named row keeps its own; other rows are untouched', async () => {
+    const { nameLinkOpeners } = await import('../../src/v2/contactsSource.js');
+    const rows = [{ contactId: 'bobkey', name: 'bobkey' }, { contactId: 'carolkey', name: 'Carol' }, { contactId: 'dave', name: 'dave' }];
+    const links = async () => [
+      { state: 'used', usedBy: 'bobkey', usedByName: 'Bea' },
+      { state: 'used', usedBy: 'carolkey', usedByName: 'Someone else' },
+      { state: 'unused', usedBy: null, usedByName: null },
+    ];
+    expect((await nameLinkOpeners(rows, { links })).map((r) => r.name)).toEqual(['Bea', 'Carol', 'dave']);
+  });
+});

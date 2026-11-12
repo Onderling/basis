@@ -54,7 +54,7 @@ export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = nu
     // a shared link's first opener: their first turn uses the link, their later turns pass while its use names them
     const by = contactId || fromAddr;
     if (linkToken && typeof useLink === 'function') {
-      try { if ((await useLink({ token: linkToken, by, to }))?.ok === true) return 'member'; } catch { /* decided as a stranger's */ }
+      try { if ((await useLink({ token: linkToken, by, to, ...(card ? { card } : {}) }))?.ok === true) return 'member'; } catch { /* decided as a stranger's */ }
     }
     if (typeof letOnByLink === 'function') {
       try { if ((await letOnByLink({ by, to })) === true) return 'member'; } catch { /* decided as a stranger's */ }

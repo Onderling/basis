@@ -19,6 +19,7 @@
 
 import nacl from 'tweetnacl';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { decodeContactCard } from './contactCard.js';
 
 export const SHARED_CARD_TTL_MS = param({ key: 'pinboard.sharedCardTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 24 * 60 * 60 * 1000 });
 export const SHARED_CARDS_UNUSED_MAX = param({ key: 'pinboard.sharedCardsUnusedMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
@@ -35,6 +36,18 @@ function freshToken() {
 }
 
 const usedOf = (r) => (typeof r?.assignee === 'string' && r.assignee ? r.assignee : null);
+const CARD_PREFIX = 'onderling-contact://';
+
+/** The opener's name from the card their turn carried, only when that card names the link's opener (else null). */
+function openerName(r) {
+  const by = usedOf(r);
+  if (!by || typeof r?.card !== 'string' || !r.card.startsWith(CARD_PREFIX)) return null;
+  try {
+    const c = decodeContactCard(r.card.slice(CARD_PREFIX.length));
+    if (!c || (c.webid !== by && c.pubKey !== by && c.peerAddr !== by)) return null;
+    return (typeof c.displayName === 'string' && c.displayName.trim()) ? c.displayName.trim() : (c.handle ?? null);
+  } catch { return null; }
+}
 
 /** A link as the module returns it: its token, when it was made and ends, and whether (and by whom, when) it was used. */
 function view(r) {
@@ -42,6 +55,7 @@ function view(r) {
   return {
     token: r.token, mintedAt: r.mintedAt, expiresAt: r.expiresAt,
     state: usedBy ? 'used' : 'unused', usedBy, usedAt: usedBy && Number.isFinite(r.claimedAt) ? r.claimedAt : null,
+    usedByName: openerName(r),
   };
 }
 
@@ -99,7 +113,7 @@ export function createSharedCards({ store, selfFor = null, now = Date.now } = {}
    * unused or already theirs. The use is written as a first-wins claim.
    * @returns {Promise<{ok: true} | {ok: false, reason: 'unknown'|'expired'|'used'|'no-self'}>}
    */
-  async function use({ token, by, persona = null } = {}) {
+  async function use({ token, by, persona = null, card = null } = {}) {
     if (typeof by !== 'string' || !by) throw new TypeError('shared cards: by (the opener) required');
     const me = self(persona);
     if (!me) return { ok: false, reason: 'no-self' };
@@ -111,7 +125,7 @@ export function createSharedCards({ store, selfFor = null, now = Date.now } = {}
       if (expired(r)) return { ok: false, reason: 'expired' };
       const usedBy = usedOf(r);
       if (usedBy) return usedBy === by ? { ok: true } : { ok: false, reason: 'used' };
-      await st.put({ ...r, assignee: by, claimedAt: now() }, { by: me.writer });
+      await st.put({ ...r, assignee: by, claimedAt: now(), ...(typeof card === 'string' && card.startsWith(CARD_PREFIX) ? { card } : {}) }, { by: me.writer });
       return { ok: true };
     });
   }

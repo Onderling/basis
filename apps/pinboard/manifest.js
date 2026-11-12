@@ -796,6 +796,7 @@ export const pinboardManifest = {
       params: [
         { name: 'token',   kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'by',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'card',    kind: 'string', required: false },   // the card the opener's turn carried: names their thread
         { name: 'persona', kind: 'string', required: false },
       ],
       surfaces: { internal: true },

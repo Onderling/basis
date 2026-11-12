@@ -34,7 +34,8 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     const code = await A.page.locator('.cc-share__code input').inputValue();
     expect(code.startsWith('onderling-contact://'), `the code is the card: ${code.slice(0, 30)}`).toBe(true);
     const link = await A.page.locator('.cc-share__link input').inputValue();
-    expect(link, 'the link is THIS app\'s url with the contact in the fragment').toMatch(/^http:\/\/localhost:\d+\/#contact=[A-Za-z0-9_-]+$/);
+    expect(link, 'the link is THIS app\'s url with the contact and the link\'s one-time token in the fragment').toMatch(/^http:\/\/localhost:\d+\/#contact=[A-Za-z0-9_-]+&t=[A-Za-z0-9_-]{22}$/);
+    expect(await A.page.locator('.cc-share__state').textContent(), 'the panel says the link is not used yet').toMatch(/Nog niet gebruikt|Not used yet/);
     const aId = (await A.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
     await A.page.locator('.cc-share__back').click();   // back to Mij — the panel is a sub-screen without the tab bar
     await A.page.waitForTimeout(800);
@@ -82,13 +83,12 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     });
     const sent = await sendDirectMessage(B.page, marker, { to: aId });
     expect(sent.sent, `B could not write: ${sent.why}`).toBe(true);
-    // A never chose B: today B's first message is a MESSAGE REQUEST on A's side, and A accepts it (the shared-link door,
-    // a pending design, will let the opener of A's own shared link in without this step)
+    // B opened A's OWN shared link: its first message carries the link's token, so A's door lets B on (L806) — no
+    // request, no accept; the link is then used
     const bWebid = (await B.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
-    await expect.poll(async () => ((await A.page.evaluate(async () => (await window.onderlingCall('pinboard', 'listMessageRequests', {}))?.requests ?? [])) ?? []).map((q) => q.from),
-      { timeout: 30_000, message: 'B\'s first message is a request on A\'s side' }).toContain(bWebid);
-    const accepted = await A.page.evaluate(async (from) => window.onderlingAcceptRequest(from), bWebid);
-    expect(accepted?.accepted, JSON.stringify(accepted)).toBe(true);
+    await expect.poll(async () => ((await A.page.evaluate(async () => (await window.onderlingCall('pinboard', 'listSharedCards', {}))?.links ?? [])) ?? []).map((l) => l.usedBy),
+      { timeout: 30_000, message: 'B used A\'s link' }).toContain(bWebid);
+    expect(((await A.page.evaluate(async () => (await window.onderlingCall('pinboard', 'listMessageRequests', {}))?.requests ?? [])) ?? []).map((q) => q.from), 'the link\'s opener is no request').not.toContain(bWebid);
     // ── Before A opens anything: the Contacten tab says something is new, and B's row carries the count (2026-09-21,
     // Frits: "add some 'new message' visual to the contacts frame — I have to check each contact all the time").
     await gotoCircles(A.page);
@@ -170,6 +170,17 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(seen2.painted, 'B\'s second message is on A\'s device but NOT on the screen — stored under an address no row opens (the direct path keyed by the sender address, not the person)').toBe(true);
     expect(seen2.contactId, 'the same thread as the first message').toBe(seen.contactId);
     log('STEP4 the second message', 'PASS', 'same thread, painted');
+    // ── A ANSWERS (L806): B opened A's own link, so B wrote on a thread before A chose them; answering is choosing. A's
+    // answer makes B a contact (the card B's first turn carried goes into A's book) and forms the pair circle.
+    const answer = `fijn je te spreken ${Date.now().toString(36)}`;
+    const answered = await sendDirectMessage(A.page, answer, { to: seen.contactId });
+    expect(answered.sent, `A could not answer: ${answered.why}`).toBe(true);
+    await waitForContactMessageDetailed(B.page, answer);
+    await expect.poll(async () => ((await A.page.evaluate(async () => (await window.onderlingCall('pinboard', 'listContacts', {}))?.contacts ?? [])) ?? []).map((c) => c.webid),
+      { timeout: 30_000, message: 'A\'s answer put B in A\'s book' }).toContain(seen.contactId);
+    await expect.poll(async () => B.page.evaluate(async () => ((await window.onderlingCall('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-')).length),
+      { timeout: 45_000, message: 'the pair circle formed once A answered' }).toBeGreaterThan(0);
+    log('STEP4b A answers', 'PASS', 'B is in A\'s book; the pair circle formed');
     // NOTHING REFUSED inside the pair circle during the join. Until 2026-09-21 two envelopes were, every run: the
     // joiner's lane catch-up requests left as its pair-circle address FOR THE ADMIN'S GLOBAL address (`listGroupRoster`
     // names webids), so the admin — met at its canonical door — answered the greeting canonically, to a per-circle

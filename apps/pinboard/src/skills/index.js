@@ -4265,7 +4265,7 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (!bundle?.sharedCards) return { ok: false, reason: 'no-contacts' };
       try {
-        return await bundle.sharedCards.use({ token: a.token, by: a.by, persona: a.persona ?? null });
+        return await bundle.sharedCards.use({ token: a.token, by: a.by, persona: a.persona ?? null, card: typeof a.card === 'string' ? a.card : null });
       } catch (err) {
         return { ok: false, reason: 'invalid', error: err?.message ?? String(err) };
       }

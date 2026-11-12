@@ -74,23 +74,24 @@ describe('makeHandleGroupRedeemRequest', () => {
     expect(order, 'a malformed request is turned away and earns no reply').toEqual([]);
   });
 
-  it('forwards substrate error in the reply', async () => {
-    const d = reqDeps({ callSkill: vi.fn(async () => ({ error: 'invalid code' })) });
+  it('a refusal the circle knows goes back as its code', async () => {
+    const d = reqDeps({ callSkill: vi.fn(async () => ({ error: 'invalid-or-expired-code' })) });
     const handle = makeHandleGroupRedeemRequest(d);
     await handle('peer-A', validRequest());
     expect(d.sendPeer).toHaveBeenCalledWith('peer-A', expect.objectContaining({
-      subtype: 'group-redeem-response', error: 'invalid code',
+      subtype: 'group-redeem-response', error: 'invalid-or-expired-code',
     }));
     expect(d.propagateCircleAddresses).not.toHaveBeenCalled();
   });
 
-  it('captures thrown callSkill error in the reply', async () => {
-    const d = reqDeps({ callSkill: vi.fn(async () => { throw new Error('db down'); }) });
-    const handle = makeHandleGroupRedeemRequest(d);
-    await handle('peer-A', validRequest());
-    expect(d.sendPeer).toHaveBeenCalledWith('peer-A', expect.objectContaining({
-      subtype: 'group-redeem-response', error: 'db down',
-    }));
+  it('ANY other refusal, or a thrown error, goes back as the one catch-all code: never its text on the wire', async () => {
+    for (const callSkill of [vi.fn(async () => ({ error: 'invalid code' })), vi.fn(async () => { throw new Error('db down at /var/x'); })]) {
+      const d = reqDeps({ callSkill });
+      await makeHandleGroupRedeemRequest(d)('peer-A', validRequest());
+      const sent = d.sendPeer.mock.calls[0][1];
+      expect(sent).toMatchObject({ subtype: 'group-redeem-response', error: 'join-refused' });
+      expect(JSON.stringify(sent)).not.toMatch(/db down|invalid code/);
+    }
   });
 });
 

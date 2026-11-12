@@ -11,6 +11,7 @@
  * without an explicit polyfill check.
  */
 
+import { inviteRefusalOf, inviteRefusalKey } from '../../v2/inviteRefusals.js';
 import { normalizeDriverKind, REVEAL_PRESETS, isRevealPreset } from '@onderling/agent-registry';
 
 // Re-export so the wizards render the reveal-level picker off ONE import (they already
@@ -1011,13 +1012,17 @@ export async function finalSubmit({
       state.submitError = err?.message ?? String(err);
       state.submitErrorKey = 'circle.errors.rules_acceptance_required';
       state.submitErrorReason = 'rules-acceptance-required';
+    } else if (err?.reason === 'invalid-or-expired-code' || err?.reason === 'join-refused'
+      || /invalid-or-expired-code/.test(String(err?.message ?? ''))) {
+      // The inviter refused: an expired or rotated-away code ("ask for a fresh invite", not "try again later"), or a
+      // refusal it did not name. Both are said in words (inviteRefusals.js), never as the wire's code.
+      const code = err?.reason === 'join-refused' ? 'join-refused' : 'invalid-or-expired-code';
+      state.submitError = err?.message ?? String(err);
+      state.submitErrorKey = inviteRefusalKey(code);
+      state.submitErrorReason = code;
     } else {
       state.submitError = err?.message ?? String(err);
-      // An expired or rotated-away code arrives as the substrate's own string. Naming it here means a
-      // caller can act on it — "ask for a fresh invite" is a different instruction from "try again later".
-      state.submitErrorReason = /invalid-or-expired-code/.test(String(err?.message ?? ''))
-        ? 'invalid-or-expired-code'
-        : 'join-failed';
+      state.submitErrorReason = 'join-failed';
     }
     if (state.submitErrorReason !== 'handle-taken') state.handle = ownField;
     state.submitting = false;
@@ -1183,8 +1188,12 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
       if (peerReply?.error === 'handle-taken') throw handleTakenError();
       if (!peerReply) throw adminUnreachableError();   // reached out, heard nothing
       if (peerReply.error) {
-        // A real REJECTION from a live admin device stays verbatim — that is not "offline".
-        throw new Error(peerReply.error);
+        // A real REJECTION from a live admin device — not "offline". Its code is read through the closed set (the
+        // wire is not trusted to stay inside it) and said in words below.
+        const code = inviteRefusalOf(peerReply.error);
+        const e = new Error(code);
+        e.reason = code;
+        throw e;
       }
       await callSkill('pinboard', 'recordRemoteRedemption', {
         groupId:     inv.groupId,

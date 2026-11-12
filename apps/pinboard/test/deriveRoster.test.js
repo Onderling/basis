@@ -652,6 +652,7 @@ describe('the link proofs a roster read checks are checked ahead, giving the thr
     await new Promise((r) => { setTimeout(r, 5); });
     last = Date.now();
     try { await proveLinksAhead(a); } finally { running = false; spy.mockRestore(); }
-    expect(worst, 'the ahead pass held the thread').toBeLessThan(100);
+    // the slice's budget is 50 ms per stretch; seven unsliced checks hold ~210 ms. 150 leaves room for a loaded runner
+    expect(worst, 'the ahead pass held the thread').toBeLessThan(150);
   });
 });

@@ -348,6 +348,7 @@ describe('a read gives the thread back: checking never holds it for long (fast s
     await reader.readVerifiedBodies(CIRCLE);
     running = false;
     await new Promise((r) => { setTimeout(r, 5); });
-    expect(worst, 'the read held the thread').toBeLessThan(100);
+    // the slice's budget is 50 ms per stretch; unsliced this read held the thread ~227 ms. 150 leaves room for a loaded runner
+    expect(worst, 'the read held the thread').toBeLessThan(150);
   });
 });

@@ -1483,7 +1483,7 @@ is blind) or to a circle **group key** that is itself distributed by recipient-w
 O(1) per member, rotation on eviction. Portable crypto, one implementation across Node, browser, and
 mobile.
 
-**Access control is ACP, and only ACP (decided 2026-08-26).** A circle grants a member read access by
+**Access control is ACP, and only ACP (decided 2026-08-27).** A circle grants a member read access by
 writing a Solid **Access Control Resource** — `<container>/.acr` — directly, over the owner's
 authenticated fetch. Solid's older model, **WAC**, honours a different resource (`<container>/.acl`),
 and the two are not interchangeable: on a WAC-served pod the `.acr` write SUCCEEDS, because the server

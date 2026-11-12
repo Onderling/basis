@@ -974,6 +974,9 @@ deployment controls, which is what invariant 7 asks for — sensitive data does 
 host. It also keeps the access-control model as WAC, which the storage layout and the grants work already
 assume.
 
+**Superseded in part, 2026-08-27:** the access-control model is ACP, and only ACP — see that entry. Self-hosting on
+Community Solid Server stands; a pod hosted for Onderling is served with CSS's ACP configuration.
+
 **Recorded rather than decided:** this entry exists because the choice was made by doing, and an unwritten
 choice is one that gets silently re-opened. Revisit only if hosting a pod becomes the thing standing
 between a real neighbourhood and using this.
@@ -1225,6 +1228,35 @@ chose, and you can choose yourself* — but it is now a description of behaviour
 
 ---
 
+## 2026-08-19 — A connection belongs to the person, not to the device that paired it; the companion is a device of yours (Frits)
+
+*Recorded 2026-11-12: decided in a session on 2026-08-19 and written into `docs/architecture.md` the next day, but never
+entered here.*
+
+Two rulings. **A connection is a property of the person**, not of the device it was paired on: grants and revocations
+are entries on the device log's grants lane, the active-grant set is a projection folded from them (never a second
+store), so revocation survives a restart and restore carries it; the person's own devices exchange the lane live, so a
+revoke made on the phone reaches the laptop's door — "unpairing the kitchen tablet on your phone must not leave your
+laptop still admitting it", and a revoke that waits for a reboot is not a revoke. The trust base is add-a-device
+enrolment (only an enrolled, unrevoked device's statements count) and revoke wins. Telling the view to drop is a
+convenience, never the gate. **The companion is a device of yours**, enrolled with add-a-device like any other; the
+blind holder for a host you do not own (a rented server) is parked as a variant. Where it runs today:
+`docs/architecture.md`, the Surfaces home ("A connection belongs to the person").
+
+## 2026-08-27 — Pod access control is ACP, and only ACP: no WAC path (Frits)
+
+*Recorded 2026-11-12: decided 2026-08-27 and written only into `docs/architecture.md` (which gave the date as
+2026-08-26), never here, so the 2026-07-31 entry's "WAC" stood unchallenged in this file.*
+
+Frits: "ACP is the way to go, no compatibility with older methods." A circle grants a member read access by writing
+a Solid Access Control Resource (`<container>/.acr`) directly. WAC honours a different resource (`.acl`), and on a
+WAC-served pod the `.acr` write succeeds as an ordinary file and grants nothing: members cannot read their own circle.
+It fails closed, and the writer now refuses out loud when a container advertises a WAC control resource. So a pod
+hosted for Onderling must be served with an ACP configuration (CSS: `@css:config/file-acp.json`), a provisioning
+choice. **There is deliberately no WAC compatibility path:** two access models would mean two implementations of
+every grant, revoke and rotation, each able to drift. Supersedes the access-model sentence of 2026-07-31 (self-hosted
+CSS stands). Kept honest by `apps/basis/test/circlePod2Pod.css.test.js`, which needs an ACP server and fails on WAC.
+
 ## 2026-09-03 — A thread is keyed by IDENTITY, and one person may not present as several (Frits)
 
 **Status:** settled and built (both shells).
@@ -1279,28 +1311,6 @@ open question (the person, the admins, the group).
 **Where.** `packages/core/src/security/rosterFold.js` (`equivocators` returns the fork siblings; `forkAt` / the
 removal in the depth loop); spec in `test/rosterFold.test.js`.
 
-## 2026-10-31 — The stable point: one address per persona per circle, spine statements only from the point (Frits)
-
-A member's devices used to hold a circle address each, so co-members saw a device count, a revoke re-keyed the circle,
-and two devices signing at once forked the member's chain. Rulings. (1) **One address per persona per circle.** The
-per-circle key derives from the persona's circle root (root → persona → circle, epoched), not from a device seed; every
-FULL device of the persona (a phone, a companion) holds it, a LIGHT device (a web login, a borrowed laptop) does not
-and works through the point. Co-members see one member, one address. (2) **The point.** One device per persona signs
-the circle's SPINE statements (membership, role, key, governance): the companion if there is one, otherwise the device
-the person chose as main; the first device writes itself as point when a second enrols, and the "main device" tap moves
-it. The point is its own record, apart from the primary contact address. A device without the circle root cannot be the
-point. (3) **Spine statements only from the point.** The other devices hand the ACT (kind, subject, payload — never key
-material, never an identity of their own choosing) to the point over the own-devices lane; the point signs it as the
-member, on its own head, and fans it. Chat and items stay any-device (they are not chained). An act waits for an
-offline point and is re-sent for seven days on connect and when the point moves; the point remembers an act id for the
-same seven days, so a re-send is signed once. Past seven days the act is dropped and the person is told it was not sent.
-A double sign after a forgotten id is accepted as the cheaper failure: the acts settle the same applied twice, on one key
-and one head. (4) **Revoke.** A light device: stop its fan, drop its delegation, no re-key. A full device: the ceremony
-re-keys (only the remaining full devices get the new epoch).
-
-**This is a convention, not an enforcement** (the enforceability test): a STOLEN full device that ignores rule (3) can
-fork the shared key on purpose. By the fork rule (2026-09-25) the person then loses standing from that depth and is told
-— the same as a stolen per-device key before this — and the re-key plus an admin's re-admit is the way back.
 ## 2026-10-22 — The household bot reads several items in one sentence with the MODEL, not a deterministic rule (Frits)
 
 A member wrote "balkondeur isoleren, gangdeur isoleren" and got ONE chore; the proposal was a deterministic split on
@@ -1385,6 +1395,29 @@ in-place patch (and its per-row chain), the task lane's hand-written refusal of 
 Acceptance: the enrol-race story (one enrol in ten, 2026-09-13) and the pairing walk red-first, then a phone + box
 walk. Order: 5c-2a as (a) now, the fold through 5d, then this as the first post-fold arc; `docs/architecture.md`'s
 data-plane section is rewritten from the code AFTER it lands, not before. Ledger: L467.
+
+## 2026-10-31 — The stable point: one address per persona per circle, spine statements only from the point (Frits)
+
+A member's devices used to hold a circle address each, so co-members saw a device count, a revoke re-keyed the circle,
+and two devices signing at once forked the member's chain. Rulings. (1) **One address per persona per circle.** The
+per-circle key derives from the persona's circle root (root → persona → circle, epoched), not from a device seed; every
+FULL device of the persona (a phone, a companion) holds it, a LIGHT device (a web login, a borrowed laptop) does not
+and works through the point. Co-members see one member, one address. (2) **The point.** One device per persona signs
+the circle's SPINE statements (membership, role, key, governance): the companion if there is one, otherwise the device
+the person chose as main; the first device writes itself as point when a second enrols, and the "main device" tap moves
+it. The point is its own record, apart from the primary contact address. A device without the circle root cannot be the
+point. (3) **Spine statements only from the point.** The other devices hand the ACT (kind, subject, payload — never key
+material, never an identity of their own choosing) to the point over the own-devices lane; the point signs it as the
+member, on its own head, and fans it. Chat and items stay any-device (they are not chained). An act waits for an
+offline point and is re-sent for seven days on connect and when the point moves; the point remembers an act id for the
+same seven days, so a re-send is signed once. Past seven days the act is dropped and the person is told it was not sent.
+A double sign after a forgotten id is accepted as the cheaper failure: the acts settle the same applied twice, on one key
+and one head. (4) **Revoke.** A light device: stop its fan, drop its delegation, no re-key. A full device: the ceremony
+re-keys (only the remaining full devices get the new epoch).
+
+**This is a convention, not an enforcement** (the enforceability test): a STOLEN full device that ignores rule (3) can
+fork the shared key on purpose. By the fork rule (2026-09-25) the person then loses standing from that depth and is told
+— the same as a stolen per-device key before this — and the re-key plus an admin's re-admit is the way back.
 
 ## 2026-11-06 — A word where a key would be: a person nobody has named is "someone", never a piece of their key (Frits)
 

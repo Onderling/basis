@@ -7,8 +7,6 @@ Vault — agent identity + token storage (Vault, VaultMemory, VaultLocalStorage,
 
 README: [`packages/vault/README.md`](../../packages/vault/README.md) · Index: [docs/api/README.md](README.md)
 
-_Note: the entry could not be imported outside its peer context (Cannot find package 'tweetnacl' imported from /home/frits/expotest/wt-train/packages/vault/src/VaultEncrypted.js); analysed statically._
-
 ## `src/OAuthVault.js`
 
 ### `OAuthVault`
@@ -25,6 +23,8 @@ a `'default'` accountId fallback for single-account use. `getTokens` proactively
 the access token is within 60s of expiry (via the per-service `RefreshFn` registered with
 `registerRefreshFn`); concurrent refreshes for the same (service, accountId) share one
 in-flight promise. `refreshTokens` forces a refresh for the reactive 401-fallback path.
+
+**Methods:** `registerRefreshFn()` · `storeTokens()` · `getTokens()` · `refreshTokens()` · `revokeTokens()` · `listAccounts()`
 
 ### `makeAuthorizedFetch`
 
@@ -80,6 +80,8 @@ is that it exists only on paper/in memory; the seed is the machine artifact and 
 the machine's key place. `Bootstrap.toMnemonic()` re-renders the phrase from the seed
 when the user asks to see it — one secret, two encodings, each kept where it belongs.
 
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+
 ### `assertSeed`
 
 **Kind:** function · **Import:** `assertSeed` from `'@onderling/vault'`
@@ -121,6 +123,8 @@ new RootKeyStoreMemory()
 
 In-memory store — tests and ephemeral agents.
 
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+
 ### `ROOT_SEED_VAULT_KEY`
 
 **Kind:** constant · **Import:** `ROOT_SEED_VAULT_KEY` from `'@onderling/vault'`
@@ -142,6 +146,8 @@ whatever the backing vault provides — the gain over the retired phrase-at-rest
 what sits on disk is one device's seed encoding, no longer the user-facing recovery
 artifact the product promises exists only in their hands.
 
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+
 ## `src/RootKeyStoreWebCrypto.js`
 
 ### `RootKeyStoreWebCrypto`
@@ -154,6 +160,8 @@ new RootKeyStoreWebCrypto()
 ```
 
 The browser's root-key store: the seed in IndexedDB, AES-GCM-sealed under a non-extractable WebCrypto key (see the file header).
+
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
 
 ## `src/Vault.js`
 
@@ -177,6 +185,8 @@ Key naming conventions (all vaults use these):
   'group-proof:<groupId>'     — JSON-serialised group proof
   'a2a-token:<url>'           — Bearer token for an A2A peer
   'solid-pod-token'           — Solid OIDC token
+
+**Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
 
 ## `src/VaultEncrypted.js`
 
@@ -204,6 +214,8 @@ new VaultEncrypted({ backing, key } = {})
 ```
 
 A Vault decorator that encrypts every value at rest (secretbox, `enc1:` format) over any backing vault; reads are strict.
+
+**Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
 
 ### `migrateVaultToEncrypted`
 
@@ -286,6 +298,8 @@ Browser `Vault` backed by IndexedDB (string values in a single object store). Op
 encryption at rest: pass `encryptionKey` as a CryptoKey, or as a passphrase string from which a
 key is derived. Throws at construction when IndexedDB is unavailable.
 
+**Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
+
 ## `src/VaultLocalStorage.js`
 
 ### `VaultLocalStorage`
@@ -300,6 +314,8 @@ new VaultLocalStorage({ prefix = 'dwag:', storage } = {})
 Browser `Vault` over `localStorage`, namespacing keys under `prefix` (default `'dwag:'`).
 Values are stored as plaintext strings; a custom `Storage` (e.g. sessionStorage or a mock) can
 be injected. Throws at construction when no storage is available (browser only).
+
+**Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
 
 ## `src/VaultMemory.js`
 
@@ -323,6 +339,8 @@ bindings survive a CLI restart). Snapshots are plain JSON-safe
 objects (`{key: string-value}`) — encryption-at-rest, if needed,
 is the caller's responsibility.
 
+**Methods:** `get()` · `set()` · `delete()` · `has()` · `list()` · `snapshot()`
+
 ## `src/VaultNodeFs.js`
 
 ### `VaultNodeFs`
@@ -337,3 +355,5 @@ new VaultNodeFs(filePath, passphrase)
 Node.js `Vault` persisting to a single JSON file. With a passphrase, values are encrypted with
 AES-256-GCM under a scrypt-derived key; without one the file is plaintext (dev/CI only). Node
 built-ins load lazily on first use, so the module itself is safe to load in a browser.
+
+**Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`

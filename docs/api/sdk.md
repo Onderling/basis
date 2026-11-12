@@ -9,12 +9,12 @@ README: [`packages/sdk/README.md`](../../packages/sdk/README.md) · Index: [docs
 
 **Entry points**
 
-- `'@onderling/sdk'` — could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/sdk/src/core.js); analysed statically
-- `'@onderling/sdk/core'` — could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/sdk/src/core.js); analysed statically
-- `'@onderling/sdk/transports'` — could not be imported outside its peer context (Cannot find package '@onderling/transports' imported from /home/frits/expotest/wt-train/packages/sdk/src/transports.js); analysed statically
-- `'@onderling/sdk/vault'` — could not be imported outside its peer context (Cannot find package '@onderling/vault' imported from /home/frits/expotest/wt-train/packages/sdk/src/vault.js); analysed statically
-- `'@onderling/sdk/pod'` — could not be imported outside its peer context (Cannot find package '@onderling/pod-client' imported from /home/frits/expotest/wt-train/packages/sdk/src/pod.js); analysed statically
-- `'@onderling/sdk/high'` — could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/sdk/src/createAgent.js); analysed statically
+- `'@onderling/sdk'`
+- `'@onderling/sdk/core'`
+- `'@onderling/sdk/transports'`
+- `'@onderling/sdk/vault'`
+- `'@onderling/sdk/pod'`
+- `'@onderling/sdk/high'`
 - `'@onderling/sdk/requires'`
 - `'@onderling/sdk/testing'`
 - `'@onderling/sdk/skills'`

@@ -9,7 +9,7 @@ README: [`packages/pseudo-pod/README.md`](../../packages/pseudo-pod/README.md) Â
 
 **Entry points**
 
-- `'@onderling/pseudo-pod'` â€” could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/pseudo-pod/src/PseudoPod.js); analysed statically
+- `'@onderling/pseudo-pod'`
 - `'@onderling/pseudo-pod/node'`
 - `'@onderling/pseudo-pod/browser'`
 - `'@onderling/pseudo-pod/memory'`

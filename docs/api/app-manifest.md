@@ -7,8 +7,6 @@ Per-app declarative manifest + pure projectors (validateManifest, paramsToJsonSc
 
 README: [`packages/app-manifest/README.md`](../../packages/app-manifest/README.md) · Index: [docs/api/README.md](README.md)
 
-_Note: the entry could not be imported outside its peer context (Cannot find package '@onderling/item-types' imported from /home/frits/expotest/wt-train/packages/app-manifest/src/validate.js); analysed statically._
-
 ## `src/atoms.js`
 
 ### `ATOMS`

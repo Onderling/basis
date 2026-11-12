@@ -9,7 +9,7 @@ README: [`packages/agent-registry/README.md`](../../packages/agent-registry/READ
 
 **Entry points**
 
-- `'@onderling/agent-registry'` — could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/agent-registry/src/AgentRegistry.js); analysed statically
+- `'@onderling/agent-registry'`
 - `'@onderling/agent-registry/offerings-taxonomy'`
 - `'@onderling/agent-registry/src/offeringsTaxonomy.js'`
 

@@ -74,6 +74,17 @@ export function settingsChangeNeedsProposal(policy) {
   return true;   // member-vote — the vote is the point, whatever the roster size
 }
 
+/**
+ * Does THIS Save need a proposal? Asked of the rule IN FORCE (the policy the screen opened with), never of the edited
+ * copy: an admin of a circle that decides together could otherwise set "who decides" back to "any admin" in the same
+ * Save and pass the very change the rule exists to put to the others. With nothing in force yet (a fresh screen), the
+ * edited policy is all there is. The one gate both settings screens call.
+ * @param {{inForce?: object|null, edited?: object|null}} a
+ */
+export function settingsSaveNeedsProposal({ inForce = null, edited = null } = {}) {
+  return settingsChangeNeedsProposal(inForce ?? edited);
+}
+
 export const CIRCLE_POLICY_ENUMS = {
   // 'cross-stream' RETIRED (wave 1 batch 5, with the Stream view): stored values migrate to 'chat'
   // in `normalizeCirclePolicy` — the same landing surface the axis always mapped it to.

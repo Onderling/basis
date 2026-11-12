@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { AgentIdentity, signSpine } from '@onderling/core';
+import { describe, it, expect, vi } from 'vitest';
+import { AgentIdentity, signSpine, createSignatureMemo } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { makeCircleEntryRail } from '../../src/v2/circleEntryRail.js';
 import { foldGovernance } from '../../src/v2/governanceLog.js';
@@ -219,7 +219,7 @@ describe('the rail — compact (tombstones on the fold\'s word)', () => {
     return log;
   }
   const MKINDS = ['join', 'member-props'];
-  const mrail = (log, me) => makeCircleEntryRail({ eventLog: log, signerFor: async () => ({ identity: me.identity, ref: me.ref }), entryKind: 'membership', declaredKinds: MKINDS });
+  const mrail = (log, me) => makeCircleEntryRail({ eventLog: log, signerFor: async () => ({ identity: me.identity, ref: me.ref }), entryKind: 'membership', declaredKinds: MKINDS, compactableKinds: ['member-props'] });
 
   it('a tombstoned statement keeps its chain fields and its place, loses its content, and is never resurrected', async () => {
     const log = fakeEventLogWithCompact();
@@ -287,5 +287,68 @@ describe('verify-on-read verifies each distinct signed statement once per rail; 
     const sig = stored.payload.sig;
     stored.payload = { ...stored.payload, sig: (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1) };
     expect((await rail.readVerified(CIRCLE)).events, 'the tampered statement verifies afresh and is refused').toHaveLength(0);
+  });
+});
+
+describe('one verdict memo for the process: two rails over one log check each statement once', () => {
+  it('the agent\'s rail and a shell\'s rail over the same log: N checks, not 2N', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-memo');
+    const writer = railFor(log, alice);
+    const N = 5;
+    for (let i = 0; i < N; i++) await writer.append(CIRCLE, { kind: 'propose', subject: `memo-${i}`, payload: { action: 'changePolicy', subject: { n: i }, by: alice.ref, at: i } });
+    const spy = vi.spyOn(AgentIdentity, 'verify');
+    try {
+      await railFor(log, alice).readVerified(CIRCLE);
+      await railFor(log, alice).readVerified(CIRCLE);
+      expect(spy.mock.calls.length, 'the second rail checked the same statements again').toBeLessThanOrEqual(N);
+    } finally { spy.mockRestore(); }
+  });
+});
+
+describe('a narrowed read checks only what it keeps (verify-once step B)', () => {
+  it('kinds: [vote] on a lane of N proposals and one vote does one signature check', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-narrow');
+    const writer = railFor(log, alice);
+    for (let i = 0; i < 4; i++) await writer.append(CIRCLE, { kind: 'propose', subject: `n-${i}`, payload: { action: 'changePolicy', subject: { n: i }, by: alice.ref, at: i } });
+    await writer.append(CIRCLE, { kind: 'vote', subject: 'n-0', payload: { voter: alice.ref, choice: 'yes', at: 9 } });
+    let checks = 0;
+    const memo = createSignatureMemo({ verify: (m, s, k) => { checks += 1; return AgentIdentity.verify(m, s, k); } });
+    const { bodies } = await railFor(log, alice, { signatureMemo: memo }).readVerifiedBodies(CIRCLE, { kinds: ['vote'] });
+    expect(bodies.map((b) => b.kind)).toEqual(['vote']);
+    expect(checks, 'the narrowed read checked statements it then dropped').toBe(1);
+  });
+
+  it('a statement whose kind was changed to be kept fails its check and is not kept', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-tamper');
+    await railFor(log, alice).append(CIRCLE, { kind: 'propose', subject: 't-0', payload: { action: 'changePolicy', subject: {}, by: alice.ref, at: 1 } });
+    log.entries[0].payload = { ...log.entries[0].payload, body: { ...log.entries[0].payload.body, kind: 'vote' } };
+    const { bodies } = await railFor(log, alice).readVerifiedBodies(CIRCLE, { kinds: ['vote'] });
+    expect(bodies).toEqual([]);
+  });
+});
+
+describe('a read gives the thread back: checking never holds it for long (fast start, the 100 ms rule)', () => {
+  it('six statements whose checks take ~30 ms each: no stretch of more than 100 ms without the event loop running', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-slice');
+    const writer = railFor(log, alice);
+    for (let i = 0; i < 6; i++) await writer.append(CIRCLE, { kind: 'propose', subject: `s-${i}`, payload: { action: 'x', subject: {}, by: alice.ref, at: i } });
+    const busy = (ms) => { const end = Date.now() + ms; while (Date.now() < end) { /* a slow phone's check */ } };
+    const memo = createSignatureMemo({ verify: (m, s, k) => { busy(30); return AgentIdentity.verify(m, s, k); } });
+    const reader = railFor(log, alice, { signatureMemo: memo });
+    let last = Date.now(); let worst = 0; let running = true;
+    const tick = () => { const t = Date.now(); worst = Math.max(worst, t - last); last = t; if (running) setTimeout(tick, 0); };
+    setTimeout(tick, 0);
+    await new Promise((r) => { setTimeout(r, 5); });
+    last = Date.now();
+    await reader.readVerified(CIRCLE);
+    await reader.readVerifiedBodies(CIRCLE);
+    running = false;
+    await new Promise((r) => { setTimeout(r, 5); });
+    // the slice's budget is 50 ms per stretch; unsliced this read held the thread ~227 ms. 150 leaves room for a loaded runner
+    expect(worst, 'the read held the thread').toBeLessThan(150);
   });
 });

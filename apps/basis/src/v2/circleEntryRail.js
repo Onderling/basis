@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, createSignatureMemo } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo, createTimeSlice } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -35,7 +35,12 @@ import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, createSig
  *   lane's carried delegation record). Absent → only self-signed statements resolve (single-device honest
  *   degrade; the fan's ingest supplies the full resolver).
  */
-export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding } = {}) {
+/**
+ * `compactableKinds`: the kinds this lane's fold may call dead and compact to a tombstone (only the membership lane's
+ * `member-props` today). A tombstone of any other kind is never made here, so one found in the log was planted: the
+ * read side drops it. Empty by default: a lane that never compacts takes no tombstone at all.
+ */
+export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding, signatureMemo = null, compactableKinds = [] } = {}) {
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.appendSilentEntry !== 'function') {
     throw new Error('circleEntryRail: an eventLog with query + appendSilentEntry is required');
   }
@@ -43,18 +48,19 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   if (!Array.isArray(declaredKinds) || declaredKinds.length === 0) {
     throw new Error('circleEntryRail: declaredKinds required (a rail lane with no declared kinds is inert)');
   }
+  const compactable = new Set((Array.isArray(compactableKinds) ? compactableKinds : []).filter((k) => declaredKinds.includes(k)));
 
+  /** This lane's entries in one circle: from the log's index when it has one (the device EventLog), so a read costs the
+   *  lane and not a copy of the whole log; else the whole-log filter (a minimal log, a test's). Same entries, same order. */
+  const laneEntries = (circleId) => (typeof eventLog.entriesOf === 'function'
+    ? eventLog.entriesOf(entryKind, circleId)
+    : eventLog.query({})).filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body);
   /** The stored signed statements for one circle (raw — verification is the read side's job). */
-  const storedStatements = (circleId) => eventLog
-    .query({})
-    .filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body)
-    .map((e) => e.payload);
+  const storedStatements = (circleId) => laneEntries(circleId).map((e) => e.payload);
   /** The same, with each statement's POSITION on this device's log (`seq`, stamped at append/ingest, never by
    *  a writer). A re-read hands it to the binding: a statement that landed here BEFORE a retirement landed
    *  keeps binding to the address it was signed with — revocation cuts the future, not the past. */
-  const storedEntries = (circleId) => eventLog
-    .query({})
-    .filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body)
+  const storedEntries = (circleId) => laneEntries(circleId)
     .map((e) => ({ statement: e.payload, atSeq: Number.isFinite(e.seq) ? e.seq : null }));
 
   const entryId = (stmt) => `${entryKind}:${stmt.body.hash}`;
@@ -130,12 +136,13 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    */
   /** verifySpine THROWS on structurally-garbage input (e.g. a wrong-size signature) — a malicious peer must
    *  get a refusal, never an exception, so every verify on the receive path goes through this wrapper. */
-  // Verify-on-read verifies each distinct signed statement ONCE per rail: the memo keeps only the pure signature check
-  // (keyed by the statement's exact bytes, so a tampered stored statement misses and is refused); the chain, kind,
-  // circle and every binding below are re-decided on every read.
-  const signatures = createSignatureMemo();
+  // Verify-on-read verifies each distinct signed statement ONCE per PROCESS: the one memo (`processSignatureMemo`, or a
+  // test's own) keeps only the pure signature check, keyed by the verifier, the key, the signature and the statement's
+  // exact bytes (a tampered stored statement misses and is refused); the chain, kind, circle and every binding below
+  // are re-decided on every read. Every rail over the same log (the agent's and a shell's) shares it.
+  const verifySignature = (signatureMemo ?? processSignatureMemo()).verifierFor('spine');
   const safeVerify = (statement, circleId) => {
-    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature: signatures.verify }); }
+    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature }); }
     catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
   };
 
@@ -163,7 +170,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     // Report whether this statement is NEW here — a windowed catch-up's progress guard must not count a
     // re-delivered duplicate as progress (that is how two diverged peers would page forever).
     const id = entryId(statement);
-    const existed = eventLog.query({}).some((e) => e && e.id === id);
+    const existed = typeof eventLog.entryById === 'function' ? eventLog.entryById(id) !== null : eventLog.query({}).some((e) => e && e.id === id);
     const entry = eventLog.appendSilentEntry({ circleId, kind: entryKind, payload: statement, id });
     return { ok: true, entry, existed };
   }
@@ -199,7 +206,9 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const events = [];
     const seenByAuthorParent = new Map();   // `${author}|${parent}` → Set(hash) — fork detection
     const disputedRefs = new Set();
+    const slice = createTimeSlice();   // a read of many statements gives the thread back between checks
     for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+      await slice();
       if (stmt?.tombstone === true) continue;   // a compacted statement has no event to project (L121)
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
@@ -233,24 +242,30 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const bodies = [];
     const seenByAuthorParent = new Map();
     const disputed = new Set();
+    const slice = createTimeSlice();
     for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+      await slice();
       if (stmt?.tombstone === true) {
-        // A TOMBSTONE (L121): verified and bound when it landed; compacted to its chain fields on the fold's own
-        // word. It carries no content the fold could act on (payload = the authorRef alone, which every consumer
-        // reads as "nothing said") — only the edge that keeps later statements' causal depth where it was. Not
-        // re-verified: there is no signature left to check, and the only thing a forged one could do is add a
-        // depth edge, which a writer of this device's own log could do in a hundred other ways.
+        // A TOMBSTONE: verified and bound when it landed; compacted to its chain fields on the fold's own word. It has
+        // no signature left, so nothing here can check it, and therefore it must carry nothing the fold can act on:
+        // only a kind this lane compacts (`compactableKinds`; a tombstone of any other kind was never made here, so it
+        // was planted), and a payload forced to the authorRef alone, whatever the stored one says. What stays is the
+        // edge that keeps later statements' causal depth where it was. Known remainder: a planted tombstone off a
+        // member's parent still adds such an edge (a fork shape); it closes when a tombstone keeps its own signature.
         const b = stmt.body ?? {};
         const ref = b.payload?.authorRef;
-        if (typeof ref !== 'string' || !ref || typeof b.hash !== 'string' || !declaredKinds.includes(b.kind)) continue;
-        bodies.push({ ...b, author: ref, authorKey: b.author, atSeq, tombstone: true });
+        if (typeof ref !== 'string' || !ref || typeof b.hash !== 'string' || !compactable.has(b.kind)) continue;
+        bodies.push({ ...b, payload: { authorRef: ref }, author: ref, authorKey: b.author, atSeq, tombstone: true });
         continue;
       }
+      // A NARROWED READ (the ceremony retirements alone) drops other kinds BEFORE the signature check: the kind is inside
+      // the signed bytes, so a statement kept by a changed kind fails its check below, and one dropped is never used. Fork
+      // detection here already runs only over the statements kept, so nothing it computes changes.
+      if (Array.isArray(kinds) && !kinds.includes(stmt?.body?.kind)) continue;
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
       const b = v.body;
       if (!declaredKinds.includes(b.kind)) continue;
-      if (Array.isArray(kinds) && !kinds.includes(b.kind)) continue;   // a narrowed read (the ceremony retirements alone)
       const ref = b.payload?.authorRef;
       if (typeof ref !== 'string' || !ref) continue;
       // The read side verifies with the SAME kind-aware rule as ingest (decided 2026-08-20): what
@@ -295,11 +310,20 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     if (typeof eventLog.compactEntries !== 'function') return 0;
     const ids = [...(hashes ?? [])].filter((h) => typeof h === 'string' && h).map((h) => `${entryKind}:${h}`);
     if (ids.length === 0) return 0;
-    const live = new Set(eventLog.query({}).filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body && e.payload.tombstone !== true).map((e) => e.id));
+    // only a kind this lane compacts: tombstoning anything else would be read back as planted and dropped
+    const live = new Set(eventLog.query({}).filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body && e.payload.tombstone !== true && compactable.has(e.payload.body.kind)).map((e) => e.id));
     return eventLog.compactEntries(ids.filter((id) => live.has(id)), (e) => ({ ...e, payload: tombstoneOf(e.payload) }));
   }
 
-  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact };
+  /**
+   * Is this STORED statement still what its author signed (its chain hash recomputes and its own signature passes, on
+   * this device, now)? What a catch-up or a carry sends on must pass this: a statement whose stored bytes or signature
+   * changed after it landed would be refused by every receiver, which then holds a silent hole. A tombstone never
+   * passes (it has no signature left). Not the binding: who the author was is history, judged by the receiver.
+   */
+  const checkSigned = (circleId, statement) => !!statement && statement.tombstone !== true && safeVerify(statement, circleId)?.ok === true;
+
+  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact, checkSigned };
 }
 
 export default makeCircleEntryRail;

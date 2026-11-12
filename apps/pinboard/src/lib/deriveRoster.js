@@ -1,9 +1,8 @@
-import { foldRoster, verifyCircleLink, foldPersonKeys, createSignatureMemo } from '@onderling/core';
+import { foldRoster, verifyCircleLink, foldPersonKeys, createTimeSlice } from '@onderling/core';
 
 // A roster is derived again on every read; each member's link signature is checked ONCE per process. The memo keeps only
 // the pure check, keyed by the exact signed bytes — whether the address is still the member's, still proven for THIS
 // circle, still not retired, is decided again on every derivation.
-const linkSignatures = createSignatureMemo();
 import { hasHumanRules } from '@onderling/circles';
 
 /**
@@ -56,6 +55,48 @@ import { hasHumanRules } from '@onderling/circles';
  *   row also carries `adminVia` — the fold's word for HOW they hold it (`'founder'` · `'role'` ·
  *   `` `caretaker:<hash>` ``) — wherever the fold can say; absent otherwise, never guessed.
  */
+/**
+ * EVERY link proof `deriveRoster` checks, read off the same inputs in the same way: a joiner's address (and the extra
+ * proven ones on its row), the admin's as the joiner recorded it, a founder's from its creation statement. One list,
+ * so the ahead pass below and the fold cannot disagree (a test pins it: after the pass the fold checks nothing again).
+ * @returns {Array<{groupId: string, address: string, proof: string}>}
+ */
+export function linkProofsOf({ redemptions = [], founderWebids = [], founderFacts = {} } = {}) {
+  const out = [];
+  const add = (groupId, address, proof) => {
+    if (typeof address === 'string' && address && typeof proof === 'string' && proof) out.push({ groupId, address, proof });
+  };
+  for (const it of redemptions ?? []) {
+    const src = (it && it.source) ?? {};
+    if (src.redeemedBy) {
+      add(src.groupId, src.circleAddress, src.circleAddressProof);
+      for (const p of Array.isArray(src.circleAddresses) ? src.circleAddresses : []) add(src.groupId, p?.address, p?.proof);
+    }
+    if (src.confirmedBy && src.channel === 'peer') {
+      add(src.groupId, src.confirmedByCircleAddress, src.confirmedByCircleAddressProof);
+      for (const p of Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : []) add(src.groupId, p?.address, p?.proof);
+    }
+  }
+  for (const w of founderWebids ?? []) {
+    const fa = founderFacts?.[w];
+    if (fa) add(fa.groupId, fa.circleAddress, fa.circleAddressProof);
+  }
+  return out;
+}
+
+/**
+ * Check the roster's link proofs AHEAD of the fold, giving the thread back between checks (a check is ~60 ms on a
+ * phone, and the fold is synchronous). The verdicts land in the process's signature memo, so the fold's own checks
+ * are then answered from memory. A proof that fails here fails there too; nothing is decided here.
+ */
+export async function proveLinksAhead(args = {}) {
+  const slice = createTimeSlice();
+  for (const { groupId, address, proof } of linkProofsOf(args)) {
+    await slice();
+    verifyCircleLink({ groupId, address, proof });
+  }
+}
+
 export function deriveRoster({
   redemptions = [],
   founderWebids = [],
@@ -108,7 +149,7 @@ export function deriveRoster({
   const addProvenAddress = (webid, groupId, address, proof) => {
     if (typeof webid !== 'string' || !webid) return;
     if (typeof address !== 'string' || !address) return;
-    if (!verifyCircleLink({ groupId, address, proof, verifySignature: linkSignatures.verify })) return;   // unproven ⇒ refused, never stored
+    if (!verifyCircleLink({ groupId, address, proof })) return;   // unproven ⇒ refused, never stored
     let set = provenAddresses.get(webid);
     if (!set) provenAddresses.set(webid, (set = new Set()));
     set.add(address);
@@ -202,7 +243,7 @@ export function deriveRoster({
   for (const w of founderWebids ?? []) {
     // the founder's per-circle address, from their creation statement, through the same proof gate a joiner's passes
     const fa = founderFacts?.[w];
-    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof, verifySignature: linkSignatures.verify });
+    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof });
     upsert(w, 'admin', {
       ...(proven ? { circleAddress: fa.circleAddress, circleAddressProof: fa.circleAddressProof } : {}),
       ...(typeof fa?.handle === 'string' && fa.handle ? { handle: fa.handle } : {}),

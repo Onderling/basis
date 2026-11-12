@@ -15,6 +15,7 @@ import { bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCir
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { primeCircleSecurity } from '../../src/v2/circleSecurityPriming.js';
 import { EventLog } from '../../src/eventLog.js';
+import { COMPACT_SUPERSEDED_PROPS } from '../../src/v2/membershipRail.js';
 
 const CIRCLE = 'circle-member-props-supersede';
 const settle = (ms = 1500) => new Promise((r) => setTimeout(r, ms));
@@ -62,6 +63,13 @@ describe('member-props supersession — three devices agree, with and without th
 
     // the admin's LOG: bram's member-props entries — the first (name+face A) is dead: both fields overwritten
     const entries = () => logs.admin.query({}).filter((e) => e.type === 'membership' && e.circleId === CIRCLE && e.payload?.body?.kind === 'member-props' && e.payload?.body?.payload?.authorRef === bram.pubKey);
+    if (!COMPACT_SUPERSEDED_PROPS) {
+      // PAUSED (membershipRail.js): the dead statements stay whole, so a member who joins later folds the same roster
+      await readRoster(admin, CIRCLE); await settle(1500); await readRoster(admin, CIRCLE);
+      expect(entries().filter((e) => e.payload.tombstone === true), 'nothing is compacted while compaction is paused').toEqual([]);
+      expect(entries().length).toBe(3);
+      return;
+    }
     const tombstoned = await until(async () => { await readRoster(admin, CIRCLE); const t = entries().filter((e) => e.payload.tombstone === true); return t.length >= 1 ? t : null; }, { timeout: 20_000, step: 400 });
     expect(tombstoned.length).toBeGreaterThanOrEqual(1);
     for (const t of tombstoned) {

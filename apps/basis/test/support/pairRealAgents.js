@@ -77,6 +77,7 @@ import {
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeItemsPeerHandler, ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
@@ -345,8 +346,15 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   }
   pairSeams.bindSelf = (circleId) => bindCircleAddresses([nodeRef.current], circleId);
   const nodeRef = { current: null };
+  const carryToSiblings = typeof agent.siblingCarry?.carry === 'function' ? (p, o) => agent.siblingCarry.carry(p, o) : null;
   const handlers = {
-    [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
+    // as every shell composes it (`circleLanes.js`): a statement that landed from a member, or passed without being
+    // kept, goes on to my other devices by the one sibling carry (a no-op on a one-device person)
+    [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({
+      rail: chatRail,
+      onPassed: (circleId, statement, fromPeerAddr) => carryLandedStatement({ carry: carryToSiblings, subtype: CHAT_STATEMENT_BROADCAST, circleId, statement, fromPeerAddr, msgId: statement?.body?.payload?.msgId ?? statement?.body?.subject ?? null }),
+      onLanded: (circleId, entry, fromPeerAddr, statement) => carryLandedStatement({ carry: carryToSiblings, subtype: CHAT_STATEMENT_BROADCAST, circleId, statement, fromPeerAddr, msgId: entry?.id ?? null }),
+    }),
     [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
     [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
     [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,

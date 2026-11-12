@@ -38,7 +38,7 @@
  * a genuine, untampered, chain-consistent signature by `body.author`; WHO may issue this kind, and whether a
  * concurrent change voids it, is the fold's authority decision (deny-wins), never decided here.
  */
-import { AgentIdentity }       from '../identity/AgentIdentity.js';
+import { processSignatureMemo } from './signatureMemo.js';
 import { canonicalize }        from '../Envelope.js';
 import { encode as b64encode } from '../crypto/b64.js';
 import { createAuthorChain }   from './authorChain.js';
@@ -107,11 +107,11 @@ export function signSpine(identity, { kind, circleId, subject, payload, parent =
  * @param {string} [opts.expectedCircleId]  if given, `body.circleId` must match
  * @param {string} [opts.expectedKind]      if given, `body.kind` must match
  * @param {(msg: string, sig: string, pubKey: string) => boolean} [opts.verifySignature]  the pure signature check —
- *   default `AgentIdentity.verify`; a caller that re-reads the same statements passes a memo (`createSignatureMemo`)
+ *   default: the process's memo under the verifier name 'spine' (`processSignatureMemo`); a test that counts passes its own
  * @returns {{ ok: true, body: object } | { ok: false, reason: string }}
  */
 export function verifySpine(statement, opts = {}) {
-  const { expectedCircleId, expectedKind, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = opts;
+  const { expectedCircleId, expectedKind, verifySignature = processSignatureMemo().verifierFor('spine') } = opts;
   if (!statement || typeof statement !== 'object') return { ok: false, reason: 'malformed statement' };
   const { body, sig } = statement;
   if (typeof sig !== 'string' || !sig)   return { ok: false, reason: 'missing signature' };

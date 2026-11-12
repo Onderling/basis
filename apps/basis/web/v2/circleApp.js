@@ -237,6 +237,7 @@ import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../src/v2/enrollOffer.js';
+import { runStartQueue, startQueueSiblings } from '../../src/v2/startQueue.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
@@ -1513,7 +1514,8 @@ let govCatchUpShell = null;          // pull-all governance catch-up (the offlin
 let memCatchUpShell = null;
 let keyCatchUpShell = null;          // pull-all key-lane catch-up (the group-key chain's offline half)          // the membership lane's catch-up (same mechanism, its own subtypes)
 let itemsCatchUpShell = null;         // the items lane's catch-up (serves stored entries + signed live heads)
-let chatCatchUpShell = null;         // the chat lane's catch-up (windowed frontier replay + the consent rung)
+let chatCatchUpShell = null;
+let shownCircleId = null;           // the circle on screen (the start queue pulls it first)         // the chat lane's catch-up (windowed frontier replay + the consent rung)
 let podChatCatchUpShell = null;      // pod-only circles' statement read-back (the pod is the meeting point)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
@@ -7257,6 +7259,7 @@ async function showDetail(id) {
 // chat-message event scoped to this circle.  Inbound peer broadcast
 // slash-command parsing land in.
 function showCircle(id, circle, policy) {
+  shownCircleId = id ?? null;
   // S6.C deep — scope the bot catalogue (tools + slash-suggest) to the apps THIS
   // circle composes (policy.apps); null = all. Re-scopes on every circle-open.
   circleActiveApps = Array.isArray(policy?.apps) ? policy.apps : null;
@@ -9958,24 +9961,15 @@ async function boot() {
       // Fire after a short delay so the NKN HI handshake settles.
       // 1.5s mirrors web/main.js's existing kick-off timing.
       setTimeout(() => {
-        // Governance pull-all rides the same kick — any one complete peer suffices (idempotent ingest).
-        govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
-        memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
-        keyCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
-        // The grants lane's pull: my own devices — a revoke made elsewhere while this device was
-        // offline binds at this door now, before a stale view is served.
-        agent.grantsCatchUp?.requestFromSiblings().catch(() => {});
-        // Who my other devices know — a greeting or a contact that landed there while this device
-        // was off: bindings and contact rows, established here, never replacing what this device holds.
-        agent.knownPeersSync?.requestFromSiblings().catch(() => {});
-        // The person key a ceremony rotated on another device while this one was off.
-        agent.personKeySync?.requestFromSiblings().catch(() => {});
-        // …and each profile's facts (properties + disclosure), from the devices holding the same self
-        agent.profileFactsSync?.requestFromSiblings().catch(() => {});
-        // The person's own store (their own appointments, their planned rows) as their other devices hold it.
-        agent.ownStoreSync?.requestFromSiblings().catch(() => {});
-        // …and which of the person's devices is primary for direct messages (sync-policy §12).
-        agent.primaryDevice?.requestFromSiblings?.().catch(() => {});
+        // THE START QUEUE (shared, startQueue.js): the circle on screen first, then my own devices (grants first), then
+        // every other circle, one step at a time — every lane's catch-up and every own-device ask, in one order.
+        runStartQueue({
+          catchUps: { membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: itemsCatchUpShell, chat: chatCatchUpShell },
+          siblings: startQueueSiblings(agent),
+          callSkill: rawCallSkill,
+          firstCircle: () => shownCircleId,
+          readFirst: (cid) => agent?.readCircleRosterFirst?.(cid),
+        }).catch(() => {});
         // AN ARRIVING CONTACT LINK (`…#contact=<payload>` — the clickable form of someone's contact QR): add the
         // contact through the one decoder, scrub the card from the address bar, open Contacten so the new row is
         // the first thing seen. A fragment never reached the server; scrubbing keeps it out of the history too.
@@ -10057,8 +10051,6 @@ async function boot() {
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         agent.bootstrapFromStashedOffer();
-        itemsCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
-        chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The build's feedback contact is OFFERED at the feedback door, never added here: a boot adds nobody to the book.
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {

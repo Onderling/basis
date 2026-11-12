@@ -29,6 +29,27 @@ evolve without a flag day.
    signer writes the current version; the verifier owns the accept/reject set. Keep the two in one file so
    they cannot drift.
 
+## Which signatures are valid (rule set `ed25519-strict-1`, 2026-11-12)
+
+Every device, and every independent implementation, must accept exactly the same Ed25519 signatures, or a member can
+craft a statement that some devices accept and others refuse, and their rosters differ. Libraries disagree on crafted
+input, so the platform fixes the rule itself, as byte checks before the library's equation
+(`packages/core/src/crypto/ed25519Strict.js`, `verifyEd25519Strict`; every check in shipped code goes through it,
+`lint-one-signature-check`):
+
+1. the signature is 64 bytes and the public key 32;
+2. the scalar S (the signature's last 32 bytes, little-endian) is canonical: S < L, the group order;
+3. the public key A and the point R (the signature's first 32 bytes) are canonically encoded: y < p = 2^255 − 19;
+4. neither A nor R is of small order (its encoding, sign bit ignored, is not one of the seven encodings of the eight
+   small-order points);
+5. then the library's single-signature equation, which must be the COFACTORLESS one (never the cofactored one, never
+   batch verification).
+
+The conformance set is `@onderling/core/conformance`: `ED25519_EDGE_VECTORS` (the 12 vectors of "Taming the many
+EdDSAs", Chalkias, Garillot, Nikolaenko 2020), `ED25519_ACCEPTED` (exactly case 3) and `ed25519Disagreements(verify)`,
+which must return an empty list for any check an implementation uses. Honest signatures from a standard signer always
+pass the rule.
+
 ## What this looks like
 
 ```js

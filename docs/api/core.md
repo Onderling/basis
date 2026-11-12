@@ -487,6 +487,43 @@ Uses vitest's expect, so it must run inside a vitest test.
 - `[opts.label='DataSource']` `string`
 - `[opts.supportsQuery=false]` `boolean` — also exercise `query()`.
 
+## `src/conformance/ed25519Conformance.js`
+
+### `ED25519_EDGE_VECTORS`
+
+**Kind:** constant · **Import:** `ED25519_EDGE_VECTORS` from `'@onderling/core/conformance'`
+
+Ed25519 conformance: the 12 published edge-case vectors and the answer the platform's strict rule gives on each.
+
+Source: ed25519-speccheck (github.com/novifinancial/ed25519-speccheck, cases.json, fetched 2026-11-12), the vectors of
+"Taming the many EdDSAs" (Chalkias, Garillot, Nikolaenko, 2020). Each is [message, public key, signature] in hex.
+Under the platform's rule (`crypto/ed25519Strict.js`, rule set 'ed25519-strict-1') exactly case 3 is valid.
+
+An adapter that checks signatures faster (a native module, node:crypto, WebCrypto) proves it gives the same answer
+by running `ed25519Disagreements(verify)` and expecting an empty list. Runner-agnostic: no test framework needed.
+
+### `ED25519_ACCEPTED`
+
+**Kind:** constant · **Import:** `ED25519_ACCEPTED` from `'@onderling/core/conformance'`
+
+The vector indexes that are VALID under the strict rule.
+
+### `ed25519Disagreements`
+
+**Kind:** function · **Import:** `ed25519Disagreements` from `'@onderling/core/conformance'`
+
+```js
+ed25519Disagreements(verify)
+```
+
+Where a check disagrees with the rule on the vectors.
+
+**Parameters**
+
+- `verify` `(msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean`
+
+**Returns:** `Array<{ index: number, expected: boolean, got: boolean }>`
+
 ## `src/conformance/storageBackendConformance.js`
 
 ### `REQUIRED_STORAGE_BACKEND_METHODS`
@@ -1406,7 +1443,7 @@ the redeem seam so a joiner can prove control of the address they present.
 **Kind:** function · **Import:** `verifyCircleLink` from `'@onderling/core'`
 
 ```js
-verifyCircleLink({ groupId, address, proof, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
+verifyCircleLink({ groupId, address, proof, verifySignature = processSignatureMemo().verifierFor('circle-link') } = {})
 ```
 
 Verify a presented linkage: the proof must be a signature over the challenge by the private
@@ -1414,7 +1451,7 @@ key behind `address`. Deny-by-default — anything missing or malformed is `fals
 
 **Parameters**
 
-- `a` `{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}` — `verifySignature` — the pure signature check, default `AgentIdentity.verify`; a caller that re-derives passes a memo
+- `a` `{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}` — `verifySignature` — the pure signature check, default the process's memo under the name 'circle-link'
 
 **Returns:** `boolean`
 
@@ -4097,19 +4134,37 @@ Read the credential off an envelope. One accessor so the field name appears in o
 **Kind:** function · **Import:** `createSignatureMemo` from `'@onderling/core'`
 
 ```js
-createSignatureMemo({ max = SIGNATURE_MEMO_MAX, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
+createSignatureMemo({ maxBytes = SIGNATURE_MEMO_MAX_BYTES, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
 ```
 
-Build a memo over the pure signature check: `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
+Build a memo over the pure signature check. `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
 check that passed once for exactly those bytes, that signature and that key is answered from memory.
+`verifierFor(name)` is the same for a NAMED verifier (a circle-link proof, a ceremony reveal, a delegation): the name
+is part of the key, so one verifier's "true" is never another's, even over the same bytes. ONE agent holds one memo
+and hands it to every rail and check; the only writer is the real check below, after it returned true.
 
 **Parameters**
 
 - `[o]` `object`
-- `[o.max]` `number` — most remembered checks
+- `[o.maxBytes]` `number` — the bound, in bytes of keys held
 - `[o.verify]` `(msg: string, sig: string, pubKey: string) => boolean` — the real check (default AgentIdentity.verify)
 
-**Returns:** `{ verify: (msg: string, sig: string, pubKey: string) => boolean, readonly size: number }`
+**Returns:** `{ verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }`
+
+### `processSignatureMemo`
+
+**Kind:** function · **Import:** `processSignatureMemo` from `'@onderling/core'`
+
+```js
+processSignatureMemo()
+```
+
+THE process's one memo (verify-once, step A): every rail, the chat rail and the named checks (a circle-link proof, a
+ceremony reveal, a device delegation) use it unless a caller hands its own (a test that counts). One memo per process
+rather than per agent: a production process holds one agent, and a verdict is a pure fact about bytes, a signature
+and a key, the same for any agent that asks. In memory only; never persisted, never taken from another device.
+
+**Returns:** `ReturnType<typeof createSignatureMemo>`
 
 ## `src/security/spineAppender.js`
 
@@ -4198,7 +4253,7 @@ it) — that is the fold's deny-wins decision.
 - `[opts]` `object`
 - `[opts.expectedCircleId]` `string` — if given, `body.circleId` must match
 - `[opts.expectedKind]` `string` — if given, `body.kind` must match
-- `[opts.verifySignature]` `(msg: string, sig: string, pubKey: string) => boolean` — the pure signature check — default `AgentIdentity.verify`; a caller that re-reads the same statements passes a memo (`createSignatureMemo`)
+- `[opts.verifySignature]` `(msg: string, sig: string, pubKey: string) => boolean` — the pure signature check — default: the process's memo under the verifier name 'spine' (`processSignatureMemo`); a test that counts passes its own
 
 **Returns:** `{ ok: true, body: object } | { ok: false, reason: string }`
 
@@ -4804,6 +4859,33 @@ DataSourceAccessDeniedError on refusal) before delegating read, write, delete,
 list, or query to it.
 
 **Methods:** `getSource()` · `addSource()` · `removeSource()` · `read()` · `write()` · `delete()` · `list()` · `query()`
+
+## `src/timeSlice.js`
+
+### `TIME_SLICE_MS`
+
+**Kind:** constant · **Import:** `TIME_SLICE_MS` from `'@onderling/core'`
+
+How long one stretch of work may hold the thread before it gives it back (the start target: never above 100 ms).
+
+### `createTimeSlice`
+
+**Kind:** function · **Import:** `createTimeSlice` from `'@onderling/core'`
+
+```js
+createTimeSlice({ budgetMs = TIME_SLICE_MS, now = () => Date.now(), yieldFn = giveBack } = {})
+```
+
+One slice for one piece of long work (a read): call the returned function at every step.
+
+**Parameters**
+
+- `[o]` `object`
+- `[o.budgetMs]` `number` — a stretch longer than this yields
+- `[o.now]` `() => number`
+- `[o.yieldFn]` `() => Promise<void>` — how to give the thread back (default: one macrotask)
+
+**Returns:** `() => Promise<void>`
 
 ## `src/transport/InternalTransport.js`
 

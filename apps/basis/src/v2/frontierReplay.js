@@ -32,6 +32,7 @@ import { frontier } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { chunkItems, DEFAULT_CHUNK_SIZE } from './chunking.js';
 import { catchUpTargets } from './catchUpTargets.js';
+import { sendOnOnlyChecked } from './sendOnOnlyChecked.js';
 
 /** The most statements one replay round serves. The window a long-offline device converges through —
  *  several rounds page through a bigger backlog. `param()` returns the default (200). */
@@ -122,7 +123,9 @@ export function makeFrontierReplay({
         ? (await statementsFor(circleId)) ?? []
         : rail.storedStatements(circleId);
       const known = reachableFrom(payload.frontier, all);
-      const missing = all.filter((s) => s?.body?.hash && !known.has(s.body.hash));
+      // only what this device can still vouch for (checked here, now): an unchecked one would be refused there and
+      // leave the receiver a hole it cannot explain
+      const missing = sendOnOnlyChecked(all.filter((s) => s?.body?.hash && !known.has(s.body.hash)), circleId, rail);
       if (missing.length === 0) return;       // nothing to serve — silence, the receiver stops paging
       const allowance = Number.isFinite(payload.allowance) && payload.allowance > 0 ? Math.floor(payload.allowance) : 0;
       // The consent gate (Frits, the chat-lane sitting): above the provider's threshold, do not stream —

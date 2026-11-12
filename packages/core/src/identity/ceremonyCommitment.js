@@ -22,6 +22,7 @@
 import nacl from 'tweetnacl';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
+import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
 
 const COMMIT_DOMAIN = 'onderling-ceremony-commitment-v1';
 const REVEAL_DOMAIN = 'onderling-ceremony-reveal-v1';
@@ -78,7 +79,7 @@ export function verifyCeremonyReveal(reveal, { circleId, kind, subject, authorRe
     const key = b64decode(reveal.authorityPubKey);
     const sig = b64decode(reveal.sig);
     if (key.length !== 32 || sig.length !== 64) return false;
-    return nacl.sign.detached.verify(msg, sig, key);
+    return verifyEd25519Strict(msg, sig, key);
   } catch { return false; }
 }
 
@@ -101,6 +102,6 @@ export function verifyCeremonyCommitmentDeclaration({ circleId, circleAddress, c
     const msg = new TextEncoder().encode(ceremonyCommitmentDeclaration({ circleId, circleAddress, commitment }));
     const key = b64decode(circleAddress); const sig = b64decode(proof);
     if (key.length !== 32 || sig.length !== 64) return false;
-    return nacl.sign.detached.verify(msg, sig, key);
+    return verifyEd25519Strict(msg, sig, key);
   } catch { return false; }
 }

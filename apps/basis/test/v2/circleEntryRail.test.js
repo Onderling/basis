@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { AgentIdentity, signSpine } from '@onderling/core';
+import { AgentIdentity, signSpine, createSignatureMemo } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { makeCircleEntryRail } from '../../src/v2/circleEntryRail.js';
 import { foldGovernance } from '../../src/v2/governanceLog.js';
@@ -303,5 +303,29 @@ describe('one verdict memo for the process: two rails over one log check each st
       await railFor(log, alice).readVerified(CIRCLE);
       expect(spy.mock.calls.length, 'the second rail checked the same statements again').toBeLessThanOrEqual(N);
     } finally { spy.mockRestore(); }
+  });
+});
+
+describe('a narrowed read checks only what it keeps (verify-once step B)', () => {
+  it('kinds: [vote] on a lane of N proposals and one vote does one signature check', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-narrow');
+    const writer = railFor(log, alice);
+    for (let i = 0; i < 4; i++) await writer.append(CIRCLE, { kind: 'propose', subject: `n-${i}`, payload: { action: 'changePolicy', subject: { n: i }, by: alice.ref, at: i } });
+    await writer.append(CIRCLE, { kind: 'vote', subject: 'n-0', payload: { voter: alice.ref, choice: 'yes', at: 9 } });
+    let checks = 0;
+    const memo = createSignatureMemo({ verify: (m, s, k) => { checks += 1; return AgentIdentity.verify(m, s, k); } });
+    const { bodies } = await railFor(log, alice, { signatureMemo: memo }).readVerifiedBodies(CIRCLE, { kinds: ['vote'] });
+    expect(bodies.map((b) => b.kind)).toEqual(['vote']);
+    expect(checks, 'the narrowed read checked statements it then dropped').toBe(1);
+  });
+
+  it('a statement whose kind was changed to be kept fails its check and is not kept', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-tamper');
+    await railFor(log, alice).append(CIRCLE, { kind: 'propose', subject: 't-0', payload: { action: 'changePolicy', subject: {}, by: alice.ref, at: 1 } });
+    log.entries[0].payload = { ...log.entries[0].payload, body: { ...log.entries[0].payload.body, kind: 'vote' } };
+    const { bodies } = await railFor(log, alice).readVerifiedBodies(CIRCLE, { kinds: ['vote'] });
+    expect(bodies).toEqual([]);
   });
 });

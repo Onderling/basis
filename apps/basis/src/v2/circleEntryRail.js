@@ -247,11 +247,14 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
         bodies.push({ ...b, author: ref, authorKey: b.author, atSeq, tombstone: true });
         continue;
       }
+      // A NARROWED READ (the ceremony retirements alone) drops other kinds BEFORE the signature check: the kind is inside
+      // the signed bytes, so a statement kept by a changed kind fails its check below, and one dropped is never used. Fork
+      // detection here already runs only over the statements kept, so nothing it computes changes.
+      if (Array.isArray(kinds) && !kinds.includes(stmt?.body?.kind)) continue;
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
       const b = v.body;
       if (!declaredKinds.includes(b.kind)) continue;
-      if (Array.isArray(kinds) && !kinds.includes(b.kind)) continue;   // a narrowed read (the ceremony retirements alone)
       const ref = b.payload?.authorRef;
       if (typeof ref !== 'string' || !ref) continue;
       // The read side verifies with the SAME kind-aware rule as ingest (decided 2026-08-20): what

@@ -9,6 +9,7 @@
  */
 import { selfRefIn } from './selfRef.js';
 import { makeCircleGovernance } from './governanceHost.js';
+import { removeCircleMember } from './circleMembershipHygiene.js';
 import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -134,7 +135,7 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  *   `opts.to` NARROWS the recipient set — the report channel passes the circle's admin refs, so a report
  *   never lands on the device of the person it is about.
  */
-export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, spineGate = null }) {
+export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, spineGate = null, agent = null }) {
   // Governance rides the RAIL, period: signed, circle-scoped, receiver-verified. The unsigned legacy
   // path was deleted with the cutover (one chained-statement primitive remains — signSpine); a composition
   // without a per-circle signer is a wiring bug, surfaced here rather than as silently-unsigned governance.
@@ -172,6 +173,9 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   const governance = makeCircleGovernance({
     callSkill, appendGovernanceEvent, getPolicy, getMembers,
     localActorRef: refIn, newProposalId: genId, now, setPolicy,
+    // with this device's agent, an enacted removal is the WHOLE removal the members panel makes (unbind the member's
+    // circle address, re-record the authorize snapshot), not the bare substrate op
+    ...(agent ? { removeMember: (circleId, memberWebid) => removeCircleMember({ agent, callSkill, circleId, memberWebid }) } : {}),
     // The fold's input: VERIFIED events + the disputed (equivocator) ref set, from the rail's read.
     readGovernanceState: (circleId) => rail.readVerified(circleId),
   });

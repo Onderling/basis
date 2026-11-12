@@ -4579,6 +4579,7 @@ let mijGov = null;
 function shellGovernance({ myWebid = '' } = {}) {
   return bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
@@ -8829,6 +8830,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
@@ -8846,6 +8848,7 @@ async function showGovernance(id) {
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     removeReported: removeReportedItem,

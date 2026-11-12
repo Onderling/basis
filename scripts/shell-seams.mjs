@@ -298,6 +298,10 @@ export const SEAMS = Object.freeze([
   // …and every composer says it while it lasts (Fable, 2026-11-06: the composer is where a message would vanish): the
   // host hands the circle and the contact composer the same predicate.
   { id: 'composer-knows-no-relay', pattern: /noRelay(=\{|:\s*)!_?relayKnown/, shells: ['web', 'mobile'], why: 'a message typed with no connection point waits, and the composer the person types in would not say so' },
+  // THE SIGNATURE CHECK: each shell installs its faster Ed25519 equation behind the one strict rule (core
+  // `useSignatureEquation`): node:crypto on the box, WebCrypto's batch on the web. A shell that does not checks every
+  // signature in pure JS (~10 ms on a laptop, ~61 ms on a mid-range phone, against ~0.15 ms).
+  { id: 'signature-equation', pattern: /install\w*SignatureEquation\(/, why: 'a shell that installs no fast equation checks every signature in pure JS: seconds of a start on a phone' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 
@@ -309,7 +313,10 @@ export const SHELLS = Object.freeze([
 ]);
 
 /** Gaps a shell is known to have, each with what closes it. Remove the entry when the seam lands. */
-export const BASELINE = Object.freeze([]);
+export const BASELINE = Object.freeze([
+  // the phone's fast check is a native module (its own row, after the box and the web); until then tweetnacl behind the rule
+  { shell: 'mobile', seam: 'signature-equation', closes: 'the phone native signature check (ledger L835)' },
+]);
 
 /** Source with comments removed — a comment that EXPLAINS a seam is not the seam. */
 export const code = (src) => String(src).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

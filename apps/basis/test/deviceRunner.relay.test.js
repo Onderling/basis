@@ -88,6 +88,10 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     expect(out, 'a run with no Telegram token must say so rather than look broken').toMatch(/telegram\s+off/);
   });
 
+  it('checks signatures with node:crypto behind the strict rule (it agreed on the vectors at boot)', () => {
+    expect(out).toMatch(/\[security\] signature equation: node-crypto/);
+  });
+
   it('keeps a direct message written to it while nobody is watching (from a stranger: as a request)', async () => {
     const card = cardFrom(out);
     // the sender holds the box's card (it scanned it); on the box's side the sender is still a stranger

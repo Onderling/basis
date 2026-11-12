@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo, signatureEquationBatches, canonicalize } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -134,7 +134,21 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   // test's own) keeps only the pure signature check, keyed by the verifier, the key, the signature and the statement's
   // exact bytes (a tampered stored statement misses and is refused); the chain, kind, circle and every binding below
   // are re-decided on every read. Every rail over the same log (the agent's and a shell's) shares it.
-  const verifySignature = (signatureMemo ?? processSignatureMemo()).verifierFor('spine');
+  const memo = signatureMemo ?? processSignatureMemo();
+  const verifySignature = memo.verifierFor('spine');
+  // Where the device's fast check is a BATCH off the thread (WebCrypto on the web), a read checks its statements ahead
+  // as one batch into the memo, and the synchronous checks below are answered from memory. Elsewhere (the box's
+  // node:crypto, tweetnacl) the synchronous check is the fast one and nothing is done twice. The memo's only writer is
+  // still the real check; everything below is re-decided as before.
+  const checkAhead = async (entries) => {
+    if (!signatureEquationBatches() || typeof memo.checkBatch !== 'function') return;
+    const items = [];
+    for (const { statement: s } of entries) {
+      if (s?.tombstone === true || typeof s?.sig !== 'string' || typeof s?.body?.author !== 'string') continue;
+      try { items.push({ msg: canonicalize(s.body), sig: s.sig, pubKey: s.body.author }); } catch { /* the check below refuses it */ }
+    }
+    try { await memo.checkBatch('spine', items); } catch { /* the synchronous check answers */ }
+  };
   const safeVerify = (statement, circleId) => {
     try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature }); }
     catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
@@ -200,7 +214,9 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const events = [];
     const seenByAuthorParent = new Map();   // `${author}|${parent}` → Set(hash) — fork detection
     const disputedRefs = new Set();
-    for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+    const stored = storedEntries(circleId);
+    await checkAhead(stored);
+    for (const { statement: stmt, atSeq } of stored) {
       if (stmt?.tombstone === true) continue;   // a compacted statement has no event to project (L121)
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
@@ -234,7 +250,9 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const bodies = [];
     const seenByAuthorParent = new Map();
     const disputed = new Set();
-    for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+    const stored = storedEntries(circleId);
+    await checkAhead(Array.isArray(kinds) ? stored.filter(({ statement: s }) => kinds.includes(s?.body?.kind)) : stored);
+    for (const { statement: stmt, atSeq } of stored) {
       if (stmt?.tombstone === true) {
         // A TOMBSTONE (L121): verified and bound when it landed; compacted to its chain fields on the fold's own
         // word. It carries no content the fold could act on (payload = the authorRef alone, which every consumer

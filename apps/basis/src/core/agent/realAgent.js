@@ -6635,16 +6635,23 @@ export async function createRealHouseholdAgent(opts = {}) {
   const heldSends = createHeldSends({
     onEnded: (_e, why) => { try { structuredLog.warn('agent', 'send.held-ended', { reason: 'unknown-address', why }); } catch { /* never breaks a send */ } },
   });
+  // THE RETRY of the held sends: one one-shot timer, re-armed after each pass only while something is still held (a
+  // retry of pending work, not a clock: the host's one clock is its tick, and the agent core has none)
   let heldRecheck = null;
+  function armHeldRetry() {
+    if (heldRecheck || heldSends.size === 0) return;
+    heldRecheck = setTimeout(() => {
+      heldRecheck = null;
+      redriveHeldSends().catch(() => {}).finally(armHeldRetry);
+    }, HELD_SEND_RECHECK_MS);
+    heldRecheck.unref?.();
+  }
   function holdUnknownAddress(to, payload, o, decision, heldSince = null) {
     heldSends.hold({ to, payload, opts: o, since: heldSince });
     const held = { held: true, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: 'unknown-address' };
     // one record per send, at its FIRST hold (a re-judge that still finds no reason is not a new send)
     if (heldSince == null) { try { structuredLog.info('agent', 'send.decision', sendDecisionFields(decision, null, held)); } catch { /* the log never breaks a send */ } }
-    if (!heldRecheck) {
-      heldRecheck = setInterval(() => { redriveHeldSends().catch(() => {}); }, HELD_SEND_RECHECK_MS);
-      heldRecheck.unref?.();
-    }
+    armHeldRetry();
     return held;
   }
   /** Judge every held send again by sending it through the gate once more (one place decides, and an invite exchange's
@@ -6656,7 +6663,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       for (const e of heldSends.take()) {
         try { await peerSend(e.to, e.payload, e.opts ?? {}, { heldSince: e.since }); } catch { /* the send's own record says what happened */ }
       }
-      if (heldSends.size === 0 && heldRecheck) { clearInterval(heldRecheck); heldRecheck = null; }
     })().finally(() => { redriving = null; });
     return redriving;
   }
@@ -6675,10 +6681,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // a member of a circle of the self that SPEAKS (a persona's circle never lets the general person key speak, nor the reverse)
     let circleMember = null;
     if (!(inviteExchangeSide || granted || kept)) {
+      // the self that speaks: the persona whose chat key is `sendAs`, else this device's primary (the person path's key)
       const speaker = typeof o?.sendAs === 'string' && o.sendAs
-        ? ([...personas].find(([pid, rt]) => pid !== 'default' && rt?.chatId?.pubKey === o.sendAs)?.[0] ?? 'default')
-        : 'default';
-      circleMember = circleAddressIndex.memberCircleOf(to, { accept: (cid) => (circlePersonas.get(cid) ?? 'default') === speaker });
+        ? ([...personas].find(([, rt]) => rt?.chatId?.pubKey === o.sendAs)?.[0] ?? primaryId)
+        : primaryId;
+      circleMember = circleAddressIndex.memberCircleOf(to, { accept: (cid) => (circlePersonas.get(cid) ?? primaryId) === speaker });
     }
     return { inviteExchange: inviteExchangeSide, granted, contact: kept?.row ?? null, viaDevice: kept?.via === 'device', circleMember, addressFallback: addressFallbackOn() };
   }

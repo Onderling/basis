@@ -5965,6 +5965,10 @@
       "text": "sending…",
       "doc": "P5 — transient state while a turn is in flight to the bot."
     },
+    "write_needs_card": {
+      "text": "You can’t write to {{name}} here yet: you share no circle that shows their address. Add their card first.",
+      "doc": "A contact shown from the peer graph (a co-member, no card) whom no shared circle shows an address for: writing would leave on the person key, so the thread says why and sends nothing (the send gate, 2026-11-12)."
+    },
     "send_failed": {
       "text": "Couldn’t reach {{name}} — they may be offline.",
       "doc": "P5 — shown when a turn fails to send over the peer transport."

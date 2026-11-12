@@ -166,7 +166,7 @@ export function createContactThreadChannel({
   const adoptMemberCard = (peerAddr) => {
     const id = resolveId(peerAddr);
     const held = memberCards.get(id) ?? memberCards.get(peerAddr);
-    if (!held || typeof onCard !== 'function') return Promise.resolve();
+    if (!held || typeof onCard !== 'function') return null;   // nothing to adopt: the send is not delayed a tick
     memberCards.delete(id); memberCards.delete(peerAddr);
     return Promise.resolve(onCard({ contactId: id, fromAddr: held.fromAddr, card: held.card })).catch(() => {});
   };
@@ -391,7 +391,7 @@ export function createContactThreadChannel({
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
     const sent = (async () => {
-      await adopted;   // the answer's card is in the book before the gate judges the send
+      if (adopted) await adopted;   // the answer's card is in the book before the gate judges the send
       // a person on the block list gets no direct message from this device: refused with its reason, nothing on the wire
       if (typeof messageRequests?.isBlocked === 'function' && await blockedNow(resolveId(peerAddr), peerAddr)) return { held: false, delivered: false, refused: 'blocked', reason: 'blocked' };
       let self = null;

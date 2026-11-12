@@ -13,21 +13,25 @@
 // their next envelope arrived anyway, and after a reload even the filtering stopped. There is one set
 // now — the shell's — and the app reads it.
 //
-// Five claims, one per way a block can be half:
-//   1. HIDE      — their posts stop appearing on the blocker's device.
-//   2. REFUSE    — their envelopes are dropped at the blocker's boundary, and the drop is COUNTED
-//                  (a silent drop and a flaky transport look identical otherwise).
-//   3. BYSTANDER — a block is one person's decision about another; a third device sees no change.
-//                  This is the claim that fails loudest if a block ever leaks onto the wire.
-//   4. REVERSIBLE— unblocking restores traffic. A door, not a trapdoor.
-//   5. PERSON    — blocking someone blocks the person, not the address: their second address is
-//                  refused too, without the blocker doing anything more.
-import { checker, declaredOp, wait } from './_util.mjs';
+// A BLOCK IS ABOUT DIRECT CONTACT, NEVER A CIRCLE (Frits 2026-11-12, after comparing Signal, WhatsApp and Telegram,
+// which all keep a block one-on-one). Before, the secure agent dropped everything from the person and refused every send
+// to them, circle traffic included: a silent half-removal that made the blocker's view of the circle drift from every
+// other member's. Now the block list is kept (alias-aware) and asked only by the DIRECT doors; circle traffic never asks.
+// The inbound direct door is walked end to end in apps/basis/test/blockIsDirectOnly.relay.test.js (these journey nodes
+// compose no contact channel); here, across three real devices:
+//   1. CIRCLE    — the blocked person's circle post still lands on the blocker's device (the circle folds the same
+//                  everywhere); their earlier posts stay; the view can still HIDE them on the blocker's device.
+//   2. DIRECT    — the blocker's DIRECT send to them is refused at the agent's send gate, with the reason, nothing on
+//                  the wire; a circle send to the same address is not.
+//   3. BYSTANDER — a third device sees no change.
+//   4. REVERSIBLE— unblocking lets direct contact through again.
+//   5. PERSON    — the block covers the person, not the address: their per-circle address, and one bound later.
+import { checker, declaredOp } from './_util.mjs';
 import { bootAppCircle, sendCircleChat, untilTrue, addressOf } from './_app.mjs';
 // The projection both shells render their chat through — the hide half lives here, not in a view.
 import { mutedActorSet } from '../../basis/src/v2/circleStream.js';
 
-export const name = 'J-block (blocking a person holds everywhere, and only for the blocker)';
+export const name = 'J-block (a block is about direct contact: the circle is untouched, and only the blocker changes)';
 
 const CIRCLE = 'e2e-block';
 
@@ -71,22 +75,25 @@ export async function run({ relayUrl }) {
       Array.isArray(listed?.peers) && listed.peers.includes(bramAddr),
       JSON.stringify(listed?.peers)?.slice(0, 120));
 
-    // ── 1. HIDE + 2. REFUSE ─────────────────────────────────────────────────────────────────────
-    const dropsBefore = saOf(anne).securityStatus().mutedDrops ?? 0;
+    // ── 1. CIRCLE ───────────────────────────────────────────────────────────────────────────────
     await sendCircleChat(bram, { groupId: CIRCLE, msgId: 'after-block', text: 'hallo?' });
-    await wait(1200);   // no event to await on: the claim IS that nothing happens on Anne's device
+    check('[CIRCLE] the blocked person\'s circle post still lands on the blocker\'s device (the circle is not cut)',
+      await untilTrue(() => subjectsOn(anne).includes('after-block')), subjectsOn(anne).join(','));
+    check('[CIRCLE] and what they said before stays', subjectsOn(anne).includes('before-1'));
+    const hideSet = mutedActorSet([bramAddr], await rosterRows());
+    check('[CIRCLE] the view can still hide them on the blocker\'s device (the key resolves to an actor)',
+      hideSet.size === 1, JSON.stringify([...hideSet]).slice(0, 120));
 
-    check('[HIDE] the blocked person\'s post does not appear on the blocker\'s device',
-      !subjectsOn(anne).includes('after-block'), subjectsOn(anne).join(','));
-
-    const dropsAfter = saOf(anne).securityStatus().mutedDrops ?? 0;
-    check('[REFUSE] the envelope was refused at the boundary, and counted',
-      dropsAfter > dropsBefore, `mutedDrops ${dropsBefore} → ${dropsAfter}`);
+    // ── 2. DIRECT ───────────────────────────────────────────────────────────────────────────────
+    const direct = await anne.agent.sendPeerMessage(bramAddr, { subtype: 'contact-msg', text: 'hoi', messageId: 'direct-1' });
+    check('[DIRECT] the blocker\'s direct send to them is refused at the send gate, with the reason',
+      direct?.refused === 'blocked', JSON.stringify(direct)?.slice(0, 120));
+    const circleSend = await anne.agent.sendPeerMessage(bramAddr, { subtype: 'circle-address-announce', groupId: CIRCLE }).catch((e) => ({ error: String(e?.message ?? e) }));
+    check('[DIRECT] a circle send to the same address is not refused for the block',
+      circleSend?.refused !== 'blocked', JSON.stringify(circleSend)?.slice(0, 120));
+    check('[DIRECT] the block list covers them (what every direct door asks)', (await saOf(anne).mute.covers(bramAddr)) === true);
 
     // ── 3. BYSTANDER ────────────────────────────────────────────────────────────────────────────
-    // Cato never asked for anything. If a block ever travelled — as a statement on the lane, as a
-    // roster effect — this is where it would show. Blocking must be invisible to everyone but the
-    // blocker, including the person blocked.
     check('[BYSTANDER] the third device still receives the same person normally',
       await untilTrue(() => subjectsOn(cato).includes('after-block')),
       subjectsOn(cato).join(','));
@@ -94,34 +101,14 @@ export async function run({ relayUrl }) {
     check('[BYSTANDER] and has nobody blocked of its own',
       Array.isArray(catoList?.peers) && catoList.peers.length === 0);
 
-    // ── 1b. HIDE, the other half ────────────────────────────────────────────────────────────────
-    // The two halves act on DIFFERENT messages, and the difference is the one a user feels:
-    //   • what they send AFTER the block is refused at the boundary — it never lands, and unblocking
-    //     cannot bring it back (there is nothing to bring). That is [REFUSE], above.
-    //   • what they sent BEFORE is already on the log and STAYS there. Blocking someone must not
-    //     delete what they already said to you; it is hidden at the one projection every chat surface
-    //     reads, and unblocking shows it again.
-    // The hiding itself is projection logic with its own tests (`personMuteViewFilter`, which covers
-    // "the log keeps everything; unmute restores" through `chatRows`). What only three real devices
-    // can show is the half those cannot: that the block, acting at the transport, left the history
-    // alone — and that the key the block was made with is one the view filter can resolve to a person.
-    check('[HIDE] blocking did not delete what they said before it',
-      subjectsOn(anne).includes('before-1'), subjectsOn(anne).join(','));
-    const hideSet = mutedActorSet([bramAddr], await rosterRows());
-    check('[HIDE] …and the blocked key resolves to an actor the view filter can hide',
-      hideSet.size === 1, JSON.stringify([...hideSet]).slice(0, 120));
-
     // ── 4. REVERSIBLE ───────────────────────────────────────────────────────────────────────────
-    // The post sent DURING the block stays gone — it was refused, not held. What must come back is
-    // the NEXT one; a block that silently queued would deliver a backlog here, which is its own bug.
     const unblocked = await block(anne, 'unmute', bramAddr);
     check('the unblock is accepted', !unblocked?.error, JSON.stringify(unblocked)?.slice(0, 120));
-
+    const again = await anne.agent.sendPeerMessage(bramAddr, { subtype: 'contact-msg', text: 'toch hoi', messageId: 'direct-2' });
+    check('[REVERSIBLE] direct contact goes through again (a door, not a trapdoor)',
+      again?.refused !== 'blocked', JSON.stringify(again)?.slice(0, 120));
     await sendCircleChat(bram, { groupId: CIRCLE, msgId: 'after-unblock', text: 'nog steeds die ladder' });
-    check('[REVERSIBLE] the next post arrives again (a door, not a trapdoor)',
-      await untilTrue(() => subjectsOn(anne).includes('after-unblock')));
-    check('[REVERSIBLE] and the refused one did NOT arrive late (refused, not queued)',
-      !subjectsOn(anne).includes('after-block'));
+    check('[REVERSIBLE] and the circle goes on as it did', await untilTrue(() => subjectsOn(anne).includes('after-unblock')));
 
     // ── 5. PERSON, not address ──────────────────────────────────────────────────────────────────
     // The claim the other four quietly depend on. Anne blocked ONE address — the canonical one, the
@@ -139,10 +126,12 @@ export async function run({ relayUrl }) {
     check('[PERSON] …which the blocker\'s device knows is the same person',
       Array.isArray(circleAliases) && circleAliases.includes(bramAddr),
       JSON.stringify(circleAliases)?.slice(0, 140));
+    await block(anne, 'mute', bramAddr);
+    check('[PERSON] the block covers their per-circle address too (what a direct door there asks)',
+      (await saOf(anne).mute.covers(bramCircle)) === true);
 
     // And once more for an address bound later — a second device, a rotated per-circle address. The
     // block is not re-applied; the one decision already covers it.
-    await block(anne, 'mute', bramAddr);
     const secondAddr = `${bramAddr}#circle-2`;
     saOf(anne).registerPeerAddress?.(secondAddr, bramAddr);
     const secondAliases = await saOf(anne).resolver.aliasesFor(secondAddr);

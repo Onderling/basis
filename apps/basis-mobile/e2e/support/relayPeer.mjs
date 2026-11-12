@@ -15,6 +15,9 @@
  * phone needs no relay typed in. `--offering` sets one offering on the peer's persona and RELEASES it to the circle
  * (the per-circle disclosure, said on the circle's lane) — what a person does in Me → personas.
  *
+ * In `--talk` mode the peer also keeps the circle's LISTS on stdin commands: `list-create`, `list-add` and `lists-dump`
+ * (every list and its open entries), through the same `lists` ops the shells call.
+ *
  * `--talk` makes the peer a person who CONVERSES (the messaging story): it composes the contact thread, reports what
  * it hears, and speaks when the walk tells it to. It hears: one line per new circle chat line from someone else
  * (`{"step":"circle-heard","text":…}`) and per new inbound contact turn (`{"step":"contact-heard","text":…,"from":…}`).
@@ -136,6 +139,24 @@ if (talk) {
           unrouted: (peer.received ?? []).map((r) => r?.payload?.type ?? r?.payload?.subtype ?? typeof r?.payload),
           refused: peer.contactTurnsRefused ?? [],
         });
+      } else if (cmd.do === 'list-create') {
+        // the circle's lists, through the same ops the shells call (`lists` app): what the peer makes, the phone sees
+        const r = await call('lists', 'createList', { circleId: groupId, text: cmd.list });
+        say({ step: 'list-created', ok: r?.ok !== false && !r?.error, result: r ?? null });
+      } else if (cmd.do === 'list-add') {
+        const r = await call('lists', 'addToList', { circleId: groupId, list: cmd.list, text: cmd.text });
+        say({ step: 'list-added', ok: r?.ok !== false && !r?.error, result: r ?? null });
+      } else if (cmd.do === 'lists-dump') {
+        // what the peer holds of the circle's lists: every list's name and its open entries' texts
+        const lists = (await call('lists', 'listLists', { circleId: groupId }))?.items ?? [];
+        const out = [];
+        for (const l of lists) {
+          const name = l?.label ?? null;
+          if (!name) continue;
+          const entries = (await call('lists', 'listEntries', { circleId: groupId, list: name }))?.items ?? [];
+          out.push({ list: name, entries: entries.map((e) => e?.label ?? null).filter(Boolean) });
+        }
+        say({ step: 'lists', lists: out });
       } else if (cmd.do === 'circle-say') {
         const r = await sendCircleChat(peer, { groupId, msgId: `peer-${Date.now().toString(36)}`, text: cmd.text });
         say({ step: 'circle-said', ok: !r?.error, error: r?.error ?? null });

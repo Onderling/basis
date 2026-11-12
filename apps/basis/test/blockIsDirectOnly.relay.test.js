@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 
 const C = 'straat';
@@ -49,6 +49,7 @@ describe('a block is about direct contact, never a circle', () => {
   }, 40_000);
 
   it('her direct message leaves nothing: no request, no thread', async () => {
+    await addCardOf(ann, me);   // she holds my card (blocking me does not take it from her)
     await ann.contactThreadChannel.sendTurn({ peerAddr: me.pubKey, text: 'hoi', messageId: 'ann-dm-1' });
     await new Promise((r) => { setTimeout(r, 3000); });
     expect((await requestsOf(me)).map((q) => q.from)).not.toContain(ann.pubKey);
@@ -60,7 +61,7 @@ describe('a block is about direct contact, never a circle', () => {
     expect(file?.refused, JSON.stringify(file)).toBe('blocked');
     const receipt = await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'delivery-receipt', messageId: 'x' });
     expect(receipt?.refused, JSON.stringify(receipt)).toBe('blocked');
-    const circleish = await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'circle-address-announce', groupId: C }).catch((e) => ({ error: String(e?.message ?? e) }));
+    const circleish = await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'circle-address-announce', groupId: C }, { circleId: C }).catch((e) => ({ error: String(e?.message ?? e) }));
     expect(circleish?.refused ?? null, 'circle traffic is never refused for a block').not.toBe('blocked');
   }, 30_000);
 

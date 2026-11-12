@@ -133,10 +133,11 @@ export function createContactThreadChannel({
   // stranger there. It rides inside the seal when there is one. Absent: turns carry none, as before.
   authFor = null,
   // A FIRST MESSAGE FROM SOMEONE THE PERSON DID NOT CHOOSE IS A REQUEST (Frits 2026-11-12): `messageRequests` is the
-  // agent's door (`agent.messageRequests`: `active()`, `isKnown(key)`, `hold(turn)`). Each inbound turn is decided BEFORE
+  // agent's door (`agent.messageRequests`: `policy()`, `isKnown(key)`, `hold(turn)`). Each inbound turn is decided BEFORE
   // anything is kept (messageRequestDoor.js): a known sender's turn goes on as below; anyone else's is held on their
-  // request and nothing else happens (no card into the book, no pair roster, no thread turn, no receipt). Inactive on a
-  // function profile, whose own door decides. Absent: every turn goes on, as before.
+  // request and nothing else happens (no card into the book, no pair roster, no thread turn, no receipt). A persona
+  // whose policy is 'open' (anyone may write; a bot's by default) lets a stranger's turn go on, within the stranger
+  // budgets. Absent: every turn goes on, as before.
   messageRequests = null,
 } = {}) {
   // the person wrote to them first (an outbound turn of theirs in the thread): chosen, so their answer is never a request
@@ -151,6 +152,11 @@ export function createContactThreadChannel({
     hold: (turn) => messageRequests.hold(turn),
     now,
   }));
+  /** The persona's policy for first messages: 'open' or 'request' (the door's default when it cannot say). */
+  const policyNow = async () => {
+    if (typeof messageRequests?.policy !== 'function') return 'request';
+    try { return (await messageRequests.policy()) === 'open' ? 'open' : 'request'; } catch { return 'request'; }
+  };
   /**
    * Whether a sender is KNOWN to this person (the door's question, without holding anything): asked by the other doors
    * into a contact thread (a file, a threaded answer), which keep nothing from someone the person did not choose.
@@ -158,7 +164,7 @@ export function createContactThreadChannel({
    */
   async function knownSender(contactId, fromAddr) {
     if (!messageRequests || typeof messageRequests.isKnown !== 'function') return true;
-    try { if (typeof messageRequests.active === 'function' && (await messageRequests.active()) !== true) return true; } catch { return true; }
+    if ((await policyNow()) === 'open') return true;
     for (const k of [fromAddr, contactId]) {
       try { if (k && (await messageRequests.isKnown(k)) === true) return true; } catch { /* next */ }
     }
@@ -167,8 +173,7 @@ export function createContactThreadChannel({
   /** 'known' when this turn goes on; 'held' or 'dropped' when the door kept it from everything else. */
   const decideAtDoor = async (m) => {
     if (!messageRequests || typeof messageRequests.hold !== 'function') return 'known';
-    try { if (typeof messageRequests.active === 'function' && (await messageRequests.active()) !== true) return 'known'; } catch { return 'known'; }
-    return doorFor()(m);
+    return doorFor()({ ...m, policy: await policyNow() });
   };
   const hiddenNow = async (contactId) => {
     if (typeof isHidden !== 'function' || !contactId) return false;

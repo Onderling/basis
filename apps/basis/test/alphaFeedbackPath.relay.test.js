@@ -98,6 +98,9 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     await bindCircleAddresses([phone], CIRCLE);
 
     // ── The box: enrolled phone-first (the offer, the phrase), then started for real. ─────────────
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await phone.agent.setFirstMessages('open')).toBe('open');
     const offer = await phone.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     const phrase = (await phone.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;

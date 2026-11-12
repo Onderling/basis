@@ -12,6 +12,8 @@
  *   - NOT KNOWN, within the stranger budgets (the function profile door's own: bytes per turn, turns per key per day,
  *     stranger turns per hour) → the turn is HELD on the sender's message request → 'held'. No book row, no pair circle,
  *     no thread turn, no receipt: the person accepts, ignores or blocks.
+ *   - NOT KNOWN, within the budgets, to a persona whose policy is 'open' (anyone may write; a bot's by default) →
+ *     'known': the turn goes on as a known one does.
  *   - past the budgets, or a turn the request refuses (no card on a new request, a card naming someone else, a file) →
  *     'dropped', with a count line (kind + reason, never who).
  * A blocked sender never reaches this door: the secure agent's block set drops them below every channel.
@@ -29,7 +31,7 @@ import { createInboundAdmission } from './inboundAdmission.js';
  * @param {(turn: object) => Promise<{held: boolean, reason?: string}>} a.hold  hold a turn on the sender's request
  * @param {(e: {kind: string, reason: string}) => void} [a.count]
  * @param {() => number} [a.now]
- * @returns {(m: {contactId: string, fromAddr: string, text?: string, card?: string|null, messageId?: string, ts?: number, file?: boolean}) =>
+ * @returns {(m: {contactId: string, fromAddr: string, text?: string, card?: string|null, messageId?: string, ts?: number, file?: boolean, policy?: 'request'|'open'}) =>
  *   Promise<'known'|'held'|'dropped'>}
  */
 export function createMessageRequestDoor({ isKnown, iWrote = null, hold, count = null, now = Date.now } = {}) {
@@ -40,10 +42,10 @@ export function createMessageRequestDoor({ isKnown, iWrote = null, hold, count =
   // a request, below), and a known peer is admitted without a question
   const admission = createInboundAdmission({ admit: async () => ({ known: true }), isKnown, answered: iWrote, open: true, count, now });
 
-  return async function decide({ contactId, fromAddr, text = '', card = null, messageId = null, ts = null, file = false } = {}) {
+  return async function decide({ contactId, fromAddr, text = '', card = null, messageId = null, ts = null, file = false, policy = 'request' } = {}) {
     const r = await admission({ contactId, fromAddr, text, messageId, channel: 'contact' });
     if (!r.admitted) return 'dropped';   // the admission said its own count line
-    if (!r.stranger) return 'known';
+    if (!r.stranger || policy === 'open') return 'known';
     let held;
     try {
       held = await hold({ from: contactId || fromAddr, messageId: messageId || `${fromAddr}:${now()}`, ts: Number.isFinite(ts) ? ts : now(), text: String(text ?? ''), ...(card ? { card } : {}), ...(file ? { file: true } : {}) });

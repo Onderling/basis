@@ -132,6 +132,9 @@ describe('the box is revoked while it holds the address', () => {
 
     phrase = (await web.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(phrase?.split(/\s+/).length).toBe(24);
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await web.agent.setFirstMessages('open')).toBe('open');
     const offer = await web.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     const once = run(['--data-dir', dataDir, '--enrol'], { env, stdin: `${offer.uri}\n${phrase}\n` });

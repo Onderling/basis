@@ -64,6 +64,9 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     await bindCircleAddresses([web], CIRCLE);
     // The box: enrolled from the web device's offer, then started AS THE PRIMARY DEVICE (the deploy default).
     const env = { PATH: process.env.PATH, HOME: dataDir, ONDERLING_RELAY_URL: relay.url, BASIS_VAULT_PASSPHRASE: 'test-only-passphrase', ONDERLING_PRIMARY_DEVICE: '1' };
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await web.agent.setFirstMessages('open')).toBe('open');
     const offer = await web.agent.callSkill('household', 'buildEnrollOffer', { relayUrl: relay.url });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     const phrase = (await web.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;

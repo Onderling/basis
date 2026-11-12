@@ -187,6 +187,7 @@ import {
   isRequestable,
   effectiveProperties,
   profileFactsOf, withProfileFacts, factsDiffer, nextFactsAt, stampChangedFacts,
+  firstMessagesOf, FIRST_MESSAGE_POLICIES, FIRST_MESSAGES_KEY,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -9578,12 +9579,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     isKnownPeer: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
     /**
      * The contact channel's DOOR (Frits 2026-11-12): a first message from someone this person did not choose is held as
-     * a message request. `active()` is false on a function profile (its own door decides who gets in); `isKnown(key)` is
-     * the wire gate's known (own devices, circle co-members, contacts); `hold(turn)` keeps the turn on the sender's
-     * request (pinboard, the own-devices store). The shells hand it to `createContactThreadChannel` as it is.
+     * a message request. `policy()` is the persona's own (`firstMessages` on its profile record: 'request', or 'open' =
+     * anyone may write within the stranger budgets; absent, a function profile's is open and a person's is request: the
+     * persona IS the policy, a bot is one whose door is open); `isKnown(key)` is the wire gate's known (own devices,
+     * circle co-members, contacts); `hold(turn)` keeps the turn on the sender's request (pinboard, the own-devices
+     * store). The shells hand it to `createContactThreadChannel` as it is.
      */
     messageRequests: Object.freeze({
-      active: async () => { try { return (await myProfileKind()) !== 'function'; } catch { return true; } },
+      policy: async () => {
+        try { return firstMessagesOf(await agentsRegistryRef?.lookup?.(primaryId)); } catch { return 'request'; }
+      },
       isKnown: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
       hold: async (turn) => (await callSkill('pinboard', 'holdMessageRequest', turn)) ?? { held: false, reason: 'no-answer' },
     }),
@@ -10080,6 +10085,14 @@ export async function createRealHouseholdAgent(opts = {}) {
      * device). Refused when the profile has another device: a profile with a phone and a laptop behind it is a
      * person's, and their inbox must never start answering (the VPS box, enrolled as Frits' device).
      */
+    /** Set who may write to this persona first ('request' | 'open', `FIRST_MESSAGE_POLICIES`): its profile record. */
+    setFirstMessages: async (policy) => {
+      if (!FIRST_MESSAGE_POLICIES.includes(policy)) throw new Error(`setFirstMessages: policy must be one of ${FIRST_MESSAGE_POLICIES.join(', ')}`);
+      // the profile's own property, written as any property is: a fact, carried to the person's other devices
+      const r = await callSkill('agents', 'setProfileProperty', { id: primaryId, key: FIRST_MESSAGES_KEY, value: policy });
+      if (r && r.ok === false) throw new Error(`setFirstMessages: ${r.reason ?? 'refused'}`);
+      return firstMessagesOf(await agentsRegistryRef?.lookup?.(primaryId));
+    },
     markFunctionProfile: async () => {
       if (!agentsRegistryRef || typeof agentsRegistryRef.updateKind !== 'function') throw new Error('markFunctionProfile: no profile registry');
       const cur = await agentsRegistryRef.lookup('default');

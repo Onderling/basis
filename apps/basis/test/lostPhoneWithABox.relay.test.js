@@ -93,6 +93,9 @@ describe('the phone is lost, and there is a box', () => {
 
     phrase = (await phone.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(phrase?.split(/\s+/).length).toBe(24);
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await phone.agent.setFirstMessages('open')).toBe('open');
     const offer = await phone.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     box = await enrolBox(dataDir, env, offer.uri, phrase);
@@ -162,6 +165,9 @@ describe('the phone is lost, and there is a box', () => {
   it('6 · the box re-enrols from the new phone — in a fresh data dir — and takes feedback again, which the new phone sees', async () => {
     try { box.child.kill('SIGTERM'); } catch { /* */ }
     await box.exited;
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await newPhone.agent.setFirstMessages('open')).toBe('open');
     const offer = await newPhone.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     // The retired install refuses to enrol again, and says what to do instead — before asking for the phrase.

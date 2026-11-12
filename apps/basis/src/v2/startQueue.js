@@ -27,14 +27,16 @@ const idOf = (c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null));
  * @param {Array<[string, {requestFromSiblings?: Function}]>} [o.siblings]  the own-device asks, named; 'grants' goes first
  * @param {Function} o.callSkill
  * @param {() => (string|null)} [o.firstCircle]   the circle on screen when the queue starts (none on the box)
+ * @param {(s: {lane?: string, sibling?: string, circleId?: string}) => void} [o.onStep]  told each step as it starts (the box logs it)
  * @returns {Promise<{ circles: number, steps: number, failed: number }>}
  */
-export async function runStartQueue({ catchUps = {}, siblings = [], callSkill, firstCircle = () => null } = {}) {
+export async function runStartQueue({ catchUps = {}, siblings = [], callSkill, firstCircle = () => null, onStep = null } = {}) {
   const slice = createTimeSlice();
   let steps = 0; let failed = 0;
-  const step = async (fn) => {
+  const step = async (fn, said) => {
     await slice();
     steps += 1;
+    try { onStep?.(said); } catch { /* a report never stops the queue */ }
     try { await fn(); } catch { failed += 1; }
   };
   let circles = [];
@@ -43,15 +45,15 @@ export async function runStartQueue({ catchUps = {}, siblings = [], callSkill, f
     for (const lane of START_LANES) {
       const cu = catchUps?.[lane];
       if (typeof cu?.requestCircle !== 'function') continue;
-      await step(() => cu.requestCircle(circleId, { callSkill }));
+      await step(() => cu.requestCircle(circleId, { callSkill }), { lane, circleId });
     }
   };
   let onScreen = null;
   try { onScreen = firstCircle?.() ?? null; } catch { onScreen = null; }
   if (onScreen && circles.includes(onScreen)) await pullCircle(onScreen);
   const ordered = [...siblings].sort(([a], [b]) => (a === 'grants' ? -1 : 0) - (b === 'grants' ? -1 : 0));
-  for (const [, s] of ordered) {
-    if (typeof s?.requestFromSiblings === 'function') await step(() => s.requestFromSiblings());
+  for (const [name, s] of ordered) {
+    if (typeof s?.requestFromSiblings === 'function') await step(() => s.requestFromSiblings(), { sibling: name });
   }
   for (const c of circles) if (c !== onScreen) await pullCircle(c);
   return { circles: circles.length, steps, failed };

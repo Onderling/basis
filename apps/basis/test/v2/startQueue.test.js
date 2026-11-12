@@ -73,4 +73,20 @@ describe('startQueueSiblings: the own-device asks, one list for every shell', ()
     const ask = { requestFromSiblings: async () => {} };
     expect(startQueueSiblings({ grantsCatchUp: ask, personKeySync: ask, knownPeersSync: null }).map(([n]) => n)).toEqual(['grants', 'person-key']);
   });
+
+  it('names all six own-device asks the shell seams count on it for (grants, known peers, person key, profile facts, own store, primary device)', () => {
+    const ask = { requestFromSiblings: async () => {} };
+    const agent = { grantsCatchUp: ask, knownPeersSync: ask, personKeySync: ask, profileFactsSync: ask, ownStoreSync: ask, primaryDevice: ask };
+    expect(startQueueSiblings(agent).map(([n]) => n)).toEqual(['grants', 'known-peers', 'person-key', 'profile-facts', 'own-store', 'primary-device']);
+  });
+});
+
+describe('runStartQueue reports each step as it starts', () => {
+  it('names the lane and circle, or the own-device ask', async () => {
+    const said = [];
+    const f = fakeLanes([]);
+    await runStartQueue({ catchUps: f.catchUps, siblings: [['grants', f.sibling('grants')]], callSkill: circles(['a']), onStep: (x) => said.push(x) });
+    expect(said[0]).toEqual({ sibling: 'grants' });
+    expect(said.slice(1)).toEqual(START_LANES.map((lane) => ({ lane, circleId: 'a' })));
+  });
 });

@@ -21,6 +21,9 @@
 /** A seam: what it is, why every shell needs it, and the text that proves a shell composes it. `shells` narrows a
  *  seam to the shells it applies to (a view seam has no meaning on the box) — with the reason beside it. */
 export const SEAMS = Object.freeze([
+  // The own-device asks below (grants, known peers, person key, profile facts, own store, primary device) are composed
+  // ONCE by the shared start queue's list (`startQueueSiblings`, startQueue.js), which names each of them; a shell that
+  // hands that list to the queue composes all six.
   // THE START QUEUE: what a device pulls after it starts (every lane's catch-up, every own-device ask) runs as one
   // queue in shared code, the circle on screen first and one step at a time. Each shell had its own dozen timers, all
   // firing at once over every circle, in the window where the person first taps (the cold-start freeze on a phone).
@@ -159,7 +162,7 @@ export const SEAMS = Object.freeze([
   { id: 'change-feed', pattern: /createChangeFeed\(/, shells: ['box'], why: 'a change a member makes in their app reaches the bot\'s event rows and its screens, not only the bot\'s own writes' },
   // The person's own store rides between their own devices (signed by the device, sealed to the person); what a
   // sibling wrote while this device was off is asked for on connect — every shell that holds the person's store.
-  { id: 'own-store-catch-up', pattern: /ownStoreSync\??\.requestFromSiblings\(|kick\(agent\.ownStoreSync/, why: 'an appointment added on the phone while the laptop was off is on the laptop when it comes back' },
+  { id: 'own-store-catch-up', pattern: /ownStoreSync\??\.requestFromSiblings\(|kick\(agent\.ownStoreSync|startQueueSiblings\(/, why: 'an appointment added on the phone while the laptop was off is on the laptop when it comes back' },
   // A person's device runs its OWN planned rows (their week on Saturday) while the app is in front: one host tick, its
   // timer the foreground cadence. The box keeps its own clock (`host-tick`).
   { id: 'person-clock', pattern: /createPersonClock\(/, shells: ['web', 'mobile'], why: 'a person\'s own planned rows (their week overview) run on their phone and in their browser while the app is open' },
@@ -234,11 +237,11 @@ export const SEAMS = Object.freeze([
   // painting shells ask the one rule, and paint the one outcome. The box has no screen to paint it on.
   { id: 'restore-finish-applies', pattern: /restoreFinishApplies\(/, shells: ['web', 'mobile'], why: 'an enrol from an offer is not a restore — "your circles are not here" would tell a person adding a device that their circles are gone' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
-  { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
-  { id: 'known-peers-catchup',   pattern: /knownPeersSync/,                      why: 'who the person knows, on every device: bindings and the contact book' },
-  { id: 'person-key-catchup',    pattern: /personKeySync/,                       why: 'the person key and its chain, on every device' },
-  { id: 'profile-facts-catchup', pattern: /profileFactsSync/,                    why: "a profile's properties and disclosure, the same on every device holding that self" },
-  { id: 'grants-catchup',        pattern: /grantsCatchUp/,                       why: 'the grants lane: what my devices may do' },
+  { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings|startQueueSiblings\(/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
+  { id: 'known-peers-catchup',   pattern: /knownPeersSync|startQueueSiblings\(/,                      why: 'who the person knows, on every device: bindings and the contact book' },
+  { id: 'person-key-catchup',    pattern: /personKeySync|startQueueSiblings\(/,                       why: 'the person key and its chain, on every device' },
+  { id: 'profile-facts-catchup', pattern: /profileFactsSync|startQueueSiblings\(/,                    why: "a profile's properties and disclosure, the same on every device holding that self" },
+  { id: 'grants-catchup',        pattern: /grantsCatchUp|startQueueSiblings\(/,                       why: 'the grants lane: what my devices may do' },
   { id: 'circle-presence',       pattern: /registerCirclePresence/,              why: 'per-circle addresses on the relay and the announce — the three acts every device performs on connect' },
   // Siblings follow a circle (L109, 2026-09-21): a circle founded or joined on one device reaches the others. A shell
   // that hands no consume in hears the carry and joins nothing; one that never asks misses what happened while it was off.

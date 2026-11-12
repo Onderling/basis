@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo, createTimeSlice } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -200,7 +200,9 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const events = [];
     const seenByAuthorParent = new Map();   // `${author}|${parent}` → Set(hash) — fork detection
     const disputedRefs = new Set();
+    const slice = createTimeSlice();   // a read of many statements gives the thread back between checks
     for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+      await slice();
       if (stmt?.tombstone === true) continue;   // a compacted statement has no event to project (L121)
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
@@ -234,7 +236,9 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const bodies = [];
     const seenByAuthorParent = new Map();
     const disputed = new Set();
+    const slice = createTimeSlice();
     for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+      await slice();
       if (stmt?.tombstone === true) {
         // A TOMBSTONE (L121): verified and bound when it landed; compacted to its chain fields on the fold's own
         // word. It carries no content the fold could act on (payload = the authorRef alone, which every consumer

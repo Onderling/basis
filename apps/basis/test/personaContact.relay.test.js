@@ -12,6 +12,7 @@ import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './sup
 import { pairCircleIdFor } from '../src/v2/pairRoster.js';
 import { EventLog } from '../src/eventLog.js';
 import { decodeContactCard } from '../src/v2/contactCardLink.js';
+import { acceptMessageRequest } from '../src/v2/messageRequestAccept.js';
 
 describe('a contact filed under a persona talks to that persona', () => {
   let relay; let phone; let cor; let B; let personaId;
@@ -53,6 +54,11 @@ describe('a contact filed under a persona talks to that persona', () => {
     const A = phone.pubKey;
     const before = cor.received.length;   // (the harness's own connect greets everyone first — not the contact's doing)
     await phone.contactThreadChannel.sendTurn({ peerAddr: cor.pubKey, threadId: cor.pubKey, text: 'hoi Cor, hier de buurman', messageId: 't-1' }).sent;
+    // Cor never chose B: the first turn is a REQUEST from B (never from the default), and Cor accepts it
+    const req = await until(async () => (((await cor.agent.callSkill('pinboard', 'listMessageRequests', {}))?.requests ?? []).find((q) => q.from === B.chatId.pubKey) ?? null), { timeout: 20_000, step: 200 });
+    expect(req, 'Cor has a request from B').toBeTruthy();
+    expect(((await cor.agent.callSkill('pinboard', 'listMessageRequests', {}))?.requests ?? []).map((q) => q.from)).not.toContain(A);
+    expect((await acceptMessageRequest({ callSkill: (a, o, x) => cor.agent.callSkill(a, o, x), channel: cor.contactThreadChannel, from: B.chatId.pubKey }))?.accepted).toBe(true);
     // Cor's thread is keyed by the sender's identity: the turn is in B's thread, and the default has none
     const inB = await until(async () => ((await cor.contactThreadChannel.rehydrate(B.chatId.pubKey)) ?? []).find((t) => t.text === 'hoi Cor, hier de buurman') ?? null, { timeout: 20_000, step: 200 });
     expect(inB, 'Cor has it from B').toBeTruthy();

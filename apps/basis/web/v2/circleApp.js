@@ -2434,6 +2434,8 @@ function buildCircleBot(agent) {
     openFor: agent.contactSeal?.openFor ?? null,
     // a turn to a bot my identity is linked to (`/koppel`) carries this device's statement over it
     authFor: agent.linkedTurnAuth ?? null,
+    // a first message from someone the person did not choose is a request, decided before anything is kept
+    messageRequests: agent.messageRequests ?? null,
     // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
     selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
     localActor: LOCAL_ACTOR,
@@ -9816,6 +9818,8 @@ async function boot() {
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
             // A file sealed to the person opens with my key for the version it names (the text turn's seal).
             openFor: (sealed, fromAddr) => agent.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
+            // a file from someone the person did not choose is refused (the channel's door decides who is known)
+            isKnownSender: (contactId, fromAddr, to) => (circleContactChannel?.knownSender ? circleContactChannel.knownSender(contactId, fromAddr, to) : true),
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
@@ -9830,6 +9834,8 @@ async function boot() {
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
             noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
+            // a turn from someone the person did not choose is not kept (the channel's door decides who is known)
+            isKnownSender: (contactId, fromAddr, to) => (circleContactChannel?.knownSender ? circleContactChannel.knownSender(contactId, fromAddr, to) : true),
           }),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user
           // "shared with me" store; the surface opens each with this device's own network-derived sealing key.

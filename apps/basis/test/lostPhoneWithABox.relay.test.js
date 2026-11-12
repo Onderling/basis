@@ -64,6 +64,8 @@ async function enrolBox(dataDir, env, offerUri, phrase) {
   const box = run(['--data-dir', dataDir], { env });
   expect(await until(async () => (box.out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 }), `the box never came up:\n${box.out.slice(-1500)}`).toBe(true);
   expect(await until(async () => walkLog(dataDir).filter((e) => e.kind === 'enroll-offer').length ? true : null, { timeout: 60_000, step: 500 }), 'the box never consumed the offer').toBe(true);
+  // the box has the person's profile (the feedback persona's policy among it) once its catch-up has landed
+  expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'profile-facts-landed') ?? null, { timeout: 30_000, step: 500 }), 'the box never got the person\'s profile facts').toBeTruthy();
   return box;
 }
 
@@ -93,6 +95,9 @@ describe('the phone is lost, and there is a box', () => {
 
     phrase = (await phone.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(phrase?.split(/\s+/).length).toBe(24);
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await phone.agent.setFirstMessages('open')).toBe('open');
     const offer = await phone.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     box = await enrolBox(dataDir, env, offer.uri, phrase);
@@ -162,6 +167,9 @@ describe('the phone is lost, and there is a box', () => {
   it('6 · the box re-enrols from the new phone — in a fresh data dir — and takes feedback again, which the new phone sees', async () => {
     try { box.child.kill('SIGTERM'); } catch { /* */ }
     await box.exited;
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await newPhone.agent.setFirstMessages('open')).toBe('open');
     const offer = await newPhone.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     // The retired install refuses to enrol again, and says what to do instead — before asking for the phrase.

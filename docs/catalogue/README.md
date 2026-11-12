@@ -26,6 +26,6 @@ Rule for anyone ruling on absence: before "not built" or "needs design", read th
 | lists | plain lines, sendable lists | owed |
 | household-bot | the bot in a circle: add/done, nudges, digests | owed |
 | nearby | rooms, levels, connection points, LAN/BLE | owed |
-| contacts-and-personas | contacts, trust, personas, disclosure, Mij | owed |
+| [contacts-and-personas.md](contacts-and-personas.md) | contacts, trust, personas, disclosure, Mij, message requests, blocking | started 2026-11-12 |
 | feedback | the feedback app (its own repo; one row here) | owed |
 | relay-and-box | relay, the always-on box, companion, delivery ladder | owed |

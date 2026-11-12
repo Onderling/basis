@@ -1500,3 +1500,26 @@ gate decided, each candidate transport by kind with why it is or is not eligible
 and the outcome. It shows in the copy-log door and, on a test build, in logcat, so a failure on a phone names its branch
 without a new instrument. Connection points compare in one form (`samePoint`): spellings of one relay match, two names
 for one host do not.
+
+## 2026-11-12 — A first message from someone you did not choose is a request; the persona decides who may write first (Frits)
+
+A first contact turn from someone the person did not choose is HELD as a message request (`message-request`, in the
+self's own-devices store, beside the contact book and never in it), decided at the contact channel's door before
+anything is kept: no contact row, no pair circle, no thread turn, no delivery receipt. Before this, the card riding a
+first message went straight into the book and the pair roster made a circle, so "in the book" meant "wrote first", and
+the receipt and the person key's allowlist could not tell a chosen contact from a stranger. Known, and so let on as
+before: one's own devices, a member of a circle one is in, a contact in the book (hidden ones too), and anyone one wrote
+to first. The person accepts (the held card goes into the book as a scanned card does, the held turns move into the
+thread in order), ignores (kept, still acceptable), or blocks. A file or a threaded answer from someone not known is not
+kept; a request holds no files.
+
+**The persona is the policy** for who may write first: a profile property `firstMessages`, `request` or `open` (anyone,
+within the stranger budgets), reaching every device of the person with the profile's facts and never released by a
+reveal preset. A person's persona is `request` until they choose; a function profile's is `open` (a bot is a persona
+whose door is open; its own admission still decides). The persona a message is for is the one whose identity answers
+on the address it arrived on. The feedback persona ("Onderling") is open; the general persona is not bridged to it.
+A box is managed through its profile like any device, not through environment settings.
+
+**Block** is the existing block set (`/block`, the secure agent's), on this device for now: a block reaching all the
+person's devices is a later step. A block is by identity and the addresses it had; a fresh key gets past it as a new
+stranger, and the stranger budgets are the defence there. Ledger: L806, L807, L808.

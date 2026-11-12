@@ -25,6 +25,7 @@
  * injects `sendToPeer` + registers `replyHandler(onReply)` in its peer router.
  */
 
+import { createMessageRequestDoor } from './messageRequestDoor.js';
 import { createAddressedDeliver, chatTurnsFromItems } from '@onderling/item-store';
 import { cardNamesSender } from './contactCardLink.js';
 import { applyPresendFloor } from './presendFloor.js';
@@ -131,7 +132,52 @@ export function createContactThreadChannel({
   // null for anyone else — the bot accepts a turn as the person only by it, so a device the person revoked is a
   // stranger there. It rides inside the seal when there is one. Absent: turns carry none, as before.
   authFor = null,
+  // A FIRST MESSAGE FROM SOMEONE THE PERSON DID NOT CHOOSE IS A REQUEST (Frits 2026-11-12): `messageRequests` is the
+  // agent's door (`agent.messageRequests`: `policy()`, `isKnown(key)`, `hold(turn)`). Each inbound turn is decided BEFORE
+  // anything is kept (messageRequestDoor.js): a known sender's turn goes on as below; anyone else's is held on their
+  // request and nothing else happens (no card into the book, no pair roster, no thread turn, no receipt). A persona
+  // whose policy is 'open' (anyone may write; a bot's by default) lets a stranger's turn go on, within the stranger
+  // budgets. Absent: every turn goes on, as before.
+  messageRequests = null,
+  // `onDoor({ verdict })`: told each door decision that kept a turn from the thread ('held' | 'dropped'), the verdict
+  // only, never who or what (a host's walk log counts them). Optional.
+  onDoor = null,
 } = {}) {
+  // the person wrote to them first (an outbound turn of theirs in the thread): chosen, so their answer is never a request
+  const wroteTo = async (contactId) => {
+    if (!contactId) return false;
+    try { return (await rehydrateAll()).some((t) => t.contactId === contactId && t.origin === 'user'); } catch { return false; }
+  };
+  let requestDoor = null;
+  const doorFor = () => (requestDoor ??= createMessageRequestDoor({
+    isKnown: (key) => messageRequests.isKnown(key),
+    iWrote: wroteTo,
+    hold: (turn) => messageRequests.hold(turn),
+    now,
+  }));
+  /** The policy for first messages of the persona a turn was written to (`to`): 'open' or 'request' (the default). */
+  const policyNow = async (to = null) => {
+    if (typeof messageRequests?.policy !== 'function') return 'request';
+    try { return (await messageRequests.policy(to)) === 'open' ? 'open' : 'request'; } catch { return 'request'; }
+  };
+  /**
+   * Whether a sender is KNOWN to this person (the door's question, without holding anything): asked by the other doors
+   * into a contact thread (a file, a threaded answer), which keep nothing from someone the person did not choose.
+   * True when there is no door (or it is inactive: a function profile).
+   */
+  async function knownSender(contactId, fromAddr, to = null) {
+    if (!messageRequests || typeof messageRequests.isKnown !== 'function') return true;
+    if ((await policyNow(to)) === 'open') return true;
+    for (const k of [fromAddr, contactId]) {
+      try { if (k && (await messageRequests.isKnown(k)) === true) return true; } catch { /* next */ }
+    }
+    return wroteTo(contactId);
+  }
+  /** 'known' when this turn goes on; 'held' or 'dropped' when the door kept it from everything else. */
+  const decideAtDoor = async (m) => {
+    if (!messageRequests || typeof messageRequests.hold !== 'function') return 'known';
+    return doorFor()({ ...m, policy: await policyNow(m.to ?? null) });
+  };
   const hiddenNow = async (contactId) => {
     if (typeof isHidden !== 'function' || !contactId) return false;
     try { return (await isHidden(contactId)) === true; } catch { return false; }
@@ -605,7 +651,7 @@ export function createContactThreadChannel({
   }
 
   function makeInboundHandler(subtype, cb) {
-    return async function onContactInbound(fromAddr, payload) {
+    return async function onContactInbound(fromAddr, payload, ctx = {}) {
       if (!payload || payload.subtype !== subtype) return;   // not ours
       if (typeof cb !== 'function') return;
       let text = payload.text ?? '';
@@ -626,6 +672,12 @@ export function createContactThreadChannel({
         if (typeof content.card === 'string') card = content.card;
         if (typeof content.admission === 'string') admission = content.admission;
         if (content.auth && typeof content.auth === 'object') auth = content.auth;
+      }
+      // THE DOOR, before anything is kept: a sender the person did not choose is held as a request, and nothing below
+      // runs for them (no card into the book, no pair roster, no thread turn, no receipt)
+      if (messageRequests) {
+        const verdict = await decideAtDoor({ contactId: resolveId(fromAddr), fromAddr, text, card, messageId: payload.messageId ?? null, ts: Number.isFinite(payload.ts) ? payload.ts : null, to: ctx?.to ?? null });
+        if (verdict !== 'known') { try { onDoor?.({ verdict }); } catch { /* a count never breaks a turn */ } return; }
       }
       // The sender's card — taken only when it names the person this message is from (the shell's read of the
       // address); the shell adds it to the book. Never on the thread; the words go on regardless.
@@ -661,5 +713,5 @@ export function createContactThreadChannel({
   /** What runs when a contact's turn LANDS here (the shells hand it the delivery receipt sender). One; null unsets. */
   function setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; }
 
-  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, setLandedHook, contactOfMessage, subtypes };
+  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, knownSender, setLandedHook, contactOfMessage, subtypes };
 }

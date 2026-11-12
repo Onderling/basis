@@ -308,6 +308,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,
         authFor: agent.linkedTurnAuth ?? null,          // a turn to a linked bot carries this device's statement, as the shells compose it
+        messageRequests: agent.messageRequests ?? null,   // a stranger's first message is a request, as the shells compose it
         localActor: pubKey,
         fanToOwnDevices: agent.contactTurnFan,
         // the pair roster (L105), composed as both shells do. A walk of the CARD-ONLY path (the chain pull after a

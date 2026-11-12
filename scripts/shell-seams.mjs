@@ -197,6 +197,16 @@ export const SEAMS = Object.freeze([
   // The first message carries the sender's card (2026-09-21): a device that does not hand its card in leaves the
   // other side a nameless row; one that does not take a card in never names the people who write to it.
   { id: 'contact-channel-my-card',   pattern: /myCard:/,                          why: 'the first message to a contact carries my card — name, handle, where to write back, the person key' },
+  // A first message from someone the person did not choose is a REQUEST (Frits 2026-11-12): the channel decides at its
+  // door, before the card, the pair roster or the thread see the turn. A shell without it lets a stranger's first turn
+  // write a contact row and a pair circle (measured), which the receipt and the person key's allowlist then trust.
+  // The agent switches it off on a function profile, whose own door decides.
+  // …and the other doors into a contact thread (a file, a threaded answer to a post) keep nothing from such a sender:
+  // they ask the channel's `knownSender`. Mobile builds both doors in the SHARED inbound wiring (src/v2/inboundWiring.js,
+  // which asks the channel itself), so it has them by construction; web builds its own and is checked here. The box
+  // registers neither door.
+  { id: 'contact-doors-ask-known', pattern: /isKnownSender:\s*\(contactId, fromAddr, to\)/, shells: ['web'], why: 'a file or a threaded turn from someone the person did not choose is not kept, on every painting shell' },
+  { id: 'contact-channel-requests', pattern: /messageRequests:\s*agent\.messageRequests/, why: 'a stranger\'s first message is held as a request, never a contact, on every shell' },
   { id: 'contact-channel-on-card',   pattern: /onCard:/,                          why: 'a card that arrives with a message (naming its sender) goes into the book; the book carry names them on every device' },
   { id: 'pair-roster',           pattern: /createPairRoster\(/,                 why: 'the hidden two-member circle every written-to contact gets; DMs ride it (L105)' },
   { id: 'pair-roster-lens',      pattern: /shareRelease:/,                      why: 'the founder says on a new pair circle what THIS contact\'s persona discloses — which persona a contact sees you as (the lens, persona step 3)' },

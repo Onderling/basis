@@ -36,6 +36,9 @@ describe('attachments on the phone — a file into a contact thread crosses to t
     relay = await startJourneyRelay();
     anna = await bootMobileNode({ name: 'anna', relayUrl: relay.url });
     bob = await bootMobileNode({ name: 'bob', relayUrl: relay.url });
+    // Bob chose Anna (her card in his book): a file from someone he did not choose is refused (a request holds none)
+    const card = (await anna.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+    expect((await bob.agent.callSkill('pinboard', 'addContactFromQr', { payload: card }))?.error ?? null).toBe(null);
   }, 90_000);
   afterAll(async () => { await anna?.dispose(); await bob?.dispose(); await relay?.close(); });
 

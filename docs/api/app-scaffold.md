@@ -7,6 +7,8 @@ A pure manifest→app scaffolder. Takes an app manifest + a `requires` capabilit
 
 README: [`packages/app-scaffold/README.md`](../../packages/app-scaffold/README.md) · Index: [docs/api/README.md](README.md)
 
+_Note: the entry could not be imported outside its peer context (Cannot find package '@onderling/sdk' imported from /home/frits/expotest/wt-train/packages/app-scaffold/src/index.js); analysed statically._
+
 ### `APP_SCAFFOLD_CODES`
 
 **Kind:** constant · **Import:** `APP_SCAFFOLD_CODES` from `'@onderling/app-scaffold'`

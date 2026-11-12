@@ -9,17 +9,17 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 
 **Entry points**
 
-- `'@onderling/transports'`
-- `'@onderling/transports/mdns'`
+- `'@onderling/transports'` — could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/transports/src/NknTransport.js); analysed statically
+- `'@onderling/transports/mdns'` — could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/transports/src/MdnsTransport.js); analysed statically
 - `'@onderling/transports/mdns-node'`
-- `'@onderling/transports/mdns-dnssd'`
+- `'@onderling/transports/mdns-dnssd'` — could not be imported outside its peer context (Cannot find package 'bonjour-service' imported from /home/frits/expotest/wt-train/packages/transports/src/mdnsDnsSdDiscovery.js); analysed statically
 - `'@onderling/transports/utils/base64'`
 
 ## `src/MdnsTransport.js`
 
 ### `lanWhisperSecret`
 
-**Kind:** function · **Import:** `lanWhisperSecret` from `'@onderling/transports/mdns'`
+**Kind:** constant · **Import:** `lanWhisperSecret` from `'@onderling/transports/mdns'`
 
 A whisper secret from material two parties already share, under a purpose label. See `mdnsChannel.js`.
 
@@ -31,19 +31,19 @@ How many tags each side whispers on a LAN connection: its secrets first, random 
 
 ### `channelEphemeralKeyPair`
 
-**Kind:** function · **Import:** `channelEphemeralKeyPair` from `'@onderling/transports/mdns'`
+**Kind:** constant · **Import:** `channelEphemeralKeyPair` from `'@onderling/transports/mdns'`
 
 A fresh ephemeral X25519 key pair for one hello (never stored). See `mdnsChannel.js`.
 
 ### `channelTranscript`
 
-**Kind:** function · **Import:** `channelTranscript` from `'@onderling/transports/mdns'`
+**Kind:** constant · **Import:** `channelTranscript` from `'@onderling/transports/mdns'`
 
 The hello transcript (both LAN keys, both nonces, both ephemeral keys) a channel is bound to. See `mdnsChannel.js`.
 
 ### `openLanChannel`
 
-**Kind:** function · **Import:** `openLanChannel` from `'@onderling/transports/mdns'`
+**Kind:** constant · **Import:** `openLanChannel` from `'@onderling/transports/mdns'`
 
 Open one end of a LAN connection's channel once its hello is proven. See `mdnsChannel.js`.
 
@@ -129,8 +129,6 @@ exercise:
 A backend with `start` but no `startAdvertising`/`startDiscovery` is honoured as far as it goes and says
 so — see `_applyDiscoverability`.
 
-**Methods:** `useLanIdentity()` · `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `addAddress()` · `useWhisper()` · `_defaultSenderFor()` · `_mayCarry()` · `_put()`
-
 ## `src/MqttTransport.js`
 
 ### `MqttTransport`
@@ -146,8 +144,6 @@ MQTT-broker `Transport`: the agent subscribes to its own inbox topic `onderling/
 publishes outbound envelopes to `onderling/<to>/in`. The address is 24 lowercase hex chars derived
 from the first 12 bytes of the identity's Ed25519 pubKey. Requires the `mqtt` package (peer
 dependency), dynamic-imported on `connect()`.
-
-**Methods:** `connect()` · `disconnect()` · `_put()`
 
 ## `src/NetworkTransport.js`
 
@@ -203,8 +199,6 @@ HTTP, anything that can carry a JSON string. Overrides only `_put`, encoding env
 fetch/HTTP mode, a response envelope whose `_re` matches a request currently served by
 `handleNetworkRequest` resolves that capture instead of being pushed outbound. Envelopes arrive
 SecurityLayer-encrypted, so the receiving agent's capability gate is unchanged.
-
-**Methods:** `_put()` · `receiveFrame()` · `_serveRequest()`
 
 ### `createNetworkTransport`
 
@@ -263,8 +257,6 @@ identity's Ed25519 seed, so it is deterministic per keypair. Pass the library as
 (browser/CDN) or let `connect()` dynamic-import it (Node). Includes robustness handling for
 slow connects: transient send retries, a soft warning, and a hard timeout with seedless retry.
 
-**Methods:** `connect()` · `disconnect()` · `_put()` · `_deriveSeed()`
-
 ## `src/RelayTransport.js`
 
 ### `RelayTransport`
@@ -282,8 +274,6 @@ backoff (capped at 30s) until `disconnect()`. Also supports the relay's opt-in p
 protocol (`registerPushToken`/`unregisterPushToken`). Uses `ws` in Node.js and falls back to
 `globalThis.WebSocket` in browsers.
 
-**Methods:** `addAddress()` · `_bindAddress()` · `setPrimaryDevice()` · `_unbindAddress()` · `canReach()` · `connect()` · `disconnect()` · `_put()` · `registerPushToken()` · `unregisterPushToken()` · `forgetPeer()`
-
 ## `src/RendezvousTransport.js`
 
 ### `RendezvousTransport`
@@ -300,8 +290,6 @@ signaling transport (e.g. `RelayTransport`), then moves all further traffic to a
 RTCDataChannel — the relay leaves the data path once the channel opens. Browser-first; Node and
 React Native need an injected `rtcLib` polyfill. Use `RendezvousTransport.isSupported()` to
 guard instantiation where WebRTC globals may be missing.
-
-**Methods:** `connect()` · `disconnect()` · `connectToPeer()` · `hasOpenChannelTo()` · `canReach()` · `_put()`
 
 ## `src/mdnsDnsSdDiscovery.js`
 

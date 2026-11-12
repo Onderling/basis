@@ -7,6 +7,8 @@ Cross-app item-type taxonomy + JSON Schema validation. Ships the canonical types
 
 README: [`packages/item-types/README.md`](../../packages/item-types/README.md) · Index: [docs/api/README.md](README.md)
 
+_Note: the entry could not be imported outside its peer context (Cannot find package 'ajv' imported from /home/frits/expotest/wt-train/packages/item-types/src/registry.js); analysed statically._
+
 ## `index.js`
 
 ### `_defaultRegistryBuilt`

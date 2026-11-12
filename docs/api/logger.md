@@ -7,6 +7,8 @@ Privacy-first structured logging facade + on-device ring buffer (web ≡ mobile)
 
 README: [`packages/logger/README.md`](../../packages/logger/README.md) · Index: [docs/api/README.md](README.md)
 
+_Note: the entry could not be imported outside its peer context (Cannot find package '@onderling/params' imported from /home/frits/expotest/wt-train/packages/logger/src/index.js); analysed statically._
+
 ### `REDACTED`
 
 **Kind:** constant · **Import:** `REDACTED` from `'@onderling/logger'`

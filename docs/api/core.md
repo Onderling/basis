@@ -9,8 +9,8 @@ README: [`packages/core/README.md`](../../packages/core/README.md) · Index: [do
 
 **Entry points**
 
-- `'@onderling/core'`
-- `'@onderling/core/conformance'` — could not be imported outside its peer context (Vitest failed to access its internal state.); analysed statically
+- `'@onderling/core'` — could not be imported outside its peer context (Cannot find package 'tweetnacl' imported from /home/frits/expotest/wt-train/packages/core/src/identity/AgentIdentity.js); analysed statically
+- `'@onderling/core/conformance'` — could not be imported outside its peer context (Cannot find package 'vitest' imported from /home/frits/expotest/wt-train/packages/core/src/conformance/transportConformance.js); analysed statically
 
 ## `../params/src/params.js`
 
@@ -94,8 +94,6 @@ registries, peer graph, storage, config, and routing strategy. Register skills w
 envelopes; talk to peers via `hello()` and `invoke()`. Emits lifecycle and protocol
 events (extends Emitter).
 
-**Methods:** `addTransport()` · `removeTransport()` · `getTransport()` · `addPeer()` · `forget()` · `register()` · `bindToHub()` · `unbindFromHub()` · `start()` · `stop()` · `transportFor()` · `routeFor()` · `reachabilityFor()` · `hello()` · `call()` · `invoke()` · `invokeWithHop()` · `callWithHop()` · `swapIdentity()` · `enableRelayForward()` · `enableTunnelForward()` · `enableReachabilityOracle()` · `enableRendezvous()` · `upgradeToRendezvous()` · `isRendezvousActive()` · `enableSealedForwardFor()` · `disableSealedForwardFor()` · `getSealedForwardConfig()` · `setHelloGate()` · `startDiscovery()` · `enableAutoHello()` · `message()` · `introduce()` · `discoverA2A()` · `issueCapabilityToken()` · `issueA2ACapabilityToken()` · `storeA2AToken()` · `discoverSkills()` · `publish()` · `clearPubSubHistory()` · `export()` · `_asCallCtx()` · `_dispatch()`
-
 ## `src/Emitter.js`
 
 ### `Emitter`
@@ -109,8 +107,6 @@ new Emitter()
 
 Tiny EventEmitter — no dependencies.
 Works in browser, Node.js, and React Native.
-
-**Methods:** `on()` · `off()` · `once()` · `emit()` · `removeAllListeners()`
 
 ## `src/Envelope.js`
 
@@ -286,8 +282,6 @@ Trust tier assignment for inbound callers:
 Note: JWT signature is NOT verified here (trust TLS + token issuer).
 For production use, configure an issuer + JWKS URI for signature verification.
 
-**Methods:** `validateInbound()` · `buildHeaders()` · `storeToken()` · `getToken()`
-
 ## `src/a2a/A2ATLSLayer.js`
 
 ### `A2ATLSLayer`
@@ -306,8 +300,6 @@ the SecurityLayer interface expected by Transport (encrypt / decryptAndVerify)
 with pass-throughs, while also providing HTTP-level auth helpers used
 directly by A2ATransport.
 
-**Methods:** `encrypt()` · `decryptAndVerify()` · `registerPeer()` · `learnPeerKey()` · `wrapOutbound()` · `validateInbound()`
-
 ## `src/a2a/A2ATransport.js`
 
 ### `A2ATransport`
@@ -325,8 +317,6 @@ optional static-file serving); as a client it maps outbound RQ/OW/CX envelopes t
 the peer's A2A endpoints. Pair with A2ATLSLayer so envelope crypto is a pass-through
 (authentication lives in the HTTP layer).
 
-**Methods:** `connect()` · `disconnect()` · `_put()`
-
 ## `src/a2a/AgentCardBuilder.js`
 
 ### `AgentCardBuilder`
@@ -342,8 +332,6 @@ Builds the A2A-compatible agent-card JSON for an agent, filtered by caller trust
 tier: `build(requestTier)` lists only skills whose visibility tier is at or below
 the request tier. Name/description/url/relay/groups come from the optional config;
 the pubKey and skill list come from the agent itself.
-
-**Methods:** `build()`
 
 ## `src/a2a/a2aDiscover.js`
 
@@ -436,8 +424,6 @@ developer overrides into a static baseline at construction; `set()` adds runtime
 overrides on top (highest priority) and emits 'changed', `reset()` reverts a path
 back to the baseline. Values are read by dot-path via `get()`.
 
-**Methods:** `get()` · `set()` · `reset()` · `snapshot()` · `_reload()`
-
 ## `src/conformance/actorResolverConformance.js`
 
 ### `assertActorResolverConformance`
@@ -486,6 +472,43 @@ Uses vitest's expect, so it must run inside a vitest test.
 - `[opts]` `object`
 - `[opts.label='DataSource']` `string`
 - `[opts.supportsQuery=false]` `boolean` — also exercise `query()`.
+
+## `src/conformance/ed25519Conformance.js`
+
+### `ED25519_EDGE_VECTORS`
+
+**Kind:** constant · **Import:** `ED25519_EDGE_VECTORS` from `'@onderling/core/conformance'`
+
+Ed25519 conformance: the 12 published edge-case vectors and the answer the platform's strict rule gives on each.
+
+Source: ed25519-speccheck (github.com/novifinancial/ed25519-speccheck, cases.json, fetched 2026-11-12), the vectors of
+"Taming the many EdDSAs" (Chalkias, Garillot, Nikolaenko, 2020). Each is [message, public key, signature] in hex.
+Under the platform's rule (`crypto/ed25519Strict.js`, rule set 'ed25519-strict-1') exactly case 3 is valid.
+
+An adapter that checks signatures faster (a native module, node:crypto, WebCrypto) proves it gives the same answer
+by running `ed25519Disagreements(verify)` and expecting an empty list. Runner-agnostic: no test framework needed.
+
+### `ED25519_ACCEPTED`
+
+**Kind:** constant · **Import:** `ED25519_ACCEPTED` from `'@onderling/core/conformance'`
+
+The vector indexes that are VALID under the strict rule.
+
+### `ed25519Disagreements`
+
+**Kind:** function · **Import:** `ed25519Disagreements` from `'@onderling/core/conformance'`
+
+```js
+ed25519Disagreements(verify)
+```
+
+Where a check disagrees with the rule on the vectors.
+
+**Parameters**
+
+- `verify` `(msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean`
+
+**Returns:** `Array<{ index: number, expected: boolean, got: boolean }>`
 
 ## `src/conformance/storageBackendConformance.js`
 
@@ -622,8 +645,6 @@ Each round invokes the peer's 'peer-list' skill, feeds returned discoverable
 cards to PeerDiscovery.discoverByIntroduction, and pulls the peer's signed
 reachability claim into the PeerGraph oracle fields.
 
-**Methods:** `start()` · `stop()` · `runRound()`
-
 ## `src/discovery/PeerDiscovery.js`
 
 ### `PeerDiscovery`
@@ -640,8 +661,6 @@ URLs (stub), direct introductions, and group bootstrap lists. Constructs and
 starts/stops a PingScheduler and GossipProtocol, and registers the 'peer-list'
 responder skill on start().
 
-**Methods:** `start()` · `stop()` · `discoverByQR()` · `discoverByUrl()` · `discoverByIntroduction()` · `discoverByGroupBootstrap()`
-
 ## `src/discovery/PeerGraph.js`
 
 ### `PeerGraph`
@@ -657,8 +676,6 @@ Registry of known peers with merge-on-upsert semantics, filtered queries, and
 change events ('added', 'removed', 'cleared', 'reachable', 'unreachable').
 Records are keyed by pubKey (or url for A2A-only peers) and persisted through a
 pluggable key-value backend; without one, an in-memory Map is used.
-
-**Methods:** `upsert()` · `get()` · `addressesOf()` · `all()` · `remove()` · `clear()` · `withSkill()` · `inGroup()` · `reachable()` · `fastest()` · `a2aAgents()` · `canHandle()` · `setReachable()` · `updateLatency()` · `updateTier()` · `export()` · `import()`
 
 ## `src/discovery/PingScheduler.js`
 
@@ -679,8 +696,6 @@ persistently unreachable peer is pinged less frequently over time.
 
 Backoff sequence (in units of the base interval):
   failures: 0 → 1 → 2 → 4 → 8 → 16 → … (capped at maxBackoffMs)
-
-**Methods:** `start()` · `stop()` · `pingAll()`
 
 ## `src/discovery/peerFacade.js`
 
@@ -764,8 +779,6 @@ carries `stableId` (rotation-surviving user id) and `deviceId` (per-install id),
 persisted in the vault. Construct via the static factories (`generate`, `restore`,
 `fromMnemonic`, `fromSeed`, …) so seed persistence and id init happen.
 
-**Methods:** `getMnemonic()` · `sign()` · `box()` · `unbox()` · `deriveSessionKey()` · `sharedCopyOpener()`
-
 ## `src/identity/Bootstrap.js`
 
 ### `Bootstrap`
@@ -782,8 +795,6 @@ Root identity secret + key derivation.
 Construct via `Bootstrap.create()`, `Bootstrap.fromSeed(bytes)`, or
 `Bootstrap.fromMnemonic(phrase)`.  Direct `new Bootstrap(...)` is
 possible but the static factories validate inputs.
-
-**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveProfileAuthority()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()`
 
 ### `deriveVaultAtRestKeyFrom`
 
@@ -819,8 +830,6 @@ Implementations MUST persist `bytes` keyed by `ref` and return the same
 bytes from `get(ref)`.  `delete(ref)` removes the blob; `list()` returns
 the set of refs currently stored.
 
-**Methods:** `put()` · `get()` · `delete()` · `list()`
-
 ### `MemoryAdapter`
 
 **Kind:** class · **Import:** `MemoryAdapter` from `'@onderling/core'`
@@ -835,8 +844,6 @@ MemoryAdapter — in-memory `CloudAdapter` for tests and local development.
 Not for production: no persistence, no concurrency control, no quota.
 Useful as a stand-in while concrete adapters are deferred and as
 the substrate for `CloudBackup.test.js`.
-
-**Methods:** `put()` · `get()` · `delete()` · `list()`
 
 ## `src/identity/CloudBackup.js`
 
@@ -855,8 +862,6 @@ CloudBackup — orchestrates encrypt/upload + download/decrypt against a
 Construct once per (adapter, ref) pair.  The instance is stateless beyond
 its constructor args: each `upload`/`restore` call performs a fresh round
 trip.
-
-**Methods:** `upload()` · `restore()` · `exists()` · `deleteRemote()`
 
 ## `src/identity/Mnemonic.js`
 
@@ -1957,8 +1962,6 @@ permission to call `skill` (exact id, '<prefix>.*', or '*') on `agentId` until
 `expiresAt`. Issue via the static `issue()`; check with `verify()` / `verifyAsync()`
 / `verifyChain()`; `fromJSON()` re-hydrates a stored or wire token.
 
-**Methods:** `toJSON()` · `toString()`
-
 ### `offeringMatches`
 
 **Kind:** function · **Import:** `offeringMatches` from `'@onderling/core'`
@@ -2030,8 +2033,6 @@ Allow-list policy controlling which skills and agents may access which named
 data sources. checkAccess() throws DataSourceAccessDeniedError for a disallowed
 skill or agent; source labels absent from the config are open access.
 
-**Methods:** `checkAccess()`
-
 ## `src/permissions/GroupManager.js`
 
 ### `GroupManager`
@@ -2049,8 +2050,6 @@ under 'group-admin:<groupId>'. Member side: own proofs stored under
 'group-proof:<groupId>'. Proofs without a `role` field (pre-D3) verify fine and are
 treated as role 'member'.
 
-**Methods:** `issueProof()` · `setRole()` · `revokeProof()` · `issueInvite()` · `verifyInvite()` · `redeemInvite()` · `getRole()` · `listMembersByRole()` · `storeProof()` · `getProof()` · `hasValidProof()` · `verifyProof()` · `canChangeRole()` · `listGroups()`
-
 ## `src/permissions/PodCapabilityToken.js`
 
 ### `PodCapabilityToken`
@@ -2067,8 +2066,6 @@ permission to perform the listed scopes (`pod.read|write|delete|*:<path>`) again
 pod root `pod` until `expiresAt`. Issue via the static `issue()`; check with
 `verify()` / `verifyChain()`; `matchesScope()` implements the prefix-strict scope
 coverage rules; `fromJSON()` re-hydrates a stored or wire token.
-
-**Methods:** `toJSON()` · `toString()`
 
 ## `src/permissions/PolicyEngine.js`
 
@@ -2118,8 +2115,6 @@ via the TrustRegistry, then checks it against the skill's visibility and policy,
 honouring capability tokens, group roles (when a GroupManager is wired), and the
 issuer-side revocation resolver it was constructed with. Throws PolicyDeniedError on any denial;
 returns { tier, allowed: true } otherwise.
-
-**Methods:** `resolveActor()` · `checkCaller()` · `checkInbound()` · `checkOutbound()`
 
 ## `src/permissions/RoleBundle.js`
 
@@ -2272,8 +2267,6 @@ new RoleGrantManager({ identity, groupManager, agentId, store = null } = {})
 Grants a role to a member and materializes its bundle's capability tokens,
 tracking the issued token ids so revoking the role invalidates them through
 the PolicyEngine revocation hook.
-
-**Methods:** `ready()` · `isRevoked()` · `materializedTokenIds()` · `grant()` · `revoke()`
 
 ## `src/permissions/Roles.js`
 
@@ -2447,8 +2440,6 @@ granter's OWN authority and revocable with the task.
 OFF BY DEFAULT: a freshly-constructed manager has granted nothing. Authority
 exists on a task ONLY after an explicit `attachGrant`.
 
-**Methods:** `whenReady()` · `attachGrant()` · `revokeTaskGrants()` · `tokensForTask()` · `isRevoked()`
-
 ## `src/permissions/TokenRegistry.js`
 
 ### `TokenRegistry`
@@ -2463,8 +2454,6 @@ new TokenRegistry(vault)
 Vault-backed store for CapabilityTokens received from peers ("held" tokens). `get()`
 returns the latest-expiring valid token matching an agent+skill; `revoke()` marks a
 token locally revoked; `cleanup()` deletes expired tokens from the vault.
-
-**Methods:** `store()` · `get()` · `holds()` · `revoke()` · `isRevoked()` · `cleanup()`
 
 ## `src/permissions/TrustRegistry.js`
 
@@ -2486,8 +2475,6 @@ new TrustRegistry(vault)
 Vault-backed store of per-peer trust records ('trust:<pubKey>' → { tier, groups,
 tokenIds }). Unknown peers default to tier 'authenticated'. Used by PolicyEngine to
 resolve a caller's trust tier.
-
-**Methods:** `setTier()` · `getTier()` · `has()` · `getRecord()` · `addGroup()` · `removeGroup()` · `addTokenGrant()` · `all()`
 
 ## `src/permissions/groupProofVerify.js`
 
@@ -2546,8 +2533,6 @@ resolves write conflicts through the optional onConflict callback, stores
 cursor state in an injected Vault, and polls on an interval between explicit
 runOnce() cycles.
 
-**Methods:** `start()` · `stop()` · `runOnce()`
-
 ## `src/protocol/SkillsPubSub.js`
 
 ### `audienceFromHumanInTheLoop`
@@ -2601,8 +2586,6 @@ Construct one per agent.  Broadcasts go through the underlying pubSub;
 subscriptions register pattern listeners that fire on incoming `publish`
 events.
 
-**Methods:** `topicFor()` · `broadcastSkill()` · `broadcastAll()` · `subscribeToSkills()` · `followPublisher()` · `republishOnSkillChange()` · `destroy()`
-
 ## `src/protocol/Task.js`
 
 ### `Task`
@@ -2619,8 +2602,6 @@ Tracks submitted → working → terminal transitions (completed / failed /
 cancelled / expired, with input-required round-trips), buffers streaming chunks
 for stream(), and gives callers done(), cancel(), and send(). Emits 'done',
 'failed', 'cancelled', 'expired', 'input-required', and 'stream-chunk'.
-
-**Methods:** `done()` · `stream()` · `cancel()` · `send()` · `_transition()` · `_pushChunk()` · `_closeStream()`
 
 ## `src/protocol/hello.js`
 
@@ -3092,8 +3073,6 @@ A transport is "degraded" for a peer if markDegraded() was called and the
 `until` timestamp has not elapsed.  Degraded transports are ranked after
 all healthy transports.
 
-**Methods:** `record()` · `getBest()` · `markDegraded()` · `clearDegraded()` · `isDegraded()` · `getAll()` · `clear()`
-
 ## `src/routing/ReachabilityOracle.js`
 
 ### `REACHABILITY_ORACLE_TOPIC`
@@ -3118,8 +3097,6 @@ Signs and publishes this agent's direct-peer set on ORACLE_TOPIC (on start(), on
 transport add/remove, and on a heartbeat interval), verifies inbound claims with
 a per-issuer sequence replay guard, caches them with TTL eviction, and answers
 bridgeFor(peerId) with a deterministically chosen bridge issuer or null.
-
-**Methods:** `start()` · `stop()` · `notifyTransportChange()` · `bridgeFor()` · `knownIssuers()` · `getEntry()`
 
 ## `src/routing/ReachabilityTier.js`
 
@@ -3230,8 +3207,6 @@ priority order to pick the best transport; tierFor() additionally classifies the
 selection into 'direct' | 'mesh' | 'hop' reachability tiers, and routeLadder()
 exposes the full 'direct → mesh → hop → companion' rung ladder.
 
-**Methods:** `attachPeerGraph()` · `selectTransport()` · `onTransportFailure()` · `onTransportRecovered()` · `setPreferredTransport()` · `clearPreferredTransport()` · `getPreferredTransport()` · `addTransport()` · `removeTransport()` · `tierFor()` · `routeLadder()`
-
 ## `src/routing/invokeWithHop.js`
 
 ### `invokeWithHop`
@@ -3293,8 +3268,6 @@ the key IT carries — never against a key looked up by the address it claims. P
 learned from HI envelopes — established when we hold none for that address, never replaced by one
 (a key change arrives through the ceremony or the roster, not an envelope); HI itself is signed but
 plaintext.
-
-**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `swapIdentity()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `inProcessPeerKeys()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `encrypt()` · `decryptAndVerify()`
 
 ## `src/security/authorChain.js`
 
@@ -4312,8 +4285,6 @@ Indexed store of SkillDefinitions, keyed by id. Registration is last-write-wins
 (replace() instead asserts the id already exists); forTier() and forCaller()
 answer visibility-aware queries and getByPosture() filters on posture metadata.
 
-**Methods:** `register()` · `replace()` · `unregister()` · `get()` · `all()` · `forTier()` · `forCaller()` · `getByPosture()` · `has()`
-
 ## `src/skills/capabilities.js`
 
 ### `registerCapabilitiesSkill`
@@ -4526,8 +4497,6 @@ Each row binds the originator's outer taskId to the target's inner taskId; a
 periodic sweeper drops rows whose TTL has elapsed. Emits 'opened', 'closing',
 and 'closed'.
 
-**Methods:** `start()` · `stop()` · `add()` · `get()` · `getByCarolTaskId()` · `getByAliceTaskId()` · `has()` · `markClosing()` · `drop()` · `rows()`
-
 ## `src/state/StateManager.js`
 
 ### `StateManager`
@@ -4543,8 +4512,6 @@ Runtime registries for in-flight tasks, streams, and sessions, shared by the
 protocol handlers on an Agent. Entries carry TTLs (30 min for tasks, 10 min for
 streams and sessions); task creation sweeps all three registries, and task and
 stream lookups also expire lazily.
-
-**Methods:** `createTask()` · `getTask()` · `deleteTask()` · `openStream()` · `getStream()` · `closeStream()` · `openSession()` · `getSession()` · `closeSession()`
 
 ## `src/storage/DataSource.js`
 
@@ -4583,8 +4550,6 @@ traversal outside the configured root is required or enforced here.
                          `query` as best-effort and tolerate its absence.
 Every method is async (returns a Promise). Paths are opaque forward-slash keys.
 
-**Methods:** `read()` · `write()` · `delete()` · `list()` · `query()`
-
 ## `src/storage/FileSystemSource.js`
 
 ### `FileSystemSource`
@@ -4600,8 +4565,6 @@ Node.js filesystem DataSource rooted at a directory. All paths resolve under
 `root` (escaping it throws a path-traversal error), parent directories are
 created on write, and read() returns null for missing files. Node-only — the
 fs/path modules are imported lazily so browsers can still load the module.
-
-**Methods:** `read()` · `write()` · `delete()` · `list()` · `query()`
 
 ## `src/storage/IndexedDBSource.js`
 
@@ -4619,8 +4582,6 @@ The database is opened lazily on first operation; write() serialises
 Uint8Array/Buffer values to base64 strings. Browser-only — fails where
 IndexedDB is unavailable.
 
-**Methods:** `open()` · `read()` · `write()` · `delete()` · `list()` · `query()`
-
 ## `src/storage/MemorySource.js`
 
 ### `MemorySource`
@@ -4634,8 +4595,6 @@ new MemorySource()
 
 In-memory DataSource backed by a plain Map. Non-persistent; query() JSON-parses
 string values and matches objects by exact field equality.
-
-**Methods:** `read()` · `write()` · `delete()` · `list()` · `query()`
 
 ## `src/storage/MemoryStorageBackend.js`
 
@@ -4653,8 +4612,6 @@ strings, backed by a plain Map. The conformance reference (see
 `assertStorageBackendConformance`) and the local/test backend for the
 seal-is-the-gate path: it stores ciphertext verbatim, never decodes it, and
 holds no plaintext of its own. See the module header for the full contract.
-
-**Methods:** `put()` · `get()` · `list()`
 
 ## `src/storage/MergeContracts/appendOnlyEventLog.js`
 
@@ -4803,8 +4760,6 @@ over cleartext fields — only opaque put/get/list. Keeping it separate makes
 `ref` is an opaque forward-slash key; `ciphertext` is an opaque string (a
 sealed envelope). Every method is async (returns a Promise).
 
-**Methods:** `put()` · `get()` · `list()`
-
 ## `src/storage/StorageManager.js`
 
 ### `StorageManager`
@@ -4820,8 +4775,6 @@ Policy-gated facade over a set of named DataSources. Each operation resolves
 the labelled source and consults the optional DataSourcePolicy (which throws
 DataSourceAccessDeniedError on refusal) before delegating read, write, delete,
 list, or query to it.
-
-**Methods:** `getSource()` · `addSource()` · `removeSource()` · `read()` · `write()` · `delete()` · `list()` · `query()`
 
 ## `src/transport/InternalTransport.js`
 
@@ -4858,8 +4811,6 @@ In-process transport: all instances sharing one InternalBus can reach each other
 Delivery is deferred by a microtask, so it is asynchronous but near-instant. Used in
 unit tests and for running multiple agents inside the same JS process or browser tab.
 
-**Methods:** `peerTransport()` · `canReach()` · `connect()` · `disconnect()` · `_bindAddress()` · `_unbindAddress()` · `_put()`
-
 ## `src/transport/LocalTransport.js`
 
 ### `LocalTransport`
@@ -4876,8 +4827,6 @@ socket path, or full ws:// URL. Registers its address on open and feeds inbound
 'message' frames to `_receive`. No auto-reconnect: when the connection drops it
 emits 'disconnect' and must be reconnected manually.
 
-**Methods:** `connect()` · `disconnect()` · `_put()`
-
 ## `src/transport/OfflineTransport.js`
 
 ### `OfflineTransport`
@@ -4893,8 +4842,6 @@ No-op fallback transport for agents that start without a network interface.
 `connect()` succeeds immediately, `canReach()` is always false (so routing never
 selects it as a candidate), and `_put()` throws so any send fails fast. Real
 transports added at runtime take over via the routing strategy.
-
-**Methods:** `connect()` · `disconnect()` · `canReach()` · `_put()`
 
 ## `src/transport/Transport.js`
 
@@ -4913,8 +4860,6 @@ call `_receive(rawEnvelope)` for inbound traffic; the base then provides the
 interaction primitives (sendOneWay/sendAck/request/respond/sendHello), reply
 correlation, auto-ACK of AS envelopes, SecurityLayer wiring, and receive-handler
 dispatch. See the file header for the full port contract.
-
-**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_defaultSenderFor()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `holdsAddress()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_frameRefused()` · `_receive()` · `appMessageIdFor()` · `_send()` · `_awaitReply()`
 
 ## `src/transport/discoverability.js`
 

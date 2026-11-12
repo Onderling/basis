@@ -7,6 +7,8 @@ Requested-attributes charter — a coarse, capped, k-anon-guarded privacy mini-s
 
 README: [`packages/attribute-charter/README.md`](../../packages/attribute-charter/README.md) · Index: [docs/api/README.md](README.md)
 
+_Note: the entry could not be imported outside its peer context (Cannot find package '@noble/hashes' imported from /home/frits/expotest/wt-train/packages/attribute-charter/src/charter.js); analysed statically._
+
 ## `src/charter.js`
 
 ### `CHARTER_MAX_ATTRIBUTES`

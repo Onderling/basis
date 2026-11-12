@@ -9,8 +9,8 @@ README: [`packages/pod-client/README.md`](../../packages/pod-client/README.md) �
 
 **Entry points**
 
-- `'@onderling/pod-client'`
-- `'@onderling/pod-client/sealing'`
+- `'@onderling/pod-client'` — could not be imported outside its peer context (Cannot find package '@inrupt/solid-client' imported from /home/frits/expotest/wt-train/packages/pod-client/src/SolidPodSource.js); analysed statically
+- `'@onderling/pod-client/sealing'` — could not be imported outside its peer context (Cannot find package 'tweetnacl' imported from /home/frits/expotest/wt-train/packages/pod-client/src/sealing/envelope.js); analysed statically
 
 ## `src/Auth/Auth.js`
 
@@ -24,8 +24,6 @@ new Auth()
 ```
 
 Auth — interface bridging "who am I" to outgoing pod requests.
-
-**Methods:** `getAuthHeaders()` · `identity()` · `refresh()` · `close()`
 
 ## `src/Auth/CapabilityAuth.js`
 
@@ -66,8 +64,6 @@ request back to the issuing device via the injected `invoke` callback — auth-b
 are stripped and a request body over `maxBodyBytes` is refused before anything is sent.
 An unknown mode throws an `AuthError` (`AUTH_MODE_NOT_SUPPORTED`).
 
-**Methods:** `getAuthHeaders()` · `identity()` · `close()`
-
 ## `src/Auth/PodTokenRegistry.js`
 
 ### `PodTokenRegistry`
@@ -93,8 +89,6 @@ vault with a `TokenRegistry` without colliding.
 
 Vault keys:
   'pod-revoked:<tokenId>' → '1'
-
-**Methods:** `revoke()` · `isRevoked()` · `unrevoke()` · `list()`
 
 ## `src/Auth/PodTokenVerifier.js`
 
@@ -155,8 +149,6 @@ OIDC-session `Auth` for the user's own agent: wraps a `SolidVault` (or anything 
 `getAuthenticatedFetch()`) and hands its session-bound fetch to `PodClient`. `getAuthHeaders()`
 always throws — Solid OIDC needs per-request DPoP-style proofs, not static headers.
 
-**Methods:** `getAuthenticatedFetch()` · `getAuthHeaders()` · `identity()` · `refresh()` · `close()`
-
 ## `src/ConflictResolver.js`
 
 ### `ConflictResolver`
@@ -172,8 +164,6 @@ Payload for the `'conflict'` event that `PodClient.write` emits on HTTP 412. A l
 it by calling `resolveWith(content)` (re-issue the write with `force: true`) or `cancelWrite()`
 (abort with `ConflictError`); if nothing settles it, `PodClient`'s wait times out and the
 configured `conflictPolicy` applies. First settlement wins; later calls are no-ops.
-
-**Methods:** `resolveWith()` · `cancelWrite()` · `_wait()`
 
 ## `src/Errors.js`
 
@@ -381,8 +371,6 @@ sync or pod crawling. Tracks per-resource etags and, on an HTTP 412 write confli
 `deleteLocal(uri)` records a per-device tombstone that hides the URI from `list()` without
 touching the pod; URIs starting with `pseudo-pod://` are routed to the optional `pseudoPod`.
 
-**Methods:** `on()` · `off()` · `once()` · `removeAllListeners()` · `listenerCount()` · `read()` · `list()` · `write()` · `append()` · `patch()` · `createContainer()` · `delete()` · `deleteCompletely()` · `deleteLocal()` · `clearTombstone()` · `close()` · `disconnect()`
-
 ## `src/PodExporter.js`
 
 ### `PodExporter`
@@ -402,8 +390,6 @@ Construction:
   const exporter = new PodExporter({ podClient, podRoot, bootstrap });
   const archive  = await exporter.export({ encrypt: true, dataOnly: false });
 
-**Methods:** `export()` · `digest()`
-
 ## `src/PodImporter.js`
 
 ### `PodImporter`
@@ -419,8 +405,6 @@ Restores a portable archive produced by `PodExporter` into a (possibly different
 Decrypts the archive via the supplied `Bootstrap` when it is encrypted, writes each entry under
 `podRoot`, and collects per-entry errors into the returned summary. ACL re-establishment is out
 of scope in v1 — only resource bytes are written.
-
-**Methods:** `import()`
 
 ## `src/SolidPodSource.js`
 
@@ -438,8 +422,6 @@ container creation, using an injected authenticated `fetch` (falls back to `glob
 Relative URIs are resolved against `podUrl`; reads return bytes plus `etag`/`lastModified`
 metadata for conflict detection upstream.
 
-**Methods:** `read()` · `write()` · `delete()` · `list()` · `exists()` · `createContainer()` · `query()`
-
 ## `src/TombstoneStore.js`
 
 ### `TombstoneStore`
@@ -452,8 +434,6 @@ new TombstoneStore()
 ```
 
 TombstoneStore — per-device per-URI tombstone tracking.
-
-**Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`
 
 ## `src/identity/IdentityPodStore.js`
 
@@ -468,8 +448,6 @@ new IdentityPodStore({ podClient, bootstrap, identity, podRoot } = {})
 
 High-level read / write / append / verify API for the identity
 container in a Solid pod.
-
-**Methods:** `init()` · `readResource()` · `writeResource()` · `appendAuthEvent()` · `readAuthLog()` · `verifyManifest()`
 
 ## `src/identity/IdentitySync.js`
 
@@ -525,8 +503,6 @@ Emits:
   - `'synced'` `{ priority, pulls, pushes, conflicts, durationMs }`
   - `'error'`  `(err)` — caught from periodic ticks; manual `now()`
                          calls re-throw so callers can react.
-
-**Methods:** `start()` · `stop()` · `onForeground()` · `now()`
 
 ## `src/identity/migrateVaultToPod.js`
 
@@ -1860,8 +1836,6 @@ Each tombstone is stored as its own key — `<prefix><uri>` → JSON `{ at }` �
 never read a whole index. The AsyncStorage module can be passed in via `{ asyncStorage }` or is
 dynamic-imported from the host app's `node_modules` on first use.
 
-**Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`
-
 ## `src/tombstones/FileTombstones.js`
 
 ### `FileTombstones`
@@ -1877,8 +1851,6 @@ Node-side `TombstoneStore` backed by a single JSON file, persistent across `PodC
 Writes are atomic (written to `<path>.tmp`, then renamed onto `<path>`). Defaults to
 `os.tmpdir() + '/onderling-tombstones.json'`; pass an explicit `{ path }` for production use.
 
-**Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`
-
 ## `src/tombstones/IndexedDBTombstones.js`
 
 ### `IndexedDBTombstones`
@@ -1892,8 +1864,6 @@ new IndexedDBTombstones({ dbName = DEFAULT_DB_NAME, storeName = DEFAULT_STORE_NA
 
 Browser-side `TombstoneStore` backed by IndexedDB: a single object store keyed by `uri`, value
 `{ at: number }`. Throws on first operation (`add`/`has`/...) when `indexedDB` is unavailable.
-
-**Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`
 
 ## `src/tombstones/MemoryTombstones.js`
 
@@ -1909,5 +1879,3 @@ new MemoryTombstones()
 In-memory Map-backed `TombstoneStore` — the non-persistent default of `PodClient`, for tests and
 fallback use. `close()` is a no-op that keeps entries, so a re-constructed client sharing the
 same instance still sees them.
-
-**Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`

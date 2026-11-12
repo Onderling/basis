@@ -7,6 +7,8 @@ Solid OIDC session manager for Node — SolidVault. Peer of @onderling/oidc-sess
 
 README: [`packages/oidc-session/README.md`](../../packages/oidc-session/README.md) · Index: [docs/api/README.md](README.md)
 
+_Note: the entry could not be imported outside its peer context (Cannot find package '@onderling/params' imported from /home/frits/expotest/wt-train/packages/oidc-session/src/SolidVault.js); analysed statically._
+
 ## `src/SolidVault.js`
 
 ### `_setSessionFactory`
@@ -39,8 +41,6 @@ access token in memory only). Delegates the OIDC flow to `@inrupt/solid-client-a
 `Session`; `getAuthenticatedFetch()` transparently refreshes when the access token is within
 60s of expiry, coalescing concurrent refreshes onto one in-flight promise. Emits `'auth-state'`
 with `'authenticated'` | `'unauthenticated'` | `'refreshed'` | `'expired'`.
-
-**Methods:** `getPodRoot()` · `isAuthenticated()` · `login()` · `logout()` · `refresh()` · `getAuthenticatedFetch()`
 
 ## `src/createSolidAuthNode.js`
 

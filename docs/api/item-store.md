@@ -7,6 +7,8 @@ Open/closed items in a hybrid pod — attribution, audit, per-field merge contra
 
 README: [`packages/item-store/README.md`](../../packages/item-store/README.md) · Index: [docs/api/README.md](README.md)
 
+_Note: the entry could not be imported outside its peer context (Cannot find package '@onderling/core' imported from /home/frits/expotest/wt-train/packages/item-store/src/index.js); analysed statically._
+
 ## `../params/src/params.js`
 
 ### `PARAM_SCOPE`
@@ -88,8 +90,6 @@ item-types registry, causal inbound merge (`put` with `origin: true`), and an op
 publish-on-write sync hook (`setSyncHook`). Type-specific lifecycle lives in functions over this
 store, not in the class. See the module doc for the design rationale.
 
-**Methods:** `setSyncHook()` · `put()` · `putIfMatch()` · `get()` · `delete()` · `list()` · `listByType()`
-
 ## `src/ItemStore.js`
 
 ### `ItemStore`
@@ -108,8 +108,6 @@ verbs (`claim` / `reassign` / `markComplete` / `submit` / `approve` / `reject` /
 by the injected role policy, and cross-store sync ingestion (`applySync` / `removeSync`).
 Extends core `Emitter` and emits per-action item events. See the module doc for the per-field
 merge contracts.
-
-**Methods:** `addItems()` · `ingestItems()` · `listOpen()` · `listClosed()` · `getById()` · `markComplete()` · `applySync()` · `removeSync()` · `removeItems()` · `claim()` · `reassign()` · `update()` · `auditLog()` · `submit()` · `approve()` · `reject()` · `revoke()` · `setApprovalMode()` · `_assertDepsClosed()`
 
 ## `src/addressedDeliver.js`
 

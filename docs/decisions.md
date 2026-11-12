@@ -1556,3 +1556,20 @@ already answered from memory. What may be remembered, and what may not:
   a read that computes a chain, a fork or a lane's head over the whole lane keeps checking the whole lane.
 
 Ledger: L619, L821.
+
+## 2026-11-12 — One strict rule for a valid signature; no remembered verdicts (Frits, the L619 fast-start brief)
+
+**One rule.** Ed25519 libraries disagree on crafted signatures: on the 12 published edge-case vectors tweetnacl (what
+every device ran) accepted seven, node:crypto and WebCrypto five, libsodium one. A faster check on one device would
+then accept what another refuses, and a member could split a circle's roster. So every signature check in the platform
+applies one rule first, as byte checks: S < L, the key and R canonically encoded and not of small order, then the
+cofactorless equation (`verifyEd25519Strict`, rule set `ed25519-strict-1`, written out in
+`docs/conventions/signed-bodies.md`, the vectors in `@onderling/core/conformance`). It accepts less than before and
+nothing an honest signer makes. It ships on all three shells at once, by construction (it is in `AgentIdentity.verify`
+and the three checks that called the library directly), and before any device uses a faster check behind it.
+
+**No remembered verdicts.** A "this signature checked out" mark that survives a restart (verify-once step C1, or the
+same for membership and keys) is not built: stored chat is never re-verified on read, so it saved nothing; the
+signed lanes are covered by checking each signature once per process (the shared memo) and, later, by checking a
+circle when it is first needed; and a remembered mark would travel with a history restore, a verdict from another
+device. Ledger: L619, L829.

@@ -149,6 +149,8 @@ export function bindCircleAddressKeys({ members, registerPeerAddress, selfPubKey
       // PROVEN: the primary only with the person's signature over it (a legacy row carries an address and no proof);
       // an extra exists in the set only because the fold verified its proof. The secure agent keeps the proven links
       // apart: "is this address my contact's other device" asks only those (the person key's allowlist).
+      // PRESENCE of the proof stands for its check only because every writer of a roster row verifies it first
+      // (verifyCircleLink: hasProvenCircleAddress above, deriveRoster, pinboard's redeem): a writer must never copy a proof unchecked.
       const primaryProven = typeof m?.circleAddressProof === 'string' && m.circleAddressProof !== '';
       for (const address of addresses) {
         registerPeerAddress(address, pubKey, {

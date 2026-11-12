@@ -146,9 +146,14 @@ export function bindCircleAddressKeys({ members, registerPeerAddress, selfPubKey
       // `No pubKey registered` while the first device's address works. The primary keeps the
       // explicit-override rule; an additional address signs as itself (the one-derivation L2 rule).
       const primary = typeof m?.circleAddress === 'string' && m.circleAddress ? m.circleAddress : null;
+      // PROVEN: the primary only with the person's signature over it (a legacy row carries an address and no proof);
+      // an extra exists in the set only because the fold verified its proof. The secure agent keeps the proven links
+      // apart: "is this address my contact's other device" asks only those (the person key's allowlist).
+      const primaryProven = typeof m?.circleAddressProof === 'string' && m.circleAddressProof !== '';
       for (const address of addresses) {
         registerPeerAddress(address, pubKey, {
           signingKey: address === primary ? circleSigningKeyOf(m) : address,
+          proven: address === primary ? primaryProven : true,
         });
       }
       bound += 1;   // per ROW, as before — the count means "members bound", not addresses

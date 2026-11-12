@@ -6659,7 +6659,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const direct = rows.find((c) => names(c, address));
     if (direct) return { row: direct, via: 'card' };
     let id = address;
-    try { id = sa.resolver?.pubKeyForAddr?.(address) || address; } catch { id = address; }
+    // ONLY a link the person PROVED (the circle-link signature): an address merely bound for sealing (a legacy roster row
+    // without proof) is not "my contact's other device"
+    try { id = sa.resolver?.provenPubKeyForAddr?.(address) || address; } catch { id = address; }
     if (id === address) return null;
     const viaId = rows.find((c) => names(c, id));
     return viaId ? { row: viaId, via: 'device' } : null;

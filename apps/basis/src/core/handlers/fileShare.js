@@ -48,7 +48,7 @@ export function makeHandleFileShare({
 } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleFileShare: deliverToThread required');
 
-  return async function handleFileShare(fromAddr, payload) {
+  return async function handleFileShare(fromAddr, payload, ctx = {}) {
     let f = payload?.file;
     let sealedTo = null;
     if (payload?.sealed && typeof payload.sealed === 'object') {
@@ -73,7 +73,7 @@ export function makeHandleFileShare({
     // files): no row, no thread turn, no notice. `isKnownSender` is the contact channel's `knownSender`; absent, as before.
     if (typeof isKnownSender === 'function') {
       let known = false;
-      try { known = (await isKnownSender(contactId, fromAddr)) === true; } catch { known = false; }
+      try { known = (await isKnownSender(contactId, fromAddr, ctx?.to ?? null)) === true; } catch { known = false; }
       if (!known) { logger.info?.('[peer] a file from someone not known: refused (a request holds no files)'); return; }
     }
     try { notePeer?.(contactId); } catch { /* a row is a convenience; the thread persists regardless */ }

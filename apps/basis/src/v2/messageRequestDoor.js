@@ -42,13 +42,13 @@ export function createMessageRequestDoor({ isKnown, iWrote = null, hold, count =
   // a request, below), and a known peer is admitted without a question
   const admission = createInboundAdmission({ admit: async () => ({ known: true }), isKnown, answered: iWrote, open: true, count, now });
 
-  return async function decide({ contactId, fromAddr, text = '', card = null, messageId = null, ts = null, file = false, policy = 'request' } = {}) {
+  return async function decide({ contactId, fromAddr, text = '', card = null, messageId = null, ts = null, file = false, policy = 'request', to = null } = {}) {
     const r = await admission({ contactId, fromAddr, text, messageId, channel: 'contact' });
     if (!r.admitted) return 'dropped';   // the admission said its own count line
     if (!r.stranger || policy === 'open') return 'known';
     let held;
     try {
-      held = await hold({ from: contactId || fromAddr, messageId: messageId || `${fromAddr}:${now()}`, ts: Number.isFinite(ts) ? ts : now(), text: String(text ?? ''), ...(card ? { card } : {}), ...(file ? { file: true } : {}) });
+      held = await hold({ from: contactId || fromAddr, messageId: messageId || `${fromAddr}:${now()}`, ts: Number.isFinite(ts) ? ts : now(), text: String(text ?? ''), ...(card ? { card } : {}), ...(file ? { file: true } : {}), ...(to ? { to } : {}) });
     } catch { held = null; }
     if (held?.held) return 'held';
     said(held?.reason ?? 'not-held');

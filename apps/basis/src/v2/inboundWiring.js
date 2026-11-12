@@ -139,7 +139,7 @@ export function buildInboundWiring({
         // a file sealed to the person opens with my key for the version it names (the text turn's seal)
         openFor: (sealed, fromAddr) => agent?.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
         // a file from someone the person did not choose is refused (the channel's door decides who is known)
-        isKnownSender: (contactId, fromAddr) => (contactChannel?.knownSender ? contactChannel.knownSender(contactId, fromAddr) : true),
+        isKnownSender: (contactId, fromAddr, to) => (contactChannel?.knownSender ? contactChannel.knownSender(contactId, fromAddr, to) : true),
         notePeer,
         publishEvent,
       }),
@@ -149,7 +149,7 @@ export function buildInboundWiring({
         notePeer,
         identityOf: personOf,
         noteAnswer: (addr, requestId) => agent?.noteAnswer?.(addr, requestId),
-        isKnownSender: (contactId, fromAddr) => (contactChannel?.knownSender ? contactChannel.knownSender(contactId, fromAddr) : true),
+        isKnownSender: (contactId, fromAddr, to) => (contactChannel?.knownSender ? contactChannel.knownSender(contactId, fromAddr, to) : true),
       }),
     } : {}),
     // a sealed copy pushed straight to us lands in the per-person "shared with me" store

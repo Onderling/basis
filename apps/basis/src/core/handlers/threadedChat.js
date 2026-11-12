@@ -33,7 +33,7 @@
 export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, noteAnswer, isKnownSender = null, logger = console } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleThreadedChat: deliverToThread required');
 
-  return function handleThreadedChat(fromAddr, payload) {
+  return function handleThreadedChat(fromAddr, payload, ctx = {}) {
     const body = payload?.body;
     if (typeof body !== 'string' || body === '') {
       // Infrastructure envelopes (handshakes, claims) routinely arrive without a body — not ours.
@@ -42,7 +42,7 @@ export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, 
     }
     const contactId = contactIdFor(identityOf, fromAddr);
     if (typeof isKnownSender === 'function') {
-      return Promise.resolve(isKnownSender(contactId, fromAddr)).then((known) => {
+      return Promise.resolve(isKnownSender(contactId, fromAddr, ctx?.to ?? null)).then((known) => {
         if (known === true) land(contactId, fromAddr, payload, body);
         else logger.info?.('[peer] a threaded turn from someone not known: not kept (a first message is a request)');
       }, () => { /* unknown: not kept */ });

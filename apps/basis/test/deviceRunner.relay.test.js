@@ -88,18 +88,20 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     expect(out, 'a run with no Telegram token must say so rather than look broken').toMatch(/telegram\s+off/);
   });
 
-  it('keeps a direct message written to it while nobody is watching', async () => {
+  it('keeps a direct message written to it while nobody is watching (from a stranger: as a request)', async () => {
     const card = cardFrom(out);
     await sender.contactThreadChannel.sendTurn({
       peerAddr: card.peerAddr, threadId: card.peerAddr, text: 'is er nog brood?', messageId: 'to-device-1',
     }).sent;
 
-    const landed = await until(
-      async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'is er nog brood?') ?? null,
+    // nobody chose the sender on this box (a person's profile, its policy request): the message is KEPT as a message
+    // request, not on a thread, and the walk log counts it (the verdict only, never who or what)
+    const held = await until(
+      async () => walkLog(dataDir).find((e) => e.kind === 'message-request' && e.verdict === 'held') ?? null,
       { timeout: 30_000, step: 500 },
     );
-    expect(landed, `the device never recorded the message. Its output:\n${out.slice(-1200)}`).toBeTruthy();
-    expect(landed.from, 'the device did not record who wrote').toBeTruthy();
+    expect(held, `the device never kept the message. Its output:\n${out.slice(-1200)}`).toBeTruthy();
+    expect(walkLog(dataDir).some((e) => e.kind === 'contact-turn' && e.text === 'is er nog brood?'), 'a stranger\'s turn reached a thread').toBe(false);
   }, 60_000);
 
   it('is a full agent, not a listener — every signed lane is actually carried', () => {

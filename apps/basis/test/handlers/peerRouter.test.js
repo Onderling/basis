@@ -13,9 +13,10 @@ describe('makePeerRouter', () => {
       logger:   { info: () => {}, warn: () => {}, debug: () => {} },
     });
     router({ from: 'peer-A', payload: { subtype: 'calendar-invite', x: 1 } });
-    router({ from: 'peer-B', payload: { subtype: 'file-share',      y: 2 } });
-    expect(calendar).toHaveBeenCalledWith('peer-A', { subtype: 'calendar-invite', x: 1 });
-    expect(fileShare).toHaveBeenCalledWith('peer-B', { subtype: 'file-share',     y: 2 });
+    router({ from: 'peer-B', payload: { subtype: 'file-share',      y: 2 }, to: 'my-persona-addr' });
+    expect(calendar).toHaveBeenCalledWith('peer-A', { subtype: 'calendar-invite', x: 1 }, {});
+    // the address the frame arrived on (which of my selves it is for) is handed on beside it
+    expect(fileShare).toHaveBeenCalledWith('peer-B', { subtype: 'file-share',     y: 2 }, { to: 'my-persona-addr' });
   });
 
   it('falls back to defaultHandler when subtype is unknown', () => {
@@ -26,7 +27,7 @@ describe('makePeerRouter', () => {
       logger:   { info: () => {}, warn: () => {}, debug: () => {} },
     });
     router({ from: 'peer-A', payload: { subtype: 'mystery', body: 'hi' } });
-    expect(defaultHandler).toHaveBeenCalledWith('peer-A', { subtype: 'mystery', body: 'hi' });
+    expect(defaultHandler).toHaveBeenCalledWith('peer-A', { subtype: 'mystery', body: 'hi' }, {});
   });
 
   it('falls back to defaultHandler when subtype is missing (HI envelopes)', () => {

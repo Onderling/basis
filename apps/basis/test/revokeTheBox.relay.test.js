@@ -143,6 +143,8 @@ describe('the box is revoked while it holds the address', () => {
     expect(boxDeviceIdPrefix, `the ceremony did not say which device it made:\n${once.out.slice(-600)}`).toBeTruthy();
     box = await startBox(dataDir, env);
     expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'enroll-offer') ?? null, { timeout: 60_000, step: 500 }), 'the box never consumed the offer').toBeTruthy();
+    // the box has the person's profile (the feedback persona's policy among it) once its catch-up has landed
+    expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'profile-facts-landed') ?? null, { timeout: 30_000, step: 500 }), 'the box never got the person\'s profile facts').toBeTruthy();
     // ONE ADDRESS PER PERSONA PER CIRCLE: the box presents the person's one address in Thuis; the web app learns the BOX in
     // its device map (the box introduced itself at the web app's device address), and Bea's row keeps one address.
     const webOwn = web.agent.circleAddressFor(CIRCLE);

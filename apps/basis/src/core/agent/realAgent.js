@@ -2320,6 +2320,18 @@ export async function createRealHouseholdAgent(opts = {}) {
   // first held self speaks for the device, it does not stand in for the general persona).
   // an address this device answers at (any self's, any circle's) is never one of its siblings
   const isOwnAddress = (addr) => Boolean(sa.agent.security?.selfIdentityFor?.(addr));
+  /**
+   * WHICH OF MY SELVES an own address belongs to (a persona id; this device's primary when it is the general self's, or
+   * not mine, or unsaid): the identity that answers on the address (the secure agent's own lookup), matched to the
+   * persona whose chat identity it is.
+   */
+  const personaOfOwnAddress = (addr) => {
+    if (typeof addr !== 'string' || !addr) return primaryId;
+    let key = addr;
+    try { key = sa.agent.security?.selfIdentityFor?.(addr)?.pubKey ?? addr; } catch { key = addr; }
+    for (const [pid, rt] of personas) if (rt?.chatId?.pubKey === key || rt?.chatId?.pubKey === addr) return pid;
+    return primaryId;
+  };
   const rosterSiblingRowsOfDefault = async () => (!personas.has('default') ? [] : siblingDevices({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
@@ -3676,6 +3688,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   // A PROFILE'S FACTS, between the devices holding that self (profileFactsSync.js): per self, its siblings, sent as it.
   const profileFactsSyncs = new Map();
+  // who hears that a self's facts landed from a sibling (a host's walk log: when, and for which self, never what)
+  const factsLandedListeners = new Set();
   const profileFactsFor = (pid) => {
     if (!pid || !personas.has(pid)) return null;
     if (profileFactsSyncs.has(pid)) return profileFactsSyncs.get(pid);
@@ -3692,6 +3706,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         return true;
       }),
       onRefused: (reason, from) => console.warn(`[profile-facts] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
+      onLanded: (r) => { for (const fn of factsLandedListeners) { try { fn({ persona: pid, general: pid === primaryId, factsAt: r?.factsAt ?? null }); } catch { /* a listener never breaks a landing */ } } },
     });
     profileFactsSyncs.set(pid, s);
     return s;
@@ -3702,6 +3717,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     onRefused: (reason, from) => console.warn(`[profile-facts] refused ${String(from).slice(0, 12)}… (${reason})`),
   });
   profileFactsChanged = (pid) => { profileFactsSync.fanFor(pid).catch(() => {}); };
+  /** Hear that a self's facts landed from a sibling (`{ persona, general, factsAt }`); returns the unsubscribe. */
+  profileFactsSync.onLanded = (fn) => { if (typeof fn !== 'function') return () => {}; factsLandedListeners.add(fn); return () => factsLandedListeners.delete(fn); };
   // THE CIRCLES THIS DEVICE IS IN, each as the entry a sibling joins from — the enrol offer's circle shape
   // (`{id, handle, address, relays}`, the address THIS device's per-circle one). Built once, for the add-a-device
   // offer and for the follow carry alike: the registry's records first, then whatever the substrate holds
@@ -9586,11 +9603,17 @@ export async function createRealHouseholdAgent(opts = {}) {
      * store). The shells hand it to `createContactThreadChannel` as it is.
      */
     messageRequests: Object.freeze({
-      policy: async () => {
-        try { return firstMessagesOf(await agentsRegistryRef?.lookup?.(primaryId)); } catch { return 'request'; }
+      // `to`: the address the turn arrived on, which names the persona it is for (the self whose identity answers there)
+      policy: async (to = null) => {
+        try { return firstMessagesOf(await agentsRegistryRef?.lookup?.(personaOfOwnAddress(to))); } catch { return 'request'; }
       },
       isKnown: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
-      hold: async (turn) => (await callSkill('pinboard', 'holdMessageRequest', turn)) ?? { held: false, reason: 'no-answer' },
+      // filed under the persona the turn was written to (its `to`), never another
+      hold: async ({ to = null, ...turn } = {}) => {
+        const pid = personaOfOwnAddress(to);
+        const args = pid === primaryId ? turn : { ...turn, persona: pid };
+        return (await callSkill('pinboard', 'holdMessageRequest', args)) ?? { held: false, reason: 'no-answer' };
+      },
     }),
     // Cross-peer state (delegates to sa.peer).  Same surface main.js
     // already consumes: peer.address / peer.status / peer.error.
@@ -10086,12 +10109,14 @@ export async function createRealHouseholdAgent(opts = {}) {
      * person's, and their inbox must never start answering (the VPS box, enrolled as Frits' device).
      */
     /** Set who may write to this persona first ('request' | 'open', `FIRST_MESSAGE_POLICIES`): its profile record. */
-    setFirstMessages: async (policy) => {
+    setFirstMessages: async (policy, { persona = null } = {}) => {
       if (!FIRST_MESSAGE_POLICIES.includes(policy)) throw new Error(`setFirstMessages: policy must be one of ${FIRST_MESSAGE_POLICIES.join(', ')}`);
+      const pid = persona && personas.has(persona) ? persona : primaryId;
+      if (persona && pid !== persona) throw new Error(`setFirstMessages: no persona ${persona} on this device`);
       // the profile's own property, written as any property is: a fact, carried to the person's other devices
-      const r = await callSkill('agents', 'setProfileProperty', { id: primaryId, key: FIRST_MESSAGES_KEY, value: policy });
+      const r = await callSkill('agents', 'setProfileProperty', { id: pid, key: FIRST_MESSAGES_KEY, value: policy });
       if (r && r.ok === false) throw new Error(`setFirstMessages: ${r.reason ?? 'refused'}`);
-      return firstMessagesOf(await agentsRegistryRef?.lookup?.(primaryId));
+      return firstMessagesOf(await agentsRegistryRef?.lookup?.(pid));
     },
     markFunctionProfile: async () => {
       if (!agentsRegistryRef || typeof agentsRegistryRef.updateKind !== 'function') throw new Error('markFunctionProfile: no profile registry');

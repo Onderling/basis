@@ -64,6 +64,8 @@ async function enrolBox(dataDir, env, offerUri, phrase) {
   const box = run(['--data-dir', dataDir], { env });
   expect(await until(async () => (box.out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 }), `the box never came up:\n${box.out.slice(-1500)}`).toBe(true);
   expect(await until(async () => walkLog(dataDir).filter((e) => e.kind === 'enroll-offer').length ? true : null, { timeout: 60_000, step: 500 }), 'the box never consumed the offer').toBe(true);
+  // the box has the person's profile (the feedback persona's policy among it) once its catch-up has landed
+  expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'profile-facts-landed') ?? null, { timeout: 30_000, step: 500 }), 'the box never got the person\'s profile facts').toBeTruthy();
   return box;
 }
 

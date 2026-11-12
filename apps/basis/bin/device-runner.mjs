@@ -546,6 +546,8 @@ if (relayUrl) {
     authFor: agent.linkedTurnAuth ?? null,
     // a first message from someone the person did not choose is a request, decided before anything is kept
     messageRequests: agent.messageRequests ?? null,
+    // what the door kept from the thread, counted in the walk log (the verdict only, never who)
+    onDoor: ({ verdict }) => walkLog({ kind: 'message-request', verdict }),
     sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
@@ -883,6 +885,8 @@ if (relayUrl) {
   // step, run when the sibling's carry lands; the log says so. Asked for on connect with the other kicks below.
   agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
   agent.circleFollowSync?.onLanded?.((r) => walkLog({ kind: 'circle-follow', from: String(r.from).slice(0, 12), circleId: r.circleId, ok: r.ok, steps: r.steps }));
+  // a self's profile facts arrived from a sibling (its settings, name, policies): when, and whether the general self's
+  agent.profileFactsSync?.onLanded?.((r) => walkLog({ kind: 'profile-facts-landed', general: r.general === true }));
   agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
     if (r?.consumed) {
       walkLog({ kind: 'enroll-offer', cleared: r.cleared, circles: r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps })) });

@@ -205,7 +205,7 @@ export const SEAMS = Object.freeze([
   // they ask the channel's `knownSender`. Mobile builds both doors in the SHARED inbound wiring (src/v2/inboundWiring.js,
   // which asks the channel itself), so it has them by construction; web builds its own and is checked here. The box
   // registers neither door.
-  { id: 'contact-doors-ask-known', pattern: /isKnownSender:\s*\(contactId, fromAddr\)/, shells: ['web'], why: 'a file or a threaded turn from someone the person did not choose is not kept, on every painting shell' },
+  { id: 'contact-doors-ask-known', pattern: /isKnownSender:\s*\(contactId, fromAddr, to\)/, shells: ['web'], why: 'a file or a threaded turn from someone the person did not choose is not kept, on every painting shell' },
   { id: 'contact-channel-requests', pattern: /messageRequests:\s*agent\.messageRequests/, why: 'a stranger\'s first message is held as a request, never a contact, on every shell' },
   { id: 'contact-channel-on-card',   pattern: /onCard:/,                          why: 'a card that arrives with a message (naming its sender) goes into the book; the book carry names them on every device' },
   { id: 'pair-roster',           pattern: /createPairRoster\(/,                 why: 'the hidden two-member circle every written-to contact gets; DMs ride it (L105)' },

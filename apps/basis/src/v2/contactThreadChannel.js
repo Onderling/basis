@@ -139,6 +139,9 @@ export function createContactThreadChannel({
   // whose policy is 'open' (anyone may write; a bot's by default) lets a stranger's turn go on, within the stranger
   // budgets. Absent: every turn goes on, as before.
   messageRequests = null,
+  // `onDoor({ verdict })`: told each door decision that kept a turn from the thread ('held' | 'dropped'), the verdict
+  // only, never who or what (a host's walk log counts them). Optional.
+  onDoor = null,
 } = {}) {
   // the person wrote to them first (an outbound turn of theirs in the thread): chosen, so their answer is never a request
   const wroteTo = async (contactId) => {
@@ -152,19 +155,19 @@ export function createContactThreadChannel({
     hold: (turn) => messageRequests.hold(turn),
     now,
   }));
-  /** The persona's policy for first messages: 'open' or 'request' (the door's default when it cannot say). */
-  const policyNow = async () => {
+  /** The policy for first messages of the persona a turn was written to (`to`): 'open' or 'request' (the default). */
+  const policyNow = async (to = null) => {
     if (typeof messageRequests?.policy !== 'function') return 'request';
-    try { return (await messageRequests.policy()) === 'open' ? 'open' : 'request'; } catch { return 'request'; }
+    try { return (await messageRequests.policy(to)) === 'open' ? 'open' : 'request'; } catch { return 'request'; }
   };
   /**
    * Whether a sender is KNOWN to this person (the door's question, without holding anything): asked by the other doors
    * into a contact thread (a file, a threaded answer), which keep nothing from someone the person did not choose.
    * True when there is no door (or it is inactive: a function profile).
    */
-  async function knownSender(contactId, fromAddr) {
+  async function knownSender(contactId, fromAddr, to = null) {
     if (!messageRequests || typeof messageRequests.isKnown !== 'function') return true;
-    if ((await policyNow()) === 'open') return true;
+    if ((await policyNow(to)) === 'open') return true;
     for (const k of [fromAddr, contactId]) {
       try { if (k && (await messageRequests.isKnown(k)) === true) return true; } catch { /* next */ }
     }
@@ -173,7 +176,7 @@ export function createContactThreadChannel({
   /** 'known' when this turn goes on; 'held' or 'dropped' when the door kept it from everything else. */
   const decideAtDoor = async (m) => {
     if (!messageRequests || typeof messageRequests.hold !== 'function') return 'known';
-    return doorFor()({ ...m, policy: await policyNow() });
+    return doorFor()({ ...m, policy: await policyNow(m.to ?? null) });
   };
   const hiddenNow = async (contactId) => {
     if (typeof isHidden !== 'function' || !contactId) return false;
@@ -648,7 +651,7 @@ export function createContactThreadChannel({
   }
 
   function makeInboundHandler(subtype, cb) {
-    return async function onContactInbound(fromAddr, payload) {
+    return async function onContactInbound(fromAddr, payload, ctx = {}) {
       if (!payload || payload.subtype !== subtype) return;   // not ours
       if (typeof cb !== 'function') return;
       let text = payload.text ?? '';
@@ -673,8 +676,8 @@ export function createContactThreadChannel({
       // THE DOOR, before anything is kept: a sender the person did not choose is held as a request, and nothing below
       // runs for them (no card into the book, no pair roster, no thread turn, no receipt)
       if (messageRequests) {
-        const verdict = await decideAtDoor({ contactId: resolveId(fromAddr), fromAddr, text, card, messageId: payload.messageId ?? null, ts: Number.isFinite(payload.ts) ? payload.ts : null });
-        if (verdict !== 'known') return;
+        const verdict = await decideAtDoor({ contactId: resolveId(fromAddr), fromAddr, text, card, messageId: payload.messageId ?? null, ts: Number.isFinite(payload.ts) ? payload.ts : null, to: ctx?.to ?? null });
+        if (verdict !== 'known') { try { onDoor?.({ verdict }); } catch { /* a count never breaks a turn */ } return; }
       }
       // The sender's card — taken only when it names the person this message is from (the shell's read of the
       // address); the shell adds it to the book. Never on the thread; the words go on regardless.

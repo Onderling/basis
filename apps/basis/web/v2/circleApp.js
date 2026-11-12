@@ -9819,7 +9819,7 @@ async function boot() {
             // A file sealed to the person opens with my key for the version it names (the text turn's seal).
             openFor: (sealed, fromAddr) => agent.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
             // a file from someone the person did not choose is refused (the channel's door decides who is known)
-            isKnownSender: (contactId, fromAddr) => (circleContactChannel?.knownSender ? circleContactChannel.knownSender(contactId, fromAddr) : true),
+            isKnownSender: (contactId, fromAddr, to) => (circleContactChannel?.knownSender ? circleContactChannel.knownSender(contactId, fromAddr, to) : true),
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
@@ -9835,7 +9835,7 @@ async function boot() {
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
             noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
             // a turn from someone the person did not choose is not kept (the channel's door decides who is known)
-            isKnownSender: (contactId, fromAddr) => (circleContactChannel?.knownSender ? circleContactChannel.knownSender(contactId, fromAddr) : true),
+            isKnownSender: (contactId, fromAddr, to) => (circleContactChannel?.knownSender ? circleContactChannel.knownSender(contactId, fromAddr, to) : true),
           }),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user
           // "shared with me" store; the surface opens each with this device's own network-derived sealing key.

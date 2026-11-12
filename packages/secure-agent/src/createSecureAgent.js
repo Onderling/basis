@@ -1341,7 +1341,7 @@ export async function createSecureAgent(opts = {}) {
     // a transfer given up on is a receive-boundary drop like any other: said once per reason and sender, counted
     onDrop: (reason, env) => noteDrop(reason, env),
     onPayload: (whole, env) => {
-      handToApp(env._from, whole, env._ts ?? Date.now()).catch(() => { /* handToApp says its own failures */ });
+      handToApp(env._from, whole, env._ts ?? Date.now(), env._to).catch(() => { /* handToApp says its own failures */ });
     },
   });
 
@@ -1378,7 +1378,9 @@ export async function createSecureAgent(opts = {}) {
     const inner = (payload?.type === 'message' && Array.isArray(payload.parts)) ? payload.parts.find((p) => p?.data)?.data : null;
     return inner?.subtype ?? payload?.subtype ?? payload?.type ?? '?';
   }
-  async function handToApp(from, payload, ts) {
+  // `to`: the address this frame arrived on (one of this agent's own): it names WHICH self the message is for, the
+  // same address the handshake answers from. Handed on beside the sender so the app need not guess the self.
+  async function handToApp(from, payload, ts, to = null) {
     if (typeof onPeerMessageFn !== 'function') return;
     const key = seenInbound ? inboundMessageKey(from, payload) : null;
     if (key) {
@@ -1401,7 +1403,7 @@ export async function createSecureAgent(opts = {}) {
     try {
       let verdict;
       try {
-        verdict = await onPeerMessageFn({ from, payload, ts });
+        verdict = await onPeerMessageFn({ from, payload, ts, ...(typeof to === 'string' && to ? { to } : {}) });
       } catch (err) {
         if (typeof console !== 'undefined') console.error('[secure-agent] onPeerMessage threw', err);
         return;
@@ -1706,7 +1708,7 @@ export async function createSecureAgent(opts = {}) {
       // A greeting is this channel's own handshake — answered above and told as `peer` — never a message for the app:
       // handed on, its payload (no subtype, no type) reached every router as a frame it could not route.
       // Handed on now; awaited at the end, so the presence flush below never waits on an app handler.
-      const handed = env?._p !== 'HI' ? handToApp(env._from, env.payload, env._ts ?? Date.now()) : null;
+      const handed = env?._p !== 'HI' ? handToApp(env._from, env.payload, env._ts ?? Date.now(), env._to) : null;
       // Delivery guarantee — PRESENCE-FLUSH. Any inbound envelope from a peer
       // (their reconnect HI, or any message) proves they are reachable now, so
       // flush anything we were holding for them. Fire-and-forget: re-hold on a

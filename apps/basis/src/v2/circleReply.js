@@ -7,6 +7,7 @@ import { replyLine } from './replyLine.js';
 const OP_REFUSAL_KEYS = Object.freeze({
   'self-required': 'circle.errors.self_required',
   'no-such-persona': 'circle.errors.no_such_persona',
+  'no-circle-address': 'circle.errors.no_circle_address',
 });
 //
 // The circle stream renders plain chat bubbles (no rich cards), so a dispatched command surfaces as a

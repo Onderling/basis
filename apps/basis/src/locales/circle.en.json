@@ -7891,6 +7891,10 @@
       "text": "This device holds more than one persona — say which one this is for.",
       "doc": "An op that issues as one of the person's selves (a grant, an install with grants) refused: the device holds more than one self and none was named."
     },
+    "no_circle_address": {
+      "text": "This person can't be reached in this circle yet. Try again a little later.",
+      "doc": "respondToItem refused: the post's author has no address in that circle on this device yet (no announce reached it). The answer is not sent on their person key; their next announce makes it possible."
+    },
     "no_such_persona": {
       "text": "That persona is not on this device.",
       "doc": "An op named a persona this device does not hold."

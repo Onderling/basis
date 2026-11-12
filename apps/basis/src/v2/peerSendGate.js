@@ -38,15 +38,21 @@ export const INVITE_EXCHANGE_MAX = param({ key: 'sendGate.inviteExchangeMax', sc
 export const PERSON_ALLOWLIST = Object.freeze([
   Object.freeze({
     id: 'invite-exchange',
-    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal) (the invite names the inviter\'s cross-circle id by decision, so this buys no link)',
-    matches: (f) => f?.inviteExchange === 'joiner' || f?.inviteExchange === 'answer' || f?.inviteExchange === 'refusal',
+    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal), and the one request a scanned pairing code sends to the scanned key (the invite names the inviter\'s cross-circle id by decision, so this buys no link)',
+    matches: (f) => f?.inviteExchange === 'joiner' || f?.inviteExchange === 'answer' || f?.inviteExchange === 'refusal' || f?.inviteExchange === 'pairing',
     detail: (f) => ({ side: f.inviteExchange }),
   }),
   Object.freeze({
+    id: 'granted',
+    reason: 'a view (a screen) this self granted access to, live in its grant set: the grant is the person\'s own act, so its nudges speak to it as the person',
+    matches: (f) => typeof f?.granted === 'string' && !!f.granted,
+    detail: (f) => ({ grantKind: f.granted }),
+  }),
+  Object.freeze({
     id: 'contact-card',
-    reason: 'a person in this self\'s contact book (not hidden, not deleted): an address the person chose to keep, so speaking to it as the person links nothing new',
+    reason: 'a person in this self\'s contact book (not hidden, not deleted), at an address the row names or one the identity link PROVES is theirs (a contact\'s other device): an address the person chose to keep, so speaking to it as the person links nothing new',
     matches: (f) => !!f?.contact,
-    detail: (f) => ({ origin: contactOriginOf(f.contact) }),
+    detail: (f) => ({ origin: f.viaDevice === true ? 'card-via-device' : contactOriginOf(f.contact) }),
   }),
   Object.freeze({
     id: 'address-fallback',
@@ -98,9 +104,11 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
   const joiners = new Map();
   /** address → { side: 'answer'|'refusal', until }: the one reply owed to that joiner */
   const replies = new Map();
+  /** address → { n, until }: pairing codes scanned toward that key */
+  const pairings = new Map();
   const sweep = () => {
     const t = now();
-    for (const m of [joiners, replies]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
+    for (const m of [joiners, replies, pairings]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
   };
   const bound = (m) => { while (m.size > max) m.delete(m.keys().next().value); };
   const reply = (address, side) => {
@@ -128,6 +136,23 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
         if (cur.n <= 1) joiners.delete(address); else cur.n -= 1;
       };
     },
+    /** PAIRING: the person scanned a pairing code; its one request to the scanned key may leave. Returns its release. */
+    expectPairing(address) {
+      if (typeof address !== 'string' || !address) return () => {};
+      sweep();
+      const e = pairings.get(address);
+      pairings.delete(address);
+      pairings.set(address, { n: (e?.n ?? 0) + 1, until: now() + lifetimeMs });
+      bound(pairings);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        const cur = pairings.get(address);
+        if (!cur) return;
+        if (cur.n <= 1) pairings.delete(address); else cur.n -= 1;
+      };
+    },
     /** INVITER: a well-formed request from `address` did not prove its code; its ONE refusal may go back. */
     refuseParsedRequest(address) { reply(address, 'refusal'); },
     /** INVITER: a request from `address` proved its code; its ONE answer may go back (replaces a refusal registration). */
@@ -138,9 +163,10 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
       sweep();
       const r = replies.get(address);
       if (r) { replies.delete(address); return r.side; }
-      return joiners.has(address) ? 'joiner' : null;
+      if (joiners.has(address)) return 'joiner';
+      return pairings.has(address) ? 'pairing' : null;
     },
-    get size() { sweep(); return joiners.size + replies.size; },
+    get size() { sweep(); return joiners.size + replies.size + pairings.size; },
   };
 }
 
@@ -247,6 +273,7 @@ export function sendDecisionFields(decision, explained = null, result = null, ta
   if (typeof decision?.allowedBy === 'string') out.allowedBy = decision.allowedBy;
   if (typeof decision?.origin === 'string') out.origin = decision.origin;
   if (typeof decision?.side === 'string') out.side = decision.side;
+  if (typeof decision?.grantKind === 'string') out.grantKind = decision.grantKind;
   // the route the send TOOK, as the send itself reported it; the candidates are explained only when nothing took it
   if (typeof taken === 'string' && taken) out.chosen = taken;
   const cands = Array.isArray(explained?.candidates) ? explained.candidates : [];

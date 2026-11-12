@@ -243,6 +243,8 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
+    // the only statements the roster fold calls dead (`superseded`: member properties a later one replaced)
+    compactableKinds: ['member-props'],
     verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, {
       circleIdentityFor, ownCeremonyCommitmentFor, chainFor,
       storedFor: (circleId) => { try { return railRef.current?.storedStatements?.(circleId) ?? []; } catch { return []; } },

@@ -6075,8 +6075,8 @@
         "doc": "Heading of the requests section at the top of Contacten: first messages from people the person did not choose."
       },
       "says": {
-        "text": "Says they are {name}",
-        "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {name} is that name."
+        "text": "Says they are {{name}}",
+        "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {{name}} is that name."
       },
       "no_name": {
         "text": "Someone without a name",
@@ -6095,8 +6095,8 @@
         "doc": "Block the sender of a request, on this device only: their direct messages are refused; circles are untouched."
       },
       "ignored_fold": {
-        "text": "Ignored ({n})",
-        "doc": "The fold holding ignored requests. {n} is how many."
+        "text": "Ignored ({{n}})",
+        "doc": "The fold holding ignored requests. {{n}} is how many."
       }
     }
   },

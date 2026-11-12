@@ -6080,8 +6080,8 @@
         "doc": "Heading of the requests section at the top of Contacten: first messages from people the person did not choose."
       },
       "says": {
-        "text": "Zegt {name} te zijn",
-        "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {name} is that name."
+        "text": "Zegt {{name}} te zijn",
+        "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {{name}} is that name."
       },
       "no_name": {
         "text": "Iemand zonder naam",
@@ -6100,8 +6100,8 @@
         "doc": "Block the sender of a request, on this device only: their direct messages are refused; circles are untouched."
       },
       "ignored_fold": {
-        "text": "Genegeerd ({n})",
-        "doc": "The fold holding ignored requests. {n} is how many."
+        "text": "Genegeerd ({{n}})",
+        "doc": "The fold holding ignored requests. {{n}} is how many."
       }
     }
   },

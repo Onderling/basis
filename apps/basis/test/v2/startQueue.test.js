@@ -4,7 +4,7 @@
  * first: a revoke made elsewhere binds before a stale view is served), then every other circle, one at a time.
  */
 import { describe, it, expect } from 'vitest';
-import { runStartQueue, START_LANES } from '../../src/v2/startQueue.js';
+import { runStartQueue, START_LANES, startQueueSiblings } from '../../src/v2/startQueue.js';
 
 function fakeLanes(log, { slowMs = 5 } = {}) {
   let inFlight = 0; let maxInFlight = 0;
@@ -65,5 +65,12 @@ describe('runStartQueue', () => {
     const f = fakeLanes(log);
     await runStartQueue({ catchUps: f.catchUps, siblings: [], callSkill: circles(['a']), firstCircle: () => 'stranger-circle' });
     expect(log.some((x) => x.includes('stranger-circle'))).toBe(false);
+  });
+});
+
+describe('startQueueSiblings: the own-device asks, one list for every shell', () => {
+  it('names what the agent has, grants first, and skips what it lacks', () => {
+    const ask = { requestFromSiblings: async () => {} };
+    expect(startQueueSiblings({ grantsCatchUp: ask, personKeySync: ask, knownPeersSync: null }).map(([n]) => n)).toEqual(['grants', 'person-key']);
   });
 });

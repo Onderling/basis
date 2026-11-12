@@ -56,3 +56,21 @@ export async function runStartQueue({ catchUps = {}, siblings = [], callSkill, f
   for (const c of circles) if (c !== onScreen) await pullCircle(c);
   return { circles: circles.length, steps, failed };
 }
+
+/**
+ * The person's OWN-device asks at a start, named, in one list every shell hands the queue (each was a hand-kept copy
+ * per shell): grants (a revoke binds before a stale view is served), who my devices know, a rotated person key, each
+ * profile's facts, my own store, which device is primary for direct messages.
+ * @param {object} agent
+ * @returns {Array<[string, object]>}
+ */
+export function startQueueSiblings(agent) {
+  return [
+    ['grants', agent?.grantsCatchUp],
+    ['known-peers', agent?.knownPeersSync],
+    ['person-key', agent?.personKeySync],
+    ['profile-facts', agent?.profileFactsSync],
+    ['own-store', agent?.ownStoreSync],
+    ['primary-device', agent?.primaryDevice],
+  ].filter(([, s]) => typeof s?.requestFromSiblings === 'function');
+}

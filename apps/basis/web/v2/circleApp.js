@@ -244,7 +244,7 @@ import { hostFrameOf } from '../../src/v2/hostFrame.js';
 import { renderPersonCard } from './personCard.js';
 import { createPersonClock, webAppState } from '../../src/v2/personClock.js';
 import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.js';
-import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
+import { contactCardFromLink, loadShareMyContact, sharedLinkState, sharedLinkWords, withdrawSharedLink } from '../../src/v2/contactCardLink.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
@@ -3320,7 +3320,7 @@ async function loadTaskGrants({ taskId, circleId } = {}) {
 // The logic is `src/v2/contactLens.js`; the pair roster's own id function names the pair circle for both.
 function openLensForm(extra) { mountMyDataWizard(renderContactLensPanel, { t, ...extra }); }
 /** Add a card AFTER the sheet: the chosen lens, or `null` when the person closed it (nothing added). */
-async function addContactWithSheet(payload) {
+async function addContactWithSheet(payload, { linkToken = null } = {}) {
   const model = await contactAddSheetModel({ payload, callSkill: rawCallSkill });
   // not a card this decoder reads: hand it to pinboard as before, which refuses it with its own reason
   if (!model) return rawCallSkill('pinboard', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
@@ -3328,7 +3328,7 @@ async function addContactWithSheet(payload) {
     mode: 'add', model, onSubmit: (c) => resolve(c), onCancel: () => resolve(null),
   }));
   if (!choice) return null;
-  const r = await addContactAs({ callSkill: rawCallSkill, payload, ...choice, pairCircleIdOf: circlePairRoster?.pairCircleIdFor, adoptPoint: adoptContactPoint });
+  const r = await addContactAs({ callSkill: rawCallSkill, payload, ...choice, linkToken, pairCircleIdOf: circlePairRoster?.pairCircleIdFor, adoptPoint: adoptContactPoint });
   if (r?.adoptedSay) globalThis.alert?.(r.adoptedSay);
   return r;
 }
@@ -4886,10 +4886,14 @@ async function showMij({ landing = false } = {}) {
 // Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card pinboard makes
 // (`getContactShareQr` — webid, key, name, the address I am written to, my relay), painted three ways. The LINK is
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
+// Every showing mints a NEW link (L806, Frits 2026-11-12): its first opener reaches me directly, anyone after is a
+// request; the panel says the link's state and offers to withdraw it (a fresh link is shown after).
 async function showShareMyContact() {
   hideTabBar();
-  const { payload, link, qr } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
-  renderShareMyContact(rootEl, { payload, link, qr, t, onBack: showMij });
+  const { payload, link, qr, token } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
+  const linkState = token ? sharedLinkWords(await sharedLinkState({ callSkill: rawCallSkill, token }), { t, lang: currentLang() }) : null;
+  const onWithdraw = token ? async () => { await withdrawSharedLink({ callSkill: rawCallSkill, token }); await showShareMyContact(); } : null;
+  renderShareMyContact(rootEl, { payload, link, qr, linkState, onWithdraw, t, onBack: showMij });
 }
 
 // SILENT out-of-circle delivery — the "shared with me" inbox (a Mij sub-screen). Reads the
@@ -9976,7 +9980,7 @@ async function boot() {
             const fromLink = contactCardFromLink(window.location.hash);
             if (!fromLink.ok) return;
             try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
-            addContactWithSheet(fromLink.payload)
+            addContactWithSheet(fromLink.payload, { linkToken: fromLink.token ?? null })   // a shared link's token rides along (L806)
               .then((r) => {
                 if (r === null) return;   // closed the sheet: nothing added
                 const c = r?.contact;

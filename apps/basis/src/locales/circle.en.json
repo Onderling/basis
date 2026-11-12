@@ -9190,7 +9190,7 @@
       "doc": "Heading of the share panel under Mij."
     },
     "hint": {
-      "text": "Let someone scan the QR, or send them the link. Whoever opens it has you as a contact and can message you directly. It holds no secret.",
+      "text": "Let someone scan the QR, or send them the link. Every time you open this screen there is a new link: the first person who opens it can message you directly; anyone after them lands in your requests.",
       "doc": "What the QR/link does and does not do. Plain Dutch; no \"kaart\"."
     },
     "code_label": {
@@ -9212,6 +9212,18 @@
     "share": {
       "text": "Share…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    },
+    "link_unused": {
+      "text": "Not used yet",
+      "doc": "State of the shared link on the share panel: nobody has opened it and written yet (Frits 2026-11-12)."
+    },
+    "link_used": {
+      "text": "Used on {{date}}",
+      "doc": "State of the shared link: its first opener wrote on {{date}} (day + short month); anyone after them is a request (Frits 2026-11-12)."
+    },
+    "link_withdraw": {
+      "text": "Withdraw this link",
+      "doc": "Button on the share panel: the link stops letting its opener write directly; a new link is shown (Frits 2026-11-12)."
     }
   },
   "tasks": {

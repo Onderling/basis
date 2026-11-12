@@ -52,12 +52,7 @@ test('a no-relay device adopts the scanned card\'s point and stays reachable aft
     const hi = `hoi ${Date.now().toString(36)}`;
     const sent = await sendDirectMessage(A.page, hi, { to: bId });
     expect(sent.sent, `A could not write: ${sent.why}`).toBe(true);
-    // B never chose A: A's first message is a MESSAGE REQUEST on B's side (since 2026-11-12), and B accepts it; this walk
-    // is about the relay point A adopts, not about that door
-    await expect.poll(async () => ((await B.page.evaluate(async () => (await window.onderlingCall('pinboard', 'listMessageRequests', {}))?.requests ?? [])) ?? []).map((q) => q.from),
-      { timeout: 30_000, message: 'A\'s first message is a request on B\'s side' }).toContain(aId);
-    const accepted = await B.page.evaluate(async (from) => window.onderlingAcceptRequest(from), aId);
-    expect(accepted?.accepted, JSON.stringify(accepted)).toBe(true);
+    // A opened B's OWN shared link: A's first message carries its token, so B's door lets A on (L806), no accept
     await waitForContactMessageDetailed(B.page, hi);
     const back = `terug ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(B.page, back, { to: aId });

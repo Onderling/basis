@@ -48,7 +48,7 @@ export { createRegistry }         from './src/registry.js';
 export { registerCanonicalTypes } from './src/canonical.js';
 export { registerDeclaredTypes }  from './src/declaredTypes.js';
 export { CANONICAL_TYPES }        from './src/canonical.js';
-export { CANONICAL_FIELD_CLOCKS, CANONICAL_SET_UNIONS, OWN_SCOPE_TYPES } from './src/canonical.js';
+export { CANONICAL_FIELD_CLOCKS, CANONICAL_SET_UNIONS, CANONICAL_CLAIMS, OWN_SCOPE_TYPES } from './src/canonical.js';
 export { READ_MARKS_SET_UNION } from './src/types/readMarks.js';
 export { MESSAGE_REQUEST_SET_UNION, MESSAGE_REQUEST_STATES } from './src/types/messageRequest.js';
 export { NAMESPACE }              from './src/baseSchema.js';

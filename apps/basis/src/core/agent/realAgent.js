@@ -9674,6 +9674,29 @@ export async function createRealHouseholdAgent(opts = {}) {
         for (const k of [fromAddr, contactId]) if (k && (await inThem(k))) return true;
         return false;
       },
+      // A SHARED LINK'S FIRST OPENER (L806): a turn carrying a link's token, addressed to the persona that minted it, uses
+      // the link (a first-wins claim between my devices); a later turn of the same opener is let on while the link's
+      // use names them. Fails closed: no persona, no.
+      useLink: async ({ token, by, to = null, card = null } = {}) => {
+        const pid = await personaOwningAny(to);
+        if (!pid) return { ok: false, reason: 'no-persona' };
+        const general = pid === primaryId || pid === profileIdOf(null);
+        return (await callSkill('pinboard', 'useSharedCard', { token, by, ...(card ? { card } : {}), ...(general ? {} : { persona: pid }) })) ?? { ok: false, reason: 'no-answer' };
+      },
+      letOnByLink: async ({ by, to = null } = {}) => {
+        const pid = await personaOwningAny(to);
+        if (!pid || typeof by !== 'string' || !by) return false;
+        const general = pid === primaryId || pid === profileIdOf(null);
+        const links = (await callSkill('pinboard', 'listSharedCards', general ? {} : { persona: pid }))?.links ?? [];
+        return links.some((l) => l?.usedBy === by);
+      },
+      // THE OPENER'S SIDE: the token a contact row kept (it came from a shared link), for the first turn to them, and its
+      // clearing once that turn left
+      linkTokenFor: async (peerAddr) => (await keptContactOf(peerAddr))?.row?.linkToken ?? null,
+      linkTokenSent: async (peerAddr) => {
+        const webid = (await keptContactOf(peerAddr))?.row?.webid ?? null;
+        if (webid) await callSkill('pinboard', 'clearContactLinkToken', { webid });
+      },
       // filed under the persona the turn was written to (its `to`), never another
       hold: async ({ to = null, ...turn } = {}) => {
         const pid = await personaOfOwnAddress(to);

@@ -103,6 +103,9 @@ const ITEM_TYPES = [
   //  - 'message-request' — a first message from someone not chosen, held beside the book until the person answers
   //    (listMessageRequests / ignoreMessageRequest appliesTo). Canonical in `@onderling/item-types`, own-devices only.
   'message-request',
+  //  - 'shared-card' — a contact link the person handed out, let on for its first opener only (mint / list / withdraw /
+  //    use appliesTo). Canonical in `@onderling/item-types`, own-devices only.
+  'shared-card',
 ];
 
 // The trio that renders on the noticeboard (ask / offer / lend) — used as
@@ -148,6 +151,7 @@ export const pinboardManifest = {
     member:        { atoms: ['add', 'list'] },
     // a request is held by the door (`add`, self only, internal), listed and answered; never merged into a view
     'message-request': { atoms: ['add', 'list', 'submit', 'remove'] },
+    'shared-card':     { atoms: ['add', 'list', 'submit', 'remove'] },
   },
 
   operations: [
@@ -733,6 +737,69 @@ export const pinboardManifest = {
         slash: { command: '/ignore-request', body: 'flags' },
         chat:  { reply: 'text', hint: 'ignore a request: it stays and can still be accepted' },
       },
+    },
+    // ── Shared contact links (Frits 2026-11-12) ──
+    // Every "Share my contact" makes a NEW link for the persona shared as: its first opener is let on as if chosen (a
+    // thread, the card held, no book row until the person answers); anyone after is a request. Used once, valid 30 days,
+    // at most 20 unused per persona. Rows on the own-devices store, so every device of the person knows them.
+    {
+      // The share screen's write, once per showing: never typed (a typed link would be a link nobody sees the state of).
+      id:   'mintSharedCard', visibility: 'authenticated', verb: 'add',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'shared-card' },
+      resolves: [{ field: 'token', policy: 'content' }],   // a new row per link: nothing to merge but its use (the claim)
+      params: [{ name: 'persona', kind: 'string', required: false }],
+      surfaces: { internal: true },
+    },
+    {
+      id:   'listSharedCards', visibility: 'authenticated', group: 'data', verb: 'list',
+      appliesTo: { type: 'shared-card' },
+      params: [{ name: 'persona', kind: 'string', required: false }],
+      surfaces: {
+        slash: { command: '/shared-links', body: 'flags' },
+        chat:  { reply: 'list', hint: 'list the contact links you shared: not used yet, or used on which day' },
+      },
+    },
+    {
+      id:   'withdrawSharedCard', visibility: 'authenticated', group: 'admin', verb: 'remove',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'shared-card' },
+      params: [
+        { name: 'token',   kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/withdraw-link', body: 'flags' },
+        chat:  { reply: 'text', hint: 'withdraw a contact link you shared: whoever opens it later lands in requests' },
+      },
+    },
+    {
+      // The opener's side: the token a contact row kept (it came from a shared link) left with the first turn to them.
+      id:   'clearContactLinkToken', visibility: 'private', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'contact' },
+      resolves: [{ field: 'linkToken', policy: 'content' }],
+      params: [{ name: 'webid', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: { internal: true },
+    },
+    {
+      // The door's write (the contact channel, a first turn carrying a token): never typed, self only. The use is a
+      // first-wins claim between the person's devices.
+      id:   'useSharedCard', visibility: 'private', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'shared-card' },
+      resolves: [{ field: 'assignee', policy: 'claim' }],
+      params: [
+        { name: 'token',   kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'by',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'card',    kind: 'string', required: false },   // the card the opener's turn carried: names their thread
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: { internal: true },
     },
     {
       // WHAT A CONTACT SEES OF YOU (L125, Frits 2026-09-24): the persona whose release their pair roster carries, and
@@ -1436,6 +1503,7 @@ export const pinboardManifest = {
       id:   'addContactFromQr', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'person' },
       params: [
+        { name: 'linkToken', kind: 'string', required: false },   // a shared link's one-time token (L806)
         { name: 'payload', kind: 'string', required: true },   // the card as scanned or pasted (`onderling-contact://…`): every caller passes a string; the skill refuses anything else
         // Which of your personas this contact is added through — what they see of you. Optional: absent
         // means "not recorded", which is a different thing from "the default", and nothing may read it as one.

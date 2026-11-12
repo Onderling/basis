@@ -75,7 +75,8 @@ function minimalItem(typeName, schema, i) {
       default:
         out[field] = spec.format === 'date-time' ? new Date().toISOString()
           : Array.isArray(spec.enum) ? spec.enum[0]
-          : `${field}-x`;
+          // a string the schema bounds below (a link's token) is padded to its minimum
+          : `${field}-x`.padEnd(Number.isInteger(spec.minLength) ? spec.minLength : 0, 'x');
     }
   }
   return out;

@@ -79,6 +79,9 @@ function classifyContact(text) {
   if (typeof text !== 'string') return null;
   if (text.startsWith(CONTACT_SCHEME)) return text;
   const fromLink = contactCardFromLink(text);
+  // a SHARED link carries its one-time token beside the card (L806): keep the whole link then, so the shared add
+  // (`addContactAs`) keeps the token with the contact; the first turn to them carries it
+  if (fromLink.ok && fromLink.token) return text;
   return fromLink.ok ? fromLink.payload : null;
 }
 

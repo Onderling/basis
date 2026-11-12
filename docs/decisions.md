@@ -1548,4 +1548,8 @@ So compaction is OFF (`COMPACT_SUPERSEDED_PROPS` in `apps/basis/src/v2/membershi
 whole, are served to late joiners like any other, and every device folds the same. The price: the log keeps old
 member properties (a face thumbnail per change). It turns back on with the statement format whose signature covers a
 header that a tombstone keeps, so a tombstone proves itself and can be sent on. The decision to pause on a red finding
-was set in advance in the L619 fast-start brief (Frits, 2026-11-12). Ledger: L827, L833.
+was set in advance in the L619 fast-start brief (Frits, 2026-11-12). What the pause does NOT undo: tombstones made
+before it stay on the devices that ran with compaction on, and nothing serves a tombstone (a catch-up sends only what
+it can vouch for), so a member who joins such a circle later still lacks those parents. That is pre-launch state with
+no compatibility owed: the alpha starts from fresh circles (and the statement format change founds every circle again).
+Ledger: L827, L833.

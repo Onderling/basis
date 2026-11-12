@@ -355,6 +355,14 @@
     "link_copied": {
       "text": "Link gekopieerd.",
       "doc": "The invite on web, when the browser has no share sheet: the link went to the clipboard."
+    },
+    "expired_code": {
+      "text": "Deze uitnodiging is niet meer geldig. Vraag wie je uitnodigde om een nieuwe.",
+      "doc": "The inviter's device refused the join: the code is unknown, expired or rotated away (`invalid-or-expired-code`)."
+    },
+    "join_refused": {
+      "text": "De kring liet je niet binnen met deze uitnodiging. Vraag wie je uitnodigde om een nieuwe.",
+      "doc": "The inviter's device refused the join for a reason it does not name (`join-refused`, the catch-all of the closed refusal set)."
     }
   },
   "members": {

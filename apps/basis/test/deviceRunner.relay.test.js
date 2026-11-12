@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
@@ -90,6 +90,8 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
 
   it('keeps a direct message written to it while nobody is watching (from a stranger: as a request)', async () => {
     const card = cardFrom(out);
+    // the sender holds the box's card (it scanned it); on the box's side the sender is still a stranger
+    await addCardOf(sender, null, { payload: /onderling-contact:\/\/[A-Za-z0-9_-]+/.exec(out)[0] });
     await sender.contactThreadChannel.sendTurn({
       peerAddr: card.peerAddr, threadId: card.peerAddr, text: 'is er nog brood?', messageId: 'to-device-1',
     }).sent;

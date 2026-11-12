@@ -20,6 +20,7 @@
  * something else. That assumption is exactly what L27/L29 are about, so the walk does not
  * pretend to settle it.
  */
+import { sendBypassingTheGate } from '../../e2e-journeys/journeys/_app.mjs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
@@ -69,7 +70,7 @@ describe('the reading half over a REAL relay — the nudge crosses, the view re-
         provisionHistoryMirror: async (strategy) => createHistoryPodMedium({ podSource: memoryPodSource(podMap), strategy }),
         // The nudge goes over the REAL relay to the node hosting the view (see the header note).
         surfaceNudge: (viewPubKey, laneId) =>
-          A.agent.sendPeerMessage(VIEWHOST.pubKey, { subtype: SURFACE_NUDGE_SUBTYPE, laneId }, SEND),
+          sendBypassingTheGate(A, VIEWHOST.pubKey, { subtype: SURFACE_NUDGE_SUBTYPE, laneId }, { reason: 'a test node hosts the view; the product nudges a GRANTED view key, which the gate allows' }),
       },
     });
     await connectNodesOverRelay([A, VIEWHOST], { relayUrl });

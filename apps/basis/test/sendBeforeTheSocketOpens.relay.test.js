@@ -14,7 +14,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { decodeContactCard, encodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
+import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
 
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
 const textsAt = (node) => node.received.map((m) => m?.payload?.text).filter(Boolean);
@@ -30,6 +31,11 @@ describe('a send before the relay socket is open', () => {
 
   it('is held — and goes the moment the socket opens, with nobody else doing anything', async () => {
     fresh = await bootRealAgentNode('fresh');
+    // the person writes to a contact whose card they hold; the card's relays are left off, so no point to reach Bea
+    // exists before this device's own socket opens (what is measured)
+    const full = (await bea.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+    const { relays: _relays, ...body } = decodeContactCard(full.slice('onderling-contact://'.length));
+    await addCardOf(fresh, null, { payload: `onderling-contact://${encodeContactCard(body)}` });
     // The person writes BEFORE the relay is up — the deterministic form of "in the first second".
     const r = await fresh.agent.sendPeerMessage(bea.pubKey, { type: 'p2p-chat', msgId: 'first-second', ts: Date.now(), text: 'hoi, meteen na het opstarten' }, SEND);
     expect(r?.held, 'with no wire yet the send must be held, not lost or reported delivered').toBe(true);

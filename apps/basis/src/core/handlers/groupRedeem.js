@@ -31,6 +31,8 @@
  * @param {{info?, warn?, error?}}                                         [args.logger]
  * @returns {(fromAddr: string, payload: object) => Promise<void>}
  */
+
+import { inviteRefusalOf } from '../../v2/inviteRefusals.js';
 /**
  * The admin's own display name IN THIS CIRCLE, read the way every screen reads it: their row on the
  * roster, found by the per-circle address they answer on. No profile store is consulted directly, so this
@@ -99,7 +101,8 @@ export function makeHandleGroupRedeemRequest({
         ...(typeof podWebId === 'string' && podWebId ? { podWebId } : {}),
       });
       if (result?.error) {
-        reply = { error: result.error };
+        // a CODE from the closed set crosses the wire, never the substrate's own text (inviteRefusals.js)
+        reply = { error: inviteRefusalOf(result.error) };
       } else {
         reply = { ok: true, codeId: result.codeId, validUntil: result.validUntil };
         // Per-circle addressing RIDES BACK (2026-07-30). Until now it was one-directional: the joiner
@@ -129,7 +132,9 @@ export function makeHandleGroupRedeemRequest({
         if (result.joinStatement?.body && result.joinStatement?.sig) reply.joinStatement = result.joinStatement;
       }
     } catch (err) {
-      reply = { error: err?.message ?? String(err) };
+      // the exception stays on this device (its text can carry internals); the joiner hears the catch-all code
+      logger.warn?.('[group-redeem] the admitting step threw', err?.message ?? err);
+      reply = { error: 'join-refused' };
     }
     try {
       // the one reply on the person key: the answer when the request proved its code, else the refusal (the request was

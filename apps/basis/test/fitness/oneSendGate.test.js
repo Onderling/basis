@@ -80,6 +80,18 @@ describe('one send gate: no peer.sendTo( outside it', () => {
     expect(offenders, 'send through the agent\'s peerSend (realAgent), not the secure agent directly').toEqual([]);
   });
 
+  it('the declared TEST seam around the gate (sendBypassingTheGate) is named by no app or package code', () => {
+    // it lives in the journeys' boot for tests that measure a receiver's refusal; a product path that reached it would
+    // be a send around the gate with a reason string as its only excuse
+    const offenders = [];
+    for (const f of files) {
+      const rel = relative(REPO, f).split('\\').join('/');
+      if (rel.startsWith('apps/e2e-journeys/')) continue;
+      if (/\bsendBypassingTheGate\b/.test(readFileSync(f, 'utf8'))) offenders.push(rel);
+    }
+    expect(offenders, 'a test seam reached from product code').toEqual([]);
+  });
+
   it('the pattern catches the ways around a call-only match (self-test)', () => {
     for (const line of [
       'const send = sa.peer.sendTo;',

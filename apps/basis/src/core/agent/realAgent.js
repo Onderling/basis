@@ -43,7 +43,7 @@ import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
-import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange } from '../../v2/peerSendGate.js';
+import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange, exchangeKindOf } from '../../v2/peerSendGate.js';
 import { log as structuredLog } from '@onderling/logger';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
@@ -6627,12 +6627,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (decision.kind === 'as-person') return speakAsPerson(to, payload, o, decision);
     // THE PERSON KEY'S ALLOWLIST (peerSendGate.js): which entry lets this send leave on the person key, from what this
     // device holds about `to`. RECORDED today (allowedBy in the decision record); held as 'unknown-address' once enforced.
-    const sent = decision.kind === 'person' ? { ...decision, ...(await personSendFacts(to).then(personAllowedBy, () => ({ allowedBy: 'none' }))) } : decision;
+    const sent = decision.kind === 'person' ? { ...decision, ...(await personSendFacts(to, payload).then(personAllowedBy, () => ({ allowedBy: 'none' }))) } : decision;
     return sendCircleScoped(to, payload, decision.circleId ? { ...o, circleId: decision.circleId } : o, sent);
   }
   /** What this device holds about a person-path address: an open invite exchange, a kept contact, the fallback setting. */
-  async function personSendFacts(to) {
-    const inviteExchangeSide = inviteExchange.take(to);
+  async function personSendFacts(to, payload = null) {
+    // the exchange is asked for the side THIS payload is, never another side's registration
+    const inviteExchangeSide = inviteExchange.take(to, { kind: exchangeKindOf(payload) });
     // a view this self granted (its grant set names the view's key): the grant is the fact
     let granted = null;
     if (!inviteExchangeSide) {
@@ -6658,7 +6659,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const direct = rows.find((c) => names(c, address));
     if (direct) return { row: direct, via: 'card' };
     let id = address;
-    try { id = sa.resolver?.pubKeyForAddr?.(address) || address; } catch { id = address; }
+    // ONLY a link the person PROVED (the circle-link signature): an address merely bound for sealing (a legacy roster row
+    // without proof) is not "my contact's other device"
+    try { id = sa.resolver?.provenPubKeyForAddr?.(address) || address; } catch { id = address; }
     if (id === address) return null;
     const viaId = rows.find((c) => names(c, id));
     return viaId ? { row: viaId, via: 'device' } : null;

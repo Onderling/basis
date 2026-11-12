@@ -115,8 +115,10 @@ describe('J-NP2 — the admin-offline case is a typed NOTICE, not a generic fail
     // "Offline, try later" on a genuine refusal would send people retrying forever.
     const state = unreachableState();
     await finalSubmit({ state, callSkill, sendPeerRedeem: async () => ({ error: 'code-revoked' }) });
-    expect(state.submitErrorKey).toBeNull();
-    expect(state.submitError).toBe('code-revoked');
+    // a code outside the closed refusal set reads as the catch-all refusal, in words, never as "offline"
+    expect(state.submitErrorKey).toBe('circle.invite.join_refused');
+    expect(state.submitErrorReason).toBe('join-refused');
+    expect(state.submitErrorKey).not.toBe('circle.nearbyScreen.join_no_admin');
   });
 });
 

@@ -28,6 +28,7 @@ import {
 
 import {
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, getActiveCircle,
+  runStartQueue, startQueueSiblings,
   renderReply, isQrUri,
   // record-panel auto-refresh after a mutation.
   itemRefFromReply, REFRESHABLE_VERBS,
@@ -481,47 +482,20 @@ export default function ChatScreen({
     });
     const { gov: govCatchUp, membership: memCatchUp, key: keyCatchUp,
             task: itemsCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
-    const grantsCatchUp = bundle?.agent?.grantsCatchUp ?? null;
 
-    // The reconnect kicks — once per app launch each; after that the LIVE fan keeps the log current.
-    if (govCatchUp && !globalThis.__onderlingGovCatchUpKicked) {
-      globalThis.__onderlingGovCatchUpKicked = true;
-      setTimeout(() => { govCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2000);
-    }
-    if (memCatchUp && !globalThis.__onderlingMemCatchUpKicked) {
-      globalThis.__onderlingMemCatchUpKicked = true;
-      setTimeout(() => { memCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2500);
-    }
-    // The grants lane: pull my own devices' grant/revoke statements on connect, so a revoke made
-    // elsewhere binds at this door before a stale view is served.
-    if (grantsCatchUp && !globalThis.__onderlingGrantsCatchUpKicked) {
-      globalThis.__onderlingGrantsCatchUpKicked = true;
-      setTimeout(() => { grantsCatchUp.requestFromSiblings().catch(() => {}); }, 2500);
-    }
-    // Who my other devices know (bindings + contact rows) — web parity with the kick above.
-    if (bundle?.agent?.knownPeersSync && !globalThis.__onderlingKnownPeersKicked) {
-      globalThis.__onderlingKnownPeersKicked = true;
-      setTimeout(() => { bundle.agent.knownPeersSync.requestFromSiblings().catch(() => {}); }, 2500);
-    }
-    // The person key a ceremony rotated on another device while this one was off — web parity.
-    if (bundle?.agent?.personKeySync && !globalThis.__onderlingPersonKeyKicked) {
-      globalThis.__onderlingPersonKeyKicked = true;
-      setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
-    }
-    // Each profile's facts (properties + disclosure) as the devices holding the same self have them — web parity.
-    if (bundle?.agent?.profileFactsSync && !globalThis.__onderlingProfileFactsKicked) {
-      globalThis.__onderlingProfileFactsKicked = true;
-      setTimeout(() => { bundle.agent.profileFactsSync.requestFromSiblings().catch(() => {}); }, 2500);
-    }
-    // The person's own store (their own appointments, their planned rows) as their other devices hold it — web parity.
-    if (bundle?.agent?.ownStoreSync && !globalThis.__onderlingOwnStoreKicked) {
-      globalThis.__onderlingOwnStoreKicked = true;
-      setTimeout(() => { bundle.agent.ownStoreSync.requestFromSiblings().catch(() => {}); }, 2500);
-    }
-    // …and which of the person's devices is primary for direct messages (sync-policy §12), web parity.
-    if (bundle?.agent?.primaryDevice && !globalThis.__onderlingPrimaryDeviceKicked) {
-      globalThis.__onderlingPrimaryDeviceKicked = true;
-      setTimeout(() => { bundle.agent.primaryDevice.requestFromSiblings().catch(() => {}); }, 2600);
+    // THE START QUEUE (shared, startQueue.js) — once per app launch; after that the LIVE fan keeps the log current. The
+    // circle on screen first, then my own devices (grants first), then every other circle, one step at a time: every
+    // lane's catch-up and every own-device ask, in one order (web and the box run the same queue).
+    if (!globalThis.__onderlingStartQueueRun) {
+      globalThis.__onderlingStartQueueRun = true;
+      setTimeout(() => {
+        runStartQueue({
+          catchUps: { membership: memCatchUp, gov: govCatchUp, key: keyCatchUp, task: itemsCatchUp, chat: chatCatchUp },
+          siblings: startQueueSiblings(bundle?.agent),
+          callSkill: bundle.callSkill,
+          firstCircle: () => getActiveCircle(),
+        }).catch(() => {});
+      }, 2000);
     }
     // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
     // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
@@ -557,10 +531,6 @@ export default function ChatScreen({
     }
     // The build's feedback contact is OFFERED at the feedback door, never added here (web parity): a boot adds
     // nobody to the book.
-    if (itemsCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
-      globalThis.__onderlingTaskCatchUpKicked = true;
-      setTimeout(() => { itemsCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);
-    }
     // Pod-only circles never fan — read their statement rows back on the same kick.
     if (podChatCatchUp && !globalThis.__onderlingPodChatCatchUpKicked) {
       globalThis.__onderlingPodChatCatchUpKicked = true;
@@ -571,14 +541,6 @@ export default function ChatScreen({
           await podChatCatchUp.catchUpAll(ids);
         } catch { /* best-effort — the next launch retries */ }
       }, 4000);
-    }
-    if (chatCatchUp && !globalThis.__onderlingChatCatchUpKicked) {
-      globalThis.__onderlingChatCatchUpKicked = true;
-      setTimeout(() => { chatCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
-    }
-    if (keyCatchUp && !globalThis.__onderlingKeyCatchUpKicked) {
-      globalThis.__onderlingKeyCatchUpKicked = true;
-      setTimeout(() => { keyCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
     }
     // Background-fetch: when the OS grants a background slot, run the SAME catch-ups the boot kicks
     // run — pod chat read-back + frontier replay — so messages land while the app is backgrounded.

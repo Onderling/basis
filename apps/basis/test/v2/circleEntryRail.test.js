@@ -219,7 +219,7 @@ describe('the rail — compact (tombstones on the fold\'s word)', () => {
     return log;
   }
   const MKINDS = ['join', 'member-props'];
-  const mrail = (log, me) => makeCircleEntryRail({ eventLog: log, signerFor: async () => ({ identity: me.identity, ref: me.ref }), entryKind: 'membership', declaredKinds: MKINDS });
+  const mrail = (log, me) => makeCircleEntryRail({ eventLog: log, signerFor: async () => ({ identity: me.identity, ref: me.ref }), entryKind: 'membership', declaredKinds: MKINDS, compactableKinds: ['member-props'] });
 
   it('a tombstoned statement keeps its chain fields and its place, loses its content, and is never resurrected', async () => {
     const log = fakeEventLogWithCompact();
@@ -327,6 +327,29 @@ describe('a narrowed read checks only what it keeps (verify-once step B)', () =>
     log.entries[0].payload = { ...log.entries[0].payload, body: { ...log.entries[0].payload.body, kind: 'vote' } };
     const { bodies } = await railFor(log, alice).readVerifiedBodies(CIRCLE, { kinds: ['vote'] });
     expect(bodies).toEqual([]);
+  });
+});
+
+describe('a read gives the thread back: checking never holds it for long (fast start, the 100 ms rule)', () => {
+  it('six statements whose checks take ~30 ms each: no stretch of more than 100 ms without the event loop running', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-slice');
+    const writer = railFor(log, alice);
+    for (let i = 0; i < 6; i++) await writer.append(CIRCLE, { kind: 'propose', subject: `s-${i}`, payload: { action: 'x', subject: {}, by: alice.ref, at: i } });
+    const busy = (ms) => { const end = Date.now() + ms; while (Date.now() < end) { /* a slow phone's check */ } };
+    const memo = createSignatureMemo({ verify: (m, s, k) => { busy(30); return AgentIdentity.verify(m, s, k); } });
+    const reader = railFor(log, alice, { signatureMemo: memo });
+    let last = Date.now(); let worst = 0; let running = true;
+    const tick = () => { const t = Date.now(); worst = Math.max(worst, t - last); last = t; if (running) setTimeout(tick, 0); };
+    setTimeout(tick, 0);
+    await new Promise((r) => { setTimeout(r, 5); });
+    last = Date.now();
+    await reader.readVerified(CIRCLE);
+    await reader.readVerifiedBodies(CIRCLE);
+    running = false;
+    await new Promise((r) => { setTimeout(r, 5); });
+    // the slice's budget is 50 ms per stretch; unsliced this read held the thread ~227 ms. 150 leaves room for a loaded runner
+    expect(worst, 'the read held the thread').toBeLessThan(150);
   });
 });
 

@@ -236,7 +236,10 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
     return !!e && e.payload?.circleId === circleId;
   };
 
-  return { appendMessage, signEntry, ingest, verify, storedStatements, hasEntry };
+  /** What a catch-up sends on must still be what its author signed, checked here, now (as the circle entry rail's). */
+  const checkSigned = (circleId, statement) => !!statement && statement.tombstone !== true && safeVerify(statement, circleId)?.ok === true;
+
+  return { appendMessage, signEntry, ingest, verify, storedStatements, hasEntry, checkSigned };
 }
 
 /**

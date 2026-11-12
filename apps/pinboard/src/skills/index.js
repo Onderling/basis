@@ -108,7 +108,7 @@ const _reportAddressFallback = makeFallbackReporter(undefined, {
 import { getPrivacyNotice } from '../lib/privacyNotice.js';
 import { categoryFor, TAXONOMY } from '../lib/offeringsMatch.js';
 import { findNearDuplicate } from '../lib/dupCheck.js';
-import { deriveRoster } from '../lib/deriveRoster.js';
+import { deriveRoster, proveLinksAhead } from '../lib/deriveRoster.js';
 // B4 — who has LEFT or been REMOVED from ONE circle. The rule lives in one place so the roster
 // projection, the fan-out roster and the legacy MemberMap fallback cannot disagree about who is in.
 // B5 — how many people ONE invite may admit: circle ceiling → per-invite choice → system cap,
@@ -1015,6 +1015,8 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
   // hold this circle — and the honest answer to that is nothing, for every caller.
   if (forGroup.length === 0 && founderWebids.size === 0) return null;
 
+  // the link proofs the fold will check, checked first with the thread given back between them (the fold is synchronous)
+  await proveLinksAhead({ redemptions: forGroup, founderWebids: [...founderWebids], founderFacts });
   return deriveRoster({
     redemptions: forGroup,
     founderWebids: [...founderWebids],

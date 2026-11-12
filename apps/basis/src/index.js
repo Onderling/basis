@@ -85,6 +85,7 @@ export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OP
 export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from './v2/circlePodProducer.js';
 export { realPodRouting, podRootFromWebid, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
+export { runStartQueue, startQueueSiblings, START_LANES } from './v2/startQueue.js';
 export {
   CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, decisionDeadlineDays,
   DEFAULT_CIRCLE_POLICY, normalizeCirclePolicy, mergeCirclePolicy, policyPatch,

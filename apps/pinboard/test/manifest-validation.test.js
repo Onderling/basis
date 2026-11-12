@@ -68,6 +68,8 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
       expect(typeof op.verb, `${op.id} verb-type`).toBe('string');
 
       expect(op.surfaces, `${op.id} surfaces`).toBeDefined();
+      // an INTERNAL op (a door's write, never typed, never a button) has no surface to hint on
+      if (op.surfaces.internal === true) { expect(Object.keys(op.surfaces), `${op.id} internal and surfaced`).toEqual(['internal']); continue; }
       expect(op.surfaces.chat, `${op.id} surfaces.chat`).toBeDefined();
       expect(op.surfaces.chat.hint, `${op.id} surfaces.chat.hint`).toBeTruthy();
       expect(typeof op.surfaces.chat.hint, `${op.id} hint-type`).toBe('string');
@@ -159,8 +161,8 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // 2026-10-23: -1, `restoreFromMnemonic` retired — the recovery phrase is the owner root's, restored by the host
   // (`restoreOwnerPhrase`); this agent's key is never in the phrase → 92.
   // 2026-10-30: +1, `dismissRemovedCircle` — closing a circle an admin removed you from (this device's copy only) → 84.
-  it('ships the full chat+slash surface (one pinboard manifest, 83 ops)', () => {
-    expect(pinboardManifest.operations.length).toBe(83);
+  it('ships the full chat+slash surface (one pinboard manifest, 87 ops)', () => {
+    expect(pinboardManifest.operations.length).toBe(87);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail
@@ -176,7 +178,7 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // Part G dissolve (2026-06-17) — adds the app-local chat-shell types
   // 'post'/'contact'/'member' (used by the relocated ops' appliesTo +
   // the feed/contacts views) on top of the eight D.1 substrate types.
-  it('declares the eight substrate itemTypes + the three Part-G chat-shell types', () => {
+  it('declares the substrate itemTypes, the three Part-G chat-shell types and the held message request', () => {
     expect(pinboardManifest.itemTypes).toEqual([
       'ask',
       'offer',
@@ -188,6 +190,7 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
       'post',
       'contact',
       'member',
+      'message-request',
     ]);
   });
 

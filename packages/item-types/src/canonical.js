@@ -33,6 +33,7 @@ import { READ_MARKS_SCHEMA, READ_MARKS_SET_UNION } from './types/readMarks.js';
 import { RSVP_SCHEMA }              from './types/rsvp.js';
 import { MEMBERSHIP_REDEMPTION_SCHEMA } from './types/membershipRedemption.js';
 import { GROUP_RULES_SCHEMA }       from './types/groupRules.js';
+import { MESSAGE_REQUEST_SCHEMA, MESSAGE_REQUEST_SET_UNION } from './types/messageRequest.js';
 
 /**
  * Map of canonical name → schema. Useful for `Object.entries(...)`
@@ -106,6 +107,9 @@ export const CANONICAL_TYPES = Object.freeze({
   'membership-code':    MEMBERSHIP_CODE_SCHEMA,
   'post-answers':       POST_ANSWERS_SCHEMA,
   'read-marks':         READ_MARKS_SCHEMA,
+  // A first message from someone the person did not choose, held until they accept, ignore or block it. Own-devices
+  // only, beside the book and never in it (2026-11-12).
+  'message-request':    MESSAGE_REQUEST_SCHEMA,
   // One person's answer to one appointment (2026-10-20): its own item, so no whole-item write of the appointment can
   // carry or drop it; the appointment's `rsvp` is a read projection over these.
   'rsvp':               RSVP_SCHEMA,
@@ -140,7 +144,7 @@ export const CANONICAL_TYPES = Object.freeze({
  * never into a circle. A rule that trusts its writers to be one person (a writer-stamped clock) may hold only for
  * these; `@onderling/item-store`'s resolution registry reads this list to refuse it elsewhere.
  */
-export const OWN_SCOPE_TYPES = Object.freeze(['contact', 'device-link', 'membership-code', 'post-answers', 'read-marks']);
+export const OWN_SCOPE_TYPES = Object.freeze(['contact', 'message-request', 'device-link', 'membership-code', 'post-answers', 'read-marks']);
 
 /**
  * The canonical types that declare field-sets merging by their own clock (`field-clock`), by type name. The item
@@ -158,6 +162,7 @@ export const CANONICAL_FIELD_CLOCKS = Object.freeze({
  */
 export const CANONICAL_SET_UNIONS = Object.freeze({
   'read-marks': [READ_MARKS_SET_UNION],
+  'message-request': [MESSAGE_REQUEST_SET_UNION],
 });
 
 export const LEGACY_ALIASES = Object.freeze({

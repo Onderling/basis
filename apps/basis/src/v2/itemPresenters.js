@@ -32,6 +32,8 @@ export const NOT_MERGED = Object.freeze({
   // who answered my post: folded into the post on the poster's own reads only (routedStore), never shown on its own
   'post-answers': "who answered one of my posts; folded into the post on my own reads, never shown on its own",
   'read-marks': "what I read in one circle or conversation; read by the news projections, never shown on its own",
+  // a first message from someone not chosen: shown in Contacten's requests section only (accept / ignore / block)
+  'message-request': "a first message from someone I did not choose; shown in Contacten's requests only, never merged into a view",
   // an answer to an appointment is read through its appointment only (its `rsvp`, projected by rsvpItems.js)
   rsvp: 'one person\'s answer to one appointment; read through its event (withAnswers), never shown on its own',
   // a roster-trail row is what the circle's roster is projected FROM (deriveRoster) — the roster is the view, never the row

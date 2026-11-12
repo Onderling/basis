@@ -64,6 +64,9 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     await bindCircleAddresses([web], CIRCLE);
     // The box: enrolled from the web device's offer, then started AS THE PRIMARY DEVICE (the deploy default).
     const env = { PATH: process.env.PATH, HOME: dataDir, ONDERLING_RELAY_URL: relay.url, BASIS_VAULT_PASSPHRASE: 'test-only-passphrase', ONDERLING_PRIMARY_DEVICE: '1' };
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await web.agent.setFirstMessages('open')).toBe('open');
     const offer = await web.agent.callSkill('household', 'buildEnrollOffer', { relayUrl: relay.url });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     const phrase = (await web.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
@@ -72,6 +75,8 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     box = run(['--data-dir', dataDir], { env });
     expect(await until(async () => (box.out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 }), `the box never came up:\n${box.out.slice(-1500)}`).toBe(true);
     expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'enroll-offer') ?? null, { timeout: 60_000, step: 500 }), 'the box never consumed the offer').toBeTruthy();
+    // the box has the person's profile (the feedback persona's policy among it) once its catch-up has landed
+    expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'profile-facts-landed') ?? null, { timeout: 30_000, step: 500 }), 'the box never got the person\'s profile facts').toBeTruthy();
     expect(await until(async () => (box.out.includes('primary contact address') ? true : null), { timeout: 30_000, step: 250 }), 'the box never claimed the primary address').toBe(true);
     card = cardFrom(box.out);
     expect(card).toBeTruthy();

@@ -100,6 +100,9 @@ const ITEM_TYPES = [
   'post',
   'contact',
   'member',
+  //  - 'message-request' — a first message from someone not chosen, held beside the book until the person answers
+  //    (listMessageRequests / ignoreMessageRequest appliesTo). Canonical in `@onderling/item-types`, own-devices only.
+  'message-request',
 ];
 
 // The trio that renders on the noticeboard (ask / offer / lend) — used as
@@ -143,6 +146,8 @@ export const pinboardManifest = {
     // sitting of its own.
     contact:       { atoms: ['add', 'list', 'submit'] },
     member:        { atoms: ['add', 'list'] },
+    // a request is held by the door (`add`, self only, internal), listed and answered; never merged into a view
+    'message-request': { atoms: ['add', 'list', 'submit'] },
   },
 
   operations: [
@@ -648,6 +653,72 @@ export const pinboardManifest = {
         slash: { command: '/hide-contact', body: 'flags' },
         chat:  { reply: 'text', hint: 'hide a contact from Contacten, or show them again' },
         ui:    { control: 'button', labelKey: 'circle.button.pinboard.setContactHidden' },
+      },
+    },
+    // ── Requests (Frits 2026-11-12) ──
+    // A first message from someone the person did not choose is a REQUEST, held beside the book (never in it) until the
+    // person accepts, ignores or blocks it. Requests are per self, on the own-devices store, so they reach every device
+    // of the person. Blocking is basis's block set (`mute`, /block).
+    {
+      id:   'listMessageRequests', visibility: 'authenticated', group: 'data', verb: 'list',
+      appliesTo: { type: 'message-request' },
+      params: [
+        { name: 'persona', kind: 'string', required: false },
+        { name: 'state',   kind: 'enum', of: ['open', 'ignored'], required: false },
+      ],
+      surfaces: {
+        slash: { command: '/requests', body: 'flags' },
+        chat:  { reply: 'list', hint: 'list first messages from people you did not choose' },
+      },
+    },
+    {
+      // The door's write (the contact channel, when a turn's sender is not known to this self): never typed, never a
+      // button, self only. Refused with its reason when it cannot be held (no card on a new request, a card naming
+      // someone else, a file, a turn larger than the bound).
+      id:   'holdMessageRequest', visibility: 'private', verb: 'add',
+      circleScoped: false,   // a person's own request, never a circle's
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'turns', policy: 'content' }],   // the held turns merge by union between the person's devices
+      params: [
+        { name: 'from',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'messageId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'ts',        kind: 'number', required: true },
+        { name: 'text',      kind: 'string', required: false },
+        { name: 'card',      kind: 'string', required: false },
+        { name: 'file',      kind: 'boolean', required: false },
+        { name: 'persona',   kind: 'string', required: false },
+      ],
+      surfaces: { internal: true },
+    },
+    {
+      // Accept: the held card into the book (as a scanned card), the request goes, the held turns are returned. The thread
+      // is the contact channel's, so a person's accept goes through basis's shared `acceptMessageRequest`, which puts the
+      // turns there; the Contacten section's button is that function. Not typed: a typed accept would drop the turns.
+      id:   'acceptMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'contact', policy: 'content' }],
+      params: [
+        { name: 'from',         kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona',      kind: 'string', required: false },
+        { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
+      ],
+      surfaces: { internal: true },
+    },
+    {
+      id:   'ignoreMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'state', policy: 'content' }],   // the newer write wins between the person's devices; a later turn keeps the mark
+      params: [
+        { name: 'from',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/ignore-request', body: 'flags' },
+        chat:  { reply: 'text', hint: 'ignore a request: it stays and can still be accepted' },
       },
     },
     {

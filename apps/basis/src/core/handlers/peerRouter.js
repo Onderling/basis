@@ -45,7 +45,8 @@ export function makePeerRouter({
   logger     = console,
 } = {}) {
   return function onPeerMessage(env) {
-    const { from, payload: rawPayload } = env ?? {};
+    // `to`: the address the frame arrived on (the secure agent hands it on): WHICH of my selves it is for
+    const { from, payload: rawPayload, to = null } = env ?? {};
     logger.info?.('[peer] received from', from, rawPayload);
 
     // A chat turn rides the A2A message shape — `{ type:'message', parts:[{ type:'DataPart', data }] }`
@@ -57,8 +58,9 @@ export function makePeerRouter({
     const h = (subtype && typeof handlers[subtype] === 'function')
       ? handlers[subtype]
       : null;
-    if (h) return _runSafe(h, from, payload, subtype, logger);
-    if (typeof defaultHandler === 'function') return _runSafe(defaultHandler, from, payload, 'default', logger);
+    const ctx = to ? { to } : {};
+    if (h) return _runSafe(h, from, payload, subtype, logger, ctx);
+    if (typeof defaultHandler === 'function') return _runSafe(defaultHandler, from, payload, 'default', logger, ctx);
     logger.debug?.('[peer] unhandled subtype', subtype, 'from', from);
     return Promise.resolve(NOT_TAKEN);
   };
@@ -80,9 +82,9 @@ export const NOT_TAKEN = Object.freeze({ refused: true });
  * agent records a message as taken only on a verdict that is not a refusal, so a frame a handler could not take
  * yet (its sender not folded, its circle not known) stays retryable.
  */
-function _runSafe(handler, from, payload, label, logger) {
+function _runSafe(handler, from, payload, label, logger, ctx = {}) {
   try {
-    const r = handler(from, payload);
+    const r = handler(from, payload, ctx);
     if (r && typeof r.then === 'function') {
       return r.catch((err) => { logger.error?.(`[peer] ${label} failed`, err); return NOT_TAKEN; });
     }

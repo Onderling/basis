@@ -852,6 +852,8 @@ export async function bootAgentBundle(opts = {}) {
     openFor: agent.contactSeal?.openFor ?? null,
     // a turn to a bot my identity is linked to (`/koppel`) carries this device's statement over it (web parity)
     authFor: agent.linkedTurnAuth ?? null,
+    // a first message from someone the person did not choose is a request, decided before anything is kept
+    messageRequests: agent.messageRequests ?? null,
     localActor: 'me',
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them (web parity).

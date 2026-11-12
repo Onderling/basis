@@ -37,6 +37,8 @@ test('the identity link in the app: the bot named, the line with this app\'s key
 
     // the bot's statement, over the relay, to the chat identity in the offer: the sheet says linked, the bot is a contact
     // — which also proves the offer carries THIS app's own identity (the relay delivers to the key it registered)
+    // the bot checked this offer above (parseLinkOffer), so its one answer is registered, as the bot's own link code does
+    bot.agent.inviteExchange.expectLinkAnswer(offer.webid);
     await bot.agent.sendPeerMessage(offer.webid, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: bot.pubKey, row: 'telegram:42', root: offer.root, at: Date.now() } });
     await expect(sheet.locator('[data-identity-link="linked"]')).toBeVisible({ timeout: 60_000 });
     const book = await page.evaluate(() => window.onderlingCall('pinboard', 'listContacts', {}));

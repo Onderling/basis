@@ -38,8 +38,8 @@ export const INVITE_EXCHANGE_MAX = param({ key: 'sendGate.inviteExchangeMax', sc
 export const PERSON_ALLOWLIST = Object.freeze([
   Object.freeze({
     id: 'invite-exchange',
-    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal), and the one request a scanned pairing code sends to the scanned key (the invite names the inviter\'s cross-circle id by decision, so this buys no link)',
-    matches: (f) => f?.inviteExchange === 'joiner' || f?.inviteExchange === 'answer' || f?.inviteExchange === 'refusal' || f?.inviteExchange === 'pairing',
+    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal), and the one request a scanned pairing code sends to the scanned key (the invite names the inviter\'s cross-circle id by decision, so this buys no link); and the ONE answer to an address that just asked this device by a statement it signed and this device checked: a bot\'s link statement to the app identity whose link offer it checked (chained to its root, fresh, nonce spent), a box\'s refusal to the screen key whose own offer it read',
+    matches: (f) => ['joiner', 'answer', 'refusal', 'pairing', 'link-answer', 'screen-refusal'].includes(f?.inviteExchange),
     detail: (f) => ({ side: f.inviteExchange }),
   }),
   Object.freeze({
@@ -94,13 +94,15 @@ export function contactOriginOf(row) {
  * only, so a send of one side never uses up another side's registration (an address that is both, two devices inviting
  * each other), and a send that is no part of it (a contact message to an address with an open redeem) is not named so.
  * @param {object|null} payload
- * @returns {'joiner'|'reply'|'pairing'|null}
+ * @returns {'joiner'|'reply'|'pairing'|'link-answer'|'screen-refusal'|null}
  */
 export function exchangeKindOf(payload) {
   if (!payload || typeof payload !== 'object') return null;
   if (payload.subtype === 'group-redeem-request') return 'joiner';
   if (payload.subtype === 'group-redeem-response') return 'reply';
   if (payload.__pairReq && typeof payload.__pairReq === 'object') return 'pairing';
+  if (payload.subtype === 'identity-link') return 'link-answer';
+  if (payload.subtype === 'screen-offer-refused') return 'screen-refusal';
   return null;
 }
 
@@ -165,9 +167,19 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
   const replies = new Map();
   /** address → { n, until }: pairing codes scanned toward that key */
   const pairings = new Map();
+  /** `${side}\u0000${address}` → { until }: the one answer owed to an address whose signed ask this device just checked */
+  const asked = new Map();
   const sweep = () => {
     const t = now();
-    for (const m of [joiners, replies, pairings]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
+    for (const m of [joiners, replies, pairings, asked]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
+  };
+  const owe = (side, address) => {
+    if (typeof address !== 'string' || !address) return;
+    sweep();
+    const key = `${side}\u0000${address}`;
+    asked.delete(key);
+    asked.set(key, { until: now() + lifetimeMs });
+    bound(asked);
   };
   const bound = (m) => { while (m.size > max) m.delete(m.keys().next().value); };
   const reply = (address, side) => {
@@ -216,6 +228,10 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
     refuseParsedRequest(address) { reply(address, 'refusal'); },
     /** INVITER: a request from `address` proved its code; its ONE answer may go back (replaces a refusal registration). */
     answerProvenRequest(address) { reply(address, 'answer'); },
+    /** A BOT checked a link offer (or a turn's device statement) from the app identity `address`: its ONE statement may go back. */
+    expectLinkAnswer(address) { owe('link-answer', address); },
+    /** A BOX read the screen `address`'s own offer and will not take it: its ONE refusal may go back. */
+    expectScreenRefusal(address) { owe('screen-refusal', address); },
     /**
      * The gate asks, once per send, for the side the payload IS (`exchangeKindOf`): 'joiner' | 'answer' | 'refusal' (a
      * reply, now consumed) | 'pairing' | null. No kind: no part of the exchange, so null.
@@ -231,9 +247,15 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
       }
       if (kind === 'joiner') return joiners.has(address) ? 'joiner' : null;
       if (kind === 'pairing') return pairings.has(address) ? 'pairing' : null;
+      if (kind === 'link-answer' || kind === 'screen-refusal') {
+        const key = `${kind}\u0000${address}`;
+        if (!asked.has(key)) return null;
+        asked.delete(key);
+        return kind;
+      }
       return null;
     },
-    get size() { sweep(); return joiners.size + replies.size + pairings.size; },
+    get size() { sweep(); return joiners.size + replies.size + pairings.size + asked.size; },
   };
 }
 

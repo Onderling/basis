@@ -1240,6 +1240,7 @@ if (tgToken || inboxDoor.bridge) {
     },
     // a screen whose offer was not taken is told, so it says so instead of waiting
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
+    expectRefusal: (viewPubKey) => agent.inviteExchange?.expectScreenRefusal?.(viewPubKey),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
     grant: async (g) => {
       const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
@@ -1276,6 +1277,7 @@ if (tgToken || inboxDoor.bridge) {
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
     tellApp: (key, payload) => agent.sendPeerMessage(key, payload),
+    expectAnswer: (key) => agent.inviteExchange?.expectLinkAnswer?.(key),
     listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
     revokeView: async (viewPubKey) => {
       const revoked = (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true;

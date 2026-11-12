@@ -10058,11 +10058,14 @@ export async function createRealHouseholdAgent(opts = {}) {
      */
     nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
     nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
-    // the invite exchange's registrations, for the redeem code (groupRedeem.js) only; the gate alone reads them
+    // the invite exchange's registrations, for the code that checked the ask (the redeem code, groupRedeem.js; the
+    // bot's identity link and its screens, botIdentityLink.js / botScreens.js); the gate alone reads them
     inviteExchange: Object.freeze({
       expectFromInviter: (address) => inviteExchange.expectFromInviter(address),
       answerProvenRequest: (address) => inviteExchange.answerProvenRequest(address),
       refuseParsedRequest: (address) => inviteExchange.refuseParsedRequest(address),
+      expectLinkAnswer: (address) => inviteExchange.expectLinkAnswer(address),
+      expectScreenRefusal: (address) => inviteExchange.expectScreenRefusal(address),
     }),
     /** The Nearby room's `keep` port for the current visit (nearbyKept.js), over this device's log; null without one. */
     nearbyKeeper: (visitId) => (opts.deviceLog ? makeRoomKeeper({

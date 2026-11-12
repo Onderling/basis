@@ -233,3 +233,32 @@ describe('a co-member\'s PERSON address is no reason to speak as the person', ()
     expect(personAllowedBy({ circleMember: 'buren' })).toEqual({ allowedBy: 'none' });
   });
 });
+
+describe('createInviteExchange: the one answer to a signed ask this device just checked (the link offer, the screen offer)', () => {
+  it('a link answer and a screen refusal are each registered once, by the checking code, and consumed by the send', () => {
+    const x = createInviteExchange();
+    expect(exchangeKindOf({ subtype: 'identity-link' })).toBe('link-answer');
+    expect(exchangeKindOf({ subtype: 'screen-offer-refused' })).toBe('screen-refusal');
+    expect(x.take('APP', { kind: 'link-answer' }), 'nothing registered: nothing allowed').toBe(null);
+    x.expectLinkAnswer('APP');
+    x.expectScreenRefusal('SCREEN');
+    expect(x.take('SCREEN', { kind: 'link-answer' }), 'a side never uses another side\'s registration').toBe(null);
+    expect(x.take('APP', { kind: 'link-answer' })).toBe('link-answer');
+    expect(x.take('APP', { kind: 'link-answer' }), 'consumed: one answer').toBe(null);
+    expect(x.take('SCREEN', { kind: 'screen-refusal' })).toBe('screen-refusal');
+    expect(x.take('SCREEN', { kind: 'screen-refusal' })).toBe(null);
+  });
+
+  it('bounded in time like the rest of the exchange', () => {
+    let t = 0;
+    const x = createInviteExchange({ now: () => t, lifetimeMs: 100 });
+    x.expectLinkAnswer('APP');
+    t = 101;
+    expect(x.take('APP', { kind: 'link-answer' })).toBe(null);
+  });
+
+  it('the allowlist names both sides under invite-exchange', () => {
+    expect(personAllowedBy({ inviteExchange: 'link-answer' })).toEqual({ allowedBy: 'invite-exchange', side: 'link-answer' });
+    expect(personAllowedBy({ inviteExchange: 'screen-refusal' })).toEqual({ allowedBy: 'invite-exchange', side: 'screen-refusal' });
+  });
+});

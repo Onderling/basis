@@ -44,17 +44,17 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     throw new Error('circleEntryRail: declaredKinds required (a rail lane with no declared kinds is inert)');
   }
 
+  /** This lane's entries in one circle: from the log's index when it has one (the device EventLog), so a read costs the
+   *  lane and not a copy of the whole log; else the whole-log filter (a minimal log, a test's). Same entries, same order. */
+  const laneEntries = (circleId) => (typeof eventLog.entriesOf === 'function'
+    ? eventLog.entriesOf(entryKind, circleId)
+    : eventLog.query({})).filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body);
   /** The stored signed statements for one circle (raw — verification is the read side's job). */
-  const storedStatements = (circleId) => eventLog
-    .query({})
-    .filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body)
-    .map((e) => e.payload);
+  const storedStatements = (circleId) => laneEntries(circleId).map((e) => e.payload);
   /** The same, with each statement's POSITION on this device's log (`seq`, stamped at append/ingest, never by
    *  a writer). A re-read hands it to the binding: a statement that landed here BEFORE a retirement landed
    *  keeps binding to the address it was signed with — revocation cuts the future, not the past. */
-  const storedEntries = (circleId) => eventLog
-    .query({})
-    .filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body)
+  const storedEntries = (circleId) => laneEntries(circleId)
     .map((e) => ({ statement: e.payload, atSeq: Number.isFinite(e.seq) ? e.seq : null }));
 
   const entryId = (stmt) => `${entryKind}:${stmt.body.hash}`;
@@ -164,7 +164,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     // Report whether this statement is NEW here — a windowed catch-up's progress guard must not count a
     // re-delivered duplicate as progress (that is how two diverged peers would page forever).
     const id = entryId(statement);
-    const existed = eventLog.query({}).some((e) => e && e.id === id);
+    const existed = typeof eventLog.entryById === 'function' ? eventLog.entryById(id) !== null : eventLog.query({}).some((e) => e && e.id === id);
     const entry = eventLog.appendSilentEntry({ circleId, kind: entryKind, payload: statement, id });
     return { ok: true, entry, existed };
   }

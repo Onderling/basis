@@ -1534,3 +1534,25 @@ to them, circle traffic included: a silent half-removal on one device. In a circ
 on their own device; removal stays the admin's. The block is on this device for now: a block reaching all the person's
 devices is a later step. A block is by identity and the addresses it had; a fresh key gets past it as a new stranger,
 and the stranger budgets are the defence there. Ledger: L806, L807, L808.
+
+## 2026-11-12 — A signature verdict is remembered only in memory, once per process; nothing persisted, nothing from another device (Frits)
+
+What a start costs on a phone is first-time signature checks (measured on a Samsung A33: one Ed25519 check in pure
+JavaScript is about 61 ms, and a start with 18 circles does about 90 of them in its first 15 seconds). Repeats were
+already answered from memory. What may be remembered, and what may not:
+
+- **Only the pure check is remembered**: (the verifier, the key, the signature, the sha-256 of the signed bytes) →
+  true. One memo per process (`processSignatureMemo` in the kernel), bounded by bytes (8 MiB, a parameter), used by
+  every rail, a circle-link proof, a ceremony reveal and a device delegation under their own verifier names, so one
+  verifier's "true" is never another's. A failure is never remembered. The only writer is the real check, after it
+  returned true.
+- **No verdict is persisted**, inside or beside the log, and none is accepted from another device or a restore: a
+  remembered mark in the device log would travel with a history restore, a verdict made elsewhere. Considered and
+  dropped: remembering the verdict of chat and item statements in the sealed log record (it saved nothing, since stored
+  chat is not re-verified on read, and the rail lanes have a way with no new trust).
+- **What binds is re-decided on every read**: the binding of a key to a member, the fold, fork detection, revocation,
+  the admin check. Only the cryptographic fact is remembered.
+- A read that asks for some kinds drops the others before checking signatures (the kind is inside the signed bytes);
+  a read that computes a chain, a fork or a lane's head over the whole lane keeps checking the whole lane.
+
+Ledger: L619, L821.

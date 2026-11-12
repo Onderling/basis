@@ -7207,6 +7207,10 @@
     "removed": {
       "text": "{{name}} zit niet meer in deze kring. Andere kringen die jullie delen blijven ongewijzigd.",
       "doc": "B4 — confirmation after removing a member; states the per-circle scope, which is the thing that used to be untrue."
+    },
+    "remove_proposed": {
+      "text": "Er staat een voorstel open om {{name}} te verwijderen: deze kring beslist dat samen. Je ziet het als er besloten is.",
+      "doc": "Na Verwijderen in een kring die samen over verwijderen beslist: er is nog niets gebeurd, er staat een voorstel open."
     }
   },
   "userLlm": {

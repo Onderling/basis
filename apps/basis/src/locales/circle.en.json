@@ -7201,6 +7201,10 @@
     "removed": {
       "text": "{{name}} is no longer in this circle. They keep any other circle you share.",
       "doc": "B4 — confirmation after removing a member; states the per-circle scope, which is the thing that used to be untrue."
+    },
+    "remove_proposed": {
+      "text": "A proposal to remove {{name}} is open: this circle decides that together. You will see when it is decided.",
+      "doc": "After an admin taps Remove in a circle that decides removals together: nothing happened yet, a proposal is open."
     }
   },
   "userLlm": {

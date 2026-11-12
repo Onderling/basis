@@ -96,7 +96,8 @@ import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } fr
 // removing one member from ONE circle, and leaving one, live in shared code: both end by
 // re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
 // makes a removal a security change rather than a list edit. web ≡ mobile by construction.
-import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
+import { leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
+import { removeMemberDoor } from '../../src/v2/governanceDoors.js';
 // "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
@@ -9067,19 +9068,14 @@ async function showAdmin(id) {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
-        // ONE shared op. It reads the roster while the member is still on it (for their
-        // per-circle address), removes them from THIS circle only, unbinds that address, and then
-        // re-reads the roster to re-record the authorize snapshot — the step without which a removed
-        // member's key stays in the allowed set and they can still speak here.
-        const r = await removeCircleMember({
-          agent: _peerAgent, callSkill: rawCallSkill,
-          circleId: id, memberWebid: m.webid, memberStableId: m.stableId,
-        });
-        if (!r.ok) notice = t('circle.admin.refused');
-        else {
-          removed = true;
-          notice = t('circle.admin.removed', { name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }) });
-        }
+        // THE DOOR (governanceDoors.js): a removal goes through this circle's rule for removing. Where any admin may,
+        // it is done at once (governance enacts the whole removal, `removeCircleMember`, and leaves its trail); where
+        // the circle decides together, a proposal opens and nobody is removed yet.
+        const name = rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t });
+        const r = await removeMemberDoor({ governance: shellGovernance({ myWebid }), circleId: id, memberWebid: m.webid, actorRef: mySelfIn(id) ?? myWebid });
+        if (r.outcome === 'done') { removed = true; notice = t('circle.admin.removed', { name }); }
+        else if (r.outcome === 'proposed') notice = t('circle.admin.remove_proposed', { name });
+        else notice = t('circle.admin.refused');
       } catch { notice = t('circle.admin.refused'); }
       // objective L — auto-revoke: on a SUCCESSFUL removal, rotate this circle's outbound canonical shares away
       // from the departing member (reuses revokeAllForMember → revokeItemShare). BEST-EFFORT — a revoke failure

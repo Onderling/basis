@@ -100,3 +100,20 @@ describe('the batch check fills the memo', () => {
     expect(await verifyEd25519StrictBatch([{ msg, sig, key: kp.publicKey }, { msg, sig: bad, key: kp.publicKey }])).toEqual([true, false]);
   });
 });
+
+describe('the installed equation is reached only behind the byte rule', () => {
+  it('a signature that is not 64 bytes or a key that is not 32 never reaches it (a native equation reads fixed lengths)', async () => {
+    const lengths = [];
+    useSignatureEquation({ name: 'length-spy', verify: (m, s, k) => { lengths.push([s.length, k.length]); return nacl.sign.detached.verify(m, s, k); } });
+    lengths.length = 0;
+    const kp = nacl.sign.keyPair();
+    const msg = new TextEncoder().encode('x');
+    const sig = nacl.sign.detached(msg, kp.secretKey);
+    expect(verifyEd25519Strict(msg, sig.subarray(0, 63), kp.publicKey)).toBe(false);
+    expect(verifyEd25519Strict(msg, sig, kp.publicKey.subarray(0, 31))).toBe(false);
+    expect(await verifyEd25519StrictBatch([{ msg, sig: sig.subarray(0, 40), key: kp.publicKey }])).toEqual([false]);
+    expect(lengths).toEqual([]);
+    expect(verifyEd25519Strict(msg, sig, kp.publicKey)).toBe(true);
+    expect(lengths).toEqual([[64, 32]]);
+  });
+});

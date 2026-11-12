@@ -62,7 +62,7 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS } from '../../v2/membershipRail.js';
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS, COMPACT_SUPERSEDED_PROPS } from '../../v2/membershipRail.js';
 import { makeLateRecipientRetell } from '../../v2/membershipLateRecipient.js'; // the membership rider — statements ride the device log
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
@@ -6289,7 +6289,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
     // between here and the fold has to learn a new name.
-    membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
+    // PAUSED (COMPACT_SUPERSEDED_PROPS): a late joiner cannot accept a tombstone and would fold a different roster
+    membershipRead.compact = async (circleId, hashes) => {
+      if (!COMPACT_SUPERSEDED_PROPS) return 0;
+      try { return membershipRail.compact(circleId, hashes); } catch { return 0; }
+    };
     // …and a statement that travelled with the act that caused it (the admin's join on a redeem reply) lands the same road
     // a fanned one does: the rail's full ingest gate (verify + declared kind + key↔ref binding), never a direct write.
     membershipRead.ingest = async (circleId, statement) => { try { return await membershipRail.ingest(circleId, statement); } catch { return { ok: false }; } };

@@ -297,7 +297,11 @@ away):
   computes as dead (every field it set overwritten by a later accepted statement of the same subject, no handle
   set) keeps its chain fields and sheds its payload — so the author's chain and every later statement's causal
   depth stay exactly what they were, and only the bytes go. Refused statements and handle-bearing ones are never
-  dead, because their effect depends on the history around them.
+  dead, because their effect depends on the history around them. **Compaction is paused (2026-11-12):** "exactly
+  what they were" holds on the device that made the tombstone, not on a member who joins later, who cannot accept an
+  unsigned tombstone, lacks that parent and so folds a lower depth and can order two acts differently
+  (`COMPACT_SUPERSEDED_PROPS`, `membershipRail.js`; the proof is `lateJoinerFoldOrder.test.js`). Dead statements stay
+  whole until a tombstone can prove itself.
 - **The spine chain** (`createAuthorChain` + the generic `signSpine`) — for events where **EQUIVOCATION is an
   attack**: governance (proposals/votes), **roles** (admin promote/demote), **membership** (join/leave/evict),
   **key rotations**. A per-author hash-chain with fork-proofs, filterable by `kind`: each entry points at its

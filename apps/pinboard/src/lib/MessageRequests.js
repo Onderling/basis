@@ -92,17 +92,20 @@ export function createMessageRequests({ store, selfFor = null, now = Date.now } 
     if (!me) return { held: false, reason: 'no-self' };
     return inTurn(me.id, async () => {
       if (file) return { held: false, reason: 'file-on-request' };
-      const decoded = cardOf(card);
-      if (!decoded) return { held: false, reason: 'malformed-card' };
-      if (decoded.webid !== from && decoded.pubKey !== from) return { held: false, reason: 'card-not-sender' };
       if (bytesOf(text) > MESSAGE_REQUEST_TEXT_MAX_BYTES) return { held: false, reason: 'turn-too-large' };
-
       const st = await getStore();
       const mine = await rowsOf(REQUEST, me.id);
       for (const r of mine.filter(expired)) await st.delete(r.id);
       const live = mine.filter((r) => !expired(r));
       const id = requestId(me.id, from);
       const before = live.find((r) => r.id === id) ?? null;
+      // the card: a NEW request needs one (the first message carries it; later turns need not), and any card given must
+      // name the sender
+      if (card != null || !before) {
+        const decoded = cardOf(card);
+        if (!decoded) return { held: false, reason: card == null ? 'no-card' : 'malformed-card' };
+        if (decoded.webid !== from && decoded.pubKey !== from) return { held: false, reason: 'card-not-sender' };
+      }
 
       // the turns: a union by message id, the oldest dropped to keep both bounds (the floor says how far)
       const byId = new Map((before?.turns ?? []).map((t) => [t.messageId, t]));

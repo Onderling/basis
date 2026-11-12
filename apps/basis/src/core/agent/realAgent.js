@@ -9576,6 +9576,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** Whether this device knows a wire key (own devices, shared circles, contacts) — the wire gate's question, asked
      *  by a door too (a function profile's inbox lets a known peer past its stranger budgets). */
     isKnownPeer: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
+    /**
+     * The contact channel's DOOR (Frits 2026-11-12): a first message from someone this person did not choose is held as
+     * a message request. `active()` is false on a function profile (its own door decides who gets in); `isKnown(key)` is
+     * the wire gate's known (own devices, circle co-members, contacts); `hold(turn)` keeps the turn on the sender's
+     * request (pinboard, the own-devices store). The shells hand it to `createContactThreadChannel` as it is.
+     */
+    messageRequests: Object.freeze({
+      active: async () => { try { return (await myProfileKind()) !== 'function'; } catch { return true; } },
+      isKnown: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
+      hold: async (turn) => (await callSkill('pinboard', 'holdMessageRequest', turn)) ?? { held: false, reason: 'no-answer' },
+    }),
     // Cross-peer state (delegates to sa.peer).  Same surface main.js
     // already consumes: peer.address / peer.status / peer.error.
     peer: sa.peer,

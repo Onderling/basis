@@ -544,6 +544,8 @@ if (relayUrl) {
     pair: pairRoster,
     // a turn to a bot this person's identity is linked to (`/koppel`) carries this device's statement over it
     authFor: agent.linkedTurnAuth ?? null,
+    // a first message from someone the person did not choose is a request, decided before anything is kept
+    messageRequests: agent.messageRequests ?? null,
     sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,

@@ -27,7 +27,7 @@ catalogue's baseline and moves here as it is written up.
   hello gate, on receive and on send), reached through basis's `mute` / `unmute` / `muted` ops.
 
 <!-- catalogue-ops
-pinboard: listMessageRequests ignoreMessageRequest
+pinboard: holdMessageRequest listMessageRequests acceptMessageRequest ignoreMessageRequest
 -->
 
 ## Proof

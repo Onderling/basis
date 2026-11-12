@@ -42,6 +42,9 @@ describe('a phone in Node, over a real relay', () => {
   });
 
   it('a direct message from one phone lands in the other phone\'s contact thread, through its own wiring', async () => {
+    // Bob chose Anna (her card in his book): a first message from someone he did not choose is a request instead
+    const card = (await anna.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+    expect((await bob.agent.callSkill('pinboard', 'addContactFromQr', { payload: card }))?.error ?? null).toBe(null);
     const text = `hallo bob ${Date.now()}`;
     const { sent } = anna.bundle.contactChannel.sendTurn({ peerAddr: bob.address, threadId: bob.address, text });
     await sent;

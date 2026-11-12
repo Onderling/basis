@@ -1513,6 +1513,48 @@ export function buildSkills({
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid) ?? null;
   };
 
+  /**
+   * A card into the book, exactly as a scanned or pasted card goes in: the one add both `addContactFromQr` and a message
+   * request's accept use. `a.payload` is the `onderling-contact://` card; `a.persona` / `a.revealPreset` as the op's.
+   */
+  async function addFromCard(a) {
+      const card = decodeContactCard(a.payload.slice('onderling-contact://'.length));
+      if (!card?.webid) return { error: 'malformed-card' };
+      const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
+        ? card.trustOffer : 'bekend';
+      const m = await bundle.contacts.addContact({
+        webid:       card.webid,
+        pubKey:      card.pubKey      ?? null,
+        stableId:    card.stableId    ?? null,
+        handle:      card.handle      ?? null,
+        displayName: card.displayName ?? null,
+        avatarUrl:   card.avatarUrl   ?? null,
+        // 2026-05-27 — preserve the NKN peer address embedded in the
+        // QR card so the chat-shell can DM straight after add.
+        ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
+        // The card's relays become the contact's POINTS — where a message to them goes first.
+        ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
+        // A node's card says where its agenda links are served (a household's companion): kept, so a bot builds the link
+        // from the contact it holds.
+        ...(typeof card.serves === 'string' && /^https?:\/\//.test(card.serves) ? { serves: card.serves } : {}),
+        // a card that says it is a bot (display only — what a person's app signs to is decided by their own admission)
+        ...(card.bot === true ? { bot: true } : {}),
+        // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
+        // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
+        // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable
+        // from one that was. Only the explicit backfill may write `default`, and only where it can prove it.
+        ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
+        // the level chosen in the add sheet; absent when nobody was asked (a card arriving with a message)
+        ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
+        trustLevel,
+      });
+      metrics?.record?.('contact-added-from-qr');
+      // The card's person key: the first one is taken on the card's word (the same trust as its profile key — the
+      // person handed it over); a later card must chain from the version already known.
+      const pk = card.personKey ? await adoptContactPersonKey(card.webid, card.personKey, card.personKeyLinks) : null;
+      return { contact: m, ...(pk ? { personKey: pk } : {}) };
+  }
+
   return [
     /**
      * postRequest({text, intent?, kind?, requiredSkills?, dueAt?, timeoutMs?, expectClaims?})
@@ -3919,41 +3961,7 @@ export function buildSkills({
         return { error: 'invalid-payload' };
       }
       if (!bundle?.contacts) return { error: 'no-contacts' };
-      const card = decodeContactCard(a.payload.slice('onderling-contact://'.length));
-      if (!card?.webid) return { error: 'malformed-card' };
-      const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
-        ? card.trustOffer : 'bekend';
-      const m = await bundle.contacts.addContact({
-        webid:       card.webid,
-        pubKey:      card.pubKey      ?? null,
-        stableId:    card.stableId    ?? null,
-        handle:      card.handle      ?? null,
-        displayName: card.displayName ?? null,
-        avatarUrl:   card.avatarUrl   ?? null,
-        // 2026-05-27 — preserve the NKN peer address embedded in the
-        // QR card so the chat-shell can DM straight after add.
-        ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
-        // The card's relays become the contact's POINTS — where a message to them goes first.
-        ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
-        // A node's card says where its agenda links are served (a household's companion): kept, so a bot builds the link
-        // from the contact it holds.
-        ...(typeof card.serves === 'string' && /^https?:\/\//.test(card.serves) ? { serves: card.serves } : {}),
-        // a card that says it is a bot (display only — what a person's app signs to is decided by their own admission)
-        ...(card.bot === true ? { bot: true } : {}),
-        // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
-        // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
-        // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable
-        // from one that was. Only the explicit backfill may write `default`, and only where it can prove it.
-        ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
-        // the level chosen in the add sheet; absent when nobody was asked (a card arriving with a message)
-        ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
-        trustLevel,
-      });
-      metrics?.record?.('contact-added-from-qr');
-      // The card's person key: the first one is taken on the card's word (the same trust as its profile key — the
-      // person handed it over); a later card must chain from the version already known.
-      const pk = card.personKey ? await adoptContactPersonKey(card.webid, card.personKey, card.personKeyLinks) : null;
-      return { contact: m, ...(pk ? { personKey: pk } : {}) };
+      return addFromCard(a);
     }, {
       description: 'Add a contact from a onderling-contact:// QR/URL payload. `persona` records which of your personas they were added through — what they see of you.',
       visibility:  'authenticated',
@@ -4145,6 +4153,44 @@ export function buildSkills({
       return { requests: await bundle.messageRequests.list({ persona: a.persona ?? null, state }) };
     }, {
       description: 'List first messages from people you did not choose, waiting for your answer (open and ignored).',
+      visibility:  'authenticated',
+    }),
+
+    /** holdMessageRequest({from, messageId, ts, text?, card?, file?, persona?}) — the door's write: a turn from someone not known. */
+    defineSkill('holdMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { held: false, reason: 'no-contacts' };
+      try {
+        return await bundle.messageRequests.hold({
+          from: a.from, messageId: a.messageId, ts: a.ts, text: typeof a.text === 'string' ? a.text : '',
+          card: typeof a.card === 'string' ? a.card : null, file: a.file === true, persona: a.persona ?? null,
+        });
+      } catch (err) {
+        return { held: false, reason: 'invalid', error: err?.message ?? String(err) };
+      }
+    }, {
+      description: 'Hold a turn from someone not known to this self as a message request (the contact channel\'s door; self only).',
+      visibility:  'private',
+    }),
+
+    /**
+     * acceptMessageRequest({from, persona?, revealPreset?}) — the person accepts: the held card goes into the book exactly as a
+     * scanned card does, the request goes, and the held turns come back for the caller to put on the thread (the
+     * contact channel's, which pinboard does not hold: `acceptMessageRequest` in basis's src/v2 does both).
+     */
+    defineSkill('acceptMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests || !bundle?.contacts) return { error: 'no-contacts' };
+      const persona = typeof a.persona === 'string' && a.persona.trim() ? a.persona.trim() : null;
+      const request = await bundle.messageRequests.get(a.from, { persona });
+      if (!request) return { error: 'no-such-request' };
+      const added = await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset });
+      if (added?.error) return added;
+      await bundle.messageRequests.remove(a.from, { persona });
+      metrics?.record?.('message-request-accepted');
+      return { ...added, turns: request.turns };
+    }, {
+      description: 'Accept a message request: the sender becomes a contact; the held messages are returned for their thread.',
       visibility:  'authenticated',
     }),
 

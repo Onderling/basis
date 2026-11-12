@@ -146,8 +146,8 @@ export const pinboardManifest = {
     // sitting of its own.
     contact:       { atoms: ['add', 'list', 'submit'] },
     member:        { atoms: ['add', 'list'] },
-    // a request is listed and answered; it is never added by the person (the door holds it) nor merged into a view
-    'message-request': { atoms: ['list', 'submit'] },
+    // a request is held by the door (`add`, self only, internal), listed and answered; never merged into a view
+    'message-request': { atoms: ['add', 'list', 'submit'] },
   },
 
   operations: [
@@ -670,6 +670,42 @@ export const pinboardManifest = {
         slash: { command: '/requests', body: 'flags' },
         chat:  { reply: 'list', hint: 'list first messages from people you did not choose' },
       },
+    },
+    {
+      // The door's write (the contact channel, when a turn's sender is not known to this self): never typed, never a
+      // button, self only. Refused with its reason when it cannot be held (no card on a new request, a card naming
+      // someone else, a file, a turn larger than the bound).
+      id:   'holdMessageRequest', visibility: 'private', verb: 'add',
+      circleScoped: false,   // a person's own request, never a circle's
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'turns', policy: 'content' }],   // the held turns merge by union between the person's devices
+      params: [
+        { name: 'from',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'messageId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'ts',        kind: 'number', required: true },
+        { name: 'text',      kind: 'string', required: false },
+        { name: 'card',      kind: 'string', required: false },
+        { name: 'file',      kind: 'boolean', required: false },
+        { name: 'persona',   kind: 'string', required: false },
+      ],
+      surfaces: { internal: true },
+    },
+    {
+      // Accept: the held card into the book (as a scanned card), the request goes, the held turns are returned. The thread
+      // is the contact channel's, so a person's accept goes through basis's shared `acceptMessageRequest`, which puts the
+      // turns there; the Contacten section's button is that function. Not typed: a typed accept would drop the turns.
+      id:   'acceptMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'contact', policy: 'content' }],
+      params: [
+        { name: 'from',         kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona',      kind: 'string', required: false },
+        { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
+      ],
+      surfaces: { internal: true },
     },
     {
       id:   'ignoreMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',

@@ -43,6 +43,13 @@ describe('message requests: held beside the book, bounded', () => {
     expect(await requests.list()).toEqual([]);
   });
 
+  it('a new request needs a card; a later turn may come without one', async () => {
+    expect(await requests.hold({ ...turn('s', 1), card: null })).toEqual({ held: false, reason: 'no-card' });
+    await requests.hold(turn('s', 1));
+    expect((await requests.hold({ ...turn('s', 2), card: null })).held).toBe(true);
+    expect((await requests.list())[0].turns).toHaveLength(2);
+  });
+
   it('a file on a request is refused with its own reason', async () => {
     expect(await requests.hold(turn('s', 1, { file: { name: 'x.jpg' } }))).toEqual({ held: false, reason: 'file-on-request' });
     expect(await requests.list()).toEqual([]);

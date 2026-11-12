@@ -18,8 +18,8 @@
  *
  * # What lands in S1 + S2 + S3 (also this file)
  *
- *   - muteListVaultKey   (A.1)   persistent mute set + send-side block
- *   - helloGate          (A+.1)  PSK / predicate gate + mute base gate
+ *   - muteListVaultKey   (A.1)   persistent block list (kept here, enforced by the app's direct doors: `mute.covers`)
+ *   - helloGate          (A+.1)  PSK / predicate gate (+ the first-contact rate gate)
  *   - webidClaim         (A.2)   sa.claim.sign/verify/serialize/parse
  *   - passphrase         (A.3)   forwards to vault picker → VaultIndexedDB
  *   - webAuthnUnlock     (A+.5)  sa.passkey.{register,unlock} via PRF
@@ -351,23 +351,22 @@ export async function createSecureAgent(opts = {}) {
       console.info(`[secure-agent] dropped an inbound envelope from …${from.slice(-6)} (${reason}) — subtype ${env?.payload?.subtype ?? env?._p ?? '?'}; further drops of this kind from this sender are counted, not said`);
     }
   };
-  const muteBlockGate = async (env) => {
-    if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return false; }
-    return true;
-  };
   const rl = (opts.helloRateLimit && typeof opts.helloRateLimit === 'object') ? opts.helloRateLimit : {};
   const boundGate = firstContactRateGate({
     isKnown: async (from) => !agent.peers || !!(await agent.peers.get(from)),
     maxPerWindow: rl.maxPerWindow,
     windowMs:     rl.windowMs,
   });
-  const gates = [muteBlockGate, boundGate, ...(userHelloGate ? [userHelloGate] : [])];
+  // The block list is NOT a gate here (Frits 2026-11-12): a block is about DIRECT contact, and this layer cannot tell a
+  // direct message from circle traffic (nothing below the app learns that a circle exists). The app's direct doors ask
+  // `mute.covers(addr)`; circle traffic never does, so a block never makes one member's view of a circle drift.
+  const gates = [boundGate, ...(userHelloGate ? [userHelloGate] : [])];
   const composedGate = async (env) => {
     for (const g of gates) {
       if (await g(env)) continue;
-      // the mute gate says its own drop; the first-contact limit and an app's own gate say theirs here
+      // the first-contact limit and an app's own gate say their drops here
       if (g === boundGate) noteDrop('first-contact-limited', env);
-      else if (g !== muteBlockGate) noteDrop('hello-gate', env);
+      else noteDrop('hello-gate', env);
       return false;
     }
     return true;
@@ -1551,10 +1550,6 @@ export async function createSecureAgent(opts = {}) {
             && typeof agent.security?.learnPeerKey === 'function') {
         agent.security.learnPeerKey(env.payload.pubKey, env.payload.pubKey);
       }
-      // drop envelopes from muted peers BEFORE any further
-      // bookkeeping (no reciprocal HI, no onPeerMessage fire).
-      // fanout the check across resolver-known aliases.
-      if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return; }
       // 5.7c — circle override enforcement runs AFTER mute (so muted
       // peers never reach the override layer) and BEFORE rate-limit /
       // reciprocal HI / onPeerMessage.  When the local user has
@@ -2509,7 +2504,6 @@ export async function createSecureAgent(opts = {}) {
    * socket, which would show the relay that the two are one device (the very link a persona exists to prevent).
    */
   async function sendAsPersona(addr, payload, opts, owner) {
-    if (await isPeerMuted(addr)) throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
     // points compare by pointKey, as the general route does: one relay under two spellings is one point
     const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points.map(pointKey).filter(Boolean)) : null;
     // A send AS one of the persona's circle addresses goes out only on a socket that holds that address: on one that does
@@ -2559,13 +2553,6 @@ export async function createSecureAgent(opts = {}) {
   }
 
   async function _sendWithFailover(addr, payload, opts = {}) {
-    // refuse to send to a muted peer (alias-aware) up front.
-    // This is an APPLICATION decision, never a transport failure: no
-    // re-route, no degrade.  Throws so the caller knows the intent didn't
-    // reach the wire.
-    if (await isPeerMuted(addr)) {
-      throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
-    }
 
     const budget = Math.max(1, Number.isInteger(opts.failoverBudget)
       ? opts.failoverBudget
@@ -3238,6 +3225,9 @@ export async function createSecureAgent(opts = {}) {
         return r;
       },
       has:    (addr) => muteSet.has(addr),
+      /** Is this address, or any address the resolver binds to the same person, on the block list? Asked by the app's
+       *  DIRECT doors (a block is about direct contact; this layer enforces nothing). */
+      covers: (addr) => isPeerMuted(addr),
       list:   ()     => muteSet.list(),
       entries: ()    => muteSet.entries(),
       clear:  ()     => muteSet.clear(),

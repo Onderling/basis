@@ -1525,6 +1525,12 @@ one of THAT persona's circles, seen on this device's own roster, gets a thread w
 row; the person's answer is the choice that makes them a contact. Off: their first private message is a request.
 Circles of another persona do not count, so being in a circle with one persona does not open the others.
 
-**Block** is the existing block set (`/block`, the secure agent's), on this device for now: a block reaching all the
-person's devices is a later step. A block is by identity and the addresses it had; a fresh key gets past it as a new
-stranger, and the stranger budgets are the defence there. Ledger: L806, L807, L808.
+**Block is about direct contact, never a circle** (Frits, after comparing Signal, WhatsApp and Telegram, which all keep a
+block one-on-one). The block list (`/block`) is kept by the secure agent, alias-aware, but enforced only by the app's
+DIRECT doors: the contact channel (before anything else: no request, no thread, no receipt), files and threaded answers,
+and the person's own direct send to them (refused, with the reason). Circle traffic never asks it, so every member's
+device keeps the same view of the circle; before this, a block dropped everything from the person and refused every send
+to them, circle traffic included: a silent half-removal on one device. In a circle the person can hide someone's posts
+on their own device; removal stays the admin's. The block is on this device for now: a block reaching all the person's
+devices is a later step. A block is by identity and the addresses it had; a fresh key gets past it as a new stranger,
+and the stranger budgets are the defence there. Ledger: L806, L807, L808.

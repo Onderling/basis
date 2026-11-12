@@ -187,6 +187,7 @@ export function createContactThreadChannel({
    * True when there is no door (or it is inactive: a function profile).
    */
   async function knownSender(contactId, fromAddr, to = null) {
+    if (await blockedNow(contactId, fromAddr)) return false;   // a block refuses every direct door, first
     if (!messageRequests || typeof messageRequests.isKnown !== 'function') return true;
     if ((await policyNow(to)) === 'open') return true;
     for (const k of [fromAddr, contactId]) {
@@ -195,8 +196,17 @@ export function createContactThreadChannel({
     if (await wroteTo(contactId)) return true;
     try { return typeof messageRequests.isMember === 'function' && (await messageRequests.isMember({ contactId, fromAddr, to })) === true; } catch { return false; }
   }
-  /** 'known' when this turn goes on; 'held' or 'dropped' when the door kept it from everything else. */
+  /** On the person's block list (by either the sender's address or the person behind it)? Asked first, by every direct door. */
+  async function blockedNow(contactId, fromAddr) {
+    if (typeof messageRequests?.isBlocked !== 'function') return false;
+    for (const k of [fromAddr, contactId]) {
+      try { if (k && (await messageRequests.isBlocked(k)) === true) return true; } catch { /* next */ }
+    }
+    return false;
+  }
+  /** 'known' when this turn goes on; 'held' or 'dropped' when the door kept it from everything else; 'blocked' first. */
   const decideAtDoor = async (m) => {
+    if (await blockedNow(m.contactId, m.fromAddr)) return 'blocked';
     if (!messageRequests || typeof messageRequests.hold !== 'function') return 'known';
     return doorFor()({ ...m, policy: await policyNow(m.to ?? null) });
   };
@@ -378,6 +388,8 @@ export function createContactThreadChannel({
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
     const sent = (async () => {
+      // a person on the block list gets no direct message from this device: refused with its reason, nothing on the wire
+      if (typeof messageRequests?.isBlocked === 'function' && await blockedNow(resolveId(peerAddr), peerAddr)) return { held: false, delivered: false, refused: 'blocked', reason: 'blocked' };
       let self = null;
       if (typeof selfFor === 'function') { try { self = (await selfFor(peerAddr)) ?? null; } catch { self = null; } }
       if (self?.webid) {

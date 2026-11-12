@@ -138,6 +138,7 @@ import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
+import { blockedFirst } from '../src/v2/directDoors.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
 import { makeCircleGovernancePeerHandler } from '../src/v2/circleLogReceiver.js';
@@ -777,11 +778,11 @@ if (relayUrl) {
       ...(govRail ? { 'circle-governance-broadcast': makeCircleGovernancePeerHandler({
         eventLog: deviceLog, rail: govRail, onLanded: lanes.landedCarrier?.governance, onChange: govChanged,
       }) } : {}),
-      [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
-      [contactChannel.subtypes.out]: contactChannel.messageHandler(landMessage),
+      [contactChannel.subtypes.in]:  blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), contactChannel.replyHandler(landTurn)),
+      [contactChannel.subtypes.out]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), contactChannel.messageHandler(landMessage)),
       // A join request — for the box, a contact joining the pair circle it founded: admit, promote to co-admin
       // (the pair roster's rule), return the box's proven per-circle address, hand the circle the newcomer's.
-      'group-redeem-request': makeHandleGroupRedeemRequest({
+      'group-redeem-request': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemRequest({
         callSkill, sendPeer,
         publishEvent: (e) => walkLog({ kind: 'redeem', ...(e?.type ? { type: e.type } : {}), circleId: e?.circleId ?? e?.groupId ?? null }),
         onAdmitted: (a) => pairRoster?.onAdmitted?.(a),
@@ -793,8 +794,8 @@ if (relayUrl) {
         // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
         inviteExchange: agent.inviteExchange ?? null,
         logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} },
-      }),
-      'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap: pendingPeerRedeems }),
+      })),
+      'group-redeem-response': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemResponse({ pendingMap: pendingPeerRedeems })),
       // A member — above all this owner's OTHER device — says where it answers in a circle. Without
       // this the box never learns a sibling's address, its sibling set stays empty, and the fan above
       // has nowhere to go: the one message this device exists to pass on would stop here.
@@ -802,19 +803,19 @@ if (relayUrl) {
       // A roster owner says a row changed; the values are re-read, never carried on this wire.
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       // A screen a person asked to connect (`/scherm`) sends its offer; the door, once up, grants it.
-      [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
+      [SCREEN_OFFER_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => screenOffer.handle?.(from, payload)),
       // a screen waiting for its grant says it is there: nothing to do — its message alone releases what was held for it
-      [SCREEN_WAITING_SUBTYPE]: () => {},
+      [SCREEN_WAITING_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), () => {}),
       // a companion's owner granted this bot ops there: the companion sends the tokens; kept only from a companion contact
-      [COMPANION_GRANT_SUBTYPE]: (from, payload) => companionGrantDoor.accept?.(from, payload),
+      [COMPANION_GRANT_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => companionGrantDoor.accept?.(from, payload)),
       // a linked person revoked one of their devices: the root's tombstone, which any party may deliver
-      [IDENTITY_LINK_REVOKE_SUBTYPE]: (from, payload) => linkRevokeDoor.handle?.(payload),
-      'chat-message': makeHandleThreadedChat({
+      [IDENTITY_LINK_REVOKE_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => linkRevokeDoor.handle?.(payload)),
+      'chat-message': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
-      }),
+      })),
     },
     // TESTING ONLY (`ONDERLING_WALK_SHAPES=1`, an environment variable, off in every release config): the frame's key
     // NAMES, so an unrouted frame can be identified — never a value, an address, a key or a length

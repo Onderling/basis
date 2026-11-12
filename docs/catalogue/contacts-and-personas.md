@@ -18,8 +18,9 @@ catalogue's baseline and moves here as it is written up.
   them a contact. Off: their first private message is a request. Circles of another persona do not count.
 - Ignore a request: it stays, marked, later messages still land on it, and it can still be accepted. The sender sees
   nothing different.
-- Block someone: `/block` (basis's block set). Their messages are dropped on this device and sends to them are refused;
-  the block covers every address the identity link knows for them.
+- Block someone, on this device: `/block`. Direct contact only: their direct messages, requests, files and answers are
+  refused before anything is kept, and a direct message to them is refused with the reason. Circles are untouched (their
+  posts still arrive, yours still reach them); the block covers every address the identity link knows for them.
 
 ## Where it lives
 

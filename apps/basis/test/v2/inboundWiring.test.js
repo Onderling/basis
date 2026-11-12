@@ -50,10 +50,10 @@ describe('the inbound wiring', () => {
     for (const k of Object.keys(lanes.handlers)) expect(handlers[k], `lane entry ${k} was replaced`).toBe(lanes.handlers[k]);
   });
 
-  it('the delivery receipt reaches the room and the reducer, in that order of arguments', () => {
+  it('the delivery receipt reaches the room and the reducer, in that order of arguments', async () => {
     const hooks = every();
     const { handlers } = buildInboundWiring({ agent: {}, callSkill: vi.fn(), ...hooks });
-    handlers['delivery-receipt']('addr:bea', { msgId: 'm1' });
+    await handlers['delivery-receipt']('addr:bea', { msgId: 'm1' });   // a direct door: it asks the block list first
     expect(hooks.nearbyRoom.onReceipt).toHaveBeenCalledWith('addr:bea', { msgId: 'm1' });
     expect(hooks.applyIncomingReceipt).toHaveBeenCalledWith({ msgId: 'm1' }, 'addr:bea');
   });

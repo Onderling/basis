@@ -37,6 +37,7 @@ import { MemberMapCache }    from './lib/MemberMapCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
 import { createContactBook, moveContactsFromMemberMap } from './lib/ContactBook.js';
 import { createMessageRequests } from './lib/MessageRequests.js';
+import { createSharedCards } from './lib/SharedCards.js';
 import { createMemorySelfProfile } from './lib/selfProfile.js';
 import { wireChat }          from './chat/wireChat.js';
 import { createRoutedStore } from './lib/routedStore.js';
@@ -470,6 +471,8 @@ export async function createNeighbourhoodAgent({
   // first messages from people the person did not choose, and the people they blocked: beside the book, on the same
   // store, written as the same selves (lib/MessageRequests.js)
   const messageRequests = createMessageRequests({ store: contacts.ownStore, selfFor: selfOfPersona });
+  // the contact links the person handed out, each let on for its first opener only: same store, same selves (lib/SharedCards.js)
+  const sharedCards = createSharedCards({ store: contacts.ownStore, selfFor: selfOfPersona });
   // …and what the old book held (MemberMap contact entries) moves into it once, before anything reads it
   try {
     const { moved, kept } = await moveContactsFromMemberMap({ members, contacts });
@@ -527,6 +530,7 @@ export async function createNeighbourhoodAgent({
     memberMapDetach,                   // call on shutdown to stop persisting member mutations
     contacts,   // the person's contacts (above)
     messageRequests,   // requests from people not chosen, and the block list (above)
+    sharedCards,       // the contact links handed out (above)
   };
 
   // track bulk-sync state on the bundle so the UI

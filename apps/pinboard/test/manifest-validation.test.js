@@ -161,8 +161,8 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // 2026-10-23: -1, `restoreFromMnemonic` retired — the recovery phrase is the owner root's, restored by the host
   // (`restoreOwnerPhrase`); this agent's key is never in the phrase → 92.
   // 2026-10-30: +1, `dismissRemovedCircle` — closing a circle an admin removed you from (this device's copy only) → 84.
-  it('ships the full chat+slash surface (one pinboard manifest, 88 ops)', () => {
-    expect(pinboardManifest.operations.length).toBe(88);
+  it('ships the full chat+slash surface (one pinboard manifest, 92 ops)', () => {
+    expect(pinboardManifest.operations.length).toBe(92);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail
@@ -178,7 +178,7 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // Part G dissolve (2026-06-17) — adds the app-local chat-shell types
   // 'post'/'contact'/'member' (used by the relocated ops' appliesTo +
   // the feed/contacts views) on top of the eight D.1 substrate types.
-  it('declares the substrate itemTypes, the three Part-G chat-shell types and the held message request', () => {
+  it('declares the substrate itemTypes, the three Part-G chat-shell types the held message request and the shared contact link', () => {
     expect(pinboardManifest.itemTypes).toEqual([
       'ask',
       'offer',
@@ -191,6 +191,7 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
       'contact',
       'member',
       'message-request',
+      'shared-card',
     ]);
   });
 

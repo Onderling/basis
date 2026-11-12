@@ -45,7 +45,7 @@
  */
 
 import { CLAIM_FIELDS } from './causalMerge.js';
-import { CANONICAL_FIELD_CLOCKS, CANONICAL_SET_UNIONS, OWN_SCOPE_TYPES } from '@onderling/item-types';
+import { CANONICAL_FIELD_CLOCKS, CANONICAL_SET_UNIONS, CANONICAL_CLAIMS, OWN_SCOPE_TYPES } from '@onderling/item-types';
 
 /** The resolution policies, under their CRDT-system names. */
 export const RESOLUTION = Object.freeze({ CONTENT: 'content', CLAIM: 'claim', SPINE: 'spine', FIELD_CLOCK: 'field-clock', SET_UNION: 'set-union' });
@@ -226,6 +226,8 @@ export function createResolutionRegistry() {
 export function defaultResolutionRegistry() {
   const r = createResolutionRegistry();
   for (const f of CLAIM_FIELDS) r.declare('task', f, RESOLUTION.CLAIM);
+  // …and the other canonical types whose claim is first-wins (a contact link used once across the person's devices)
+  for (const type of CANONICAL_CLAIMS) for (const f of CLAIM_FIELDS) r.declare(type, f, RESOLUTION.CLAIM);
   // the field-clock sets the canonical types declare (the type is where a per-field rule is stated)
   for (const [type, sets] of Object.entries(CANONICAL_FIELD_CLOCKS)) {
     for (const s of sets) r.declareFieldClock(type, s.clock, s.fields);

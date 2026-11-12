@@ -71,6 +71,7 @@ describe('Canonical types — registration via default registry', () => {
       'request',
       'reveal-request',
       'rsvp',
+      'shared-card',
       'shared-ref',
       'task',
       'view',

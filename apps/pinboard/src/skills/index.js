@@ -4215,6 +4215,52 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
+    // ── Shared contact links: each let on for its first opener only (lib/SharedCards.js) ──
+    /** mintSharedCard({persona?}) — a new link for the persona shared as (the share screen, once per showing). */
+    defineSkill('mintSharedCard', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { error: 'no-contacts' };
+      const minted = await bundle.sharedCards.mint({ persona: a.persona ?? null });
+      return minted ?? { error: 'no-self' };
+    }, {
+      description: 'Make a new contact link for the persona shared as: its first opener reaches you; anyone after is a request.',
+      visibility:  'authenticated',
+    }),
+
+    /** listSharedCards({persona?}) — this persona's live links, newest first, each not used yet or used (when). */
+    defineSkill('listSharedCards', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { links: [] };
+      return { links: await bundle.sharedCards.list({ persona: a.persona ?? null }) };
+    }, {
+      description: 'List the contact links you shared that still live: not used yet, or used on which day.',
+      visibility:  'authenticated',
+    }),
+
+    /** withdrawSharedCard({token, persona?}) — the link goes; whoever opens it later lands in requests. */
+    defineSkill('withdrawSharedCard', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { error: 'no-contacts' };
+      return (await bundle.sharedCards.withdraw(a.token, { persona: a.persona ?? null })) ? { withdrawn: true } : { error: 'no-such-link' };
+    }, {
+      description: 'Withdraw a contact link you shared: whoever opens it later lands in requests.',
+      visibility:  'authenticated',
+    }),
+
+    /** useSharedCard({token, by, persona?}) — the door's write: a first turn carrying a link's token. */
+    defineSkill('useSharedCard', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { ok: false, reason: 'no-contacts' };
+      try {
+        return await bundle.sharedCards.use({ token: a.token, by: a.by, persona: a.persona ?? null });
+      } catch (err) {
+        return { ok: false, reason: 'invalid', error: err?.message ?? String(err) };
+      }
+    }, {
+      description: 'Let on the first opener of a contact link this self shared (the contact channel\'s door; self only).',
+      visibility:  'private',
+    }),
+
     /** setContactPersona({webid, persona, revealPreset?, personaAt?}) — what a contact sees of you (L125). */
     defineSkill('setContactPersona', async ({ parts }) => {
       const a = dataArgs(parts);

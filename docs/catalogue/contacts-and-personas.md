@@ -35,11 +35,17 @@ catalogue's baseline and moves here as it is written up.
   the contact channel on every shell (seam `contact-channel-requests`); the agent's `messageRequests` answers the
   persona's policy for the address a turn arrived on. Accept: `apps/basis/src/v2/messageRequestAccept.js`. The policy:
   the profile property `firstMessages` (`packages/agent-registry/src/firstMessages.js`).
+- Shared contact links: `shared-card` rows on the same store, one per link handed out, for the persona shared as:
+  `apps/pinboard/src/lib/SharedCards.js` (type `packages/item-types/src/types/sharedCard.js`, own-devices). Each
+  "Share my contact" mints a new 128-bit token; its first opener is let on, anyone after is a request. The use is a
+  first-wins claim (the store's claim channel), so the person's devices agree on one opener. Bounded by internal params:
+  how long a link lives, how many unused links a persona keeps.
 - The block set: the secure agent's (`packages/secure-agent/src/mute.js`, enforced in `createSecureAgent.js` at the
   hello gate, on receive and on send), reached through basis's `mute` / `unmute` / `muted` ops.
 
 <!-- catalogue-ops
 pinboard: holdMessageRequest listMessageRequests acceptMessageRequest ignoreMessageRequest removeMessageRequest
+pinboard: mintSharedCard listSharedCards withdrawSharedCard useSharedCard
 -->
 
 ## Proof

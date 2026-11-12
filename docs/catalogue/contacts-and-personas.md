@@ -7,8 +7,12 @@ catalogue's baseline and moves here as it is written up.
 ## What a person can do
 
 - See first messages from people they did not choose, as requests: one per sender, with the sender's card held (its
-  name shown as unverified) and the turns they sent. (Listing and ignoring are built; the Contacten section, accept, and
-  the door that turns a stranger's first message into a request are being built.)
+  name shown as unverified) and the turns they sent. Known senders are let on as before: own devices, members of a
+  circle the person is in, contacts in the book, and anyone the person wrote to first.
+- Accept a request: the held card becomes a contact (as a scanned card does) and the held messages move into the
+  thread, in order. (The Contacten section that offers it is still being built.)
+- Choose, per persona, who may write first: `request` (the default for a person) or `open` (anyone, within the
+  stranger budgets; the default for a bot, and the feedback persona's).
 - Ignore a request: it stays, marked, later messages still land on it, and it can still be accepted. The sender sees
   nothing different.
 - Block someone: `/block` (basis's block set). Their messages are dropped on this device and sends to them are refused;
@@ -23,6 +27,10 @@ catalogue's baseline and moves here as it is written up.
   own-devices type; its held turns are a set that grows by union between the person's devices (keyed by message id,
   timed by the sender), pruned by a floor that merges by its maximum. Bounded by internal params: requests per self,
   turns per request, text per request, how long an ignored request is kept after its last turn. Files are never held.
+- The door: `apps/basis/src/v2/messageRequestDoor.js` (over the stranger budgets of `inboundAdmission.js`), composed by
+  the contact channel on every shell (seam `contact-channel-requests`); the agent's `messageRequests` answers the
+  persona's policy for the address a turn arrived on. Accept: `apps/basis/src/v2/messageRequestAccept.js`. The policy:
+  the profile property `firstMessages` (`packages/agent-registry/src/firstMessages.js`).
 - The block set: the secure agent's (`packages/secure-agent/src/mute.js`, enforced in `createSecureAgent.js` at the
   hello gate, on receive and on send), reached through basis's `mute` / `unmute` / `muted` ops.
 
@@ -31,6 +39,12 @@ pinboard: holdMessageRequest listMessageRequests acceptMessageRequest ignoreMess
 -->
 
 ## Proof
+
+- `apps/basis/test/messageRequestDoor.relay.test.js` — a stranger's first turn is a request with no row, no pair circle
+  and no thread turn; accept; a chosen contact lands as before; someone the person wrote to first is not a request.
+- `apps/basis/test/messageRequestPersona.relay.test.js` — each persona's own policy decides, and a request is filed
+  under the persona the message was written to.
+- `apps/basis/test/alphaFeedbackPath.relay.test.js` — a tester's feedback reaches the open feedback persona's box.
 
 - `apps/pinboard/test/messageRequests.test.js` — a first turn is held and writes no book row; turns land once each, in
   order; a card that does not decode or names someone else is refused; files refused; each bound drops the oldest;
@@ -49,5 +63,5 @@ pinboard: holdMessageRequest listMessageRequests acceptMessageRequest ignoreMess
 
 ## Decisions that bind this area
 
-- [decisions.md](../decisions.md): the entry on message requests (to be written with the door: a card on a first message
-  is held on a request, no longer added as a contact).
+- [decisions.md](../decisions.md): 2026-11-12, a first message from someone you did not choose is a request; the persona
+  decides who may write first.

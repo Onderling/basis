@@ -24,7 +24,7 @@ describe('reply-to-post surface parity', () => {
 
   it('both peer routers route chat-message through the shared threaded-chat handler', () => {
     for (const src of [webApp, mobileApp]) {
-      expect(src).toMatch(/'chat-message':\s+makeHandleThreadedChat\(/);
+      expect(src).toMatch(/'chat-message':\s+(blockedFirst\([^\n]{0,80}?,\s*)?makeHandleThreadedChat\(/);   // through the block check first (a block refuses direct contact)
       expect(src).toMatch(/core\/handlers\/threadedChat\.js/);
     }
   });

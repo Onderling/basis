@@ -55,6 +55,15 @@ describe('a block is about direct contact, never a circle', () => {
     expect((await threadOf(me, ann.pubKey)).map((t) => t.text)).toEqual([]);
   }, 30_000);
 
+  it('my OTHER direct sends to her are refused at the agent (a file, a receipt), and circle traffic is not', async () => {
+    const file = await me.agent.sendPeerMessage(ann.pubKey, { type: 'p2p-chat', subtype: 'file-share', file: { id: 'f1', name: 'x.txt', dataB64: 'eA==' } });
+    expect(file?.refused, JSON.stringify(file)).toBe('blocked');
+    const receipt = await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'delivery-receipt', messageId: 'x' });
+    expect(receipt?.refused, JSON.stringify(receipt)).toBe('blocked');
+    const circleish = await me.agent.sendPeerMessage(ann.pubKey, { subtype: 'circle-address-announce', groupId: C }).catch((e) => ({ error: String(e?.message ?? e) }));
+    expect(circleish?.refused ?? null, 'circle traffic is never refused for a block').not.toBe('blocked');
+  }, 30_000);
+
   it('my direct message to her is refused, with its reason', async () => {
     const r = me.contactThreadChannel.sendTurn({ peerAddr: ann.pubKey, text: 'hoi Ann', messageId: 'me-dm-1' });
     const sent = await r.sent.catch((e) => ({ error: String(e?.message ?? e) }));

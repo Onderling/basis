@@ -142,16 +142,37 @@ export function createContactThreadChannel({
   // `onDoor({ verdict })`: told each door decision that kept a turn from the thread ('held' | 'dropped'), the verdict
   // only, never who or what (a host's walk log counts them). Optional.
   onDoor = null,
+  // A RECEIPT ONLY TO SOMEONE THE PERSON KEPT (Frits 2026-11-11): `isKept(contactId)` → true when the person holds a
+  // non-hidden row for them in the contact book (the agent's `isKeptContact`, which also follows a contact's other device
+  // through the identity link). Kept means accepted: a circle member who wrote first is not kept until the person answers.
+  // A receipt is a read and online signal; anyone the shell cannot vouch for gets none. Absent: none.
+  isKept = null,
 } = {}) {
+  const keptNow = async (contactId) => {
+    if (typeof isKept !== 'function' || !contactId) return false;
+    try { return (await isKept(contactId)) === true; } catch { return false; }
+  };
   // the person wrote to them first (an outbound turn of theirs in the thread): chosen, so their answer is never a request
   const wroteTo = async (contactId) => {
     if (!contactId) return false;
     try { return (await rehydrateAll()).some((t) => t.contactId === contactId && t.origin === 'user'); } catch { return false; }
   };
   let requestDoor = null;
+  // a circle member's card, held until the person answers them (answering makes the contact)
+  const memberCards = new Map();
+  const MEMBER_CARDS_MAX = 500;
+  /** The person writes to `peerAddr`: a member's held card goes into the book now (their answer is the choice). */
+  const adoptMemberCard = (peerAddr) => {
+    const id = resolveId(peerAddr);
+    const held = memberCards.get(id) ?? memberCards.get(peerAddr);
+    if (!held || typeof onCard !== 'function') return;
+    memberCards.delete(id); memberCards.delete(peerAddr);
+    Promise.resolve(onCard({ contactId: id, fromAddr: held.fromAddr, card: held.card })).catch(() => {});
+  };
   const doorFor = () => (requestDoor ??= createMessageRequestDoor({
     isKnown: (key) => messageRequests.isKnown(key),
     iWrote: wroteTo,
+    isMember: (m) => (typeof messageRequests.isMember === 'function' ? messageRequests.isMember(m) : false),
     hold: (turn) => messageRequests.hold(turn),
     now,
   }));
@@ -171,7 +192,8 @@ export function createContactThreadChannel({
     for (const k of [fromAddr, contactId]) {
       try { if (k && (await messageRequests.isKnown(k)) === true) return true; } catch { /* next */ }
     }
-    return wroteTo(contactId);
+    if (await wroteTo(contactId)) return true;
+    try { return typeof messageRequests.isMember === 'function' && (await messageRequests.isMember({ contactId, fromAddr, to })) === true; } catch { return false; }
   }
   /** 'known' when this turn goes on; 'held' or 'dropped' when the door kept it from everything else. */
   const decideAtDoor = async (m) => {
@@ -327,6 +349,8 @@ export function createContactThreadChannel({
   function sendTurn({ peerAddr, threadId, text, messageId, replyTo, sender, floor, admission } = {}) {
     if (!peerAddr) throw new Error('contactThreadChannel.sendTurn: peerAddr is required');
     if (typeof sendToPeer !== 'function') throw new Error('contactThreadChannel: sendToPeer is required');
+    // answering a circle member who wrote first is choosing them: their held card goes into the book
+    adoptMemberCard(peerAddr);
     const id = messageId ?? mkId();
     rememberSentTo(id, threadId, peerAddr);
     // The pre-send floor: what a contact declared is applied HERE, the one place every shell's turn
@@ -494,7 +518,7 @@ export function createContactThreadChannel({
           // to a per-circle address is refused by their authorizer (measured 2026-11-07 on two web apps: "delivered",
           // never applied) AND hands the relay the link canonical-me ↔ their per-circle address, which that address
           // exists to withhold — so a per-circle address no pair roster explains gets NO receipt rather than that.
-          const scope = await receiptScopeFor({ who, fromAddr });
+          const scope = (await keptNow(who)) ? await receiptScopeFor({ who, fromAddr }) : { send: false };
           if (scope.send) {
             try { await landedHook({ msgId: messageId, fromPeerAddr: fromAddr, source: 'receiver', ...(scope.circleId ? { circleId: scope.circleId } : {}) }); } catch { /* best-effort, as the circle's */ }
           }
@@ -677,7 +701,14 @@ export function createContactThreadChannel({
       // runs for them (no card into the book, no pair roster, no thread turn, no receipt)
       if (messageRequests) {
         const verdict = await decideAtDoor({ contactId: resolveId(fromAddr), fromAddr, text, card, messageId: payload.messageId ?? null, ts: Number.isFinite(payload.ts) ? payload.ts : null, to: ctx?.to ?? null });
-        if (verdict !== 'known') { try { onDoor?.({ verdict }); } catch { /* a count never breaks a turn */ } return; }
+        if (verdict !== 'known' && verdict !== 'member') { try { onDoor?.({ verdict }); } catch { /* a count never breaks a turn */ } return; }
+        // a circle member writing first: a thread, but NOT a contact until the person answers. Their card waits for that
+        // answer (bounded, in memory: a later turn carries it again); the pair roster is left until they are a contact.
+        if (verdict === 'member') {
+          if (card) memberCards.set(resolveId(fromAddr), { card, fromAddr });
+          while (memberCards.size > MEMBER_CARDS_MAX) memberCards.delete(memberCards.keys().next().value);
+          card = null; pairInvite = null; pairRequest = false;
+        }
       }
       // The sender's card — taken only when it names the person this message is from (the shell's read of the
       // address); the shell adds it to the book. Never on the thread; the words go on regardless.

@@ -539,6 +539,8 @@ if (relayUrl) {
     }),
   });
   contactChannel = createContactThreadChannel({
+    // a receipt only to someone the person kept (a non-hidden contact, or a contact's other device)
+    isKept: (id) => agent.isKeptContact?.(id) ?? false,
     // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
     selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     pair: pairRoster,

@@ -1520,6 +1520,11 @@ whose door is open; its own admission still decides). The persona a message is f
 on the address it arrived on. The feedback persona ("Onderling") is open; the general persona is not bridged to it.
 A box is managed through its profile like any device, not through environment settings.
 
+**People in my circles may write to me** (a second profile property, `circleMembersMayWrite`, default on): a member of
+one of THAT persona's circles, seen on this device's own roster, gets a thread when they write privately, but no contact
+row; the person's answer is the choice that makes them a contact. Off: their first private message is a request.
+Circles of another persona do not count, so being in a circle with one persona does not open the others.
+
 **Block** is the existing block set (`/block`, the secure agent's), on this device for now: a block reaching all the
 person's devices is a later step. A block is by identity and the addresses it had; a fresh key gets past it as a new
 stranger, and the stranger budgets are the defence there. Ledger: L806, L807, L808.

@@ -13,6 +13,9 @@ catalogue's baseline and moves here as it is written up.
   thread, in order. (The Contacten section that offers it is still being built.)
 - Choose, per persona, who may write first: `request` (the default for a person) or `open` (anyone, within the
   stranger budgets; the default for a bot, and the feedback persona's).
+- Choose, per persona, whether people in its circles may write to it first (default on). On: a member of one of THAT
+  persona's circles, as this device's own roster shows them, gets a thread but no contact row; answering them makes
+  them a contact. Off: their first private message is a request. Circles of another persona do not count.
 - Ignore a request: it stays, marked, later messages still land on it, and it can still be accepted. The sender sees
   nothing different.
 - Block someone: `/block` (basis's block set). Their messages are dropped on this device and sends to them are refused;

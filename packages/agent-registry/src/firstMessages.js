@@ -17,3 +17,17 @@ export function firstMessagesOf(entry) {
   if (FIRST_MESSAGE_POLICIES.includes(v)) return v;
   return entry?.kind === 'function' ? 'open' : 'request';
 }
+
+/**
+ * "PEOPLE IN MY CIRCLES MAY WRITE TO ME" (Frits 2026-11-12): a member of one of THIS persona's circles may write to it
+ * privately and gets a thread (not a contact row: they become a contact when the person answers). Off: their first
+ * private message is a request like anyone's. The profile's own property `circleMembersMayWrite`, a boolean; absent: ON.
+ */
+export const CIRCLE_MEMBERS_KEY = 'circleMembersMayWrite';
+
+/** Whether a registry entry's persona lets its circle members write first: its own property, else on. */
+export function circleMembersMayWriteOf(entry) {
+  const own = entry?.properties?.[CIRCLE_MEMBERS_KEY];
+  const v = own && typeof own === 'object' && own.mode === 'own' ? own.value : undefined;
+  return v === false ? false : true;
+}

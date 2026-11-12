@@ -69,9 +69,31 @@ describe('one turn on the shared map', () => {
 });
 
 describe('the receiver answers a landed turn with the circle\'s receipt', () => {
-  it('a turn straight from the contact, with their id, goes to the landed hook once; a duplicate and a carried copy do not', async () => {
+  const isKept = async () => true;   // these turns come from a contact the person kept (the stranger case is below)
+  it('NO receipt to a sender who is not a kept contact (none, or hidden): a receipt is a read and online signal to someone the person never chose', async () => {
+    const landed = [];
+    const book = new Map([['webid:bea', 'kept'], ['webid:hidden', 'hidden']]);
+    const ch = createContactThreadChannel({
+      sendToPeer: () => {}, itemStore: memStore(),
+      isKept: async (who) => book.get(who) === 'kept',
+    });
+    ch.setLandedHook((info) => { landed.push(info); });
+    await ch.persistInbound({ contactId: 'webid:stranger', fromAddr: 'webid:stranger', text: 'hoi', messageId: 's-1', ts: 1 });
+    await ch.persistInbound({ contactId: 'webid:hidden', fromAddr: 'webid:hidden', text: 'hoi', messageId: 'h-1', ts: 2 });
+    expect(landed, 'a stranger and a hidden contact get nothing back').toEqual([]);
+    await ch.persistInbound({ contactId: 'webid:bea', fromAddr: 'webid:bea', text: 'hoi', messageId: 'b-1', ts: 3 });
+    expect(landed).toEqual([{ msgId: 'b-1', fromPeerAddr: 'webid:bea', source: 'receiver' }]);
+  });
+  it('without the book (no isKept handed in) nothing is confirmed: deny by default', async () => {
     const landed = [];
     const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore() });
+    ch.setLandedHook((info) => { landed.push(info); });
+    await ch.persistInbound({ contactId: 'webid:bea', fromAddr: 'webid:bea', text: 'hoi', messageId: 'b-1', ts: 1 });
+    expect(landed).toEqual([]);
+  });
+  it('a turn straight from the contact, with their id, goes to the landed hook once; a duplicate and a carried copy do not', async () => {
+    const landed = [];
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore(), isKept });
     ch.setLandedHook((info) => { landed.push(info); });
     await ch.persistInbound({ contactId: 'webid:bea', fromAddr: PEER, text: 'hoi', messageId: 'their-1', ts: 1 });
     expect(landed).toEqual([{ msgId: 'their-1', fromPeerAddr: PEER, source: 'receiver' }]);
@@ -84,7 +106,7 @@ describe('the receiver answers a landed turn with the circle\'s receipt', () => 
   });
   it('the hook is the circle\'s receipt sender: the person\'s setting decides, and the wire carries only the id', async () => {
     const wire = [];
-    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore() });
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore(), isKept });
     let settings = { sendReceipts: true };
     ch.setLandedHook(makeReceiptSender({ getSettings: () => settings, sendTo: async (to, payload, opts) => { wire.push({ to, payload, opts }); } }));
     await ch.persistInbound({ contactId: 'webid:bea', fromAddr: PEER, text: 'hoi', messageId: 'their-1', ts: 1 });
@@ -103,7 +125,7 @@ describe('the receiver answers a landed turn with the circle\'s receipt', () => 
     const pair = { rosterAddressesFor: async (who) => (who === PEER ? { circleId: 'pair:anna:bea', addresses: new Set([PHONE, LAPTOP, 'me-in-pair']) } : null) };
     // the channel keys the thread by the identity behind the address: a per-circle address resolves to the person
     const identityOf = (addr) => ([PHONE, LAPTOP, STRANGE].includes(addr) ? PEER : addr);
-    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore(), pair, identityOf });
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: memStore(), pair, identityOf, isKept });
     ch.setLandedHook((info) => { landed.push(info); });
     await ch.persistInbound({ contactId: PEER, fromAddr: PHONE, text: 'via de kring', messageId: 'their-1', ts: 1 });
     expect(landed[0]).toEqual({ msgId: 'their-1', fromPeerAddr: PHONE, source: 'receiver', circleId: 'pair:anna:bea' });

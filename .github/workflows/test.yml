@@ -340,7 +340,10 @@ jobs:
     # THE TAIL: after a merge (a push to development or live) and by hand — never on a pull request.
     needs: same-bytes
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.same-bytes.outputs.same != 'true' }}
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: on 2026-11-12 ubuntu-latest became 26.04, and Playwright refuses it
+    # ("Playwright does not support chromium on ubuntu26.04-x64"), so every shard failed before a test ran.
+    # Move to latest when the Playwright in package.json lists 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false

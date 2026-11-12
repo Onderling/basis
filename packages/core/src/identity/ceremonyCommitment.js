@@ -20,6 +20,7 @@
 // The commitment is DECLARED by the member's device and signed with the circle key the address proves
 // (`signCeremonyCommitment`), so a carrier relaying a member's announcement cannot substitute one.
 import nacl from 'tweetnacl';
+import { processSignatureMemo } from '../security/signatureMemo.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { verifyEd25519Strict } from '../crypto/ed25519Strict.js';
@@ -75,11 +76,11 @@ export function verifyCeremonyReveal(reveal, { circleId, kind, subject, authorRe
     if (!reveal || typeof reveal.authorityPubKey !== 'string' || typeof reveal.sig !== 'string') return false;
     if (typeof commitment !== 'string' || !commitment) return false;
     if (ceremonyCommitment(reveal.authorityPubKey, circleId) !== commitment) return false;
-    const msg = new TextEncoder().encode(ceremonyRevealMessage({ circleId, kind, subject, authorRef, facts }));
+    const msg = ceremonyRevealMessage({ circleId, kind, subject, authorRef, facts });
     const key = b64decode(reveal.authorityPubKey);
     const sig = b64decode(reveal.sig);
     if (key.length !== 32 || sig.length !== 64) return false;
-    return verifyEd25519Strict(msg, sig, key);
+    return processSignatureMemo().verifierFor('ceremony-reveal')(msg, reveal.sig, reveal.authorityPubKey) === true;
   } catch { return false; }
 }
 

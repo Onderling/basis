@@ -13,7 +13,7 @@
 // the attacker can't sign, and a replay only re-asserts the same identity into the same
 // circle (idempotent). See docs — NOTE-identity-and-linkability Decision B (signing proof).
 import nacl from 'tweetnacl';
-import { AgentIdentity } from './AgentIdentity.js';
+import { processSignatureMemo } from '../security/signatureMemo.js';
 import { deriveCircleSeed } from './circleAddress.js';
 import { encode as b64encode } from '../crypto/b64.js';
 
@@ -46,10 +46,10 @@ export function signCircleLinkFromSeed(derivationSeed, circleId, groupId, addres
  * Verify a presented linkage: the proof must be a signature over the challenge by the private
  * key behind `address`. Deny-by-default — anything missing or malformed is `false`.
  * @param {{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}} a
- *   `verifySignature` — the pure signature check, default `AgentIdentity.verify`; a caller that re-derives passes a memo
+ *   `verifySignature` — the pure signature check, default the process's memo under the name 'circle-link'
  * @returns {boolean}
  */
-export function verifyCircleLink({ groupId, address, proof, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = {}) {
+export function verifyCircleLink({ groupId, address, proof, verifySignature = processSignatureMemo().verifierFor('circle-link') } = {}) {
   if (!groupId || typeof address !== 'string' || !address || typeof proof !== 'string' || !proof) return false;
   try { return verifySignature(circleLinkMessage(groupId, address), proof, address) === true; }
   catch { return false; }

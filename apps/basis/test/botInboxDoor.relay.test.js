@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 import { addBoxCard } from './support/addBoxCard.js';
 
@@ -58,6 +58,8 @@ describe('the bot answers its inbox on a function profile', () => {
   it('a contact without a code is told once; with the code, admitted and answered', async () => {
     const card = cardFrom(out);
     expect(card?.peerAddr, 'the runner printed no card to write to').toBeTruthy();
+    // the sender holds the bot's card, as a person who scanned it does (the card, through the real door)
+    await addCardOf(sender, null, { payload: /onderling-contact:\/\/[A-Za-z0-9_-]+/.exec(out)[0] });
     const send = (text, extra = {}) => sender.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text, ...extra }).sent;
 
     await send('hallo');

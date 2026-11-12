@@ -27,8 +27,7 @@ import { VaultMemory } from '@onderling/vault';
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
 import { startJourneyRelay } from './support/testRelay.js';
 import {
-  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown, shareDeviceRecords,
-} from './support/pairRealAgents.js';
+  bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown, shareDeviceRecords, addCardOf } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { CONTACT_TURN_BROADCAST } from '../src/v2/contactTurnFan.js';
 import { EventLog } from '../src/eventLog.js';
@@ -110,6 +109,7 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
   });
 
   it('what Anna writes on her always-on device is in the thread on her phone', async () => {
+    await addCardOf(alwaysOn, bea);   // Anna writes to Bea as her contact (the card, through the real door)
     await alwaysOn.contactThreadChannel.sendTurn({
       peerAddr: bea.pubKey, threadId: bea.pubKey, text: 'ik ben er morgen', messageId: 'anna-1',
     }).sent;
@@ -187,7 +187,7 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
     await alwaysOn.agent.sendPeerMessage(phone.agent.circleAddressFor(GROUP), {
       subtype: CONTACT_TURN_BROADCAST,
       turn: { direction: 'in', contactId: bea.pubKey, fromAddr: bea.pubKey, text: 'fijn, tot morgen', messageId: 'bea-1' },
-    }, SEND);
+    }, { ...SEND, circleId: GROUP });   // to my own device in our circle: the circle named
 
     // Wait for the wire to go quiet rather than for a value: a dedup that is merely slow would pass a
     // bare "nothing yet" check.

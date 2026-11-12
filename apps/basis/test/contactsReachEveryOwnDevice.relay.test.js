@@ -25,8 +25,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { startJourneyRelay } from './support/testRelay.js';
 import {
-  bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, until, teardown,
-} from './support/pairRealAgents.js';
+  bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { EventLog } from '../src/eventLog.js';
 import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
 
@@ -64,6 +63,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
 
   it('Bea greets the phone; the box enrols and takes the address; Bea\'s next message lands on the box and is ACCEPTED', async () => {
     // ── 1. Bea reaches the phone. First contact: the greeting binds her key on THE PHONE. ─────────
+    await addCardOf(bea, phone);   // Bea holds the phone's card (she scanned it)
     await bea.agent.sendPeerMessage(phone.pubKey, { type: 'p2p-chat', msgId: 'bea-1', ts: Date.now(), text: 'hoi, hier Bea' }, SEND);
     expect(await until(async () => (textsAt(phone).includes('hoi, hier Bea') ? true : null), { timeout: 15_000 }),
       'the phone must receive Bea directly — the baseline the box must not break').toBe(true);
@@ -142,6 +142,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
     const cas = await bootRealAgentNode('cas');
     try {
       await connectNodesOverRelay([cas], { relayUrl });
+      await addCardOf(cas, phone);   // Cas holds the person's card (he scanned it)
       await cas.agent.sendPeerMessage(phone.pubKey, { type: 'p2p-chat', msgId: 'cas-1', ts: Date.now(), text: 'hoi, Cas hier' }, SEND);
       expect(await until(async () => (textsAt(box).includes('hoi, Cas hier') ? true : null), { timeout: 15_000 }),
         'the box holds the address now — Cas must reach it directly').toBe(true);

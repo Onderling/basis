@@ -15,6 +15,7 @@
  * phone needs no relay typed in. `--offering` sets one offering on the peer's persona and RELEASES it to the circle
  * (the per-circle disclosure, said on the circle's lane) — what a person does in Me → personas.
  *
+ * `--features lists` switches circle features on (the admin's policy update, signed, on the governance lane).
  * In `--talk` mode the peer also keeps the circle's LISTS on stdin commands: `list-create`, `list-add` and `lists-dump`
  * (every list and its open entries), through the same `lists` ops the shells call.
  *
@@ -35,6 +36,7 @@ import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, teardown, sendCircleChat, readRoster,
 } from '../../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../../basis/src/v2/householdRosterPairing.js';
+import { DEFAULT_CIRCLE_POLICY } from '../../../basis/src/v2/circlePolicy.js';
 import { buildCircleInviteUri } from '../../../basis/src/v2/circleInvite.js';
 import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 
@@ -74,6 +76,14 @@ await bindCircleAddresses([peer], groupId);
 await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId });
 
 const call = (app, op, args) => peer.agent.callSkill(app, op, args);
+// `--features lists,calendar`: the admin switches circle features ON, as the settings screen's save does: a signed
+// policy update on the governance lane, which every member (the phone too) folds into its copy of the policy
+const features = (arg('features', '') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+if (features.length) {
+  const policy = { ...DEFAULT_CIRCLE_POLICY, features: { ...DEFAULT_CIRCLE_POLICY.features, ...Object.fromEntries(features.map((f) => [f, true])) } };
+  const st = await peer.agent.emitPolicyUpdate?.({ groupId, policy, version: 2 }).catch((e) => ({ error: String(e?.message ?? e) }));
+  say({ step: 'features', on: features, ok: !!st && !st?.error });
+}
 await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
 if (offering) {
   const set = await call('agents', 'setProfileDriver', { id: 'default', key: 'walk-offering', kind: 'offering', text: offering, tags: '' });

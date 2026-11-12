@@ -1089,6 +1089,9 @@ and counted. The app answers `stale` for a circle address with no roster read an
 was read, reads that circle's roster again, and the parked envelopes are judged ONCE more: accepted ones are delivered
 in arrival order, the rest are dropped and counted, nothing is parked twice. Every circle-identity install reads that
 circle's roster, and the boot primer reads rosters before it installs identities.
+*Amended 2026-11-12 (Fable, keeping the decision; the fast start):* every install still reads its circle's roster, but
+the reads run in turn, not all at once: one at a time, giving the thread back between them, the circle on screen first;
+a held message moves its circle first (its read starts at once). Nothing is let in unchecked.
 
 ---
 

@@ -335,7 +335,12 @@ describe('the enroll offer — the sibling is not there when the new device firs
     expect(row2.ok).toBe(true);
     expect(second.cleared, 'now it clears').toBe(true);
     expect(await pendingEnrollOffer(storage)).toBeNull();
-    const rows = (await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    // the other member's statements come by the lane pulls the consume starts, after it returns: waited for, not assumed
+    // (a sliced read made that arrival ~1.3 s; an assertion with no wait was a race the test happened to win)
+    const rows = await until(async () => {
+      const r = (await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+      return r.some((m) => (m.webid ?? m.addr ?? m.ref) === B.pubKey) ? r : null;
+    }, { timeout: 30_000, step: 300 }) ?? [];
     expect(rows.map((m) => m.webid ?? m.addr ?? m.ref), 'the other member derives once the seed lands').toContain(B.pubKey);
   }, 150_000);
 });

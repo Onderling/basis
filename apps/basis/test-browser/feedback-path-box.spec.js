@@ -66,6 +66,11 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     await maker.page.waitForTimeout(2000);
     log('STEP1 maker boots', 'PASS', 'a web app with one circle');
 
+    // The feedback persona takes anyone's first word: its policy is OPEN (a tester's first message would otherwise be a
+    // message request the maker accepts). Set where the person sets it (the profile), so it reaches the box.
+    const opened = await maker.page.evaluate(async () => window.onderlingCall('agents', 'setProfileProperty', { id: 'default', key: 'firstMessages', value: 'open' }));
+    expect(opened?.ok, JSON.stringify(opened)).toBe(true);
+
     // ── The box, enrolled from the maker's offer, started as the PRIMARY device. ──────────────────────
     const offer = await maker.page.evaluate(async (relay) => window.onderlingCall('household', 'buildEnrollOffer', { relayUrl: relay }), R1);
     expect(offer?.ok, JSON.stringify(offer)).toBe(true);
@@ -77,6 +82,8 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     expect(await untilOut(box, 'device-runner: up', 90_000), `the box never came up:\n${box.out.slice(-1500)}`).toBe(true);
     const consumed = await untilLog(dataDir, (e) => e.kind === 'enroll-offer', 60_000);
     expect(consumed, 'the box never consumed the offer').toBeTruthy();
+    // the box holds the maker's profile (the open policy among it) once its catch-up has landed
+    expect(await untilLog(dataDir, (e) => e.kind === 'profile-facts-landed', 30_000), 'the box never got the maker\'s profile facts').toBeTruthy();
     expect(consumed.cleared, `the enrol did not complete on the box — the maker's web app must answer the seed: ${JSON.stringify(consumed.circles)}`).toBe(true);
     expect(await untilOut(box, 'primary contact address', 30_000), 'the box never claimed the primary address').toBe(true);
     const card = /onderling-contact:\/\/[A-Za-z0-9_-]+/.exec(box.out)?.[0];

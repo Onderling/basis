@@ -166,6 +166,8 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { acceptMessageRequest, ignoreMessageRequest, blockFromRequest, messageRequestRows } from '../../src/v2/messageRequestAccept.js';
+import { blockedFirst, blockedAll } from '../../src/v2/directDoors.js';
 import { createPairRoster } from '../../src/v2/pairRoster.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
@@ -2447,6 +2449,10 @@ function buildCircleBot(agent) {
   });
   if (typeof window !== 'undefined') {
     window.onderlingContactChannel = circleContactChannel;
+    // accept a message request: the shared act (the held card into the book, the held turns onto the thread); the
+    // Contacten requests section calls the same function
+    window.onderlingAcceptRequest = (from, opts = {}) => acceptMessageRequest({ callSkill: rawCallSkill, channel: circleContactChannel, from, ...opts })
+      .then((r) => { if (r?.accepted && r.turns > 0) noteNewContactTurn(from, 'bot'); return r; });   // the held turns are new: the tab and the row say so
     window.onderlingPeers = circlePeerGraph;   // debug / e2e seam (roster + journey-A tests seed/inspect peers)
     // e2e seam: what this device resolves an address to, and which addresses it counts as its own — the two reads
     // that decide whether a peer-graph record is a row in Contacten (a walk's red names the filter, not a guess).
@@ -3090,8 +3096,18 @@ async function showContacts() {
   showTabBar('contacten');   // the sum may have changed
   // the help bot is a contact: its conversation is the help circle's, so the row is there while that circle is
   contacts = withHelpContact(contacts, { t, available: (circlesCache ?? []).some((c) => c.id === HELP_CIRCLE_ID) });
+  // first messages from people not chosen: the requests section at the top (only when there is one)
+  let requests = [];
+  try { requests = messageRequestRows((await rawCallSkill('pinboard', 'listMessageRequests', {}))?.requests ?? []); } catch { requests = []; }
   renderContactsRoster(rootEl, {
-    contacts, unread, t,
+    contacts, unread, t, requests,
+    onAccept: async (from) => {
+      const r = await acceptMessageRequest({ callSkill: rawCallSkill, channel: circleContactChannel, from }).catch(() => null);
+      if (r?.accepted && r.turns > 0) noteNewContactTurn(from, 'bot');   // the held turns are new: the tab and the row say so
+      showContacts().catch(() => {});
+    },
+    onIgnore: async (from) => { await ignoreMessageRequest({ callSkill: rawCallSkill, from }).catch(() => null); showContacts().catch(() => {}); },
+    onBlock: async (from, name) => { await blockFromRequest({ callSkill: rawCallSkill, from, name }).catch(() => null); showContacts().catch(() => {}); },
     // each row's picture is sealed to ITS pair circle
     resolvePictureFor: (c) => circlePictureResolver(c?.pairCircleId),
     onOpen: (contactId) => {
@@ -9785,7 +9801,7 @@ async function boot() {
           // The shared receiver validates (rebuilt, `from` off the wire), checks the sender against the
           // circle's roster, and the map's monotonic rule orders it. Fire-and-forget: the roster read is a
           // skill call and the router does not await handlers, so it delays the bubble, not the receive loop.
-          'delivery-receipt':        (from, payload) => { ensureNearbyRoom(agent)?.onReceipt(from, payload); applyIncomingReceipt(payload, from); },
+          'delivery-receipt':        blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => { ensureNearbyRoom(agent)?.onReceipt(from, payload); applyIncomingReceipt(payload, from); }),
           'circle-recipe-broadcast':  circleRecipeHandler,
           'circle-rules-broadcast':   circleRulesHandler,
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
@@ -9799,21 +9815,21 @@ async function boot() {
           // the event locally (→ shows on the calendar surface) + a circle
           // heads-up; rsvp/cancel apply to local calendar state. (A richer
           // time-card-with-RSVP-buttons bubble in the circle is a follow-up.)
-          'calendar-invite':         makeHandleCalendarInvite({
+          'calendar-invite':         blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleCalendarInvite({
             callSkill:     rawCallSkill,
             addMainBubble: (bubble) => {
               const title = bubble?.embed?.snapshot?.title;
               if (title) _circleRender?.botBubble(t('circle.calendar.invited', { title }));
             },
             publishEvent:  publishEventToLog,
-          }),
-          'calendar-rsvp':           makeHandleCalendarRsvp({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
-          'calendar-cancel':         makeHandleCalendarCancel({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
+          })),
+          'calendar-rsvp':           blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleCalendarRsvp({ callSkill: rawCallSkill, publishEvent: publishEventToLog })),
+          'calendar-cancel':         blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleCalendarCancel({ callSkill: rawCallSkill, publishEvent: publishEventToLog })),
           // a peer shared a file → it lands in THAT SENDER's contact thread (durable + live via the
           // same onContactReply glue every DM turn uses). It used to drop a bot bubble into whatever
           // circle happened to be open — a file from a person, announced by nobody's bot, in a room
           // the sender may not even be in.
-          'file-share':              makeHandleFileShare({
+          'file-share':              blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleFileShare({
             deliverToThread: ({ contactId, fromAddr, file, messageId, sealed }) => {
               onContactReply({ contactId, fromAddr, text: '', file, messageId, ...(sealed ? { sealed } : {}) });
             },
@@ -9825,11 +9841,11 @@ async function boot() {
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
-          }),
+          })),
           // a peer answered one of OUR noticeboard posts → the reply lands in THAT REPLIER's contact
           // thread (the same glue), marked with the post it answers. Before this the subtype had no
           // router entry here, so a reply to a post was silently dropped on web.
-          'chat-message':            makeHandleThreadedChat({
+          'chat-message':            blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleThreadedChat({
             deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) => {
               onContactReply({ contactId, fromAddr, text, messageId, ts, replyTo });
             },
@@ -9838,16 +9854,16 @@ async function boot() {
             noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
             // a turn from someone the person did not choose is not kept (the channel's door decides who is known)
             isKnownSender: (contactId, fromAddr, to) => (circleContactChannel?.knownSender ? circleContactChannel.knownSender(contactId, fromAddr, to) : true),
-          }),
+          })),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user
           // "shared with me" store; the surface opens each with this device's own network-derived sealing key.
-          'shared-copy':             makeHandleSharedCopy({
+          'shared-copy':             blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleSharedCopy({
             store:        sharedWithMeStore,
             publishEvent: publishEventToLog,
-          }),
+          })),
           // OBJ-2 membership — the no-pod join handshake (shared core, same as the classic shells):
           // admin verifies an incoming redeem + replies; joiner resolves the pending request on response.
-          'group-redeem-request':    makeHandleGroupRedeemRequest({
+          'group-redeem-request':    blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
             // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
             // …and an open invite catches up: an admin's own admission is a local write, so the membership lane's
@@ -9868,8 +9884,8 @@ async function boot() {
             // and they cannot address the joiner. Mobile wires the identical seam.
             propagateCircleAddresses: ({ circleId, newMemberWebid }) =>
               propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
-          }),
-          'group-redeem-response':   makeHandleGroupRedeemResponse({ pendingMap: circlePendingRedeems }),
+          })),
+          'group-redeem-response':   blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemResponse({ pendingMap: circlePendingRedeems })),
           // a member (or the admin, relaying) says where they answer in this circle. Each
           // announcement carries its own proof, so the carrier is not trusted; recording refreshes
           // the sealing binding AND the authorize snapshot together.
@@ -9887,15 +9903,16 @@ async function boot() {
           // record it as a SILENT stream entry (never a chat bubble, never a wake) and re-read
           // those rows from the roster. The values are never on this wire.
           // The Nearby room's inbound side — asks, answers, cards, room chat, broadcast invites (nearbyRoomBinding.js).
-          ...(ensureNearbyRoom(agent)?.handlers ?? {}),
+          // the Nearby room: people in the same room, direct contact (not a circle): a block refuses them
+          ...blockedAll((a) => agent?.messageRequests?.isBlocked?.(a), ensureNearbyRoom(agent)?.handlers ?? {}),
           // a contact-bot's reply in its 1:1 DM thread (guarded: the channel
           // is null if buildCircleBot threw, and must not break the peer router).
           // S1 #3 — also handle an inbound PEER DM (contact-msg): a person's message
           // lands in the thread with them (onContactReply routes by sender addr).
           ...(circleContactChannel
             ? {
-                [circleContactChannel.subtypes.in]:  circleContactChannel.replyHandler(onContactReply),
-                [circleContactChannel.subtypes.out]: circleContactChannel.messageHandler(onContactReply),
+                [circleContactChannel.subtypes.in]:  blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), circleContactChannel.replyHandler(onContactReply)),
+                [circleContactChannel.subtypes.out]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), circleContactChannel.messageHandler(onContactReply)),
               }
             : {}),
         },

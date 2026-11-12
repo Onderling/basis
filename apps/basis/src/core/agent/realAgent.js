@@ -304,7 +304,8 @@ import { createLocalBuiltins }             from '../localBuiltins.js';          
 import { mergeManifests }                  from '../../manifestMerge.js';
 import { sharedCopyIdFor, sharedFieldsOf, withSharedMark } from '../../v2/sharedAppointment.js';
 import { personaOfContact, DEFAULT_PERSONA } from '../../v2/contactPersona.js';
-import { pairCircleIdFor, isPairCircleId } from '../../v2/pairCircleId.js';   // an own appointment shared with a contact
+import { pairCircleIdFor, isPairCircleId } from '../../v2/pairCircleId.js';
+import { isDirectPayload } from '../../v2/directDoors.js';   // a block refuses direct contact, never a circle's   // an own appointment shared with a contact
 import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
@@ -6595,6 +6596,14 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   async function peerSend(to, payload, sendOpts = {}) {
     const o = sendOpts ?? {};
+    // A BLOCKED ADDRESS gets no DIRECT contact from this device (Frits 2026-11-12: a block is about direct contact; the
+    // secure agent enforces nothing): a direct payload (directDoors.js) to it is refused with the reason, nothing on the
+    // wire. Circle traffic goes on regardless, so every member's device folds the same.
+    if (isDirectPayload(payload)) {
+      let blocked = false;
+      try { blocked = (await sa.mute?.covers?.(to)) === true; } catch { blocked = false; }
+      if (blocked) return { held: false, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, refused: 'blocked', reason: 'blocked' };
+    }
     // ONE OF MY OWN DEVICES (the registry's device map) is reached at its device address, as this device's own: never in
     // a circle, whose address it shares with this device. A caller that names who speaks keeps that choice.
     if (!(typeof o.sendAs === 'string' && o.sendAs)) {
@@ -9638,6 +9647,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The delivery receipt asks it before answering anyone (the contact channel's `isKept`).
     isKeptContact: async (address) => !!(await keptContactOf(address)),
     messageRequests: Object.freeze({
+      // BLOCKED (Frits 2026-11-12: a block is about direct contact): on the block list by this address or any address the
+      // resolver binds to the same person. Asked FIRST by the direct doors and by a direct send; never by circle traffic.
+      isBlocked: async (addr) => { try { return typeof addr === 'string' && !!addr && (await sa.mute?.covers?.(addr)) === true; } catch { return false; } },
       // `to`: the address the turn arrived on, which names the persona it is for (the self whose identity answers there)
       // FAIL CLOSED: an address that names none of my personas by its own identity (or none) is 'request', never the
       // primary's policy, so a device whose primary is open does not let on a turn it cannot place

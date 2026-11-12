@@ -41,7 +41,7 @@ describe('inbound events reach the agent', () => {
     expect(seen.length).toBe(1);
   });
 
-  it('a muted peer\'s greeting does NOT say `peer` — the gates above still gate', async () => {
+  it('a blocked peer\'s greeting still says `peer`: the block is the app\'s direct doors\' (circle traffic needs the session)', async () => {
     const tx = fakeTransport();
     const sa = await createSecureAgent({ vault: new VaultMemory() });
     await sa.addSecureTransport('relay', tx);
@@ -49,7 +49,7 @@ describe('inbound events reach the agent', () => {
     const seen = [];
     sa.agent.on('peer', (p) => seen.push(p));
     await tx.inbound({ _from: 'cato', _id: 'env-1', _p: 'HI', payload: { pubKey: 'pk-cato' } });
-    expect(seen).toEqual([]);
+    expect(seen.length).toBe(1);
   });
 
   it('a transport\'s refusal is re-emitted as `security-error` on the agent, with the raw envelope', async () => {

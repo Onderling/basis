@@ -19,6 +19,8 @@ import { splitShownHidden, loadContactRoster, makeContactNameStore, contactRowMe
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
+// first messages from people not chosen: the requests section and its three acts, shared with web
+import { acceptMessageRequest, ignoreMessageRequest, blockFromRequest, messageRequestRows } from '../../../../basis/src/v2/messageRequestAccept.js';
 // L125 — the add sheet: what the new contact sees of you, asked before the card is added (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';   // never the key on screen
@@ -39,6 +41,8 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   const peerGraph = bundle?.peerGraph ?? null;
   const callSkill = bundle?.callSkill ?? null;
   const [contacts, setContacts] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [ignoredOpen, setIgnoredOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState('');
   const [error, setError] = useState(false);
@@ -62,7 +66,13 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
     // contact with a pair roster here named by what they said on it.
     try { const all = await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill, names: contactNames }); const kept = typeof keep === 'function' ? keep(all) : all; setContacts(withHelpContact(kept, { t, available: helpAvailable })); }
     catch { setContacts([]); }
+    try { setRequests(messageRequestRows((await callSkill?.('pinboard', 'listMessageRequests', {}))?.requests ?? [])); } catch { setRequests([]); }
   }, [peerGraph, callSkill, contactNames, helpAvailable]);
+
+  // the three acts on a request (shared with web), then the screen reads again
+  const onAccept = useCallback(async (from) => { await acceptMessageRequest({ callSkill, channel: bundle?.contactChannel, from }).catch(() => null); reload(); }, [callSkill, bundle, reload]);
+  const onIgnore = useCallback(async (from) => { await ignoreMessageRequest({ callSkill, from }).catch(() => null); reload(); }, [callSkill, reload]);
+  const onBlock = useCallback(async (from, name) => { await blockFromRequest({ callSkill, from, name }).catch(() => null); reload(); }, [callSkill, reload]);
 
   // Load on mount + whenever the graph changes (a bot added/discovered/removed).
   useEffect(() => {
@@ -128,6 +138,41 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
     );
   };
 
+  // THE REQUESTS (web: contactsRoster.js): at the top, only when there is one; the name the card SAYS (unverified)
+  const requestRow = (r, ignored) => (
+    <View key={`req-${r.from}`} style={styles.reqRow} testID={`request-${r.from}`}>
+      <Text style={styles.reqName}>{r.name ? t('circle.contacts.requests.says', { name: r.name }) : t('circle.contacts.requests.no_name')}</Text>
+      {r.firstLine ? <Text style={styles.reqLine} numberOfLines={2}>{r.firstLine}</Text> : null}
+      <View style={styles.reqActs}>
+        <Pressable style={styles.reqAct} onPress={() => onAccept(r.from)} accessibilityRole="button" testID={`request-accept-${r.from}`}>
+          <Text style={styles.reqActText}>{t('circle.contacts.requests.accept')}</Text>
+        </Pressable>
+        {ignored ? null : (
+          <Pressable style={styles.reqAct} onPress={() => onIgnore(r.from)} accessibilityRole="button" testID={`request-ignore-${r.from}`}>
+            <Text style={styles.reqActText}>{t('circle.contacts.requests.ignore')}</Text>
+          </Pressable>
+        )}
+        <Pressable style={[styles.reqAct, styles.reqActDanger]} onPress={() => onBlock(r.from, r.name)} accessibilityRole="button" testID={`request-block-${r.from}`}>
+          <Text style={[styles.reqActText, styles.reqActDangerText]}>{t('circle.contacts.requests.block')}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+  const openRequests = requests.filter((r) => !r.ignored);
+  const ignoredRequests = requests.filter((r) => r.ignored);
+  const requestsSection = requests.length ? (
+    <View style={styles.requests} testID="contacts-requests">
+      <Text style={styles.reqTitle}>{t('circle.contacts.requests.title')}</Text>
+      {openRequests.map((r) => requestRow(r, false))}
+      {ignoredRequests.length ? (
+        <Pressable style={styles.fold} onPress={() => setIgnoredOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: ignoredOpen }} testID="contacts-requests-ignored">
+          <Text style={styles.foldText}>{t('circle.contacts.requests.ignored_fold', { n: ignoredRequests.length })}</Text>
+        </Pressable>
+      ) : null}
+      {ignoredOpen ? ignoredRequests.map((r) => requestRow(r, true)) : null}
+    </View>
+  ) : null;
+
   // at the foot of Contacten: the blocked list (someone blocked is not a contact, so an empty roster has it too)
   const blockedDoor = typeof onBlocked === 'function' ? (
     <Pressable style={styles.blockedDoor} onPress={onBlocked} accessibilityRole="button" testID="contacts-blocked">
@@ -173,6 +218,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
         </View>
       )}
       {error && <Text style={styles.error}>{t(error === 'invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed')}</Text>}
+      {requestsSection}
 
       {contacts.length === 0 ? (
         <>
@@ -196,6 +242,16 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
 }
 
 const makeStyles = (theme, insets) => StyleSheet.create({
+  requests: { paddingHorizontal: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  reqTitle: { fontSize: 13, fontWeight: '600', color: theme.color.inkSoft, paddingVertical: 8, textTransform: 'uppercase' },
+  reqRow: { paddingVertical: 10 },
+  reqName: { fontSize: 15, color: theme.color.ink },
+  reqLine: { fontSize: 14, color: theme.color.inkSoft, marginTop: 2 },
+  reqActs: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
+  reqAct: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.color.line, marginRight: 8, marginBottom: 4 },
+  reqActText: { fontSize: 14, color: theme.color.ink },
+  reqActDanger: { borderColor: theme.color.danger ?? theme.color.line },
+  reqActDangerText: { color: theme.color.danger ?? theme.color.ink },
   blockedDoor: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: theme.color.line },
   blockedText: { fontSize: 15, color: theme.color.ink },
   blockedArrow: { fontSize: 15, color: theme.color.inkSoft },

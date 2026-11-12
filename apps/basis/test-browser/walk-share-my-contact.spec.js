@@ -82,6 +82,13 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     });
     const sent = await sendDirectMessage(B.page, marker, { to: aId });
     expect(sent.sent, `B could not write: ${sent.why}`).toBe(true);
+    // A never chose B: today B's first message is a MESSAGE REQUEST on A's side, and A accepts it (the shared-link door,
+    // a pending design, will let the opener of A's own shared link in without this step)
+    const bWebid = (await B.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
+    await expect.poll(async () => ((await A.page.evaluate(async () => (await window.onderlingCall('pinboard', 'listMessageRequests', {}))?.requests ?? [])) ?? []).map((q) => q.from),
+      { timeout: 30_000, message: 'B\'s first message is a request on A\'s side' }).toContain(bWebid);
+    const accepted = await A.page.evaluate(async (from) => window.onderlingAcceptRequest(from), bWebid);
+    expect(accepted?.accepted, JSON.stringify(accepted)).toBe(true);
     // ── Before A opens anything: the Contacten tab says something is new, and B's row carries the count (2026-09-21,
     // Frits: "add some 'new message' visual to the contacts frame — I have to check each contact all the time").
     await gotoCircles(A.page);

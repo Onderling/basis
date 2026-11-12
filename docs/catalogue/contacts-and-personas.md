@@ -55,6 +55,16 @@ pinboard: holdMessageRequest listMessageRequests acceptMessageRequest ignoreMess
 - A request is not a book row with a flag: every reader of the book would have to filter it, and the one that forgets
   makes a stranger a contact.
 - A block does not stop a sender who makes a fresh key; the stranger budgets are the defence there.
+- Requests are bounded per self; a flood of fresh keys past that bound evicts the oldest OPEN requests once the ignored
+  ones are gone, so a real first message can be lost under a flood. The stranger budgets (turns per key per day, all
+  strangers per hour) are the defence; nothing beyond them.
+- On accept, the held turns go onto the thread ordered by the SENDER's time (their clock, not this device's arrival).
+- A persona whose policy is `open` also takes files and threaded answers from someone it does not know: intended for the
+  feedback persona (a tester sends a screenshot).
+- An address the door cannot place on one of the device's personas is decided as `request`, never by the primary
+  persona's policy.
+- Whether the person wrote to a sender first is read from the threads on each stranger's turn; within the stranger
+  budgets that is cheap, and a memo comes only if it shows.
 
 ## Open rows
 

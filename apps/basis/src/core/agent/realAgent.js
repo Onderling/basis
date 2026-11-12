@@ -2325,13 +2325,15 @@ export async function createRealHouseholdAgent(opts = {}) {
    * not mine, or unsaid): the identity that answers on the address (the secure agent's own lookup), matched to the
    * persona whose chat identity it is.
    */
-  const personaOfOwnAddress = (addr) => {
-    if (typeof addr !== 'string' || !addr) return primaryId;
+  const personaOwning = (addr) => {
+    if (typeof addr !== 'string' || !addr) return null;
     let key = addr;
     try { key = sa.agent.security?.selfIdentityFor?.(addr)?.pubKey ?? addr; } catch { key = addr; }
     for (const [pid, rt] of personas) if (rt?.chatId?.pubKey === key || rt?.chatId?.pubKey === addr) return pid;
-    return primaryId;
+    return null;
   };
+  /** The same, filing what cannot be placed under the primary (a held request still has a self to live in). */
+  const personaOfOwnAddress = (addr) => personaOwning(addr) ?? primaryId;
   const rosterSiblingRowsOfDefault = async () => (!personas.has('default') ? [] : siblingDevices({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
@@ -9604,8 +9606,12 @@ export async function createRealHouseholdAgent(opts = {}) {
      */
     messageRequests: Object.freeze({
       // `to`: the address the turn arrived on, which names the persona it is for (the self whose identity answers there)
+      // FAIL CLOSED: an address that names none of my personas by its own identity (or none) is 'request', never the
+      // primary's policy, so a device whose primary is open does not let on a turn it cannot place
       policy: async (to = null) => {
-        try { return firstMessagesOf(await agentsRegistryRef?.lookup?.(personaOfOwnAddress(to))); } catch { return 'request'; }
+        const pid = personaOwning(to);
+        if (!pid) return 'request';
+        try { return firstMessagesOf(await agentsRegistryRef?.lookup?.(pid)); } catch { return 'request'; }
       },
       isKnown: (key) => (isKnownPeerRef.current ? isKnownPeerRef.current(key) : false),
       // filed under the persona the turn was written to (its `to`), never another

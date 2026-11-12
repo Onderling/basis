@@ -1000,6 +1000,7 @@ export default function CircleLauncherScreen({
       const broadcast = makeGovernanceBroadcast((...a) => bundle?.callSkill?.(...a));   // the one shared fan
       const gov = bindCircleGovernance({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
+        agent: bundle?.agent ?? null,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
         myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
         circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
         spineGate: bundle?.agent?.spineGate ?? null,   // spine acts only from the point
@@ -1120,6 +1121,7 @@ export default function CircleLauncherScreen({
     const broadcast = makeGovernanceBroadcast((...a) => bundle.callSkill(...a));   // the one shared fan
     return bindCircleGovernance({
       eventLog, callSkill: bundle.callSkill, getPolicy: (cid) => policyStore.get(cid),
+      agent: bundle?.agent ?? null,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
       myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
       circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
@@ -2515,6 +2517,7 @@ export default function CircleLauncherScreen({
         callSkill={bundle?.callSkill}
         circleIdentityFor={bundle?.agent?.circleIdentityFor ?? null}
         spineGate={bundle?.agent?.spineGate ?? null}
+        agent={bundle?.agent ?? null}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         eventLog={eventLog}
         getPolicy={(cid) => policyStore.get(cid)}

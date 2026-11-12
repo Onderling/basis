@@ -9962,6 +9962,7 @@ async function boot() {
           siblings: startQueueSiblings(agent),
           callSkill: rawCallSkill,
           firstCircle: () => shownCircleId,
+          readFirst: (cid) => agent?.readCircleRosterFirst?.(cid),
         }).catch(() => {});
         // AN ARRIVING CONTACT LINK (`…#contact=<payload>` — the clickable form of someone's contact QR): add the
         // contact through the one decoder, scrub the card from the address bar, open Contacten so the new row is

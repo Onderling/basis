@@ -494,6 +494,7 @@ export default function ChatScreen({
           siblings: startQueueSiblings(bundle?.agent),
           callSkill: bundle.callSkill,
           firstCircle: () => getActiveCircle(),
+          readFirst: (cid) => bundle?.agent?.readCircleRosterFirst?.(cid),
         }).catch(() => {});
       }, 2000);
     }

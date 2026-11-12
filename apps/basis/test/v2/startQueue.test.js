@@ -90,3 +90,15 @@ describe('runStartQueue reports each step as it starts', () => {
     expect(said.slice(1)).toEqual(START_LANES.map((lane) => ({ lane, circleId: 'a' })));
   });
 });
+
+describe('runStartQueue moves the on-screen circle\'s roster read first', () => {
+  it('tells the agent the circle on screen before its lanes are pulled; nothing for a circle not mine', async () => {
+    const order = [];
+    const f = fakeLanes(order);
+    await runStartQueue({ catchUps: f.catchUps, siblings: [], callSkill: circles(['a', 'b']), firstCircle: () => 'b', readFirst: (c) => order.push(`first:${c}`) });
+    expect(order[0]).toBe('first:b');
+    const none = [];
+    await runStartQueue({ catchUps: fakeLanes(none).catchUps, callSkill: circles(['a']), firstCircle: () => 'zz', readFirst: (c) => none.push(`first:${c}`) });
+    expect(none.some((x) => x.startsWith('first:'))).toBe(false);
+  });
+});

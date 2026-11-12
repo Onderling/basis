@@ -28,9 +28,10 @@ const idOf = (c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null));
  * @param {Function} o.callSkill
  * @param {() => (string|null)} [o.firstCircle]   the circle on screen when the queue starts (none on the box)
  * @param {(s: {lane?: string, sibling?: string, circleId?: string}) => void} [o.onStep]  told each step as it starts (the box logs it)
+ * @param {(circleId: string) => void} [o.readFirst]  moves the on-screen circle's roster read to the front of the agent's line
  * @returns {Promise<{ circles: number, steps: number, failed: number }>}
  */
-export async function runStartQueue({ catchUps = {}, siblings = [], callSkill, firstCircle = () => null, onStep = null } = {}) {
+export async function runStartQueue({ catchUps = {}, siblings = [], callSkill, firstCircle = () => null, onStep = null, readFirst = null } = {}) {
   const slice = createTimeSlice();
   let steps = 0; let failed = 0;
   const step = async (fn, said) => {
@@ -50,7 +51,10 @@ export async function runStartQueue({ catchUps = {}, siblings = [], callSkill, f
   };
   let onScreen = null;
   try { onScreen = firstCircle?.() ?? null; } catch { onScreen = null; }
-  if (onScreen && circles.includes(onScreen)) await pullCircle(onScreen);
+  if (onScreen && circles.includes(onScreen)) {
+    try { readFirst?.(onScreen); } catch { /* the line reads it in its turn */ }
+    await pullCircle(onScreen);
+  }
   const ordered = [...siblings].sort(([a], [b]) => (a === 'grants' ? -1 : 0) - (b === 'grants' ? -1 : 0));
   for (const [name, s] of ordered) {
     if (typeof s?.requestFromSiblings === 'function') await step(() => s.requestFromSiblings(), { sibling: name });

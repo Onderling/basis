@@ -166,6 +166,7 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { acceptMessageRequest, ignoreMessageRequest, blockFromRequest, messageRequestRows } from '../../src/v2/messageRequestAccept.js';
 import { createPairRoster } from '../../src/v2/pairRoster.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
@@ -3090,8 +3091,18 @@ async function showContacts() {
   showTabBar('contacten');   // the sum may have changed
   // the help bot is a contact: its conversation is the help circle's, so the row is there while that circle is
   contacts = withHelpContact(contacts, { t, available: (circlesCache ?? []).some((c) => c.id === HELP_CIRCLE_ID) });
+  // first messages from people not chosen: the requests section at the top (only when there is one)
+  let requests = [];
+  try { requests = messageRequestRows((await rawCallSkill('pinboard', 'listMessageRequests', {}))?.requests ?? []); } catch { requests = []; }
   renderContactsRoster(rootEl, {
-    contacts, unread, t,
+    contacts, unread, t, requests,
+    onAccept: async (from) => {
+      const r = await acceptMessageRequest({ callSkill: rawCallSkill, channel: circleContactChannel, from }).catch(() => null);
+      if (r?.accepted && r.turns > 0) noteNewContactTurn(from, 'bot');   // the held turns are new: the tab and the row say so
+      showContacts().catch(() => {});
+    },
+    onIgnore: async (from) => { await ignoreMessageRequest({ callSkill: rawCallSkill, from }).catch(() => null); showContacts().catch(() => {}); },
+    onBlock: async (from, name) => { await blockFromRequest({ callSkill: rawCallSkill, from, name }).catch(() => null); showContacts().catch(() => {}); },
     // each row's picture is sealed to ITS pair circle
     resolvePictureFor: (c) => circlePictureResolver(c?.pairCircleId),
     onOpen: (contactId) => {

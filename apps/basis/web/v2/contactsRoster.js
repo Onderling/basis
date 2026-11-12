@@ -12,7 +12,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitShownHidden, contactRowMeta } from '../../src/v2/contactsSource.js';
 import { paintFace } from './faceView.js';
 
-export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null, onBlocked = null } = {}) {
+export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null, onBlocked = null, requests = [], onAccept = null, onIgnore = null, onBlock = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
@@ -40,6 +40,71 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
   if (typeof onAdd === 'function') addButton('circle.contacts.add', 'add-bot', onAdd);
   if (acts.childElementCount) head.appendChild(acts);
   container.appendChild(head);
+
+  // THE REQUESTS (first messages from people not chosen): at the top, only when there is one. Open ones first, each with
+  // Accept · Ignore · Block on this device; ignored ones fold into one line and can still be accepted. The name is what
+  // the sender's card SAYS (unverified); the rows come from the shared projection (`messageRequestRows`).
+  const openRequests = (requests ?? []).filter((r) => !r.ignored);
+  const ignoredRequests = (requests ?? []).filter((r) => r.ignored);
+  if (openRequests.length || ignoredRequests.length) {
+    const section = document.createElement('section');
+    section.className = 'cc-requests';
+    const title = document.createElement('h3');
+    title.className = 'cc-requests__title';
+    title.textContent = tr('circle.contacts.requests.title');
+    section.appendChild(title);
+    const requestRow = (r, { ignored }) => {
+      const li = document.createElement('li');
+      li.className = `cc-requests__row${ignored ? ' is-ignored' : ''}`;
+      li.dataset.from = r.from;
+      const name = document.createElement('span');
+      name.className = 'cc-requests__name';
+      name.textContent = r.name ? tr('circle.contacts.requests.says', { name: r.name }) : tr('circle.contacts.requests.no_name');
+      li.appendChild(name);
+      if (r.firstLine) {
+        const line = document.createElement('span');
+        line.className = 'cc-requests__line';
+        line.textContent = r.firstLine;
+        li.appendChild(line);
+      }
+      const btns = document.createElement('span');
+      btns.className = 'cc-requests__acts';
+      const act = (key, labelKey, fn) => {
+        if (typeof fn !== 'function') return;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `cc-btn ${key === 'block' ? 'cc-btn--danger' : 'cc-btn--quiet'} cc-requests__act cc-requests__act--${key}`;
+        b.dataset.act = key;
+        b.textContent = tr(labelKey);
+        b.addEventListener('click', () => fn());
+        btns.appendChild(b);
+      };
+      act('accept', 'circle.contacts.requests.accept', onAccept && (() => onAccept(r.from)));
+      if (!ignored) act('ignore', 'circle.contacts.requests.ignore', onIgnore && (() => onIgnore(r.from)));
+      act('block', 'circle.contacts.requests.block', onBlock && (() => onBlock(r.from, r.name)));
+      li.appendChild(btns);
+      return li;
+    };
+    if (openRequests.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'cc-requests__list';
+      for (const r of openRequests) ul.appendChild(requestRow(r, { ignored: false }));
+      section.appendChild(ul);
+    }
+    if (ignoredRequests.length) {
+      const fold = document.createElement('details');
+      fold.className = 'cc-requests__ignored';
+      const summary = document.createElement('summary');
+      summary.textContent = tr('circle.contacts.requests.ignored_fold', { n: ignoredRequests.length });
+      fold.appendChild(summary);
+      const ul = document.createElement('ul');
+      ul.className = 'cc-requests__list';
+      for (const r of ignoredRequests) ul.appendChild(requestRow(r, { ignored: true }));
+      fold.appendChild(ul);
+      section.appendChild(fold);
+    }
+    container.appendChild(section);
+  }
 
   // Hidden contacts (L106) fold away at the bottom: the row stays, out of sight, until they write again or
   // the person shows them. A list of only hidden contacts is not empty — the fold says what is there.

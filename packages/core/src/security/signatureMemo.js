@@ -15,32 +15,70 @@
  *   • bounded: least recently used out first.
  */
 import { AgentIdentity } from '../identity/AgentIdentity.js';
+import { hashHex } from '../hashHex.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 
-const SIGNATURE_MEMO_MAX = param({ key: 'security.signatureMemoMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4096 });
+/**
+ * The memo's bound, in BYTES of keys held (an entry is ~0.5 KB: the verifier, the key, the signature and the message's
+ * sha-256). 8 MiB holds ~16,000 verdicts: a second read of a 9,000-statement log does no check (measured on Frits's
+ * phone 2026-11-12: one check is ~61 ms there).
+ */
+const SIGNATURE_MEMO_MAX_BYTES = param({ key: 'security.signatureMemoMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 * 1024 * 1024 });
+/** What one entry costs beyond its key's characters (the Map slot), counted so the bound is honest. */
+const ENTRY_OVERHEAD_BYTES = 64;
 
 /**
- * Build a memo over the pure signature check: `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
+ * Build a memo over the pure signature check. `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
  * check that passed once for exactly those bytes, that signature and that key is answered from memory.
+ * `verifierFor(name)` is the same for a NAMED verifier (a circle-link proof, a ceremony reveal, a delegation): the name
+ * is part of the key, so one verifier's "true" is never another's, even over the same bytes. ONE agent holds one memo
+ * and hands it to every rail and check; the only writer is the real check below, after it returned true.
  * @param {object} [o]
- * @param {number} [o.max]                                  most remembered checks
+ * @param {number} [o.maxBytes]                             the bound, in bytes of keys held
  * @param {(msg: string, sig: string, pubKey: string) => boolean} [o.verify]  the real check (default AgentIdentity.verify)
- * @returns {{ verify: (msg: string, sig: string, pubKey: string) => boolean, readonly size: number }}
+ * @returns {{ verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }}
  */
-export function createSignatureMemo({ max = SIGNATURE_MEMO_MAX, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {}) {
-  const ok = new Map();
-  return {
-    verify(msg, sig, pubKey) {
-      if (typeof msg !== 'string' || typeof sig !== 'string' || typeof pubKey !== 'string') return verify(msg, sig, pubKey);
-      const key = `${pubKey}\u0000${sig}\u0000${msg}`;
-      if (ok.has(key)) { ok.delete(key); ok.set(key, true); return true; }
-      const good = verify(msg, sig, pubKey) === true;
-      if (good) {
-        ok.set(key, true);
-        while (ok.size > max) ok.delete(ok.keys().next().value);
+export function createSignatureMemo({ maxBytes = SIGNATURE_MEMO_MAX_BYTES, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {}) {
+  const ok = new Map();   // key → its cost in bytes
+  let bytes = 0;
+  const check = (verifier, msg, sig, pubKey) => {
+    if (typeof msg !== 'string' || typeof sig !== 'string' || typeof pubKey !== 'string') return verify(msg, sig, pubKey);
+    const key = `${verifier}\u0000${pubKey}\u0000${sig}\u0000${hashHex(msg)}`;
+    const had = ok.get(key);
+    if (had !== undefined) { ok.delete(key); ok.set(key, had); return true; }
+    const good = verify(msg, sig, pubKey) === true;
+    if (good) {
+      const cost = key.length * 2 + ENTRY_OVERHEAD_BYTES;
+      ok.set(key, cost); bytes += cost;
+      while (bytes > maxBytes && ok.size > 1) {
+        const [oldest, c] = ok.entries().next().value;
+        ok.delete(oldest); bytes -= c;
       }
-      return good;
+    }
+    return good;
+  };
+  const named = new Map();
+  return {
+    verify: (msg, sig, pubKey) => check('signature', msg, sig, pubKey),
+    verifierFor(name) {
+      if (typeof name !== 'string' || !name || name === 'signature') throw new Error('signatureMemo: a named verifier needs its own name');
+      if (!named.has(name)) named.set(name, (msg, sig, pubKey) => check(name, msg, sig, pubKey));
+      return named.get(name);
     },
     get size() { return ok.size; },
+    get bytes() { return bytes; },
   };
+}
+
+let processMemo = null;
+/**
+ * THE process's one memo (verify-once, step A): every rail, the chat rail and the named checks (a circle-link proof, a
+ * ceremony reveal, a device delegation) use it unless a caller hands its own (a test that counts). One memo per process
+ * rather than per agent: a production process holds one agent, and a verdict is a pure fact about bytes, a signature
+ * and a key, the same for any agent that asks. In memory only; never persisted, never taken from another device.
+ * @returns {ReturnType<typeof createSignatureMemo>}
+ */
+export function processSignatureMemo() {
+  if (!processMemo) processMemo = createSignatureMemo();
+  return processMemo;
 }

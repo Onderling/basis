@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, createSignatureMemo } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -35,7 +35,7 @@ import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, createSig
  *   lane's carried delegation record). Absent → only self-signed statements resolve (single-device honest
  *   degrade; the fan's ingest supplies the full resolver).
  */
-export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding } = {}) {
+export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding, signatureMemo = null } = {}) {
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.appendSilentEntry !== 'function') {
     throw new Error('circleEntryRail: an eventLog with query + appendSilentEntry is required');
   }
@@ -130,12 +130,13 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    */
   /** verifySpine THROWS on structurally-garbage input (e.g. a wrong-size signature) — a malicious peer must
    *  get a refusal, never an exception, so every verify on the receive path goes through this wrapper. */
-  // Verify-on-read verifies each distinct signed statement ONCE per rail: the memo keeps only the pure signature check
-  // (keyed by the statement's exact bytes, so a tampered stored statement misses and is refused); the chain, kind,
-  // circle and every binding below are re-decided on every read.
-  const signatures = createSignatureMemo();
+  // Verify-on-read verifies each distinct signed statement ONCE per PROCESS: the one memo (`processSignatureMemo`, or a
+  // test's own) keeps only the pure signature check, keyed by the verifier, the key, the signature and the statement's
+  // exact bytes (a tampered stored statement misses and is refused); the chain, kind, circle and every binding below
+  // are re-decided on every read. Every rail over the same log (the agent's and a shell's) shares it.
+  const verifySignature = (signatureMemo ?? processSignatureMemo()).verifierFor('spine');
   const safeVerify = (statement, circleId) => {
-    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature: signatures.verify }); }
+    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature }); }
     catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
   };
 

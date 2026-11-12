@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, signSpine } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { makeCircleEntryRail } from '../../src/v2/circleEntryRail.js';
@@ -287,5 +287,21 @@ describe('verify-on-read verifies each distinct signed statement once per rail; 
     const sig = stored.payload.sig;
     stored.payload = { ...stored.payload, sig: (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1) };
     expect((await rail.readVerified(CIRCLE)).events, 'the tampered statement verifies afresh and is refused').toHaveLength(0);
+  });
+});
+
+describe('one verdict memo for the process: two rails over one log check each statement once', () => {
+  it('the agent\'s rail and a shell\'s rail over the same log: N checks, not 2N', async () => {
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-memo');
+    const writer = railFor(log, alice);
+    const N = 5;
+    for (let i = 0; i < N; i++) await writer.append(CIRCLE, { kind: 'propose', subject: `memo-${i}`, payload: { action: 'changePolicy', subject: { n: i }, by: alice.ref, at: i } });
+    const spy = vi.spyOn(AgentIdentity, 'verify');
+    try {
+      await railFor(log, alice).readVerified(CIRCLE);
+      await railFor(log, alice).readVerified(CIRCLE);
+      expect(spy.mock.calls.length, 'the second rail checked the same statements again').toBeLessThanOrEqual(N);
+    } finally { spy.mockRestore(); }
   });
 });

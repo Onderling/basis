@@ -1546,6 +1546,8 @@ export function buildSkills({
         ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
         // the level chosen in the add sheet; absent when nobody was asked (a card arriving with a message)
         ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
+        // the shared link's one-time token, when the card came from a link (L806): the first turn to them carries it
+        ...(typeof a.linkToken === 'string' && /^[A-Za-z0-9_-]{16,}$/.test(a.linkToken) ? { linkToken: a.linkToken } : {}),
         trustLevel,
       });
       metrics?.record?.('contact-added-from-qr');
@@ -4245,6 +4247,17 @@ export function buildSkills({
     }, {
       description: 'Withdraw a contact link you shared: whoever opens it later lands in requests.',
       visibility:  'authenticated',
+    }),
+
+    /** clearContactLinkToken({webid}) — the opener's side: the token left with the first turn; the row drops it. */
+    defineSkill('clearContactLinkToken', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.contacts) return { error: 'no-contacts' };
+      if (typeof a.webid !== 'string' || !a.webid) return { error: 'webid-required' };
+      try { await bundle.contacts.clearLinkToken(a.webid); return { cleared: true }; } catch (err) { return { error: err?.message ?? String(err) }; }
+    }, {
+      description: 'Drop the shared link token a contact row kept, once the first turn to them carried it (self only).',
+      visibility:  'private',
     }),
 
     /** useSharedCard({token, by, persona?}) — the door's write: a first turn carrying a link's token. */

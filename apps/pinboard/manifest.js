@@ -776,6 +776,16 @@ export const pinboardManifest = {
       },
     },
     {
+      // The opener's side: the token a contact row kept (it came from a shared link) left with the first turn to them.
+      id:   'clearContactLinkToken', visibility: 'private', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'contact' },
+      resolves: [{ field: 'linkToken', policy: 'content' }],
+      params: [{ name: 'webid', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: { internal: true },
+    },
+    {
       // The door's write (the contact channel, a first turn carrying a token): never typed, self only. The use is a
       // first-wins claim between the person's devices.
       id:   'useSharedCard', visibility: 'private', verb: 'submit',
@@ -1492,6 +1502,7 @@ export const pinboardManifest = {
       id:   'addContactFromQr', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'person' },
       params: [
+        { name: 'linkToken', kind: 'string', required: false },   // a shared link's one-time token (L806)
         { name: 'payload', kind: 'string', required: true },   // the card as scanned or pasted (`onderling-contact://…`): every caller passes a string; the skill refuses anything else
         // Which of your personas this contact is added through — what they see of you. Optional: absent
         // means "not recorded", which is a different thing from "the default", and nothing may read it as one.

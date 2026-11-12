@@ -32,7 +32,7 @@ const FIELDS = Object.freeze([
   'webid', 'handle', 'displayName', 'avatarUrl', 'persona', 'revealPreset', 'personaAt', 'deletedAt', 'stableId',
   'pubKey', 'peerAddr', 'points', 'serves', 'bot', 'linkedRow', 'linkedRoot', 'linkedAt', 'personKey', 'pairCircleId',
   'channel', 'role', 'trustLevel', 'tags', 'shareLocation', 'allowAutomatching', 'hidden', 'hiddenAt', 'label',
-  'externalIds',
+  'externalIds', 'linkToken',
 ]);
 
 /** A row as the book reads it: every field present, defaults as the MemberMap book gave them. */
@@ -67,6 +67,7 @@ function normalise(r = {}) {
     hiddenAt:     Number.isFinite(r.hiddenAt) ? r.hiddenAt : null,
     label:        r.label ?? null,
     externalIds:  r.externalIds ?? null,
+    linkToken:    typeof r.linkToken === 'string' && r.linkToken ? r.linkToken : null,
     relation:     'contact',
   };
 }
@@ -230,6 +231,8 @@ export function createContactBook({ store = null, selfFor = null } = {}) {
     setPersona:    inTurn(setPersona),
     setTags:       inTurn(setTags),
     setFlag:       inTurn(setFlag),
+    /** The shared link's token left with the first turn to this contact: the row keeps it no longer. */
+    clearLinkToken: inTurn(async (webid) => ((await rowOf(webid))?.linkToken ? write(webid, { linkToken: null }) : read(webid))),
     /** The contact a webid is, or null — the one read of a single row. */
     get:           read,
     listContacts,

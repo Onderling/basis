@@ -3320,7 +3320,7 @@ async function loadTaskGrants({ taskId, circleId } = {}) {
 // The logic is `src/v2/contactLens.js`; the pair roster's own id function names the pair circle for both.
 function openLensForm(extra) { mountMyDataWizard(renderContactLensPanel, { t, ...extra }); }
 /** Add a card AFTER the sheet: the chosen lens, or `null` when the person closed it (nothing added). */
-async function addContactWithSheet(payload) {
+async function addContactWithSheet(payload, { linkToken = null } = {}) {
   const model = await contactAddSheetModel({ payload, callSkill: rawCallSkill });
   // not a card this decoder reads: hand it to pinboard as before, which refuses it with its own reason
   if (!model) return rawCallSkill('pinboard', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
@@ -3328,7 +3328,7 @@ async function addContactWithSheet(payload) {
     mode: 'add', model, onSubmit: (c) => resolve(c), onCancel: () => resolve(null),
   }));
   if (!choice) return null;
-  const r = await addContactAs({ callSkill: rawCallSkill, payload, ...choice, pairCircleIdOf: circlePairRoster?.pairCircleIdFor, adoptPoint: adoptContactPoint });
+  const r = await addContactAs({ callSkill: rawCallSkill, payload, ...choice, linkToken, pairCircleIdOf: circlePairRoster?.pairCircleIdFor, adoptPoint: adoptContactPoint });
   if (r?.adoptedSay) globalThis.alert?.(r.adoptedSay);
   return r;
 }
@@ -9980,7 +9980,7 @@ async function boot() {
             const fromLink = contactCardFromLink(window.location.hash);
             if (!fromLink.ok) return;
             try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
-            addContactWithSheet(fromLink.payload)
+            addContactWithSheet(fromLink.payload, { linkToken: fromLink.token ?? null })   // a shared link's token rides along (L806)
               .then((r) => {
                 if (r === null) return;   // closed the sheet: nothing added
                 const c = r?.contact;

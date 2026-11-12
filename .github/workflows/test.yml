@@ -203,7 +203,13 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Relink workspace (the second half of installing — see header)
         run: node scripts/relink-workspace.mjs
+      # the base branch, so a guard can compare a file with it (lint-architecture-date: a change to
+      # docs/architecture.md must move its "Last updated" date); one commit is enough
+      - name: Fetch the base branch
+        run: git fetch --depth=1 origin "${{ github.base_ref || 'development' }}:refs/remotes/origin/guard-base" || true
       - name: Guards aggregate
+        env:
+          GUARD_BASE_REF: origin/guard-base
         run: npm run guards
       # the box's updater, against a real git remote and a fake docker (`deploy/box/test`, node:test — outside
       # every app suite, so it ran nowhere until 2026-10-05)

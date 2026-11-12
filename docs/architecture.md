@@ -1,5 +1,9 @@
 # Architecture
 
+> **Last updated: 2026-11-12** — checked against the code on `development` that day. Every change to this file
+> moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
+> file is, not one paragraph.
+
 The deep version of how onderling fits together. If you only need the summary, the one-sentence model +
 invariants in [`CLAUDE.md`](../CLAUDE.md) and the [project overview](../README.md) are enough. Read this when
 you need to *understand the whole system* — why it's shaped this way, and how a request actually flows.

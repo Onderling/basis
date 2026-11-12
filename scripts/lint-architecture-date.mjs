@@ -8,7 +8,7 @@
  * has to move says nothing. So:
  *   • the line must exist and be a real date, not in the future;
  *   • when the file differs from the base branch (`origin/development`, or GUARD_BASE_REF), its date must be LATER
- *     than the base's date. A change that leaves the date alone is red.
+ *     than the base's date, or today (a second change on the same day). A change that leaves an older date is red.
  * When the base ref is not available (a fresh clone, a shallow CI checkout that did not fetch it), the second check
  * says so and passes: it cannot tell, and a guard that guesses goes red for the wrong reason.
  */
@@ -41,7 +41,8 @@ export function architectureDateProblems(text, base, today) {
   if (now > today) out.push(`${FILE} says it was last updated ${now}, which is in the future`);
   if (base != null && base !== text) {
     const was = lastUpdated(base);
-    if (was && now <= was) out.push(`${FILE} changed but its "Last updated" date did not move (still ${now}) — set it to today`);
+    // moved, or already today (a second change on the day the base was dated)
+    if (was && now <= was && now !== today) out.push(`${FILE} changed but its "Last updated" date did not move (still ${now}) — set it to today`);
   }
   return out;
 }

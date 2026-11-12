@@ -3449,6 +3449,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     isSelf: isOwnAddress,
     ownDeviceAddresses: async () => (await Promise.all([...personas.keys()].map((pid) => deviceSiblingRowsOf(pid).catch(() => []))))
       .flat().map((d) => d?.address).filter(Boolean),
+    // a PAIR circle is the two-member circle a contact relation makes: whoever is on its roster is a contact (by any of
+    // their per-circle addresses there), so a turn over the pair route is known. Ordinary circles are not here.
+    myCircleIds: async () => ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])
+      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((cid) => typeof cid === 'string' && isPairCircleId(cid)),
+    rosterOf: async (circleId) => (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [],
     contacts: contactRecords,
   });
   /** A contact's row in the contact book, by their webid or by an address of theirs. */
@@ -9629,6 +9634,9 @@ export async function createRealHouseholdAgent(opts = {}) {
      * circle co-members, contacts); `hold(turn)` keeps the turn on the sender's request (pinboard, the own-devices
      * store). The shells hand it to `createContactThreadChannel` as it is.
      */
+    // did the person KEEP this address (a non-hidden contact, or a contact's other device through the identity link)?
+    // The delivery receipt asks it before answering anyone (the contact channel's `isKept`).
+    isKeptContact: async (address) => !!(await keptContactOf(address)),
     messageRequests: Object.freeze({
       // `to`: the address the turn arrived on, which names the persona it is for (the self whose identity answers there)
       // FAIL CLOSED: an address that names none of my personas by its own identity (or none) is 'request', never the

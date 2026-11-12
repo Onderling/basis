@@ -142,7 +142,16 @@ export function createContactThreadChannel({
   // `onDoor({ verdict })`: told each door decision that kept a turn from the thread ('held' | 'dropped'), the verdict
   // only, never who or what (a host's walk log counts them). Optional.
   onDoor = null,
+  // A RECEIPT ONLY TO SOMEONE THE PERSON KEPT (Frits 2026-11-11): `isKept(contactId)` → true when the person holds a
+  // non-hidden row for them in the contact book (the agent's `isKeptContact`, which also follows a contact's other device
+  // through the identity link). Kept means accepted: a circle member who wrote first is not kept until the person answers.
+  // A receipt is a read and online signal; anyone the shell cannot vouch for gets none. Absent: none.
+  isKept = null,
 } = {}) {
+  const keptNow = async (contactId) => {
+    if (typeof isKept !== 'function' || !contactId) return false;
+    try { return (await isKept(contactId)) === true; } catch { return false; }
+  };
   // the person wrote to them first (an outbound turn of theirs in the thread): chosen, so their answer is never a request
   const wroteTo = async (contactId) => {
     if (!contactId) return false;
@@ -509,7 +518,7 @@ export function createContactThreadChannel({
           // to a per-circle address is refused by their authorizer (measured 2026-11-07 on two web apps: "delivered",
           // never applied) AND hands the relay the link canonical-me ↔ their per-circle address, which that address
           // exists to withhold — so a per-circle address no pair roster explains gets NO receipt rather than that.
-          const scope = await receiptScopeFor({ who, fromAddr });
+          const scope = (await keptNow(who)) ? await receiptScopeFor({ who, fromAddr }) : { send: false };
           if (scope.send) {
             try { await landedHook({ msgId: messageId, fromPeerAddr: fromAddr, source: 'receiver', ...(scope.circleId ? { circleId: scope.circleId } : {}) }); } catch { /* best-effort, as the circle's */ }
           }

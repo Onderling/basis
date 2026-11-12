@@ -3,6 +3,10 @@
  * one of THAT persona's circles (seen on this device's own roster, never on their say-so) who writes privately gets a
  * THREAD, but NO contact row: they become a contact when the person answers (answering is choosing). With it off, their
  * first private message is a request like anyone's. Circles of another persona do not count.
+ *
+ * And the delivery receipt (Frits 2026-11-11, kept = accepted): a member who wrote first is KNOWN, not KEPT, so their
+ * turn gets no receipt until the person answers; after that it does. The receipt is read where the channel decides it
+ * (its landed hook, which the shells point at the receipt sender).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
@@ -18,6 +22,7 @@ const CIRCLE = 'buren';
 
 describe('people in my circles may write to me', () => {
   let relay; let me; let ann; let bob; let B;
+  const receipts = [];
 
   beforeAll(async () => {
     relay = await startJourneyRelay();
@@ -30,6 +35,7 @@ describe('people in my circles may write to me', () => {
     await joinExistingCircle(me, bob, { groupId: CIRCLE, handle: 'bobby' });
     await bindCircleAddresses([me, ann, bob], CIRCLE);
     B = me.agent.persona((await me.agent.callSkill('agents', 'createProfile', { name: 'Werk' })).id);
+    me.contactThreadChannel.setLandedHook((r) => { receipts.push(r.msgId); });
   }, 180_000);
   afterAll(async () => { await teardown(me, ann, bob); await relay?.close?.(); });
 
@@ -40,12 +46,16 @@ describe('people in my circles may write to me', () => {
     await new Promise((r) => { setTimeout(r, 1500); });
     expect(await requestsOf(me)).toEqual([]);
     expect(await bookOf(me), 'a circle member became a contact before the person answered').not.toContain(ann.pubKey);
+    expect(receipts, 'a member the person has not answered got a receipt').not.toContain('ann-1');
   }, 40_000);
 
   it('the person answers: then the member is a contact', async () => {
     await me.contactThreadChannel.sendTurn({ peerAddr: ann.pubKey, text: 'hoi Ann', messageId: 'me-1' });
     expect(await until(async () => ((await bookOf(me)).includes(ann.pubKey) ? true : null), { timeout: 20_000, step: 200 }),
       'answering did not make the member a contact').toBe(true);
+    await ann.contactThreadChannel.sendTurn({ peerAddr: me.pubKey, text: 'fijn', messageId: 'ann-2' });
+    expect(await until(async () => (receipts.includes('ann-2') ? true : null), { timeout: 20_000, step: 200 }),
+      `a kept contact got no receipt; ${JSON.stringify(receipts)}`).toBe(true);
   }, 40_000);
 
   it('a circle of the general persona does not open another persona\'s door', async () => {

@@ -104,6 +104,10 @@ export const SEAMS = Object.freeze([
   // address, and the inviter's one answer to a request that proved its code, leave on the person key, from what the redeem
   // code registers with the agent. A shell that builds the redeem without it records 'none' for its joins (and, once the
   // gate enforces, holds them). Mobile's handler comes from the shared inbound wiring; its sender is agentBundle's.
+  // A RECEIPT ONLY TO SOMEONE THE PERSON KEPT (Frits 2026-11-11): the contact channel answers a landed turn only when the
+  // agent says the sender is a kept contact. A shell that leaves `isKept` out confirms nothing (deny by default), so the
+  // seam keeps every shell's receipts alive and every shell's strangers unanswered.
+  { id: 'contact-receipt-kept', pattern: /isKept:\s*\(id\)\s*=>\s*agent\.isKeptContact/, why: 'a delivery receipt answers only a contact the person kept, on every shell' },
   { id: 'redeem-invite-exchange', pattern: /inviteExchange:\s*agent\.inviteExchange/, why: 'a join\'s two person-key sends are an allowed case on every shell, registered by the redeem itself' },
   // Each self on its own sockets: a persona's circle registers its per-circle address (and the persona's person address)
   // on the persona's OWN relay sockets, never the default's — or replies to it land on the default's socket and the

@@ -300,6 +300,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         // a hidden contact who writes again comes back (L106), composed as the shells do: the book says who is
         // hidden; the landing unhides the row. Recorded too, so a walk can assert the marker's moment.
+        isKept: (id) => agent.isKeptContact?.(id) ?? false,   // as the shells compose it: receipts only to kept contacts
         isHidden: async (contactId) => ((await agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true),
         onReturned: async (contactId) => { await agent.callSkill('pinboard', 'setContactHidden', { webid: contactId, hidden: false }); returned.push(contactId); },
         // the first message carries my card; an arriving card goes into the book — as the shells compose it

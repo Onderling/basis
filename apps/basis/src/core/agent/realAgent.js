@@ -6628,7 +6628,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // THE PERSON KEY'S ALLOWLIST (peerSendGate.js): which entry lets this send leave on the person key, from what this
     // device holds about `to`. None ('none') → HELD as 'unknown-address': nothing on the wire, the caller told it waits,
     // and it goes once this device learns who `to` is (a contact lands, a roster read binds it), within its lifetime.
-    const sent = decision.kind === 'person' ? { ...decision, ...(await personSendFacts(to, payload, o).then(personAllowedBy, () => ({ allowedBy: 'none' }))) } : decision;
+    const sent = decision.kind === 'person' ? { ...decision, ...(await personSendFacts(to, payload).then(personAllowedBy, () => ({ allowedBy: 'none' }))) } : decision;
     if (sent.allowedBy === 'none') return holdUnknownAddress(to, payload, o, sent, heldSince);
     return sendCircleScoped(to, payload, decision.circleId ? { ...o, circleId: decision.circleId } : o, sent);
   }
@@ -6667,7 +6667,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     return redriving;
   }
   /** What this device holds about a person-path address: an open invite exchange, a kept contact, the fallback setting. */
-  async function personSendFacts(to, payload = null, o = {}) {
+  async function personSendFacts(to, payload = null) {
     // the exchange is asked for the side THIS payload is, never another side's registration
     const inviteExchangeSide = inviteExchange.take(to, { kind: exchangeKindOf(payload) });
     // a view this self granted (its grant set names the view's key): the grant is the fact
@@ -6678,16 +6678,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
     }
     const kept = (inviteExchangeSide || granted) ? null : await keptContactOf(to);
-    // a member of a circle of the self that SPEAKS (a persona's circle never lets the general person key speak, nor the reverse)
-    let circleMember = null;
-    if (!(inviteExchangeSide || granted || kept)) {
-      // the self that speaks: the persona whose chat key is `sendAs`, else this device's primary (the person path's key)
-      const speaker = typeof o?.sendAs === 'string' && o.sendAs
-        ? ([...personas].find(([, rt]) => rt?.chatId?.pubKey === o.sendAs)?.[0] ?? primaryId)
-        : primaryId;
-      circleMember = circleAddressIndex.memberCircleOf(to, { accept: (cid) => (circlePersonas.get(cid) ?? primaryId) === speaker });
-    }
-    return { inviteExchange: inviteExchangeSide, granted, contact: kept?.row ?? null, viaDevice: kept?.via === 'device', circleMember, addressFallback: addressFallbackOn() };
+    return { inviteExchange: inviteExchangeSide, granted, contact: kept?.row ?? null, viaDevice: kept?.via === 'device', addressFallback: addressFallbackOn() };
   }
   /**
    * A contact the person KEPT, for `address`: a non-hidden book row naming it (`via: 'card'`), or, through the device-local

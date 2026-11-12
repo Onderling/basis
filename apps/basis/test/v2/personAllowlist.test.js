@@ -227,30 +227,9 @@ describe('createHeldSends: a person-key send with no reason waits, bounded, neve
   });
 });
 
-describe('a circle member at the person address their roster row names (people in my circles may write to me)', () => {
-  it('is allowed as circle-member, after a kept contact and before the fallback', () => {
-    expect(personAllowedBy({ circleMember: 'buren' })).toEqual({ allowedBy: 'circle-member' });
-    const ids = PERSON_ALLOWLIST.map((e) => e.id);
-    expect(ids.indexOf('contact-card')).toBeLessThan(ids.indexOf('circle-member'));
-    expect(ids.indexOf('circle-member')).toBeLessThan(ids.indexOf('address-fallback'));
-  });
-
-  it('the roster index knows a member by the webid their row names, never my own, and forgets it with the circle', () => {
-    const ix = createCircleAddressIndex();
-    ix.recordRoster('buren', [{ webid: 'ME', circleAddress: 'meC' }, { webid: 'ANN', circleAddress: 'annC' }], { selfWebid: 'ME' });
-    expect(ix.memberCircleOf('ANN')).toBe('buren');
-    expect(ix.memberCircleOf('ME')).toBe(null);
-    expect(ix.memberCircleOf('annC'), 'a circle address is not a person address').toBe(null);
-    ix.forget('buren');
-    expect(ix.memberCircleOf('ANN')).toBe(null);
-  });
-});
-
-describe('circle-member is narrowed to the circles of the self that speaks', () => {
-  it('accept filters the circles a webid is a member of', () => {
-    const ix = createCircleAddressIndex();
-    ix.recordRoster('werk', [{ webid: 'ANN', circleAddress: 'annW' }]);
-    expect(ix.memberCircleOf('ANN', { accept: (c) => c !== 'werk' }), 'a persona circle opened the general key').toBe(null);
-    expect(ix.memberCircleOf('ANN', { accept: (c) => c === 'werk' })).toBe('werk');
+describe('a co-member\'s PERSON address is no reason to speak as the person', () => {
+  it('there is no circle-member entry: a co-member is reached at their circle address, as my circle self', () => {
+    expect(PERSON_ALLOWLIST.map((e) => e.id)).not.toContain('circle-member');
+    expect(personAllowedBy({ circleMember: 'buren' })).toEqual({ allowedBy: 'none' });
   });
 });

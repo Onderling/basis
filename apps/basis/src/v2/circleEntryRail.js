@@ -311,7 +311,15 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     return eventLog.compactEntries(ids.filter((id) => live.has(id)), (e) => ({ ...e, payload: tombstoneOf(e.payload) }));
   }
 
-  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact };
+  /**
+   * Is this STORED statement still what its author signed (its chain hash recomputes and its own signature passes, on
+   * this device, now)? What a catch-up or a carry sends on must pass this: a statement whose stored bytes or signature
+   * changed after it landed would be refused by every receiver, which then holds a silent hole. A tombstone never
+   * passes (it has no signature left). Not the binding: who the author was is history, judged by the receiver.
+   */
+  const checkSigned = (circleId, statement) => !!statement && statement.tombstone !== true && safeVerify(statement, circleId)?.ok === true;
+
+  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact, checkSigned };
 }
 
 export default makeCircleEntryRail;

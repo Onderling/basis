@@ -12,6 +12,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { bootPeer, teardown, gotoCircles, log, sendDirectMessage, waitForContactMessageDetailed } from './peerHarness.js';
+import { addByLink } from './contactsWalk.js';
 import { fillFounderHandle } from './helpers.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
@@ -106,6 +107,9 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     expect((await bookRow(B.page, aId))?.persona, 'and the persona').toBe('default');
     log('STEP3 L125 the add sheet', 'PASS', 'default persona, level handle');
 
+    // A chooses B too (a first message from someone not chosen is a request since 2026-11-12; this walk is about the
+    // add sheet, the lens and delete, not about that door)
+    await addByLink(B, A);
     // ── B writes; the pair circle forms ──────────────────────────────────────────────────────────────
     await gotoCircles(B.page);
     const first = `hoi Anna ${Date.now().toString(36)}`;

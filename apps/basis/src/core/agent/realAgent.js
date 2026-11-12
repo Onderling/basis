@@ -9638,6 +9638,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The delivery receipt asks it before answering anyone (the contact channel's `isKept`).
     isKeptContact: async (address) => !!(await keptContactOf(address)),
     messageRequests: Object.freeze({
+      // BLOCKED (Frits 2026-11-12: a block is about direct contact): on the block list by this address or any address the
+      // resolver binds to the same person. Asked FIRST by the direct doors and by a direct send; never by circle traffic.
+      isBlocked: async (addr) => { try { return typeof addr === 'string' && !!addr && (await sa.mute?.covers?.(addr)) === true; } catch { return false; } },
       // `to`: the address the turn arrived on, which names the persona it is for (the self whose identity answers there)
       // FAIL CLOSED: an address that names none of my personas by its own identity (or none) is 'request', never the
       // primary's policy, so a device whose primary is open does not let on a turn it cannot place

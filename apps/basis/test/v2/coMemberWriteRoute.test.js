@@ -27,13 +27,19 @@ describe('withCoMemberRoutes', () => {
     expect(by.BOT.writeTo).toBeUndefined();
   });
 
-  it('no shared circle names a proven address: the row says why, and has no address to write to', async () => {
-    const out = await withCoMemberRoutes(rows, { circleIds: async () => Object.keys(circles), membersOf: async (c) => circles[c] ?? [] });
+  it('a co-member no shared circle shows an address for: the row says why, and has no address to write to', async () => {
+    const withCarol = { buren: [...circles.buren, { webid: 'CAROL' }] };
+    const out = await withCoMemberRoutes(rows, { circleIds: async () => Object.keys(withCarol), membersOf: async (c) => withCarol[c] ?? [] });
     expect(out.find((r) => r.contactId === 'CAROL').writeTo).toEqual({ blocked: 'no-circle-address' });
+  });
+
+  it('someone who is no co-member (they wrote first through a link or a card) keeps the row\'s own road', async () => {
+    const out = await withCoMemberRoutes(rows, { circleIds: async () => Object.keys(circles), membersOf: async (c) => circles[c] ?? [] });
+    expect(out.find((r) => r.contactId === 'CAROL').writeTo).toBeUndefined();
   });
 
   it('a pair circle is not a shared circle for this (it is the kept contact\'s own road)', async () => {
     const out = await withCoMemberRoutes([rows[0]], { circleIds: async () => ['pair-xyz'], membersOf: async () => [{ webid: ANN, circleAddress: 'ANN-IN-PAIR' }], isPairCircle: (c) => c.startsWith('pair-') });
-    expect(out[0].writeTo).toEqual({ blocked: 'no-circle-address' });
+    expect(out[0].writeTo, 'no shared (non-pair) circle: no co-member route').toBeUndefined();
   });
 });

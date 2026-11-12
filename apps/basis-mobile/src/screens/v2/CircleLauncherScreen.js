@@ -1124,6 +1124,7 @@ export default function CircleLauncherScreen({
       agent: bundle?.agent ?? null,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
       myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
       circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
+      spineGate: bundle?.agent?.spineGate ?? null,   // spine acts only from the point (as every other binding)
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
     });
   }, [bundle, eventLog, policyStore]);
@@ -2497,6 +2498,7 @@ export default function CircleLauncherScreen({
       <CircleAdminPanelScreen
         callSkill={bundle?.callSkill}
         agent={bundle?.agent}
+        governance={govPolicy}   // the members panel's Remove goes through the circle's rule (governanceDoors.js)
         groupId={selected.id}
         resolvePicture={circlePictureResolver(selected.id)}
         // the circle's reveal ladder: a member's real name shows on the admin page only when it lets the admin see it

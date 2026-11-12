@@ -1573,3 +1573,22 @@ same for membership and keys) is not built: stored chat is never re-verified on 
 signed lanes are covered by checking each signature once per process (the shared memo) and, later, by checking a
 circle when it is first needed; and a remembered mark would travel with a history restore, a verdict from another
 device. Ledger: L619, L829.
+
+## 2026-11-12 — Compacting superseded member properties is paused until a tombstone can prove itself (Frits's brief)
+
+A device compacts a `member-props` statement the roster fold calls dead into a tombstone: chain fields kept, payload
+and signature gone. The tombstone keeps the causal edge on the device that made it, but a member who joins LATER
+cannot accept it (nothing to verify), so it lacks that parent, and the fold skips a missing parent: the late joiner
+gives the author's later statements a lower causal depth. Proven (`apps/basis/test/v2/lateJoinerFoldOrder.test.js`):
+an admin who evicts a member right after seeing their newest name folds as an eviction on the devices that were there,
+and as no eviction on a device that joined later. Two devices of one circle, two rosters, nobody misbehaving.
+
+So compaction is OFF (`COMPACT_SUPERSEDED_PROPS` in `apps/basis/src/v2/membershipRail.js`): dead statements stay
+whole, are served to late joiners like any other, and every device folds the same. The price: the log keeps old
+member properties (a face thumbnail per change). It turns back on with the statement format whose signature covers a
+header that a tombstone keeps, so a tombstone proves itself and can be sent on. The decision to pause on a red finding
+was set in advance in the L619 fast-start brief (Frits, 2026-11-12). What the pause does NOT undo: tombstones made
+before it stay on the devices that ran with compaction on, and nothing serves a tombstone (a catch-up sends only what
+it can vouch for), so a member who joins such a circle later still lacks those parents. That is pre-launch state with
+no compatibility owed: the alpha starts from fresh circles (and the statement format change founds every circle again).
+Ledger: L827, L833.

@@ -300,7 +300,11 @@ away):
   dead, because their effect depends on the history around them. A tombstone has no signature left, so the read
   side trusts nothing in it: a lane names the kinds it may compact (`compactableKinds`; only the membership lane's
   `member-props`), a tombstone of any other kind is treated as planted and dropped, and one that is kept hands the
-  fold its authorRef and nothing else, whatever its stored payload says.
+  fold its authorRef and nothing else, whatever its stored payload says. **Compaction is paused (2026-11-12):**
+  "exactly what they were" holds on the device that made the tombstone, not on a member who joins later, who cannot
+  accept an unsigned tombstone, lacks that parent and so folds a lower depth and can order two acts differently
+  (`COMPACT_SUPERSEDED_PROPS`, `membershipRail.js`; the proof is `lateJoinerFoldOrder.test.js`). Dead statements stay
+  whole until a tombstone can prove itself.
 - **The spine chain** (`createAuthorChain` + the generic `signSpine`) — for events where **EQUIVOCATION is an
   attack**: governance (proposals/votes), **roles** (admin promote/demote), **membership** (join/leave/evict),
   **key rotations**. A per-author hash-chain with fork-proofs, filterable by `kind`: each entry points at its

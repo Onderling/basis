@@ -340,6 +340,9 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
  */
 export async function nameLinkOpeners(rows = [], { links = null } = {}) {
   if (typeof links !== 'function') return rows;
+  // the links are read only when a row has no name of its own: a book read where every row is named costs nothing more
+  const unnamedRow = (r) => r && (!r.name || r.name === r.contactId || r.name === r.peerAddr);
+  if (!rows.some(unnamedRow)) return rows;
   let used = [];
   try { used = ((await links()) ?? []).filter((l) => l?.state === 'used' && typeof l.usedBy === 'string' && typeof l.usedByName === 'string' && l.usedByName); } catch { used = []; }
   if (!used.length) return rows;
@@ -347,8 +350,7 @@ export async function nameLinkOpeners(rows = [], { links = null } = {}) {
   return rows.map((r) => {
     const n = r ? (nameOf.get(r.contactId) ?? nameOf.get(r.peerAddr) ?? null) : null;
     if (!n) return r;
-    const unnamed = !r.name || r.name === r.contactId || r.name === r.peerAddr;
-    return unnamed ? { ...r, name: n } : r;
+    return unnamedRow(r) ? { ...r, name: n } : r;
   });
 }
 

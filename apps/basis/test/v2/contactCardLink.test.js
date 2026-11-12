@@ -170,3 +170,15 @@ describe('Contacten names the first opener of my shared link from the card their
     expect((await nameLinkOpeners(rows, { links })).map((r) => r.name)).toEqual(['Bea', 'Carol', 'dave']);
   });
 });
+
+describe('the link lookup runs only when Contacten has a row without a name (L806)', () => {
+  it('every row named: no read of the links', async () => {
+    const { nameLinkOpeners } = await import('../../src/v2/contactsSource.js');
+    let reads = 0;
+    const links = async () => { reads += 1; return []; };
+    await nameLinkOpeners([{ contactId: 'a', name: 'Anna' }], { links });
+    expect(reads).toBe(0);
+    await nameLinkOpeners([{ contactId: 'a', name: 'a' }], { links });
+    expect(reads).toBe(1);
+  });
+});

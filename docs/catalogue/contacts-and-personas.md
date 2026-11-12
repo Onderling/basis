@@ -43,7 +43,9 @@ catalogue's baseline and moves here as it is written up.
   card (`apps/basis/src/v2/contactCardLink.js`); the opener's contact row keeps it (`linkToken`) and the first turn to
   them carries it inside the person seal, then drops it. The door (`messageRequestDoor.js`, `useLink` / `letOnByLink`
   on the agent's `messageRequests`) gives the first opener the circle member's treatment: a thread, no book row until
-  the person answers; Contacten names them from the card their turn carried (`nameLinkOpeners`).
+  the person answers; Contacten names them from the card their turn carried (`nameLinkOpeners`). Reachable by a link
+  lasts as long as the link: an opener the person never answered is a requester again once the link's row expires
+  (30 days; an expired row goes on the next share), so answering is what keeps them.
 - The block set: the secure agent's (`packages/secure-agent/src/mute.js`, enforced in `createSecureAgent.js` at the
   hello gate, on receive and on send), reached through basis's `mute` / `unmute` / `muted` ops.
 

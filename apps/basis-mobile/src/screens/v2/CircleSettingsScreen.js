@@ -45,7 +45,7 @@ import { basisManifest } from '../../../../basis/src/index.js';
 // Same shared source the web renderer uses (invariants #1/#2).
 import { resolveControlEnablement, settingsControlsFromManifest } from '../../../../basis/src/v2/circleSettingsControls.js';
 import { isAdvancedSetting } from '../../../../basis/src/v2/alphaSurface.js';
-import { settingsChangeNeedsProposal } from '../../../../basis/src/v2/circlePolicy.js';
+import { settingsSaveNeedsProposal } from '../../../../basis/src/v2/circlePolicy.js';
 import { policySaveControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
 import { policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../../../basis/src/v2/governanceAppWiring.js';
 
@@ -183,7 +183,8 @@ export default function CircleSettingsScreen({
     template: working.capabilities || {},
   }) : []), [sources, working]);
 
-  const consensusActive = settingsChangeNeedsProposal(working);   // the ONE decision-table gate (the unification)
+  // the ONE decision-table gate, asked of the rule IN FORCE (what the screen opened with), never the edited copy
+  const consensusActive = settingsSaveNeedsProposal({ inForce: entryPolicyRef.current, edited: working });
 
   // B · consent-card — LOAD + REVIEW: load the pasted recipe (URL/JSON) via the SHARED loadRecipeForReview,
   // build the review model, then open the native consent card. Nothing is persisted here (mirror of web's

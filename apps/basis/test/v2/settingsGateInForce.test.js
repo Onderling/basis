@@ -7,7 +7,15 @@
  * force; the edit is what the proposal carries.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { settingsSaveNeedsProposal } from '../../src/v2/circlePolicy.js';
+
+const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+const SCREENS = {
+  web: '../../web/v2/circleApp.js',
+  mobile: '../../../basis-mobile/src/screens/v2/CircleSettingsScreen.js',
+};
 
 const quorumTwoAdmins = { governance: { changePolicy: 'admin-quorum' }, admins: ['a', 'b'] };
 const anyAdmin = { governance: { changePolicy: 'any-admin' }, admins: ['a', 'b'] };
@@ -23,4 +31,14 @@ describe('the settings gate reads the rule in force', () => {
     expect(settingsSaveNeedsProposal({ inForce: null, edited: quorumTwoAdmins })).toBe(true);
     expect(settingsSaveNeedsProposal({ inForce: null, edited: anyAdmin })).toBe(false);
   });
+});
+
+describe('both settings screens ask the one gate, with the rule in force', () => {
+  for (const [shell, rel] of Object.entries(SCREENS)) {
+    it(`${shell}: calls settingsSaveNeedsProposal with inForce, never the old per-policy gate`, () => {
+      const src = read(rel);
+      expect(src).toMatch(/settingsSaveNeedsProposal\(\{\s*inForce:/);
+      expect(src).not.toMatch(/settingsChangeNeedsProposal\(/);
+    });
+  }
 });

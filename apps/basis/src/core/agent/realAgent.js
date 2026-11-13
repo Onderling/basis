@@ -2561,8 +2561,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!self?.enrolledDevice || !self.deviceDerivationSeed) return null;
     try { return deviceDelegationPubKey(self.deviceDerivationSeed); } catch { return null; }
   };
-  /** Every self's device address on this device: registered as an identity of ours and on that self's own relay
-   *  sockets (never another self's: a socket holding two selves' addresses would link them at the relay). */
   /** Each persona this device runs, on a socket of its own at every relay point of the circles it holds here. Best-effort
    *  per socket (one relay down must not cost the others); the boot does not wait for the sockets to open. */
   const reopenPersonaSockets = async ({ only = null } = {}) => {
@@ -2582,6 +2580,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       catch (err) { console.warn(`[persona] could not reopen its socket on ${url}: ${err?.message ?? err}`); }
     }
   };
+  /** Every self's device address on this device: registered as an identity of ours and on that self's own relay
+   *  sockets (never another self's: a socket holding two selves' addresses would link them at the relay). */
   const registerDeviceAddresses = async () => {
     for (const [pid, self] of personas) {
       const address = deviceAddressOf(pid);

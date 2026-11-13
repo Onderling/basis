@@ -52,5 +52,9 @@ describe("a persona's own socket after a restart", () => {
     const reopened = await until(async () => (onRelay(again).includes(relay.url) ? true : null), { timeout: 10_000, step: 200 }).catch(() => null);
     expect(onRelay(again), "after the restart the persona is on its circle's relay again").toContain(relay.url);
     expect(reopened).toBe(true);
+    // asked again for the same (relay, persona) — as a circle that maps to the persona after the connect does — it is
+    // the SAME socket, never a second one
+    await again.agent.sa.relays.add(relay.url, { identity: again.agent.persona(w).chatId, awaitReady: true });
+    expect(onRelay(again).filter((u) => u === relay.url), 'one socket per relay and persona').toHaveLength(1);
   });
 });

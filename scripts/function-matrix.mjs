@@ -45,7 +45,9 @@ export const FUNCTIONS = Object.freeze([
     box: { file: 'apps/basis/test/alphaFeedbackPath.relay.test.js', test: 'what the person writes lands on the box' },
   } },
   { id: 'personas', name: 'Personas', cells: {
-    web: null,      // persona-switcher is one page narrowing its own view; nobody else sees the persona (Fable 2026-11-10)
+    // a person joins another's circle as a persona chosen in the join wizard: the other member's roster and chat show the
+    // persona, never the general name, also after a reload
+    web: { file: 'apps/basis/test-browser/walk-persona-joins-a-circle.spec.js', test: 'a person joins a circle as a persona' },
     // the phone joins a circle as a new persona made in the join wizard; the other member's roster has the persona, its
     // lines arrive from it, and after a restart it still speaks there as the persona
     mobile: { file: 'apps/basis-mobile/e2e/personas.test.js', test: 'after a restart the phone still speaks in the circle as the persona' },

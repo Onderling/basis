@@ -83,6 +83,10 @@ const REQ_TIMEOUT = param({ key: 'transport.reqTimeoutMs', scope: PARAM_SCOPE.DE
 // moment after a create or a join, before the presence step binds it) — then it is refused, never sent as the primary.
 const ALIAS_WAIT = param({ key: 'transport.aliasWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });  // ms
 // …and how many sends may wait for one address at once (the oldest gives way): a bound on what one unbound address can park.
+// What a transport remembers about its own sends (for a give-up that names only the envelope): a person's messages
+// (a payload with an app message id) and lane traffic in two separate bounds, so the second never pushes the first out.
+const SENT_WITH_APP_ID_MAX = param({ key: 'transport.sentWithAppIdMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2000 });
+const SENT_CONTROL_MAX = param({ key: 'transport.sentControlMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2000 });
 const ALIAS_WAITERS = param({ key: 'transport.aliasWaitersMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 /**
@@ -115,8 +119,8 @@ export class Transport extends Emitter {
   // AFTER the fact — the relay's give-up names the envelope, the app's delivery state is keyed by the msgId, and
   // nothing else ever holds both. Bounded FIFO: a give-up arrives within the relay's queue TTL, and an entry
   // that outlives the cap belonged to a message long since settled either way.
-  #appMessageIds        = new Map();
-  static #APP_MESSAGE_IDS_CAP = 2000;
+  #appMessageIds        = new Map();   // sends that carried an app message id (a person's messages)
+  #controlSends         = new Map();   // every other send (lane traffic): its own bound, so it cannot evict the above
   #envelopeSubscribers  = null;       // Set<(payload, rawEnvelope) => void> — Phase 50.7
 
   /**
@@ -750,21 +754,35 @@ export class Transport extends Emitter {
    * @returns {string|null}
    */
   appMessageIdFor(envelopeId) {
-    return (typeof envelopeId === 'string' && this.#appMessageIds.get(envelopeId)) || null;
+    return this.sentEnvelopeFor(envelopeId)?.msgId ?? null;
   }
 
-  #noteAppMessageId(envelope) {
-    const msgId = envelope?.payload?.msgId;
-    if (typeof envelope?._id !== 'string' || typeof msgId !== 'string' || !msgId) return;
-    if (this.#appMessageIds.size >= Transport.#APP_MESSAGE_IDS_CAP) {
-      this.#appMessageIds.delete(this.#appMessageIds.keys().next().value);   // the oldest — Map keeps insertion order
-    }
-    this.#appMessageIds.set(envelope._id, msgId);
+  /**
+   * What this transport remembers about an outgoing envelope: the app's message id (or null), who it went to, and the
+   * payload's kind (`subtype` or `type`). Kept on THIS device only, bounded, never sent: a report naming only the
+   * envelope (the relay's give-up) can then say what was lost and for whom. Null when unknown.
+   * @param {string} envelopeId
+   * @returns {{msgId: string|null, to: string|null, subtype: string|null}|null}
+   */
+  sentEnvelopeFor(envelopeId) {
+    if (typeof envelopeId !== 'string') return null;
+    return this.#appMessageIds.get(envelopeId) ?? this.#controlSends.get(envelopeId) ?? null;
+  }
+
+  #noteAppMessageId(to, envelope) {
+    if (typeof envelope?._id !== 'string') return;
+    const p = envelope.payload;
+    const msgId = typeof p?.msgId === 'string' && p.msgId ? p.msgId : null;
+    const kind = typeof p?.subtype === 'string' ? p.subtype : (typeof p?.type === 'string' ? p.type : null);
+    const map = msgId ? this.#appMessageIds : this.#controlSends;
+    const cap = Number(msgId ? SENT_WITH_APP_ID_MAX : SENT_CONTROL_MAX);
+    if (map.size >= cap) map.delete(map.keys().next().value);   // the oldest of its own kind — Map keeps insertion order
+    map.set(envelope._id, { msgId, to: typeof to === 'string' ? to : null, subtype: kind });
   }
 
   /** Apply SecurityLayer (if set) and call _put. */
   async _send(to, envelope) {
-    this.#noteAppMessageId(envelope);   // before encryption — the payload is opaque after it
+    this.#noteAppMessageId(to, envelope);   // before encryption — the payload is opaque after it
     const outgoing = this.#securityLayer
       ? this.#securityLayer.encrypt(envelope)
       : envelope;

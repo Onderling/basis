@@ -21,9 +21,7 @@ import { useTheme } from './themeContext.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
 import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
-import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
-
-const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
+import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
 
 // `governance`: the launcher's ONE binding (governanceOneBindingPerShell) — this screen decides with the same options as

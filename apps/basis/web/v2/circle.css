@@ -1542,6 +1542,10 @@
 .circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
 .circle-screen__row-act:hover { color: var(--accent-ink); }
 .circle-screen__items-list { list-style: none; margin: 0; padding: 0; }
+/* a list's add field on Vandaag: one line, the theme's paper and ink (follows dark mode) */
+.circle-screen__list-add { display: flex; gap: 6px; margin: 4px 0 10px; }
+.circle-screen__list-add input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 14px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; }
+.circle-screen__list-add button { flex: 0 0 auto; }
 
 /* The shared overlay sheet (the "+" sheet, restore, …): the theme's card, so it follows dark mode. */
 .cc-overlay-card { background: var(--card); color: var(--ink); border: 1px solid var(--line); max-width: 26rem; width: 92%; padding: 1.25rem; border-radius: var(--radius); max-height: 80vh; overflow: auto; }

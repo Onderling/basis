@@ -35,6 +35,7 @@ import { t } from '../../core/localisation.js';
 import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
+import { typedRowOp } from '../../../../basis/src/v2/rowPrimary.js';
 import { nounHeading } from '../../../../basis/src/v2/nounNames.js';
 
 // An embed `ref` may be a full URN (urn:dec:item:T2) while a rendered row
@@ -361,6 +362,28 @@ function PrimaryButton({ item, noun, onAction, styles }) {
   );
 }
 
+// A list's add field: a typed line goes on that list through the act the block carries (`typedRowOp`, shared).
+// Web twin: circleScreen.js `addField`.
+function ListAddField({ list, onAction, styles }) {
+  const [text, setText] = useState('');
+  if (typeof onAction !== 'function') return null;
+  const send = () => {
+    const go = typedRowOp(list.add, text);
+    if (!go) return;
+    onAction(go);
+    setText('');
+  };
+  return (
+    <View style={styles.listAdd} testID={`list-add-${list.id}`}>
+      <TextInput style={styles.listAddInput} value={text} onChangeText={setText} onSubmitEditing={send} returnKeyType="done"
+        placeholder={t(list.add.placeholderKey ?? 'circle.lists.add_prompt')} testID={`list-add-input-${list.id}`} />
+      <Pressable style={styles.rowAct} onPress={send} accessibilityRole="button" testID={`list-add-send-${list.id}`}>
+        <Text style={styles.rowActText}>{t(list.add.labelKey ?? 'circle.container.add')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // An OWN row (no circle) opens the "+" sheet on itself — change it or take it away (`onAction({ kind: 'edit-own' })`);
 // a circle's row stays the circle's. Web twin: circleScreen.js `openableOwn`.
 const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, children, ...rest }, ref) {
@@ -498,6 +521,7 @@ function renderLists(block, styles, onAction = null) {
               <PrimaryButton item={e} noun="list-item" onAction={onAction} styles={styles} />
             </View>
           ))}
+          {l.add ? <ListAddField list={l} onAction={onAction} styles={styles} /> : null}
         </View>
       ))}
     </View>
@@ -670,6 +694,8 @@ const makeStyles = (theme) => StyleSheet.create({
   groupHead:           { fontSize: 13, color: theme.color.inkSoft, paddingVertical: 4 },
   agendaMoment:        { fontSize: 13, color: theme.color.inkSoft },
   // a row's own act ("Change"): a quiet text button — the page's one accent is the "+"
+  listAdd:             { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 10 },
+  listAddInput:        { flex: 1, fontSize: 14, paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, color: theme.color.ink, backgroundColor: theme.color.paper },
   rowAct:              { paddingVertical: 4, paddingHorizontal: 6, marginLeft: 'auto' },
   rowActText:          { fontSize: 13, color: theme.color.inkSoft },
   taskRowCompact:      { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 6 },

@@ -108,6 +108,17 @@ describe('personas on the phone — join a circle as a new persona; the other me
       found = (await firstOf([by.id(`circle-tile-${ready.circleId}`)], 10_000)) === 0;
     }
     if (!found) { await device.takeScreenshot('per-04a-no-tile'); throw new Error("after the restart the circle's tile never showed"); }
+    // the tile still carries the circle's NAME, not its id: a persona's circle names come through the fold of every
+    // persona's circles into the launcher's list (they were lost after a restart once, and the tile showed the id)
+    const tile = by.id(`circle-tile-${ready.circleId}`);
+    if (await isVisible(by.text(ready.circleId).withAncestor(tile))) {
+      await device.takeScreenshot('per-04c-tile-shows-id');
+      throw new Error(`after the restart the circle's tile shows its id (${ready.circleId}), not its name "${ready.circleName}"`);
+    }
+    if (!(await isVisible(by.text(ready.circleName).withAncestor(tile)))) {
+      await device.takeScreenshot('per-04c-tile-no-name');
+      throw new Error(`after the restart the circle's tile does not show its name "${ready.circleName}" (nor its id)`);
+    }
     await tapSoon(by.id(`circle-tile-${ready.circleId}`));
     await soon(by.id('circle-detail-composer'), 30_000);
     await say('circle-detail-composer-input', LINE_2);

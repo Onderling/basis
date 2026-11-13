@@ -28,17 +28,23 @@
  *   {"do":"roster"}                    its circle's other members as its own roster has them → {"step":"roster","rows":[…]}
  * and answers each with `{"step":"circle-said"|"contact-said","ok":…}`.
  *
+ * `--join` makes the peer a person who JOINS the phone's circle instead of founding one (the first-five-minutes story:
+ * the phone makes the circle and its invite brings the peer in). It prints `{"step":"ready","waitingForInvite":true}` and joins
+ * on `{"do":"join","invite":"onderling-invite://…"}` (the link the phone's invite card shows), the way the shells join
+ * (`joinCircleFromInvite`), then answers `{"step":"joined","ok":…,"circleId":…}`. `--talk` works the same after.
+ *
  * Run from apps/basis-mobile; the agent code is imported from the basis app's test support.
  */
 import { startJourneyRelay } from '../../../basis/test/support/testRelay.js';
 import readline from 'node:readline';
+import { makerRootKeyStore, MAKER_HANDLE, MAKER_RELAY_PORT, lanAddress } from './makerCard.mjs';
 import { networkInterfaces } from 'node:os';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, teardown, sendCircleChat, readRoster,
 } from '../../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../../basis/src/v2/householdRosterPairing.js';
 import { DEFAULT_CIRCLE_POLICY } from '../../../basis/src/v2/circlePolicy.js';
-import { buildCircleInviteUri } from '../../../basis/src/v2/circleInvite.js';
+import { buildCircleInviteUri, joinCircleFromInvite } from'../../../basis/src/v2/circleInvite.js';
 import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 
 const arg = (name, fallback = null) => {
@@ -49,34 +55,37 @@ const say = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
 
 const circleName = arg('circle', 'Walk Kring');
 const offering = arg('offering');
-const handle = arg('handle', 'bram');
+// the maker's handle is part of its card, so it is fixed with it
+const handle = process.argv.includes('--maker') ? MAKER_HANDLE : arg('handle', 'bram');
 // ONE NAME FOR THE RELAY, used by everyone. A relay a deployment runs has one public name; here the host's relay was
 // `127.0.0.1` to this peer and `10.0.2.2` (the emulator's alias for the host) to the phone, so the two recorded the same
 // relay under two urls. A circle's points carry the peer's spelling, the phone's socket did not match it, and routing
 // fell to live NKN — a harness artefact that looked like a lost message (found by instrumenting the route, 2026-11-11).
 // So both sides dial the host's LAN address, which the emulator reaches too. `--phone-host` overrides it; 10.0.2.2 is
 // only a last resort (the host cannot dial it, so the two names come back).
-const lanAddress = () => {
-  for (const list of Object.values(networkInterfaces())) {
-    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) return a.address;
-  }
-  return null;
-};
 const phoneHost = arg('phone-host', lanAddress() ?? '10.0.2.2');
-const talk = process.argv.includes('--talk');
+const makerMode = process.argv.includes('--maker');
+const talk = process.argv.includes('--talk') || makerMode;
+const joinMode = process.argv.includes('--join');
 
-const relay = await startJourneyRelay();
+// the maker's relay is on the fixed port its card names; both sides dial it under the LAN address, as the card says
+const relay = await startJourneyRelay(makerMode ? { port: MAKER_RELAY_PORT } : {});
 const relayUrl = phoneHost === '10.0.2.2' ? relay.url : `ws://${phoneHost}:${new URL(relay.url).port}`;
 say({ step: 'relay', url: relayUrl });
-const peer = await bootRealAgentNode(handle, { itemsLane: true, contactChannel: talk });
+// `--maker`: the feedback contact an e2e build carries (e2e/support/makerCard.mjs): a FIXED root seed, so this peer is
+// the same person on every run and its card is the one baked into that build
+const makerOpts = makerMode ? { agentOpts: { rootKeyStore: await makerRootKeyStore() } } : {};
+const peer = await bootRealAgentNode(handle, { itemsLane: true, contactChannel: talk, ...makerOpts });
 await connectNodesOverRelay([peer], { relayUrl });
 
-const groupId = `walk-${Date.now().toString(36)}`;
+const call = (app, op, args) => peer.agent.callSkill(app, op, args);
+// the circle this peer is in: its own (founded here), or, in `--join` mode, the phone's once the invite arrives
+let groupId = (joinMode || makerMode) ? null : `walk-${Date.now().toString(36)}`;
+if (!joinMode && !makerMode) {
 await createCircle(peer, { groupId, name: circleName });
 await bindCircleAddresses([peer], groupId);
 await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId });
 
-const call = (app, op, args) => peer.agent.callSkill(app, op, args);
 // `--features lists,calendar`: the admin switches circle features ON, as the settings screen's save does: a signed
 // policy update on the governance lane, which every member (the phone too) folds into its copy of the policy
 const features = (arg('features', '') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -96,6 +105,25 @@ if (offering) {
   say({ step: 'offering', set: !!set?.ok, released: !!shown?.ok, said: said?.ok ? said.via ?? true : said });
 }
 
+}
+
+if (makerMode) {
+  // the feedback contact: in no circle, reachable as a person; its card (made by its own op) is what the walk compares
+  // with the card the e2e build carries
+  await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
+  // the feedback persona is OPEN to first messages, as the deployed one is (decisions.md 2026-11-12: "the feedback
+  // persona is open"): a person's default is 'request', which holds a stranger's note as a message request and keeps
+  // it out of the thread (the walk's first runs: sent, never in the maker's thread, nothing refused)
+  const firstMessages = await peer.agent.setFirstMessages('open');
+  if (firstMessages !== 'open') throw new Error(`the maker could not open its door to first messages: ${firstMessages}`);
+  const card = (await call('pinboard', 'getContactShareQr', {}).catch(() => null))?.payload ?? null;
+  // `webid`: who it is (the build's card names the same one; the live card adds this run's relay, so cards differ)
+  // `relayUrl`: the one spelling both sides dial, the same the e2e build's card names (made at build time)
+  say({ step: 'ready', maker: true, webid: peer.pubKey, card, relayUrl });
+} else if (joinMode) {
+  await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
+  say({ step: 'ready', waitingForInvite: true, relayUrl });
+} else {
 const port = new URL(relay.url).port;
 const invite = await buildCircleInviteUri({
   callSkill: call, circleId: groupId,
@@ -112,6 +140,29 @@ say({
     circleAddress: String(peer.agent.circleAddressFor?.(groupId) ?? '').slice(0, 12),
   },
 });
+}
+
+if (joinMode) {
+  // JOINING: the phone's invite, the way a shell joins (the wizard's own call), then the circle's addresses bound
+  readline.createInterface({ input: process.stdin }).on('line', async (line) => {
+    let cmd = null;
+    try { cmd = JSON.parse(line); } catch { return; }
+    if (cmd?.do !== 'join' || groupId) return;
+    try {
+      const r = await joinCircleFromInvite({
+        inviteUri: cmd.invite, callSkill: call, sendPeerRedeem: peer.sendPeerRedeem, handle, rulesAccepted: true,
+        circleAddressFor: (cid) => peer.agent.circleAddressFor(cid),
+        signCircleLink: (src, dst, addr) => peer.agent.signCircleLink?.(src, dst, addr) ?? null,
+      });
+      if (r?.ok) {
+        groupId = r.circleId;
+        await bindCircleAddresses([peer], groupId).catch(() => {});
+        await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId }).catch(() => {});
+      }
+      say({ step: 'joined', ok: !!r?.ok, circleId: r?.circleId ?? null, error: r?.ok ? null : (r?.reason ?? r?.error ?? null) });
+    } catch (err) { say({ step: 'joined', ok: false, error: String(err?.message ?? err) }); }
+  });
+}
 
 if (talk) {
   // HEARING: what landed in the peer's own stores (its chat log, its stored contact threads), polled — the same
@@ -119,7 +170,7 @@ if (talk) {
   const heardChat = new Set(); const heardTurns = new Set(); let lastFrom = null;
   const listen = async () => {
     for (const e of peer.chatEvents) {
-      if (!e?.id || heardChat.has(e.id) || e.actor === peer.pubKey || e.payload?.circleId !== groupId || !e.payload?.text) continue;
+      if (!groupId || !e?.id || heardChat.has(e.id) || e.actor === peer.pubKey || e.payload?.circleId !== groupId || !e.payload?.text) continue;
       heardChat.add(e.id);
       say({ step: 'circle-heard', text: e.payload.text, from: e.actor ?? null });
     }
@@ -149,6 +200,8 @@ if (talk) {
           turns: turns.map((x) => ({ contactId: x.contactId, origin: x.origin, text: x.text ?? null })),
           unrouted: (peer.received ?? []).map((r) => r?.payload?.type ?? r?.payload?.subtype ?? typeof r?.payload),
           refused: peer.contactTurnsRefused ?? [],
+          // first messages held as requests (the door), not in a thread: a held note is THIS branch
+          requests: ((await call('pinboard', 'listMessageRequests', {}).catch(() => null))?.requests ?? []).map((q) => ({ from: q?.contactId ?? q?.from ?? null, text: q?.text ?? null })),
         });
       } else if (cmd.do === 'roster') {
         // the circle's members as the peer's own roster has them (its own rows left out): who joined, under which name
@@ -170,7 +223,7 @@ if (talk) {
           const name = l?.label ?? null;
           if (!name) continue;
           const entries = (await call('lists', 'listEntries', { circleId: groupId, list: name }))?.items ?? [];
-          out.push({ list: name, entries: entries.map((e) => e?.label ?? null).filter(Boolean), ids: Object.fromEntries(entries.filter((e) => e?.label && e?.id).map((e) => [e.label, e.id])) });
+          out.push({ list: name, id: l?.id ?? null, entries: entries.map((e) => e?.label ?? null).filter(Boolean), ids: Object.fromEntries(entries.filter((e) => e?.label && e?.id).map((e) => [e.label, e.id])) });
         }
         say({ step: 'lists', lists: out });
       } else if (cmd.do === 'circle-say') {

@@ -35,6 +35,7 @@ import { identityLineWords, agentRowWords } from '../../src/v2/mijWords.js';
 import { dateLocaleOf } from '../../src/v2/whenWords.js';
 import { whereTag } from '../../src/v2/rowWhere.js';
 import { nounHeading } from '../../src/v2/nounNames.js';
+import { typedRowOp } from '../../src/v2/rowPrimary.js';
 
 /**
  * Render an array of materialized blocks into a container.
@@ -520,7 +521,33 @@ function renderLists(section, block, tr, onAction) {
       ul.appendChild(li);
     }
     section.appendChild(ul);
+    if (l.add) addField(section, l, tr, onAction);
   }
+}
+
+/** A list's add field: a typed line goes on that list through the act the block carries (`typedRowOp`). */
+function addField(section, l, tr, onAction) {
+  if (typeof onAction !== 'function') return;
+  const form = document.createElement('form');
+  form.className = 'circle-screen__list-add';
+  form.dataset.listId = l.id ?? '';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = tr(l.add.placeholderKey ?? 'circle.lists.add_prompt');
+  input.setAttribute('aria-label', input.placeholder);
+  const b = document.createElement('button');
+  b.type = 'submit';
+  b.className = 'cc-btn cc-btn--quiet';
+  b.textContent = tr(l.add.labelKey ?? 'circle.container.add');
+  form.append(input, b);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const go = typedRowOp(l.add, input.value);
+    if (!go) return;
+    onAction(go);
+    input.value = '';
+  });
+  section.appendChild(form);
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */

@@ -85,6 +85,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `createSignatureMemo` | function | [`core.md`](core.md#createsignaturememo) |
 | `createSpineAppender` | function | [`core.md`](core.md#createspineappender) |
 | `createTimeSlice` | function | [`core.md`](core.md#createtimeslice) |
+| `createVerdictMemo` | function | [`core.md`](core.md#createverdictmemo) |
 | `DataPart` | function | [`core.md`](core.md#datapart) |
 | `DataSource` | class | [`core.md`](core.md#datasource) |
 | `DataSourceAccessDeniedError` | class | [`core.md`](core.md#datasourceaccessdeniederror) |
@@ -119,6 +120,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `EnvelopeTooLargeError` | class | [`core.md`](core.md#envelopetoolargeerror) |
 | `EVICTION_KIND` | constant | [`core.md`](core.md#eviction_kind) |
 | `EVICTION_STMT_VERSION` | constant | [`core.md`](core.md#eviction_stmt_version) |
+| `exactVerdictKey` | function | [`core.md`](core.md#exactverdictkey) |
 | `FallbackTable` | class | [`core.md`](core.md#fallbacktable) |
 | `FilePart` | function | [`core.md`](core.md#filepart) |
 | `FileSystemSource` | class | [`core.md`](core.md#filesystemsource) |
@@ -214,6 +216,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `PodCapabilityToken` | class | [`core.md`](core.md#podcapabilitytoken) |
 | `PolicyEngine` | class | [`core.md`](core.md#policyengine) |
 | `processSignatureMemo` | function | [`core.md`](core.md#processsignaturememo) |
+| `processVerdictMemo` | function | [`core.md`](core.md#processverdictmemo) |
 | `publish` | function | [`core.md`](core.md#publish) |
 | `publishes` | function | [`core.md`](core.md#publishes) |
 | `pullPeerList` | function | [`core.md`](core.md#pullpeerlist) |
@@ -282,6 +285,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `SPINE_STATEMENT_ITEM` | constant | [`core.md`](core.md#spine_statement_item) |
 | `SPINE_STMT_VERSION` | constant | [`core.md`](core.md#spine_stmt_version) |
 | `spineSignedMessage` | function | [`core.md`](core.md#spinesignedmessage) |
+| `spineVerdictKey` | function | [`core.md`](core.md#spineverdictkey) |
 | `staleSender` | function | [`core.md`](core.md#stalesender) |
 | `STANDARD_RANKS` | constant | [`core.md`](core.md#standard_ranks) |
 | `StateManager` | class | [`core.md`](core.md#statemanager) |

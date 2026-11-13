@@ -41,7 +41,7 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'feedback', name: 'Feedback to the maker', cells: {
     web: { file: 'apps/basis/test-browser/feedback-path-box.spec.js', test: 'a visitor writes to the maker' },
-    mobile: null,   // feedbackDoorMobile is a unit of the door
+    mobile: { file: 'apps/basis-mobile/e2e/feedbackDoor.test.js', test: 'a note written there reaches the maker, and the answer shows in the thread' },
     box: { file: 'apps/basis/test/alphaFeedbackPath.relay.test.js', test: 'what the person writes lands on the box' },
   } },
   { id: 'personas', name: 'Personas', cells: {
@@ -122,7 +122,9 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'help-onboarding', name: 'Help and onboarding', cells: {
     web: { file: 'apps/basis/test-browser/walk-first-five-minutes.spec.js', test: 'first five minutes: onboarding, a handle' },
-    mobile: null,   // helpCircleOnboarding is a unit
+    // a Detox walk on the emulator (not in CI; run before each release and the two-phone walk): a fresh install's help
+    // circle, a first circle from Today, its invite link joined by a real second person, a first message each way
+    mobile: { file: 'apps/basis-mobile/e2e/firstFiveMinutes.test.js', test: 'a first message each way' },
     box: BOX_NO_SCREEN,
   } },
   { id: 'connected-screens', name: 'Connected screens', cells: {

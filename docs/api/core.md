@@ -1519,7 +1519,7 @@ the redeem seam so a joiner can prove control of the address they present.
 **Kind:** function · **Import:** `verifyCircleLink` from `'@onderling/core'`
 
 ```js
-verifyCircleLink({ groupId, address, proof, verifySignature = processSignatureMemo().verifierFor('circle-link') } = {})
+verifyCircleLink({ groupId, address, proof, verifySignature, verdictMemo } = {})
 ```
 
 Verify a presented linkage: the proof must be a signature over the challenge by the private
@@ -4228,6 +4228,66 @@ and hands it to every rail and check; the only writer is the real check below, a
 
 **Returns:** `{ checkBatch: (verifier: string, items: Array<{msg: string, sig: string, pubKey: string}>) => Promise<number>, verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }`
 
+### `createVerdictMemo`
+
+**Kind:** function · **Import:** `createVerdictMemo` from `'@onderling/core'`
+
+```js
+createVerdictMemo({ maxBytes = VERDICT_MEMO_MAX_BYTES } = {})
+```
+
+THE VERDICT MEMO, one level up: remember that EXACTLY this input checked out under a pure check, so the work around
+the signature (the canonical form, the payload digest, the header hash) is not redone either. A cold start on the
+Samsung ran the statement check 554 times over 71 distinct statements and the circle-link proof 920 times over 23
+addresses: the signature was already remembered, the canonical form and the hashes around it were not (~2.7 ms each).
+
+The same rule as the signature memo, and the key is the whole input:
+  • only a pure check whose answer depends on its input alone (a statement's own validity, never an authority);
+  • the key is the caller's exact input as bytes (`JSON.stringify` of the statement plus what was asked of it), never
+    a hash the content claims: a copy changed anywhere, or written in another key order, misses and is checked;
+  • only a pass is stored; a refusal is checked again every time;
+  • bounded in bytes, least recently used out first.
+
+**Parameters**
+
+- `[o]` `object`
+- `[o.maxBytes]` `number`
+
+**Returns:** `{ has: (key: string) => boolean, remember: (key: string) => void, readonly size: number, readonly bytes: number }`
+
+### `exactVerdictKey`
+
+**Kind:** function · **Import:** `exactVerdictKey` from `'@onderling/core'`
+
+```js
+exactVerdictKey(value)
+```
+
+The exact key for a verdict: the value's JSON, or null when JSON would make two different inputs look the same (a
+non-finite number or a value with `toJSON`, both written as something else, an `undefined` inside an array, written
+as null, or a function, symbol or bigint, which JSON drops or refuses). A null key is never remembered, so such an input is always checked in full.
+
+**Parameters**
+
+- `value` `*`
+
+**Returns:** `string|null`
+
+### `processVerdictMemo`
+
+**Kind:** function · **Import:** `processVerdictMemo` from `'@onderling/core'`
+
+```js
+processVerdictMemo(name)
+```
+
+The process's verdict memo for one named check ('spine', 'circle-link'): one per check, so one check's pass is never
+read as another's. In memory only, like the signature memo.
+
+**Parameters**
+
+- `name` `string`
+
 ### `processSignatureMemo`
 
 **Kind:** function · **Import:** `processSignatureMemo` from `'@onderling/core'`
@@ -4339,6 +4399,25 @@ Sign a spine statement of any `kind`. `identity` is the issuer's CIRCLE-SCOPED s
 - `[args.deps]` `string[]` — the CROSS-AUTHOR frontier the issuer had SEEN (other authors' heads); normally empty. Bound into the hash + signature, excluded from the content serialization (a fork stays detectable).
 
 **Returns:** `{ body: object, sig: string, by: string }`
+
+### `spineVerdictKey`
+
+**Kind:** function · **Import:** `spineVerdictKey` from `'@onderling/core'`
+
+```js
+spineVerdictKey(statement, { expectedCircleId, expectedKind } = {})
+```
+
+The verdict memo's key for a statement checked with these expectations: what was asked, then the statement's exact
+content (`exactVerdictKey`); null when the content cannot be keyed exactly (then it is always checked in full).
+One function, so a rail that asks "is this one known already?" asks with the key the check remembers.
+
+**Parameters**
+
+- `statement` `object`
+- `[o]` `{expectedCircleId?: string, expectedKind?: string}`
+
+**Returns:** `string|null`
 
 ### `verifySpine`
 

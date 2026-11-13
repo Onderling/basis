@@ -42,7 +42,7 @@
  * a genuine, untampered, chain-consistent signature by `body.author`; WHO may issue this kind, and whether a
  * concurrent change voids it, is the fold's authority decision (deny-wins), never decided here.
  */
-import { processSignatureMemo } from './signatureMemo.js';
+import { exactVerdictKey, processSignatureMemo, processVerdictMemo } from './signatureMemo.js';
 import { encode as b64encode } from '../crypto/b64.js';
 import { hashHex }             from '../hashHex.js';
 
@@ -122,6 +122,19 @@ export function signSpine(identity, { kind, circleId, subject, payload, parent =
 }
 
 /**
+ * The verdict memo's key for a statement checked with these expectations: what was asked, then the statement's exact
+ * content (`exactVerdictKey`); null when the content cannot be keyed exactly (then it is always checked in full).
+ * One function, so a rail that asks "is this one known already?" asks with the key the check remembers.
+ * @param {object} statement
+ * @param {{expectedCircleId?: string, expectedKind?: string}} [o]
+ * @returns {string|null}
+ */
+export function spineVerdictKey(statement, { expectedCircleId, expectedKind } = {}) {
+  const exact = exactVerdictKey(statement);
+  return exact === null ? null : `${expectedCircleId ?? ''}\u0000${expectedKind ?? ''}\u0000${exact}`;
+}
+
+/**
  * Verify a spine statement is a genuine, untampered, chain-consistent signature by `body.author`. NO timestamp
  * window (durable). Does NOT decide authority (who may issue this kind, or whether a concurrent change voids
  * it) — that is the fold's deny-wins decision.
@@ -135,8 +148,20 @@ export function signSpine(identity, { kind, circleId, subject, payload, parent =
  * @returns {{ ok: true, body: object } | { ok: false, reason: string }}
  */
 export function verifySpine(statement, opts = {}) {
-  const { expectedCircleId, expectedKind, verifySignature = processSignatureMemo().verifierFor('spine') } = opts;
+  const { expectedCircleId, expectedKind } = opts;
   if (!statement || typeof statement !== 'object') return { ok: false, reason: 'malformed statement' };
+  // THE VERDICT MEMO: a statement that passed, asked exactly the same, passes again without the canonical form and the
+  // hashes (a read of a lane re-checks every stored statement). Keyed by the statement's whole content and what was asked
+  // of it; only a pass is remembered; a caller that brings its own signature check is never answered from memory.
+  const memo = opts.verdictMemo ?? (opts.verifySignature ? null : processVerdictMemo('spine'));
+  const key = memo ? spineVerdictKey(statement, { expectedCircleId, expectedKind }) : null;
+  if (key && memo.has(key)) return { ok: true, body: statement.body };
+  const r = verifySpineUncached(statement, { expectedCircleId, expectedKind, verifySignature: opts.verifySignature ?? processSignatureMemo().verifierFor('spine') });
+  if (r.ok && key) memo.remember(key);
+  return r;
+}
+
+function verifySpineUncached(statement, { expectedCircleId, expectedKind, verifySignature }) {
   const { body, sig } = statement;
   if (typeof sig !== 'string' || !sig)   return { ok: false, reason: 'missing signature' };
   if (!body || typeof body !== 'object') return { ok: false, reason: 'missing body' };

@@ -74,7 +74,7 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
       // Competing resolves settle deterministically the same way (smallest hash wins the recorded outcome).
       const better = !p.closed
         || (typeof e.hash === 'string' && String(e.hash).localeCompare(String(p._resolveHash ?? '￿')) < 0);
-      if (better) { p.closed = true; p.closedStatus = e.status ?? null; p.closedBy = e.by ?? null; p._resolveHash = e.hash ?? null; }
+      if (better) { p.closed = true; p.closedStatus = e.status ?? null; p.closedBy = e.by ?? null; p.closedAt = e.at ?? 0; p._resolveHash = e.hash ?? null; }
     }
   }
 
@@ -85,6 +85,7 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
     proposals.push({
       proposalId: p.proposalId, action: p.action, subject: p.subject, by: p.by, deadline: p.deadline,
       proposedAt: p._proposedAt, votes: p.votes, closed: p.closed,
+      closedAt: p.closed ? (p.closedAt ?? 0) : null,   // the resolve's own signed time (a receiver judges an override by it, never its clock)
       seed: p._proposeHash ?? p.proposalId,   // what a drawn sample (`random-sample`) is drawn from
       // a closed proposal keeps its recorded outcome; an open one shows the live decision.
       status: p.closed ? (p.closedStatus ?? DECISION_STATUS.REJECTED) : decision.status,

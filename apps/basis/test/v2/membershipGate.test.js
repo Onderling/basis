@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { membershipGateFor, judgePolicyChain } from '../../src/v2/governanceReceiverGate.js';
-import { foldGovernance, proposeEvent, voteEvent } from '../../src/v2/governanceLog.js';
+import { foldGovernance, proposeEvent, voteEvent, resolveEvent } from '../../src/v2/governanceLog.js';
 import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 
 const members = [{ ref: 'a0', role: 'admin', via: 'founder' }, { ref: 'a1', role: 'admin' }, { ref: 'm0', role: 'member' }, { ref: 'm1', role: 'member' }];
@@ -48,5 +48,29 @@ describe('the membership gate', () => {
     const role = (subject, r, extra) => ({ kind: 'role', author: 'a1', subject, hash: `r-${subject}`, payload: { role: r, ...extra } });
     expect(membershipGateFor({ chain, currentPolicy: tight, members })(role('m0', 'admin', { policyVersion: 1 }), { admins })).toBe(true);
     expect(membershipGateFor({ chain, currentPolicy: tight, members })(role('m0', 'admin', { policyVersion: 2 }), { admins })).toBe(false);
+  });
+  it('a stamp up to the highest version SEEN is judged (a refused version included); only beyond it does it wait', () => {
+    const refusedV3 = judgePolicyChain({ bodies: [
+      { kind: 'policy-update', author: 'a0', hash: 'p1', payload: { policy: loose, version: 1 } },
+      { kind: 'policy-update', author: 'a0', hash: 'p2', payload: { policy: tight, version: 2 } },
+      { kind: 'policy-update', author: 'a1', hash: 'p3', payload: { policy: loose, version: 3 } },   // a lone loosening: refused
+    ], members, proposals: [] });
+    expect(refusedV3.head).toBe(2);
+    expect(refusedV3.seen).toBe(3);
+    const gate = membershipGateFor({ chain: refusedV3, currentPolicy: tight, members });
+    expect(gate(evict('a1', 'm0', { policyVersion: 3 }), { admins })).toBe(false);   // judged by v2's tight rule, not waiting
+    expect(gate(evict('a1', 'm1', { policyVersion: 9 }), { admins })).toBe(false);   // unseen: waits
+  });
+  it('NO DEVICE CLOCK: an admin\'s override is judged at the resolve\'s own signed time', () => {
+    const vote = normalizeCirclePolicy({ governance: { removeMember: 'member-vote', changePolicy: 'any-admin' } });
+    const voteChain = judgePolicyChain({ bodies: [{ kind: 'policy-update', author: 'a0', hash: 'v1', payload: { policy: vote, version: 1 } }], members, proposals: [] });
+    const fold = (resolveAt) => foldGovernance([
+      proposeEvent({ proposalId: 'p7', action: 'removeMember', subject: 'm0', by: 'a1', deadline: 100, at: 0 }),
+      voteEvent({ proposalId: 'p7', voter: 'a1', choice: 'yes', at: 0 }),
+      resolveEvent({ proposalId: 'p7', status: 'approved', by: 'a1', at: resolveAt }),
+    ].map((e) => ({ ...e, kind: 'governance' })), { policy: vote, members, now: 1 }).proposals;
+    const gate = (proposals) => membershipGateFor({ chain: voteChain, currentPolicy: vote, members, proposals });
+    expect(gate(fold(150))(evict('a1', 'm0', { policyVersion: 1, proposalId: 'p7' }), { admins })).toBe(true);    // overridden after the deadline
+    expect(gate(fold(50))(evict('a1', 'm0', { policyVersion: 1, proposalId: 'p7' }), { admins })).toBe(false);    // an "override" before it
   });
 });

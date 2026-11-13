@@ -24,6 +24,10 @@
  * The founding write (version 1, by a founder of the circle) is not a change and is never judged; a version 1 by
  * anyone else is judged like any change.
  *
+ * NO DEVICE CLOCK: an open proposal is judged by its votes alone, a closed one at its resolve's own signed time (the
+ * override's deadline test), so devices either side of a deadline judge the same. The residual: an admin can sign an
+ * override with a false time; the resolve is signed and visible to every member, so the lie is attributable.
+ *
  * Pure: bodies, the policy chain, members and the folded proposals in; verdicts out.
  */
 import { changeNeedsVote, normalizeCirclePolicy } from './circlePolicy.js';
@@ -86,8 +90,10 @@ export function writeSkippedTheVote({ action, body, policy, members = [], propos
   if (proposals == null) { if (need) need.proposals = true; return true; }
   const p = (Array.isArray(proposals) ? proposals : []).find((x) => x?.proposalId === id);
   if (!p || p.action !== action) return true;
+  // NO DEVICE CLOCK (Opus): an open proposal is judged by its votes alone; a closed one at its resolve's own signed
+  // time (the override's deadline test), so every device judges the same statement the same way
   const d = resolveGovernance({
-    action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now,
+    action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0,
     seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by,
   });
   const approved = d.status === DECISION_STATUS.APPROVED
@@ -136,7 +142,10 @@ export function judgePolicyChain({ bodies = [], members = [], proposals = [], me
     for (const [v, pol] of after) if (v <= version) p = pol;
     return p;
   };
-  return { kept, skipped, policyAt, head: after[after.length - 1][0] };
+  // `seen`: the highest settings version on the lane, kept or refused: a stamp up to it is judged (by the last kept
+  // policy at or below it); only a stamp beyond it waits for a statement this device has not got yet
+  const seen = Math.max(0, ...bodies.map(versionOf));
+  return { kept, skipped, policyAt, head: after[after.length - 1][0], seen };
 }
 
 /**
@@ -159,7 +168,7 @@ export function judgeRulesWrites({ bodies = [], chain, currentPolicy = {}, membe
     const stamp = Number.parseInt(b?.payload?.policyVersion, 10);
     let policy;
     if (!Number.isFinite(stamp)) policy = currentPolicy;
-    else if (stamp > (chain?.head ?? 0)) { waiting.push(b); continue; }
+    else if (stamp > (chain?.seen ?? chain?.head ?? 0)) { waiting.push(b); continue; }
     else if (stamp < (floor.get(b.author) ?? 0)) { skipped.push(b); continue; }
     else policy = chain.policyAt(stamp);
     if (Number.isFinite(stamp)) floor.set(b.author, Math.max(floor.get(b.author) ?? 0, stamp));
@@ -245,7 +254,7 @@ export function membershipGateFor({ chain, currentPolicy = {}, members = [], pro
     const stamp = Number.parseInt(payload.policyVersion, 10);
     let policy;
     if (!Number.isFinite(stamp)) policy = currentPolicy;
-    else if (stamp > (chain?.head ?? 0)) return false;                       // a rule this device has not seen yet
+    else if (stamp > (chain?.seen ?? chain?.head ?? 0)) return false;        // a rule this device has not seen yet
     else if (stamp < (floor.get(s.author) ?? 0)) return false;               // signed under a rule the author had left
     else policy = chain.policyAt(stamp);
     if (Number.isFinite(stamp)) floor.set(s.author, Math.max(floor.get(s.author) ?? 0, stamp));
@@ -258,7 +267,7 @@ export function membershipGateFor({ chain, currentPolicy = {}, members = [], pro
       ? p.subject === s.subject
       : p.subject?.member === s.subject && p.subject?.role === payload.role;
     if (!about) return false;
-    const d = resolveGovernance({ action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now, seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by });
+    const d = resolveGovernance({ action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0, seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by });
     return d.status === DECISION_STATUS.APPROVED
       || (p.closed === true && p.status === DECISION_STATUS.APPROVED && d.overrideAvailable === true);
   };

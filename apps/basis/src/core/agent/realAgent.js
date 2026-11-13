@@ -6306,7 +6306,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // the point builds the statement on its own head and signs it. The point is the primary-device claim; with no claim
     // yet, this device signs as before (a lone device, or the moment before the claim is made).
     localMembershipEmitRef.current = localMembershipEmit;
-    membershipEmit = async (act = {}) => {
+    membershipEmit = async (actIn = {}) => {
+      // STAMPED BY CONSTRUCTION (Opus, reviewing the membership gate): every removal and role change carries the settings
+      // version this device has seen, whichever path wrote it (the governance enact, the box bot's /revoke, the circle
+      // screen's op, a slash or AI call); an unstamped one would be re-judged by a LATER rule and could undo itself
+      const act = (actIn?.kind === 'evict' || actIn?.kind === 'role') && typeof actIn.circleId === 'string'
+        && !Number.isFinite(Number.parseInt(actIn.payload?.policyVersion, 10))
+        ? Object.assign({}, actIn, { payload: Object.assign({}, actIn.payload ?? {}, { policyVersion: policyVersionSeen(actIn.circleId) }) })
+        : actIn;
       // the point that has not caught up in this circle queues its own act — a ceremony's too: its authority is the root
       // reveal it carries (bound to circle, subject and kind), which keeps; the statement is signed with the circle key on open
       // a circle FOUNDED here: its creation starts a chain nothing came before, so there is nothing to catch up on — it is
@@ -6544,6 +6551,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   // a device log the append lands on an ephemeral log — the live fan still carries the statement
   // (receivers verify at their OWN rail); only local restart durability degrades, like the other
   // riders.
+  // THE SETTINGS VERSION THIS DEVICE HAS SEEN for a circle: the highest signature-checked settings statement on its
+  // governance lane. What a removal, a role change or a rules change is stamped with when its caller passed none.
+  let seenRailMemo = null;
+  function policyVersionSeen(circleId) {
+    seenRailMemo ??= makeGovernanceRail({
+      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+      circleIdentityFor, myRef: circleSelfRef, callSkill: (...a) => callSkill(...a),
+    });
+    let max = 0;
+    try {
+      for (const st of seenRailMemo?.storedStatements?.(circleId) ?? []) {
+        if (st?.body?.kind === POLICY_UPDATE_KIND && seenRailMemo.checkSigned(circleId, st)) max = Math.max(max, Number.parseInt(st.body.payload?.version, 10) || 0);
+      }
+    } catch { /* nothing seen */ }
+    return max;
+  }
   const rulesUpdateEmit = makeRulesUpdateEmitter({
     rail: makeGovernanceRail({
       eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
@@ -6837,7 +6860,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     forgetCircleContent: (circleId) => selfAgent?.forgetCircleContent?.(circleId),
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
     currentPersonKey,
-    rulesUpdateEmit,
+    // stamped by construction too (a chat edit of the rules names no settings version): the version this device has seen
+    rulesUpdateEmit: (u = {}) => rulesUpdateEmit(Number.isFinite(Number.parseInt(u.policyVersion, 10)) ? u : Object.assign({}, u, { policyVersion: policyVersionSeen(u.groupId) })),
     // One block set for the whole device. Blocking is a decision about a PERSON, so it cannot live
     // per-app: the boundary refuses their envelopes, and this app's ingest filter reads the same set
     // so anything that arrived by another road is dropped too. Keys line up because in basis' binding

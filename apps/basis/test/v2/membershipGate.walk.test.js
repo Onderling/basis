@@ -73,5 +73,14 @@ describe('the membership gate, walked', () => {
     const r2 = await removeCircleMember({ agent: founder.agent, callSkill: (...a) => founder.agent.callSkill(...a), circleId: ANY, memberWebid: third.pubKey });
     expect(r2.ok, JSON.stringify(r2)).toBe(true);
     expect(await until(async () => ((await names(second, ANY, third.pubKey)) ? null : true), { timeout: 20_000, step: 300 }), 'bram\'s device removes cato where any admin decides').toBe(true);
-  }, 180_000);
+
+    // ── OPUS'S CASE: a removal made under any-admin through the PLAIN op (no stamp passed by the caller) stays valid
+    // after the circle tightens to a member vote: the membership emitter stamps every removal by construction ──
+    const tighter = normalizeCirclePolicy({ governance: { removeMember: 'member-vote', changePolicy: 'any-admin' } });
+    const st2 = await founder.agent.emitPolicyUpdate({ groupId: ANY, policy: tighter, version: 2 });
+    expect(st2?.body?.hash, 'the circle tightened (version 2)').toBeTruthy();
+    await new Promise((res) => { setTimeout(res, 4000); });
+    expect(await names(second, ANY, third.pubKey), 'cato stays removed after the circle moved to a member vote').toBe(false);
+    expect(await names(founder, ANY, third.pubKey), 'on the founder\'s device too').toBe(false);
+  }, 240_000);
 });

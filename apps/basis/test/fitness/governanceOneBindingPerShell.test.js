@@ -55,11 +55,20 @@ describe('an enacted settings change is written AND stated on the lane', () => {
     const order = [];
     const enact = policyEnactor({
       setPolicy: async (cid, patch) => { order.push(['set', cid, patch]); return { ok: true }; },
-      statePolicy: async (cid) => { order.push(['state', cid]); },
+      statePolicy: async (cid) => { order.push(['state', cid]); return { body: {} }; },   // the lane answers its statement
     });
     const r = await enact('c1', { chat: 'off' });
-    expect(r.ok).toBe(true);
+    expect(r).toEqual({ ok: true, stated: true });
     expect(order).toEqual([['set', 'c1', { chat: 'off' }], ['state', 'c1']]);
+  });
+
+  it('a statement that cannot be made is tried again, then SAID (stated: false), never a plain success', async () => {
+    let tries = 0;
+    const flaky = policyEnactor({ setPolicy: async () => {}, statePolicy: async () => { tries += 1; if (tries < 2) throw new Error('no signer yet'); return { body: {} }; } });
+    expect(await flaky('c1', {})).toEqual({ ok: true, stated: true });
+    expect(tries).toBe(2);
+    const never = policyEnactor({ setPolicy: async () => {}, statePolicy: async () => null });
+    expect(await never('c1', {})).toEqual({ ok: true, stated: false });
   });
 
   it('a write that failed is not stated', async () => {

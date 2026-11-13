@@ -146,8 +146,13 @@ export function policyEnactor({ setPolicy = null, statePolicy = null } = {}) {
   if (typeof setPolicy !== 'function') return null;
   return async (circleId, patch) => {
     try { await setPolicy(circleId, patch); } catch { return { ok: false, error: 'policy-write-failed' }; }
-    if (typeof statePolicy === 'function') { try { await statePolicy(circleId); } catch { /* the catch-up reconciles */ } }
-    return { ok: true };
+    if (typeof statePolicy !== 'function') return { ok: true, stated: false };
+    // A change that was never STATED has nothing for the catch-up to carry: the other members would never get it (Opus,
+    // reviewing). Try twice; a second failure is said (`stated: false`), never reported as a plain success.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try { if (await statePolicy(circleId)) return { ok: true, stated: true }; } catch { /* tried again below */ }
+    }
+    return { ok: true, stated: false };
   };
 }
 

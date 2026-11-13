@@ -15,6 +15,8 @@
  *   • bounded: least recently used out first.
  */
 import { AgentIdentity } from '../identity/AgentIdentity.js';
+import { verifyEd25519StrictBatch } from '../crypto/ed25519Strict.js';
+import { decode as b64decode } from '../crypto/b64.js';
 import { hashHex } from '../hashHex.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 
@@ -36,7 +38,7 @@ const ENTRY_OVERHEAD_BYTES = 64;
  * @param {object} [o]
  * @param {number} [o.maxBytes]                             the bound, in bytes of keys held
  * @param {(msg: string, sig: string, pubKey: string) => boolean} [o.verify]  the real check (default AgentIdentity.verify)
- * @returns {{ verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }}
+ * @returns {{ checkBatch: (verifier: string, items: Array<{msg: string, sig: string, pubKey: string}>) => Promise<number>, verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }}
  */
 export function createSignatureMemo({ maxBytes = SIGNATURE_MEMO_MAX_BYTES, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {}) {
   const ok = new Map();   // key → its cost in bytes
@@ -47,18 +49,47 @@ export function createSignatureMemo({ maxBytes = SIGNATURE_MEMO_MAX_BYTES, verif
     const had = ok.get(key);
     if (had !== undefined) { ok.delete(key); ok.set(key, had); return true; }
     const good = verify(msg, sig, pubKey) === true;
-    if (good) {
-      const cost = key.length * 2 + ENTRY_OVERHEAD_BYTES;
-      ok.set(key, cost); bytes += cost;
-      while (bytes > maxBytes && ok.size > 1) {
-        const [oldest, c] = ok.entries().next().value;
-        ok.delete(oldest); bytes -= c;
-      }
-    }
+    if (good) remember(key);
     return good;
   };
+  function remember(key) {
+    if (ok.has(key)) return;
+    const cost = key.length * 2 + ENTRY_OVERHEAD_BYTES;
+    ok.set(key, cost); bytes += cost;
+    while (bytes > maxBytes && ok.size > 1) {
+      const [oldest, c] = ok.entries().next().value;
+      ok.delete(oldest); bytes -= c;
+    }
+  }
   const named = new Map();
+  /**
+   * Check many at once through the strict rule's batch (an async equation never holds the thread) and remember every
+   * one that passed, under `verifier` (the same name the synchronous reads will ask with). The batch IS the real check:
+   * a false or an error is never remembered. Returns how many were remembered (already-known ones count).
+   * @param {string} verifier  'signature' or a named verifier
+   * @param {Array<{msg: string, sig: string, pubKey: string}>} items
+   */
+  async function checkBatch(verifier, items) {
+    const list = (Array.isArray(items) ? items : []).filter((it) => typeof it?.msg === 'string' && typeof it?.sig === 'string' && typeof it?.pubKey === 'string');
+    const keys = list.map((it) => `${verifier}\u0000${it.pubKey}\u0000${it.sig}\u0000${hashHex(it.msg)}`);
+    const todo = [];
+    let known = 0;
+    keys.forEach((k, i) => { if (ok.has(k)) known += 1; else todo.push(i); });
+    if (todo.length === 0) return known;
+    const enc = new TextEncoder();
+    const asBytes = [];
+    const at = [];
+    for (const i of todo) {
+      try { asBytes.push({ msg: enc.encode(list[i].msg), sig: b64decode(list[i].sig), key: b64decode(list[i].pubKey) }); at.push(i); } catch { /* not decodable: not remembered */ }
+    }
+    let answers = [];
+    try { answers = await verifyEd25519StrictBatch(asBytes); } catch { answers = []; }
+    let added = 0;
+    at.forEach((i, j) => { if (answers[j] === true) { remember(keys[i]); added += 1; } });
+    return known + added;
+  }
   return {
+    checkBatch,
     verify: (msg, sig, pubKey) => check('signature', msg, sig, pubKey),
     verifierFor(name) {
       if (typeof name !== 'string' || !name || name === 'signature') throw new Error('signatureMemo: a named verifier needs its own name');

@@ -18,6 +18,7 @@ import { Modal, View, Text, Pressable, ScrollView, Switch, StyleSheet } from 're
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { declinedKeysFrom } from '../../core/recipeConsentWiring.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
 /** Localised atom verb label, falling back to the atom when no key is translated (t() echoes on a miss). */
 function verbLabel(atom) {
@@ -30,6 +31,7 @@ function capLabel(cap) {
 }
 
 export default function RecipeConsentCard({ model, visible, onAgree, onDecline }) {
+  const sheetCap = useSheetCap(0.85);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const optItems = Array.isArray(model?.consent?.items) ? model.consent.items : [];
@@ -56,11 +58,11 @@ export default function RecipeConsentCard({ model, visible, onAgree, onDecline }
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onDecline}>
       <Pressable style={styles.backdrop} onPress={onDecline} testID="recipe-consent-backdrop">
-        <Pressable style={styles.sheet} onPress={() => {}} testID="recipe-consent-card">
+        <Pressable style={[styles.sheet, sheetCap]} onPress={() => {}} testID="recipe-consent-card">
           <Text style={styles.title}>{t('circle.recipeConsent.title')}</Text>
           <Text style={styles.intro}>{t('circle.recipeConsent.intro')}</Text>
 
-          <ScrollView contentContainerStyle={styles.body}>
+          <ScrollView style={SHEET_SCROLL} contentContainerStyle={styles.body}>
             {(mandatoryCaps.length || features.length || settings.length) ? (
               <>
                 <Text style={styles.label}>{t('circle.recipeConsent.enables')}</Text>
@@ -118,7 +120,7 @@ export default function RecipeConsentCard({ model, visible, onAgree, onDecline }
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  sheet:        { backgroundColor: theme.color.paper, borderRadius: theme.radius?.lg ?? 12, padding: 20, width: '100%', maxWidth: 460, maxHeight: '85%' },
+  sheet:        { backgroundColor: theme.color.paper, borderRadius: theme.radius?.lg ?? 12, padding: 20, width: '100%', maxWidth: 460 },
   title:        { fontSize: 18, fontWeight: '600', color: theme.color.ink, marginBottom: 6 },
   intro:        { fontSize: 14, color: theme.color.inkSoft, marginBottom: 12 },
   body:         { paddingBottom: 8 },

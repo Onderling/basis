@@ -122,6 +122,10 @@ export const ENTRY_KINDS = Object.freeze({
   // conversation line would be derived from; the statement itself must never paint. Same retention as the
   // human task kind: the store row is the durable head, the statements age out and catch-up re-serves heads.
   'items':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING(), true),
+  // The two kinds production appended unregistered (measured over the suites, 2026-11-13), declared as they behaved:
+  // a panel's 'this changed, repaint' ping and an app's alert bubble. Plumbing, not the record: not mirrored.
+  'item-changed':    K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, false),
+  notification:      K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, false),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, true),
   // A store row someone else wrote, held by this device for the first time: a REFERENCE (circle, item id, kind,
   // author), never its words. The store keeps no landing time, so this is what makes a late arrival news. Written by
@@ -163,7 +167,8 @@ export const ENTRY_KINDS = Object.freeze({
 export const VIEWER_FACING_SYSTEM_KINDS = Object.freeze(['membership', 'governance']);
 
 /** The conservative default for an unregistered kind — never wakes, never reads as conversation. */
-export const UNKNOWN_KIND = K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, true);   // unregistered: mirrored, as before   // accepts: none — refused from a peer by construction
+// unregistered: plumbing by the table's own default, so not the record either (a privacy filter must not fail open)
+export const UNKNOWN_KIND = K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, false);   // accepts: none — refused from a peer by construction
 
 /**
  * The binding columns of a kind, with the two that may name several levels normalised to arrays: a

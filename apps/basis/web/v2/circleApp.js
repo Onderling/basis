@@ -351,7 +351,7 @@ import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoste
 // "only you" vs "whole circle" — message scope (a data property; the badge renders it).
 import { scopeForReply } from '../../src/v2/messageScope.js';
 import {
-  circleRows, chatRows, mutedActorSet,
+  circleRows, chatRows, mutedActorSet, sendersToPlace,
 } from '../../src/v2/circleStream.js';
 // The agent-detail activity card's rows — the device log narrowed to one agent (batch-4 trail).
 import { agentActivityRows } from '../../src/v2/agentActivity.js';
@@ -7443,6 +7443,7 @@ function showCircle(id, circle, policy) {
   // G16 — the MEMBERS tab's trail-roster (canonical Member via normalizeCircleMembers).
   // null = not loaded yet → the tab shows its loading state; [] = loaded empty.
   let circleRoster = null;
+  const sendersAskedAbout = new Set();   // senders the roster could not place: read once more for each (sendersToPlace)
   let circleUnreachable = new Set();   // members this device has no address for past the re-tell window (their row says so)
   let circleMutedActors = new Set();   // the person-mute view filter's resolved actor refs (see loadRoster)
   let noticeboardPendingAttachment = null;   // { encoded, thumbnail, name } before posting
@@ -7917,6 +7918,12 @@ function showCircle(id, circle, policy) {
       }),
       deliveryByMessageId,
     );
+    // a line from someone this roster cannot place yet (a member this device admitted, a first line ahead of the
+    // membership): read the roster once more, which repaints, instead of leaving them "Onbekend lid" until a reopen
+    if (Array.isArray(circleRoster)) {
+      const unplaced = sendersToPlace(rows, sendersAskedAbout);
+      if (unplaced.length) { for (const a of unplaced) sendersAskedAbout.add(a); loadRoster().catch?.(() => {}); }
+    }
     renderCircleView(rootEl, {
       noRelay: !_relayKnownNow,
       circle, rows, t,

@@ -113,18 +113,17 @@ test('a person joins a circle as a persona: the other member sees only the perso
     const b1 = await bubbleWith(bram.page, LINE_1);
     await shot(bram.page, 'persona-web-02-bram-sees');
     expect(b1, 'the line arrived at Bram').toBeTruthy();
-    // KNOWN DEFECT (2026-11-13): a live line from a member who has just joined paints as an unknown member until the
-    // circle is repainted; reopening it shows the persona's name. The cell judges the name after a repaint; the live
-    // label is a defect of its own, not this story's.
-    let named = b1;
-    if (!named.includes(PERSONA)) {
-      await gotoCircles(bram.page);
-      await openCircleMatching(bram.page, new RegExp(stamp));
-      await toChat(bram.page);
-      named = (await bubbleWith(bram.page, LINE_1, 20_000)) ?? '';
-      const members = (await call(bram.page, 'pinboard', 'listGroupMembers', { groupId }))?.members ?? [];
-      console.log('[persona-web] bubble before/after repaint:', JSON.stringify({ before: b1, after: named, members }));
-    }
+    // the live bubble names the persona as it lands, without a repaint: a sender the roster could not place yet makes
+    // the shell read the roster once more (sendersToPlace)
+    const named = (await (async () => {
+      const until = Date.now() + 20_000;
+      while (Date.now() < until) {
+        const hit = (await readBubbles(bram.page)).find((x) => x.includes(LINE_1));
+        if (hit?.includes(PERSONA)) return hit;
+        await bram.page.waitForTimeout(1000);
+      }
+      return (await readBubbles(bram.page)).find((x) => x.includes(LINE_1)) ?? '';
+    })());
     expect(named, 'it arrived under the persona').toContain(PERSONA);
     expect(b1, 'never under the general name').not.toContain(GENERAL);
 

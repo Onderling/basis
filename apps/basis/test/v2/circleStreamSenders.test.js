@@ -86,3 +86,19 @@ describe('memberLabelFor — the same resolution, for surfaces that carry the au
     expect(memberLabelFor('webid:anna', {})).toBe(null);   // no roster yet: no byline, never a wire name
   });
 });
+
+describe('a sender the roster cannot place yet asks for a roster read, once', () => {
+  it('names the actors that came out as unknown members, never the app, the viewer or one already tried', async () => {
+    const { sendersToPlace } = await import('../../src/v2/circleStream.js');
+    const rows = stampSenderLabels([
+      { actor: 'new-member-addr', ts: 3 },
+      { actor: 'new-member-addr', ts: 4 },
+      { actor: 'known', ts: 2 },
+      { actor: BOT_ACTOR, ts: 1 },
+      { actor: 'me', ts: 0 },
+    ], { members: [{ webid: 'known', handle: 'Bram' }], viewerId: 'me' });
+    expect(sendersToPlace(rows)).toEqual(['new-member-addr']);
+    expect(sendersToPlace(rows, new Set(['new-member-addr'])), 'tried once: not again').toEqual([]);
+    expect(sendersToPlace(null)).toEqual([]);
+  });
+});

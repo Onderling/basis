@@ -1922,6 +1922,8 @@ export default function CircleLauncherScreen({
   // the one scanner above — one door with `/scan-qr`.
   const onMeAction = (id) => {
     if (id === 'share-contact') { setView('shareContact'); return; }
+    // the person's ongoing conversation with the assistant: the "+" sheet (web parity)
+    if (id === 'assistant') { setPlusEdit(null); setPlusOpen(true); return; }
     if (id === 'scan') {
       // ONE door: the op opens the scanner through its seam. If it refuses, say so — opening the scanner anyway would be
       // a second door to the same act.
@@ -2392,6 +2394,8 @@ export default function CircleLauncherScreen({
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
           onOpenPerCircle={() => setView('settingsCircles')}
           onOpenDoor={(d) => {
+            // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same; web parity)
+            if (d?.target?.kind === 'nav' && d.target.to === 'help') { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); return; }
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
             Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))

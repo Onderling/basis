@@ -42,6 +42,17 @@ describe('the "+" line: own acts, else the circle act — at once when the circl
     expect(r.command).toMatchObject({ appOrigin: 'lists', opId: 'addToList', args: { list: 'Boodschappen', text: 'melk' } });
   });
 
+  it("a pick on the card runs in THAT circle, on its own list (the reading names the list by name, not a circle-local id)", async () => {
+    const { plusCircleOp } = await import('../../src/v2/vandaagPlus.js');
+    const both = [circle('c1', 'Thuis', ['lists'], [SHOP]), circle('c2', 'Ouders', ['lists'], [SHOP])];
+    const r = plusLineOutcome('zet melk op de boodschappen', { circles: both });
+    const second = plusCircleOp(r.command, r.to[1].circleId);
+    expect(second).toEqual({ app: 'lists', opId: 'addToList', args: { list: 'Boodschappen', text: 'melk', circleId: 'c2' } });
+    // and the second circle read the line to the same command on its own (nothing of the first circle rides along)
+    const own = plusLineOutcome('zet melk op de boodschappen', { circles: [both[1]] });
+    expect(second).toEqual(plusCircleOp(own.command, 'c2'));
+  });
+
   it('the line names one of them ("<circle>: …"): that circle, at once', () => {
     const r = plusLineOutcome('ouders: zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', ['lists'], [SHOP]), circle('c2', 'Ouders', ['lists'], [SHOP])] });
     expect(r).toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c2', command: { args: { list: 'Boodschappen', text: 'melk', circleId: 'c2' } } });

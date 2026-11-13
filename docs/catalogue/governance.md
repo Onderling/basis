@@ -57,6 +57,10 @@ kernel's roster fold; every shell composes the same binding).
   line through their own hash chain (`membershipUpTo`, `authorChainCut.js`), so what they signed before it keeps its
   stamp. Never asked for a person's own acts (leaving, stepping down, the caretaker's acknowledgement). Admissions
   (`join`) are not gated: the policy has no admission class yet.
+  An author's stamps bind only that author: an admin who never stamps above an older settings version keeps being
+  judged by it after ANOTHER admin tightened (no device can tell them from an honest admin who was offline); it is
+  signed, attributable and shown. Two admins' settings at one version merge "who decides" strictest-first per act
+  (member vote, then the admins together, then any one admin): `denyWinsMerge`'s governance order.
 - **The roster and the caretaker:** `packages/core/src/security/rosterFold.js` (`foldRoster`, `caretakerOrder`),
   folded by pinboard's `deriveRoster`.
 - **Screens:** web `apps/basis/web/v2/circleGovernancePanel.js`; phone `CircleGovernanceScreen.js`; the doors' callers

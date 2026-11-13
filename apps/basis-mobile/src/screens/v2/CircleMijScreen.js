@@ -367,6 +367,24 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
                 )}
               </View>
             ))}
+            {/* who may write to this persona first (firstContact.js, web twin: circleMij's card): each control's choices,
+                the one in force marked; a tap sets it on THIS persona through the waist, then the model is read again */}
+            {(p.firstContact || []).map((row) => (
+              <View key={row.key} style={styles.firstContact}>
+                <Text style={styles.entryKey}>{t(row.labelKey)}</Text>
+                {row.choices.map((choice) => {
+                  const on = choice.value === row.value;
+                  return (
+                    <Pressable key={String(choice.value)} accessibilityRole="button" accessibilityState={{ selected: on }} disabled={on}
+                      style={[styles.choice, on && styles.choiceOn]}
+                      testID={`mij-first-contact-${p.id}-${row.key}-${String(choice.value)}`}
+                      onPress={async () => { try { await callSkill('agents', 'setProfileProperty', { id: p.id, key: row.key, value: choice.value }); } catch { /* the model shows what holds */ } await load(); }}>
+                      <Text style={[styles.choiceText, on && styles.choiceTextOn]}>{t(choice.labelKey)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
         ))}
 
@@ -577,6 +595,11 @@ const makeStyles = (theme) => {
   cardName: { fontSize: 14, fontWeight: '800', color: c.ink },
   cardTag: { fontFamily: theme.font.mono, fontSize: 9.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: c.card, backgroundColor: c.accentInk, paddingVertical: 2, paddingHorizontal: 6, overflow: 'hidden' },
   entry: { flexDirection: 'row', alignItems: 'baseline', gap: theme.space.sm, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: c.line },
+  firstContact: { gap: 4, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.line },
+  choice: { paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: c.line, borderRadius: 6 },
+  choiceOn: { borderColor: c.ink },
+  choiceText: { fontSize: 13, color: c.ink },
+  choiceTextOn: { fontWeight: '600' },
   entryKey: { fontFamily: theme.font.mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, color: c.inkSoft, flexBasis: '38%' },
   entryOwn: { flexDirection: 'row', alignItems: 'baseline', gap: 6, flexShrink: 1 },
   ownMark: { fontFamily: theme.font.mono, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, color: c.accentInk },

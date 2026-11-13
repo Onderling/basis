@@ -106,7 +106,15 @@ describe("a stranger's first five minutes on the phone: the help circle, a first
     const said = await peer.next('circle-said', () => true, 60_000);
     if (!said.ok) throw new Error(`Bram's line did not go out: ${said.error}`);
     await soon(by.text(FROM_BRAM), 90_000);
+    // the phone admitted Bram itself (its own invite), so its roster read at open did not hold him: his first line is
+    // still named, not "Unknown member" (the shell reads the roster once more for a sender it cannot place)
+    let named = false;
+    for (let i = 0; i < 10 && !named; i += 1) {
+      named = !(await isVisible(by.text('Unknown member')));
+      if (!named) await new Promise((r) => setTimeout(r, 1000));
+    }
     await device.takeScreenshot('ffm-06-bram-heard');
+    if (!named) throw new Error("Bram's first line on the phone is labelled 'Unknown member'");
     await say('circle-detail-composer-input', FROM_PHONE);
     // the phone's keyboard capitalises a line's first letter, as it does for a person
     await peer.next('circle-heard', (m) => String(m.text).toLowerCase() === FROM_PHONE.toLowerCase(), 90_000);

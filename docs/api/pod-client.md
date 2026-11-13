@@ -1669,7 +1669,8 @@ async readSealedMessagesSince(backend, open, { circleId, sinceTs = 0, max = 200 
 ```
 
 Range-query a circle's rows for every message with `ts >= sinceTs`, opened + returned oldest→newest and
-capped to `max`. This is the read half of the KEY CONVENTION: a single `list('<circleId>/')` prefix walk
+capped to `max`: the OLDEST `max` (one page forward from the watermark), `truncated` when more follow, so a reader
+pages on from the last row's ts. Keeping the freshest instead lost every older row after a long absence. This is the read half of the KEY CONVENTION: a single `list('<circleId>/')` prefix walk
 + a numeric ts filter, no store query language. A row that fails to open (wrong-key / corrupt) is SKIPPED,
 not thrown — one bad row must not sink a whole catch-up batch.
 

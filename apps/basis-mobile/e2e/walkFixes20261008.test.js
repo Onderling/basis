@@ -77,11 +77,16 @@ describe('the walk of 2026-10-08, pinned', () => {
     }
     if (!found) throw new Error(`${PERSON.name}'s card was added but never appeared in Contacts (polled ~60 s)`);
     await element(by.text(PERSON.name)).tap();
-    await waitFor(element(by.id('contact-thread-actions'))).toBeVisible().withTimeout(30_000);
-    // Visible = at least 75% of each control on the screen — what "reachable" means for a thumb.
-    for (const id of ['contact-thread-hide', 'contact-thread-lens', 'contact-thread-delete']) {
+    await waitFor(element(by.id('contact-thread-more'))).toBeVisible().withTimeout(30_000);
+    // Visible = at least 75% of each control on the screen — what "reachable" means for a thumb: who you are here (the
+    // lens) and the ⋯, which holds Hide and Delete in the platform's own sheet
+    for (const id of ['contact-thread-self', 'contact-thread-more']) {
       await expect(element(by.id(id))).toBeVisible();
     }
+    await element(by.id('contact-thread-more')).tap();
+    await device.takeScreenshot('walk-fixes-contact-more');
+    await expect(element(by.text('Delete'))).toBeVisible();
+    await device.pressBack();
   });
 
   it('a cold start never says "No circles yet." to an account that has a circle', async () => {

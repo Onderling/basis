@@ -170,7 +170,7 @@ describe('a decided change carries the proposal that decided it', async () => {
 
   it('a settings change both admins approved is stated with its proposal id', async () => {
     const stated = [];
-    const { gov, events } = host(policyEnactor({ setPolicy: async () => {}, statePolicy: async (cid, meta) => { stated.push(meta); } }));
+    const { gov, events } = host(policyEnactor({ setPolicy: async () => {}, statePolicy: async (cid, meta) => { stated.push(meta); return { body: {} }; } }));
     const { proposalId } = await gov.propose({ circleId: CIRCLE, action: 'changePolicy', subject: { chat: 'off' }, actor: { ref: 'a0' } });
     events.push(voteEvent({ proposalId, voter: 'a1', choice: 'yes', at: 0 }));
     await gov.vote({ circleId: CIRCLE, proposalId, voter: 'a0', choice: 'yes' });

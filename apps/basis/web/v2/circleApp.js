@@ -97,7 +97,7 @@ import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } fr
 // re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
 // makes a removal a security change rather than a list edit. web ≡ mobile by construction.
 import { leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
-import { removeMemberDoor, changeRulesDoor, changeRoleDoor, readCircleRules, rulesForSave } from '../../src/v2/governanceDoors.js';
+import { removeMemberDoor, changeRulesDoor, changeRoleDoor, changeSettingsDoor, readCircleRules, rulesForSave } from '../../src/v2/governanceDoors.js';
 // "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
@@ -315,6 +315,7 @@ import { loadRecipeForReview, applyReviewedRecipe } from '../../src/v2/recipeCon
 // S6.C (per-circle) — gate an app's surfaces by the circle's policy.features.
 import { isAppSurfaceEnabled } from '../../src/v2/appFeature.js';
 import { renderContactThread } from './contactThread.js';
+import { contactSendRoute } from '../../src/v2/contactsSource.js';
 import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -3428,6 +3429,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   // a draft to start the composer with (the feedback door's prefill): it stays in the composer until the person sends
   if (typeof draft === 'string' && draft) thread.draft = draft;
   thread.name = name; thread.peerAddr = peerAddr;
+  // where a turn goes: a co-member shown from the peer graph is written to at their circle address (the send gate)
+  thread.sendTo = contactSendRoute(row, peerAddr);
   // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
   // every turn, and said in the header so the participant knows before typing.
   const floor = presendFloorFor(row);
@@ -3512,7 +3515,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   const onRetryDelivery = (msgId) => {
     const m = thread.messages.find((x) => x.messageId === msgId && x.origin === 'user' && !x.file);
     if (!m) return;   // a file retries through its own op; a turn that is not mine has nothing to retry
-    const { sent } = circleContactChannel.sendTurn({ peerAddr: thread.peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
+    if (thread.sendTo?.blocked) return;
+    const { sent } = circleContactChannel.sendTurn({ peerAddr: thread.sendTo?.to ?? thread.peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
     trackContactTurn({ messageId: msgId, sent, deliveryMap: deliveryStateMap }).catch(() => {});
   };
   const unsubscribeDelivery = deliveryStateMap.subscribe((msgId, state) => {
@@ -3523,6 +3527,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   });
   const rerender = () => renderContactThread(rootEl, {
     deliveryStateFor, deliveryReasonFor, onRetryDelivery,
+    cannotWrite: !!thread.sendTo?.blocked,
     attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
@@ -3585,7 +3590,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
       // The bubble carries the send's state from here on (pending → the verdict; a receipt moves it further):
       // no "versturen…" line under the list and no error line — the chip says it, and a tap on it retries.
       let turn;
-      try { turn = circleContactChannel.sendTurn({ peerAddr: thread.peerAddr, threadId: contactId, text, floor }); }
+      if (thread.sendTo?.blocked) { rerender(); return; }   // the line says why; nothing leaves
+      try { turn = circleContactChannel.sendTurn({ peerAddr: thread.sendTo?.to ?? thread.peerAddr, threadId: contactId, text, floor }); }
       catch { error = true; rerender(); return; }   // the turn never got an id: nothing is on screen to carry a state
       thread.messages.push({ origin: 'user', text: turn.text, messageId: turn.messageId });
       rerender();
@@ -4571,19 +4577,22 @@ async function materializeVandaag() {
 /** Mij's own governance binding for its reads (made once, on first need). */
 let mijGov = null;
 
-/** The circle governance as the shell binds it (settings, Mij's "wat wacht op jou"): one binding, one set of options. */
+/**
+ * THE circle governance binding of this shell: every screen that decides (settings, members, rules, Decisions, reports,
+ * Mij's "wat wacht op jou") binds through here, so they all decide with one set of options (governanceOneBindingPerShell).
+ */
 function shellGovernance({ myWebid = '' } = {}) {
   return bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
     spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
+    // an enacted settings change: written here, then stated on the lane so every member's device applies it
+    setPolicy: (cid, patch) => policyStore.update(cid, patch),
+    statePolicy: (cid) => circlePolicyLane.state(cid),
   });
 }
 
@@ -8782,14 +8791,7 @@ function removeReportedItem(circleId, targetType, targetRef) {
 async function fileCircleReport(circleId, targetType, targetRef, targetLabel = null, reason = '') {
   let myWebid = '';
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    circleIdentityFor: circleIdentityForShell,
-    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-  });
+  const gov = shellGovernance({ myWebid });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
   catch { return { ok: false }; }
 }
@@ -8800,19 +8802,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
 async function showGovernance(id) {
   let myWebid = '';
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    removeReported: removeReportedItem,
-    circleIdentityFor: circleIdentityForShell,
-    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
-  });
+  const gov = shellGovernance({ myWebid });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
   back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
@@ -8850,11 +8840,10 @@ async function showGovernance(id) {
         try { await gov.override({ circleId: id, proposalId, actor: { ref: myWebid } }); } catch { /* */ }
         await rerender();
       },
+      // who decides an action is a SETTING: it goes through the circle's settings rule (a proposal where the admins or
+      // the circle decide settings together) and is stated on the lane, like every other setting
       onSetClass: async (action, cls) => {
-        try {
-          const cur = (await policyStore.get(id)) ?? {};
-          await policyStore.update(id, mergeCirclePolicy(cur, { governance: { [action]: cls } }));
-        } catch { /* */ }
+        try { await changeSettingsDoor({ governance: gov, circleId: id, patch: { governance: { [action]: cls } }, actorRef: mySelfIn(id) ?? myWebid }); } catch { /* */ }
         await rerender();
       },
       // "review & remove" an equivocator: open a removeMember decision (its class applies).

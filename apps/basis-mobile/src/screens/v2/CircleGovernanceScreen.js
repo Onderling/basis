@@ -9,7 +9,7 @@
  * "who decides" decision-class settings per governed action.
  *
  * Thin shell: all logic (fold, resolver, enact-gate, roster assembly) lives in shared src;
- * this file resolves my webid, binds the host, renders the model, and re-reads after each
+ * this file resolves my webid, takes the launcher's one binding, renders the model, and re-reads after each
  * action (persisted state, not the tap). RN screens are excluded from vitest — see
  * REMAINING-WORK.md for the on-device verification checklist.
  */
@@ -18,15 +18,18 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
-import { bindCircleGovernance, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';
+import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
 import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
-import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
+import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
 
-export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy, updatePolicy, circleId, onBack, circleIdentityFor = null, spineGate = null, selfIn = null, agent = null }) {
+// `governance`: the launcher's ONE binding (governanceOneBindingPerShell) — this screen decides with the same options as
+// every other screen on the phone (its own binding lacked the settings enactor, so approving a settings proposal here
+// closed it rejected).
+export default function CircleGovernanceScreen({ callSkill, governance, circleId, onBack, selfIn = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState({ view: { open: [], closed: [] }, isAdmin: false, policy: null });
@@ -35,14 +38,8 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
   const load = useCallback(async () => {
     let myWebid = '';
     try { const r = await callSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-    const broadcast = makeGovernanceBroadcast(callSkill);   // the one shared fan (web parity by construction)
-    const gov = bindCircleGovernance({
-      // the self this device is in each circle (a persona's circle is the persona's) — the launcher hands `selfIn`
-      eventLog, callSkill, getPolicy, myRef: (cid) => (typeof selfIn === 'function' ? selfIn(cid) : null) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
-      circleIdentityFor,
-      spineGate,
-      agent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
-    });
+    const gov = governance ?? null;
+    if (!gov) return;
     ctxRef.current = { gov, myWebid };
     let ctx = { policy: {}, members: [] };
     try { ctx = await gov.getContext(circleId); } catch { /* */ }
@@ -60,7 +57,7 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     let reports = [];
     if (isAdmin) { try { reports = (await gov.reports.list(circleId)).open; } catch { /* */ } }
     setModel({ view, isAdmin, policy: ctx.policy, reports });
-  }, [callSkill, eventLog, getPolicy, circleId]);
+  }, [callSkill, governance, circleId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -76,13 +73,13 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     await load();
   }, [circleId, load]);
 
+  // who decides an action is a SETTING: through the circle's settings rule (a proposal where the admins or the circle
+  // decide settings together), and stated on the lane like every other setting
   const onSetClass = useCallback(async (action, cls) => {
-    try {
-      const cur = (await getPolicy(circleId)) ?? {};
-      await updatePolicy?.(circleId, mergeCirclePolicy(cur, { governance: { [action]: cls } }));
-    } catch { /* */ }
+    const { gov, myWebid } = ctxRef.current;
+    try { await changeSettingsDoor({ governance: gov, circleId, patch: { governance: { [action]: cls } }, actorRef: (typeof selfIn === 'function' ? selfIn(circleId) : null) ?? (myWebid || null) }); } catch { /* */ }
     await load();
-  }, [getPolicy, updatePolicy, circleId, load]);
+  }, [circleId, selfIn, load]);
 
   const onReviewDisputed = useCallback(async (ref) => {
     const { gov, myWebid } = ctxRef.current;

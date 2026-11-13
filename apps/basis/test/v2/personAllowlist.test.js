@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PERSON_ALLOWLIST, personAllowedBy, contactOriginOf, createInviteExchange, exchangeKindOf,
   INVITE_EXCHANGE_LIFETIME_MS, INVITE_EXCHANGE_MAX, sendDecisionFields,
+  createHeldSends, HELD_SEND_MAX, HELD_SEND_LIFETIME_MS, createCircleAddressIndex,
 } from '../../src/v2/peerSendGate.js';
 
 describe('the person-key allowlist: data, one reason per entry, most specific first', () => {
@@ -187,5 +188,93 @@ describe('createInviteExchange: a send uses only the registration of ITS side (t
     expect(ix.take('bot', { kind: null })).toBe(null);
     expect(ix.take('bot')).toBe(null);
     expect(ix.take('bot', { kind: 'pairing' })).toBe('pairing');
+  });
+});
+
+describe('createHeldSends: a person-key send with no reason waits, bounded, never standing', () => {
+  it('the bound and the lifetime are params, not literals', () => {
+    expect(HELD_SEND_MAX).toBeGreaterThan(0);
+    expect(HELD_SEND_LIFETIME_MS).toBeGreaterThan(0);
+  });
+
+  it('takes what is held, and an entry put back keeps its first time', () => {
+    let t = 1000;
+    const h = createHeldSends({ now: () => t, lifetimeMs: 100, max: 4 });
+    h.hold({ to: 'a', payload: { msgId: 'm1' }, opts: {} });
+    expect(h.size).toBe(1);
+    const [e] = h.take();
+    expect(h.size).toBe(0);
+    t = 1050; h.putBack(e);
+    t = 1101;
+    expect(h.take(), 'the put-back entry kept its first time and ended at its lifetime').toEqual([]);
+  });
+
+  it('an entry past its lifetime is dropped and reported', () => {
+    let t = 0; const ended = [];
+    const h = createHeldSends({ now: () => t, lifetimeMs: 10, max: 4, onEnded: (e, why) => ended.push([e.payload.msgId, why]) });
+    h.hold({ to: 'a', payload: { msgId: 'm1' } });
+    t = 11;
+    expect(h.take()).toEqual([]);
+    expect(ended).toEqual([['m1', 'expired']]);
+  });
+
+  it('is bounded: past the bound the oldest goes, reported', () => {
+    const ended = [];
+    const h = createHeldSends({ now: () => 0, lifetimeMs: 10, max: 2, onEnded: (e, why) => ended.push([e.payload.msgId, why]) });
+    for (const id of ['m1', 'm2', 'm3']) h.hold({ to: 'a', payload: { msgId: id } });
+    expect(h.size).toBe(2);
+    expect(ended).toEqual([['m1', 'evicted']]);
+  });
+});
+
+describe('a co-member\'s PERSON address is no reason to speak as the person', () => {
+  it('there is no circle-member entry: a co-member is reached at their circle address, as my circle self', () => {
+    expect(PERSON_ALLOWLIST.map((e) => e.id)).not.toContain('circle-member');
+    expect(personAllowedBy({ circleMember: 'buren' })).toEqual({ allowedBy: 'none' });
+  });
+});
+
+describe('createInviteExchange: the one answer to a signed ask this device just checked (the link offer, the screen offer)', () => {
+  it('a link answer and a screen refusal are each registered once, by the checking code, and consumed by the send', () => {
+    const x = createInviteExchange();
+    expect(exchangeKindOf({ subtype: 'identity-link' })).toBe('link-answer');
+    expect(exchangeKindOf({ subtype: 'screen-offer-refused' })).toBe('screen-refusal');
+    expect(x.take('APP', { kind: 'link-answer' }), 'nothing registered: nothing allowed').toBe(null);
+    x.expectLinkAnswer('APP');
+    x.expectScreenRefusal('SCREEN');
+    expect(x.take('SCREEN', { kind: 'link-answer' }), 'a side never uses another side\'s registration').toBe(null);
+    expect(x.take('APP', { kind: 'link-answer' })).toBe('link-answer');
+    expect(x.take('APP', { kind: 'link-answer' }), 'consumed: one answer').toBe(null);
+    expect(x.take('SCREEN', { kind: 'screen-refusal' })).toBe('screen-refusal');
+    expect(x.take('SCREEN', { kind: 'screen-refusal' })).toBe(null);
+  });
+
+  it('bounded in time like the rest of the exchange', () => {
+    let t = 0;
+    const x = createInviteExchange({ now: () => t, lifetimeMs: 100 });
+    x.expectLinkAnswer('APP');
+    t = 101;
+    expect(x.take('APP', { kind: 'link-answer' })).toBe(null);
+  });
+
+  it('the allowlist names both sides under invite-exchange', () => {
+    expect(personAllowedBy({ inviteExchange: 'link-answer' })).toEqual({ allowedBy: 'invite-exchange', side: 'link-answer' });
+    expect(personAllowedBy({ inviteExchange: 'screen-refusal' })).toEqual({ allowedBy: 'invite-exchange', side: 'screen-refusal' });
+  });
+});
+
+describe('createHeldSends keeps how a held send ends', () => {
+  it('an entry\'s settle survives a take and a put-back, and is what the end reports to', () => {
+    let t = 0; const ended = [];
+    const h = createHeldSends({ now: () => t, lifetimeMs: 10, max: 4, onEnded: (e, why) => { ended.push(why); e.settle?.({ delivered: false, ended: why }); } });
+    let told = null;
+    h.hold({ to: 'a', payload: { msgId: 'm1' }, settle: (r) => { told = r; } });
+    const [e] = h.take();
+    expect(typeof e.settle).toBe('function');
+    h.putBack(e);
+    t = 11;
+    expect(h.take()).toEqual([]);
+    expect(ended).toEqual(['expired']);
+    expect(told).toEqual({ delivered: false, ended: 'expired' });
   });
 });

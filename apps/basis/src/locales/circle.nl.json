@@ -689,6 +689,10 @@
         "text": "Wacht tot er een verbinding is. Het gaat dan vanzelf.",
         "doc": "A message to a contact is held on this device because it has no connection to send on (no connection point yet). Not a failure: it leaves by itself once there is one, and the bubble moves on. Pairs with the pending state."
       },
+      "unknown_address": {
+        "text": "Niet verstuurd: dit apparaat weet niet van wie dat adres is. Voeg eerst hun kaartje toe en stuur het dan opnieuw.",
+        "doc": "A contact turn the send gate held (no reason to send on the person key) and gave up at its time limit: not sent, and why."
+      },
       "peer_unreachable": {
         "text": "Niet bereikt, misschien offline (tik om opnieuw te proberen)",
         "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."
@@ -5978,6 +5982,10 @@
       "text": "versturen…",
       "doc": "P5 — transient state while a turn is in flight to the bot."
     },
+    "write_needs_card": {
+      "text": "Je kunt {{name}} hier nog niet schrijven: jullie delen geen kring die hun adres toont. Voeg eerst hun kaartje toe.",
+      "doc": "A contact shown from the peer graph (a co-member, no card) whom no shared circle shows an address for: writing would leave on the person key, so the thread says why and sends nothing (the send gate, 2026-11-12)."
+    },
     "send_failed": {
       "text": "Kon {{name}} niet bereiken — mogelijk offline.",
       "doc": "P5 — shown when a turn fails to send over the peer transport."
@@ -7102,6 +7110,16 @@
       "text": "Beheerdersrol intrekken",
       "doc": "The same control the other way: an admin becomes a member again. Neutral wording on purpose — it sits on your OWN row too, which is how someone steps back from running a circle."
     },
+    "handover": {
+      "let_app_choose": {
+        "text": "Stap terug; laat de app kiezen",
+        "doc": "The last admin stepping down: the button that steps down now; the circle passes to a member chosen from the log (Frits 2026-11-10)."
+      },
+      "appoint_first": {
+        "text": "Eerst iemand aanwijzen",
+        "doc": "The last admin stepping down: the button that closes the question so they can make someone admin on their row first."
+      }
+    },
     "role_confirm": {
       "promote": {
         "text": "{{name}} kan dan mensen toelaten, de regels wijzigen en leden verwijderen.",
@@ -7112,7 +7130,7 @@
         "doc": "Confirm body for an ordinary demotion — another admin remains, so nothing is handed over."
       },
       "handover": {
-        "text": "{{name}} is de enige beheerder. Hierna beheert niemand deze kring meer, dus gaat het beheer over op een van de andere leden — wie dat wordt volgt uit het logboek; niemand kiest dat.",
+        "text": "{{name}} is de enige beheerder. Stap nu terug en de kring gaat naar een van de andere leden, gekozen uit het logboek (niemand kiest); of wijs eerst iemand aan: maak die beheerder op hun regel, en stap dan terug.",
         "doc": "Confirm body when the LAST admin steps back. The fold answers this by handing over (appointing a caretaker from whoever is left), not by refusing it, so the person must be told that the circle changes hands. Deliberately does NOT name the successor: that is derived from the log and a shell guessing at it would give one circle two stories."
       },
       "no_one_else": {

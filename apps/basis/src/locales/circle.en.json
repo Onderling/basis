@@ -689,6 +689,10 @@
         "text": "Waiting for a connection. It goes by itself once there is one.",
         "doc": "A message to a contact is held on this device because it has no connection to send on (no connection point yet). Not a failure: it leaves by itself once there is one, and the bubble moves on. Pairs with the pending state."
       },
+      "unknown_address": {
+        "text": "Not sent: this device does not know who that address is. Add their card first, then send again.",
+        "doc": "A contact turn the send gate held (no reason to send on the person key) and gave up at its time limit: not sent, and why."
+      },
       "peer_unreachable": {
         "text": "Not reached, maybe offline (tap to retry)",
         "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."
@@ -5973,6 +5977,10 @@
       "text": "sending…",
       "doc": "P5 — transient state while a turn is in flight to the bot."
     },
+    "write_needs_card": {
+      "text": "You can’t write to {{name}} here yet: you share no circle that shows their address. Add their card first.",
+      "doc": "A contact shown from the peer graph (a co-member, no card) whom no shared circle shows an address for: writing would leave on the person key, so the thread says why and sends nothing (the send gate, 2026-11-12)."
+    },
     "send_failed": {
       "text": "Couldn’t reach {{name}} — they may be offline.",
       "doc": "P5 — shown when a turn fails to send over the peer transport."
@@ -7096,6 +7104,16 @@
       "text": "Remove admin role",
       "doc": "The same control the other way: an admin becomes a member again. Neutral wording on purpose — it sits on your OWN row too, which is how someone steps back from running a circle."
     },
+    "handover": {
+      "let_app_choose": {
+        "text": "Step down; let the app choose",
+        "doc": "The last admin stepping down: the button that steps down now; the circle passes to a member chosen from the log (Frits 2026-11-10)."
+      },
+      "appoint_first": {
+        "text": "Appoint someone first",
+        "doc": "The last admin stepping down: the button that closes the question so they can make someone admin on their row first."
+      }
+    },
     "role_confirm": {
       "promote": {
         "text": "{{name}} will be able to admit people, change the rules and remove members.",
@@ -7106,7 +7124,7 @@
         "doc": "Confirm body for an ordinary demotion — another admin remains, so nothing is handed over."
       },
       "handover": {
-        "text": "{{name}} is the only admin. After this nobody is running this circle, so it passes to one of the other members — which one follows from the log; nobody picks.",
+        "text": "{{name}} is the only admin. Step down now and the circle passes to one of the other members, chosen from the log (nobody picks); or appoint someone first: make them admin on their row, then step down.",
         "doc": "Confirm body when the LAST admin steps back. The fold answers this by handing over (appointing a caretaker from whoever is left), not by refusing it, so the person must be told that the circle changes hands. Deliberately does NOT name the successor: that is derived from the log and a shell guessing at it would give one circle two stories."
       },
       "no_one_else": {

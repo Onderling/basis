@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { pairFounderOf, pairCircleIdFor, isPairCircleId } from '../src/v2/pairCircleId.js';
 
 const circlesOf = async (node) => ((await node.agent.callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])
@@ -33,6 +33,9 @@ describe('a stranger who founds the pair circle cannot put it in my list', () =>
 
   it('the founder\'s first turn carries the invite; on my side it is held and no pair circle appears', async () => {
     const pairId = pairCircleIdFor(stranger.pubKey, me.pubKey);
+    // the stranger holds my card (a link I shared, a card passed on): whoever writes holds the card of whom they write to;
+    // I hold nothing of theirs, so to MY door they are a stranger
+    await addCardOf(stranger, me);
     await stranger.contactThreadChannel.sendTurn({ peerAddr: me.pubKey, text: 'hoi, ik ken je niet', messageId: 's-1' });
     // the stranger made the pair circle on their side (the invite rode the turn)
     expect(await until(async () => ((await circlesOf(stranger)).includes(pairId) ? true : null), { timeout: 20_000, step: 200 }),

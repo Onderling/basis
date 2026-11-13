@@ -40,7 +40,8 @@ describe('people in my circles may write to me', () => {
   afterAll(async () => { await teardown(me, ann, bob); await relay?.close?.(); });
 
   it('on (the default): a circle member writing privately gets a thread, and no contact row', async () => {
-    await ann.contactThreadChannel.sendTurn({ peerAddr: me.pubKey, text: 'hoi buur', messageId: 'ann-1' });
+    // as Contacten writes to a co-member it holds no card for: at their circle address, as my circle self (the send gate)
+    await ann.contactThreadChannel.sendTurn({ peerAddr: me.agent.circleAddressFor(CIRCLE), threadId: me.pubKey, text: 'hoi buur', messageId: 'ann-1' });
     expect(await until(async () => ((await threadOf(me, ann.pubKey)).some((t) => t.text === 'hoi buur') ? true : null), { timeout: 20_000, step: 200 }),
       `not on the thread; requests ${JSON.stringify((await requestsOf(me)).map((q) => q.from))}`).toBe(true);
     await new Promise((r) => { setTimeout(r, 1500); });
@@ -50,7 +51,7 @@ describe('people in my circles may write to me', () => {
   }, 40_000);
 
   it('the person answers: then the member is a contact', async () => {
-    await me.contactThreadChannel.sendTurn({ peerAddr: ann.pubKey, text: 'hoi Ann', messageId: 'me-1' });
+    await me.contactThreadChannel.sendTurn({ peerAddr: ann.agent.circleAddressFor(CIRCLE), threadId: ann.pubKey, text: 'hoi Ann', messageId: 'me-1' });
     expect(await until(async () => ((await bookOf(me)).includes(ann.pubKey) ? true : null), { timeout: 20_000, step: 200 }),
       'answering did not make the member a contact').toBe(true);
     await ann.contactThreadChannel.sendTurn({ peerAddr: me.pubKey, text: 'fijn', messageId: 'ann-2' });
@@ -65,7 +66,7 @@ describe('people in my circles may write to me', () => {
 
   it('off: a circle member\'s first private message is a request', async () => {
     expect(await me.agent.setCircleMembersMayWrite(false)).toBe(false);
-    await bob.contactThreadChannel.sendTurn({ peerAddr: me.pubKey, text: 'hallo', messageId: 'bob-1' });
+    await bob.contactThreadChannel.sendTurn({ peerAddr: me.agent.circleAddressFor(CIRCLE), threadId: me.pubKey, text: 'hallo', messageId: 'bob-1' });
     expect(await until(async () => ((await requestsOf(me)).some((q) => q.from === bob.pubKey) ? true : null), { timeout: 20_000, step: 200 })).toBe(true);
     expect((await threadOf(me, bob.pubKey)).map((t) => t.text)).toEqual([]);
   }, 40_000);

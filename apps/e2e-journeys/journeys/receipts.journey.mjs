@@ -95,7 +95,9 @@ export async function run({ relayUrl }) {
     const theyStore = async (who, msgId) => {
       const landed = await untilTrue(() => who.node.chatRail.storedStatements(CIRCLE)
         .some((s) => s?.body?.subject === msgId));
-      if (landed) await who.delivery.onStored({ msgId, fromPeerAddr: anne.pubKey, source: 'receiver' });
+      // as the shells call it (circleLanes' chatLanded): the address the message came FROM in the circle, and the circle,
+      // so the receipt goes back as circle traffic (never to the sender's person key: the send gate holds that)
+      if (landed) await who.delivery.onStored({ msgId, circleId: CIRCLE, fromPeerAddr: anne.agent.circleAddressFor(CIRCLE) ?? anne.pubKey, source: 'receiver' });
       return landed;
     };
     const withBram = { node: bram, delivery: theirs };

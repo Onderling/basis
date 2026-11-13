@@ -62,7 +62,7 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS, COMPACT_SUPERSEDED_PROPS } from '../../v2/membershipRail.js';
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS, COMPACT_SUPERSEDED_PROPS, addressBindsOnRow } from '../../v2/membershipRail.js';
 import { makeLateRecipientRetell } from '../../v2/membershipLateRecipient.js'; // the membership rider — statements ride the device log
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
@@ -6333,35 +6333,44 @@ export async function createRealHouseholdAgent(opts = {}) {
     // removal or a role change (a superset check, any author) → no gate, the roster folds once as before; memoised by
     // the lane's length. Otherwise a builder the roster read calls with its first-pass rows (the members a tally counts).
     const gateNeedMemo = new Map();   // circleId → { n, needed }
-    let gateRailMemo = null;
-    const gateRail = () => (gateRailMemo ??= makeGovernanceRail({
+    // NO CYCLE (found walking it, 2026-11-13): a content lane checks its statements' key↔member bindings against the
+    // membership FOLD (rosterBindingVerifier), and this gate is asked FROM INSIDE that fold. So the gate never reads
+    // the governance lane through the roster: the cheap check uses the signature alone (`checkSigned`, no binding),
+    // and the builder binds against the FIRST-PASS rows it is handed (the same set-aware rule, `addressBindsOnRow`).
+    const signedRail = () => (gateRailMemo ??= makeGovernanceRail({
       eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
       circleIdentityFor, myRef: circleSelfRef, callSkill: (...a) => callSkill(...a),
     }));
+    let gateRailMemo = null;
     const asksVote = (p) => {
       const pol = normalizeCirclePolicy(p ?? {});
       return decisionClassFor(pol, 'removeMember') !== 'any-admin' || decisionClassFor(pol, 'changeRole') !== 'any-admin';
     };
     membershipRead.governedGateFor = async (circleId) => {
-      const rail = gateRail();
-      let n = 0;
-      try { n = rail.storedStatements(circleId).length; } catch { return null; }
-      if (n === 0) return null;
+      const rail = signedRail();
+      let stored = [];
+      try { stored = rail.storedStatements(circleId) ?? []; } catch { return null; }
+      if (!stored.length) return null;
       const memo = gateNeedMemo.get(circleId);
-      if (memo && memo.n === n && memo.needed === false) return null;
-      let bodies = [];
-      try { ({ bodies = [] } = await rail.readVerifiedBodies(circleId)); } catch { return null; }
-      const policyStatements = bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND);
-      const needed = policyStatements.some((b) => asksVote(b.payload?.policy));
-      gateNeedMemo.set(circleId, { n, needed });
+      if (memo && memo.n === stored.length && memo.needed === false) return null;
+      // the cheap answer, on signatures alone (a superset: any author): did any settings statement ever ask a vote?
+      const needed = stored.some((st) => st?.body?.kind === POLICY_UPDATE_KIND && rail.checkSigned(circleId, st) && asksVote(st.body.payload?.policy));
+      gateNeedMemo.set(circleId, { n: stored.length, needed });
       if (!needed) return null;
       return async (firstPass) => {
-        const members = (Array.isArray(firstPass) ? firstPass : [])
-          .filter((r) => typeof r?.webid === 'string' && r.webid)
-          .map((r) => ({ ref: r.webid, role: r.role === 'admin' ? 'admin' : 'member', ...(r.adminVia ? { via: r.adminVia } : {}) }));
+        const rows = (Array.isArray(firstPass) ? firstPass : []).filter((r) => typeof r?.webid === 'string' && r.webid);
+        const members = rows.map((r) => ({ ref: r.webid, role: r.role === 'admin' ? 'admin' : 'member', ...(r.adminVia ? { via: r.adminVia } : {}) }));
         const admins = new Set(members.filter((m) => m.role === 'admin').map((m) => m.ref));
-        const proposals = await proposalsOn({ rail, circleId, policy: normalizeCirclePolicy({}), members });
-        const chain = judgePolicyChain({ bodies: policyStatements.filter((b) => admins.has(b.author)), members, proposals, merge: denyWinsMerge });
+        // the governance read for the gate, bound against the first-pass rows: never the roster (no re-entry)
+        const bound = makeGovernanceRail({
+          eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+          circleIdentityFor, myRef: circleSelfRef, callSkill: (...a) => callSkill(...a),
+          verifyBinding: async ({ author, ref, atSeq = null }) => rows.some((m) => m.webid === ref && addressBindsOnRow(m, author, atSeq)),
+        });
+        let bodies = [];
+        try { ({ bodies = [] } = await bound.readVerifiedBodies(circleId)); } catch { bodies = []; }
+        const proposals = await proposalsOn({ rail: bound, circleId, policy: normalizeCirclePolicy({}), members });
+        const chain = judgePolicyChain({ bodies: bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author)), members, proposals, merge: denyWinsMerge });
         return membershipGateFor({ chain, currentPolicy: chain.policyAt(chain.head), members, proposals });
       };
     };

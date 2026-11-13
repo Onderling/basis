@@ -3883,7 +3883,7 @@ two words a profile record holds (`PROFILE_KINDS` in agent-registry is this list
 **Kind:** function · **Import:** `foldRoster` from `'@onderling/core'`
 
 ```js
-foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {} } = {})
+foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {}, governedGate = null } = {})
 ```
 
 Fold spine membership statements into the roster head.
@@ -3895,6 +3895,7 @@ Fold spine membership statements into the roster head.
 - `[opts.founderKinds]` `Record<string, string>` — a founder's kind from its own VERIFIED creation statement (`{ <founder>: 'function' }` when a function profile founded); returned as `kinds` with the admin-authored joins'
 - `[opts.founders]` `Array<string>` — the circle's creators — admin + member by construction, and the fold's starting authority. They are **not evictable**: you cannot be put out of a circle you made. They ARE demotable once another admin exists (Frits, 2026-08-23), so a founder who steps back hands over rather than holding the circle open forever; the last-admin rule is what supplies the "once another admin exists" half.
 - `[opts.seed]` `{ members?: string[], admins?: string[] }` — the roster the spine folds ON TOP OF — the pre-spine materialised HEAD at cutover (the current trail-derived roster). Seed members/admins are the starting state; UNLIKE founders they are ordinary members (evictable, demotable). Absent (the default) the fold starts from the founders alone, exactly as before — so pure-spine callers are unchanged.
+- `[opts.governedGate]` `(statement: object, ctx: {admins: Set<string>}) => boolean` — the circle's "who decides" at the receiver: asked for another person's `evict` / `role` (never a person's own acts); false → it does not take effect. Absent → unchanged (the kernel holds no policy).
 - `[opts.rulesGate]` `{ versions?: string[]|Set<string> }` — RULES-GATED JOINS (task #80, sitting-A decision). When present, a `join` folds ONLY if its signed payload carries a non-empty `rulesAccepted` string — and, when `versions` is a non-empty set, one that is IN it (the set of rules-doc versions this circle has ever had; acceptance of a then-current version stays valid forever). Deny-favouring both ways: no acceptance → the join does not fold, on every device independently — the statement stays on the log as evidence, the joiner lands on nobody's roster. Founders and seed members never fold via `join`, so the gate cannot touch them. Absent (the default), joins fold exactly as before — the projector opts in, the kernel stays pure.
 
 **Returns:** `{ members: string[], admins: string[], rulesAccepted: Record<string,string>, handles: Record<string,string>, adminProvenance: Record<string,string>, caretakerAcknowledged: Record<string,string> }` — sorted members/admins for a stable, comparable result, plus each member's latest accepted rules version (from the join's payload, superseded by later `rules-accept` statements — the per-member "accepted v1, current v2" visibility rides this map), plus HOW each admin holds it: `'founder'` · `'role'` · `` `caretaker:<hash>` `` (see the note where `adminVia` is built), plus which caretakers have SIGNED for their own appointment (`caretakerAcknowledged`: ref → seed hash).

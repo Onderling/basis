@@ -198,7 +198,10 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const pendingMap = new Map();
   // The circle chat's device log — what the chat rail below lands each verified statement on (the shells' wiring).
-  const chatEventLog = new EventLog({ initial: [], muted: [] });
+  // ONE LOG, as every shell has: where a node has a device log, its receivers (chat, governance, reports) land on that
+  // same log (web: circleApp hands one `eventLog` as the agent's deviceLog AND to its receive rails; the phone and the
+  // box the same). A separate log here made the agent's own readers of those lanes blind on this harness only.
+  const chatEventLog = agentOpts.deviceLog ?? deviceLog ?? new EventLog({ initial: [], muted: [] });
   // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
   // key↔ref binding) and lands as the ONE render entry. The harness's LEGACY pairing records no
   // circleAddress roster rows, so the DEFAULT binding here resolves through the live in-process node

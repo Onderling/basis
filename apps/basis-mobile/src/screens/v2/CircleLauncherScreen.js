@@ -1115,7 +1115,7 @@ export default function CircleLauncherScreen({
       // an enacted settings change: written here, then stated on the lane so every member's device applies it (this
       // binding used to write the store only: an approved settings proposal enacted on the phone reached nobody)
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
-      statePolicy: (cid) => (circlePolicyLane ? circlePolicyLane.state(cid) : null),
+      statePolicy: (cid, meta) => (circlePolicyLane ? circlePolicyLane.state(cid, meta) : null),
     });
   }, [bundle, eventLog, policyStore, circlePolicyLane]);
   govPolicyRef.current = govPolicy;

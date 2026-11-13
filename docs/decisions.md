@@ -1617,3 +1617,30 @@ Ledger: L827, L833.
 authorRef kept), so it proves itself, a catch-up serves it, and a member who joins later accepts it and folds the same
 roster: `apps/basis/test/v2/tombstoneProvesItself.test.js` and the relay walk `lateJoinerAfterCompaction` (with
 tombstones on the admin's side) are green. Every circle is founded again by the format change (no compatibility owed).
+
+## 2026-11-13 — Who decides is enforced on every member's device, judged by the rule the act was made under (Fable, Opus; the governance work Frits set)
+
+The circle policy names a decision class per governed act (remove a member, change a role, change the rules, change the
+settings). Until now only an honest app asked for the vote; a modified app, or a path that skipped the door, could
+remove a member or change the rules alone, and every device applied it. Now every member's device checks it:
+
+- **The device's own tally.** A governed statement that needed a vote names its proposal; the receiving device
+  re-tallies that proposal from the votes it holds, about the same subject. A recorded "approved" counts for nothing
+  on its own. Where one admin may decide (any-admin, or admins together with one admin) the statement stands alone.
+- **The rule the act was made under.** Every removal, role change and rules change carries the settings version its
+  device had seen (`policyVersion`), stamped where the statement is built, whichever path wrote it (a screen, the
+  box bot, a slash command, the assistant). It is judged by that version, so a decision taken under a looser rule is
+  not undone when the circle tightens later. A stamp the device has not seen yet waits; no stamp is judged by the rule
+  in force now. An author's stamps never go back, and an author's own later settings change draws a line through
+  that author's hash chain: what they signed before it keeps its stamp, what they sign after it does not.
+- **No clock.** A tally reads the votes, and an admin's override after the deadline is judged at the resolve's own
+  signed time, so every device reaches the same answer about the same statements.
+- **The settings themselves.** Two admins' settings at one version merge "who decides" strictest-first per act, so a
+  tightening beside an unrelated change is never lost to hash order.
+- **Shown, never silent.** A refused change stays on the lane and is listed in the circle's governance view.
+
+Not covered yet: admissions (`join`) are not gated (the policy has no admission class), and the drawn sample is held
+back for the alpha. Residues, accepted: an admin can sign an override with a false time, and an admin who never stamps
+above an old version keeps being judged by it; both are signed, attributable and visible. Where it lives:
+`apps/basis/src/v2/governanceReceiverGate.js`, the kernel's `foldRoster` (`governedGate`), `docs/catalogue/governance.md`.
+Ledger: L663, L855, L856, L858.

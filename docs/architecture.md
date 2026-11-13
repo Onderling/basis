@@ -1110,12 +1110,22 @@ and bad actors, weakest concern to strongest:
   with an **admin-override** valve once a vote sits past its deadline. If the **last admin** departs, a
   **deterministic caretaker** is appointed — the member the whole circle independently computes from the log (a
   hash-of-the-departure pick, next-in-line if unreachable), never a locally-rolled random that would itself fork.
+  **Every member's device enforces the class, not only the author's app** (2026-11-13): a removal, a role change, a
+  rules change or a settings change that skipped the vote its class asks takes effect on no member's device. Each
+  device judges it by its OWN tally of the proposal the statement names (a recorded "approved" alone counts for
+  nothing), and by the settings version the statement carries (`policyVersion`, stamped by construction at the
+  emitters), so a removal made under any-admin stays valid after the circle tightens. An author's own later
+  settings change draws its line through that author's hash chain (what they signed before it keeps its stamp), and
+  no device clock enters a tally. For the membership lane the gate is a predicate the kernel's roster fold takes
+  (`governedGate`); the host builds it from the circle's settings chain on its governance lane, so the kernel holds
+  no policy. A person's own acts (leaving, stepping down, the caretaker's acknowledgement) are never asked.
 
 **Circle state an admin sets rides the same governance lane, as carried facts rather than decisions:** the rules
 document (`rules-update`) and the circle **policy** (`policy-update` — storage posture, pod, features, sharing, the
 decision classes above). Each is a signed statement carrying the whole document and a monotonic version; a receiver
 applies it only when its author is an admin on its own roster, the highest version wins, and two admins at one
-version fold **deny-wins** per axis (sealed over plaintext, off over on). A joiner and a following device catch it
+version fold **deny-wins** per axis (sealed over plaintext, off over on; "who decides" strictest-first per act:
+a member vote, then the admins together, then any one admin). A joiner and a following device catch it
 up exactly as they catch up the roster, and a device keeps the winning statement so it can serve it after the lane's
 audit window — so a policy is the same on every member's device, not a per-device setting that only a settings save
 ever broadcast.

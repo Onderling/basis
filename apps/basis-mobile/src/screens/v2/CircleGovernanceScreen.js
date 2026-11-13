@@ -105,6 +105,14 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
       </Pressable>
       <Text style={styles.title}>{t('circle.governance.title')}</Text>
 
+      {/* changes made WITHOUT the vote this circle requires: every device refused them (the receiver gate); shown so the
+          members see that it happened (kept and shown, never applied) — web parity: circleGovernancePanel */}
+      {(model.view.refused ?? []).map((r) => (
+        <View key={r.hash ?? `${r.action}-${r.version}`} style={styles.disputed} testID={`gov-refused-${r.action}`}>
+          <Text style={styles.disputedLine}>{t(`circle.governance.refused_${r.action}`, { who: r.label || r.by })}</Text>
+        </View>
+      ))}
+
       {(model.view.disputed ?? []).map((d) => (
         <View key={d.ref} style={styles.disputed} testID={`gov-disputed-${d.ref}`}>
           <Text style={styles.disputedLine}>{t('circle.governance.disputed_line', { who: d.label || d.ref })}</Text>

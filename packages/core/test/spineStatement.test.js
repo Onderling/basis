@@ -25,7 +25,7 @@ describe('signSpine / verifySpine (generic spine chain)', () => {
       payload: { role: 'admin' }, author: admin.pubKey, parentHash: null,
     });
     expect(typeof stmt.body.hash).toBe('string');
-    expect(SPINE_STMT_VERSION).toBe('onderling/spine.v1');
+    expect(SPINE_STMT_VERSION).toBe('onderling/spine.v2');   // the header format (one header, hashed and signed)
     expect(verifySpine(stmt, { expectedCircleId: 'c', expectedKind: 'role' }).ok).toBe(true);
   });
 

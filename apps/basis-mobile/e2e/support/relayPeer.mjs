@@ -25,6 +25,7 @@
  * It speaks on a JSON line on stdin:
  *   {"do":"circle-say","text":"…"}     a circle chat line in its circle, over the signed path
  *   {"do":"contact-say","text":"…"}    a contact turn to the person it last heard from, else the first other member
+ *   {"do":"roster"}                    its circle's other members as its own roster has them → {"step":"roster","rows":[…]}
  * and answers each with `{"step":"circle-said"|"contact-said","ok":…}`.
  *
  * `--join` makes the peer a person who JOINS the phone's circle instead of founding one (the first-five-minutes story:
@@ -157,7 +158,7 @@ if (talk) {
     for (const e of peer.chatEvents) {
       if (!groupId || !e?.id || heardChat.has(e.id) || e.actor === peer.pubKey || e.payload?.circleId !== groupId || !e.payload?.text) continue;
       heardChat.add(e.id);
-      say({ step: 'circle-heard', text: e.payload.text });
+      say({ step: 'circle-heard', text: e.payload.text, from: e.actor ?? null });
     }
     const turns = await peer.contactThreadChannel.rehydrateAll().catch(() => []);
     for (const turn of turns) {
@@ -186,6 +187,11 @@ if (talk) {
           unrouted: (peer.received ?? []).map((r) => r?.payload?.type ?? r?.payload?.subtype ?? typeof r?.payload),
           refused: peer.contactTurnsRefused ?? [],
         });
+      } else if (cmd.do === 'roster') {
+        // the circle's members as the peer's own roster has them (its own rows left out): who joined, under which name
+        const mine = new Set([peer.pubKey, peer.agent.circleSelf?.(groupId)?.webid].filter(Boolean));
+        const rows = (await readRoster(peer, groupId)).filter((m) => !mine.has(m?.webid ?? m?.pubKey ?? null));
+        say({ step: 'roster', rows });
       } else if (cmd.do === 'list-create') {
         // the circle's lists, through the same ops the shells call (`lists` app): what the peer makes, the phone sees
         const r = await call('lists', 'createList', { circleId: groupId, text: cmd.list });

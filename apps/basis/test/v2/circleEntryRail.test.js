@@ -235,7 +235,7 @@ describe('the rail — compact (tombstones on the fold\'s word)', () => {
     expect(rail.compact(CIRCLE, [h1, 'not-a-hash'])).toBe(1);
     const t = log.entries.find((e) => e.id === `membership:${h1}`);
     expect(t.payload.tombstone).toBe(true);
-    expect(t.payload.sig).toBeUndefined();
+    expect(typeof t.payload.sig, 'format v2: the tombstone keeps its signature over the header').toBe('string');
     expect(JSON.stringify(t.payload)).not.toContain('XXXX');                   // the bytes are gone
     expect(t.payload.body).toMatchObject({ hash: original.body.hash, author: original.body.author, parentHash: original.body.parentHash, kind: 'member-props' });
 

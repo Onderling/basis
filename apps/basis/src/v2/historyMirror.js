@@ -25,9 +25,11 @@
  * The READ half (`hydrateHistory`) is the instant-restore ladder: merge every lane by entry id,
  * hydrate the RECENT window first (last N days OR the newest M entries per circle, whichever is
  * larger — conversations open live), then the long tail in the background (folds are
- * deterministic, so arrival order cannot change any outcome). Opening a sealed batch IS the
- * integrity gate: the seal is authenticated encryption under the owner's key, so a tampered or
- * foreign mirror fails to OPEN — it cannot inject.
+ * deterministic, so arrival order cannot change any outcome). Two gates: opening a sealed batch
+ * (authenticated encryption under the owner's key, so a tampered or foreign mirror fails to OPEN),
+ * and then each signed statement in it is checked as an arrival (`restoreCheckFor`, the rails' own
+ * `checkEntry`) — the seal says a batch is the owner's, not that every statement in it is what its
+ * author signed.
  */
 
 import { createSealedPodDataSource } from '@onderling/pod-client';
@@ -220,7 +222,9 @@ async function listBatchKeys(source, prefix, lanes = null) {
  * half-restored device just continues. Returns the hydrated ids so the caller can hand them to
  * the sink's `skip` — what came FROM the mirror must not backfill into this device's lane.
  *
- * @returns {Promise<{recent:number, hydratedIds:Set<string>, tailDone:Promise<number>}>}
+ * `admit` (from `restoreCheckFor`) is the arrival check: an entry it refuses never lands, and `refused` counts them.
+ *
+ * @returns {Promise<{recent:number, hydratedIds:Set<string>, tailDone:Promise<number>, refused:number}>}
  */
 export async function hydrateHistory({
   source,
@@ -231,6 +235,7 @@ export async function hydrateHistory({
   maxPerCircle = 500,
   now = Date.now,
   logger = console,
+  admit = null,
 } = {}) {
   if (!source || typeof source.list !== 'function') throw new Error('hydrateHistory: a DataSource-shaped source is required');
   if (!eventLog || typeof eventLog.hydrate !== 'function') throw new Error('hydrateHistory: an event log with hydrate() is required');
@@ -241,11 +246,17 @@ export async function hydrateHistory({
   // regardless, so this is efficiency, not a gate — the SEAL is the gate).
   const keys = await listBatchKeys(source, prefix, lanes);
   const byId = new Map();
+  const refusedIds = new Set();
   for (const key of keys) {
     try {
       const batch = JSON.parse(await source.read(key));
       for (const e of (batch?.entries ?? [])) {
-        if (e && typeof e.id === 'string' && e.id && !byId.has(e.id)) byId.set(e.id, e);
+        if (!e || typeof e.id !== 'string' || !e.id || byId.has(e.id)) continue;
+        // THE RESTORE IS AN ARRIVAL: a statement lands only if it verifies here, the check a peer's statement passes.
+        // The seal proves the batch is the owner's; it does not prove each statement in it is what its author signed.
+        let ok = true;
+        if (typeof admit === 'function') { try { ok = admit(e) === true; } catch { ok = false; } }
+        if (ok) byId.set(e.id, e); else refusedIds.add(e.id);
       }
     } catch (err) {
       // An unopenable batch is a FAILED gate (tampered, or sealed under a foreign key) — skip it
@@ -253,6 +264,8 @@ export async function hydrateHistory({
       logger.warn?.(`[history-restore] batch unreadable — skipped: ${key}`, err?.message ?? err);
     }
   }
+
+  if (refusedIds.size) logger.warn?.(`[history-restore] refused ${refusedIds.size} entr${refusedIds.size === 1 ? 'y' : 'ies'} that did not verify`);
 
   // Newest first, per the hydrate contract (it walks oldest→newest itself).
   const all = [...byId.values()].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
@@ -281,7 +294,26 @@ export async function hydrateHistory({
     }, 0);
   });
 
-  return { recent, hydratedIds, tailDone };
+  return { recent, hydratedIds, tailDone, refused: refusedIds.size };
+}
+
+/**
+ * The restore's check, from the rails that hold the device log's signed lanes: an entry of a rail's lane lands only when
+ * that rail's `checkEntry` passes (the statement verifies; a chat line shows the text that was signed); an entry of no
+ * signed lane has no signature to check and lands. Each rail knows its own entry shape, so the knowledge stays there.
+ *
+ * @param {Array<{ entryKind: string, checkEntry: (entry: object) => boolean } | null>} rails
+ * @returns {(entry: object) => boolean}
+ */
+export function restoreCheckFor(rails) {
+  const byKind = new Map();
+  for (const r of rails ?? []) {
+    if (r && typeof r.entryKind === 'string' && typeof r.checkEntry === 'function') byKind.set(r.entryKind, r);
+  }
+  return (entry) => {
+    const rail = byKind.get(entry?.type);
+    return rail ? rail.checkEntry(entry) === true : true;
+  };
 }
 
 /**

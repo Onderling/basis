@@ -4288,6 +4288,34 @@ TWO signer modes:
 
 Version of the signed spine body — a self-describing namespaced STRING (docs/conventions/signed-bodies.md).
 
+### `canonicalDeep`
+
+**Kind:** function · **Import:** `canonicalDeep` from `'@onderling/core'`
+
+```js
+canonicalDeep(value)
+```
+
+ONE canonical form, sorted at EVERY depth (today's envelope `canonicalize` sorts the top level only): the same
+statement is the same bytes, whatever order its nested payload keys were written in. Arrays keep their order;
+`undefined` members are left out as JSON leaves them out.
+
+**Parameters**
+
+- `value` `*`
+
+**Returns:** `string`
+
+### `spineSignedMessage`
+
+**Kind:** function · **Import:** `spineSignedMessage` from `'@onderling/core'`
+
+```js
+spineSignedMessage(body)
+```
+
+The exact bytes (as a string) a spine statement's signature and chain hash are over: its canonical header.
+
 ### `signSpine`
 
 **Kind:** function · **Import:** `signSpine` from `'@onderling/core'`

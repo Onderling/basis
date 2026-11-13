@@ -9,7 +9,7 @@ import { createTelegramRunner } from './runner.js';
 import { createBotThreads, memoryThreadStore } from '../v2/botThreads.js';
 import { EventLog } from '../eventLog.js';
 import { loadListItems, promptLinesForLists } from '../v2/householdTemplate.js';
-import { listsGateRules } from '../v2/circleGate.js';
+import { listsGateRules, circleListsFor } from '../v2/circleGate.js';
 import { scopeCatalogueToRole, roleHintsFor } from '../v2/botOpMap.js';
 import { circleCallerActor } from '../v2/circleDoor.js';
 
@@ -19,15 +19,6 @@ const CIRCLE_LINES = Object.freeze([
   'Herinneringen, het weekoverzicht en persoonlijke instellingen bestaan in een kring niet; die regelt ieder in zijn eigen gesprek met de bot. Zeg dat als erom gevraagd wordt.',
 ]);
 
-/**
- * A circle's lists as the template functions read them.
- * @param {(app: string, op: string, args: object) => Promise<any>} hostCall  the bot's own call, in that circle
- */
-export async function circleLists(hostCall) {
-  const r = await hostCall('lists', 'listLists', {}).catch(() => null);
-  const items = Array.isArray(r?.items) ? r.items : [];
-  return items.map((l) => ({ name: l.label ?? l.text ?? l.title ?? '', kind: l.kind ?? 'list', defaultChild: l.defaultChild ?? null, aliases: [] })).filter((l) => l.name);
-}
 
 /**
  * @param {object} a
@@ -45,7 +36,7 @@ export async function circleLists(hostCall) {
  */
 export async function composeCircleRunner({ circleId, bridge, roleOf, agentCall, catalogue, t, lang = 'nl', llm = null, interpret = null, expand = null }) {
   const hostCall = (app, op, args = {}) => agentCall(app, op, { ...args, circleId });
-  const lists = await circleLists(hostCall);
+  const lists = await circleListsFor(hostCall);
   // the circle's memory: kept for the process, never on the device log (the box forgets a circle it leaves); a circle
   // has no welcome — the bot is a member there, not a new chat
   const base = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });

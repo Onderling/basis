@@ -188,7 +188,9 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
+import { circleListsFor } from '../../src/v2/circleGate.js';
+import { replyLine } from '../../src/v2/replyLine.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -4629,7 +4631,8 @@ function showVandaagPlus({ edit = null } = {}) {
   const editId = edit?.id ?? null;
   let line = '';
   let error = null;
-  let referral = null;   // the line named something that lives in a circle: where (opened, never acted on)
+  let circleCard = null;   // the line reads to an act more than one circle holds: which circle (the card)
+  let done = null;         // what an act the line ran in a circle did (its reply line)
   // Vastgezet: what this person pinned, as it can be painted now (a bookmark only while its circle is theirs and shows
   // the op there), each with its words; computed after open (availability is async), then the sheet paints again
   let pinnedView = [];
@@ -4657,11 +4660,21 @@ function showVandaagPlus({ edit = null } = {}) {
     return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // a circle's act the line read: as the person, through the waist with the circle named, so the circle's own doors
+  // and governance decide (the "+" has no authority the circle's composer lacks); the reply line says what happened
+  const runInCircle = async (command, circleId) => {
+    const op = plusCircleOp(command, circleId);
+    if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return; }
+    const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    if (r?.ok === false || r?.error) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); done = null; }
+    else { error = null; done = replyLine(r, { opId: op.opId, args: op.args, t }); }
+    paint();
+  };
   // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
   let shareTargets = null;
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
-    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, referral,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
@@ -4693,20 +4706,23 @@ function showVandaagPlus({ edit = null } = {}) {
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
-      line = text; referral = null;
-      // the person's OWN agent: an own act, or — for something that lives in a circle — where it lives (a referral,
-      // opened, never acted on from here); the own model only reads what the plain reading missed
+      line = text; circleCard = null; done = null;
+      // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
+      // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
       const circles = await Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
         id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
+        lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
       })));
       const o = plusLineOutcome(text, { circles });
       const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
-      if (o?.kind === 'referral') { referral = o.to; error = null; }
+      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return; }
+      if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }
       else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
       paint();
     },
-    onOpenCircle: (id) => { close(); showDetail(id); },
+    onCircleRun: async (circleId) => { const card = circleCard; circleCard = null; if (card) await runInCircle(card.command, circleId); },
+    onCircleCancel: () => { circleCard = null; error = null; paint(); },
     onSave: async (id, filled) => {
       values = filled;
       const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);

@@ -33,11 +33,24 @@ describe('the settings gate reads the rule in force', () => {
   });
 });
 
+describe('the admins are counted from the roster, as every other device counts them', () => {
+  // A real circle's policy carries no admin list (`policy.admins` is never written), so counting it said "one admin"
+  // in every admin-quorum circle and a Save never proposed. The roster is what the receiving devices count.
+  const quorumNoList = { governance: { changePolicy: 'admin-quorum' } };
+  const roster = [{ webid: 'a', role: 'admin' }, { webid: 'b', role: 'admin' }, { webid: 'm', role: 'member' }];
+  it('two admins on the roster: a Save in an admin-quorum circle opens a proposal', () => {
+    expect(settingsSaveNeedsProposal({ inForce: quorumNoList, edited: quorumNoList, members: roster })).toBe(true);
+  });
+  it('one admin on the roster: that admin is the quorum, the Save goes directly', () => {
+    expect(settingsSaveNeedsProposal({ inForce: quorumNoList, edited: quorumNoList, members: roster.filter((m) => m.webid !== 'b') })).toBe(false);
+  });
+});
+
 describe('both settings screens ask the one gate, with the rule in force', () => {
   for (const [shell, rel] of Object.entries(SCREENS)) {
     it(`${shell}: calls settingsSaveNeedsProposal with inForce, never the old per-policy gate`, () => {
       const src = read(rel);
-      expect(src).toMatch(/settingsSaveNeedsProposal\(\{\s*inForce:/);
+      expect(src).toMatch(/settingsSaveNeedsProposal\(\{\s*inForce:[^}]*members:/);
       expect(src).not.toMatch(/settingsChangeNeedsProposal\(/);
     });
   }

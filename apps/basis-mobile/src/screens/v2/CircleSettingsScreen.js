@@ -184,7 +184,8 @@ export default function CircleSettingsScreen({
   }) : []), [sources, working]);
 
   // the ONE decision-table gate, asked of the rule IN FORCE (what the screen opened with), never the edited copy
-  const consensusActive = settingsSaveNeedsProposal({ inForce: entryPolicyRef.current, edited: working });
+  // (the admins counted from the roster this screen reads, as every receiving device counts them)
+  const consensusActive = settingsSaveNeedsProposal({ inForce: entryPolicyRef.current, edited: working, members: saveRoster.members });
 
   // B · consent-card — LOAD + REVIEW: load the pasted recipe (URL/JSON) via the SHARED loadRecipeForReview,
   // build the review model, then open the native consent card. Nothing is persisted here (mirror of web's

@@ -9136,7 +9136,7 @@ async function showSettings(id) {
   const baselinePod = working?.pod;
   let storageNote;
   // the ONE decision-table gate, asked of the rule IN FORCE (what the screen opened with), never the edited copy
-  const consensusActive = () => settingsSaveNeedsProposal({ inForce: entryPolicy, edited: working });
+  const consensusActive = () => settingsSaveNeedsProposal({ inForce: entryPolicy, edited: working, members: settingsRoster });
   // load pending proposals so the banner can surface the count of
   // outstanding "waiting on N admins" approvals on settings entry — folded off the LOG, so a
   // proposal raised on another admin's device shows here too.

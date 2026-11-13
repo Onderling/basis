@@ -53,6 +53,7 @@ export const DECISION_KINDS = Object.freeze({
   'change-rule':     'changeRule',
   'change-policy':   'changePolicy',
   'settings-change': 'changePolicy',
+  'change-role':     'changeRole',
 });
 
 /** The required class for a decision KIND (the table row → the policy's class for its action). */
@@ -298,8 +299,19 @@ export function normalizeGovernance(stored = {}) {
   return out;
 }
 
+/**
+ * GOVERNED ACTIONS THAT HAVE NO CLASS OF THEIR OWN: they are decided by another action's class. Making someone an
+ * admin, or an admin a member again, follows the circle's SETTINGS class (Frits 2026-11-10): a circle that decides its
+ * settings together also decides its admins together. Not a policy key, so the who-decides control does not list it.
+ */
+export const GOVERNED_BY_CLASS_OF = Object.freeze({ changeRole: 'changePolicy' });
+
+/** Every action the governance flow can carry (the policy's own keys + the ones decided by another's class). */
+export const GOVERNED_ACTIONS = Object.freeze([...GOVERNANCE_ACTIONS, ...Object.keys(GOVERNED_BY_CLASS_OF)]);
+
 /** The decision-class for a governed action on a (possibly partial) policy. */
-export function decisionClassFor(policy, action) {
+export function decisionClassFor(policy, governedAction) {
+  const action = GOVERNED_BY_CLASS_OF[governedAction] ?? governedAction;
   if (!GOVERNANCE_ACTIONS.includes(action)) return null;
   const g = policy && typeof policy === 'object' ? policy.governance : null;
   const cls = g && typeof g === 'object' ? g[action] : undefined;

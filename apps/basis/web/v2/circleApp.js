@@ -96,7 +96,8 @@ import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } fr
 // removing one member from ONE circle, and leaving one, live in shared code: both end by
 // re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
 // makes a removal a security change rather than a list edit. web ≡ mobile by construction.
-import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
+import { leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
+import { removeMemberDoor, changeRulesDoor, changeRoleDoor, changeSettingsDoor, readCircleRules, rulesForSave } from '../../src/v2/governanceDoors.js';
 // "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
@@ -783,10 +784,6 @@ import { renderOfferingEditor } from './circleOfferingEditor.js';
 import { renderCircleFolioBrowser } from './circleFolio.js';
 import {
   normalizeRulesDoc,
-  // γ.2 — per-circle rules store factory + localStorage io (was inline
-  // localStorage in showRules()).  Routes saves through a single hook
-  // point that snapshots into the versions adapter.
-  createCircleRulesStore, localStorageRulesIo, localCircleRulesStore,
 } from '../../src/v2/circleRules.js';
 import { renderRulesEditor } from './circleRulesEditor.js';
 // γ.2 — concrete versions adapter (localStorage-backed).  Wired ONCE
@@ -1198,8 +1195,6 @@ const DEFAULT_SCREEN_RECIPE = Object.freeze({
     { id: 'nb-default', type: 'noticeboard',  config: { limit: 8 } },
   ],
 });
-// γ.2 — per-circle rules store (replaces inline localStorage in showRules()).
-const rulesStore  = localCircleRulesStore();    // sealed at rest, the rules and their versions
 // γ-next.recipe — per-circle "incoming recipe" cache.  Receiver writes
 // here on every valid circle-recipe-broadcast envelope; the recipe
 // editor reads on mount + passes the cached recipe via γ.3's
@@ -4581,18 +4576,22 @@ async function materializeVandaag() {
 /** Mij's own governance binding for its reads (made once, on first need). */
 let mijGov = null;
 
-/** The circle governance as the shell binds it (settings, Mij's "wat wacht op jou"): one binding, one set of options. */
+/**
+ * THE circle governance binding of this shell: every screen that decides (settings, members, rules, Decisions, reports,
+ * Mij's "wat wacht op jou") binds through here, so they all decide with one set of options (governanceOneBindingPerShell).
+ */
 function shellGovernance({ myWebid = '' } = {}) {
   return bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
     spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
+    // an enacted settings change: written here, then stated on the lane so every member's device applies it
+    setPolicy: (cid, patch) => policyStore.update(cid, patch),
+    statePolicy: (cid) => circlePolicyLane.state(cid),
   });
 }
 
@@ -8637,71 +8636,29 @@ function showFolio(id) {
 // Circle rules document (boards 3B/3C) — editor persists per circle
 // (cc.circleRules.<id>); "preview" shows the Agree/Decline consent screen.
 // Threading the consent into the real join flow is the follow-on.
-// γ.2 — routes load/save through rulesStore so the versions adapter
-// snapshots every save.  Key shape on disk is unchanged.
+// THE CIRCLE'S RULES: the screen reads the circle's rules head (what the invite carries and a joiner agrees to) and
+// saves through the circle's rule for changing them (governanceDoors.js): where any admin may, written at once and
+// fanned by the rules-update rider; where the admins or the circle decide together, a proposal opens.
 async function showRules(id) {
-  let doc = await rulesStore.get(id);
-  // γ-next.rules — pull the cached broadcast (if any).  Editor's γ.4
-  // resolver decides whether anything actually conflicts; if not, it
-  // applies straight through.  When the slot is empty `incomingRules`
-  // stays null and the editor renders untouched.
-  let incomingRules = null;
-  try { incomingRules = await circleRulesPendingStore.get(id); }
-  catch { incomingRules = null; }
-
-  const clearPending = () => {
-    incomingRules = null;
-    circleRulesPendingStore.clear(id).catch(() => { /* ignore */ });
-  };
-
+  const { head, doc: headDoc } = await readCircleRules({ callSkill: rawCallSkill, circleId: id });
+  let doc = headDoc;
+  let notice = null;
   const rerender = () => renderRulesEditor(rootEl, {
     doc,
     t,
-    // γ-next.rules — broadcast cache → editor → γ.4 resolver.  The
-    // resolver is opt-in; when `incomingRules` is null the editor
-    // renders untouched.  Applied / discarded both clear the cache.
-    incomingRules,
-    rulesStore,
-    circleId: id,
-    onIncomingApplied:   () => clearPending(),
-    onIncomingDiscarded: () => clearPending(),
+    notice,
     onChange: (patch) => { doc = normalizeRulesDoc({ ...doc, ...patch }); rerender(); },
     onBack: () => showDetail(id),
-    // The standalone Agree/Decline preview screen was retired in 5.5d —
-    // consent now happens in the create/join wizard.  No `onPreview`.
     onSave: async () => {
-      try { await rulesStore.set(id, doc); } catch { /* ignore */ }
-      // γ-next.rules — fan the just-saved rules doc out to peers.
-      // Fire-and-forget; per-peer errors are logged inside.
-      try { broadcastRules({ circleId: id, doc }); }
-      catch (err) { console.warn('[circle-rules] broadcast scheduling failed:', err?.message ?? err); }
-      showDetail(id);
+      let r;
+      try { r = await changeRulesDoor({ governance: shellGovernance(), circleId: id, rules: rulesForSave(head, doc), actorRef: mySelfIn(id) ?? null }); }
+      catch { r = { outcome: 'refused' }; }
+      if (r.outcome === 'done') { showDetail(id); return; }
+      notice = r.outcome === 'proposed' ? t('circle.rules.change_proposed') : t('circle.rules.change_refused');
+      rerender();
     },
   });
   rerender();
-}
-
-/**
- * γ-next.rules — fan the rules document out to every other circle
- * member via pinboard's `broadcastCircleRules` skill.  Fire-and-forget:
- * per-peer failures land in the result.errors array; we just log.
- * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
- */
-function broadcastRules({ circleId, doc }) {
-  if (typeof rawCallSkill !== 'function') return;
-  if (!doc || typeof doc !== 'object') return;
-  const msgId = `circle-rules-${circleId}-${Date.now()}`;
-  const ts    = Date.now();
-  rawCallSkill('pinboard', 'broadcastCircleRules', {
-    groupId:  circleId,
-    rulesDoc: doc,
-    msgId,
-    ts,
-  }).then((r) => {
-    if (r?.error) console.warn('[circle-rules] fan-out skipped:', r.error);
-  }).catch((err) => {
-    console.warn('[circle-rules] fan-out failed:', err?.message ?? err);
-  });
 }
 
 // Advisor cooldown (≤1 card/month) persists per-circle in localStorage.
@@ -8833,13 +8790,7 @@ function removeReportedItem(circleId, targetType, targetRef) {
 async function fileCircleReport(circleId, targetType, targetRef, targetLabel = null, reason = '') {
   let myWebid = '';
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    circleIdentityFor: circleIdentityForShell,
-    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-  });
+  const gov = shellGovernance({ myWebid });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
   catch { return { ok: false }; }
 }
@@ -8850,18 +8801,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
 async function showGovernance(id) {
   let myWebid = '';
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    removeReported: removeReportedItem,
-    circleIdentityFor: circleIdentityForShell,
-    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
-  });
+  const gov = shellGovernance({ myWebid });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
   back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
@@ -8899,11 +8839,10 @@ async function showGovernance(id) {
         try { await gov.override({ circleId: id, proposalId, actor: { ref: myWebid } }); } catch { /* */ }
         await rerender();
       },
+      // who decides an action is a SETTING: it goes through the circle's settings rule (a proposal where the admins or
+      // the circle decide settings together) and is stated on the lane, like every other setting
       onSetClass: async (action, cls) => {
-        try {
-          const cur = (await policyStore.get(id)) ?? {};
-          await policyStore.update(id, mergeCirclePolicy(cur, { governance: { [action]: cls } }));
-        } catch { /* */ }
+        try { await changeSettingsDoor({ governance: gov, circleId: id, patch: { governance: { [action]: cls } }, actorRef: mySelfIn(id) ?? myWebid }); } catch { /* */ }
         await rerender();
       },
       // "review & remove" an equivocator: open a removeMember decision (its class applies).
@@ -9039,10 +8978,10 @@ async function showAdmin(id) {
         execute: async () => {
           notice = null; busy = true; rerender();
           try {
-            const r = await rawCallSkill('pinboard', 'setMemberRole', {
-              groupId: id, memberWebid: m.webid, role: control.role,
-            });
-            notice = t(roleChangeNoticeWords(r, control).key, { name });
+            // THE DOOR (governanceDoors.js): a role change follows this circle's settings rule; an admin stepping down
+            // from their own role goes at once
+            const r = await changeRoleDoor({ governance: shellGovernance({ myWebid }), callSkill: rawCallSkill, circleId: id, memberWebid: m.webid, role: control.role, actorRef: mySelfIn(id) ?? myWebid });
+            notice = r.outcome === 'proposed' ? t('circle.admin.role_proposed', { name }) : t(roleChangeNoticeWords(r.outcome === 'done' ? r.result : null, control).key, { name });
           } catch { notice = t('circle.admin.refused'); }
           busy = false; await load();
         },
@@ -9070,19 +9009,14 @@ async function showAdmin(id) {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
-        // ONE shared op. It reads the roster while the member is still on it (for their
-        // per-circle address), removes them from THIS circle only, unbinds that address, and then
-        // re-reads the roster to re-record the authorize snapshot — the step without which a removed
-        // member's key stays in the allowed set and they can still speak here.
-        const r = await removeCircleMember({
-          agent: _peerAgent, callSkill: rawCallSkill,
-          circleId: id, memberWebid: m.webid, memberStableId: m.stableId,
-        });
-        if (!r.ok) notice = t('circle.admin.refused');
-        else {
-          removed = true;
-          notice = t('circle.admin.removed', { name: rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t }) });
-        }
+        // THE DOOR (governanceDoors.js): a removal goes through this circle's rule for removing. Where any admin may,
+        // it is done at once (governance enacts the whole removal, `removeCircleMember`, and leaves its trail); where
+        // the circle decides together, a proposal opens and nobody is removed yet.
+        const name = rosterRowShown(m, { viewerId: mySelfIn(id) ?? myWebid, policy: revealPolicy, t });
+        const r = await removeMemberDoor({ governance: shellGovernance({ myWebid }), circleId: id, memberWebid: m.webid, actorRef: mySelfIn(id) ?? myWebid });
+        if (r.outcome === 'done') { removed = true; notice = t('circle.admin.removed', { name }); }
+        else if (r.outcome === 'proposed') notice = t('circle.admin.remove_proposed', { name });
+        else notice = t('circle.admin.refused');
       } catch { notice = t('circle.admin.refused'); }
       // objective L — auto-revoke: on a SUCCESSFUL removal, rotate this circle's outbound canonical shares away
       // from the departing member (reuses revokeAllForMember → revokeItemShare). BEST-EFFORT — a revoke failure

@@ -110,6 +110,9 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `DISCOVERABILITY` | constant | [`core.md`](core.md#discoverability) |
 | `DISCOVERABILITY_ORDER` | constant | [`core.md`](core.md#discoverability_order) |
 | `dropSubscriber` | function | [`core.md`](core.md#dropsubscriber) |
+| `ED25519_ACCEPTED` | constant | [`core.md`](core.md#ed25519_accepted) |
+| `ED25519_EDGE_VECTORS` | constant | [`core.md`](core.md#ed25519_edge_vectors) |
+| `ed25519Disagreements` | function | [`core.md`](core.md#ed25519disagreements) |
 | `Emitter` | class | [`core.md`](core.md#emitter) |
 | `envelopeByteLength` | function | [`core.md`](core.md#envelopebytelength) |
 | `envelopeExceedsLimit` | function | [`core.md`](core.md#envelopeexceedslimit) |
@@ -258,6 +261,8 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `setUnionWithDedupe` | function | [`core.md`](core.md#setunionwithdedupe) |
 | `signAddressPossession` | function | [`core.md`](core.md#signaddresspossession) |
 | `signAddressPossessionFromSeed` | function | [`core.md`](core.md#signaddresspossessionfromseed) |
+| `signatureEquationBatches` | function | [`core.md`](core.md#signatureequationbatches) |
+| `signatureEquationName` | function | [`core.md`](core.md#signatureequationname) |
 | `signCeremonyCommitmentFromSeed` | function | [`core.md`](core.md#signceremonycommitmentfromseed) |
 | `signCeremonyReveal` | function | [`core.md`](core.md#signceremonyreveal) |
 | `signCircleLink` | function | [`core.md`](core.md#signcirclelink) |
@@ -286,6 +291,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `storePersonKey` | function | [`core.md`](core.md#storepersonkey) |
 | `streamBidi` | function | [`core.md`](core.md#streambidi) |
 | `streamOut` | function | [`core.md`](core.md#streamout) |
+| `strictSignatureShapeOk` | function | [`core.md`](core.md#strictsignatureshapeok) |
 | `subscribe` | function | [`core.md`](core.md#subscribe) |
 | `Task` | class | [`core.md`](core.md#task) |
 | `TaskGrantManager` | class | [`core.md`](core.md#taskgrantmanager) |
@@ -305,6 +311,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `unregisterRoleBundle` | function | [`core.md`](core.md#unregisterrolebundle) |
 | `UNSAFE_JSON_KEYS` | constant | [`core.md`](core.md#unsafe_json_keys) |
 | `unsubscribe` | function | [`core.md`](core.md#unsubscribe) |
+| `useSignatureEquation` | function | [`core.md`](core.md#usesignatureequation) |
 | `validateMnemonic` | function | [`core.md`](core.md#validatemnemonic) |
 | `verifyAddressPossession` | function | [`core.md`](core.md#verifyaddresspossession) |
 | `verifyCeremonyCommitmentDeclaration` | function | [`core.md`](core.md#verifyceremonycommitmentdeclaration) |
@@ -315,6 +322,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `verifyDeviceDelegation` | function | [`core.md`](core.md#verifydevicedelegation) |
 | `verifyDeviceRevocation` | function | [`core.md`](core.md#verifydevicerevocation) |
 | `verifyDeviceStatement` | function | [`core.md`](core.md#verifydevicestatement) |
+| `verifyEd25519StrictBatch` | function | [`core.md`](core.md#verifyed25519strictbatch) |
 | `verifyEviction` | function | [`core.md`](core.md#verifyeviction) |
 | `verifyGroupProof` | function | [`core.md`](core.md#verifygroupproof) |
 | `verifyOrigin` | function | [`core.md`](core.md#verifyorigin) |

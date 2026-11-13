@@ -41,7 +41,7 @@ import { effectiveCircleIds, isAllCircles } from './userScreens.js';
 import { circleRows, memberLabelFor } from './circleStream.js';
 import { normalizeCircleMembers } from '@onderling/kring-host/circleMembers';
 import { SOMEONE_LABEL_KEY } from './personLabel.js';
-import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
+import { normalizeRulesDoc, isRulesEmpty, rulesDocFromAnswer } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
 import { notificationRows, FOR_YOU_KEYS } from './notifications.js';
@@ -525,8 +525,7 @@ async function materializeRules(block, activeCircleIds, { callSkill } = {}, scre
   const cid = activeCircleIds[0];
   const res = await callSkill('pinboard', 'getGroupRules', { groupId: cid });
   const rules = res?.rules ?? null;
-  const docRaw = rules?.source?.doc ?? rules?.doc ?? null;
-  const doc = normalizeRulesDoc(docRaw);
+  const doc = normalizeRulesDoc(rulesDocFromAnswer(res));
   const multiCircle = activeCircleIds.length > 1 || (screenIsAll && activeCircleIds.length > 1);
   return {
     blockId: block.id, type: 'rules',

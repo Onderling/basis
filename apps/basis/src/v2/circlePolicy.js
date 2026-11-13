@@ -53,6 +53,7 @@ export const DECISION_KINDS = Object.freeze({
   'change-rule':     'changeRule',
   'change-policy':   'changePolicy',
   'settings-change': 'changePolicy',
+  'change-role':     'changeRole',
 });
 
 /** The required class for a decision KIND (the table row → the policy's class for its action). */
@@ -67,11 +68,41 @@ export function requiredClassFor(policy, kind) {
  * `consensusRequired && admins >= 2` checks): any-admin → direct; admin-quorum with a single
  * admin → direct (that admin IS the majority); anything else → the proposal flow.
  */
-export function settingsChangeNeedsProposal(policy) {
-  const cls = requiredClassFor(policy, 'settings-change');
+export function settingsChangeNeedsProposal(policy, members = null) {
+  return changeNeedsVote(policy, 'changePolicy', members);
+}
+
+/**
+ * THE ONE RULE for "does a change of this governed action need a decided proposal?", asked by the doors (does this
+ * Save propose?) and by every receiving device (may this carried change apply?), so the two cannot disagree:
+ * any-admin → no; admin-quorum → only with two admins or more (a single admin IS the quorum); member-vote → always.
+ * The admins are counted from the ROSTER (`members`, rows with `role`), as every device counts them; `policy.admins`
+ * only where no roster is given (a real circle's policy carries no admin list).
+ * @param {object} policy
+ * @param {string} action                   a governed action (`GOVERNED_ACTIONS`)
+ * @param {Array<{role?: string}>|null} [members]
+ */
+export function changeNeedsVote(policy, action, members = null) {
+  const cls = decisionClassFor(policy, action);
+  if (!cls) return true;   // an unknown action is never let through on its own
   if (cls === 'any-admin') return false;
-  if (cls === 'admin-quorum') return (policy?.admins?.length ?? 0) >= 2;
+  if (cls === 'admin-quorum') {
+    const admins = Array.isArray(members) ? members.filter((m) => m?.role === 'admin').length : (policy?.admins?.length ?? 0);
+    return admins >= 2;
+  }
   return true;   // member-vote — the vote is the point, whatever the roster size
+}
+
+/**
+ * Does THIS Save need a proposal? Asked of the rule IN FORCE (the policy the screen opened with), never of the edited
+ * copy: an admin of a circle that decides together could otherwise set "who decides" back to "any admin" in the same
+ * Save and pass the very change the rule exists to put to the others. With nothing in force yet (a fresh screen), the
+ * edited policy is all there is. The one gate both settings screens call.
+ * @param {{inForce?: object|null, edited?: object|null, members?: Array<{role?: string}>|null}} a   `members`: the roster the
+ *   screen holds (the admins are counted there, as every receiving device counts them)
+ */
+export function settingsSaveNeedsProposal({ inForce = null, edited = null, members = null } = {}) {
+  return settingsChangeNeedsProposal(inForce ?? edited, members);
 }
 
 export const CIRCLE_POLICY_ENUMS = {
@@ -298,8 +329,19 @@ export function normalizeGovernance(stored = {}) {
   return out;
 }
 
+/**
+ * GOVERNED ACTIONS THAT HAVE NO CLASS OF THEIR OWN: they are decided by another action's class. Making someone an
+ * admin, or an admin a member again, follows the circle's SETTINGS class (Frits 2026-11-10): a circle that decides its
+ * settings together also decides its admins together. Not a policy key, so the who-decides control does not list it.
+ */
+export const GOVERNED_BY_CLASS_OF = Object.freeze({ changeRole: 'changePolicy' });
+
+/** Every action the governance flow can carry (the policy's own keys + the ones decided by another's class). */
+export const GOVERNED_ACTIONS = Object.freeze([...GOVERNANCE_ACTIONS, ...Object.keys(GOVERNED_BY_CLASS_OF)]);
+
 /** The decision-class for a governed action on a (possibly partial) policy. */
-export function decisionClassFor(policy, action) {
+export function decisionClassFor(policy, governedAction) {
+  const action = GOVERNED_BY_CLASS_OF[governedAction] ?? governedAction;
   if (!GOVERNANCE_ACTIONS.includes(action)) return null;
   const g = policy && typeof policy === 'object' ? policy.governance : null;
   const cls = g && typeof g === 'object' ? g[action] : undefined;

@@ -32,7 +32,7 @@
 import { BLOCK_TYPES } from './circleRecipe.js';
 import { isFeatureEnabled } from './circlePolicy.js';
 import { circleRows, stampSenderLabels } from './circleStream.js';
-import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
+import { normalizeRulesDoc, isRulesEmpty, rulesDocFromAnswer } from './circleRules.js';
 import { enabledFeatures } from './circlePolicy.js';
 import { enrichEmbedsWithTitles } from './embedResolve.js';
 import { isNoticeboardPost } from './circlePinboardScope.js';
@@ -318,11 +318,7 @@ async function materializeRules(block, circleId, { callSkill } = {}) {
   }
   const res = await callSkill('pinboard', 'getGroupRules', { groupId: circleId });
   const rules = res?.rules ?? null;
-  // Rules doc lives on the pinboard item under source.doc (created by the
-  // rules wizard); fall through to a top-level `doc` for any legacy
-  // shape and let normalizeRulesDoc fill in the canonical fields.
-  const docRaw = rules?.source?.doc ?? rules?.doc ?? null;
-  const doc = normalizeRulesDoc(docRaw);
+  const doc = normalizeRulesDoc(rulesDocFromAnswer(res));
   return {
     blockId: block.id, type: 'rules',
     status: isRulesEmpty(doc) ? 'empty' : 'ok',

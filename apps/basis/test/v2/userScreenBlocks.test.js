@@ -156,7 +156,7 @@ describe('materializeScreen · α.2.b — rules', () => {
     let screen = addBlock(emptyScreen('Selwerd'), 'rules');
     screen = addCircleToScreen(screen, 'g1');
     const callSkill = vi.fn(async () => ({
-      rules: { source: { doc: { purpose: 'Circle zijn' } } },
+      rules: { source: { rules: { purpose: 'Circle zijn' } } },
     }));
     const out = await materializeScreen({
       screen,
@@ -172,7 +172,7 @@ describe('materializeScreen · α.2.b — rules', () => {
   it('multi-circle (ALL with > 1 circle): pulls FIRST circle, multiCircle=true', async () => {
     const screen = addBlock(emptyScreen('Stream'), 'rules');
     const callSkill = vi.fn(async () => ({
-      rules: { source: { doc: { purpose: 'Zomaar' } } },
+      rules: { source: { rules: { purpose: 'Zomaar' } } },
     }));
     const out = await materializeScreen({
       screen,

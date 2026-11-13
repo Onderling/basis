@@ -45,6 +45,8 @@ export const DELIVERY_REASON_LABELS = Object.freeze({
   'held': 'circle.chat.delivery.held_waiting',
   // the one person this turn was for could not be reached right now — retrying helps once they are
   'peer-unreachable': 'circle.chat.delivery.peer_unreachable',
+  // a turn held for an address this device could not tie to anyone (the send gate), and given up at its time limit
+  'unknown-address': 'circle.chat.delivery.unknown_address',
 });
 
 /**

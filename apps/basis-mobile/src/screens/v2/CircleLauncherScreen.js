@@ -249,9 +249,6 @@ import {
   makeUserScreenStoreRN,
   // β.5 — per-user pin-to-top persistence.
   makeCirclePinStoreRN,
-  // γ.2 — per-circle rules persistence + version capture (was inline
-  // AsyncStorage at the rules entry points up to β).
-  makeCircleRulesStoreRN,
 } from '../../core/circleStoresRN.js';
 // δ.1 — per-screen materialized-blocks cache (cache-first render).
 import { makeScreenBlocksCacheRN } from '../../core/screenBlocksCacheStorageRN.js';
@@ -281,6 +278,7 @@ import CircleAdvisorScreen from './CircleAdvisorScreen.js';
 import CircleOfferingEditorScreen from './CircleOfferingEditorScreen.js';
 import CircleFolioScreen from './CircleFolioScreen.js';
 import CircleRulesScreen from './CircleRulesScreen.js';
+import { changeRulesDoor, readCircleRules, rulesForSave } from '../../../../basis/src/v2/governanceDoors.js';
 import CircleRulesConsentScreen from './CircleRulesConsentScreen.js';
 import CircleTabBar from './CircleTabBar.js';
 import CircleScreenView from './CircleScreenView.js';
@@ -521,10 +519,6 @@ export default function CircleLauncherScreen({
   podAuth = null,
   eventLog,
   circleRecipePendingStore = null,
-  // γ-next.rules — per-circle pending-rules cache (AsyncStorage-backed,
-  // owned by App.js).  Receiver writes; rules editor reads on mount +
-  // clears after the γ.4 resolver applies / discards.
-  circleRulesPendingStore = null,
   // A failed agent boot, said HERE (web parity: `bootFailure` on the launcher). App.js used to hand it
   // only to the hidden ChatScreen, so the person saw "No circles yet." and concluded their data was gone.
   bootError = null,
@@ -754,11 +748,9 @@ export default function CircleLauncherScreen({
   const [folioCapMatrix, setFolioCapMatrix] = useState([]);
   const [skillDraft, setSkillDraft] = useState(null);
   const [rulesDoc, setRulesDoc] = useState(null);
+  const [rulesHead, setRulesHead] = useState(null);     // the circle's whole rules object, kept under the edited questions
+  const [rulesNotice, setRulesNotice] = useState(null); // what the last rules save came to (a proposal opened · refused)
   const [rulesPreview, setRulesPreview] = useState(null);
-  // γ-next.rules — pending incoming rules doc (from peer broadcast).
-  // Loaded when the rules screen opens; cleared after the γ.4 resolver
-  // applies or discards.
-  const [incomingRules, setIncomingRules] = useState(null);
   // γ-next.policy — pending incoming policy doc (from peer broadcast).
   // Loaded when the settings screen opens; cleared after the γ.4
   // resolver applies or discards.
@@ -1144,9 +1136,6 @@ export default function CircleLauncherScreen({
   // `menuCircle` is the circle whose context menu is open (null when
   // closed).
   const pinStore          = useMemo(() => makeCirclePinStoreRN(AsyncStorage), []);
-  // γ.2 — per-circle rules store (replaces inline AsyncStorage in the
-  // rules screen handlers).  Snapshots every save into a versions slot.
-  const rulesStore        = useMemo(() => makeCircleRulesStoreRN(AsyncStorage), []);
   const [pinnedMap, setPinnedMap] = useState({});
   const [mutedMap,  setMutedMap]  = useState({});
   // OPBERGEN — the person's put-away marks (registry records, carried between devices) and the fold's open state
@@ -1242,35 +1231,6 @@ export default function CircleLauncherScreen({
       try { await circleRecipePendingStore.clear(selected.id); } catch { /* ignore */ }
     }
   }, [selected, circleRecipePendingStore]);
-
-  // γ-next.rules — pull cached pending rules doc whenever the rules
-  // screen opens for a selected circle.  γ.4's resolver runs
-  // automatically from inside the screen when incomingRules is
-  // non-null + diverges from local.
-  useEffect(() => {
-    if (view !== 'rules' || !selected?.id || !circleRulesPendingStore) {
-      setIncomingRules(null);
-      return;
-    }
-    let alive = true;
-    (async () => {
-      try {
-        const cached = await circleRulesPendingStore.get(selected.id);
-        if (alive) setIncomingRules(cached ?? null);
-      } catch { if (alive) setIncomingRules(null); }
-    })();
-    return () => { alive = false; };
-  }, [view, selected, circleRulesPendingStore]);
-
-  // γ-next.rules — clear the cached pending rules after the γ.4
-  // resolver applies or discards.  Both paths route through here so
-  // a fresh broadcast can land in the slot again.
-  const clearIncomingRules = useCallback(async () => {
-    setIncomingRules(null);
-    if (selected?.id && circleRulesPendingStore) {
-      try { await circleRulesPendingStore.clear(selected.id); } catch { /* ignore */ }
-    }
-  }, [selected, circleRulesPendingStore]);
 
   // α.3 — Screens helpers.
   const refreshScreensBook = useCallback(async () => {
@@ -2668,40 +2628,25 @@ export default function CircleLauncherScreen({
     );
   }
   if (selected && view === 'rules') {
-    // γ-next.rules — broadcast cache → editor → γ.4 resolver.  The
-    // resolver is opt-in; when `incomingRules` is null the screen
-    // renders untouched.  Applied / discarded both clear the cache.
+    // Saving goes through the circle's rule for changing the rules (governanceDoors.js): where any admin may, written at
+    // once and fanned by the rules-update rider; where the admins or the circle decide together, a proposal opens.
     return (
       <CircleRulesScreen
         doc={rulesDoc}
-        incomingRules={incomingRules}
-        rulesStore={rulesStore}
-        circleId={selected.id}
-        onIncomingApplied={clearIncomingRules}
-        onIncomingDiscarded={clearIncomingRules}
+        notice={rulesNotice}
         onBack={() => setView('detail')}
         onPreview={(working) => { setRulesPreview(working); setView('rulesconsent'); }}
         onSave={async (doc) => {
-          // γ.2 — saves go through rulesStore so the versions adapter
-          // snapshots the doc into cc.versions.rules.<id> before the
-          // canonical write lands.
-          try { await rulesStore.set(selected.id, doc); } catch { /* ignore */ }
-          setRulesDoc(doc);
-          // γ-next.rules — fan the just-saved rules doc out to peers.
-          // Fire-and-forget; per-peer errors land in result.errors which
-          // we log.  No-op when callSkill / no agent / no doc.
-          if (doc && typeof bundle?.callSkill === 'function') {
-            const msgId = `circle-rules-${selected.id}-${Date.now()}`;
-            const ts    = Date.now();
-            bundle.callSkill('pinboard', 'broadcastCircleRules', {
-              groupId: selected.id, rulesDoc: doc, msgId, ts,
-            }).then((r) => {
-              if (r?.error) console.warn('[circle-rules] fan-out skipped:', r.error);
-            }).catch((err) => {
-              console.warn('[circle-rules] fan-out failed:', err?.message ?? err);
+          let r;
+          try {
+            r = await changeRulesDoor({
+              governance: govPolicy, circleId: selected.id, rules: rulesForSave(rulesHead, doc),
+              actorRef: bundle?.agent?.circleSelf?.(selected.id)?.webid ?? null,
             });
-          }
-          setView('detail');
+          } catch { r = { outcome: 'refused' }; }
+          setRulesDoc(doc);
+          if (r.outcome === 'done') { setView('detail'); return; }
+          setRulesNotice(r.outcome === 'proposed' ? t('circle.rules.change_proposed') : t('circle.rules.change_refused'));
         }}
       />
     );
@@ -2854,11 +2799,11 @@ export default function CircleLauncherScreen({
           setView('folio');
         }}
         onRules={async () => {
-          // γ.2 — load via rulesStore (same on-disk key as before:
-          // `cc.circleRules.<id>`).
-          let doc = null;
-          try { doc = await rulesStore.get(selected.id); } catch { /* fresh */ }
+          // THE CIRCLE'S RULES: the head the invite carries and a joiner agrees to (governanceDoors.js), not a local copy
+          const { head, doc } = await readCircleRules({ callSkill: bundle?.callSkill, circleId: selected.id });
+          setRulesHead(head);
           setRulesDoc(doc);
+          setRulesNotice(null);
           setView('rules');
         }}
         onRecipes={async () => {

@@ -22,6 +22,7 @@ import { View, Text, Pressable, ScrollView, Modal, StyleSheet } from 'react-nati
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { BLOCK_DESCRIPTORS } from '@onderling-app/basis';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
 /**
  * @param {object} props
@@ -44,6 +45,7 @@ export default function CircleRecipeConflictScreen({
   onCancel,
   title = null,
 }) {
+  const sheetCap = useSheetCap(0.85);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [blockDecisions, setBlockDecisions] = useState({});
@@ -78,11 +80,11 @@ export default function CircleRecipeConflictScreen({
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel} testID="recipe-conflict-backdrop">
         {/* Inner Pressable swallows taps so the sheet doesn't dismiss itself. */}
-        <Pressable style={styles.sheet} onPress={() => {}} testID="recipe-conflict-sheet">
+        <Pressable style={[styles.sheet, sheetCap]} onPress={() => {}} testID="recipe-conflict-sheet">
           <Text style={styles.title}>{t(typeof title === 'string' && title ? title : 'circle.recipe.conflict.title')}</Text>
           <Text style={styles.instructions}>{t('circle.recipe.conflict.instructions')}</Text>
 
-          <ScrollView contentContainerStyle={styles.body}>
+          <ScrollView style={SHEET_SCROLL} contentContainerStyle={styles.body}>
             {blockConflicts.map((bc) => {
               const ref = lBlockMap.get(bc.blockId) ?? iBlockMap.get(bc.blockId);
               const type = ref?.type ?? 'unknown';
@@ -192,7 +194,7 @@ function formatPreview(v) {
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  sheet:      { backgroundColor: theme.color.card, borderColor: theme.color.line, borderWidth: 1, borderRadius: 10, padding: 18, maxWidth: 560, width: '100%', maxHeight: '85%' },
+  sheet:      { backgroundColor: theme.color.card, borderColor: theme.color.line, borderWidth: 1, borderRadius: 10, padding: 18, maxWidth: 560, width: '100%' },
   title:      { fontSize: 18, fontWeight: '600', fontFamily: theme.font.serif, color: theme.color.ink, marginBottom: 4 },
   instructions:{ fontSize: 13, color: theme.color.inkSoft, marginBottom: 14 },
   body:       { paddingBottom: 12 },

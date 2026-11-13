@@ -12,11 +12,13 @@ import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '@onderling-app/basis';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
 const FLOW = paramsManifest.flows.find((f) => f.id === 'restore-settings');
 const OPS = new Map(paramsManifest.operations.map((o) => [o.id, o]));
 
 export default function RestoreFlowModal({ visible, callSkill, onClose, onPhrase }) {
+  const sheetCap = useSheetCap(0.85);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [inst, setInst] = useState(null);
@@ -66,7 +68,7 @@ export default function RestoreFlowModal({ visible, callSkill, onClose, onPhrase
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => { runnerRef.current?.cancel(inst); finish(); }}>
       <View style={styles.backdrop}>
-        <View style={styles.card}>
+        <View style={[styles.card, sheetCap]}>
           <Text style={styles.title}>{view ? t(view.labelKey) : t('circle.settings_restore.mismatch_title')}</Text>
           {view ? (
             <Text style={styles.progress}>
@@ -103,7 +105,7 @@ export default function RestoreFlowModal({ visible, callSkill, onClose, onPhrase
                 </View>
               </View>
             ) : view.form.step === 'merge' ? (
-              <ScrollView keyboardShouldPersistTaps="handled" style={styles.mergeList}>
+              <ScrollView keyboardShouldPersistTaps="handled" style={[styles.mergeList, SHEET_SCROLL]}>
                 <Text style={styles.body}>{t('circle.settings_restore.conflicts_body')}</Text>
                 {conflicts.map((c) => (
                   <View key={c.key} style={styles.mergeRow}>
@@ -160,7 +162,7 @@ export default function RestoreFlowModal({ visible, callSkill, onClose, onPhrase
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
-  card: { backgroundColor: theme.color.card, borderRadius: 10, padding: 18, maxHeight: '85%' },
+  card: { backgroundColor: theme.color.card, borderRadius: 10, padding: 18 },
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 6 },
   progress: { fontSize: 12, color: theme.color.inkSoft, marginBottom: 10 },
   body: { fontSize: 14, color: theme.color.ink, marginBottom: 10 },

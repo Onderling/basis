@@ -24,6 +24,7 @@ import {
 import { filterSlashSuggestions } from '../core/slashFilter.js';
 import { t }                       from '../core/localisation.js';
 import { theme }                   from '../screens/v2/theme.js';
+import { useSheetCap, SHEET_SCROLL } from '../screens/v2/sheetCap.js';
 
 /**
  * @param {object}   props
@@ -32,6 +33,7 @@ import { theme }                   from '../screens/v2/theme.js';
  * @param {boolean}  [props.visible=true]         render the FAB (false to opt out)
  */
 export default function SlashFAB({ catalogue, onDispatch, visible = true }) {
+  const sheetCap = useSheetCap(0.8);   // the card's cap in window pixels (sheetCap.js)
   const [open, setOpen]         = useState(false);
   const [input, setInput]       = useState('/');
   const [busy, setBusy]         = useState(false);
@@ -89,7 +91,7 @@ export default function SlashFAB({ catalogue, onDispatch, visible = true }) {
         onRequestClose={close}
       >
         <Pressable style={styles.backdrop} onPress={close}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.sheet, sheetCap]} onPress={(e) => e.stopPropagation()}>
             <TextInput
               autoFocus
               value={input}
@@ -102,6 +104,7 @@ export default function SlashFAB({ catalogue, onDispatch, visible = true }) {
             />
 
             <FlatList
+              style={SHEET_SCROLL}
               data={matches}
               keyExtractor={(m) => m.command}
               keyboardShouldPersistTaps="handled"
@@ -154,7 +157,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12,
-    padding: 12, paddingBottom: 24, maxHeight: '80%',
+    padding: 12, paddingBottom: 24,
   },
   input: {
     borderWidth: 1, borderColor: theme.color.line, borderRadius: 8,

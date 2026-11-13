@@ -43,6 +43,24 @@ describe('both give-ups land on a state the person can act on', () => {
     expect(map.get('nobody')).toBe(null);
   });
 
+  it("a relay give-up says WHAT was lost: the person's own message (a bubble) or lane traffic, its kind, and for whom", () => {
+    const known = new Map([['m9', 'maybe-received']]);
+    const map = { get: (id) => known.get(id), set: (id, st) => known.set(id, st) };
+    const warn = vi.fn();
+    const c = makeGiveUpConsumers({ deliveryMap: map, onWarn: warn });
+    c.onUndelivered({ msgId: 'm9', reason: 'bucket-full', to: 'GQl69DfbE5twD1fsXYZ', subtype: 'circle-chat' });
+    c.onUndelivered({ msgId: 'env-7', reason: 'bucket-full', to: 'v0Zs_pnM1QZWh9RFabc', subtype: 'circle-governance-broadcast' });
+    const [bubble, control] = warn.mock.calls.map((x) => String(x[0]));
+    expect(bubble).toMatch(/bucket-full/);
+    expect(bubble).toMatch(/bubble/);
+    expect(bubble).toMatch(/circle-chat/);
+    expect(bubble).toMatch(/GQl69Dfb/);
+    expect(bubble, 'never the whole address').not.toMatch(/GQl69DfbE5twD1fsXYZ/);
+    expect(control).toMatch(/control/);
+    expect(control).toMatch(/circle-governance-broadcast/);
+    expect(known.get('m9')).toBe('failed');
+  });
+
   it('a relay give-up marks the message failed', () => {
     const m = mapSpy();
     const warn = vi.fn();

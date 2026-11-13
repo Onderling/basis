@@ -56,6 +56,7 @@ export function renderMij(container, {
   onSaveDriver,
   onRemoveDriver,
   onCreatePersona,
+  onSetPersonaProperty,
   onToggleDisclosure,
   onShareToCircle,
   onSetPicture,
@@ -77,7 +78,7 @@ export function renderMij(container, {
   }
 
   container.appendChild(renderGeneral(tr, model, { onSetProperty, onSaveDriver, onRemoveDriver, onSetPicture, resolvePicture, currentPicture, lang }));
-  container.appendChild(renderPersonas(tr, model, { onCreatePersona }));
+  container.appendChild(renderPersonas(tr, model, { onCreatePersona, onSetPersonaProperty }));
   container.appendChild(renderCircles(tr, model, { onToggleDisclosure, onShareToCircle, canCarryMedia }));
   return container;
 }
@@ -270,7 +271,7 @@ function renderGeneral(tr, model, { onSetProperty, onSaveDriver, onRemoveDriver,
 }
 
 // ── 2 · PERSONA'S — filters + uitzonderingen op de algemene ────────────────
-function renderPersonas(tr, model, { onCreatePersona }) {
+function renderPersonas(tr, model, { onCreatePersona, onSetPersonaProperty }) {
   const sec = section(tr, 'circle.mij.personas_eyebrow', 'circle.mij.personas_tagline');
   const grid = el('div', 'cc-mij__grid');
 
@@ -300,6 +301,24 @@ function renderPersonas(tr, model, { onCreatePersona }) {
         line.appendChild(el('span', 'cc-mij__absent', tr('circle.mij.absent')));
       }
       card.appendChild(line);
+    }
+    // who may write to this persona first (firstContact.js): each control's choices, the one in force marked; a tap
+    // sets it on THIS persona
+    for (const row of (p.firstContact || [])) {
+      const box = el('div', 'cc-mij__first-contact');
+      box.dataset.key = row.key;
+      box.appendChild(el('span', 'cc-mij__entry-key', tr(row.labelKey)));
+      for (const choice of row.choices) {
+        const on = choice.value === row.value;
+        const b = el('button', on ? 'cc-mij__choice cc-mij__choice--on' : 'cc-mij__choice', tr(choice.labelKey));
+        b.type = 'button';
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.dataset.testid = `mij-first-contact-${p.id}-${row.key}-${String(choice.value)}`;
+        if (typeof onSetPersonaProperty === 'function' && !on) b.addEventListener('click', () => onSetPersonaProperty(p.id, row.key, choice.value));
+        else b.disabled = !on;
+        box.appendChild(b);
+      }
+      card.appendChild(box);
     }
     grid.appendChild(card);
   }

@@ -7004,6 +7004,8 @@ async function openAboutMePanel(personaId) {
         await removeDriver({ callSkill: rawCallSkill, personaId: model.defaultId ?? 'default', key });
         await draw();
       },
+      // a persona's own setting (who may write to it first): through the waist, on THAT persona, then the model again
+      onSetPersonaProperty: async (personaId, key, value) => { try { await rawCallSkill('agents', 'setProfileProperty', { id: personaId, key, value }); } catch { /* the model shows what holds */ } await draw(); },
       onCreatePersona: async (name, answers) => {
         try { await rawCallSkill('agents', 'createProfile', newPersonaArgs(name, answers)); } catch { /* */ }
         await draw();

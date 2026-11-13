@@ -7791,6 +7791,30 @@
       "text": "filters + uitzonderingen op de algemene",
       "doc": "mij#personas — sectie 2 tagline: persona's zijn filters/uitzonderingen op de waarheidslaag."
     },
+    "first_messages": {
+      "text": "Wie mag deze persona als eerste schrijven",
+      "doc": "mij#personas — persona-kaart: kop van de keuze wie een eerste privébericht mag sturen (eigenschap firstMessages)."
+    },
+    "first_messages_request": {
+      "text": "Alleen wie ik koos: een eerste bericht van een ander wacht als verzoek",
+      "doc": "mij#personas — keuze verzoek: een eerste bericht van iemand buiten het adresboek wacht tot de persoon het aanneemt."
+    },
+    "first_messages_open": {
+      "text": "Iedereen: een eerste bericht komt meteen binnen",
+      "doc": "mij#personas — keuze open: ieders eerste bericht wordt een gesprek."
+    },
+    "circle_members": {
+      "text": "Mensen in de kringen van deze persona",
+      "doc": "mij#personas — persona-kaart: kop van de keuze of kringleden privé mogen schrijven (circleMembersMayWrite)."
+    },
+    "circle_members_on": {
+      "text": "Mogen mij schrijven: hun bericht opent een gesprek",
+      "doc": "mij#personas — aan (standaard): het eerste privébericht van een kringlid is een gesprek, geen verzoek."
+    },
+    "circle_members_off": {
+      "text": "Eerst vragen, zoals ieder ander: hun bericht wacht als verzoek",
+      "doc": "mij#personas — uit: het eerste privébericht van een kringlid is een verzoek, zoals van een vreemde."
+    },
     "truth_tag": {
       "text": "waarheidslaag",
       "doc": "mij#personas — tag op de root-persona-kaart (roest rand)."

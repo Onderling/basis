@@ -44,6 +44,16 @@ describe('the "+" on the phone is one kept conversation', () => {
     await device.takeScreenshot('plus-thread-02-after-restart');
   });
 
+  it('typing offers lines the "+" reads here; a tap puts one in the line', async () => {
+    await new Promise((r) => setTimeout(r, 1500));   // the pool is read when the sheet opens
+    await element(by.id('vandaag-plus-line')).replaceText('onthoud');
+    await soon(by.id('vandaag-plus-suggestion'), 15_000);
+    await device.takeScreenshot('plus-thread-03-suggestions');
+    await element(by.id('vandaag-plus-suggestion')).atIndex(0).tap();
+    await new Promise((r) => setTimeout(r, 500));
+    if (await isVisible(by.text('onthoud').withAncestor(by.id('vandaag-plus')))) throw new Error('the tap did not put the suggested line in');
+  });
+
   it('Forget empties it', async () => {
     await tapSoon(by.id('vandaag-plus-forget'));
     await new Promise((r) => setTimeout(r, 1000));

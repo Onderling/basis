@@ -32,7 +32,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   pinned = [], onOpenPin = null, onUnpin = null, pinnedActIds = [], onTogglePin = null,
   // the kept conversation with the assistant (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to
   // empty it — web twin: vandaagPlus.js `plus-thread`
-  turns = [], onForget = null }) {
+  turns = [], onForget = null,
+  // what can be typed here: `suggestFor(line)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
+  suggestFor = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
@@ -103,7 +105,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={onForget} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
             </View>
           ) : null),
-              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (
+              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
               <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
@@ -111,7 +113,11 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
             </View>
-          ) : null),
+            {/* as the person types: the lines the "+" reads here that start with it; a tap puts one in the line (web twin) */}
+            {!act && typeof suggestFor === 'function' ? (suggestFor(line) ?? []).map((s) => (
+              <Btn key={s} variant="ghost" style={styles.btnAt} onPress={() => setLine(s)} testID="vandaag-plus-suggestion" label={s} />
+            )) : null}
+          </>) : null),
               'plus-own': () => (selves.length > 1 && !asSelf ? (
             <View>
               <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>

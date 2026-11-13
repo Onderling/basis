@@ -287,7 +287,7 @@ import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { replyLine } from '../../../../basis/src/v2/replyLine.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
@@ -2157,6 +2157,25 @@ export default function CircleLauncherScreen({
   const plusThread = useMemo(() => (eventLog?.append ? createPlusThread({ threads: createBotThreads({ eventLog, store: memoryThreadStore() }), threadId: plusThreadId(plusSelf) }) : null), [eventLog, plusSelf]);
   const [plusTurnsTick, setPlusTurnsTick] = useState(0);
   const plusTurns = useMemo(() => plusThread?.turns() ?? [], [plusThread, plusTurnsTick, plusOpen]);
+  // the circles the "+" line is read against (what each offers, its lists): the read uses them, and so does the pool of
+  // suggestions, read when the sheet opens — a suggestion is a line the "+" reads here (web twin: circleApp.js plusCircles)
+  const plusCircles = async () => {
+    const manifests = buildManifestsByOrigin();
+    const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
+    return Promise.all((circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+      id: c.id, name: c.name ?? '', manifestsByOrigin: manifests,
+      availability: await circleAvailabilityFor(c.id, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null),
+      lists: await circleListsFor((app, op, args = {}) => bundle?.callSkill?.(app, op, { ...args, circleId: c.id })).catch(() => []),
+    })));
+  };
+  const [plusPool, setPlusPool] = useState([]);
+  useEffect(() => {
+    if (!plusOpen) return undefined;
+    let alive = true;
+    plusCircles().then((list) => { if (alive) setPlusPool(plusSuggestionPool({ circles: list })); }).catch(() => {});
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plusOpen]);
   // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
   const plusRecorded = async (line, run) => {
     const r = plusThread ? await plusThread.exchange(line, run, { t }) : await run();
@@ -2193,14 +2212,9 @@ export default function CircleLauncherScreen({
         // missed (their settings' route only; none set = no model). Web twin: circleApp.js
         turns={plusTurns}
         onForget={plusThread ? () => { plusThread.forget(); setPlusTurnsTick((n) => n + 1); } : null}
+        suggestFor={(typed) => plusSuggest(plusPool, typed)}
         onRead={(line) => plusRecorded(line, async () => {
-          const manifests = buildManifestsByOrigin();
-          const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
-          const list = await Promise.all((circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
-            id: c.id, name: c.name ?? '', manifestsByOrigin: manifests,
-            availability: await circleAvailabilityFor(c.id, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null),
-            lists: await circleListsFor((app, op, args = {}) => bundle?.callSkill?.(app, op, { ...args, circleId: c.id })).catch(() => []),
-          })));
+          const list = await plusCircles();
           const o = plusLineOutcome(line, { circles: list });
           if (o?.kind === 'circle' && o.atOnce) return plusRunInCircle(o.command, o.circleId);
           if (o?.kind === 'circle') return { card: { line, to: o.to, command: o.command } };

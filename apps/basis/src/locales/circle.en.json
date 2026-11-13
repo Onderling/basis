@@ -5899,6 +5899,14 @@
       "text": "Show",
       "doc": "The thread header's control when the contact is hidden: show them in Contacts again (the person's own act; a message from them does the same)."
     },
+    "more": {
+      "text": "More",
+      "doc": "A contact thread: the ⋯ button that holds Hide and Delete."
+    },
+    "self_here": {
+      "text": "You are {{name}} here; what does this contact see of you?",
+      "doc": "A contact thread: the avatar top right, the persona you are in this thread; its tap shows what the contact sees of you."
+    },
     "hide_note": {
       "text": "Only from your list. Their circles and this conversation stay; a message from them brings them back.",
       "doc": "What hiding IS and is not, said under the control (amendment 3: Contacts only — their circles, roster row and member card are untouched). Never a notification."

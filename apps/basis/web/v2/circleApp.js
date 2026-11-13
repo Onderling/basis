@@ -65,7 +65,7 @@ import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
-import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens } from '../../src/v2/contactLens.js';
+import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
 import { deleteContact } from '../../src/v2/contactDelete.js';
 import { restoreFinishOutcome } from '../../src/v2/restoreFinishView.js';
@@ -3443,6 +3443,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   // to me (a peer-graph row; hiding them puts them in the book, hidden). A bot does not: a bot is removed, not
   // hidden. `null` keeps the header without it.
   let hidden = (row && !row.isBot) ? row.hidden === true : null;
+  // who you are in this thread (the persona this contact knows): the header's avatar, top right; read once, then painted
+  let selfHere = null;
 
   // Phase 2 (C3 / the G18 fix): rehydrate the DURABLE thread on open so a reload
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
@@ -3559,6 +3561,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
       try { await setContactHidden(contactId, next); } catch { error = true; rerender(); }
     },
     onOpenLens: () => { openContactLens(contactId, thread.name).catch(() => {}); },
+    self: selfHere,
     deletedAt: row?.deletedAt ?? null,
     // DELETE (L114): hide + leave the pair circle, asked first — the confirm is the undo
     onDelete: hidden === null ? null : () => { deleteContactWithConfirm(contactId, thread.name).catch(() => {}); },
@@ -3603,6 +3606,11 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   _activeContactThread?.leave?.();   // the thread this one replaces stops listening to the map
   _activeContactThread = { contactId, rerender, leave: unsubscribeDelivery, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
   rerender();
+  // who you are here (a person's thread only): read once, then the header paints it, while this thread is still on screen
+  if (hidden !== null) {
+    contactThreadSelfFor({ callSkill: rawCallSkill, row: row ?? { webid: contactId }, t })
+      .then((s) => { selfHere = s; if (_activeContactThread?.contactId === contactId) rerender(); }).catch(() => {});
+  }
   // Opening the thread is reading it: the seen-mark moves to now, and the row's count is gone next time.
   readMarks.markContact(contactId, _contactUnread[contactId]?.unreadIds ?? []).catch(() => {});   // …read on every device
   contactSeen.mark(contactId, Date.now()).then(() => { if (_contactUnread[contactId]) _contactUnread[contactId].unread = 0; }).catch(() => {});

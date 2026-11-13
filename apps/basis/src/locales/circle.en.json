@@ -7761,6 +7761,30 @@
       "text": "filters + exceptions on the general one",
       "doc": "mij#personas — section 2 tagline: personas are filters/exceptions on the truth layer."
     },
+    "first_messages": {
+      "text": "Who may write to this persona first",
+      "doc": "mij#personas — a persona card: heading of the choice who may send it a first private message (the firstMessages property)."
+    },
+    "first_messages_request": {
+      "text": "Only people I chose: anyone else's first message waits as a request",
+      "doc": "mij#personas — the request choice: a first message from someone not in the book is held until the person accepts it."
+    },
+    "first_messages_open": {
+      "text": "Anyone: a first message comes straight in",
+      "doc": "mij#personas — the open choice: anyone's first message lands as a conversation."
+    },
+    "circle_members": {
+      "text": "People in this persona's circles",
+      "doc": "mij#personas — a persona card: heading of the choice whether circle members may write privately (circleMembersMayWrite)."
+    },
+    "circle_members_on": {
+      "text": "May write to me: their message opens a conversation",
+      "doc": "mij#personas — on (the default): a co-member's first private message is a thread, not a request."
+    },
+    "circle_members_off": {
+      "text": "Ask first, like anyone else: their message waits as a request",
+      "doc": "mij#personas — off: a co-member's first private message is a request like a stranger's."
+    },
     "truth_tag": {
       "text": "truth layer",
       "doc": "mij#personas — tag on the root persona card (rust border)."

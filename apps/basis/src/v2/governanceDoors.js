@@ -8,7 +8,7 @@
  * is an outcome a screen can say in words.
  */
 import { DECISION_STATUS } from './governanceDecision.js';
-import { normalizeRulesDoc } from './circleRules.js';
+import { normalizeRulesDoc, rulesDocFromAnswer } from './circleRules.js';
 
 /**
  * What a governance `propose` answer means for the person who acted.
@@ -49,7 +49,7 @@ export async function readCircleRules({ callSkill, circleId } = {}) {
   if (typeof callSkill === 'function' && typeof circleId === 'string' && circleId) {
     try {
       const r = await callSkill('pinboard', 'getGroupRules', { groupId: circleId });
-      head = r?.doc && typeof r.doc === 'object' ? r.doc : null;
+      head = rulesDocFromAnswer(r);
     } catch { head = null; }
   }
   return { head, doc: normalizeRulesDoc(head) };

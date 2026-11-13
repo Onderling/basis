@@ -1403,26 +1403,10 @@ export default function ChatScreen({
             callSkill={bootState.kind === 'ready' ? bootState.bundle.callSkill : undefined}
             t={t}
             theme={theme}
-            // joinGroupWizard's cross-instance
-            // fallback (membershipCode-with-adminPeerAddr).  Constructed
-            // inline so it closes over the live agent + pendingMap.
-            // the bundle's shared redeem sender (same pending-map the response handler resolves against,
-            // and the same one the v2 launcher uses), so classic + v2 joins both correlate.
-            sendPeerRedeem={bootState.kind === 'ready' ? bootState.bundle.sendPeerRedeem : undefined}
-            // a join whose circle lives on another relay: be on the circle's endpoint BEFORE the redeem (same seams the v2 launcher passes).
-            // This host is where a TAPPED INVITE LINK lands, and it is precisely the host that has NOT been
-            // told which relay the invite names: without these two the redeem goes out over whatever
-            // transport this device happens to have, waits out a handshake timeout, and the join fails or
-            // crawls. Only consumed by JoinGroupWizardModal; other wizards ignore them.
-            dialEndpoint={(url) => bootState.kind === 'ready'
-              ? bootState.bundle.reconnectPeer?.({ relayUrl: url })
-              : undefined}
-            activeEndpointUrl={() => bootState.kind === 'ready'
-              ? (bootState.bundle.activeRelayUrl?.() ?? null)
-              : null}
-            // which persona this device holds a circle as (the second-persona warning); inert here until this host
-            // passes `circles` too, like the launcher does
-            profileIdOf={(cid) => (bootState.kind === 'ready' ? (bootState.bundle.agent?.profileIdOf?.(cid) ?? null) : null)}
+            // the seams every join needs (the redeem, the circle's address and link proof, the endpoint dial): the SAME set
+            // the launcher's join gets (agentBundle `joinWizardSeams`). This host is where a TAPPED INVITE LINK lands; it
+            // once passed no address seam, so a join from a link wrote no membership record. Other wizards ignore them.
+            {...(bootState.kind === 'ready' ? (bootState.bundle.joinWizardSeams ?? {}) : {})}
             // Post-join reachability (G13). Only consumed by JoinGroupWizardModal; other wizards ignore it.
             //
             // This host is where a TAPPED INVITE LINK lands, and it passed neither of the two things a join

@@ -23,10 +23,11 @@ const asRead = (st) => ({ ...st.body, author: st.body.payload.authorRef, authorK
 const asTombstone = (st) => ({ ...asRead(st), payload: { authorRef: st.body.payload.authorRef }, tombstone: true });
 
 // THE FINDING (2026-11-12): it does NOT. The devices that were there fold bram evicted; the late joiner folds bram
-// still in. This test pins that, as the reason compaction is paused (`COMPACT_SUPERSEDED_PROPS` in membershipRail.js).
+// still in. This test pins that FOLD fact: why a tombstone must REACH a late joiner. In format v2 it does (it proves
+// itself and a catch-up serves it): `tombstoneProvesItself.test.js` shows the late joiner folding the same roster.
 // When a tombstone can prove itself (the statement format whose signature covers a header the tombstone keeps), the
 // late joiner accepts the tombstone, and this test is rewritten to expect the SAME roster.
-describe('a late joiner without a compacted statement folds a DIFFERENT roster (why compaction is paused)', () => {
+describe('a late joiner WITHOUT a compacted statement folds a DIFFERENT roster (why the tombstone must reach it)', () => {
   it('the evict lands differently with and without the tombstoned parent', async () => {
     const [founder, bram, alex] = await Promise.all([1, 2, 3].map(() => AgentIdentity.generate(new VaultMemory())));
     const s = (who, kind, subject, payload, o = {}) => signSpine(who, { kind, circleId: CID, subject, payload: { authorRef: who.pubKey, ...payload }, ...o });

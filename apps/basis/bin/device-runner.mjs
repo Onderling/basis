@@ -333,6 +333,10 @@ const hiddenLanded = (item) => {
 const writeOrigin = new AsyncLocalStorage();
 const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
 const agent = await createRealHouseholdAgent({
+  // WHICH RELAY EACH CIRCLE RIDES: on a box, the one it is on (every circle it holds is reached there, as its
+  // registration below says). The agent reopens a persona's own socket at that point after a restart: a box holding a
+  // persona's circle (every device of the person is in every circle of the person) is otherwise silent there.
+  circlePointsFor: () => (relayUrl ? [relayUrl] : []),
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),

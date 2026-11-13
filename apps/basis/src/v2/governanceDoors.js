@@ -8,6 +8,7 @@
  * is an outcome a screen can say in words.
  */
 import { DECISION_STATUS } from './governanceDecision.js';
+import { normalizeRulesDoc } from './circleRules.js';
 
 /**
  * What a governance `propose` answer means for the person who acted.
@@ -34,6 +35,44 @@ export async function removeMemberDoor({ governance, circleId, memberWebid, acto
   if (typeof circleId !== 'string' || !circleId || typeof memberWebid !== 'string' || !memberWebid) return { outcome: 'refused', reason: 'missing-args' };
   let r;
   try { r = await governance.propose({ circleId, action: 'removeMember', subject: memberWebid, ...(actorRef ? { actor: { ref: actorRef } } : {}) }); }
+  catch (err) { return { outcome: 'refused', reason: err?.message ?? 'propose-failed' }; }
+  return doorOutcome(r);
+}
+
+/**
+ * THE CIRCLE'S RULES, as the rules screen edits them: the `group-rules` head that `getGroupRules` answers (the
+ * structured doc rides as `doc`). `head` is the whole stored object, `doc` the questions the screen asks.
+ * @returns {Promise<{head: object|null, doc: object}>}
+ */
+export async function readCircleRules({ callSkill, circleId } = {}) {
+  let head = null;
+  if (typeof callSkill === 'function' && typeof circleId === 'string' && circleId) {
+    try {
+      const r = await callSkill('pinboard', 'getGroupRules', { groupId: circleId });
+      head = r?.doc && typeof r.doc === 'object' ? r.doc : null;
+    } catch { head = null; }
+  }
+  return { head, doc: normalizeRulesDoc(head) };
+}
+
+/** What a save writes: the head with the edited questions on top, so the rule fields the screen does not ask stay. */
+export function rulesForSave(head, edited) {
+  return { ...(head && typeof head === 'object' ? head : {}), ...normalizeRulesDoc(edited) };
+}
+
+/**
+ * CHANGE THE CIRCLE'S RULES, through the circle's rule for `changeRule` (default: the admins decide together).
+ * @param {object} a
+ * @param {{propose: Function}} a.governance
+ * @param {string} a.circleId
+ * @param {object} a.rules                    the whole rules object to write (`rulesForSave`)
+ * @param {string|null} a.actorRef
+ */
+export async function changeRulesDoor({ governance, circleId, rules, actorRef = null } = {}) {
+  if (typeof governance?.propose !== 'function') return { outcome: 'refused', reason: 'no-governance' };
+  if (typeof circleId !== 'string' || !circleId || !rules || typeof rules !== 'object') return { outcome: 'refused', reason: 'missing-args' };
+  let r;
+  try { r = await governance.propose({ circleId, action: 'changeRule', subject: rules, ...(actorRef ? { actor: { ref: actorRef } } : {}) }); }
   catch (err) { return { outcome: 'refused', reason: err?.message ?? 'propose-failed' }; }
   return doorOutcome(r);
 }

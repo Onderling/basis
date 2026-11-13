@@ -24,7 +24,8 @@ import { decisionDeadlineDays } from './circlePolicy.js';
 export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, newProposalId, now = () => 0, canEnact = () => true } = {}) {
   async function enactAndClose(circleId, proposal, by) {
     let ok = true;
-    try { const r = await enact(circleId, proposal.action, proposal.subject); ok = r?.ok !== false; }
+    // an op REFUSES by `{ok:false}` or by `{error}` (pinboard's skills answer the second): either is not enacted
+    try { const r = await enact(circleId, proposal.action, proposal.subject); ok = r?.ok !== false && !r?.error; }
     catch { ok = false; }
     await appendEvent(circleId, resolveEvent({
       proposalId: proposal.proposalId, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, by, at: now(),

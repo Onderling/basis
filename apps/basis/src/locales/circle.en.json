@@ -4119,6 +4119,14 @@
       "text": "Save rules",
       "doc": "Save the rules document."
     },
+    "change_proposed": {
+      "text": "A proposal to change the rules is open: in this circle the admins decide that together. The rules change when it is decided.",
+      "doc": "After saving the rules in a circle where changing them is decided together: nothing changed yet, a proposal is open."
+    },
+    "change_refused": {
+      "text": "The rules were not changed: this circle did not allow it from this device.",
+      "doc": "After saving the rules when the circle refused the change (not an admin, or the write was refused): the rules stand as they were."
+    },
     "preview": {
       "text": "Preview (as a new member)",
       "doc": "Open the consent preview."

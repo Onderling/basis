@@ -4124,6 +4124,14 @@
       "text": "Regels opslaan",
       "doc": "Save the rules document."
     },
+    "change_proposed": {
+      "text": "Er staat een voorstel open om de regels te veranderen: in deze kring beslissen de beheerders dat samen. De regels veranderen als er besloten is.",
+      "doc": "After saving the rules in a circle where changing them is decided together: nothing changed yet, a proposal is open."
+    },
+    "change_refused": {
+      "text": "De regels zijn niet veranderd: deze kring stond dat vanaf dit apparaat niet toe.",
+      "doc": "After saving the rules when the circle refused the change (not an admin, or the write was refused): the rules stand as they were."
+    },
     "preview": {
       "text": "Voorbeeld (zoals een nieuw lid het ziet)",
       "doc": "Open the consent preview."

@@ -7169,8 +7169,9 @@ let helpPendingHelpQuery = null;   // { circleId, query }
 
 // Post the deterministic set-topic chips ("of kies zelf") — each resolves to its kaartje answer with
 // NO language model. `honest` frames them as the ONLY answerable topics (the no-assistant fallback).
-function postHelpTopicChips(id, { honest = false } = {}) {
-  const chips = helpTopicChips({ lang: currentLang() });
+// After a question (`query`): its five likeliest topics, the rest behind "all topics"; without one, every topic.
+function postHelpTopicChips(id, { honest = false, query = null } = {}) {
+  const chips = helpTopicChips({ lang: currentLang(), query, allLabel: t('circle.help.all_topics') });
   const text = honest ? t('circle.help.no_llm_topics') : t('circle.help.pick_topic');
   _circleRender?.botBubble(text, { buttons: chips });
 }
@@ -7200,19 +7201,21 @@ async function answerHelpMessage(id, query) {
     return;
   }
   // no LLM → honest: only the fixed topics can be answered without an assistant.
-  postHelpTopicChips(id, { honest: true });
+  postHelpTopicChips(id, { honest: true, query });
 }
 
 // A tapped help button: a topic chip resolves deterministically; a consent choice forwards to the LLM
 // ("ja, doorsturen") or offers the set topics to pick from ("nee, ik kies zelf").
 async function handleHelpAction(id, help) {
+  // "all topics" after the likeliest few: the whole list
+  if (help.kind === 'all') { postHelpTopicChips(id); return; }
   if (help.kind === 'topic') {
     const ans = resolveHelpTopic(help.id, { lang: currentLang() });
     if (ans) _circleRender?.botBubble(ans.text, { provenance: ans.provenance });
     return;
   }
   if (help.kind === 'consent') {
-    if (help.value === 'no') { postHelpTopicChips(id); return; }
+    if (help.value === 'no') { postHelpTopicChips(id, { query: helpPendingHelpQuery?.circleId === id ? helpPendingHelpQuery.query : null }); return; }
     if (help.value === 'yes') {
       const pending = helpPendingHelpQuery && helpPendingHelpQuery.circleId === id ? helpPendingHelpQuery.query : null;
       helpPendingHelpQuery = null;

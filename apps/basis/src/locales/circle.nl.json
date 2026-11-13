@@ -958,6 +958,10 @@
       "text": "Prima. Kies dan zelf een onderwerp:",
       "doc": "Task #13 Phase 2 — heading above the set-topic chips after the user declines forwarding (or types /help)."
     },
+    "all_topics": {
+      "text": "Alle onderwerpen",
+      "doc": "Help: the chip after the five likeliest topics of an unanswered question; it posts every topic."
+    },
     "no_llm_topics": {
       "text": "Zonder assistent kan ik alleen deze vaste onderwerpen beantwoorden. Kies er een:",
       "doc": "Task #13 Phase 2 — honest fallback on a MISS when NO assistant is connected: only the fixed topics can be answered."

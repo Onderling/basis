@@ -1527,9 +1527,13 @@
       "text": "Say what you want — \"note: milk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
-    "plus_referral": {
-      "text": "That is something for {{name}} → open",
-      "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
+    "plus_circle_ask": {
+      "text": "“{{line}}”: in which circle?",
+      "doc": "The \"+\" line reads to an act more than one of the person's circles holds: the card asks which circle (one button per circle, and Cancel); nothing runs until one is chosen."
+    },
+    "plus_circle_in": {
+      "text": "In {{name}}",
+      "doc": "The \"+\" card's button for one circle: run the act the line reads to in that circle, as the person."
     },
     "pin_to_plus": {
       "text": "Pin to +",

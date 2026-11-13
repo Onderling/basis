@@ -96,6 +96,17 @@ export function listsGateRules(_locale, lists = [], { greeting = true } = {}) {
   });
 }
 
+/**
+ * A circle's lists as the gate reads them (`listsGateRules`): each list's name, kind and default child, read through the
+ * lists' own op. `call` runs an op in that circle (`(app, op, args) => …`, the circle id already bound). One reader for
+ * every door that reads a circle's lists: the bot in a circle (Telegram's circle runner) and the "+" on web and mobile.
+ */
+export async function circleListsFor(call) {
+  const r = await Promise.resolve(call('lists', 'listLists', {})).catch(() => null);
+  const items = Array.isArray(r?.items) ? r.items : [];
+  return items.map((l) => ({ name: l.label ?? l.text ?? l.title ?? '', kind: l.kind ?? 'list', defaultChild: l.defaultChild ?? null, aliases: [] })).filter((l) => l.name);
+}
+
 /** The greeting's rule id (a door that has no greeting op leaves it out). */
 const GREETING_RULE = 'assistant.hello';
 /** A line as a greeting reads it: letters, digits and spaces — "goedemorgen 👋", "Hallo!!" are "goedemorgen", "Hallo". */

@@ -84,6 +84,7 @@ import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { rosterBindingVerifier, makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
+import { narrowReportStatements } from '../../src/v2/reportLane.js';
 import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
 
 import {
@@ -407,7 +408,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Wave C tail A — the REAL governance/report ingest handlers (the exact wiring the shells
     // use): a fanned vote/report lands in THIS node's EventLog, so a headless two-agent run can
     // assert cross-device replication over a genuine transport (not a simulated fan).
-    'circle-governance-broadcast': (() => {
+    ...(() => {
       // Verify-before-land, exactly as the shells: the rail off THIS node's real per-circle signer +
       // the roster's circleAddress rows for foreign bindings.
       // The key↔ref binding source: the default roster-row lookup, or a test-supplied resolver. This
@@ -415,13 +416,22 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       // binding for this path lands with the membership rider) — a repro that fans signed governance
       // supplies the binding explicitly rather than weakening the verify.
       const govRail = makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined });
-      return makeCircleGovernancePeerHandler({
-        eventLog: chatEventLog,
-        rail: govRail,
-        // The rules-update rider's receive half, exactly as the shells: a landed statement may carry
-        // a new rules doc — fold it into this node's local rules head (cheap pre-scan; vote churn no-ops).
-        onChange: (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); },
+      // The rules-update rider's receive half, exactly as the shells: a landed statement may carry
+      // a new rules doc — fold it into this node's local rules head (cheap pre-scan; vote churn no-ops).
+      const onChange = (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); };
+      // …and the governance CATCH-UP pair the shells compose (circleLanes.js `gov`): a member who joins after a statement
+      // was made (an admin's policy update before the invite) asks for it, and this node serves it. Without it a joiner
+      // never received a policy signed before it joined (found 2026-11-13 by the phone's '+' walk: lists stayed off).
+      // Reports are served only to their readers, as the shells narrow them.
+      const govCatchUp = makeGovernanceCatchUp({
+        rail: govRail, sendToPeer: sendPeer, onChange,
+        narrowServe: (statements, who) => narrowReportStatements(statements, who, { callSkill: (...a) => agent.callSkill(...a) }),
       });
+      return {
+        'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog: chatEventLog, rail: govRail, onChange }),
+        [govCatchUp.subtypes.request]: govCatchUp.onRequest,
+        [govCatchUp.subtypes.batch]:   govCatchUp.onBatch,
+      };
     })(),
     // a report is a signed statement on the same governance rail (this node's log, the same binding source)
     'circle-report-broadcast':     makeCircleReportPeerHandler({ rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }) }),

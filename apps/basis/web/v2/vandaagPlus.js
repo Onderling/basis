@@ -13,8 +13,9 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   shareTargets = null, onShare,
   // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
   selves = null, asSelf = null, onPickSelf,
-  // the line named something that lives in a circle: where it lives (`[{circleId, name}]`) — opened, never acted on
-  referral = null, onOpenCircle,
+  // the line reads to an act more than one circle holds: the card (`{line, to: [{circleId, name}]}`) — a pick runs it in
+  // that circle (`onCircleRun(circleId)`), Cancel drops it (`onCircleCancel`); `done`: the line an act that ran says
+  circleCard = null, onCircleRun, onCircleCancel, done = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
   // Vastgezet: the pins to paint (`paintablePins`, each with its `label` and `key`); a tap → `onOpenPin(pin)`, × →
@@ -191,19 +192,34 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   }
   // a section with nothing in it is not shown (its heading over nothing would be noise)
   for (const el of Object.values(sec)) if (!el.querySelector('button, form, input')) el.hidden = true;
-  if (Array.isArray(referral) && referral.length) {
+  if (circleCard && Array.isArray(circleCard.to) && circleCard.to.length) {
     const box = document.createElement('div');
-    box.className = 'circle-vandaag-plus__referral';
-    for (const r of referral) {
+    box.className = 'circle-vandaag-plus__card';
+    const q = document.createElement('p');
+    q.textContent = tr('circle.vandaag.plus_circle_ask', { line: circleCard.line ?? '' });
+    box.appendChild(q);
+    for (const r of circleCard.to) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__referral-open';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__card-in';
       b.dataset.circleId = r.circleId;
-      b.textContent = tr('circle.vandaag.plus_referral', { name: r.name || tr('circle.screens.untitled') });
-      b.addEventListener('click', () => onOpenCircle?.(r.circleId));
+      b.textContent = tr('circle.vandaag.plus_circle_in', { name: r.name || tr('circle.screens.untitled') });
+      b.addEventListener('click', () => onCircleRun?.(r.circleId));
       box.appendChild(b);
     }
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__card-no';
+    no.textContent = tr('circle.confirm.cancel');
+    no.addEventListener('click', () => onCircleCancel?.());
+    box.appendChild(no);
     container.appendChild(box);
+  }
+  if (done) {
+    const p = document.createElement('p');
+    p.className = 'circle-vandaag-plus__done';
+    p.textContent = done;
+    container.appendChild(p);
   }
   if (error) {
     const p = document.createElement('p');

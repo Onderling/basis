@@ -216,3 +216,50 @@ export function refusedCarriedChanges({ bodies = [], policy = {}, members = [], 
   }
   return out;
 }
+
+/**
+ * THE MEMBERSHIP LANE'S GATE, as the roster fold asks it (`foldRoster`'s `governedGate`): another person's removal
+ * (`evict` → removeMember) or role change (`role` → changeRole, decided by the settings class) takes effect only where
+ * the circle's rule allowed it. The same rules as the rules lane: judged by the settings version the statement carries
+ * (`payload.policyVersion`, Opus: a removal made under any-admin stays valid after the circle tightens); an author's
+ * stamps never go back (not below their own earlier ones in the fold's order, nor below a settings version they
+ * wrote); a stamp the chain does not know yet does not take effect yet; no stamp → the rule now. Where a vote was
+ * needed, the statement names its proposal, re-tallied here under that rule (`members`: the roster read WITHOUT this
+ * gate, the first pass), about the same member (and role).
+ *
+ * The fold calls it in its own deterministic order, so the per-author floor kept here is the same on every device.
+ * @param {object} a
+ * @param {{policyAt: Function, head: number, kept: object[]}} a.chain   `judgePolicyChain`'s answer
+ * @param {object} a.currentPolicy
+ * @param {Array<{ref: string, role: string}>} a.members                the first-pass roster
+ * @param {Array<object>} a.proposals
+ * @returns {(statement: object, ctx: {admins: Set<string>}) => boolean}
+ */
+export function membershipGateFor({ chain, currentPolicy = {}, members = [], proposals = [], now = Date.now() } = {}) {
+  const floor = new Map();
+  for (const b of chain?.kept ?? []) floor.set(b.author, Math.max(floor.get(b.author) ?? 0, versionOf(b)));
+  return (s, { admins } = {}) => {
+    const action = s?.kind === 'evict' ? 'removeMember' : s?.kind === 'role' ? 'changeRole' : null;
+    if (!action) return true;
+    const payload = s.payload && typeof s.payload === 'object' ? s.payload : {};
+    const stamp = Number.parseInt(payload.policyVersion, 10);
+    let policy;
+    if (!Number.isFinite(stamp)) policy = currentPolicy;
+    else if (stamp > (chain?.head ?? 0)) return false;                       // a rule this device has not seen yet
+    else if (stamp < (floor.get(s.author) ?? 0)) return false;               // signed under a rule the author had left
+    else policy = chain.policyAt(stamp);
+    if (Number.isFinite(stamp)) floor.set(s.author, Math.max(floor.get(s.author) ?? 0, stamp));
+    const atDepth = [...(admins ?? [])].map((ref) => ({ ref, role: 'admin' }));
+    if (!changeNeedsVote(policy, action, atDepth)) return true;
+    const id = typeof payload.proposalId === 'string' ? payload.proposalId : null;
+    const p = id ? (Array.isArray(proposals) ? proposals : []).find((x) => x?.proposalId === id) : null;
+    if (!p || p.action !== action) return false;
+    const about = action === 'removeMember'
+      ? p.subject === s.subject
+      : p.subject?.member === s.subject && p.subject?.role === payload.role;
+    if (!about) return false;
+    const d = resolveGovernance({ action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now, seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by });
+    return d.status === DECISION_STATUS.APPROVED
+      || (p.closed === true && p.status === DECISION_STATUS.APPROVED && d.overrideAvailable === true);
+  };
+}

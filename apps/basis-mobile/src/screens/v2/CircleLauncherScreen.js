@@ -2019,23 +2019,16 @@ export default function CircleLauncherScreen({
       {joinArgs ? (
         <JoinGroupWizardModal
           visible
+          // the seams every join needs (the redeem, the circle's address and link proof, the endpoint dial), one set
+          // for both hosts of this wizard (agentBundle `joinWizardSeams`)
+          {...(bundle?.joinWizardSeams ?? {})}
           args={joinArgs}
           callSkill={bundle?.callSkill}
-          sendPeerRedeem={bundle?.sendPeerRedeem}
           t={t}
           // The join sheet is the first surface a new person meets; it was hardcoded light and arrived
           // as a white sheet in a dark app (S3, 2026-07-30). The theme lives here, in the shell.
           theme={theme}
           circles={circles}
-          circleAddressFor={(cid) => bundle?.agent?.circleAddressFor?.(cid) ?? null}
-          signCircleLink={(cid, gid, addr) => bundle?.agent?.signCircleLink?.(cid, gid, addr) ?? null}
-          // which persona this device holds a circle as: the join warns before a second persona of the person joins it
-          profileIdOf={(cid) => bundle?.agent?.profileIdOf?.(cid) ?? null}
-          // J-CP1 — be on the circle's endpoint BEFORE the redeem. The invite names it; without this
-          // the redeem goes out over whatever transport this device happens to have, and a relay-only
-          // admin never hears it.
-          dialEndpoint={(url) => bundle?.reconnectPeer?.({ relayUrl: url })}
-          activeEndpointUrl={() => bundle?.relayUrls?.() ?? bundle?.activeRelayUrl?.() ?? null}
           // Post-join reachability (G13) — the same seam the chat-shell host passes, so a join is
           // equally complete from either surface. This screen already bound the roster keys in
           // `onDispatched`; what it never did was RE-REGISTER this device's per-circle address, so the

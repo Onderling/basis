@@ -57,7 +57,7 @@ function startPeer(args) {
  * The wizard SLIDES in: a tap mid-slide lands nowhere and the box stays unticked (screenshot 2026-10-22). Settle,
  * tick, press Next — and tick again only while the next step has not come (a tick that took would be undone).
  */
-async function joinByInvite({ invite, circleId, handle = 'anna', shot = null }) {
+async function joinByInvite({ invite, circleId, handle = 'anna', shot = null, atWhoJoins = null }) {
   await device.openURL({ url: invite });
   const step = async (box, nextId) => {
     await soon(by.id(box), 60_000);
@@ -71,7 +71,9 @@ async function joinByInvite({ invite, circleId, handle = 'anna', shot = null }) 
   };
   await step('join-rules-accept', 'join-privacy-accept');
   await step('join-privacy-accept', 'wizard-handle');
-  if (await isVisible(by.id('wizard-handle'))) await element(by.id('wizard-handle')).replaceText(handle);
+  // the wizard's third step says who joins: a walk may change that (a new persona) instead of typing a name
+  if (atWhoJoins) await atWhoJoins();
+  else if (await isVisible(by.id('wizard-handle'))) await element(by.id('wizard-handle')).replaceText(handle);
   if (shot) await device.takeScreenshot(shot);
   await tapSoon(by.id('join-submit'));
   await tapSoon(by.id('circle-tab-circles'), 60_000);

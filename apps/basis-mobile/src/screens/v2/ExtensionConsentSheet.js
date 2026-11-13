@@ -16,8 +16,10 @@ import React, { useMemo } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
 export default function ExtensionConsentSheet({ result, onAdd, onDecline }) {
+  const sheetCap = useSheetCap(0.8);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const visible = !!result;
@@ -28,7 +30,7 @@ export default function ExtensionConsentSheet({ result, onAdd, onDecline }) {
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onDecline}>
       <Pressable style={styles.backdrop} onPress={onDecline} testID="ext-consent-backdrop">
         {/* Inner Pressable swallows taps so the sheet doesn't dismiss. */}
-        <Pressable style={styles.sheet} onPress={() => {}} testID="ext-consent-sheet">
+        <Pressable style={[styles.sheet, sheetCap]} onPress={() => {}} testID="ext-consent-sheet">
           {!ok ? (
             <View>
               <Text style={styles.title} testID="ext-consent-refused">
@@ -43,7 +45,7 @@ export default function ExtensionConsentSheet({ result, onAdd, onDecline }) {
           ) : (
             <View>
               <Text style={styles.title}>{t('circle.extension.title', { title: card.title })}</Text>
-              <ScrollView contentContainerStyle={styles.body}>
+              <ScrollView style={SHEET_SCROLL} contentContainerStyle={styles.body}>
                 <Text style={styles.label}>{t('circle.extension.adds')}</Text>
                 {card.commands.map((c, i) => (
                   <Text key={i} style={styles.cmd} testID={`ext-consent-cmd-${i}`}>
@@ -78,7 +80,7 @@ export default function ExtensionConsentSheet({ result, onAdd, onDecline }) {
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  sheet:    { backgroundColor: theme.color.paper, borderRadius: theme.radius?.lg ?? 12, padding: 20, width: '100%', maxWidth: 440, maxHeight: '80%' },
+  sheet:    { backgroundColor: theme.color.paper, borderRadius: theme.radius?.lg ?? 12, padding: 20, width: '100%', maxWidth: 440 },
   title:    { fontSize: 18, fontWeight: '600', color: theme.color.ink, marginBottom: 12 },
   body:     { paddingBottom: 8 },
   label:    { fontWeight: '600', color: theme.color.ink, marginBottom: 4 },

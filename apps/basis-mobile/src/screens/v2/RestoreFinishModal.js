@@ -16,11 +16,13 @@ import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { restoreFinishOutcome } from '../../../../basis/src/v2/restoreFinishView.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'restore-finish');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
 export default function RestoreFinishModal({ visible, callSkill, onClose }) {
+  const sheetCap = useSheetCap(0.85);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [inst, setInst] = useState(null);
@@ -128,9 +130,9 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => { runnerRef.current?.cancel(inst); finish(); }}>
       <View style={styles.backdrop}>
-        <View style={styles.card} testID="restore-finish-modal">
+        <View style={[styles.card, sheetCap]} testID="restore-finish-modal">
           <Text style={styles.title}>{t('circle.restore_finish.title')}</Text>
-          <ScrollView keyboardShouldPersistTaps="handled">{body}</ScrollView>
+          <ScrollView style={SHEET_SCROLL} keyboardShouldPersistTaps="handled">{body}</ScrollView>
         </View>
       </View>
     </Modal>
@@ -139,7 +141,7 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
-  card: { backgroundColor: theme.color.card, borderRadius: 10, padding: 18, maxHeight: '85%' },
+  card: { backgroundColor: theme.color.card, borderRadius: 10, padding: 18 },
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 6 },
   body: { fontSize: 14, color: theme.color.ink, marginBottom: 8 },
   muted: { fontSize: 13, color: theme.color.inkSoft, marginBottom: 8 },

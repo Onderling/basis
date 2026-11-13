@@ -325,6 +325,7 @@ import { bindCircleGovernance, openPolicyProposals, makeGovernanceBroadcast } fr
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 import { launcherListPaint } from './launcherListPaint.js';
 import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
 // B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
 // Unset → no provider → the LLM branch
@@ -413,6 +414,7 @@ function PersonaPanel({
   personaId, onClose, styles, callSkill, circles = [],
   emitMemberProps = null, lastShared = null, resealMediaForCircle = null, profilePicture = null,
 }) {
+  const sheetCap = useSheetCap(0.85);   // the card's cap in window pixels (sheetCap.js)
   // Which circles can carry a picture right now (a seal strategy for their media) — Mij does not offer the picture
   // where a share would have to drop it, and says why (web parity: circleApp's `carriesMedia`).
   const [carriesMedia, setCarriesMedia] = useState(() => new Map());
@@ -436,7 +438,7 @@ function PersonaPanel({
   return (
     <Modal visible={!!personaId} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.panelBackdrop}>
-        <View style={styles.panelCard} testID="circle-aboutme-panel">
+        <View style={[styles.panelCard, sheetCap]} testID="circle-aboutme-panel">
           <View style={styles.panelHead}>
             <Text style={styles.panelTitle}>{t('circle.mij.title')}</Text>
             <Pressable onPress={onClose} testID="circle-aboutme-panel-close">
@@ -3196,6 +3198,7 @@ function CircleDetail({
   // a circle an admin removed this person from: the close (`dismissRemovedCircle`), offered where the composers were
   onCloseRemoved = null,
 }) {
+  const sheetCap = useSheetCap(0.85);   // the panels' card cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -4933,7 +4936,7 @@ function CircleDetail({
       {/* S6.B — chat-triggered screen panel (tasks/agenda overview) in a modal. */}
       <Modal visible={!!screenPanel} animationType="slide" transparent onRequestClose={() => setScreenPanel(null)}>
         <View style={styles.panelBackdrop}>
-          <View style={styles.panelCard} testID="circle-screen-panel">
+          <View style={[styles.panelCard, sheetCap]} testID="circle-screen-panel">
             <View style={styles.panelHead}>
               <Text style={styles.panelTitle}>
                 {screenPanel ? t(`circle.screen.open.${screenPanel.screen}`, { defaultValue: t('circle.screen.open_generic') }) : ''}
@@ -4944,7 +4947,7 @@ function CircleDetail({
             </View>
             {listScreenData?.shape === 'record' ? (
               /* a record-shaped DETAIL screen (read-only key→value, web parity). */
-              <ScrollView keyboardShouldPersistTaps="handled">
+              <ScrollView keyboardShouldPersistTaps="handled" style={SHEET_SCROLL}>
                 <CircleRecordScreen record={listScreenData.record} activity={listScreenData.activity ?? null} />
               </ScrollView>
             ) : listScreenData ? (
@@ -4992,7 +4995,7 @@ function CircleDetail({
       {/* §2 — member-persona card / self-view, opened by tapping a MEMBERS-tab row. */}
       <Modal visible={!!memberCard} animationType="slide" transparent onRequestClose={() => setMemberCard(null)}>
         <View style={styles.panelBackdrop}>
-          <View style={styles.panelCard}>
+          <View style={[styles.panelCard, sheetCap]}>
             {memberCard ? (
               <CircleMemberCardScreen
                 member={memberCard.member}
@@ -6324,7 +6327,7 @@ function MyThingsScreen({ files = [], onBack }) {
 const makeStyles = (theme, insets = null) => StyleSheet.create({
   // S6.B — chat-triggered screen panel.
   panelBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  panelCard:  { backgroundColor: theme.color.paper, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85%', minHeight: '50%', padding: 16 },
+  panelCard:  { backgroundColor: theme.color.paper, borderTopLeftRadius: 16, borderTopRightRadius: 16, minHeight: '50%', padding: 16 },
   panelHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   panelTitle: { fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },
   panelClose: { fontSize: 16, color: theme.color.inkSoft, paddingHorizontal: 6 },

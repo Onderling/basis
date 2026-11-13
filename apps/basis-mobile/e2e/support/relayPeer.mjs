@@ -19,6 +19,9 @@
  * In `--talk` mode the peer also keeps the circle's LISTS on stdin commands: `list-create`, `list-add` and `lists-dump`
  * (every list and its open entries), through the same `lists` ops the shells call.
  *
+ * and the circle's TASKS: `task-claim` and `task-complete` (the open task whose words hold `text`) and `tasks-dump`
+ * (every open task with its status and who holds it, plus the peer's own addresses), through the same `tasks` ops.
+ *
  * `--talk` makes the peer a person who CONVERSES (the messaging story): it composes the contact thread, reports what
  * it hears, and speaks when the walk tells it to. It hears: one line per new circle chat line from someone else
  * (`{"step":"circle-heard","text":…}`) and per new inbound contact turn (`{"step":"contact-heard","text":…,"from":…}`).
@@ -226,6 +229,22 @@ if (talk) {
           out.push({ list: name, id: l?.id ?? null, entries: entries.map((e) => e?.label ?? null).filter(Boolean), ids: Object.fromEntries(entries.filter((e) => e?.label && e?.id).map((e) => [e.label, e.id])) });
         }
         say({ step: 'lists', lists: out });
+      } else if (cmd.do === 'tasks-dump') {
+        // what the peer holds of the circle's tasks: every open one, its status and who holds it; `me` is the peer's
+        // own addresses, so a walk can say "held by Bram" from the peer's own store
+        const open = (await call('tasks', 'listOpen', { circleId: groupId }))?.items ?? [];
+        say({
+          step: 'tasks',
+          me: [peer.pubKey, peer.agent.circleSelf?.(groupId)?.webid, peer.agent.circleAddressFor?.(groupId)].filter(Boolean),
+          open: open.map((x) => ({ id: x?.id ?? null, text: x?.text ?? null, status: x?.status ?? x?.state ?? null, assignees: Array.isArray(x?.assignees) ? x.assignees : (x?.assignee ? [x.assignee] : []), addedBy: x?.addedBy ?? null })),
+        });
+      } else if (cmd.do === 'task-claim' || cmd.do === 'task-complete') {
+        // the open task whose words hold `text`, claimed or completed through the op a shell's chip calls
+        const step = cmd.do === 'task-claim' ? 'task-claimed' : 'task-completed';
+        const open = (await call('tasks', 'listOpen', { circleId: groupId, text: cmd.text }))?.items ?? [];
+        if (open.length !== 1) { say({ step, ok: false, error: `${open.length} open tasks hold "${cmd.text}"` }); return; }
+        const r = await call('tasks', cmd.do === 'task-claim' ? 'claimTask' : 'completeTask', { circleId: groupId, id: open[0].id });
+        say({ step, ok: !r?.error && r?.result?.ok !== false, id: open[0].id, result: r ?? null });
       } else if (cmd.do === 'circle-say') {
         const r = await sendCircleChat(peer, { groupId, msgId: `peer-${Date.now().toString(36)}`, text: cmd.text });
         say({ step: 'circle-said', ok: !r?.error, error: r?.error ?? null });

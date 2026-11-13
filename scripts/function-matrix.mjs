@@ -85,7 +85,7 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'task-sharing', name: 'Task sharing', cells: {
     web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'task-handoff — A adds a task, B claims it' },   // named by Fable 2026-11-03
-    mobile: null,   // multiCircleSeparation is one bundle keeping circles apart; nothing is shared (Fable 2026-11-10)
+    mobile: { file: 'apps/basis-mobile/e2e/taskSharing.test.js', test: 'Bram claims it: the phone shows it as taken, no longer open to claim' },
     box: { file: 'apps/basis/test/choresOnTheBox.relay.test.js', test: 'Ann adds a chore; Bert claims it' },
   } },
   { id: 'asking', name: 'Asking questions', cells: {

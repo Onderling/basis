@@ -10,7 +10,8 @@ function fakeClient() {
     m,
     write: async (uri, body) => { m.set(uri, body); },
     read: async (uri) => { if (!m.has(uri)) { const e = new Error('nf'); e.code = 'NOT_FOUND'; throw e; } return { content: m.get(uri) }; },
-    list: async (prefix) => [...m.keys()].filter((k) => k.startsWith(prefix)).map((uri) => ({ uri })),
+    // PodClient's own shape: `{ container, entries }` (a fake answering a bare array is how the list seam stayed dead)
+    list: async (prefix) => ({ container: prefix, entries: [...m.keys()].filter((k) => k.startsWith(prefix)).map((uri) => ({ uri })) }),
   };
 }
 const BASE = 'https://ann.pod/circles/c1/';
@@ -43,14 +44,6 @@ describe('podStorageBackend with a base', () => {
     const b = podStorageBackend(c, { base: 'pseudo-pod://central/circles/c1' });
     await b.put('c1/0001-m1', 'X');
     expect([...c.m.keys()]).toEqual(['pseudo-pod://central/circles/c1/c1/0001-m1']);
-    expect(await b.list('c1/')).toEqual(['c1/0001-m1']);
-  });
-
-  it('lists through a client shaped like PodClient ({container, entries}), not only a bare array', async () => {
-    const c = fakeClient();
-    const real = { ...c, list: async (prefix) => ({ container: prefix, entries: await c.list(prefix) }) };
-    const b = podStorageBackend(real, { base: BASE });
-    await b.put('c1/0001-m1', 'X');
     expect(await b.list('c1/')).toEqual(['c1/0001-m1']);
   });
 

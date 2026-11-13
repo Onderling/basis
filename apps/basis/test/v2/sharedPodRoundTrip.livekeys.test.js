@@ -155,7 +155,7 @@ describe('Phase 3 (LIVE KEYS) — shared-pod round-trip with REAL circle group-k
     const B = await chatDevice(BOB);
     const catchUp = makePodChatCatchUp({
       rail: B.rail,
-      podReadSince: (cid, q) => readSealedMessagesSince(backend, strategy.open, { circleId: cid, ...q }).then((res) => res.items),
+      podReadSince: (cid, q) => readSealedMessagesSince(backend, strategy.open, { circleId: cid, ...q }),
       eventLog: B.eventLog,
     });
     expect((await catchUp.catchUpCircle(CIRCLE)).ingested).toBe(1);

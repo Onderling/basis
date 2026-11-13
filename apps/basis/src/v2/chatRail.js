@@ -328,7 +328,9 @@ export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null, 
  *
  * @param {object} a
  * @param {object} a.rail                       the chat rail
- * @param {(circleId:string, q:{sinceTs:number})=>Promise<object[]>} a.podReadSince  the sealed-pod range reader
+ * @param {(circleId:string, q:{sinceTs:number})=>Promise<{items:object[], truncated:boolean}>} a.podReadSince  the
+ *   shared custody's sealed-pod range reader (`circlePodReadSince`): one page forward from `sinceTs`, `truncated` when
+ *   more rows follow; the catch-up reads on page by page, so a long absence loses nothing
  * @param {(circleId:string)=>Promise<string>|string} [a.dataMoveFor]  the circle's data-move branch; absent →
  *   every listed circle is probed (a pod-less circle's reader just returns nothing)
  * @param {{query: Function}} a.eventLog        for the since-watermark (newest landed chat entry per circle)
@@ -336,6 +338,7 @@ export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null, 
 export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eventLog } = {}) {
   if (!rail || typeof podReadSince !== 'function') return null;
   const OVERLAP_MS = 60 * 60 * 1000;   // re-read an hour behind the watermark; idempotent ingest dedups
+  const MAX_PAGES = 50;                // pages per kick (the reader's page is 200 rows); the next kick reads on
 
   async function catchUpCircle(circleId) {
     if (typeof dataMoveFor === 'function') {
@@ -350,18 +353,24 @@ export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eve
         if (e?.type === CHAT_LANE && e.payload?.circleId === circleId && typeof e.ts === 'number' && e.ts > sinceTs) sinceTs = e.ts;
       }
     } catch { sinceTs = 0; }
-    let rows = [];
-    try {
-      // the shells hand the shared custody's reader, which answers `{items, truncated}`; a bare array is read as is
-      const read = await podReadSince(circleId, { sinceTs: Math.max(0, sinceTs - OVERLAP_MS) });
-      rows = Array.isArray(read) ? read : (Array.isArray(read?.items) ? read.items : []);
-    } catch { return { ingested: 0 }; }
     let ingested = 0;
-    for (const row of rows) {
-      const statement = row?.event;
-      if (!statement?.body || !statement?.sig) continue;   // a pre-statement row: the migrated era's copy
-      try { const r = await rail.ingest(circleId, statement); if (r?.ok && !r.existed) ingested += 1; }
-      catch { /* one bad row never blocks the rest */ }
+    let from = Math.max(0, sinceTs - OVERLAP_MS);
+    // page by page: the reader answers one page forward from `from`; read on from the last row's ts while more follow
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      let read;
+      try { read = await podReadSince(circleId, { sinceTs: from }); }
+      catch { return { ingested }; }
+      const rows = read?.items ?? [];
+      for (const row of rows) {
+        const statement = row?.event;
+        if (!statement?.body || !statement?.sig) continue;   // a pre-statement row: the migrated era's copy
+        try { const r = await rail.ingest(circleId, statement); if (r?.ok && !r.existed) ingested += 1; }
+        catch { /* one bad row never blocks the rest */ }
+      }
+      const last = rows[rows.length - 1]?.ts;
+      // done, or no progress (a full page of one ts): the next kick reads on from the newest landed entry
+      if (!read?.truncated || !Number.isFinite(last) || last <= from) break;
+      from = last;
     }
     return { ingested };
   }

@@ -66,10 +66,9 @@ export function podStorageBackend(podClient, { isNotFound, base = null } = {}) {
     }
 
     async list(prefix = '') {
-      const listed = await podClient.list(at(prefix));
-      // PodClient.list yields `{ container, entries: [{ uri, ... }] }`; a simpler client may yield the bare array (of
-      // entries or ref strings). Reading only the array made every real pod list as empty.
-      const entries = Array.isArray(listed) ? listed : (Array.isArray(listed?.entries) ? listed.entries : []);
+      // PodClient.list answers `{ container, entries: [{ uri, ... }] }` (reading it as a bare array listed every real
+      // pod as empty)
+      const { entries = [] } = (await podClient.list(at(prefix))) ?? {};
       return entries.map((e) => back(e && typeof e === 'object' ? e.uri : e)).filter(Boolean);
     }
   }

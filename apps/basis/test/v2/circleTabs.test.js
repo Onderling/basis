@@ -26,13 +26,13 @@ describe('buildCircleTabs · SP-13.3', () => {
       .toEqual(['conversation', 'noticeboard', 'members']);
   });
 
-  it('huishouden-shape policy → CONVERSATION / TAKEN (lists has no built surface, so no tab)', () => {
+  it('huishouden-shape policy → CONVERSATION / TASKS / LISTS (lists are a tab beside tasks)', () => {
     const policy = {
       // noticeboard explicitly off — a huishouden circle uses tasks/lists, not the circle noticeboard.
       features: { chat: true, noticeboard: false, tasks: true, lists: true, memberDirectory: false },
     };
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['conversation', 'tasks']);
+      .toEqual(['conversation', 'tasks', 'lists']);
   });
 
   it('privé-shape policy → CONVERSATION / TAKEN (notes has no built surface, so no tab)', () => {
@@ -74,11 +74,11 @@ describe('buildCircleTabs · SP-13.3', () => {
     };
     // houseRules has NO tab — lives in `⋯` overflow as "Huisregels".
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['conversation', 'noticeboard', 'tasks', 'members']);
+      .toEqual(['conversation', 'noticeboard', 'tasks', 'lists', 'members']);
   });
 
   it('a feature that is on but has no built surface is a feature, not a tab (no "coming in a later slice" tab)', () => {
-    const policy = { features: { chat: true, noticeboard: false, tasks: false, memberDirectory: false, lists: true, notes: true, calendar: true } };
+    const policy = { features: { chat: true, noticeboard: false, tasks: false, memberDirectory: false, lists: false, notes: true, calendar: true } };
     expect(buildCircleTabs(policy).map((t) => t.id)).toEqual(['conversation']);
   });
 

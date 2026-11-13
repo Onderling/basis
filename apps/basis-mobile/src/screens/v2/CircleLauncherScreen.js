@@ -194,7 +194,6 @@ import { contactPointAdopter, useRelayQuestion, relayQuestion } from './RelayQue
 import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor, attachEntryForType } from '../../../../basis/src/v2/attachEntries.js';
 import { readInviteUsage, joinedSince, memberIdsOf } from '../../../../basis/src/v2/inviteUsage.js';
-import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
 import { pickRowText } from '../../../../basis/src/v2/rowText.js';
@@ -2763,7 +2762,7 @@ export default function CircleLauncherScreen({
       <>
       <CircleDetail
         noRelay={!relayKnown}
-        pagesBook={screensBook}
+        circleStoreFor={(cid) => bundle?.agent?.circleStoreFor?.(cid)}
         onCloseRemoved={async () => {
           const id = selected?.id;
           if (!id) return;
@@ -3249,7 +3248,7 @@ function CircleDetail({
   unreachableMembersOf = null,
   eventLog,
   circles = [],
-  recipeStore = null, pagesBook = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, circleStoreFor = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -3454,10 +3453,7 @@ function CircleDetail({
     // An entry whose dispatch path is not wired is NOT painted (never offer what does not work): the
     // file entry rides the sealed-media pipeline, which a circle with no media composition lacks.
     mediaWired: !!circleMedia,
-    // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
-    // …and any of the person's pages' blocks that show this circle (a lists block for it)
-    blockTypes: [...(screenBlocks ?? []).map((b) => b?.type).filter(Boolean), ...blockTypesShowingCircle(pagesBook, circle?.id)],
-  }), [manifestsByOrigin, circleAvailability, circleMedia, screenBlocks, pagesBook, circle?.id]);
+  }), [manifestsByOrigin, circleAvailability, circleMedia]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   // A ref, not state: the assistant's lane reads it when a line's turn comes (`followUpClaim`), after the turn before it.
   const pendingFollowUpRef = useRef(null);
@@ -4921,6 +4917,11 @@ function CircleDetail({
             })}
           </>)}
           </>
+        ) : activeTab === 'lists' ? (
+          // Lists tab: the circle's lists screen itself (make a list, add an entry, tick one off), the one its menu opened
+          <View testID="circle-detail-lists" style={{ flex: 1 }}>
+            <CircleListsScreen embedded circleId={circle?.id} storeFor={circleStoreFor} callSkill={rawCallSkill} />
+          </View>
         ) : activeTab === 'tasks' ? (
           // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the
           // owner-only entrust chip (the same seam the chat stream uses). Tapping entrust

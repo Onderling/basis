@@ -409,14 +409,14 @@ import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPend
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
 import {
-  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe, blockTypesOnScreen,
+  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe,
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
 } from '../../src/v2/circleRecipe.js';
 import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
 // The person's own pages (Vandaag): read here, edited only through the screen ops (no book function is called from
 // this shell to change the book).
-import { localUserScreenStore, getActiveScreen, blockTypesShowingCircle } from '../../src/v2/userScreens.js';
+import { localUserScreenStore, getActiveScreen } from '../../src/v2/userScreens.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../src/v2/vandaag.js';
 import { createScreenHead } from '../../src/v2/screenHead.js';
 import { watchCircleChanges } from '../../src/v2/headCircleWatch.js';
@@ -5904,7 +5904,12 @@ function openListsPanel(circleId) {
   overlay.appendChild(card);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+  renderListsInto(body, circleId);
+}
 
+// A CIRCLE'S LISTS: make a list, add an entry, tick one off (the lists' own ops, through the waist). One body, painted
+// by the circle's Lists tab and by the panel the circle's menu opens.
+function renderListsInto(body, circleId) {
   let openListId = null;     // null = the container index; an id = that container's card
   let pendingAddTo = null;   // container node id awaiting an inline add-input
   let pendingHint = null;    // the chosen child type for the pending input (from the picker), or null = default
@@ -7379,20 +7384,15 @@ function showCircle(id, circle, policy) {
   // The menu as it stands NOW: rebuilt when the availability lands and again when the sealed-media path resolves —
   // built once, before media resolved, it left the file entry out of the "+" for good while the composer had the
   // media pipeline all along (no photo could be attached in a circle).
-  // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
-  let circleBlockTypesNow = [];
   const circleAttachEntriesNow = () => attachEntriesFor({
     manifestsByOrigin: circleManifestsByOrigin ?? {},
     availability: circleAvailabilityNow,
     mediaWired: !!circleMedia,
-    blockTypes: circleBlockTypesNow,
   });
   (async () => {
     try {
       const av = await circleOpAvailability(id);
       circleAvailabilityNow = av;
-      // the circle's own screen's blocks, and any of the person's pages' blocks that show this circle (a lists block)
-      try { circleBlockTypesNow = [...blockTypesOnScreen(await recipeStore.get(id), DEFAULT_SCREEN_RECIPE), ...blockTypesShowingCircle(await userScreenStore.get(), id)]; } catch { circleBlockTypesNow = []; }
       // An entry declaring `via: 'media'` is exempt, and that is the same rule read correctly rather
       // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
       // over whether it works. Gating it on the catalogue would hide a working affordance to guard
@@ -8014,6 +8014,8 @@ function showCircle(id, circle, policy) {
       // Taken (tasks) tab — the circle's tasks (stream rows) + the compose affordance.
       // The view only reads these when the taken tab is active.
       tasks: circleTasks,
+      // the Lists tab: the circle's lists body, painted into the tab
+      listsTab: { render: (el) => renderListsInto(el, id) },
       ...(attachEntryForType(circleAttachMenu, 'task') ? { onAddTask: addTaskFromTab } : {}),   // only where a task can be made here
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.

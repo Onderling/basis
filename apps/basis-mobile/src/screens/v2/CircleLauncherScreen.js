@@ -4414,8 +4414,9 @@ function CircleDetail({
 
   // Post the deterministic set-topic chips ("of kies zelf"); honest=true frames them as the ONLY answerable
   // topics (the no-assistant fallback). Each chip carries its help:topic:<id> action as the mobile button id.
-  const postHelpTopicChips = useCallback(({ honest = false } = {}) => {
-    const chips = helpTopicChips({ lang: lang() }).map((c) => ({ id: c.action, label: c.label }));
+  // After a question (`query`): its five likeliest topics, the rest behind "all topics"; without one, every topic (web parity).
+  const postHelpTopicChips = useCallback(({ honest = false, query = null } = {}) => {
+    const chips = helpTopicChips({ lang: lang(), query, allLabel: t('circle.help.all_topics') }).map((c) => ({ id: c.action, label: c.label }));
     appendCircleMessage({ actor: 'bot', text: honest ? t('circle.help.no_llm_topics') : t('circle.help.pick_topic'), buttons: chips });
   }, [appendCircleMessage]);
 
@@ -4452,19 +4453,21 @@ function CircleDetail({
       });
       return;
     }
-    postHelpTopicChips({ honest: true });
+    postHelpTopicChips({ honest: true, query });
   }, [circleHelpLlm, appendCircleMessage, circle?.id, postHelpTopicChips]);
 
   // A tapped help button: a topic chip resolves deterministically; a consent choice forwards to the LLM
   // ("ja, doorsturen") or offers the set topics to pick from ("nee, ik kies zelf").
   const handleHelpAction = useCallback(async (help) => {
+    // "all topics" after the likeliest few: the whole list (web parity)
+    if (help.kind === 'all') { postHelpTopicChips(); return; }
     if (help.kind === 'topic') {
       const ans = resolveHelpTopic(help.id, { lang: lang() });
       if (ans) appendCircleMessage({ actor: 'bot', text: ans.text, provenance: ans.provenance });
       return;
     }
     if (help.kind === 'consent') {
-      if (help.value === 'no') { postHelpTopicChips(); return; }
+      if (help.value === 'no') { postHelpTopicChips({ query: helpPendingQueryRef.current?.circleId === circle?.id ? helpPendingQueryRef.current.query : null }); return; }
       if (help.value === 'yes') {
         const pending = helpPendingQueryRef.current && helpPendingQueryRef.current.circleId === circle?.id ? helpPendingQueryRef.current.query : null;
         helpPendingQueryRef.current = null;

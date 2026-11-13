@@ -58,24 +58,88 @@ describe('a rules change', () => {
 describe('a settings change', () => {
   const memIo = () => { const m = new Map(); return { getItem: async (k) => m.get(k) ?? null, setItem: async (k, v) => { m.set(k, v); } }; };
   const stated = { ...quorum, chat: 'off' };
+  // the circle's rule comes from its FOUNDING statement on the lane: version 1 by its founder (a0)
+  const founding = { kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'h1', payload: { policy: quorum, version: 1 } };
   const body = (extra = {}) => ({ kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'h2', payload: { policy: stated, version: 2, ...extra } });
-  const args = (r, written) => ({
+  const members = roster.map((m) => ({ ref: m.webid, role: m.role, ...(m.webid === 'a0' ? { via: 'founder' } : {}) }));
+  const args = (r, written, readPolicy = async () => quorum) => ({
     rail: r, circleId: CIRCLE, headStore: makePolicyHeadStore(memIo()),
-    membersOf: async () => roster.map((m) => ({ ref: m.webid, role: m.role })),
-    readPolicy: async () => quorum,
+    membersOf: async () => members, readPolicy,
     writePolicy: async (_c, p) => { written.push(p); },
   });
 
   it('a lone admin\'s settings change in a circle whose admins decide together is not applied', async () => {
     const written = [];
-    expect((await applyPolicyUpdates(args(rail([body()]), written))).applied).toBe(false);
-    expect(written).toEqual([]);
+    const r = await applyPolicyUpdates(args(rail([founding, body()]), written));
+    expect(r.version).toBe(1);   // the founding policy stands; version 2 is refused
+    expect(written.map((p) => p.chat)).not.toContain('off');
   });
 
   it('the same change carried with the approved proposal is applied', async () => {
     const written = [];
-    expect((await applyPolicyUpdates(args(rail([body({ proposalId: 'p2' })], approved('p2', 'changePolicy', { chat: 'off' })), written))).applied).toBe(true);
-    expect(written[0]?.chat).toBe('off');
+    expect((await applyPolicyUpdates(args(rail([founding, body({ proposalId: 'p2' })], approved('p2', 'changePolicy', { chat: 'off' })), written))).version).toBe(2);
+    expect(written.at(-1)?.chat).toBe('off');
+  });
+
+  it('A TIGHTENING STAYS (Opus\'s rollback case): any-admin founding, an admin\'s v2 asks for votes from now on, re-applied: still member-vote', async () => {
+    const loose = normalizeCirclePolicy({ governance: { changePolicy: 'any-admin' } });
+    const tight = normalizeCirclePolicy({ governance: { changePolicy: 'member-vote' } });
+    const lane = rail([
+      { kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'h1', payload: { policy: loose, version: 1 } },
+      { kind: POLICY_UPDATE_KIND, author: 'a1', hash: 'h2', payload: { policy: tight, version: 2 } },   // under any-admin: no vote needed
+    ]);
+    const headStore = makePolicyHeadStore(memIo());
+    let local = loose;
+    const a = { rail: lane, circleId: CIRCLE, headStore, membersOf: async () => members, readPolicy: async () => local, writePolicy: async (_c, p) => { local = p; } };
+    await applyPolicyUpdates(a);
+    expect(local.governance.changePolicy).toBe('member-vote');
+    await applyPolicyUpdates(a);   // the next landing re-applies the lane: v2 is still judged by the rule BEFORE it
+    expect(local.governance.changePolicy).toBe('member-vote');
+  });
+
+  it('a version 1 by someone who did not found the circle is judged by the founding rule, never exempt', async () => {
+    const vote = normalizeCirclePolicy({ governance: { changePolicy: 'member-vote' } });
+    const loose = normalizeCirclePolicy({ governance: { changePolicy: 'any-admin' } });
+    let local = null;
+    const lane = rail([
+      { kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'h1', payload: { policy: vote, version: 1 } },        // the founder's
+      { kind: POLICY_UPDATE_KIND, author: 'a1', hash: 'h1z', payload: { policy: loose, version: 1 } },      // another admin's "version 1"
+    ]);
+    await applyPolicyUpdates({ rail: lane, circleId: CIRCLE, headStore: makePolicyHeadStore(memIo()), membersOf: async () => members, readPolicy: async () => local, writePolicy: async (_c, p) => { local = p; } });
+    expect(local.governance.changePolicy).toBe('member-vote');
+  });
+});
+
+describe('a rules change is judged by the settings version its author held', () => {
+  const loose = normalizeCirclePolicy({ governance: { changeRule: 'any-admin', changePolicy: 'any-admin' } });
+  const tight = normalizeCirclePolicy({ governance: { changeRule: 'admin-quorum', changePolicy: 'any-admin' } });
+  const members = roster.map((m) => ({ webid: m.webid, role: m.role, ...(m.webid === 'a0' ? { adminVia: 'founder' } : {}) }));
+  const policyLane = [
+    { kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'p1', payload: { policy: loose, version: 1 } },
+    { kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'p2', payload: { policy: tight, version: 2 } },
+  ];
+  const call = (recorded) => async (_app, op, args) => {
+    if (op === 'listGroupMembers') return { members };
+    if (op === 'recordGroupRulesUpdate') { recorded.push(args); return { applied: true }; }
+    return {};
+  };
+  const rulesBody = (author, extra) => ({ kind: 'rules-update', author, hash: `r-${author}`, payload: { rules, version: 2, ...extra } });
+
+  it('a change made under the loose rule (stamped 1) stands after the circle tightened (version 2)', async () => {
+    const recorded = [];
+    const r = await applyRulesUpdates({ rail: rail([...policyLane, rulesBody('a1', { policyVersion: 1 })]), callSkill: call(recorded), circleId: CIRCLE, readPolicy: async () => tight });
+    expect(r.applied).toBe(true);
+  });
+
+  it('an author who WROTE the tightening cannot stamp below it', async () => {
+    const recorded = [];
+    const r = await applyRulesUpdates({ rail: rail([...policyLane, rulesBody('a0', { policyVersion: 1 })]), callSkill: call(recorded), circleId: CIRCLE, readPolicy: async () => tight });
+    expect(r.applied).toBe(false);
+  });
+
+  it('a stamp the chain does not know yet waits; no stamp is judged by the rule in force now', async () => {
+    expect((await applyRulesUpdates({ rail: rail([...policyLane, rulesBody('a1', { policyVersion: 9 })]), callSkill: call([]), circleId: CIRCLE, readPolicy: async () => tight })).applied).toBe(false);
+    expect((await applyRulesUpdates({ rail: rail([...policyLane, rulesBody('a1', {})]), callSkill: call([]), circleId: CIRCLE, readPolicy: async () => tight })).applied).toBe(false);
   });
 });
 

@@ -15,6 +15,10 @@
  * phone needs no relay typed in. `--offering` sets one offering on the peer's persona and RELEASES it to the circle
  * (the per-circle disclosure, said on the circle's lane) — what a person does in Me → personas.
  *
+ * `--features lists` switches circle features on (the admin's policy update, signed, on the governance lane).
+ * In `--talk` mode the peer also keeps the circle's LISTS on stdin commands: `list-create`, `list-add` and `lists-dump`
+ * (every list and its open entries), through the same `lists` ops the shells call.
+ *
  * `--talk` makes the peer a person who CONVERSES (the messaging story): it composes the contact thread, reports what
  * it hears, and speaks when the walk tells it to. It hears: one line per new circle chat line from someone else
  * (`{"step":"circle-heard","text":…}`) and per new inbound contact turn (`{"step":"contact-heard","text":…,"from":…}`).
@@ -33,6 +37,7 @@ import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, teardown, sendCircleChat, readRoster,
 } from '../../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../../basis/src/v2/householdRosterPairing.js';
+import { DEFAULT_CIRCLE_POLICY } from '../../../basis/src/v2/circlePolicy.js';
 import { buildCircleInviteUri } from '../../../basis/src/v2/circleInvite.js';
 import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 
@@ -72,6 +77,14 @@ await bindCircleAddresses([peer], groupId);
 await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId });
 
 const call = (app, op, args) => peer.agent.callSkill(app, op, args);
+// `--features lists,calendar`: the admin switches circle features ON, as the settings screen's save does: a signed
+// policy update on the governance lane, which every member (the phone too) folds into its copy of the policy
+const features = (arg('features', '') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+if (features.length) {
+  const policy = { ...DEFAULT_CIRCLE_POLICY, features: { ...DEFAULT_CIRCLE_POLICY.features, ...Object.fromEntries(features.map((f) => [f, true])) } };
+  const st = await peer.agent.emitPolicyUpdate?.({ groupId, policy, version: 2 }).catch((e) => ({ error: String(e?.message ?? e) }));
+  say({ step: 'features', on: features, ok: !!st && !st?.error });
+}
 await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
 if (offering) {
   const set = await call('agents', 'setProfileDriver', { id: 'default', key: 'walk-offering', kind: 'offering', text: offering, tags: '' });
@@ -142,6 +155,24 @@ if (talk) {
         const mine = new Set([peer.pubKey, peer.agent.circleSelf?.(groupId)?.webid].filter(Boolean));
         const rows = (await readRoster(peer, groupId)).filter((m) => !mine.has(m?.webid ?? m?.pubKey ?? null));
         say({ step: 'roster', rows });
+      } else if (cmd.do === 'list-create') {
+        // the circle's lists, through the same ops the shells call (`lists` app): what the peer makes, the phone sees
+        const r = await call('lists', 'createList', { circleId: groupId, text: cmd.list });
+        say({ step: 'list-created', ok: r?.ok !== false && !r?.error, result: r ?? null });
+      } else if (cmd.do === 'list-add') {
+        const r = await call('lists', 'addToList', { circleId: groupId, list: cmd.list, text: cmd.text });
+        say({ step: 'list-added', ok: r?.ok !== false && !r?.error, result: r ?? null });
+      } else if (cmd.do === 'lists-dump') {
+        // what the peer holds of the circle's lists: every list's name and its open entries' texts
+        const lists = (await call('lists', 'listLists', { circleId: groupId }))?.items ?? [];
+        const out = [];
+        for (const l of lists) {
+          const name = l?.label ?? null;
+          if (!name) continue;
+          const entries = (await call('lists', 'listEntries', { circleId: groupId, list: name }))?.items ?? [];
+          out.push({ list: name, entries: entries.map((e) => e?.label ?? null).filter(Boolean), ids: Object.fromEntries(entries.filter((e) => e?.label && e?.id).map((e) => [e.label, e.id])) });
+        }
+        say({ step: 'lists', lists: out });
       } else if (cmd.do === 'circle-say') {
         const r = await sendCircleChat(peer, { groupId, msgId: `peer-${Date.now().toString(36)}`, text: cmd.text });
         say({ step: 'circle-said', ok: !r?.error, error: r?.error ?? null });

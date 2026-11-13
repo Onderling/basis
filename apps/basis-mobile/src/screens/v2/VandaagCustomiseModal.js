@@ -4,7 +4,7 @@
  * is (`customiseOp`) and repaints. Nothing here changes the book itself. Web twin: web/v2/vandaagCustomise.js.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { t } from '../../core/localisation.js';
@@ -13,6 +13,8 @@ import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 export default function VandaagCustomiseModal({ visible, model, onAct, onClose }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  // the card's cap in PIXELS of the window: a percentage of the modal's root measured taller than the screen on Android 16
+  const { height: windowHeight } = useWindowDimensions();
   const [name, setName] = useState(model?.pageName ?? '');
   useEffect(() => { setName(model?.pageName ?? ''); }, [model?.pageId, model?.pageName]);
   if (!visible || !model) return null;
@@ -22,14 +24,14 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
   );
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
+      <View style={styles.backdrop} testID="customise-backdrop">
+        <View style={[styles.card, { maxHeight: Math.round(windowHeight * 0.85) }]} testID="customise-card">
           {/* the title and Done on one line, above the scroll: the way out is always in view */}
           <View style={styles.head}>
             <Text style={styles.title}>{t('circle.vandaag.customise_title')}</Text>
             <Btn variant="primary" label={t('circle.vandaag.done')} onPress={onClose} testID="customise-done" />
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroll} testID="customise-scroll">
             {/* the sheet's DECLARED sections (`screenSections.js`), in order, each by its id (= testID) */}
             {sectionsOf('vandaagCustomise').map((d) => {
               const PAINT = {
@@ -39,6 +41,8 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
               const base = { pageId: model.pageId, blockId: b.blockId, index: b.index };
               return (
                 <View key={b.blockId} style={styles.block} testID={`customise-block-${b.blockId}`}>
+                  {/* the block's TYPE, findable by a walk (block ids are random): wraps the block's own content */}
+                  <View testID={`customise-type-${b.type}`}>
                   <Text style={styles.blockName}>{t(b.labelKey)}</Text>
                   <View style={styles.row}>
                     <ActBtn label={t('circle.vandaag.up')} act="up" args={base} disabled={!b.canUp} testID={`customise-up-${b.blockId}`} />
@@ -88,6 +92,7 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                     </View>
                     </View>
                   )))}
+                  </View>
                 </View>
               );
             })}
@@ -140,6 +145,9 @@ const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16, maxHeight: '85%' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 },
+  // the scroll may SHRINK inside the card's 85% cap (React Native's flexShrink is 0 by default): without it the list
+  // grew to its full height (3,900 px on a 2,400 px screen, measured), never scrolled, and 'Add a block' was off-screen
+  scroll: { flexShrink: 1 },
   title: { flex: 1, fontSize: 17, fontWeight: '700', color: theme.color.ink },
   controlTitle: { fontSize: 12, color: theme.color.inkSoft, marginTop: 8 },
   heading: { fontSize: 14, fontWeight: '600', color: theme.color.inkSoft, marginTop: 12, marginBottom: 6 },

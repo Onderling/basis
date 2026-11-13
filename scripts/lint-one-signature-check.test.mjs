@@ -11,4 +11,12 @@ describe('lint-one-signature-check', () => {
   it('is quiet for the one module, a comment, and a call to the strict check', () => {
     expect(directChecks(['c.js', 'd.js', 'packages/core/src/crypto/ed25519Strict.js'], read)).toEqual([]);
   });
+  it('catches node:crypto and WebCrypto checks too, and exempts only the vetted equations module', () => {
+    const more = {
+      'e.js': 'const ok = crypto.verify(null, msg, key, sig);',
+      'f.js': 'await crypto.subtle.verify({ name: \'Ed25519\' }, k, sig, msg);',
+      'apps/basis/src/v2/signatureEquations.js': 'nodeCrypto.verify(null, msg, k, sig); sodium.crypto_sign_verify_detached(sig, msg, key);',
+    };
+    expect(directChecks(Object.keys(more), (f) => more[f])).toEqual(['e.js:1', 'f.js:1']);
+  });
 });

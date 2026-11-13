@@ -77,7 +77,7 @@ describe('the send gate: what the device knows decides the route', () => {
       `Anna's person decisions: ${JSON.stringify(personDecisions(anna))}`).toBe(true);
   });
 
-  it('a person-path send to a co-member\'s person key, kept nowhere as a contact, is recorded as allowedBy none', async () => {
+  it('a person-path send to a co-member\'s person key, kept nowhere as a contact, is no allowlist reason: allowedBy none, so it is held (a co-member is reached at their circle address, as my circle self)', async () => {
     // Anna's person key: Bob reaches it (the join bound it), but holds it as no contact, no invite, no fallback. (A send to
     // an address NOBODY has registered never settles and writes no record, before this change too: a pass-2 blind spot.)
     const before = personDecisions(bob).length;

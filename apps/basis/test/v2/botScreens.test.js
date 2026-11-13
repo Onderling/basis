@@ -16,6 +16,7 @@ function setup({ tellRefused = null } = {}) {
   const privately = [];
   const asked = [];
   const refused = [];
+  const expected = []; const registeredFirst = [];
   const admitted = new Set(['telegram:1']);
   let reachable = true;
   const screens = createBotScreens({
@@ -28,11 +29,12 @@ function setup({ tellRefused = null } = {}) {
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
     notify: (person, key, params) => { told.push({ person, key, params }); },
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
-    tellRefused: tellRefused ?? (async (k) => { refused.push(k); }),
+    tellRefused: tellRefused ?? (async (k) => { refused.push(k); if (expected.includes(k)) registeredFirst.push(k); }),
+    expectRefusal: (k) => { expected.push(k); },
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: 'wss://relay.example' }),
     now: () => clock,
   });
-  return { threads, screens, grants, told, privately, asked, refused, admitted, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
+  return { threads, screens, grants, told, privately, asked, refused, expected, registeredFirst, admitted, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
 }
 const linkText = (link, minutes) => `link ${link} (${minutes} min)`;
 const start = async (ctx, person = 'telegram:1') => { const r = await ctx.screens.start(person, linkText); return r.ok ? ctx.privately.at(-1).text : null; };
@@ -244,5 +246,18 @@ describe('the paste route (/koppel-scherm)', () => {
     await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' });
     expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n9'), { isPrivate: true })).ok).toBe(true);
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['P']);
+  });
+});
+
+describe('a refusal to a screen is registered as the one answer to its offer, before it leaves (the send gate)', () => {
+  it('a wrong code: the screen whose offer was read is told, and that refusal was registered first', async () => {
+    const ctx = setup();
+    const nonce = nonceOf(await start(ctx));
+    await ctx.screens.offer({ from: 'SCREEN-1', viewPubKey: 'SCREEN-1', nonce });
+    await ctx.screens.confirm('telegram:1', 'WRONG', { isPrivate: true });
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(ctx.expected).toEqual(['SCREEN-1']);
+    expect(ctx.refused.at(-1)).toBe('SCREEN-1');
+    expect(ctx.registeredFirst).toEqual(['SCREEN-1']);
   });
 });

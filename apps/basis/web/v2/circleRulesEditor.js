@@ -31,6 +31,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
  * @param {Function} [args.onChange]
  * @param {Function} [args.onBack]
  * @param {Function} [args.onSave]
+ * @param {string|null} [args.notice]          what the last save came to, in words (a proposal opened · refused)
  *
  * γ.4 — additive conflict-resolver opts (see file header).  Existing
  * call sites that pass NONE of the γ.4 opts get pre-γ.4 behaviour
@@ -42,7 +43,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
  * @param {Function} [args.onIncomingDiscarded] () => void
  */
 export function renderRulesEditor(container, {
-  doc = {}, t, onChange, onBack, onSave,
+  doc = {}, t, onChange, onBack, onSave, notice = null,
   incomingRules = null,
   rulesStore,
   circleId,
@@ -93,6 +94,14 @@ export function renderRulesEditor(container, {
     note.className = 'circle-rules__note';
     note.textContent = tr('circle.rules.required_note');
     container.appendChild(note);
+  }
+
+  if (notice) {
+    const said = document.createElement('div');
+    said.className = 'circle-rules__notice';
+    said.setAttribute('role', 'status');
+    said.textContent = notice;
+    container.appendChild(said);
   }
 
   const save = document.createElement('button');

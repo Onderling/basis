@@ -43,7 +43,7 @@ import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
-import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange, exchangeKindOf } from '../../v2/peerSendGate.js';
+import { createCircleAddressIndex, decidePeerSend, sendDecisionFields, personAllowedBy, createInviteExchange, exchangeKindOf, createHeldSends, HELD_SEND_RECHECK_MS } from '../../v2/peerSendGate.js';
 import { log as structuredLog } from '@onderling/logger';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
@@ -6662,7 +6662,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * caller's circle that disagrees with the roster → refused; otherwise the circle the caller named, or the person path
    * unchanged. Below it, `wireSend` is the only wire call and writes the decision record.
    */
-  async function peerSend(to, payload, sendOpts = {}) {
+  async function peerSend(to, payload, sendOpts = {}, { heldSince = null, settle = null } = {}) {
     const o = sendOpts ?? {};
     // A BLOCKED ADDRESS gets no DIRECT contact from this device (Frits 2026-11-12: a block is about direct contact; the
     // secure agent enforces nothing): a direct payload (directDoors.js) to it is refused with the reason, nothing on the
@@ -6694,9 +6694,58 @@ export async function createRealHouseholdAgent(opts = {}) {
     // without a person key does not speak at all (`no-person-key`): never its chat key.
     if (decision.kind === 'as-person') return speakAsPerson(to, payload, o, decision);
     // THE PERSON KEY'S ALLOWLIST (peerSendGate.js): which entry lets this send leave on the person key, from what this
-    // device holds about `to`. RECORDED today (allowedBy in the decision record); held as 'unknown-address' once enforced.
+    // device holds about `to`. None ('none') → HELD as 'unknown-address': nothing on the wire, the caller told it waits,
+    // and it goes once this device learns who `to` is (a contact lands, a roster read binds it), within its lifetime.
     const sent = decision.kind === 'person' ? { ...decision, ...(await personSendFacts(to, payload).then(personAllowedBy, () => ({ allowedBy: 'none' }))) } : decision;
+    if (sent.allowedBy === 'none') return holdUnknownAddress(to, payload, o, sent, heldSince, settle);
     return sendCircleScoped(to, payload, decision.circleId ? { ...o, circleId: decision.circleId } : o, sent);
+  }
+  const heldSends = createHeldSends({
+    onEnded: (e, why) => {
+      try { structuredLog.warn('agent', 'send.held-ended', { reason: 'unknown-address', why }); } catch { /* never breaks a send */ }
+      // the send that waited says how it ended: it did not go (the caller's bubble turns not-sent, with the reason)
+      try { e?.settle?.({ held: false, delivered: false, reason: 'unknown-address', ended: why }); } catch { /* a report never breaks the hold */ }
+    },
+  });
+  // THE RETRY of the held sends: one one-shot timer, re-armed after each pass only while something is still held (a
+  // retry of pending work, not a clock: the host's one clock is its tick, and the agent core has none)
+  let heldRecheck = null;
+  function armHeldRetry() {
+    if (heldRecheck || heldSends.size === 0) return;
+    heldRecheck = setTimeout(() => {
+      heldRecheck = null;
+      redriveHeldSends().catch(() => {}).finally(armHeldRetry);
+    }, HELD_SEND_RECHECK_MS);
+    heldRecheck.unref?.();
+  }
+  function holdUnknownAddress(to, payload, o, decision, heldSince = null, settle = null) {
+    // the FIRST hold makes the promise of how this send ends (`later`): sent once a re-judge finds a reason, or not sent
+    // at its lifetime's end; a re-judge that holds it again keeps the same one
+    let later = null;
+    let finish = settle;
+    if (typeof finish !== 'function') later = new Promise((resolve) => { finish = resolve; });
+    heldSends.hold({ to, payload, opts: o, since: heldSince, settle: finish });
+    const held = { held: true, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: 'unknown-address', ...(later ? { later } : {}) };
+    // one record per send, at its FIRST hold (a re-judge that still finds no reason is not a new send)
+    if (heldSince == null) { try { structuredLog.info('agent', 'send.decision', sendDecisionFields(decision, null, held)); } catch { /* the log never breaks a send */ } }
+    armHeldRetry();
+    return held;
+  }
+  /** Judge every held send again by sending it through the gate once more (one place decides, and an invite exchange's
+   *  single use is spent only by a send): what now has a reason goes; the rest is held again with its FIRST time. */
+  let redriving = null;
+  function redriveHeldSends() {
+    if (redriving) return redriving;
+    redriving = (async () => {
+      for (const e of heldSends.take()) {
+        let r;
+        try { r = await peerSend(e.to, e.payload, e.opts ?? {}, { heldSince: e.since, settle: e.settle }); }
+        catch (err) { r = { held: false, delivered: false, error: err?.message ?? String(err) }; }
+        // sent now (or refused for another reason): the waiting send's promise gets that answer; held again keeps it open
+        if (r?.held !== true) { try { e.settle?.(r); } catch { /* a report never breaks the re-drive */ } }
+      }
+    })().finally(() => { redriving = null; });
+    return redriving;
   }
   /** What this device holds about a person-path address: an open invite exchange, a kept contact, the fallback setting. */
   async function personSendFacts(to, payload = null) {
@@ -10095,11 +10144,14 @@ export async function createRealHouseholdAgent(opts = {}) {
      */
     nearbyRoomIdentityFor: (selfId, namespace) => (personas.get(selfId) ?? persona).roomIdentityFor(namespace),
     nearbyRoomOwnerOf: (selfId) => (personas.get(selfId) ?? persona).chatId?.pubKey ?? null,
-    // the invite exchange's registrations, for the redeem code (groupRedeem.js) only; the gate alone reads them
+    // the invite exchange's registrations, for the code that checked the ask (the redeem code, groupRedeem.js; the
+    // bot's identity link and its screens, botIdentityLink.js / botScreens.js); the gate alone reads them
     inviteExchange: Object.freeze({
       expectFromInviter: (address) => inviteExchange.expectFromInviter(address),
       answerProvenRequest: (address) => inviteExchange.answerProvenRequest(address),
       refuseParsedRequest: (address) => inviteExchange.refuseParsedRequest(address),
+      expectLinkAnswer: (address) => inviteExchange.expectLinkAnswer(address),
+      expectScreenRefusal: (address) => inviteExchange.expectScreenRefusal(address),
     }),
     /** The Nearby room's `keep` port for the current visit (nearbyKept.js), over this device's log; null without one. */
     nearbyKeeper: (visitId) => (opts.deviceLog ? makeRoomKeeper({
@@ -10536,6 +10588,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       try { selfCircleKey = (await circleIdentityFor(circleId))?.pubKey ?? null; } catch { /* derive-only */ }
       // the send gate's index learns the same rows (members' circle addresses only, never my own row)
       try { circleAddressIndex.recordRoster(circleId, members, { selfWebid: chatId.pubKey }); } catch { /* the gate then sends as before */ }
+      if (heldSends.size) redriveHeldSends().catch(() => {});   // a roster read may name an address a send waits on
       return circleSenders.recordCircleRoster({
         circleId,
         ownAddress,

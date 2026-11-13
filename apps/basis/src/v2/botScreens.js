@@ -156,6 +156,8 @@ export function parseScreenLaunchLink(link) {
  * @param {(person: string, q: {codes: string[], replaced: boolean}) => Promise<{ok: boolean}>} a.ask  the question, to
  *   the person's PRIVATE door: three codes (the real one and two others) to pick from, and "none of these"
  * @param {(viewPubKey: string) => Promise<void>|void} [a.tellRefused]  tells the screen its offer was not taken
+ * @param {(viewPubKey: string) => void} [a.expectRefusal]  registers that ONE refusal to a screen whose own offer this bot
+ *   read (the send gate lets exactly it leave; the box composes the agent's `inviteExchange.expectScreenRefusal`)
  * @param {() => {appUrl: string|null, botAddress: string|null, relayUrl: string|null}} a.where
  * @param {(initData: string) => Promise<{ok: boolean, telegramId?: string, hash?: string, reason?: string}>} [a.verifyLaunch]
  *   checks Telegram's launch data (the bot's token is in it; `verifyTelegramLaunch`)
@@ -165,7 +167,7 @@ export function parseScreenLaunchLink(link) {
  * @param {(person: string) => string} [a.launchLabel]  what `/schermen` calls a Telegram-launched screen
  * @param {() => number} [a.now]
  */
-export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
+export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, expectRefusal = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
   // when each person last connected a screen: a code tapped again within the offer's window says "connected"
   const connectedAt = new Map();
@@ -192,7 +194,11 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
 
   // A screen is told it was refused, never awaited: a screen that does not greet back would hold the person's reply
   // for the handshake ladder (23 s); best-effort — the screen times out on its own.
-  const refuseSoon = (viewPubKey) => { Promise.resolve().then(() => tellRefused?.(viewPubKey)).catch(() => {}); };
+  // only ever for a screen whose own offer was read here (a stored offer, a launch from that key): its one refusal
+  const refuseSoon = (viewPubKey) => {
+    try { expectRefusal?.(viewPubKey); } catch { /* without the registration the gate holds it; the screen's offer times out */ }
+    Promise.resolve().then(() => tellRefused?.(viewPubKey)).catch(() => {});
+  };
 
   /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
   async function askAbout(person, { viewPubKey, nonce, label }) {

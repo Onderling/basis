@@ -14,6 +14,8 @@
  * imports).
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as sodium from 'react-native-libsodium';
+import { installPhoneSignatureEquation } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
 import { flushPendingSaves } from '@onderling/local-store';
@@ -87,6 +89,12 @@ import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/c
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
 import Constants from 'expo-constants';
+
+// THE SIGNATURE CHECK: libsodium's C over JSI behind the one strict rule. The kernel takes it only after it agreed on
+// the edge-case vectors and on an honest and a tampered signature; until then (and on a refusal) tweetnacl answers.
+installPhoneSignatureEquation(sodium)
+  .then((eq) => console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`))
+  .catch(() => { /* tweetnacl stays */ });
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);
@@ -696,7 +704,6 @@ export default function App() {
           podAuth={podAuth}
           eventLog={eventLogRef.current}
           circleRecipePendingStore={circleRecipePendingStoreRef.current}
-          circleRulesPendingStore={circleRulesPendingStoreRef.current}
           circlePolicyLane={circlePolicyLaneRef.current}
           /* no onBack (no chat shell to fall back to) +
              no onChatRoute (the circle view IS the chat, no route). */

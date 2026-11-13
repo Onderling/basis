@@ -67,7 +67,8 @@ describe('createSignatureMemo', () => {
 
   it('nothing but a passed real check writes the memo (the API has no setter)', () => {
     const memo = createSignatureMemo({ verify: () => false });
-    expect(Object.keys(memo).sort()).toEqual(['bytes', 'size', 'verifierFor', 'verify']);
+    // `checkBatch` writes only through the strict rule's real batch check (signatureEquation.test.js): still no setter
+    expect(Object.keys(memo).sort()).toEqual(['bytes', 'checkBatch', 'size', 'verifierFor', 'verify']);
     memo.verify('m', 's', 'k');
     expect(memo.size).toBe(0);
   });

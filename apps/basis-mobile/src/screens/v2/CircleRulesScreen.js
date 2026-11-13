@@ -26,6 +26,7 @@ import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
 
 export default function CircleRulesScreen({
   doc, onSave, onBack, onPreview,
+  notice = null,   // what the last save came to, in words (a proposal opened · refused)
   // γ.4 — opt-in conflict resolver.  See file header for the deferred
   // source plumbing.  Existing callers pass none of these and get the
   // pre-γ.4 behaviour.
@@ -131,6 +132,7 @@ export default function CircleRulesScreen({
             </View>
           ))}
           {!complete ? <Text style={styles.note}>{t('circle.rules.required_note')}</Text> : null}
+          {notice ? <Text style={styles.note} accessibilityLiveRegion="polite" testID="circle-rules-notice">{notice}</Text> : null}
           <Pressable onPress={() => onPreview?.(working)} accessibilityRole="button" testID="circle-rules-preview" style={styles.preview}>
             <Text style={styles.previewText}>{t('circle.rules.preview')}</Text>
           </Pressable>

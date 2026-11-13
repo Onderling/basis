@@ -102,7 +102,8 @@ export const FUNCTIONS = Object.freeze([
   { id: 'lists-agenda', name: 'Lists, agenda, reminders', cells: {
     // the item crossing to another member (vandaag-lists-block is one page) — Fable 2026-11-10; the reminder is its own story
     web: { file: 'apps/basis/test-browser/walk-attach-appointment.spec.js', test: 'an appointment made from it reaches the other member' },
-    mobile: null,   // listsBlockOnThePhone is a unit of the block
+    // the circle's lists on the phone's Vandaag, both ways with a real second person (the reminder is its own story)
+    mobile: { file: 'apps/basis-mobile/e2e/listsAgenda.test.js', test: 'the phone ticks it off, and Bram has it no longer open' },
     box: { file: 'apps/basis/test/agendaLinkWalk.relay.test.js', test: 'the link carries the agenda' },
   } },
   { id: 'attachments', name: 'Files and media as attachments (circles, contact threads)', cells: {

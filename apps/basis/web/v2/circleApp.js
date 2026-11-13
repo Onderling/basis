@@ -3607,6 +3607,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   });
   _activeContactThread?.leave?.();   // the thread this one replaces stops listening to the map
   _activeContactThread = { contactId, rerender, leave: unsubscribeDelivery, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
+  _banner?.recheck();   // a banner for this thread has said its piece (shared driver)
   rerender();
   // who you are here (a person's thread only): read once, then the header paints it, while this thread is still on screen
   if (hidden !== null) {
@@ -7294,6 +7295,7 @@ async function showDetail(id) {
   await refreshRelayKnown();   // the composer says when a message would wait (no connection point)
   hideTabBar();
   setActiveCircle(id);
+  _banner?.recheck();   // a banner for this circle has said its piece (shared driver)
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
   // so items added here fan out to them. Member-only + deduped; safe to call often.
   feedHouseholdRosterForCircle?.(id)?.catch?.(() => {});

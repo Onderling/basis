@@ -720,16 +720,6 @@ export default function CircleLauncherScreen({
   }, [bundle, contactSeen, readMarks, readTick, contactNames]);
   useEffect(() => { refreshContactUnread(); }, [refreshContactUnread]);
   useEffect(() => subscribeContactReplies(() => { refreshContactUnread(); }), [refreshContactUnread]);
-  // the feedback door: the contact's row (the one Contacten paints), its thread opened with the draft in the composer
-  const openFeedbackThread = useCallback(async (webid, draft) => {
-    let row = null;
-    try {
-      const rows = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames });
-      row = rows.find((c) => c.contactId === webid) ?? null;
-    } catch { row = null; }
-    setContactThread({ ...(row ?? { contactId: webid }), draft });
-    setView('contacten');
-  }, [bundle, contactNames]);
   // 'How the bot shows actions' only for a person with a bot that acts: read from the contact book when a settings group opens
   const [botActionsShown, setBotActionsShown] = useState(false);
   useEffect(() => {
@@ -748,6 +738,20 @@ export default function CircleLauncherScreen({
     // …and it acknowledges a rename: the "was: …" line under the row clears (web parity)
     contactNames.seen(contact?.contactId, contact?.name).catch(() => {});
   }, [contactSeen, contactNames, refreshContactUnread, readMarks, contactUnread]);
+  // A THREAD OPENED BY ID (a notice, Today's "new for you" row, the feedback door): through the row Contacten paints, so
+  // it is titled and faced as the person tapped it there (web parity: showContactThread). `name` is the caller's own
+  // words for when no row names them; `draft` goes into the composer.
+  const openContactThreadById = useCallback(async (contactId, { draft = null, name = null } = {}) => {
+    let row = null;
+    try {
+      const rows = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames });
+      row = rows.find((c) => c.contactId === contactId) ?? null;
+    } catch { row = null; }
+    openContactThread({ ...(row ?? { contactId, name }), ...(draft != null ? { draft } : {}) });
+    setView('contacten');
+  }, [bundle, contactNames, openContactThread]);
+  // the feedback door: the contact's thread, opened with the draft in the composer
+  const openFeedbackThread = useCallback((webid, draft) => openContactThreadById(webid, { draft }), [openContactThreadById]);
   const tabBadges = useMemo(() => ({ contacten: totalUnread(contactUnread) }), [contactUnread]);
   const [viewAsPolicy, setViewAsPolicy] = useState('pairwise');
   const [viewAsMembers, setViewAsMembers] = useState([]);
@@ -1321,13 +1325,18 @@ export default function CircleLauncherScreen({
     return () => { d.dismiss(); bannerRef.current = null; if (typeof off === 'function') off(); };
   }, [bundle, eventLog, forYouHostOpsNow]);
   useEffect(() => { bannerRef.current?.poke(); }, [contactTurns]);
+  // a thread or circle opened another way than from the banner: a banner for it has said its piece, and it would lie
+  // over that screen's header (the shared driver asks onSource, which reads this render's open thread and circle)
+  const openThreadId = view === 'contacten' ? (contactThread?.contactId ?? null) : null;
+  const openCircleId = view === 'detail' ? (selected?.id ?? null) : null;
+  useEffect(() => { bannerRef.current?.recheck(); }, [openThreadId, openCircleId]);
   // painted over every tab beside the switcher (the tab frame's overlay); a tap opens the thing, or Today for a burst
   const bannerView = banner ? (
     <Pressable testID="notify-banner" accessibilityRole="button" accessibilityLabel={banner.text}
       onPress={() => {
         bannerRef.current?.dismiss();
         const o = banner.open;
-        if (o?.kind === 'thread') { openContactThread({ contactId: o.id, name: null }); setView('contacten'); }
+        if (o?.kind === 'thread') { openContactThreadById(o.id).catch(() => {}); }
         else if (o?.kind === 'circle') { const c = (vandaagInputs.current.circles ?? []).find((x) => x?.id === o.id); if (c) openCircle(c); }
         else if (o?.kind === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
         else setView('screens');
@@ -2324,7 +2333,7 @@ export default function CircleLauncherScreen({
                 // "Nieuw voor jou": opening a row is reading it (on every device), and it goes to the thing itself
                 else if (a?.kind === 'for-you-open' && a.row) {
                   readMarks.markRows([a.row]).catch(() => {});
-                  if (a.row.open?.kind === 'thread') { openContactThread({ contactId: a.row.open.id, name: a.row.group?.name ?? null }); setView('contacten'); }
+                  if (a.row.open?.kind === 'thread') { openContactThreadById(a.row.open.id, { name: a.row.group?.name ?? null }).catch(() => {}); }
                   else if (a.row.open?.kind === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
                   else { const c = circles.find((x) => x.id === a.row.open?.id); if (c) openCircle(c); }
                 }

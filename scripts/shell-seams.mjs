@@ -54,6 +54,11 @@ export const SEAMS = Object.freeze([
   // WHICH SELF A SCREEN IS PAIRED FOR: a persona issues its grants as itself, so on a device holding several selves the
   // pairing form asks (the active self preselected) — the shared decision is `connectionSelfChoice`. The box pairs no
   // screen through a form.
+  // A BANNER FOR WHAT IS NOW ON SCREEN GOES AWAY: the shared banner driver raises a notice on any screen; when the person
+  // then opens that thread or circle another way, the shell asks the driver to recheck, or the banner lies over the
+  // opened screen's header (found walking the phone, 2026-11-14: a tap on the thread's ⋯ landed on it). The box paints no
+  // banner, so the seam is web and mobile only.
+  { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },
   { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
   // A NEW MEMBER IS NAMED AS THEIR FIRST LINE LANDS: a sender the roster cannot place yet (one this device admitted, a
   // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles

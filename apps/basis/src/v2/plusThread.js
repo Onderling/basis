@@ -34,12 +34,13 @@ export function createPlusThread({ threads, threadId } = {}) {
     /**
      * ONE EXCHANGE, the duty both shells run for a read of the line: the person's line is heard (null: a pick on the
      * card, no new line), the read runs, and what the "+" answered is kept. `run` returns the read's result
-     * (`{error, done, card|circleCard, actId|ownActId}`, any of them); `t` words the answer. Returns the run's result.
+     * in ONE shape, `{error, done, card, actId}` (any of them; what the shared readers and the phone's sheet speak); `t`
+     * words the answer. Returns the run's result.
      */
     async exchange(line, run, { t } = {}) {
       if (line != null) this.heard(line);
       const r = await run();
-      const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.circleCard ?? r?.card ?? null, ownActId: r?.ownActId ?? r?.actId ?? null, t });
+      const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.card ?? null, ownActId: r?.actId ?? null, t });
       if (said) this.answered(said);
       return r;
     },

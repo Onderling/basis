@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { plusSuggestionPool, plusSuggest } from '../../src/v2/vandaagPlus.js';
 import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { GATE_WORDS } from '../../src/v2/gateWords.js';
@@ -38,5 +40,25 @@ describe('the "+" suggests what it can read here', () => {
     expect(plusSuggest(pool, 'Morgen')).toEqual(['nieuwe taak voor mij: ramen lappen, morgen', 'tandarts morgen om 10 uur']);
     expect(plusSuggest(pool, 'zet melk op de boodschappen')).toEqual([]);   // typed in full: nothing left to suggest
     expect(plusSuggest(Array.from({ length: 9 }, (_, i) => `zet ${i}`), 'zet')).toHaveLength(5);
+  });
+});
+
+describe('the person\'s own language first', () => {
+  const examplesOf = (lang) => new Set(Object.values(GATE_WORDS[lang] ?? {}).flatMap((e) => e?.examples ?? []));
+  it('the pool puts the examples of the person\'s language before the other\'s (both stay: the "+" reads both)', () => {
+    for (const lang of ['en', 'nl']) {
+      const own = examplesOf(lang);
+      const pool = plusSuggestionPool({ circles: [], lang });
+      const firstOther = pool.findIndex((ex) => !own.has(ex));
+      const lastOwn = pool.map((ex) => own.has(ex)).lastIndexOf(true);
+      expect(lastOwn, `${lang}: an own-language example after another language's`).toBeLessThan(firstOther === -1 ? Infinity : firstOther);
+      expect(pool.length).toBe(plusSuggestionPool({ circles: [] }).length);
+    }
+  });
+
+  it('both shells hand the person\'s language to the pool', () => {
+    const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+    expect(read('../../web/v2/circleApp.js')).toMatch(/plusSuggestionPool\(\{ circles, lang: currentLang\(\) \}\)/);
+    expect(read('../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js')).toMatch(/plusSuggestionPool\(\{ circles: list, lang: lang\(\) \}\)/);
   });
 });

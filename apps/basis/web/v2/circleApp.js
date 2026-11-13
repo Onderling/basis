@@ -183,7 +183,7 @@ import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
 import { renderContactsRoster } from './contactsRoster.js';
-import { withHelpContact, contactOpenTarget, tileCircles } from '../../src/v2/helpContact.js';
+import { withHelpContact, contactOpenTarget, tileCircles, helpDoorTarget } from '../../src/v2/helpContact.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
@@ -4688,7 +4688,7 @@ function showVandaagPlus({ edit = null } = {}) {
     lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
   })));
   let suggestionPool = [];
-  plusCircles().then((circles) => { suggestionPool = plusSuggestionPool({ circles }); }).catch(() => {});
+  plusCircles().then((circles) => { suggestionPool = plusSuggestionPool({ circles, lang: currentLang() }); }).catch(() => {});
   // a circle's act the line read: as the person, through the waist with the circle named, so the circle's own doors
   // and governance decide (the "+" has no authority the circle's composer lacks); the reply line says what happened
   const runInCircle = async (command, circleId) => {
@@ -4750,7 +4750,7 @@ function showVandaagPlus({ edit = null } = {}) {
       if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }
       else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
-      return { error, circleCard, ownActId: r?.actId ?? null };
+      return { error, card: circleCard, actId: r?.actId ?? null };
       }, { t });
       paint();
     },
@@ -4844,7 +4844,7 @@ function onScreenAction(action) {
       .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
-  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
+  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openHelpDoor()); }
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
@@ -5459,6 +5459,13 @@ async function showMyData(opts) {
 }
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
+// THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared)
+function openHelpDoor() {
+  const r = helpDoorTarget(circlesCache);
+  if (r.kind === 'circle') { showDetail(r.circleId); return; }
+  globalThis.alert?.(t(r.key));
+}
+
 function showSettingsHome() {
   hideTabBar();
   renderSettingsHome(rootEl, {
@@ -5468,7 +5475,7 @@ function showSettingsHome() {
     // another door at the foot (feedback): its op, through the waist, naming this screen's id (never words)
     onOpenDoor: (d) => {
       // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same)
-      if (d?.target?.kind === 'nav' && d.target.to === 'help') { showDetail(HELP_CIRCLE_ID); return; }
+      if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })

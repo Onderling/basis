@@ -22,6 +22,7 @@
  * goes through `verifyEd25519Strict` (a guard refuses a direct `nacl.sign.detached.verify` elsewhere).
  */
 import nacl from 'tweetnacl';
+import { ed25519Disagreements, ED25519_EDGE_VECTORS, ED25519_ACCEPTED } from '../conformance/ed25519Conformance.js';
 
 /** The rule set's name, for anything that ever records a verdict beyond this process. */
 export const ED25519_RULE = 'ed25519-strict-1';
@@ -90,8 +91,12 @@ export function strictSignatureShapeOk(sig, key) {
   return true;
 }
 
+const TWEETNACL = Object.freeze({ name: 'tweetnacl', verify: (msg, sig, key) => nacl.sign.detached.verify(msg, sig, key), verifyBatch: null });
+let equation = TWEETNACL;
+
 /**
- * THE check: the strict byte rule, then tweetnacl's cofactorless equation.
+ * THE check: the strict byte rule, then the equation (tweetnacl's cofactorless one, unless the shell installed a faster
+ * one that agrees: `useSignatureEquation`).
  * @param {Uint8Array} msg
  * @param {Uint8Array} sig
  * @param {Uint8Array} key
@@ -99,5 +104,80 @@ export function strictSignatureShapeOk(sig, key) {
  */
 export function verifyEd25519Strict(msg, sig, key) {
   if (!strictSignatureShapeOk(sig, key)) return false;
-  try { return nacl.sign.detached.verify(msg, sig, key) === true; } catch { return false; }
+  try { return equation.verify(msg, sig, key) === true; } catch { return false; }
 }
+
+/**
+ * Many checks at once, each with the byte rule in front: the installed equation's `verifyBatch` when it has one (an
+ * async check such as WebCrypto, which never blocks the thread), else one by one.
+ * @param {Array<{msg: Uint8Array, sig: Uint8Array, key: Uint8Array}>} items
+ * @returns {Promise<boolean[]>}
+ */
+export async function verifyEd25519StrictBatch(items) {
+  const list = Array.isArray(items) ? items : [];
+  const shapeOk = list.map((it) => strictSignatureShapeOk(it?.sig, it?.key));
+  const eq = equation;
+  if (typeof eq.verifyBatch !== 'function') return list.map((it, i) => shapeOk[i] && verifyEd25519Strict(it.msg, it.sig, it.key));
+  const passing = list.filter((_, i) => shapeOk[i]);
+  let answers = [];
+  try { answers = (await eq.verifyBatch(passing)) ?? []; } catch { answers = []; }
+  let j = 0;
+  return list.map((_, i) => (shapeOk[i] ? answers[j++] === true : false));
+}
+
+/**
+ * A FASTER EQUATION, installed once by the shell (node:crypto on the box, WebCrypto's batch on the web; a native module
+ * on the phone later), BEHIND the byte rule. Taken only if, with the rule in front, it gives the platform's answer on
+ * the twelve edge-case vectors, accepts an honest signature and refuses that signature tampered; otherwise the current
+ * equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never replaceable. An
+ * equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path. A `verifyBatch`
+ * is vetted HERE too, through the batch itself (the vectors with the rule in front, an honest and a tampered
+ * signature): the one place the rule "nothing faster without agreeing" lives, for every shell. Async for that reason.
+ * @param {{name: string, verify?: (msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean,
+ *          verifyBatch?: (items: Array<{msg: Uint8Array, sig: Uint8Array, key: Uint8Array}>) => Promise<boolean[]>}|null} eq
+ * @returns {Promise<{ok: boolean, name: string, reason?: string, disagreements?: Array<object>}>}
+ */
+export async function useSignatureEquation(eq) {
+  if (eq == null) { equation = TWEETNACL; return { ok: true, name: equation.name }; }
+  const hasSync = typeof eq?.verify === 'function';
+  if ((!hasSync && typeof eq?.verifyBatch !== 'function') || typeof eq?.name !== 'string' || !eq.name) return { ok: false, name: equation.name, reason: 'not-an-equation' };
+  const sync = hasSync ? eq.verify : TWEETNACL.verify;
+  const withRule = (m, s, k) => strictSignatureShapeOk(s, k) && sync(m, s, k) === true;
+  const disagreements = ed25519Disagreements(withRule);
+  if (disagreements.length) return { ok: false, name: equation.name, reason: 'disagrees-on-vectors', disagreements };
+  const kp = nacl.sign.keyPair();
+  const msg = new TextEncoder().encode('onderling equation self-test');
+  const sig = nacl.sign.detached(msg, kp.secretKey);
+  const tampered = new Uint8Array(msg); tampered[0] ^= 1;
+  let honest = false; let refused = false;
+  try { honest = withRule(msg, sig, kp.publicKey); refused = !withRule(tampered, sig, kp.publicKey); } catch { honest = false; }
+  if (!honest || !refused) return { ok: false, name: equation.name, reason: honest ? 'accepts-tampered' : 'refuses-honest' };
+  if (typeof eq.verifyBatch === 'function') {
+    const why = await batchDisagrees(eq.verifyBatch, { msg, sig, tampered, key: kp.publicKey });
+    if (why) return { ok: false, name: equation.name, reason: why };
+  }
+  equation = Object.freeze({ name: eq.name, verify: sync, verifyBatch: typeof eq.verifyBatch === 'function' ? eq.verifyBatch : null });
+  return { ok: true, name: equation.name };
+}
+
+/** The batch's own answers, with the byte rule in front as the platform runs it: null when it agrees, else why not. */
+async function batchDisagrees(verifyBatch, { msg, sig, tampered, key }) {
+  const hex = (h) => Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16)));
+  const vs = ED25519_EDGE_VECTORS.map(([m, k, s]) => ({ msg: hex(m), sig: hex(s), key: hex(k) }));
+  const shaped = vs.map((v) => strictSignatureShapeOk(v.sig, v.key));
+  const items = [...vs.filter((_, i) => shaped[i]), { msg, sig, key }, { msg: tampered, sig, key }];
+  let answers = [];
+  try { answers = (await verifyBatch(items)) ?? []; } catch { return 'batch-failed'; }
+  let j = 0;
+  const vectorsOk = vs.every((_, i) => (shaped[i] ? answers[j++] === true : false) === ED25519_ACCEPTED.includes(i));
+  if (!vectorsOk) return 'batch-disagrees-on-vectors';
+  if (answers[j] !== true) return 'batch-refuses-honest';
+  if (answers[j + 1] !== false) return 'batch-accepts-tampered';
+  return null;
+}
+
+/** Does the installed equation check a batch off the thread (WebCrypto)? A read then checks ahead, as one batch. */
+export function signatureEquationBatches() { return typeof equation.verifyBatch === 'function'; }
+
+/** Which equation answers now ('tweetnacl' until a shell installs one). For diagnostics. */
+export function signatureEquationName() { return equation.name; }

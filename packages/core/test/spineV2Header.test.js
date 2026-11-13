@@ -77,3 +77,14 @@ describe('spine v2: one header, hashed and signed', () => {
     expect(verifySpine(x).ok && verifySpine(y).ok).toBe(true);
   });
 });
+
+describe('a tombstone keeps payload { authorRef } only (the chain walks read payload.authorRef)', () => {
+  it('the authorRef-only payload is accepted on a tombstone; anything more, or another ref, is refused', async () => {
+    const a = await me();
+    const st = signSpine(a, { kind: 'member-props', circleId: CID, subject: a.pubKey, payload: { authorRef: 'ref-a', displayName: 'Ann' } });
+    const { payload, ...head } = st.body;
+    expect(verifySpine({ tombstone: true, body: { ...head, payload: { authorRef: 'ref-a' } }, sig: st.sig }).ok).toBe(true);
+    expect(verifySpine({ tombstone: true, body: { ...head, payload: { authorRef: 'ref-a', displayName: 'Mallory' } }, sig: st.sig }).ok).toBe(false);
+    expect(verifySpine({ tombstone: true, body: { ...head, payload: { authorRef: 'MALLORY' } }, sig: st.sig }).ok).toBe(false);
+  });
+});

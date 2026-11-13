@@ -156,11 +156,19 @@ export function verifySpine(statement, opts = {}) {
   if (expectedCircleId && body.circleId !== expectedCircleId) return { ok: false, reason: 'circle mismatch' };
   // The payload the header commits to: present → its digest must match and its authorRef must be the header's; absent →
   // only a TOMBSTONE may lack it (its header still proves itself), else it is the digest of nothing.
-  if (body.payload !== undefined) {
+  if (statement.tombstone === true) {
+    // a TOMBSTONE keeps at most `{ authorRef }` as its payload (what the chain walks read), and it must be the header's
+    if (body.payload !== undefined) {
+      const keys = body.payload && typeof body.payload === 'object' ? Object.keys(body.payload) : null;
+      if (!keys || keys.length !== 1 || keys[0] !== 'authorRef' || body.payload.authorRef !== (body.authorRef ?? null)) {
+        return { ok: false, reason: 'a tombstone keeps its authorRef only' };
+      }
+    }
+  } else if (body.payload !== undefined) {
     if (payloadDigestOf(body.payload) !== body.payloadDigest) return { ok: false, reason: 'payload does not match its digest' };
     const ref = typeof body.payload?.authorRef === 'string' ? body.payload.authorRef : null;
     if (ref !== (body.authorRef ?? null)) return { ok: false, reason: 'authorRef does not match the header' };
-  } else if (statement.tombstone !== true && body.payloadDigest !== payloadDigestOf(undefined)) {
+  } else if (body.payloadDigest !== payloadDigestOf(undefined)) {
     return { ok: false, reason: 'payload missing' };
   }
   // ONE header, hashed and signed: the chain hash recomputes from it, and the author's signature is over it.

@@ -1595,3 +1595,9 @@ before it stay on the devices that ran with compaction on, and nothing serves a 
 it can vouch for), so a member who joins such a circle later still lacks those parents. That is pre-launch state with
 no compatibility owed: the alpha starts from fresh circles (and the statement format change founds every circle again).
 Ledger: L827, L833.
+
+*Amended 2026-11-13 (the statement format v2, L833 — the condition this entry named):* compaction is ON again
+(`COMPACT_SUPERSEDED_PROPS = true`). A tombstone now keeps the signed header (its payload dropped, its digest and
+authorRef kept), so it proves itself, a catch-up serves it, and a member who joins later accepts it and folds the same
+roster: `apps/basis/test/v2/tombstoneProvesItself.test.js` and the relay walk `lateJoinerAfterCompaction` (with
+tombstones on the admin's side) are green. Every circle is founded again by the format change (no compatibility owed).

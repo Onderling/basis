@@ -989,17 +989,12 @@ export default function CircleLauncherScreen({
   const fileCircleReportMobile = useCallback(async (targetType, targetRef, targetLabel = null, reason = '') => {
     const circleId = selected?.id; if (!circleId || !targetRef) return;
     try {
-      const broadcast = makeGovernanceBroadcast((...a) => bundle?.callSkill?.(...a));   // the one shared fan
-      const gov = bindCircleGovernance({
-        eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
-        agent: bundle?.agent ?? null,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
-        myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
-        circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
-        spineGate: bundle?.agent?.spineGate ?? null,   // spine acts only from the point
-      });
+      // the phone's ONE governance binding (govPolicy below), never a second one with its own options
+      const gov = govPolicyRef.current;
+      if (!gov) return;
       await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason });
     } catch { /* best-effort */ }
-  }, [selected, bundle, eventLog, policyStore]);
+  }, [selected]);
   // The ops this phone mounts on the waist (the lists, basis's own), composed once in src/core/phoneAppOps.js — the
   // same function the Node phone calls. This screen hands in exactly its platform: how it picks a file, scans a code,
   // asks the person, opens the feedback thread.
@@ -1117,9 +1112,12 @@ export default function CircleLauncherScreen({
       myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
       circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
       spineGate: bundle?.agent?.spineGate ?? null,   // spine acts only from the point (as every other binding)
+      // an enacted settings change: written here, then stated on the lane so every member's device applies it (this
+      // binding used to write the store only: an approved settings proposal enacted on the phone reached nobody)
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
+      statePolicy: (cid) => (circlePolicyLane ? circlePolicyLane.state(cid) : null),
     });
-  }, [bundle, eventLog, policyStore]);
+  }, [bundle, eventLog, policyStore, circlePolicyLane]);
   govPolicyRef.current = govPolicy;
   // α.1e — per-circle screen recipe book (multi-recipe; one marked active).
   const recipeStore       = useMemo(() => makeCircleRecipeStoreRN(AsyncStorage), []);
@@ -2477,13 +2475,8 @@ export default function CircleLauncherScreen({
     return (
       <CircleGovernanceScreen
         callSkill={bundle?.callSkill}
-        circleIdentityFor={bundle?.agent?.circleIdentityFor ?? null}
-        spineGate={bundle?.agent?.spineGate ?? null}
-        agent={bundle?.agent ?? null}
+        governance={govPolicy}   // the phone's one governance binding
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
-        eventLog={eventLog}
-        getPolicy={(cid) => policyStore.get(cid)}
-        updatePolicy={(cid, next) => policyStore.update(cid, next)}
         circleId={selected.id}
         onBack={() => setView('detail')}
       />

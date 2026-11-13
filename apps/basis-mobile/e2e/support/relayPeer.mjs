@@ -37,6 +37,7 @@
  */
 import { startJourneyRelay } from '../../../basis/test/support/testRelay.js';
 import readline from 'node:readline';
+import { makerRootKeyStore, MAKER_HANDLE, MAKER_RELAY_PORT, MAKER_CARD_RELAY } from './makerCard.mjs';
 import { networkInterfaces } from 'node:os';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, teardown, sendCircleChat, readRoster,
@@ -54,7 +55,8 @@ const say = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
 
 const circleName = arg('circle', 'Walk Kring');
 const offering = arg('offering');
-const handle = arg('handle', 'bram');
+// the maker's handle is part of its card, so it is fixed with it
+const handle = process.argv.includes('--maker') ? MAKER_HANDLE : arg('handle', 'bram');
 // ONE NAME FOR THE RELAY, used by everyone. A relay a deployment runs has one public name; here the host's relay was
 // `127.0.0.1` to this peer and `10.0.2.2` (the emulator's alias for the host) to the phone, so the two recorded the same
 // relay under two urls. A circle's points carry the peer's spelling, the phone's socket did not match it, and routing
@@ -68,19 +70,24 @@ const lanAddress = () => {
   return null;
 };
 const phoneHost = arg('phone-host', lanAddress() ?? '10.0.2.2');
-const talk = process.argv.includes('--talk');
+const makerMode = process.argv.includes('--maker');
+const talk = process.argv.includes('--talk') || makerMode;
 const joinMode = process.argv.includes('--join');
 
-const relay = await startJourneyRelay();
-const relayUrl = phoneHost === '10.0.2.2' ? relay.url : `ws://${phoneHost}:${new URL(relay.url).port}`;
+// the maker's relay is on the fixed port its card names (the phone dials it as the card says, 10.0.2.2:port)
+const relay = await startJourneyRelay(makerMode ? { port: MAKER_RELAY_PORT } : {});
+const relayUrl = (phoneHost === '10.0.2.2' || makerMode) ? relay.url : `ws://${phoneHost}:${new URL(relay.url).port}`;
 say({ step: 'relay', url: relayUrl });
-const peer = await bootRealAgentNode(handle, { itemsLane: true, contactChannel: talk });
+// `--maker`: the feedback contact an e2e build carries (e2e/support/makerCard.mjs): a FIXED root seed, so this peer is
+// the same person on every run and its card is the one baked into that build
+const makerOpts = makerMode ? { agentOpts: { rootKeyStore: await makerRootKeyStore() } } : {};
+const peer = await bootRealAgentNode(handle, { itemsLane: true, contactChannel: talk, ...makerOpts });
 await connectNodesOverRelay([peer], { relayUrl });
 
 const call = (app, op, args) => peer.agent.callSkill(app, op, args);
 // the circle this peer is in: its own (founded here), or, in `--join` mode, the phone's once the invite arrives
-let groupId = joinMode ? null : `walk-${Date.now().toString(36)}`;
-if (!joinMode) {
+let groupId = (joinMode || makerMode) ? null : `walk-${Date.now().toString(36)}`;
+if (!joinMode && !makerMode) {
 await createCircle(peer, { groupId, name: circleName });
 await bindCircleAddresses([peer], groupId);
 await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId });
@@ -106,7 +113,15 @@ if (offering) {
 
 }
 
-if (joinMode) {
+if (makerMode) {
+  // the feedback contact: in no circle, reachable as a person; its card (made by its own op) is what the walk compares
+  // with the card the e2e build carries
+  await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
+  const card = (await call('pinboard', 'getContactShareQr', {}).catch(() => null))?.payload ?? null;
+  // `webid`: who it is (the build's card names the same one; the live card adds this run's relay, so cards differ)
+  // `relayUrl` here is the one the PHONE dials: the card's (the maker itself is on 127.0.0.1, the same relay)
+  say({ step: 'ready', maker: true, webid: peer.pubKey, card, relayUrl: MAKER_CARD_RELAY });
+} else if (joinMode) {
   await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
   say({ step: 'ready', waitingForInvite: true, relayUrl });
 } else {

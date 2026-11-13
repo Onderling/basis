@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "ios": "expo run:ios",
     "detox:build": "detox build --configuration android.emu.release",
+    "detox:build:e2e": "ONDERLING_E2E_BUILD=1 EXPO_PUBLIC_SEEDED_CONTACT_CARD=\"$(node -p \"require('./e2e/support/makerCard.fixture.json').uri\")\" detox build --configuration android.emu.release",
     "detox:test": "detox test --configuration android.emu.release",
     "detox:test:attached": "detox test --configuration android.attached.release",
     "build:web": "expo export --platform web --output-dir dist-web",

@@ -129,11 +129,16 @@ export async function readSealedMessagesSince(backend, open, { circleId, sinceTs
   const cap = Math.max(1, Math.min(Number.isFinite(max) ? max : 200, 1000));
   const since = Number.isFinite(sinceTs) ? sinceTs : 0;
 
-  const refs = await backend.list(`${circleId}/`);
+  // The refs carry the ts (the key convention), so the page is chosen from the KEYS: sorted oldest first, opened only
+  // until one page plus one row is in hand (the extra row says more follow). Opening every row since the watermark
+  // and slicing after cost a full read of the rest on every page. A key that is not ours (no ts) sorts last.
+  const keyTs = (ref) => { const t = tsFromRef(ref); return Number.isFinite(t) ? t : Infinity; };
+  const refs = (await backend.list(`${circleId}/`))
+    .filter((ref) => keyTs(ref) >= since)   // cheap key-only prune before the get/open
+    .sort((a, b) => keyTs(a) - keyTs(b));
   const rows = [];
   for (const ref of refs) {
-    const ts = tsFromRef(ref);
-    if (Number.isFinite(ts) && ts < since) continue;   // cheap key-only prune before the get/open
+    if (rows.length > cap) break;
     try {
       const msg = await readSealedMessage(backend, open, ref);
       if (msg && Number.isFinite(msg.ts) && msg.ts >= since) rows.push(msg);

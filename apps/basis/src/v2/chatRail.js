@@ -25,7 +25,7 @@
  */
 import { selfRefIn } from './selfRef.js';
 import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
-import { entryKindRegistryFromManifests, toEventLogItem, kindWakes } from '@onderling/item-store';
+import { entryKindRegistryFromManifests, toEventLogItem, kindWakes, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { cardForCircleWire } from '@onderling/kring-host/circleBroadcast';
 import { chatManifest, CHAT_LANE } from './chatManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
@@ -335,10 +335,13 @@ export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null, 
  *   every listed circle is probed (a pod-less circle's reader just returns nothing)
  * @param {{query: Function}} a.eventLog        for the since-watermark (newest landed chat entry per circle)
  */
+/** How far behind its newest landed chat entry the pod read-back starts again (idempotent ingest dedups the overlap). */
+export const POD_CATCHUP_OVERLAP_MS = param({ key: 'chat.podCatchUpOverlapMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 * 60 * 1000 });
+/** Pages the pod read-back reads per kick (the reader's page is 200 rows); the next kick reads on from where it landed. */
+export const POD_CATCHUP_MAX_PAGES = param({ key: 'chat.podCatchUpMaxPages', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
+
 export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eventLog } = {}) {
   if (!rail || typeof podReadSince !== 'function') return null;
-  const OVERLAP_MS = 60 * 60 * 1000;   // re-read an hour behind the watermark; idempotent ingest dedups
-  const MAX_PAGES = 50;                // pages per kick (the reader's page is 200 rows); the next kick reads on
 
   async function catchUpCircle(circleId) {
     if (typeof dataMoveFor === 'function') {
@@ -354,9 +357,11 @@ export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eve
       }
     } catch { sinceTs = 0; }
     let ingested = 0;
-    let from = Math.max(0, sinceTs - OVERLAP_MS);
+    let from = Math.max(0, sinceTs - POD_CATCHUP_OVERLAP_MS);
     // page by page: the reader answers one page forward from `from`; read on from the last row's ts while more follow
-    for (let page = 0; page < MAX_PAGES; page += 1) {
+    // The watermark is the newest LANDED chat entry: a kick whose pages held only refused rows lands nothing, so the
+    // next kick starts from the same watermark and reads those pages again (bounded by the page cap; no cursor kept).
+    for (let page = 0; page < POD_CATCHUP_MAX_PAGES; page += 1) {
       let read;
       try { read = await podReadSince(circleId, { sinceTs: from }); }
       catch { return { ingested }; }

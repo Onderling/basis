@@ -79,6 +79,22 @@ describe('sealedMessageLog — sealed round-trip (p2 group-key via resolveCircle
   });
 });
 
+describe('sealedMessageLog — a page costs a page of reads', () => {
+  it('opens only one page (plus one, to know more follow), not every row since the watermark', async () => {
+    const backend = new MemoryStorageBackend();
+    for (let i = 0; i < 1000; i++) await writeSealedMessage(backend, null, envOf({ msgId: `m${i}`, ts: 10_000 + i, text: `t${i}` }));
+    let gets = 0;
+    const counted = Object.create(backend);
+    counted.get = (ref) => { gets += 1; return backend.get(ref); };
+    counted.list = (prefix) => backend.list(prefix);
+    const { items, truncated } = await readSealedMessagesSince(counted, null, { circleId: CIRCLE, sinceTs: 0, max: 200 });
+    expect(truncated).toBe(true);
+    expect(items.map((i) => i.msgId).slice(0, 2)).toEqual(['m0', 'm1']);
+    expect(items).toHaveLength(200);
+    expect(gets, 'rows opened for one page').toBeLessThanOrEqual(201);
+  });
+});
+
 describe('sealedMessageLog — plaintext store (p0, no client seal)', () => {
   it('stores + reads plaintext JSON when the strategy is null', async () => {
     const backend = new MemoryStorageBackend();

@@ -148,6 +148,8 @@ export default function ChatScreen({
   // reload. Declared here deliberately: the sibling bug fixed the same day was App.js passing
   // `onAcceptFallback` to a screen that never destructured it, which threw on render.
   onCirclesChanged = null,
+  // a contact card opened as a link: handed to the launcher (this shell is mounted hidden; its sheet would not show)
+  onContactLink = null,
   eventLog = null,
   // ε.1 — shared inbox singleton (msgId dedup + ingest mirror + eventLog append).
   // The receiver path here routes through it; rehydrator + future catch-up paths
@@ -1562,6 +1564,8 @@ export default function ChatScreen({
     }
     const payload = res.payload;
     if (res.kind === 'contact') {
+      // this shell is mounted HIDDEN (App.js): the launcher, which the person sees, opens the add sheet for it
+      if (typeof onContactLink === 'function') { onContactLink(payload); return; }
       // Call the pinboard substrate skill that decodes the URL + adds the
       // contact in one round-trip.  Then synthesise a confirmation bubble.
       try {

@@ -218,6 +218,11 @@ export default function App() {
   // (found 2026-07-30, right after the first message round-trip landed). Bumping this is the notification.
   const [circlesRevision, setCirclesRevision] = useState(0);
   const onCirclesChanged = useCallback(() => setCirclesRevision((n) => n + 1), []);
+  // A contact card opened as a LINK is drained by the hidden ChatScreen; its own sheet and its 'added' line would be
+  // invisible there, so it hands the card to the launcher, which opens its own add sheet (the scanner's path).
+  const [contactLink, setContactLink] = useState(null);
+  const onContactLink = useCallback((payload) => setContactLink({ payload, at: Date.now() }), []);
+  const onContactLinkDone = useCallback(() => setContactLink(null), []);
 
   const registerCircleBotSink = useCallback((fn) => {
     circleBotSinkRef.current = typeof fn === 'function' ? fn : null;
@@ -677,6 +682,7 @@ export default function App() {
           <ChatScreen
             // A join completed in THIS shell (the invite-link path) must reach the launcher's list.
             onCirclesChanged={onCirclesChanged}
+            onContactLink={onContactLink}
             bundle={bundle}
             bootError={bootError}
             eventLog={eventLogRef.current}
@@ -700,6 +706,9 @@ export default function App() {
           onAcceptFallback={acceptFallbackOffer}
           // Bumped when a circle is joined/created from another surface → the launcher reloads its list.
           circlesRevision={circlesRevision}
+          // a contact card opened as a link, handed over by the hidden ChatScreen: the launcher opens its add sheet
+          contactLink={contactLink}
+          onContactLinkDone={onContactLinkDone}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}

@@ -59,9 +59,17 @@ describe('checkEntry — a stored chat line judged as an arrival (what a history
     const forged = { ...st, body: { ...st.body, payload: { ...st.body.payload, text: 'iets anders' } } };
     expect(rail.checkEntry({ ...entry, payload: { ...entry.payload, text: 'iets anders', statement: forged } })).toBe(false);
   });
-  it('a local line that never fanned (no statement) has nothing to check and passes', async () => {
+  it("a local line that never fanned (no statement) passes when it is this person's own or the local bot's", async () => {
     const { rail, entry } = await railWithOne();
     const { statement: _s, ...local } = entry.payload;
-    expect(rail.checkEntry({ ...entry, payload: local })).toBe(true);
+    expect(rail.checkEntry({ ...entry, actor: 'me', payload: local })).toBe(true);     // the shells' own optimistic line
+    expect(rail.checkEntry({ ...entry, actor: 'bot', payload: local })).toBe(true);    // a local bot bubble or notice
+    expect(rail.checkEntry({ ...entry, payload: local })).toBe(true);                  // this device's self in the circle
+  });
+  it('an unsigned line naming ANOTHER member is refused: it would show as their message', async () => {
+    const { rail, entry } = await railWithOne();
+    const { statement: _s, ...local } = entry.payload;
+    expect(rail.checkEntry({ ...entry, actor: 'b'.repeat(64), payload: local })).toBe(false);
+    expect(rail.checkEntry({ ...entry, actor: undefined, payload: local })).toBe(false);
   });
 });

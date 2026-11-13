@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t, lang } from '../../core/localisation.js';
-import { removeMemberDoor } from '../../../../basis/src/v2/governanceDoors.js';
+import { removeMemberDoor, changeRoleDoor } from '../../../../basis/src/v2/governanceDoors.js';
 import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circleShare.js';
 // The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
 // through the SAME shared compute web's panel and both members tabs paint — one answer to "how is
@@ -126,15 +126,15 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, govern
       execute: async () => {
         setNotice(null);
         try {
-          const r = await callSkill('pinboard', 'setMemberRole', {
-            groupId, memberWebid: m.webid, role: control.role,
-          });
-          setNotice(t(roleChangeNoticeWords(r, control).key, { name }));
+          // THE DOOR (governanceDoors.js): a role change follows this circle's settings rule; an admin stepping down
+          // from their own role goes at once
+          const r = await changeRoleDoor({ governance, callSkill, circleId: groupId, memberWebid: m.webid, role: control.role, actorRef: myWebid || null });
+          setNotice(r.outcome === 'proposed' ? t('circle.admin.role_proposed', { name }) : t(roleChangeNoticeWords(r.outcome === 'done' ? r.result : null, control).key, { name }));
         } catch { setNotice(t('circle.admin.refused')); }
         load();
       },
     });
-  }, [callSkill, groupId, load]);
+  }, [governance, callSkill, groupId, myWebid, load]);
   const postAnnounce = useCallback(async () => {
     const text = announce.trim(); if (!text) return;
     setAnnounce(''); setNotice(null);

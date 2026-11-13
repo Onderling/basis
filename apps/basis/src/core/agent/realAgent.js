@@ -127,7 +127,9 @@ import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 import { makeGovernanceRail, bindCircleGovernance, makeGovernanceBroadcast } from '../../v2/governanceAppWiring.js';
 import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 // …and the circle POLICY, the same way: a signed statement on the governance lane, caught up by joiners.
-import { makePolicyUpdateEmitter } from '../../v2/policyUpdateLane.js';
+import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../../v2/policyUpdateLane.js';
+import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
+import { judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
@@ -6325,6 +6327,44 @@ export async function createRealHouseholdAgent(opts = {}) {
       return sendSpineAct('membership', plain);
     };
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
+    // THE GOVERNED GATE's host half (the circle's "who decides" for removals and role changes, judged on THIS device):
+    // the circle's settings are the chain of settings statements on its governance lane (judgePolicyChain), so the
+    // gate needs no policy store. First the cheap answer: no settings statement on the lane ever asked a vote for a
+    // removal or a role change (a superset check, any author) → no gate, the roster folds once as before; memoised by
+    // the lane's length. Otherwise a builder the roster read calls with its first-pass rows (the members a tally counts).
+    const gateNeedMemo = new Map();   // circleId → { n, needed }
+    let gateRailMemo = null;
+    const gateRail = () => (gateRailMemo ??= makeGovernanceRail({
+      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+      circleIdentityFor, myRef: circleSelfRef, callSkill: (...a) => callSkill(...a),
+    }));
+    const asksVote = (p) => {
+      const pol = normalizeCirclePolicy(p ?? {});
+      return decisionClassFor(pol, 'removeMember') !== 'any-admin' || decisionClassFor(pol, 'changeRole') !== 'any-admin';
+    };
+    membershipRead.governedGateFor = async (circleId) => {
+      const rail = gateRail();
+      let n = 0;
+      try { n = rail.storedStatements(circleId).length; } catch { return null; }
+      if (n === 0) return null;
+      const memo = gateNeedMemo.get(circleId);
+      if (memo && memo.n === n && memo.needed === false) return null;
+      let bodies = [];
+      try { ({ bodies = [] } = await rail.readVerifiedBodies(circleId)); } catch { return null; }
+      const policyStatements = bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND);
+      const needed = policyStatements.some((b) => asksVote(b.payload?.policy));
+      gateNeedMemo.set(circleId, { n, needed });
+      if (!needed) return null;
+      return async (firstPass) => {
+        const members = (Array.isArray(firstPass) ? firstPass : [])
+          .filter((r) => typeof r?.webid === 'string' && r.webid)
+          .map((r) => ({ ref: r.webid, role: r.role === 'admin' ? 'admin' : 'member', ...(r.adminVia ? { via: r.adminVia } : {}) }));
+        const admins = new Set(members.filter((m) => m.role === 'admin').map((m) => m.ref));
+        const proposals = await proposalsOn({ rail, circleId, policy: normalizeCirclePolicy({}), members });
+        const chain = judgePolicyChain({ bodies: policyStatements.filter((b) => admins.has(b.author)), members, proposals, merge: denyWinsMerge });
+        return membershipGateFor({ chain, currentPolicy: chain.policyAt(chain.head), members, proposals });
+      };
+    };
     // the ceremony retirements alone — what the spineless roster folds (they bind by the root's reveal, no recursion)
     membershipRead.ceremony = (circleId) => membershipRail.readVerifiedBodies(circleId, { kinds: ['address-revoke'] });
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands

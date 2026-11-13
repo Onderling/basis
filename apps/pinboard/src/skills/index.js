@@ -1017,7 +1017,7 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
 
   // the link proofs the fold will check, checked first with the thread given back between them (the fold is synchronous)
   await proveLinksAhead({ redemptions: forGroup, founderWebids: [...founderWebids], founderFacts });
-  return deriveRoster({
+  const rosterArgs = {
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     founderKinds,
@@ -1039,7 +1039,26 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
       // a caller that needs more of the fold than the rows (the invite verdict: each subject's last exit)
       if (typeof observeFold === 'function') { try { observeFold(folded); } catch { /* a reader never breaks the read */ } }
     },
-  });
+  };
+  // THE GOVERNED GATE (the circle's "who decides" at the receiver): the host says first whether this circle needs one
+  // at all (no rule in its settings chain ever asked a vote for a removal or a role change: no gate, one fold, as
+  // before). Where it does, the roster is folded once WITHOUT the gate (the members a proposal's tally counts), then
+  // with it: a removal or role change that skipped the vote never takes effect. A property on the reader, like
+  // `compact`, so nothing between here and the fold learns a new name.
+  let gateBuilder = null;
+  if (typeof membershipRead?.governedGateFor === 'function') {
+    try { gateBuilder = await membershipRead.governedGateFor(groupId); } catch { gateBuilder = null; }
+  }
+  if (typeof gateBuilder === 'function') {
+    const firstPass = deriveRoster(Object.assign({}, rosterArgs, { onFolded: null }));
+    let governedGate = null;
+    try { governedGate = await gateBuilder(firstPass); } catch { governedGate = null; }
+    // the circle's rule is KNOWN to need a vote here: a gate that could not be built holds every governed change back
+    // (fail closed) until the next read can judge it; a person's own acts never ask it
+    if (typeof governedGate !== 'function') governedGate = () => false;
+    return deriveRoster(Object.assign({}, rosterArgs, { governedGate }));
+  }
+  return deriveRoster(rosterArgs);
 }
 
 async function respondToItemCore(scope, a, ctx) {

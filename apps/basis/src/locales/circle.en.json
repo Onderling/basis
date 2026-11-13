@@ -1560,8 +1560,16 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
-      "text": "I could not read that — fill in the fields below.",
+      "text": "I could not read that.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_forget": {
+      "text": "Forget this conversation",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Your conversation with the assistant",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
     },
     "act_done": {
       "text": "Done",
@@ -6431,6 +6439,10 @@
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
     },
+    "assistant": {
+      "text": "Assistant",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
+    },
     "share_contact": {
       "text": "Share my card",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
@@ -10406,6 +10418,7 @@
   },
   "settings_home": {
     "title": "Settings",
+    "help": "Help",
     "appearance": "Appearance",
     "per_circle": "Per circle",
     "no_circles": "You are not in any circle yet.",

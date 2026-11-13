@@ -269,6 +269,11 @@ export const SEAMS = Object.freeze([
   // never acted on (`plusLineOutcome`, with each circle's availability from `circleAvailabilityFor`). A shell reading the
   // line any other way is how the sheet would come to act in a circle.
   { id: 'plus-line-outcome', pattern: /plusLineOutcome\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // THE "+" IS ONE KEPT CONVERSATION: each read of its line is one exchange in the person's own thread (`exchange` on
+  // `createPlusThread`: the line heard, the read run, what it answered kept as the bot's own turn entries). A shell that
+  // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already
+  // keeps the same turns through `botThreads` (the Telegram thread), so it is not a shell of this seam.
+  { id: 'plus-kept-thread', pattern: /plusThread(Now\(\))?\.exchange\(/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
   { id: 'ask-matches', pattern: /askMatchChoices\(/, shells: ['web', 'mobile'], why: 'matches under my own ask come from released offerings only, and only the asker sees them' },

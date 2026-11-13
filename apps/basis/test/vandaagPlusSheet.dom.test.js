@@ -11,6 +11,51 @@ import { sectionsOf } from '../src/v2/screenSections.js';
 const t = (k) => k;
 
 describe('the "+" sheet', () => {
+  it('opens on the kept conversation above the line: each turn marked as yours or the assistant\'s, and Forget empties it', () => {
+    let forgot = 0;
+    const el = renderVandaagPlus(document.createElement('div'), {
+      t, onRead: () => {}, onForget: () => { forgot += 1; },
+      turns: [{ who: 'you', text: 'zet melk op de boodschappen' }, { who: 'assistant', text: '✓ melk staat op Boodschappen' }],
+    });
+    const thread = el.querySelector('[data-section="plus-thread"] .circle-vandaag-plus__thread');
+    expect(thread?.getAttribute('aria-label')).toBe('circle.vandaag.plus_thread');
+    const turns = [...thread.querySelectorAll('.circle-vandaag-plus__turn')];
+    expect(turns.map((x) => x.textContent)).toEqual(['zet melk op de boodschappen', '✓ melk staat op Boodschappen']);
+    expect(turns[0].classList.contains('circle-vandaag-plus__turn--you')).toBe(true);
+    expect(turns[1].classList.contains('circle-vandaag-plus__turn--assistant')).toBe(true);
+    // the thread sits above the line it continues
+    const sections = [...el.querySelectorAll('[data-section]')].map((x) => x.dataset.section);
+    expect(sections.indexOf('plus-thread')).toBeLessThan(sections.indexOf('plus-line'));
+    el.querySelector('.circle-vandaag-plus__forget').click();
+    expect(forgot).toBe(1);
+  });
+
+  it('suggests what can be typed here as the person types; a tap puts the line in, to finish', () => {
+    const pool = ['nieuwe taak: lamp vervangen', 'zet melk op de boodschappen'];
+    const el = renderVandaagPlus(document.body.appendChild(document.createElement('div')), {
+      t, onRead: () => {}, suggestFor: (v) => pool.filter((x) => v.length >= 2 && x.startsWith(v)),
+    });
+    const li = el.querySelector('.circle-vandaag-plus__line');
+    expect(el.querySelectorAll('.circle-vandaag-plus__suggestion')).toHaveLength(0);
+    li.value = 'nieuwe';
+    li.dispatchEvent(new Event('input'));
+    const shown = [...el.querySelectorAll('.circle-vandaag-plus__suggestion')];
+    expect(shown.map((b) => b.textContent)).toEqual(['nieuwe taak: lamp vervangen']);
+    shown[0].click();
+    expect(li.value).toBe('nieuwe taak: lamp vervangen');
+  });
+
+  it('no suggestions while an act\'s form is open (the line only shows what was said)', () => {
+    const el = renderVandaagPlus(document.createElement('div'), { t, onRead: () => {}, actId: 'household.note', suggestFor: () => ['x y'] });
+    expect(el.querySelector('.circle-vandaag-plus__suggest')).toBeNull();
+  });
+
+  it('no conversation yet: no thread and no Forget', () => {
+    const el = renderVandaagPlus(document.createElement('div'), { t, onRead: () => {}, onForget: () => {} });
+    expect(el.querySelector('.circle-vandaag-plus__thread')).toBeNull();
+    expect(el.querySelector('.circle-vandaag-plus__forget')).toBeNull();
+  });
+
   it('the free line has a button that reads it', () => {
     const read = [];
     const el = renderVandaagPlus(document.body.appendChild(document.createElement('div')), { t, onRead: (v) => read.push(v) });

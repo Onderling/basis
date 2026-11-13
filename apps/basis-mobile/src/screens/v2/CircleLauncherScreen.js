@@ -285,7 +285,9 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
+import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
+import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { replyLine } from '../../../../basis/src/v2/replyLine.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
@@ -1922,6 +1924,8 @@ export default function CircleLauncherScreen({
   // the one scanner above — one door with `/scan-qr`.
   const onMeAction = (id) => {
     if (id === 'share-contact') { setView('shareContact'); return; }
+    // the person's ongoing conversation with the assistant: the "+" sheet (web parity)
+    if (id === 'assistant') { setPlusEdit(null); setPlusOpen(true); return; }
     if (id === 'scan') {
       // ONE door: the op opens the scanner through its seam. If it refuses, say so — opening the scanner anyway would be
       // a second door to the same act.
@@ -2151,6 +2155,38 @@ export default function CircleLauncherScreen({
     return { done: replyLine(r, { opId: op.opId, args: op.args, t }) };
   };
 
+  // the "+" is the person's KEPT assistant thread: its turns are the bot's own turn entries on this device's log (the
+  // chat retention class, never carried), one thread per person — web twin: circleApp.js `plusThreadNow`
+  const plusSelf = bundle?.agent?.identity?.chat?.pubKey ?? null;
+  const plusThread = useMemo(() => (eventLog?.append ? createPlusThread({ threads: createBotThreads({ eventLog, store: memoryThreadStore() }), threadId: plusThreadId(plusSelf) }) : null), [eventLog, plusSelf]);
+  const [plusTurnsTick, setPlusTurnsTick] = useState(0);
+  const plusTurns = useMemo(() => plusThread?.turns() ?? [], [plusThread, plusTurnsTick, plusOpen]);
+  // the circles the "+" line is read against (what each offers, its lists): the read uses them, and so does the pool of
+  // suggestions, read when the sheet opens — a suggestion is a line the "+" reads here (web twin: circleApp.js plusCircles)
+  const plusCircles = async () => {
+    const manifests = buildManifestsByOrigin();
+    const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
+    return Promise.all((circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+      id: c.id, name: c.name ?? '', manifestsByOrigin: manifests,
+      availability: await circleAvailabilityFor(c.id, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null),
+      lists: await circleListsFor((app, op, args = {}) => bundle?.callSkill?.(app, op, { ...args, circleId: c.id })).catch(() => []),
+    })));
+  };
+  const [plusPool, setPlusPool] = useState([]);
+  useEffect(() => {
+    if (!plusOpen) return undefined;
+    let alive = true;
+    plusCircles().then((list) => { if (alive) setPlusPool(plusSuggestionPool({ circles: list })); }).catch(() => {});
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plusOpen]);
+  // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
+  const plusRecorded = async (line, run) => {
+    const r = plusThread ? await plusThread.exchange(line, run, { t }) : await run();
+    setPlusTurnsTick((n) => n + 1);
+    return r;
+  };
+
   // THE "+" SHEET, on every tab (the person's own entry): its line, their own acts, their Me actions — one element the tab
   // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
   const plusSheet = (
@@ -2178,20 +2214,17 @@ export default function CircleLauncherScreen({
         // the free line: an own act; or, for something that lives in a circle, that circle's act: run at once where the
         // circle is clear, else the card asks which (plusLineOutcome); the own model reads only what the plain reading
         // missed (their settings' route only; none set = no model). Web twin: circleApp.js
-        onRead={async (line) => {
-          const manifests = buildManifestsByOrigin();
-          const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
-          const list = await Promise.all((circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
-            id: c.id, name: c.name ?? '', manifestsByOrigin: manifests,
-            availability: await circleAvailabilityFor(c.id, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null),
-            lists: await circleListsFor((app, op, args = {}) => bundle?.callSkill?.(app, op, { ...args, circleId: c.id })).catch(() => []),
-          })));
+        turns={plusTurns}
+        onForget={plusThread ? () => { plusThread.forget(); setPlusTurnsTick((n) => n + 1); } : null}
+        suggestFor={(typed) => plusSuggest(plusPool, typed)}
+        onRead={(line) => plusRecorded(line, async () => {
+          const list = await plusCircles();
           const o = plusLineOutcome(line, { circles: list });
           if (o?.kind === 'circle' && o.atOnce) return plusRunInCircle(o.command, o.circleId);
           if (o?.kind === 'circle') return { card: { line, to: o.to, command: o.command } };
           return (o?.kind === 'own' ? o : null) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') };
-        }}
-        onCircleRun={(card, circleId) => plusRunInCircle(card?.command, circleId)}
+        })}
+        onCircleRun={(card, circleId) => plusRecorded(null, () => plusRunInCircle(card?.command, circleId))}
         shareTargets={plusShareList}
         onShare={plusEdit ? async (actId, contact) => {
           const op = plusShareOp(actId, { id: plusEdit.id, with: contact });
@@ -2392,6 +2425,8 @@ export default function CircleLauncherScreen({
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
           onOpenPerCircle={() => setView('settingsCircles')}
           onOpenDoor={(d) => {
+            // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same; web parity)
+            if (d?.target?.kind === 'nav' && d.target.to === 'help') { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); return; }
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
             Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))

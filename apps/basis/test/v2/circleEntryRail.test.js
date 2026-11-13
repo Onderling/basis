@@ -383,3 +383,26 @@ describe('the rail — a read checks ahead in one batch where the fast check is 
     } finally { useSignatureEquation(null); }
   });
 });
+
+describe('the rail — a statement checked on one read is not checked again on the next (the verdict memo)', () => {
+  it('two reads of three statements reach the statement check three times, not six', async () => {
+    const { createVerdictMemo } = await import('@onderling/core');
+    const log = fakeEventLog();
+    const alice = await member('webid:alice-verdict');
+    const writer = railFor(log, alice);
+    for (let i = 0; i < 3; i++) await writer.append(CIRCLE, { kind: 'propose', subject: `v-${i}`, payload: { action: 'x', subject: {}, by: alice.ref, at: i } });
+    // count every time a read reaches the signature step: the canonical form and the hashes come before it
+    let reached = 0;
+    const counting = { verifierFor: () => (m, s, k) => { reached += 1; return AgentIdentity.verify(m, s, k); } };
+    const reader = railFor(log, alice, { signatureMemo: counting, verdictMemo: createVerdictMemo() });
+    await reader.readVerifiedBodies(CIRCLE);
+    expect(reached).toBe(3);
+    await reader.readVerifiedBodies(CIRCLE);
+    await reader.readVerified(CIRCLE);
+    expect(reached, 'a second read redid the statement check').toBe(3);
+    // a statement damaged after it landed is a different statement: checked again, refused
+    log.entries[1].payload = { ...log.entries[1].payload, body: { ...log.entries[1].payload.body, subject: 'v-x' } };
+    const { bodies } = await reader.readVerifiedBodies(CIRCLE);
+    expect(bodies.map((b) => b.subject)).toEqual(['v-0', 'v-2']);
+  });
+});

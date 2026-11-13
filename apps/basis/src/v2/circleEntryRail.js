@@ -20,7 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
-import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo, signatureEquationBatches, spineSignedMessage, createTimeSlice } from '@onderling/core';
+import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo, processVerdictMemo, spineVerdictKey, signatureEquationBatches, spineSignedMessage, createTimeSlice } from '@onderling/core';
 
 /**
  * @param {object} deps
@@ -40,7 +40,7 @@ import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSi
  * `member-props` today). A tombstone of any other kind is never made here, so one found in the log was planted: the
  * read side drops it. Empty by default: a lane that never compacts takes no tombstone at all.
  */
-export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding, signatureMemo = null, compactableKinds = [] } = {}) {
+export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding, signatureMemo = null, verdictMemo = null, compactableKinds = [] } = {}) {
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.appendSilentEntry !== 'function') {
     throw new Error('circleEntryRail: an eventLog with query + appendSilentEntry is required');
   }
@@ -142,14 +142,21 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   // are re-decided on every read. Every rail over the same log (the agent's and a shell's) shares it.
   const memo = signatureMemo ?? processSignatureMemo();
   const verifySignature = memo.verifierFor('spine');
+  // …and one level up, the VERDICT memo (the process's, unless a test hands its own signature memo and no verdict memo):
+  // a statement that passed on one read, asked the same on the next, skips the canonical form and the hashes as well
+  // (a cold start on the Samsung re-checked 71 statements 554 times). Only a pass; the binding and every rule below are
+  // still decided on every read.
+  const verdicts = verdictMemo ?? (signatureMemo ? null : processVerdictMemo('spine'));
   // Where the device's fast check is a BATCH off the thread (WebCrypto on the web), a read checks its statements ahead
   // as one batch into the memo, and the synchronous checks below are answered from memory. Elsewhere (the box's
   // node:crypto, tweetnacl) the synchronous check is the fast one and nothing is done twice. The memo's only writer is
   // still the real check; everything below is re-decided as before.
-  const checkAhead = async (entries) => {
+  const checkAhead = async (entries, circleId) => {
     if (!signatureEquationBatches() || typeof memo.checkBatch !== 'function') return;
     const items = [];
     for (const { statement: s } of entries) {
+      // a statement whose verdict is already known needs no canonical form and no batch slot
+      if (verdicts) { const k = spineVerdictKey(s, { expectedCircleId: circleId }); if (k && verdicts.has(k)) continue; }
       // the bytes the author SIGNED (format v2: the header, which commits to the payload): a tombstone keeps that header,
       // so it is checked ahead like any other statement
       if (typeof s?.sig !== 'string' || typeof s?.body?.author !== 'string') continue;
@@ -158,7 +165,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     try { await memo.checkBatch('spine', items); } catch { /* the synchronous check answers */ }
   };
   const safeVerify = (statement, circleId) => {
-    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature }); }
+    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature, verdictMemo: verdicts }); }
     catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
   };
 
@@ -238,7 +245,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const seenByAuthorParent = new Map();   // `${author}|${parent}` → Set(hash) — fork detection
     const disputedRefs = new Set();
     const stored = storedEntries(circleId);
-    await checkAhead(stored);
+    await checkAhead(stored, circleId);
     const slice = createTimeSlice();   // a read of many statements gives the thread back between checks
     for (const { statement: stmt, atSeq } of stored) {
       await slice();
@@ -276,7 +283,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const seenByAuthorParent = new Map();
     const disputed = new Set();
     const stored = storedEntries(circleId);
-    await checkAhead(Array.isArray(kinds) ? stored.filter(({ statement: s }) => kinds.includes(s?.body?.kind)) : stored);
+    await checkAhead(Array.isArray(kinds) ? stored.filter(({ statement: s }) => kinds.includes(s?.body?.kind)) : stored, circleId);
     const slice = createTimeSlice();
     for (const { statement: stmt, atSeq } of stored) {
       await slice();

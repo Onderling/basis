@@ -114,6 +114,7 @@ export {
 export {
   signSpine,
   verifySpine,
+  spineVerdictKey,
   SPINE_STMT_VERSION,
   spineSignedMessage,
   canonicalDeep,
@@ -196,7 +197,7 @@ export {
   ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
   signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
 } from './identity/ceremonyCommitment.js';
-export { createSignatureMemo, processSignatureMemo } from './security/signatureMemo.js';   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
+export { createSignatureMemo, processSignatureMemo, createVerdictMemo, processVerdictMemo, exactVerdictKey } from './security/signatureMemo.js';   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
 export { ED25519_EDGE_VECTORS, ED25519_ACCEPTED, ed25519Disagreements } from './conformance/ed25519Conformance.js';   // the edge-case vectors a fast equation must agree on (shipped: the box and the web self-test with them)
 export { useSignatureEquation, signatureEquationName, verifyEd25519StrictBatch, strictSignatureShapeOk, signatureEquationBatches } from './crypto/ed25519Strict.js';   // a faster equation behind the one strict rule (the box: node:crypto; the web: WebCrypto's batch)
 export { createTimeSlice, TIME_SLICE_MS } from './timeSlice.js';   // long work gives the thread back   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony

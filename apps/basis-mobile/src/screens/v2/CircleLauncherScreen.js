@@ -296,7 +296,7 @@ import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
 import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
 import ContactsScreen from './ContactsScreen.js';
-import { contactOpenTarget, tileCircles } from '../../../../basis/src/v2/helpContact.js';
+import { contactOpenTarget, tileCircles, helpDoorTarget } from '../../../../basis/src/v2/helpContact.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
 import { loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
@@ -1674,6 +1674,12 @@ export default function CircleLauncherScreen({
     } catch { /* keep empty */ }
   }, [resolveSkill, bundle]);
 
+  // THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared, web twin)
+  const openHelpDoor = () => {
+    const r = helpDoorTarget(circles);
+    if (r.kind === 'circle') { const c = circles.find((x) => x.id === r.circleId); if (c) openCircle(c); return; }
+    Alert.alert('', t(r.key));
+  };
   const closeCircle = () => { setActiveCircle(null); setSelected(null); setItems([]); setView('list'); };
 
   /**
@@ -2176,7 +2182,7 @@ export default function CircleLauncherScreen({
   useEffect(() => {
     if (!plusOpen) return undefined;
     let alive = true;
-    plusCircles().then((list) => { if (alive) setPlusPool(plusSuggestionPool({ circles: list })); }).catch(() => {});
+    plusCircles().then((list) => { if (alive) setPlusPool(plusSuggestionPool({ circles: list, lang: lang() })); }).catch(() => {});
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plusOpen]);
@@ -2321,7 +2327,7 @@ export default function CircleLauncherScreen({
                     .then((r) => { Alert.alert(nameCardWords(r, t)); if (r.ok) refreshScreensBook(); });
                 }
                 else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
-                else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); });
+                else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => openHelpDoor());
                 // the key card: its explicit "Toon" reads the owner phrase and opens it; "Later" puts the card away
                 else if (a?.kind === 'key-show') {
                   Promise.resolve(bundle?.callSkill?.('household', 'revealOwnerPhrase', {})).catch(() => null).then((res) => {
@@ -2426,7 +2432,7 @@ export default function CircleLauncherScreen({
           onOpenPerCircle={() => setView('settingsCircles')}
           onOpenDoor={(d) => {
             // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same; web parity)
-            if (d?.target?.kind === 'nav' && d.target.to === 'help') { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); return; }
+            if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
             Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))

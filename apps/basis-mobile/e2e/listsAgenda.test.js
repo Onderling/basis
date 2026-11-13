@@ -106,7 +106,10 @@ describe("a circle's lists on the phone's Vandaag — a real second person over 
     await soon(by.id(`list-add-input-${listId}`), 30_000);
     await element(by.id(`list-add-input-${listId}`)).replaceText('zeep');
     await tapSoon(by.id(`list-add-send-${listId}`));
-    await device.takeScreenshot('lists-07-zeep-added');
     await bramHolds((ls) => ls.some((l) => l.list === LIST && l.entries.includes('zeep')));
+    // and the person sees their own line on the list (the page repaints after the op)
+    const seen = await vandaagShows('zeep');
+    await device.takeScreenshot('lists-07-zeep-added');
+    if (!seen) throw new Error("the phone's own line never showed in its lists block");
   });
 });

@@ -1626,7 +1626,7 @@ remove a member or change the rules alone, and every device applied it. Now ever
 
 - **The device's own tally.** A governed statement that needed a vote names its proposal; the receiving device
   re-tallies that proposal from the votes it holds, about the same subject. A recorded "approved" counts for nothing
-  on its own. Where one admin may decide (any-admin, or admins together with one admin) the statement stands alone.
+  on its own. Where one admin may decide (any-admin, or admin-quorum while the circle has one admin) the statement stands alone.
 - **The rule the act was made under.** Every removal, role change and rules change carries the settings version its
   device had seen (`policyVersion`), stamped where the statement is built, whichever path wrote it (a screen, the
   box bot, a slash command, the assistant). It is judged by that version, so a decision taken under a looser rule is
@@ -1641,6 +1641,8 @@ remove a member or change the rules alone, and every device applied it. Now ever
 
 Not covered yet: admissions (`join`) are not gated (the policy has no admission class), and the drawn sample is held
 back for the alpha. Residues, accepted: an admin can sign an override with a false time, and an admin who never stamps
-above an old version keeps being judged by it; both are signed, attributable and visible. Where it lives:
+above an old version keeps being judged by it; both are signed, attributable and visible. And a settings change
+written on a device whose copy of its author's membership chain lags names an older tip, so that author's acts in
+between are refused everywhere (a removal among them leaves the member in; L855). Where it lives:
 `apps/basis/src/v2/governanceReceiverGate.js`, the kernel's `foldRoster` (`governedGate`), `docs/catalogue/governance.md`.
 Ledger: L663, L855, L856, L858.

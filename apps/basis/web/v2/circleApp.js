@@ -188,7 +188,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { createPlusThread, plusThreadId, plusAnswerLine } from '../../src/v2/plusThread.js';
+import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
@@ -4720,9 +4720,8 @@ function showVandaagPlus({ edit = null } = {}) {
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
       line = text; circleCard = null; done = null;
-      const thread = plusThreadNow();
-      thread.heard(text);
-      const answer = (ownActId = null) => { const said = plusAnswerLine({ error, done, circleCard, ownActId, t }); if (said) thread.answered(said); };
+      // one exchange in the kept thread (the shared duty): the line heard, the read run, what it answered kept
+      await plusThreadNow().exchange(text, async () => {
       // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
       // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
       const circles = await Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
@@ -4731,19 +4730,19 @@ function showVandaagPlus({ edit = null } = {}) {
       })));
       const o = plusLineOutcome(text, { circles });
       const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
-      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); answer(); paint(); return; }
+      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return { error, done }; }
       if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }
       else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
-      answer(r?.actId ?? null);
+      return { error, circleCard, ownActId: r?.actId ?? null };
+      }, { t });
       paint();
     },
     onCircleRun: async (circleId) => {
       const card = circleCard; circleCard = null;
       if (!card) return;
-      await runInCircle(card.command, circleId);
-      const said = plusAnswerLine({ error, done, t });
-      if (said) plusThreadNow().answered(said);
+      // the pick on the card: no new line, the run's answer kept (the same shared exchange)
+      await plusThreadNow().exchange(null, async () => { await runInCircle(card.command, circleId); return { error, done }; }, { t });
       paint();
     },
     onCircleCancel: () => { circleCard = null; error = null; paint(); },

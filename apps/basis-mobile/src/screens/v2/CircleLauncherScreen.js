@@ -285,7 +285,7 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { createPlusThread, plusThreadId, plusAnswerLine } from '../../../../basis/src/v2/plusThread.js';
+import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
@@ -2157,12 +2157,9 @@ export default function CircleLauncherScreen({
   const plusThread = useMemo(() => (eventLog?.append ? createPlusThread({ threads: createBotThreads({ eventLog, store: memoryThreadStore() }), threadId: plusThreadId(plusSelf) }) : null), [eventLog, plusSelf]);
   const [plusTurnsTick, setPlusTurnsTick] = useState(0);
   const plusTurns = useMemo(() => plusThread?.turns() ?? [], [plusThread, plusTurnsTick, plusOpen]);
-  // one read of the line: the person's turn, then what the "+" answered (the shared words, as on web)
+  // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
   const plusRecorded = async (line, run) => {
-    if (line != null) plusThread?.heard(line);
-    const r = await run();
-    const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.card ?? null, ownActId: r?.actId ?? null, t });
-    if (said) plusThread?.answered(said);
+    const r = plusThread ? await plusThread.exchange(line, run, { t }) : await run();
     setPlusTurnsTick((n) => n + 1);
     return r;
   };

@@ -1560,7 +1560,7 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
-      "text": "I could not read that — fill in the fields below.",
+      "text": "I could not read that.",
       "doc": "The free line could not be read: the person fills the fields."
     },
     "plus_forget": {

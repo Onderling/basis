@@ -31,6 +31,18 @@ export function createPlusThread({ threads, threadId } = {}) {
     answered(text) { if (threadId) threads.memory.remember(threadId, 'assistant', text); },
     /** The last `n` turns, oldest first: `{who: 'you'|'assistant'|'system', text, ts}`. */
     turns(n = PLUS_TURNS_SHOWN) { return threadId ? threads.memory.turns(threadId, n) : []; },
+    /**
+     * ONE EXCHANGE, the duty both shells run for a read of the line: the person's line is heard (null: a pick on the
+     * card, no new line), the read runs, and what the "+" answered is kept. `run` returns the read's result
+     * (`{error, done, card|circleCard, actId|ownActId}`, any of them); `t` words the answer. Returns the run's result.
+     */
+    async exchange(line, run, { t } = {}) {
+      if (line != null) this.heard(line);
+      const r = await run();
+      const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.circleCard ?? r?.card ?? null, ownActId: r?.ownActId ?? r?.actId ?? null, t });
+      if (said) this.answered(said);
+      return r;
+    },
     /** Empty the thread now; returns how many turns went. */
     forget() { return threadId ? threads.memory.forget(threadId) : 0; },
   };

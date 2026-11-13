@@ -1563,7 +1563,7 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
-      "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
+      "text": "Dat kon ik niet lezen.",
       "doc": "The free line could not be read: the person fills the fields."
     },
     "plus_forget": {

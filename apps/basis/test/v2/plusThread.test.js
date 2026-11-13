@@ -4,6 +4,7 @@ import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js'
 import { createPlusThread, plusThreadId, plusAnswerLine } from '../../src/v2/plusThread.js';
 import { PLUS_ACTS } from '../../src/v2/vandaagPlus.js';
 import { forYouRows } from '../../src/v2/userScreenBlocks.js';
+import { entryKind } from '@onderling/item-store';
 
 // The "+" is the person's assistant thread: what they type and what it answered are KEPT (the bot's own turn entries
 // on the device log, the chat retention class), so the sheet opens on the conversation so far.
@@ -85,5 +86,34 @@ describe('what the "+" answers in its thread', () => {
     expect(plusAnswerLine({ circleCard: { line: 'nieuwe taak verven' }, t })).toBe('circle.vandaag.plus_circle_ask:{"line":"nieuwe taak verven"}');
     expect(plusAnswerLine({ ownActId: PLUS_ACTS[0].id, t })).toBeTruthy();
     expect(plusAnswerLine({ t })).toBeNull();
+  });
+});
+
+describe('one exchange in the "+" thread (the duty both shells run)', () => {
+  const t = (k) => k;
+  it('a typed line: heard, the read run, its answer kept; the read result handed back', async () => {
+    const { plus } = boot();
+    const r = await plus.exchange('blauwe olifanten dansen', async () => ({ error: 'circle.vandaag.plus_line_unread' }), { t });
+    expect(r).toEqual({ error: 'circle.vandaag.plus_line_unread' });
+    expect(plus.turns().map((x) => [x.who, x.text])).toEqual([['you', 'blauwe olifanten dansen'], ['assistant', 'circle.vandaag.plus_line_unread']]);
+  });
+
+  it('a pick on the card (no new line): only the answer is kept; the phone shape {card} words the question', async () => {
+    const { plus } = boot();
+    await plus.exchange(null, async () => ({ done: '✓ verf kopen staat bij Taken' }), { t });
+    await plus.exchange('nieuwe taak verven', async () => ({ card: { line: 'nieuwe taak verven', to: [] } }), { t });
+    expect(plus.turns().map((x) => x.text)).toEqual(['✓ verf kopen staat bij Taken', 'nieuwe taak verven', 'circle.vandaag.plus_circle_ask']);
+  });
+
+  it('a run with nothing to say keeps only the line', async () => {
+    const { plus } = boot();
+    await plus.exchange('iets', async () => null, { t });
+    expect(plus.turns().map((x) => x.who)).toEqual(['you']);
+  });
+});
+
+describe('where a "+" turn goes', () => {
+  it('it is never carried: no member, no own other device (the dictionary\'s sync policy for the kind)', () => {
+    expect(entryKind('assistant-turn').syncPolicy).toBe('none');
   });
 });

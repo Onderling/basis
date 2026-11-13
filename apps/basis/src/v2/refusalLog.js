@@ -15,17 +15,39 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 const WINDOW_MS = param({ key: 'diagnostics.refusalLogWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });   // how often a repeating refusal is written again
 
 /**
- * A refusal's reason as a short code and its detail: "unsupported version: onderling/spine.v1" →
- * `{ reason: 'unsupported-version', detail: 'onderling/spine.v1' }`.
+ * THE CLOSED SET of reason codes (Opus, reviewing): a reason is often built from the refused statement's own text
+ * (`unsupported version: ${body.v}`, an exception's message), so a remote sender could mint unlimited distinct codes:
+ * log spam and a growing key table. Only these codes are written; anything else is 'other'.
+ */
+export const REFUSAL_CODES = Object.freeze([
+  // the rail's statement check (verifySpine)
+  'unsupported-version', 'bad-signature', 'bad-chain-hash', 'circle-mismatch', 'kind-mismatch', 'malformed-statement',
+  'missing-body', 'missing-signature', 'payload-missing', 'payload-does-not-match-its-digest',
+  'authorref-does-not-match-the-header', 'a-tombstone-keeps-its-authorref-only', 'unverifiable',
+  'body-kind-required', 'body-circleid-required', 'body-subject-required', 'body-author-required', 'body-hash-required',
+  'body-payloaddigest-required', 'body-parenthash-must-be-a-hash-string-or-null', 'body-deps-must-be-an-array-of-hash-strings',
+  'body-authorref-must-be-a-string-or-null',
+  // the binding check and the gates
+  'key-not-bound-to-its-member', 'not-allowed-by-the-circle-rule',
+]);
+const KNOWN = new Set(REFUSAL_CODES);
+const DETAIL_MAX = 32;
+
+/**
+ * A refusal's reason as a code from the closed set and its detail: "unsupported version: onderling/spine.v1" →
+ * `{ reason: 'unsupported-version', detail: 'onderling/spine.v1' }`. The detail is the sender's text: only a short run of
+ * [A-Za-z0-9._/-], and only for a known code (an unknown one is 'other', no detail).
  * @param {unknown} reason
  * @returns {{reason: string, detail: string|null}}
  */
 export function refusalCode(reason) {
   if (typeof reason !== 'string' || !reason.trim()) return { reason: 'unknown', detail: null };
   const i = reason.indexOf(':');
-  const head = (i < 0 ? reason : reason.slice(0, i)).trim().toLowerCase();
-  const detail = i < 0 ? null : (reason.slice(i + 1).trim() || null);
-  return { reason: head.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'unknown', detail };
+  const head = (i < 0 ? reason : reason.slice(0, i)).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (!KNOWN.has(head)) return { reason: 'other', detail: null };
+  const raw = i < 0 ? '' : reason.slice(i + 1).trim();
+  const detail = raw.replace(/[^A-Za-z0-9._/-]+/g, '').slice(0, DETAIL_MAX);
+  return { reason: head, detail: detail || null };
 }
 
 /**
@@ -46,7 +68,9 @@ export function makeRefusalLog({ now = () => Date.now(), windowMs = Number(WINDO
         s.total += 1; s.pending += 1;
         const t = now();
         if (t - s.at >= windowMs) {
-          log.warn(tag, 'refused', { lane: String(lane ?? ''), check: String(check ?? ''), reason: code, ...(detail ? { detail } : {}), n: s.pending, total: s.total });
+          // `checks`: RE-CHECKS since the last record (a read re-checks every stored statement: 396 checks were 77
+          // statements on the phone), `totalChecks` since start; never a count of distinct statements
+          log.warn(tag, 'refused', { lane: String(lane ?? ''), check: String(check ?? ''), reason: code, ...(detail ? { detail } : {}), checks: s.pending, totalChecks: s.total });
           s.pending = 0; s.at = t;
         }
         seen.set(key, s);

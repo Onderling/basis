@@ -41,6 +41,18 @@ describe('the refusal log', () => {
     expect(refusalCode(null)).toEqual({ reason: 'unknown', detail: null });
   });
 
+  it('a reason outside the closed set is "other"; a detail keeps only a short run of safe characters', () => {
+    expect(refusalCode('totally new reason x1: whatever')).toEqual({ reason: 'other', detail: null });
+    const r = refusalCode('unsupported version: <script>alert(1)</script>' + 'v'.repeat(200));
+    expect(r.reason).toBe('unsupported-version');
+    expect(r.detail.length).toBeLessThanOrEqual(32);
+    expect(r.detail).toMatch(/^[A-Za-z0-9._/-]+$/);
+    // a sender minting reasons cannot grow the table: every unknown head is one key
+    const log = makeRefusalLog({ now: () => 0, windowMs: 1000 });
+    for (let i = 0; i < 500; i += 1) log.note({ lane: 'membership', check: 'verify', reason: `made up ${i}: x` });
+    expect(log.size).toBe(1);
+  });
+
   it('the first refusal is written at once; repeats are counted and written once per window', () => {
     let t = 0;
     const r = makeRefusalLog({ now: () => t, windowMs: 1000 });
@@ -51,7 +63,7 @@ describe('the refusal log', () => {
     r.note({ lane: 'membership', check: 'verify', reason: 'unsupported version: onderling/spine.v1' });
     const recs = refusals();
     expect(recs.length).toBe(2);
-    expect(recs[1].f).toMatchObject({ lane: 'membership', check: 'verify', reason: 'unsupported-version', n: 396, total: 397 });
+    expect(recs[1].f).toMatchObject({ lane: 'membership', check: 'verify', reason: 'unsupported-version', checks: 396, totalChecks: 397 });
   });
 
   it('a refused statement read through the rail leaves a record naming the lane, the check and why', async () => {

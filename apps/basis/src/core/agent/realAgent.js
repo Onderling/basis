@@ -129,8 +129,8 @@ import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 // …and the circle POLICY, the same way: a signed statement on the governance lane, caught up by joiners.
 import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../../v2/policyUpdateLane.js';
 import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
-import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';
-import { processRefusalLog } from '../../v2/refusalLog.js';   // the governed gate's host half
+import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
+import { processRefusalLog } from '../../v2/refusalLog.js';   // every refusal says why
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).

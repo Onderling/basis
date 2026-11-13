@@ -239,7 +239,6 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (!bound) refused('binding', 'key not bound to its member');
       return bound;
     }
-    refused('binding', 'no binding resolver');
     return false;   // no resolver → only self-signed statements fold (honest single-device degrade)
   }
 

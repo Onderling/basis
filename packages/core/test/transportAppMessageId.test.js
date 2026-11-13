@@ -36,6 +36,17 @@ describe('appMessageIdFor', () => {
     expect(t.sentEnvelopeFor('never-sent')).toBe(null);
   });
 
+  it("lane traffic never pushes a person's message out: 2500 control sends after a bubble, the bubble still answers", async () => {
+    const t = new Probe();
+    await t.sendOneWay('peer.a', { msgId: 'bubble-1', subtype: 'circle-chat' });
+    const bubble = t.put[0].envelope._id;
+    for (let i = 0; i < 2500; i++) await t.sendOneWay('peer.b', { type: 'circle-governance-broadcast', n: i });
+    expect(t.appMessageIdFor(bubble), "the bubble's give-up still names it").toBe('bubble-1');
+    expect(t.sentEnvelopeFor(bubble)).toMatchObject({ to: 'peer.a', subtype: 'circle-chat' });
+    expect(t.sentEnvelopeFor(t.put[1].envelope._id), 'the oldest control entry went').toBe(null);
+    expect(t.sentEnvelopeFor(t.put[t.put.length - 1].envelope._id)).toMatchObject({ to: 'peer.b' });
+  });
+
   it('is bounded — the oldest entry goes first, and the newest are always answerable', async () => {
     const t = new Probe();
     for (let i = 0; i < 2005; i++) await t.sendOneWay('peer', { msgId: `m${i}` });

@@ -124,7 +124,7 @@ export {
   eventCircleId,
   // circle-scoped stream + chip filters.
   buildCircleStream, CIRCLE_STREAM_KIND_FILTERS,
-  projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows, mutedActorSet,
+  projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows, mutedActorSet, sendersToPlace,
   // C15 — per-circle chat projection (excludes the silent system lane).
   buildCircleChat,
   // Who a row is FROM, through the reveal ladder — for surfaces that carry the author on the row

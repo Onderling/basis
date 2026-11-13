@@ -130,6 +130,7 @@ import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../../v2/policyUpdateLane.js';
 import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
 import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
+import { processRefusalLog } from '../../v2/refusalLog.js';   // every refusal says why
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
@@ -6411,7 +6412,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         // tip their later settings change named
         let spine = [];
         try { spine = (membershipRail?.storedStatements?.(circleId) ?? []).map((x) => x?.body).filter(Boolean); } catch { spine = []; }
-        return membershipGateFor({ chain, currentPolicy: chain.policyAt(chain.head), members, proposals, chainOf: chainOfBodies(spine) });
+        const gate = membershipGateFor({ chain, currentPolicy: chain.policyAt(chain.head), members, proposals, chainOf: chainOfBodies(spine) });
+        // every refusal says why (L857): a removal or a role change the circle's rule did not allow
+        return (s, ctx) => { const ok = gate(s, ctx); if (!ok) processRefusalLog().note({ tag: 'gate', lane: 'membership', check: s?.kind === 'role' ? 'role' : 'removal', reason: 'not allowed by the circle rule' }); return ok; };
       };
     };
     // the ceremony retirements alone — what the spineless roster folds (they bind by the root's reveal, no recursion)

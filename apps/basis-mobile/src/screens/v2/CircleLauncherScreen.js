@@ -65,7 +65,7 @@ import {
   // "My things" private notes-list.
   myThingsFromListFiles,
   // circle-scoped event stream + per-row action chips.
-  chatRows, mutedActorSet, agentActivityRows, actionsForStreamRow, resolveConversationKinds,
+  chatRows, mutedActorSet, agentActivityRows, actionsForStreamRow, resolveConversationKinds, sendersToPlace,
   // recognising an inbound CHAT entry for THIS circle — the same kind + the same circle-id read the
   // conversation projection itself uses, so the refresh cannot key off something the filter ignores.
   CHAT_KIND, eventCircleId,
@@ -3436,6 +3436,17 @@ function CircleDetail({
   // 2026-09-22 this read the `roster-updated` pull-me, which the admin fanned after writing someone's disclosure;
   // the disclosure is the member's own statement on that same lane now, so one subscription covers both.
   const [membersReloadTick, setMembersReloadTick] = useState(0);
+  // a line from someone this roster cannot place yet (a member this device admitted, a first line ahead of the
+  // membership): read the roster once more for each such sender (sendersToPlace, shared; web twin: circleApp.js)
+  const sendersAskedRef = useRef(new Set());
+  useEffect(() => { sendersAskedRef.current = new Set(); }, [circle?.id]);
+  useEffect(() => {
+    if (!Array.isArray(tabMembers)) return;
+    const unplaced = sendersToPlace(rows, sendersAskedRef.current);
+    if (!unplaced.length) return;
+    for (const a of unplaced) sendersAskedRef.current.add(a);
+    setMembersReloadTick((n) => n + 1);
+  }, [rows, tabMembers]);
   useEffect(() => {
     if (!eventLog?.subscribe || !circle?.id) return undefined;
     return eventLog.subscribe((e) => {

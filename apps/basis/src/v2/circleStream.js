@@ -358,3 +358,24 @@ export const buildCircleChat = chatRows;
 
 /** Kind keys the filter strip exposes, in render order. */
 export const CIRCLE_STREAM_KIND_FILTERS = ['all', 'ask', 'offer', 'lend'];
+
+/**
+ * THE SENDERS A ROSTER COULD NOT PLACE YET — the actors of rows stamped `circle.chat.unknown_sender`, so a shell reads
+ * the roster once more instead of painting a new member as "Onbekend lid" until the circle is reopened. A roster is
+ * read when a circle opens and on an inbound membership batch; a member the viewer's own device admitted, or one whose
+ * first line lands before their membership, is in neither. `tried` (the actors already asked for) keeps it to one read
+ * per sender: a sender the roster still cannot place stays unknown, honestly, and is not asked about again.
+ * @param {object[]|null} rows  stamped rows (`stampSenderLabels`)
+ * @param {Set<string>} [tried]
+ * @returns {string[]}
+ */
+export function sendersToPlace(rows, tried = new Set()) {
+  const out = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const actor = row?.actor;
+    if (row?.senderLabelKey !== 'circle.chat.unknown_sender' || typeof actor !== 'string' || !actor) continue;
+    if (tried.has(actor) || out.includes(actor)) continue;
+    out.push(actor);
+  }
+  return out;
+}

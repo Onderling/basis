@@ -25,6 +25,7 @@
  * is the durable head, exactly the items-lane relationship.
  */
 
+import { processRefusalLog } from './refusalLog.js';
 import { chainOfBodies, judgePolicyChain, judgeRulesWrites, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
 import { denyWinsMerge, POLICY_UPDATE_KIND } from './policyUpdateLane.js';
 
@@ -149,6 +150,8 @@ export async function applyRulesUpdates({ rail, callSkill, circleId, readPolicy 
     },
     () => proposalsOn({ rail, circleId, policy, members }),
   );
+  // every refusal says why (L857): a rules change the circle's rule did not allow, one record per kind of refusal
+  for (let i = 0; i < skipped.length; i += 1) processRefusalLog().note({ tag: 'gate', lane: 'governance', check: 'rules', reason: 'not allowed by the circle rule' });
   if (authorised.length === 0) return { applied: false, ...(skipped.length ? { skipped: skipped.length } : {}) };
 
   // The winner: highest version; a version tie breaks on statement hash — deterministic, so two

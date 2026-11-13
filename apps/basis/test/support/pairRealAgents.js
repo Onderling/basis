@@ -79,7 +79,8 @@ import { EventLog } from '../../src/eventLog.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
-import { makeItemsPeerHandler, ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
+import { makeItemsPeerHandler, ITEMS_BROADCAST, ITEMS_CATCHUP_SUBTYPES } from '../../src/v2/itemsRail.js';
+import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { rosterBindingVerifier, makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
@@ -440,6 +441,20 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // the statement and causally merges the item snapshot into the circle's store head, which is what
     // makes an item written on A appear in B's store.
     ...(agent.itemsRail ? { [ITEMS_BROADCAST]: makeItemsPeerHandler({ rail: agent.itemsRail }) } : {}),
+    // …and its catch-up, as the shells compose it (circleLanes.js `task`): a member who joins after a list, chore or
+    // appointment was made pulls it from here. The person's own scope is never served on a circle's catch-up.
+    ...(agent.itemsRail ? (() => {
+      const cu = makeFrontierReplay({
+        rail: agent.itemsRail, sendToPeer: sendPeer, subtypes: ITEMS_CATCHUP_SUBTYPES,
+        statementsFor: (circleId) => agent.itemsRail.catchUpStatements(circleId),
+        mayServe: (_fromPeerAddr, circleId) => circleId !== OWN_DEVICES_SCOPE,
+      });
+      return {
+        [cu.subtypes.request]: cu.onRequest,
+        [cu.subtypes.batch]:   cu.onBatch,
+        ...(cu.onOffer ? { [cu.subtypes.offer]: cu.onOffer } : {}),
+      };
+    })() : {}),
     // …and the person's own scope's catch-up between their devices, as the lane table registers it.
     ...(agent.ownStoreSync ? {
       [agent.ownStoreSync.subtypes.request]: agent.ownStoreSync.onRequest,

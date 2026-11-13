@@ -118,8 +118,9 @@ describe('the confirmation comes from the op’s own declaration', () => {
       opId: 'setMemberRole',
       message: ROLE_CONTROL_KEYS.confirm_handover,
       title: 'circle.confirm.title',
-      acceptLabel: 'circle.confirm.accept',
-      cancelLabel: 'circle.confirm.cancel',
+      // a handover names its two ways on the buttons (Frits 2026-11-10: the last admin chooses)
+      acceptLabel: ROLE_CONTROL_KEYS.handover_let_app_choose,
+      cancelLabel: ROLE_CONTROL_KEYS.handover_appoint_first,
     });
   });
 

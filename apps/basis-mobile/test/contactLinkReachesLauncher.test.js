@@ -20,8 +20,16 @@ describe('a contact link reaches the launcher', () => {
     const src = read('src/screens/ChatScreen.js');
     const branch = src.slice(src.indexOf("if (res.kind === 'contact') {"), src.indexOf("if (res.kind === 'enroll') {"));
     expect(branch).toMatch(/onContactLink\(payload\)/);
-    // the hand-off comes first: nothing of the hidden shell's own sheet runs when the launcher takes it
-    expect(branch.indexOf('onContactLink(payload)')).toBeLessThan(branch.indexOf('addWithSheet'));
+    // no second door: the hidden shell's own (invisible) add sheet is gone from the link path
+    expect(branch).not.toMatch(/addWithSheet/);
+  });
+
+  it('nothing the hidden shell says about a link is a chat bubble (it would be invisible): a native alert', () => {
+    const src = read('src/screens/ChatScreen.js');
+    const handler = src.slice(src.indexOf('async function onQrScanResult(res) {'), src.indexOf('function appendBotText('));
+    expect(handler).not.toMatch(/appendBotText\(/);
+    expect(handler).toMatch(/sayToPerson\(stashed\.ok \? t\('chat\.scan_enroll_stashed'\)/);
+    expect(src).toMatch(/const sayToPerson = \(text\) => \{ try \{ Alert\.alert\(/);
   });
 
   it('App wires the hand-off from the hidden shell to the launcher', () => {

@@ -2059,6 +2059,8 @@ export default function CircleLauncherScreen({
               {inviteFor?.uri ? (
                 <>
                   <QrCodeView value={inviteFor.uri} size={200} />
+                  {/* the link itself under the code, selectable, as web shows it: for someone who cannot scan */}
+                  <Text style={styles.inviteLink} selectable numberOfLines={3} testID="invite-link">{inviteFor.uri}</Text>
                   <Text style={styles.inviteHint} testID={inviteFor.forFunction ? 'invite-bot-hint' : 'invite-hint'}>{t(inviteFor.forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint')}</Text>
                   {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
                   {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
@@ -6354,6 +6356,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   inviteCard: { backgroundColor: theme.color.paper, borderRadius: 14, padding: 20, alignItems: 'center', maxWidth: 320 },
   inviteTitle:{ fontSize: 16, fontWeight: '700', color: theme.color.ink, marginBottom: 12 },
   inviteHint: { fontSize: 13, color: theme.color.inkSoft, marginTop: 10, textAlign: 'center' },
+  inviteLink: { fontSize: 11, color: theme.color.inkSoft, marginTop: 6, textAlign: 'center', opacity: 0.8 },
   createRow:  { marginTop: 12, flexDirection: 'row', gap: 8, alignItems: 'center' },
   input:      { flex: 1, padding: 11, borderWidth: 1, borderColor: theme.color.accent, borderRadius: 8, backgroundColor: theme.color.white, fontSize: 14 },
   createBtn:  { width: 42, paddingVertical: 11, borderRadius: 8, backgroundColor: theme.color.accent, alignItems: 'center' },

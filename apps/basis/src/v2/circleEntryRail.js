@@ -20,6 +20,7 @@
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
  */
+import { processRefusalLog } from './refusalLog.js';
 import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSignatureMemo, processVerdictMemo, spineVerdictKey, signatureEquationBatches, spineSignedMessage, createTimeSlice } from '@onderling/core';
 
 /**
@@ -40,7 +41,7 @@ import { signSpine, verifySpine, authorHead, frontier, isCeremonyKind, processSi
  * `member-props` today). A tombstone of any other kind is never made here, so one found in the log was planted: the
  * read side drops it. Empty by default: a lane that never compacts takes no tombstone at all.
  */
-export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding, signatureMemo = null, verdictMemo = null, compactableKinds = [] } = {}) {
+export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding, signatureMemo = null, verdictMemo = null, compactableKinds = [], refusalLog = processRefusalLog() } = {}) {
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.appendSilentEntry !== 'function') {
     throw new Error('circleEntryRail: an eventLog with query + appendSilentEntry is required');
   }
@@ -164,9 +165,15 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     }
     try { await memo.checkBatch('spine', items); } catch { /* the synchronous check answers */ }
   };
+  // EVERY REFUSAL SAYS WHY (L857): a statement this rail refuses leaves one record in the device's structured log
+  // (lane, check, reason code; repeats counted), never the circle, the key or the content
+  const refused = (check, reason) => { try { refusalLog?.note?.({ lane: entryKind, check, reason }); } catch { /* never breaks a read */ } };
   const safeVerify = (statement, circleId) => {
-    try { return verifySpine(statement, { expectedCircleId: circleId, verifySignature, verdictMemo: verdicts }); }
-    catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
+    let v;
+    try { v = verifySpine(statement, { expectedCircleId: circleId, verifySignature, verdictMemo: verdicts }); }
+    catch (err) { v = { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
+    if (!v?.ok) refused('verify', v?.reason);
+    return v;
   };
 
   function ingest(circleId, statement) {
@@ -227,8 +234,12 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     } catch { own = false; }
     if (own && !isCeremonyKind(kind)) return true;
     if (typeof verifyBinding === 'function') {
-      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq, hash, own })); } catch { return false; }
+      let bound = false;
+      try { bound = !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq, hash, own })); } catch { bound = false; }
+      if (!bound) refused('binding', 'key not bound to its member');
+      return bound;
     }
+    refused('binding', 'no binding resolver');
     return false;   // no resolver → only self-signed statements fold (honest single-device degrade)
   }
 

@@ -259,7 +259,9 @@ if (talk) {
         if (!to) { say({ step: 'contact-said', ok: false, error: 'nobody to talk to yet' }); return; }
         const { sent } = peer.contactThreadChannel.sendTurn({ peerAddr: to, threadId: to, text: cmd.text });
         const r = await sent;
-        say({ step: 'contact-said', ok: r?.delivered !== false, to, result: r ?? null });
+        // the send's answer is `{ sent: { delivered, held, reason }, itemId }`: a held, undelivered turn is not ok, and says why
+        const delivered = r?.sent?.delivered ?? r?.delivered;
+        say({ step: 'contact-said', ok: delivered !== false, to, reason: r?.sent?.reason ?? null, result: r ?? null });
       }
     } catch (err) { say({ step: `${cmd.do}-error`, error: String(err?.message ?? err) }); }
   });

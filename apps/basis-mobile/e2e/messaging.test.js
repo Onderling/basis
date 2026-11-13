@@ -70,13 +70,29 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     await device.takeScreenshot('msg-03-circle-answer');
   });
 
-  it("Bram writes to the phone directly; it shows in the phone's thread with him", async () => {
+  it("Bram writes to the phone directly: a request until the phone accepts it, then his thread", async () => {
     peer.send({ do: 'contact-say', text: PEER_DM });
     const said = await peer.next('contact-said', () => true, 60_000);
     if (!said.ok) throw new Error(`Bram could not write: ${JSON.stringify(said)}`);
     // the thread lives under Contacten; the list does not refresh in place (gotchas), so re-open it until Bram is there
     // the circle's chat hides the tab bar: step back out of it first
     await backToLauncher();
+    // A FIRST message from someone the person did not choose is held as a REQUEST (the first-message door): it shows in
+    // Contacten's Requests with its first line, and is NOT a thread until the person accepts it.
+    let held = false;
+    for (let i = 0; i < 8 && !held; i += 1) {
+      await tapSoon(by.id('circle-tab-circles'));
+      await tapSoon(by.id('circle-tab-contacten'));
+      await soon(by.id('contacts-screen'));
+      held = (await firstOf([by.id('contacts-requests')], 5_000)) === 0;
+    }
+    await device.takeScreenshot('msg-04-request');
+    if (!held) throw new Error("Bram's first message never showed as a request in Contacten");
+    await soon(by.text(PEER_DM).withAncestor(by.id('contacts-requests')), 20_000);
+    // before the accept there is no thread with him: no contact row carries his name
+    if ((await firstOf([by.text('bram'), by.text('Bram')], 2_000)) >= 0) throw new Error('Bram is already a contact before the request was accepted');
+    // the person accepts, the way a person does: Accept on his request
+    await element(by.text('Accept').withAncestor(by.id('contacts-requests'))).tap();
     let row = -1;
     for (let i = 0; i < 8 && row < 0; i += 1) {
       await tapSoon(by.id('circle-tab-circles'));
@@ -84,8 +100,8 @@ describe('messaging on the phone — a circle round trip and a contact round tri
       await soon(by.id('contacts-screen'));
       row = await firstOf([by.text('bram'), by.text('Bram')], 5_000);
     }
-    await device.takeScreenshot('msg-04-contacts');
-    if (row < 0) throw new Error('Bram never showed in Contacten after his direct message');
+    await device.takeScreenshot('msg-04b-contacts');
+    if (row < 0) throw new Error('Bram never showed in Contacten after the request was accepted');
     await element(row === 0 ? by.text('bram') : by.text('Bram')).atIndex(0).tap();
     await soon(by.id('contact-thread-screen'), 30_000);
     await soon(by.text(PEER_DM), 60_000);

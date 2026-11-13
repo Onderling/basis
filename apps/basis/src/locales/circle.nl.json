@@ -958,6 +958,10 @@
       "text": "Prima. Kies dan zelf een onderwerp:",
       "doc": "Task #13 Phase 2 — heading above the set-topic chips after the user declines forwarding (or types /help)."
     },
+    "all_topics": {
+      "text": "Alle onderwerpen",
+      "doc": "Help: the chip after the five likeliest topics of an unanswered question; it posts every topic."
+    },
     "no_llm_topics": {
       "text": "Zonder assistent kan ik alleen deze vaste onderwerpen beantwoorden. Kies er een:",
       "doc": "Task #13 Phase 2 — honest fallback on a MISS when NO assistant is connected: only the fixed topics can be answered."
@@ -1563,8 +1567,16 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
-      "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
+      "text": "Dat kon ik niet lezen.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_forget": {
+      "text": "Vergeet dit gesprek",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Je gesprek met de assistent",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
     },
     "act_done": {
       "text": "Klaar",
@@ -6436,6 +6448,10 @@
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
     },
+    "assistant": {
+      "text": "Assistent",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
+    },
     "share_contact": {
       "text": "Deel mijn kaart",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
@@ -10412,6 +10428,7 @@
   },
   "settings_home": {
     "title": "Instellingen",
+    "help": "Hulp",
     "appearance": "Weergave",
     "per_circle": "Per kring",
     "no_circles": "Je zit nog in geen enkele kring.",

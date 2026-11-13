@@ -519,6 +519,10 @@ export default function CircleLauncherScreen({
   // Bumped by App.js when a circle is joined/created from another surface. The launcher loads its list on
   // mount and after its OWN wizards; both screens stay mounted, so nothing else told it.
   circlesRevision = 0,
+  // A contact card opened as a link (`{payload, at}`), handed over by the hidden ChatScreen: opened here in the add
+  // sheet the person sees, then cleared (`onContactLinkDone`).
+  contactLink = null,
+  onContactLinkDone = null,
   // cluster J — the OidcSessionRN ref (App.js:187), the Solid session the pod writer authenticates with.
   sessionRef = null,
   // cluster J — podAuth (lifted from the hidden ChatScreen) so the "Me" screen can drive pod sign-in.
@@ -810,6 +814,13 @@ export default function CircleLauncherScreen({
   const contactLens = useContactLensSheet({
     callSkill: bundle?.callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t, theme,
   });
+  // a card opened as a link: the same add sheet the scanner's path opens, once per handed link
+  useEffect(() => {
+    if (!contactLink?.payload || !bundle?.callSkill) return;
+    onContactLinkDone?.();
+    contactLens.addWithSheet(contactLink.payload).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactLink, bundle]);
   const [joinArgs, setJoinArgs] = useState(null);     // {invite} → JoinGroupWizardModal runs
   const [inviteFor, setInviteFor] = useState(null);   // {circleId, uri, error} → invite-QR modal
   // selected circle's policy (loaded when `selected` changes); used

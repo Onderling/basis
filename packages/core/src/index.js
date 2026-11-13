@@ -115,6 +115,8 @@ export {
   signSpine,
   verifySpine,
   SPINE_STMT_VERSION,
+  spineSignedMessage,
+  canonicalDeep,
 }                                            from './security/spineStatement.js';
 // The WRITE side: append a signed spine statement to a circle's store, chained to its author's own frontier.
 export { createSpineAppender, SPINE_STATEMENT_ITEM } from './security/spineAppender.js';

@@ -18,9 +18,13 @@
  * GENERIC + EXTENSIBLE by design: any `kind` — including one a third party adds — signs and verifies the same
  * way here. Only the FOLD is kind-aware. So this primitive never needs to change to support a new spine kind.
  *
- *   content = { v, kind, circleId, subject, payload? }      // subject = who/what the entry is ABOUT
- *   body    = chainEvent(content, { author, parentHash })   // + author · parentHash · hash   (authorChain)
- *   sig     = b64( Ed25519.sign(canonicalize(body)) )       // by the CIRCLE-SCOPED key = author
+ *   header  = { v: 'onderling/spine.v2', kind, circleId, subject, authorRef, author, parentHash, deps, payloadDigest }
+ *   hash    = sha256( canonicalDeep(header) )                // the chain id
+ *   sig     = b64( Ed25519.sign(canonicalDeep(header)) )     // by the CIRCLE-SCOPED key = author
+ *   body    = header + payload + hash                        // the payload is committed to by its digest
+ *   • ONE header, hashed AND signed, in one canonical form sorted at every depth: a TOMBSTONE (the payload dropped,
+ *     the header and the signature kept) still proves itself, can be sent on, and a planted one fails; one statement
+ *     has one hash whatever order its nested keys came in. `authorRef` (who said it, in ref space) is in the header.
  *
  *   • `author` is the issuer's circle-scoped signing key (NOT their global identity) — matches the roster,
  *     preserves per-circle unlinkability (principle 5). The caller passes the circle-scoped signer.
@@ -39,32 +43,46 @@
  * concurrent change voids it, is the fold's authority decision (deny-wins), never decided here.
  */
 import { processSignatureMemo } from './signatureMemo.js';
-import { canonicalize }        from '../Envelope.js';
 import { encode as b64encode } from '../crypto/b64.js';
-import { createAuthorChain }   from './authorChain.js';
+import { hashHex }             from '../hashHex.js';
 
 /** Version of the signed spine body — a self-describing namespaced STRING (docs/conventions/signed-bodies.md). */
-export const SPINE_STMT_VERSION = 'onderling/spine.v1';
+export const SPINE_STMT_VERSION = 'onderling/spine.v2';
 
 /**
- * Content-selective serializer for `authorChain`: the content fields + a canonicalised payload, and NEVER the
- * chain fields (`author`/`parentHash`/`deps`/`hash`) — so chain-time hashing and the verifier's recompute
- * agree (the authorChain contract; see authorChain.js). The chain fields are authenticated by the signature
- * and the chain hash, but excluding them here is what makes a same-content-different-frontier a detectable fork.
+ * ONE canonical form, sorted at EVERY depth (today's envelope `canonicalize` sorts the top level only): the same
+ * statement is the same bytes, whatever order its nested payload keys were written in. Arrays keep their order;
+ * `undefined` members are left out as JSON leaves them out.
+ * @param {*} value
+ * @returns {string}
  */
-const SPINE_CONTENT = ['v', 'kind', 'circleId', 'subject'];
-const spineSerialize = (e) => {
-  const base = SPINE_CONTENT.filter((k) => e[k] !== undefined).map((k) => `${k}=${e[k]}`).join('&');
-  return e.payload !== undefined ? `${base}&payload=${canonicalize(e.payload)}` : base;
-};
-const spineChain = createAuthorChain(spineSerialize);
-
-/** Rebuild the content object (no chain fields) from a full body — for the verifier's hash recompute. */
-function contentOf(body) {
-  const c = { v: body.v, kind: body.kind, circleId: body.circleId, subject: body.subject };
-  if (body.payload !== undefined) c.payload = body.payload;
-  return c;
+export function canonicalDeep(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value ?? null);
+  if (Array.isArray(value)) return `[${value.map((v) => canonicalDeep(v === undefined ? null : v)).join(',')}]`;
+  const keys = Object.keys(value).filter((k) => value[k] !== undefined).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalDeep(value[k])}`).join(',')}}`;
 }
+
+/** The digest the header commits the payload by (absent payload = the digest of null). */
+export function payloadDigestOf(payload) { return hashHex(canonicalDeep(payload === undefined ? null : payload)); }
+
+const canonDeps = (deps) => (Array.isArray(deps) ? [...new Set(deps.filter((h) => typeof h === 'string' && h))].sort() : []);
+
+/**
+ * THE HEADER (format v2): what the chain hash and the signature are BOTH over. It commits to the payload by its
+ * digest, so a statement whose payload was removed (a TOMBSTONE) still proves itself: header + signature check, and
+ * the header still names who said it (`authorRef`). `deps` is the cross-author frontier, sorted.
+ */
+function headerOf(body) {
+  return {
+    v: body.v, kind: body.kind, circleId: body.circleId, subject: body.subject,
+    authorRef: typeof body.authorRef === 'string' ? body.authorRef : null,
+    author: body.author, parentHash: body.parentHash ?? null, deps: canonDeps(body.deps), payloadDigest: body.payloadDigest,
+  };
+}
+
+/** The exact bytes (as a string) a spine statement's signature and chain hash are over: its canonical header. */
+export function spineSignedMessage(body) { return canonicalDeep(headerOf(body ?? {})); }
 
 /**
  * Sign a spine statement of any `kind`. `identity` is the issuer's CIRCLE-SCOPED signer.
@@ -90,10 +108,16 @@ export function signSpine(identity, { kind, circleId, subject, payload, parent =
   if (deps !== undefined && !(Array.isArray(deps) && deps.every((h) => typeof h === 'string' && h))) {
     throw new Error('signSpine: deps must be an array of hash strings');
   }
-  const content = { v: SPINE_STMT_VERSION, kind, circleId, subject };
-  if (payload !== undefined) content.payload = payload;
-  const body = spineChain.chainEvent(content, { author: identity.pubKey, parentHash: parent, deps });
-  const sig  = b64encode(identity.sign(canonicalize(body)));
+  const d = canonDeps(deps);
+  const header = headerOf({
+    v: SPINE_STMT_VERSION, kind, circleId, subject,
+    authorRef: typeof payload?.authorRef === 'string' ? payload.authorRef : null,
+    author: identity.pubKey, parentHash: parent, deps: d, payloadDigest: payloadDigestOf(payload),
+  });
+  const signed = canonicalDeep(header);
+  const body = { ...header, ...(payload !== undefined ? { payload } : {}), hash: hashHex(signed) };
+  if (!d.length) delete body.deps;   // the body keeps its old shape: no deps field when there is no frontier
+  const sig  = b64encode(identity.sign(signed));
   return { body, sig, by: identity.pubKey };
 }
 
@@ -127,12 +151,21 @@ export function verifySpine(statement, opts = {}) {
     return { ok: false, reason: 'body.deps must be an array of hash strings' };
   }
   if (typeof body.hash !== 'string' || !body.hash)         return { ok: false, reason: 'body.hash required' };
+  if (typeof body.payloadDigest !== 'string' || !body.payloadDigest) return { ok: false, reason: 'body.payloadDigest required' };
+  if (body.authorRef !== null && body.authorRef !== undefined && typeof body.authorRef !== 'string') return { ok: false, reason: 'body.authorRef must be a string or null' };
   if (expectedCircleId && body.circleId !== expectedCircleId) return { ok: false, reason: 'circle mismatch' };
-  // Chain integrity: the hash must recompute from the content + author + parentHash + deps frontier.
-  if (spineChain.chainEvent(contentOf(body), { author: body.author, parentHash: body.parentHash, deps: body.deps }).hash !== body.hash) {
-    return { ok: false, reason: 'bad chain hash' };
+  // The payload the header commits to: present → its digest must match and its authorRef must be the header's; absent →
+  // only a TOMBSTONE may lack it (its header still proves itself), else it is the digest of nothing.
+  if (body.payload !== undefined) {
+    if (payloadDigestOf(body.payload) !== body.payloadDigest) return { ok: false, reason: 'payload does not match its digest' };
+    const ref = typeof body.payload?.authorRef === 'string' ? body.payload.authorRef : null;
+    if (ref !== (body.authorRef ?? null)) return { ok: false, reason: 'authorRef does not match the header' };
+  } else if (statement.tombstone !== true && body.payloadDigest !== payloadDigestOf(undefined)) {
+    return { ok: false, reason: 'payload missing' };
   }
-  // The signature must verify against the claimed circle-scoped author over the exact body.
-  if (!verifySignature(canonicalize(body), sig, body.author)) return { ok: false, reason: 'bad signature' };
+  // ONE header, hashed and signed: the chain hash recomputes from it, and the author's signature is over it.
+  const signed = canonicalDeep(headerOf(body));
+  if (hashHex(signed) !== body.hash) return { ok: false, reason: 'bad chain hash' };
+  if (!verifySignature(signed, sig, body.author)) return { ok: false, reason: 'bad signature' };
   return { ok: true, body };
 }

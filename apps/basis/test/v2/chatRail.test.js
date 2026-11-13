@@ -30,3 +30,46 @@ describe('owedChatStatements — the outbox as a projection of the one log', () 
     expect(owedChatStatements({ eventLog: { query: () => { throw new Error('x'); } }, circleId: 'c', myRef: 'r' })).toEqual([]);
   });
 });
+
+describe('checkEntry — a stored chat line judged as an arrival (what a history restore runs)', () => {
+  async function railWithOne() {
+    const { makeChatRail } = await import('../../src/v2/chatRail.js');
+    const { AgentIdentity } = await import('@onderling/core');
+    const { VaultMemory } = await import('@onderling/vault');
+    const { EventLog } = await import('../../src/eventLog.js');
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const log = new EventLog({ initial: [], muted: [] });
+    const rail = makeChatRail({ eventLog: log, circleIdentityFor: async () => identity, myRef: identity.pubKey, callSkill: async () => null });
+    const { entry } = await rail.appendMessage('c-1', { msgId: 'm-1', ts: Date.now(), text: 'hallo' });
+    return { rail, entry };
+  }
+
+  it('a signed line whose text is the signed text passes; the lane is named', async () => {
+    const { rail, entry } = await railWithOne();
+    expect(rail.entryKind).toBe('chat-message');
+    expect(rail.checkEntry(entry)).toBe(true);
+  });
+  it('a signed line whose shown text was changed is refused', async () => {
+    const { rail, entry } = await railWithOne();
+    expect(rail.checkEntry({ ...entry, payload: { ...entry.payload, text: 'iets anders' } })).toBe(false);
+  });
+  it('a line whose statement was changed is refused', async () => {
+    const { rail, entry } = await railWithOne();
+    const st = entry.payload.statement;
+    const forged = { ...st, body: { ...st.body, payload: { ...st.body.payload, text: 'iets anders' } } };
+    expect(rail.checkEntry({ ...entry, payload: { ...entry.payload, text: 'iets anders', statement: forged } })).toBe(false);
+  });
+  it("a local line that never fanned (no statement) passes when it is this person's own or the local bot's", async () => {
+    const { rail, entry } = await railWithOne();
+    const { statement: _s, ...local } = entry.payload;
+    expect(rail.checkEntry({ ...entry, actor: 'me', payload: local })).toBe(true);     // the shells' own optimistic line
+    expect(rail.checkEntry({ ...entry, actor: 'bot', payload: local })).toBe(true);    // a local bot bubble or notice
+    expect(rail.checkEntry({ ...entry, payload: local })).toBe(true);                  // this device's self in the circle
+  });
+  it('an unsigned line naming ANOTHER member is refused: it would show as their message', async () => {
+    const { rail, entry } = await railWithOne();
+    const { statement: _s, ...local } = entry.payload;
+    expect(rail.checkEntry({ ...entry, actor: 'b'.repeat(64), payload: local })).toBe(false);
+    expect(rail.checkEntry({ ...entry, actor: undefined, payload: local })).toBe(false);
+  });
+});

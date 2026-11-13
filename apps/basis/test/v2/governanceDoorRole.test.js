@@ -40,7 +40,7 @@ describe('a role change is decided by the circle\'s settings class', () => {
     const { gov, callSkill } = host({ changePolicy: 'any-admin' });
     const r = await changeRoleDoor({ governance: gov, callSkill: vi.fn(), circleId: 'c1', memberWebid: 'm0', role: 'admin', actorRef: 'a0' });
     expect(r.outcome).toBe('done');
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'setMemberRole', { groupId: 'c1', memberWebid: 'm0', role: 'admin' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'setMemberRole', { groupId: 'c1', memberWebid: 'm0', role: 'admin', proposalId: expect.any(String) });
     expect(r.result?.forwarded).toBe(true);
   });
 

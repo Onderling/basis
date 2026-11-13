@@ -150,7 +150,7 @@ import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGr
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
@@ -333,6 +333,10 @@ const hiddenLanded = (item) => {
 const writeOrigin = new AsyncLocalStorage();
 const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
 const agent = await createRealHouseholdAgent({
+  // WHICH RELAY EACH CIRCLE RIDES: on a box, the one it is on (every circle it holds is reached there, as its
+  // registration below says). The agent reopens a persona's own socket at that point after a restart: a box holding a
+  // persona's circle (every device of the person is in every circle of the person) is otherwise silent there.
+  circlePointsFor: () => (relayUrl ? [relayUrl] : []),
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
@@ -607,13 +611,13 @@ if (relayUrl) {
     headStore: makePolicyHeadStore(circlePolicyKv),
     readPolicy: (cid) => circlePolicyStore.get(cid),
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
-    adminsOf: adminsOfViaSkill(callSkill),
+    membersOf: membersOfViaSkill(callSkill),   // the roster the receiver gate counts
   });
   // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
   // same reaction for a catch-up batch and a live statement.
   const govChanged = (cid) => {
     if (!govRail) return;
-    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
+    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy }).catch(() => {});
     circlePolicyLane.apply(cid, govRail)
       .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
       .catch(() => {});

@@ -65,6 +65,10 @@ export const SEAMS = Object.freeze([
   // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
   // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
   { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
+  // WHICH RELAY EACH CIRCLE RIDES, handed to the agent: it scopes a circle's sends AND, after a restart, reopens each
+  // persona's own socket at its circles' points. Web and mobile passed it; the box did not, so a box holding a persona's
+  // circle would be silent there after a restart (found 2026-11-13 with the phone's personas walk; Fable's review).
+  { id: 'circle-points-for', pattern: /circlePointsFor: \(/, why: 'without it a persona\'s circle has no socket of its own after a restart: its lines wait and nothing addressed to it arrives' },
   // THE RELAY TRAVELS WITH THE CARD: a device with no relay of its own adopts the point a scanned contact card brings, saved so
   // a restart reconnects to it, and says whose it now uses. Before, it dialled the card's relay only at the first send, unsaid.
   // READ ON ONE DEVICE = READ ON ALL: a shell that paints news (circle tiles, Today, the contact badges) holds the one

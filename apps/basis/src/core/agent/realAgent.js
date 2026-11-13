@@ -55,14 +55,14 @@ import { createSealingBackend } from '@onderling/pseudo-pod';            // the 
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
 import {
-  createHistoryMirror, hydrateHistory, exportHistoryArchive,
+  createHistoryMirror, hydrateHistory, exportHistoryArchive, restoreCheckFor,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
 } from '../../v2/historyMirror.js'; // the personal history store: sealed follower sink + instant-restore hydrate + archive export
 import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS, COMPACT_SUPERSEDED_PROPS } from '../../v2/membershipRail.js';
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST, MEMBERSHIP_RAIL_KINDS, COMPACT_SUPERSEDED_PROPS, addressBindsOnRow } from '../../v2/membershipRail.js';
 import { makeLateRecipientRetell } from '../../v2/membershipLateRecipient.js'; // the membership rider — statements ride the device log
 import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
@@ -127,7 +127,9 @@ import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 import { makeGovernanceRail, bindCircleGovernance, makeGovernanceBroadcast } from '../../v2/governanceAppWiring.js';
 import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 // …and the circle POLICY, the same way: a signed statement on the governance lane, caught up by joiners.
-import { makePolicyUpdateEmitter } from '../../v2/policyUpdateLane.js';
+import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../../v2/policyUpdateLane.js';
+import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
+import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
@@ -785,6 +787,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circles (and every circle while only the default runs) are the default's, as before.
   const circlePersonas = new Map();   // circleId → profileId (non-default only)
   let onPersonaStarted = null;   // set once the own store exists: a persona that starts writes its device-map row
+  let peerConnected = false;   // the transport is up (connectPeerTransport ran): a persona circle mapped later dials at once
   const personaOf = (circleId) => personas.get(circlePersonas.get(circleId)) ?? persona;
   // the root this device derives a circle's per-circle keys from: the persona's circle root
   const circleSeedFor = (circleId) => personaOf(circleId).circleSeed;
@@ -1998,6 +2001,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
         // the circle is now this persona's: its keys and its traffic follow (the default is the map's absence)
         if (profileId === 'default') circlePersonas.delete(circleId); else circlePersonas.set(circleId, profileId);
+        // …and the persona is on that circle's relay on its own socket: a circle can become the persona's AFTER the
+        // connect (its record lands later than the boot), and the connect's reopen did not see it then
+        if (peerConnected && circlePersonas.get(circleId) === profileId) reopenPersonaSockets({ only: circleId }).catch(() => { /* said inside */ });
         // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
         // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
         // A persona's circle too: it reaches the devices holding that persona only (the follow's `siblings(circleId)`).
@@ -2556,6 +2562,25 @@ export async function createRealHouseholdAgent(opts = {}) {
     const self = personas.get(pid);
     if (!self?.enrolledDevice || !self.deviceDerivationSeed) return null;
     try { return deviceDelegationPubKey(self.deviceDerivationSeed); } catch { return null; }
+  };
+  /** Each persona this device runs, on a socket of its own at every relay point of the circles it holds here. Best-effort
+   *  per socket (one relay down must not cost the others); the boot does not wait for the sockets to open. */
+  const reopenPersonaSockets = async ({ only = null } = {}) => {
+    const wanted = new Map();   // `${url}@${personaKey}` → { url, identity }
+    for (const [cid, pid] of circlePersonas) {
+      if (only && cid !== only) continue;
+      const rt = personas.get(pid);
+      if (!rt?.chatId?.pubKey) continue;
+      let points = [];
+      try { points = opts.circlePointsFor?.(cid) ?? []; } catch { points = []; }
+      for (const url of points) {
+        if (typeof url === 'string' && /^wss?:\/\//.test(url)) wanted.set(`${url}@${rt.chatId.pubKey}`, { url, identity: rt.chatId });
+      }
+    }
+    for (const { url, identity } of wanted.values()) {
+      try { await sa.relays.add(url, { identity }); }
+      catch (err) { console.warn(`[persona] could not reopen its socket on ${url}: ${err?.message ?? err}`); }
+    }
   };
   /** Every self's device address on this device: registered as an identity of ours and on that self's own relay
    *  sockets (never another self's: a socket holding two selves' addresses would link them at the relay). */
@@ -3637,14 +3662,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     const seen = new Set(reply.circles.map(idOf).filter(Boolean));
     const circles = [...reply.circles];
     const left = Array.isArray(reply.left) ? [...reply.left] : reply.left;
+    // …with the NAMES and the REMOVED tiles too: the default's reply names only its own circles, so a persona's circle
+    // merged without its name read as its id on every tile and header (found by the phone's personas walk).
+    const names = { ...((reply.names && typeof reply.names === 'object') ? reply.names : {}) };
+    const removed = Array.isArray(reply.removed) ? [...reply.removed] : reply.removed;
     for (const [pid, rt] of personas) {
       if (pid === 'default' || !rt?.chatId?.pubKey) continue;
       let theirs = null;
       try { theirs = (await chatAgent.invoke(pinboardAgentRef.current.address, 'listMyCircles', parts, { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null; } catch { theirs = null; }
       for (const c of theirs?.circles ?? []) { const id = idOf(c); if (id && !seen.has(id)) { seen.add(id); circles.push(c); } }
+      for (const [id, name] of Object.entries(theirs?.names ?? {})) if (!(id in names) && typeof name === 'string' && name) names[id] = name;
       if (Array.isArray(left) && Array.isArray(theirs?.left)) for (const l of theirs.left) if (!left.includes(l)) left.push(l);
+      if (Array.isArray(removed) && Array.isArray(theirs?.removed)) for (const r of theirs.removed) if (r?.id && !removed.some((x) => x?.id === r.id)) removed.push(r);
     }
-    return { ...reply, circles, ...(left !== undefined ? { left } : {}) };
+    return { ...reply, circles, names, ...(left !== undefined ? { left } : {}), ...(removed !== undefined ? { removed } : {}) };
   };
   // WHO GREETED THIS DEVICE survives a reload. The security layer's bindings — "this key is Bea",
   // established by her greeting — lived in memory only, so a reload (every web session) or a restart
@@ -6304,7 +6335,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // the point builds the statement on its own head and signs it. The point is the primary-device claim; with no claim
     // yet, this device signs as before (a lone device, or the moment before the claim is made).
     localMembershipEmitRef.current = localMembershipEmit;
-    membershipEmit = async (act = {}) => {
+    membershipEmit = async (actIn = {}) => {
+      // STAMPED BY CONSTRUCTION (Opus, reviewing the membership gate): every removal and role change carries the settings
+      // version this device has seen, whichever path wrote it (the governance enact, the box bot's /revoke, the circle
+      // screen's op, a slash or AI call); an unstamped one would be re-judged by a LATER rule and could undo itself
+      const act = (actIn?.kind === 'evict' || actIn?.kind === 'role') && typeof actIn.circleId === 'string'
+        && !Number.isFinite(Number.parseInt(actIn.payload?.policyVersion, 10))
+        ? Object.assign({}, actIn, { payload: Object.assign({}, actIn.payload ?? {}, { policyVersion: policyVersionSeen(actIn.circleId) }) })
+        : actIn;
       // the point that has not caught up in this circle queues its own act — a ceremony's too: its authority is the root
       // reveal it carries (bound to circle, subject and kind), which keeps; the statement is signed with the circle key on open
       // a circle FOUNDED here: its creation starts a chain nothing came before, so there is nothing to catch up on — it is
@@ -6325,6 +6363,57 @@ export async function createRealHouseholdAgent(opts = {}) {
       return sendSpineAct('membership', plain);
     };
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
+    // THE GOVERNED GATE's host half (the circle's "who decides" for removals and role changes, judged on THIS device):
+    // the circle's settings are the chain of settings statements on its governance lane (judgePolicyChain), so the
+    // gate needs no policy store. First the cheap answer: no settings statement on the lane ever asked a vote for a
+    // removal or a role change (a superset check, any author) → no gate, the roster folds once as before; memoised by
+    // the lane's length. Otherwise a builder the roster read calls with its first-pass rows (the members a tally counts).
+    const gateNeedMemo = new Map();   // circleId → { n, needed }
+    // NO CYCLE (found walking it, 2026-11-13): a content lane checks its statements' key↔member bindings against the
+    // membership FOLD (rosterBindingVerifier), and this gate is asked FROM INSIDE that fold. So the gate never reads
+    // the governance lane through the roster: the cheap check uses the signature alone (`checkSigned`, no binding),
+    // and the builder binds against the FIRST-PASS rows it is handed (the same set-aware rule, `addressBindsOnRow`).
+    const signedRail = () => (gateRailMemo ??= makeGovernanceRail({
+      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+      circleIdentityFor, myRef: circleSelfRef, callSkill: (...a) => callSkill(...a),
+    }));
+    let gateRailMemo = null;
+    const asksVote = (p) => {
+      const pol = normalizeCirclePolicy(p ?? {});
+      return decisionClassFor(pol, 'removeMember') !== 'any-admin' || decisionClassFor(pol, 'changeRole') !== 'any-admin';
+    };
+    membershipRead.governedGateFor = async (circleId) => {
+      const rail = signedRail();
+      let stored = [];
+      try { stored = rail.storedStatements(circleId) ?? []; } catch { return null; }
+      if (!stored.length) return null;
+      const memo = gateNeedMemo.get(circleId);
+      if (memo && memo.n === stored.length && memo.needed === false) return null;
+      // the cheap answer, on signatures alone (a superset: any author): did any settings statement ever ask a vote?
+      const needed = stored.some((st) => st?.body?.kind === POLICY_UPDATE_KIND && rail.checkSigned(circleId, st) && asksVote(st.body.payload?.policy));
+      gateNeedMemo.set(circleId, { n: stored.length, needed });
+      if (!needed) return null;
+      return async (firstPass) => {
+        const rows = (Array.isArray(firstPass) ? firstPass : []).filter((r) => typeof r?.webid === 'string' && r.webid);
+        const members = rows.map((r) => ({ ref: r.webid, role: r.role === 'admin' ? 'admin' : 'member', ...(r.adminVia ? { via: r.adminVia } : {}) }));
+        const admins = new Set(members.filter((m) => m.role === 'admin').map((m) => m.ref));
+        // the governance read for the gate, bound against the first-pass rows: never the roster (no re-entry)
+        const bound = makeGovernanceRail({
+          eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+          circleIdentityFor, myRef: circleSelfRef, callSkill: (...a) => callSkill(...a),
+          verifyBinding: async ({ author, ref, atSeq = null }) => rows.some((m) => m.webid === ref && addressBindsOnRow(m, author, atSeq)),
+        });
+        let bodies = [];
+        try { ({ bodies = [] } = await bound.readVerifiedBodies(circleId)); } catch { bodies = []; }
+        const proposals = await proposalsOn({ rail: bound, circleId, policy: normalizeCirclePolicy({}), members });
+        const chain = judgePolicyChain({ bodies: bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author)), members, proposals, merge: denyWinsMerge });
+        // the membership lane's own bodies (raw author keys): an author's earlier removals sit in their chain before the
+        // tip their later settings change named
+        let spine = [];
+        try { spine = (membershipRail?.storedStatements?.(circleId) ?? []).map((x) => x?.body).filter(Boolean); } catch { spine = []; }
+        return membershipGateFor({ chain, currentPolicy: chain.policyAt(chain.head), members, proposals, chainOf: chainOfBodies(spine) });
+      };
+    };
     // the ceremony retirements alone — what the spineless roster folds (they bind by the root's reveal, no recursion)
     membershipRead.ceremony = (circleId) => membershipRail.readVerifiedBodies(circleId, { kinds: ['address-revoke'] });
     // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
@@ -6495,13 +6584,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // a device log the append lands on an ephemeral log — the live fan still carries the statement
   // (receivers verify at their OWN rail); only local restart durability degrades, like the other
   // riders.
+  // ONE governance rail for this composition's riders (rules, policy) and the restore's check: the same lane and
+  // declaration, so one instance (the shells' receive-side rail is another over the same log, as before).
+  const governanceRail = makeGovernanceRail({
+    eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+    circleIdentityFor,
+    myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
+    callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+  });
+  // THE SETTINGS VERSION THIS DEVICE HAS SEEN for a circle: the highest signature-checked settings statement on its
+  // governance lane. What a removal, a role change or a rules change is stamped with when its caller passed none.
+  function policyVersionSeen(circleId) {
+    let max = 0;
+    try {
+      for (const st of governanceRail?.storedStatements?.(circleId) ?? []) {
+        if (st?.body?.kind === POLICY_UPDATE_KIND && governanceRail.checkSigned(circleId, st)) max = Math.max(max, Number.parseInt(st.body.payload?.version, 10) || 0);
+      }
+    } catch { /* nothing seen */ }
+    return max;
+  }
   const rulesUpdateEmit = makeRulesUpdateEmitter({
-    rail: makeGovernanceRail({
-      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
-      circleIdentityFor,
-      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
-    }),
+    rail: governanceRail,
     fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
@@ -6510,16 +6613,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE POLICY-UPDATE RIDER — the same rail and fan as the rules one, a different kind. The shells call it (as
   // `emitPolicyUpdate`) when an admin saves the circle's policy and when the create wizard writes the first one.
   const policyUpdateEmit = makePolicyUpdateEmitter({
-    rail: makeGovernanceRail({
-      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
-      circleIdentityFor,
-      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      callSkill: (...a) => callSkill(...a),
-    }),
+    rail: governanceRail,
     fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
+    // where my membership chain in the circle stood (the line the receivers judge my earlier removals and role changes by)
+    membershipUpToFor: (circleId) => authorChainTip(circleId, circleAddressFor(circleId)),
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan
@@ -6837,7 +6937,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     forgetCircleContent: (circleId) => selfAgent?.forgetCircleContent?.(circleId),
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
     currentPersonKey,
-    rulesUpdateEmit,
+    // stamped by construction too (a chat edit of the rules names no settings version): the version this device has seen
+    rulesUpdateEmit: (u = {}) => rulesUpdateEmit(Number.isFinite(Number.parseInt(u.policyVersion, 10)) ? u : Object.assign({}, u, { policyVersion: policyVersionSeen(u.groupId) })),
     // One block set for the whole device. Blocking is a decision about a PERSON, so it cannot live
     // per-app: the boundary refuses their envelopes, and this app's ingest filter reads the same set
     // so anything that arrived by another road is dropped too. Keys line up because in basis' binding
@@ -9445,6 +9546,8 @@ export async function createRealHouseholdAgent(opts = {}) {
             eventLog:     opts.deviceLog,
             recencyDays:  Number(paramsService.register.valueOf(HISTORY_RECENCY_DAYS_KEY)) || 30,
             maxPerCircle: Number(paramsService.register.valueOf(HISTORY_RECENCY_MAX_KEY)) || 500,
+            // THE RESTORE IS AN ARRIVAL: every signed lane's statements are checked before they land.
+            admit: restoreCheckFor([membershipRail, itemsRail, chatRail, keyRail, grantsRail, governanceRail]),
           });
           skip = r.hydratedIds;
           if (typeof console !== 'undefined') console.info(`[history-restore] recent window live: ${r.recent} entries (tail follows)`);
@@ -10081,6 +10184,11 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (typeof console !== 'undefined') console.warn('[realAgent] rendezvous enable failed (continuing without direct WebRTC):', err?.message ?? err);
         }
       }
+      // EVERY PERSONA BACK ON ITS CIRCLES' RELAYS, each on a socket of its own (never the general persona's). The join
+      // opens that socket (`bindCirclePersona`); without this a restart left every persona circle without one: its lines
+      // waited and nothing addressed to it arrived. The points are the shell's record of which relay each circle rides.
+      peerConnected = true;
+      await reopenPersonaSockets().catch((err) => { console.warn(`[persona] sockets not reopened at connect: ${err?.message ?? err}`); });
       // revokes owed to a node the person owns (a contact deleted while it was away): told now that this device is on
       retryPendingRevokes().catch(() => {});
       // every self's device address on its own relay sockets, so the person's other devices can reach this one

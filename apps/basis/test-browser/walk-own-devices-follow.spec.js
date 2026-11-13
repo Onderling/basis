@@ -105,12 +105,19 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
       { timeout: 60_000, message: 'B arrives on A2 with the lens A1 chose' }).toBe('default/handle');
     log('STEP2 the lens follows the new contact', 'PASS', 'default/handle on A2');
 
-    // A1 writes (A1 added B; B learns A from the first message), so the pair circle exists — on A1, and on A2 by the
-    // follow carry
+    // A1 writes (A1 added B; B learns A from the first message), and B ANSWERS: A1 came in through B's shared link, so on
+    // B's side A1 is the link's first opener, a thread but not yet a contact, until B answers (answering is choosing,
+    // the message-request door). The pair roster is made only then. Without B's answer the walk passed only when A1's id
+    // sorted first (A1 founds the pair circle itself) and failed when B's did (A1's pair request waits on B's answer):
+    // about half the runs since the door, on id order alone.
     const hi = `hoi Bea ${Date.now().toString(36)}`;
     const sent = await sendDirectMessage(A1.page, hi, { to: bId });
     expect(sent.sent, `A1 could not write: ${sent.why}`).toBe(true);
     await waitForContactMessageDetailed(B.page, hi);
+    const back = `hoi terug ${Date.now().toString(36)}`;
+    const answered = await sendDirectMessage(B.page, back, { to: aId });
+    expect(answered.sent, `B could not answer: ${answered.why}`).toBe(true);
+    await waitForContactMessageDetailed(A1.page, back);
     await expect.poll(() => hasPair(A1.page), { timeout: 60_000, message: 'A1 holds the pair circle' }).toBe(true);
     await expect.poll(() => hasPair(A2.page), { timeout: 90_000, message: 'A2 follows into the pair circle' }).toBe(true);
 

@@ -21,9 +21,7 @@ import { useTheme } from './themeContext.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
 import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
-import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
-
-const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
+import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
 
 // `governance`: the launcher's ONE binding (governanceOneBindingPerShell) — this screen decides with the same options as
@@ -104,6 +102,14 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
         <Text style={styles.backText}>{`← ${t('circle.back')}`}</Text>
       </Pressable>
       <Text style={styles.title}>{t('circle.governance.title')}</Text>
+
+      {/* changes made WITHOUT the vote this circle requires: every device refused them (the receiver gate); shown so the
+          members see that it happened (kept and shown, never applied) — web parity: circleGovernancePanel */}
+      {(model.view.refused ?? []).map((r) => (
+        <View key={r.hash ?? `${r.action}-${r.version}`} style={styles.disputed} testID={`gov-refused-${r.action}`}>
+          <Text style={styles.disputedLine}>{t(`circle.governance.refused_${r.action}`, { who: r.label || r.by })}</Text>
+        </View>
+      ))}
 
       {(model.view.disputed ?? []).map((d) => (
         <View key={d.ref} style={styles.disputed} testID={`gov-disputed-${d.ref}`}>
@@ -224,7 +230,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
               <View key={action} style={styles.setting} testID={`gov-setting-${action}`}>
                 <Text style={styles.settingAction}>{t(`circle.governance.action.${action}`)}</Text>
                 <View style={styles.classRow}>
-                  {GOVERNANCE_CLASSES.map((cls) => (
+                  {OFFERED_GOVERNANCE_CLASSES.map((cls) => (
                     <Pressable
                       key={cls}
                       onPress={() => onSetClass(action, cls)}

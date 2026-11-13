@@ -367,7 +367,12 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    */
   const checkSigned = (circleId, statement) => !!statement && (statement.tombstone !== true || compactable.has(statement?.body?.kind)) && safeVerify(statement, circleId)?.ok === true;
 
-  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact, checkSigned };
+  /** A STORED LOG ENTRY of this lane, judged as an arrival: its statement must verify here, now (what a history restore
+   *  runs before an entry lands on a fresh device's log). The binding is not judged here: every read re-decides it. */
+  const checkEntry = (entry) => !!entry && entry.type === entryKind && typeof entry.circleId === 'string'
+    && checkSigned(entry.circleId, entry.payload);
+
+  return { entryKind, append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact, checkSigned, checkEntry };
 }
 
 export default makeCircleEntryRail;

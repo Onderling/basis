@@ -257,6 +257,8 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
       return statement;
     },
     apply,
+    /** The policy in force on this device: what the rules apply's receiver gate judges a rules change by. */
+    readPolicy: (circleId) => readPolicy(circleId),
     /** The shell hands over its receive rail when it builds it. */
     useRail(rail) { if (rail) knownRail = rail; },
     preserved: (circleId) => preservedPolicyStatementsFor({ headStore, circleId }),

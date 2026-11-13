@@ -1422,6 +1422,8 @@ export const pinboardManifest = {
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rules',   kind: 'object', required: true },
+        // the proposal that decided this change, where the circle's rule asked for one (governance enact passes it)
+        { name: 'proposalId', kind: 'string', required: false },
       ],
       resolves: [{ field: 'rules', policy: 'content' }],
       surfaces: {

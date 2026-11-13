@@ -48,7 +48,7 @@ describe('makeCircleGovernance — enact routing', () => {
     const { gov, callSkill } = host({ governance: { changeRule: 'any-admin' } });
     const rules = { name: 'Huisregels', quietHours: '22-07' };
     await gov.propose({ circleId: 'c1', action: 'changeRule', subject: rules, actor: { ref: 'admin0' } });
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'editGroupRules', { groupId: 'c1', rules });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'editGroupRules', { groupId: 'c1', rules, proposalId: expect.any(String) });
   });
 });
 
@@ -108,7 +108,7 @@ describe('a member PROPOSES a circle-policy change (the changePolicy action, ena
     const admin = host({ governance: { changePolicy: 'any-admin' }, localActorRef: 'admin0', events, setPolicy });
     const done = await admin.gov.vote({ circleId: 'c1', proposalId: r.proposalId, choice: 'yes' });
     expect(done).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
-    expect(setPolicy).toHaveBeenCalledWith('c1', patch);
+    expect(setPolicy).toHaveBeenCalledWith('c1', patch, { proposalId: expect.any(String) });
 
     const no = await member.gov.propose({ circleId: 'c1', action: 'changePolicy', subject: { view: 'screen' }, actor: { role: 'member' } });
     expect((await admin.gov.vote({ circleId: 'c1', proposalId: no.proposalId, choice: 'no' })).status).toBe(DECISION_STATUS.REJECTED);

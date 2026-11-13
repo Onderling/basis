@@ -1,5 +1,5 @@
 /**
- * EVERY MEMBER'S DEVICE REFUSES A RULES OR SETTINGS CHANGE THAT SKIPPED THE VOTE (L663 Q3: kept, never applied).
+ * EVERY MEMBER'S DEVICE REFUSES A RULES OR SETTINGS CHANGE THAT SKIPPED THE VOTE (Frits 2026-11-10: kept, never applied).
  *
  * The two applies every shell runs when governance statements land (`applyRulesUpdates`, `applyPolicyUpdates`),
  * over a rail holding what a device holds: an admin's change statement and the governance events beside it. In a
@@ -76,5 +76,40 @@ describe('a settings change', () => {
     const written = [];
     expect((await applyPolicyUpdates(args(rail([body({ proposalId: 'p2' })], approved('p2', 'changePolicy', { chat: 'off' })), written))).applied).toBe(true);
     expect(written[0]?.chat).toBe('off');
+  });
+});
+
+describe('a decided change carries the proposal that decided it', async () => {
+  const { makeCircleGovernance } = await import('../../src/v2/governanceHost.js');
+  const { policyEnactor } = await import('../../src/v2/governanceAppWiring.js');
+  const host = (setPolicy = null) => {
+    const events = []; let n = 0;
+    const calls = [];
+    const gov = makeCircleGovernance({
+      callSkill: async (app, op, args) => { calls.push([op, args]); return { ok: true }; },
+      readGovernanceState: async () => ({ events, disputed: new Set() }),
+      appendGovernanceEvent: async (_c, e) => { events.push(e); },
+      getPolicy: async () => quorum, getMembers: async () => [{ ref: 'a0', role: 'admin' }, { ref: 'a1', role: 'admin' }],
+      localActorRef: 'a0', newProposalId: () => `p${(n += 1)}`, now: () => 0, setPolicy,
+    });
+    return { gov, calls, events };
+  };
+
+  it('a rules change both admins approved reaches editGroupRules with its proposal id', async () => {
+    const { gov, calls, events } = host();
+    const { proposalId } = await gov.propose({ circleId: CIRCLE, action: 'changeRule', subject: rules, actor: { ref: 'a0' } });
+    // the other admin's yes arrives as THEIR event (a device votes only as its own self); this device then tallies
+    events.push(voteEvent({ proposalId, voter: 'a1', choice: 'yes', at: 0 }));
+    await gov.vote({ circleId: CIRCLE, proposalId, voter: 'a0', choice: 'yes' });
+    expect(calls.find(([op]) => op === 'editGroupRules')?.[1]).toEqual({ groupId: CIRCLE, rules, proposalId });
+  });
+
+  it('a settings change both admins approved is stated with its proposal id', async () => {
+    const stated = [];
+    const { gov, events } = host(policyEnactor({ setPolicy: async () => {}, statePolicy: async (cid, meta) => { stated.push(meta); } }));
+    const { proposalId } = await gov.propose({ circleId: CIRCLE, action: 'changePolicy', subject: { chat: 'off' }, actor: { ref: 'a0' } });
+    events.push(voteEvent({ proposalId, voter: 'a1', choice: 'yes', at: 0 }));
+    await gov.vote({ circleId: CIRCLE, proposalId, voter: 'a0', choice: 'yes' });
+    expect(stated).toEqual([{ proposalId }]);
   });
 });

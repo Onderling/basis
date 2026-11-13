@@ -11,25 +11,19 @@
  *     on THIS device from the verified governance events, must be of the same action, APPROVED, and about the same
  *     change (the enacted value matches the proposal's subject).
  * A write that fails is not applied and not dropped: it stays on the lane, and the governance view shows it as a
- * change made without the vote (Frits 2026-11-10, Q3).
+ * change made without the vote (Frits 2026-11-10: kept and shown, never applied).
  *
  * The founding write (version 1: the founder's first policy, written at creation) is not a change and is never
  * judged.
  *
  * Pure: the policy, members and folded proposals in; a verdict out.
  */
-import { decisionClassFor } from './circlePolicy.js';
+import { changeNeedsVote } from './circlePolicy.js';
 import { DECISION_STATUS } from './governanceDecision.js';
 import { foldGovernance } from './governanceLog.js';
 
-/** Does a write of `action` need a decided proposal in a circle with this policy and these members? */
-export function writeNeedsVote(policy, action, members = []) {
-  const cls = decisionClassFor(policy, action);
-  if (!cls) return true;   // an unknown action is never let through on its own
-  if (cls === 'any-admin') return false;
-  if (cls === 'admin-quorum') return (Array.isArray(members) ? members : []).filter((m) => m?.role === 'admin').length >= 2;
-  return true;   // member-vote: the vote is the point, whatever the roster size
-}
+/** Does a write of `action` need a decided proposal? THE one rule the doors ask too (`changeNeedsVote`, circlePolicy.js). */
+export const writeNeedsVote = (policy, action, members = []) => changeNeedsVote(policy, action, Array.isArray(members) ? members : []);
 
 /** Canonical JSON (sorted keys), so two equal objects compare equal whatever their key order. */
 function canonical(v) {

@@ -45,15 +45,17 @@ export function makeCircleGovernance({
   }
   // Map a governed action to the REAL op. removeMember/editGroupRules are pinboard skills;
   // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
-  async function enact(circleId, action, subject) {
+  // `proposalId` rides into the enacted change's statement, so every receiving device can check the decision (the
+  // receiver gate, governanceReceiverGate.js)
+  async function enact(circleId, action, subject, proposalId = null) {
     if (action === 'removeMember') {
       return typeof removeMember === 'function'
         ? removeMember(circleId, subject)
         : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
     }
-    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject });
+    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject, ...(proposalId ? { proposalId } : {}) });
     if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role });
-    if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject) : { ok: false, error: 'no-setPolicy' };
+    if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject, { proposalId }) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };
     return { ok: false, error: 'unknown-action' };
   }

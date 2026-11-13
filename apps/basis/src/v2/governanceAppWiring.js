@@ -139,14 +139,15 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  * THE SETTINGS ENACTOR every binding uses: write the policy to this device's store, then STATE it on the governance lane
  * so every member's device applies it (`circlePolicyLane.state`). A write that failed is not stated. Without a store
  * there is no enactor, and governance refuses the enact rather than faking one.
- * @param {{setPolicy: ((circleId: string, patch: object) => Promise<*>)|null, statePolicy: ((circleId: string) => Promise<*>)|null}} a
- * @returns {((circleId: string, patch: object) => Promise<{ok: boolean}>)|null}
+ * The proposal that decided the change (`meta.proposalId`) rides into the stated policy, for the receiver gate.
+ * @param {{setPolicy: ((circleId: string, patch: object) => Promise<*>)|null, statePolicy: ((circleId: string, meta?: {proposalId?: string|null}) => Promise<*>)|null}} a
+ * @returns {((circleId: string, patch: object, meta?: {proposalId?: string|null}) => Promise<{ok: boolean}>)|null}
  */
 export function policyEnactor({ setPolicy = null, statePolicy = null } = {}) {
   if (typeof setPolicy !== 'function') return null;
-  return async (circleId, patch) => {
+  return async (circleId, patch, meta = {}) => {
     try { await setPolicy(circleId, patch); } catch { return { ok: false, error: 'policy-write-failed' }; }
-    if (typeof statePolicy === 'function') { try { await statePolicy(circleId); } catch { /* the catch-up reconciles */ } }
+    if (typeof statePolicy === 'function') { try { await statePolicy(circleId, { proposalId: meta?.proposalId ?? null }); } catch { /* the catch-up reconciles */ } }
     return { ok: true };
   };
 }

@@ -223,7 +223,7 @@ if (talk) {
           const name = l?.label ?? null;
           if (!name) continue;
           const entries = (await call('lists', 'listEntries', { circleId: groupId, list: name }))?.items ?? [];
-          out.push({ list: name, entries: entries.map((e) => e?.label ?? null).filter(Boolean), ids: Object.fromEntries(entries.filter((e) => e?.label && e?.id).map((e) => [e.label, e.id])) });
+          out.push({ list: name, id: l?.id ?? null, entries: entries.map((e) => e?.label ?? null).filter(Boolean), ids: Object.fromEntries(entries.filter((e) => e?.label && e?.id).map((e) => [e.label, e.id])) });
         }
         say({ step: 'lists', lists: out });
       } else if (cmd.do === 'circle-say') {

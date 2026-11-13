@@ -37,12 +37,23 @@ describe('the lists block', () => {
     const r = await materializeBlock({ block: { id: 'b1', type: 'lists', config: { limit: 5 } }, circleId: 'k1', hostOps: { callSkill } });
     expect(r.status).toBe('ok');
     const tick = (id) => ({ kind: 'op', app: 'lists', opId: 'markListItemDone', args: { circleId: 'k1', item: id, list: 'l1' }, labelKey: 'circle.vandaag.act_done' });
+    // each list also carries its add act: a line the person types goes on THAT list, through the lists' own op
+    const add = (list) => ({ kind: 'op', app: 'lists', opId: 'addToList', args: { circleId: 'k1', list }, textArg: 'text', labelKey: 'circle.container.add', placeholderKey: 'circle.lists.add_prompt' });
     expect(r.content.lists).toEqual([
-      { id: 'l1', title: 'Boodschappen', entries: [{ id: 'e1', label: 'melk', done: false, primary: tick('e1') }, { id: 'e2', label: 'brood', done: false, primary: tick('e2') }] },
-      { id: 'l2', title: 'Klusjes', entries: [] },
+      { id: 'l1', title: 'Boodschappen', add: add('l1'), entries: [{ id: 'e1', label: 'melk', done: false, primary: tick('e1') }, { id: 'e2', label: 'brood', done: false, primary: tick('e2') }] },
+      { id: 'l2', title: 'Klusjes', add: add('l2'), entries: [] },
     ]);
     expect(callSkill).toHaveBeenCalledWith('lists', 'listLists', { circleId: 'k1' });
     expect(callSkill).toHaveBeenCalledWith('lists', 'listEntries', { circleId: 'k1', list: 'l1' });
+  });
+
+  it('a typed line becomes the add act\'s dispatch; an empty line dispatches nothing', async () => {
+    const { typedRowOp } = await import('../../src/v2/rowPrimary.js');
+    const act = { kind: 'op', app: 'lists', opId: 'addToList', args: { circleId: 'k1', list: 'l1' }, textArg: 'text', labelKey: 'circle.container.add' };
+    expect(typedRowOp(act, '  melk ')).toEqual({ kind: 'row-op', op: { app: 'lists', opId: 'addToList', args: { circleId: 'k1', list: 'l1', text: 'melk' } } });
+    expect(typedRowOp(act, '   ')).toBeNull();
+    expect(typedRowOp(null, 'melk')).toBeNull();
+    expect(typedRowOp({ ...act, textArg: undefined }, 'melk')).toBeNull();
   });
 
   it('a circle with no lists is empty, not an error; a failing read says so', async () => {

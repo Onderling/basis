@@ -300,7 +300,10 @@ async function materializeLists(block, circleId, { callSkill, policy } = {}) {
       // an open entry's one act: ticked off, through the lists' own op (the same act /list-done takes)
       ...(e.done === true ? {} : { primary: { kind: 'op', app: 'lists', opId: 'markListItemDone', args: { circleId, item: e.id, list: l.id }, labelKey: 'circle.vandaag.act_done' } }),
     }));
-    return { id: l.id, title: r?.title ?? l.label ?? l.id, entries };
+    // the list's add act: a line the person types goes on THIS list, through the lists' own op (the same one the
+    // circle's Lists screen and "zet melk op de boodschappen" run); `textArg` names the arg the typed line fills
+    const add = { kind: 'op', app: 'lists', opId: 'addToList', args: { circleId, list: l.id }, textArg: 'text', labelKey: 'circle.container.add', placeholderKey: 'circle.lists.add_prompt' };
+    return { id: l.id, title: r?.title ?? l.label ?? l.id, add, entries };
   }));
   return { ...empty, status: 'ok', content: { lists } };
 }

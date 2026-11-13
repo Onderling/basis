@@ -7213,6 +7213,10 @@
     "remove_proposed": {
       "text": "A proposal to remove {{name}} is open: this circle decides that together. You will see when it is decided.",
       "doc": "After an admin taps Remove in a circle that decides removals together: nothing happened yet, a proposal is open."
+    },
+    "role_proposed": {
+      "text": "A proposal to change {{name}}'s role is open: this circle decides that together, as it does its settings. You will see it once it is decided.",
+      "doc": "After making someone an admin (or an admin a member) in a circle that decides its settings together: nothing changed yet, a proposal is open."
     }
   },
   "userLlm": {
@@ -7473,6 +7477,10 @@
       "changePolicy": {
         "text": "Change setting",
         "doc": "Governed action — change a circle policy setting."
+      },
+      "changeRole": {
+        "text": "Change role",
+        "doc": "Governed action — make a member an admin, or an admin a member (decided by the circle's settings rule)."
       }
     },
     "class": {

@@ -97,7 +97,7 @@ import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } fr
 // re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
 // makes a removal a security change rather than a list edit. web ≡ mobile by construction.
 import { leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
-import { removeMemberDoor, changeRulesDoor, readCircleRules, rulesForSave } from '../../src/v2/governanceDoors.js';
+import { removeMemberDoor, changeRulesDoor, changeRoleDoor, readCircleRules, rulesForSave } from '../../src/v2/governanceDoors.js';
 // "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
@@ -8989,10 +8989,10 @@ async function showAdmin(id) {
         execute: async () => {
           notice = null; busy = true; rerender();
           try {
-            const r = await rawCallSkill('pinboard', 'setMemberRole', {
-              groupId: id, memberWebid: m.webid, role: control.role,
-            });
-            notice = t(roleChangeNoticeWords(r, control).key, { name });
+            // THE DOOR (governanceDoors.js): a role change follows this circle's settings rule; an admin stepping down
+            // from their own role goes at once
+            const r = await changeRoleDoor({ governance: shellGovernance({ myWebid }), callSkill: rawCallSkill, circleId: id, memberWebid: m.webid, role: control.role, actorRef: mySelfIn(id) ?? myWebid });
+            notice = r.outcome === 'proposed' ? t('circle.admin.role_proposed', { name }) : t(roleChangeNoticeWords(r.outcome === 'done' ? r.result : null, control).key, { name });
           } catch { notice = t('circle.admin.refused'); }
           busy = false; await load();
         },

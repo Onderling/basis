@@ -76,3 +76,36 @@ export async function changeRulesDoor({ governance, circleId, rules, actorRef = 
   catch (err) { return { outcome: 'refused', reason: err?.message ?? 'propose-failed' }; }
   return doorOutcome(r);
 }
+
+/**
+ * MAKE SOMEONE AN ADMIN, OR AN ADMIN A MEMBER AGAIN, through the circle's settings class (`changeRole` is decided by
+ * `changePolicy`'s class: Frits 2026-11-10). An admin STEPPING DOWN from their own role is their own act and never
+ * waits on a vote ("admins should be able to step down at any time"): that goes to the op at once.
+ * `result` is the op's own answer when the change was done (a non-main device hands it to the main device, and the
+ * screen says so from that answer).
+ *
+ * @param {object} a
+ * @param {{propose: Function}} a.governance
+ * @param {Function} a.callSkill               the shell's dispatch, for a person's own step-down
+ * @param {string} a.circleId
+ * @param {string} a.memberWebid
+ * @param {'admin'|'member'} a.role
+ * @param {string|null} a.actorRef            the self this device acts as in the circle
+ * @returns {Promise<{outcome: 'done'|'proposed'|'refused', proposalId?: string, reason?: string, result?: object}>}
+ */
+export async function changeRoleDoor({ governance, callSkill, circleId, memberWebid, role, actorRef = null } = {}) {
+  if (typeof circleId !== 'string' || !circleId || typeof memberWebid !== 'string' || !memberWebid) return { outcome: 'refused', reason: 'missing-args' };
+  if (role !== 'admin' && role !== 'member') return { outcome: 'refused', reason: 'bad-role' };
+  if (role === 'member' && actorRef && memberWebid === actorRef) {
+    if (typeof callSkill !== 'function') return { outcome: 'refused', reason: 'no-dispatch' };
+    let result;
+    try { result = await callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid, role }); }
+    catch (err) { return { outcome: 'refused', reason: err?.message ?? 'step-down-failed' }; }
+    return (!result || result.error || result.ok === false) ? { outcome: 'refused', reason: result?.error ?? 'refused', result } : { outcome: 'done', result };
+  }
+  if (typeof governance?.propose !== 'function') return { outcome: 'refused', reason: 'no-governance' };
+  let r;
+  try { r = await governance.propose({ circleId, action: 'changeRole', subject: { member: memberWebid, role }, ...(actorRef ? { actor: { ref: actorRef } } : {}) }); }
+  catch (err) { return { outcome: 'refused', reason: err?.message ?? 'propose-failed' }; }
+  return { ...doorOutcome(r), ...(r?.result ? { result: r.result } : {}) };
+}

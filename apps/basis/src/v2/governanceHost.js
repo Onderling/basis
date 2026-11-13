@@ -52,6 +52,7 @@ export function makeCircleGovernance({
         : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
     }
     if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject });
+    if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role });
     if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };
     return { ok: false, error: 'unknown-action' };

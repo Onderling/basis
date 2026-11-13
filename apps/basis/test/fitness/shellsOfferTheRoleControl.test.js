@@ -65,8 +65,10 @@ describe('FITNESS — both shells dispatch the op, behind the confirm it declare
   ];
 
   for (const [name, source] of DISPATCHERS) {
-    it(`${name} calls setMemberRole with the role the decision chose`, () => {
-      expect(/'setMemberRole'/.test(source), `${name} never dispatches the op`).toBe(true);
+    it(`${name} changes the role through the governance door, with the role the decision chose`, () => {
+      // the door (governanceDoors.js changeRoleDoor) dispatches setMemberRole: at once for an admin's own step-down or
+      // where any admin decides settings, else through a proposal (governanceDoorRole.test.js)
+      expect(/changeRoleDoor\s*\(/.test(source), `${name} never goes through the door`).toBe(true);
       expect(/role:\s*control\.role/.test(source),
         `${name} names a role of its own rather than the one the shared decision chose`).toBe(true);
     });
@@ -82,7 +84,7 @@ describe('FITNESS — both shells dispatch the op, behind the confirm it declare
 
     it(`${name} says what happened through the decision's notice key`, () => {
       // the shared words decide between the decision's notice key and "sent to your main device" / "waits for it"
-      expect(/t\(\s*roleChangeNoticeWords\(\s*r\s*,\s*control\s*\)\.key/.test(source),
+      expect(/t\(\s*roleChangeNoticeWords\([^)]*,\s*control\s*\)\.key/.test(source),
         `${name} reports the outcome in words of its own`).toBe(true);
     });
   }

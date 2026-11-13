@@ -7219,6 +7219,10 @@
     "remove_proposed": {
       "text": "Er staat een voorstel open om {{name}} te verwijderen: deze kring beslist dat samen. Je ziet het als er besloten is.",
       "doc": "Na Verwijderen in een kring die samen over verwijderen beslist: er is nog niets gebeurd, er staat een voorstel open."
+    },
+    "role_proposed": {
+      "text": "Er staat een voorstel open om de rol van {{name}} te veranderen: deze kring beslist dat samen, net als de instellingen. Je ziet het als er besloten is.",
+      "doc": "After making someone an admin (or an admin a member) in a circle that decides its settings together: nothing changed yet, a proposal is open."
     }
   },
   "userLlm": {
@@ -7479,6 +7483,10 @@
       "changePolicy": {
         "text": "Instelling wijzigen",
         "doc": "Governed action — change a circle policy setting."
+      },
+      "changeRole": {
+        "text": "Rol veranderen",
+        "doc": "Governed action — make a member an admin, or an admin a member (decided by the circle's settings rule)."
       }
     },
     "class": {

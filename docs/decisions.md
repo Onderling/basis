@@ -1675,7 +1675,8 @@ and members, not what a person's own record keeps; 14 kinds declare it, and the 
 mirror exists for); filter the one kind by name (rejected: a list of one that the next kind forgets).
 
 **The price:** after a lost device the conversation with the assistant is gone, also for someone who would have
-wanted it kept. Ledger: L875, L668.
+wanted it kept; and the "earlier, nearby" block in a contact's thread does not come back on a restored device. A
+mirror written before this still holds such entries on the pod; a restore never brings them back. Ledger: L875, L668.
 
 ## 2026-11-13 — A posture's name is a promise: no "central pod" circle type until members stop learning each other's addresses (Fable's ruling, recorded at Frits's request)
 

@@ -143,3 +143,36 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
     expect(otherCircle).toHaveLength(0);
   });
 });
+
+describe('a removal governance enacts is the whole removal, as the members panel does it', () => {
+  // Governance used to enact a removal with the bare pinboard op: on the enacting device the departing member's
+  // per-circle address stayed bound and the authorize snapshot was not re-recorded, the two steps
+  // `removeCircleMember` exists for. With the device's agent in the wiring, the enactment is that same op.
+  it('with the agent wired, an enacted removal unbinds the member\'s circle address and re-reads the roster', async () => {
+    const eventLog = new EventLog({ initial: [] });
+    const policy = normalizeCirclePolicy({ governance: { removeMember: 'any-admin' } });
+    let removed = false;
+    const callSkill = vi.fn(async (origin, op) => {
+      if (op === 'listGroupMembers') {
+        return { members: [{ webid: 'admin0', role: 'admin' }, ...(removed ? [] : [{ webid: 'm1', role: 'member', circleAddress: 'addr-m1' }])] };
+      }
+      if (op === 'removeMember') { removed = true; return { ok: true }; }
+      return { ok: true };
+    });
+    const forgot = [];
+    const agent = { callSkill, forgetPeerAddress: (a) => { forgot.push(a); return true; } };
+    let n = 0;
+    const cid = await mkCid();
+    const gov = bindCircleGovernance({
+      eventLog, callSkill, agent, getPolicy: async () => policy, myRef: 'admin0', genId: () => `p${(n += 1)}`, now: () => 1,
+      circleIdentityFor: async () => cid,
+    });
+    const r = await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm1', actor: { ref: 'admin0' } });
+    expect(r.status).toBe(DECISION_STATUS.APPROVED);
+    expect(removed).toBe(true);
+    expect(forgot, 'the departing member\'s circle address is unbound on the enacting device').toContain('addr-m1');
+    // the roster is read again AFTER the removal (the authorize snapshot's re-record)
+    const reads = callSkill.mock.calls.filter(([, op]) => op === 'listGroupMembers').length;
+    expect(reads).toBeGreaterThanOrEqual(2);
+  });
+});

@@ -4124,6 +4124,14 @@
       "text": "Regels opslaan",
       "doc": "Save the rules document."
     },
+    "change_proposed": {
+      "text": "Er staat een voorstel open om de regels te veranderen: in deze kring beslissen de beheerders dat samen. De regels veranderen als er besloten is.",
+      "doc": "After saving the rules in a circle where changing them is decided together: nothing changed yet, a proposal is open."
+    },
+    "change_refused": {
+      "text": "De regels zijn niet veranderd: deze kring stond dat vanaf dit apparaat niet toe.",
+      "doc": "After saving the rules when the circle refused the change (not an admin, or the write was refused): the rules stand as they were."
+    },
     "preview": {
       "text": "Voorbeeld (zoals een nieuw lid het ziet)",
       "doc": "Open the consent preview."
@@ -7207,6 +7215,10 @@
     "removed": {
       "text": "{{name}} zit niet meer in deze kring. Andere kringen die jullie delen blijven ongewijzigd.",
       "doc": "B4 — confirmation after removing a member; states the per-circle scope, which is the thing that used to be untrue."
+    },
+    "remove_proposed": {
+      "text": "Er staat een voorstel open om {{name}} te verwijderen: deze kring beslist dat samen. Je ziet het als er besloten is.",
+      "doc": "Na Verwijderen in een kring die samen over verwijderen beslist: er is nog niets gebeurd, er staat een voorstel open."
     }
   },
   "userLlm": {

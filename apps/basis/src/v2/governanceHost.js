@@ -36,6 +36,9 @@ export function makeCircleGovernance({
   callSkill, appendGovernanceEvent, getPolicy, getMembers,
   localActorRef, setPolicy = null, rotateKey = null, newProposalId, now = () => 0,
   readGovernanceState,
+  // the WHOLE removal (`removeCircleMember`: the substrate op, then unbind the member's circle address and re-record the
+  // authorize snapshot), when the wiring has this device's agent; else the bare pinboard op
+  removeMember = null,
 }) {
   if (typeof readGovernanceState !== 'function') {
     throw new Error('makeCircleGovernance: readGovernanceState is required (the rail\'s verified events + disputed set)');
@@ -43,7 +46,11 @@ export function makeCircleGovernance({
   // Map a governed action to the REAL op. removeMember/editGroupRules are pinboard skills;
   // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
   async function enact(circleId, action, subject) {
-    if (action === 'removeMember') return callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
+    if (action === 'removeMember') {
+      return typeof removeMember === 'function'
+        ? removeMember(circleId, subject)
+        : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
+    }
     if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject });
     if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };

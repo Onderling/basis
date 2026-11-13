@@ -29,7 +29,7 @@ describe('the history mirror keeps what each kind declares', () => {
   it('every kind declares it (true or false); the three left out are the assistant conversation and what was heard nearby', () => {
     for (const [kind, v] of Object.entries(ENTRY_KINDS)) expect(typeof v.mirrored, kind).toBe('boolean');
     const out = Object.entries(ENTRY_KINDS).filter(([, v]) => v.mirrored === false).map(([k]) => k).sort();
-    expect(out).toEqual(['assistant-turn', 'nearby-card', 'nearby-line']);
+    expect(out).toEqual(['assistant-turn', 'item-changed', 'nearby-card', 'nearby-line', 'notification']);
   });
 
   it('an assistant turn (the "+" thread) written with the mirror on is not in the mirror; a circle line beside it is', async () => {
@@ -79,7 +79,32 @@ describe('the history mirror keeps what each kind declares', () => {
     expect(restored.some((e) => e.id === 'c1')).toBe(true);
   });
 
-  it('a kind the table does not know is mirrored, as before (its own row decides once it is registered)', () => {
-    expect(entryKind('some-new-kind').mirrored).toBe(true);
+  it('a kind the table does not know stays OUT of the mirror (unknown is plumbing, not the record)', async () => {
+    expect(entryKind('some-new-kind').mirrored).toBe(false);
+    const log = new EventLog({ initial: [], muted: [] });
+    const { src, mirror } = await mirrorOf(log);
+    log.append({ id: 'u1', app: 'x', type: 'some-new-kind', actor: 'me', ts: Date.now(), payload: { text: 'onbekende soort' } });
+    await mirror.flush();
+    expect(await bodies(src)).not.toContain('onbekende soort');
+  });
+
+  it('the two kinds production appended unregistered are declared: a panel ping and an alert, both plumbing', () => {
+    for (const k of ['item-changed', 'notification']) {
+      expect(k in ENTRY_KINDS, k).toBe(true);
+      expect(ENTRY_KINDS[k].mirrored, k).toBe(false);
+      // as they behaved unregistered: the system lane, never waking, the short retention
+      expect(ENTRY_KINDS[k].lane, k).toBe('system');
+      expect(ENTRY_KINDS[k].wakes, k).toBe(false);
+    }
+  });
+
+  it('appending a type the table does not know says so once, through the logger', async () => {
+    const { dumpLogs, clearLogs } = await import('@onderling/logger');
+    clearLogs();
+    const log = new EventLog({ initial: [], muted: [] });
+    log.append({ id: 'a', app: 'x', type: 'never-declared-kind', actor: 'me', ts: Date.now(), payload: {} });
+    log.append({ id: 'b', app: 'x', type: 'never-declared-kind', actor: 'me', ts: Date.now(), payload: {} });
+    const said = dumpLogs().filter((r) => r.code === 'kind.unregistered' && r.f?.type === 'never-declared-kind');
+    expect(said).toHaveLength(1);
   });
 });

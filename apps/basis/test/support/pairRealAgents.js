@@ -528,6 +528,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   });
 
   const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, onJoined,
+    // the inbound subtypes this node answers (a fitness test compares them with the lane table the shells compose)
+    handlerSubtypes: Object.keys(handlers),
     // this device's presence in a circle: its per-circle address bound on its transport (the shells' `registerCirclePresence`)
     registerPresence: (cid) => pairSeams.bindSelf?.(cid),
     keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };

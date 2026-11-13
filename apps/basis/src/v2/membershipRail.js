@@ -19,15 +19,13 @@ import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the r
 export const MEMBERSHIP_RAIL_KINDS = entryKindRegistryFromManifests(membershipManifest).kindsFor(MEMBERSHIP_LANE);
 
 /**
- * COMPACTION OF SUPERSEDED MEMBER PROPERTIES IS PAUSED (2026-11-12, docs/decisions.md). A tombstone keeps the chain
- * edge on the device that made it, but it carries no signature, so a member who joins LATER cannot accept it and lacks
- * that parent; the fold skips a missing parent, so the late joiner gives the author's later statements a lower causal
- * depth and can order two acts differently: proven by `test/v2/lateJoinerFoldOrder.test.js`, where the devices that
- * were there fold a member evicted and the late joiner folds them still in. Until a tombstone can prove itself (the
- * statement format where the signature covers a header that a tombstone keeps), nothing is compacted: the log keeps
- * superseded properties (an old picture per change). The rail's `compact` stays, tested, for when this turns back on.
+ * COMPACTION OF SUPERSEDED MEMBER PROPERTIES IS ON AGAIN (format v2, docs/decisions.md). It was paused on 2026-11-12:
+ * a tombstone then had no signature, so a member who joined later could not accept it, lacked that parent and could
+ * fold a different roster (`test/v2/lateJoinerFoldOrder.test.js`). In format v2 the tombstone keeps the signed header
+ * (the payload goes, its digest stays), so it proves itself, a catch-up serves it, and the late joiner keeps the edge
+ * and folds the same roster (`test/v2/tombstoneProvesItself.test.js`).
  */
-export const COMPACT_SUPERSEDED_PROPS = false;
+export const COMPACT_SUPERSEDED_PROPS = true;
 
 /** The wire subtypes for the membership lane's fan + catch-up (the governance pair's sibling). */
 export const MEMBERSHIP_BROADCAST = 'circle-membership-broadcast';

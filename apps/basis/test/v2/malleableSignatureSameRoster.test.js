@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
-import { AgentIdentity, signSpine, foldRoster, b64encode, b64decode, canonicalize } from '@onderling/core';
+import { AgentIdentity, signSpine, foldRoster, b64encode, b64decode, spineSignedMessage } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { EventLog } from '../../src/eventLog.js';
 import { makeMembershipRail } from '../../src/v2/membershipRail.js';
@@ -50,7 +50,7 @@ describe('a crafted (S + L) signature is refused alike on every device', () => {
     const crafted = malleable(join);
 
     // the hazard this closes: the bare library check accepts the crafted form
-    const bareAccepts = nacl.sign.detached.verify(new TextEncoder().encode(canonicalize(crafted.body)), b64decode(crafted.sig), b64decode(crafted.body.author));
+    const bareAccepts = nacl.sign.detached.verify(new TextEncoder().encode(spineSignedMessage(crafted.body)), b64decode(crafted.sig), b64decode(crafted.body.author));
     expect(bareAccepts, 'bare tweetnacl accepts S + L (why the rule exists)').toBe(true);
 
     const [a, b] = await Promise.all([device(founder, member), device(founder, member)]);

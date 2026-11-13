@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-12** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-13** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -297,14 +297,14 @@ away):
   computes as dead (every field it set overwritten by a later accepted statement of the same subject, no handle
   set) keeps its chain fields and sheds its payload — so the author's chain and every later statement's causal
   depth stay exactly what they were, and only the bytes go. Refused statements and handle-bearing ones are never
-  dead, because their effect depends on the history around them. A tombstone has no signature left, so the read
-  side trusts nothing in it: a lane names the kinds it may compact (`compactableKinds`; only the membership lane's
-  `member-props`), a tombstone of any other kind is treated as planted and dropped, and one that is kept hands the
-  fold its authorRef and nothing else, whatever its stored payload says. **Compaction is paused (2026-11-12):**
-  "exactly what they were" holds on the device that made the tombstone, not on a member who joins later, who cannot
-  accept an unsigned tombstone, lacks that parent and so folds a lower depth and can order two acts differently
-  (`COMPACT_SUPERSEDED_PROPS`, `membershipRail.js`; the proof is `lateJoinerFoldOrder.test.js`). Dead statements stay
-  whole until a tombstone can prove itself.
+  dead, because their effect depends on the history around them. In the statement format v2 a statement's chain
+  hash and signature are both over ONE header (`v`, kind, circle, subject, authorRef, author, parentHash, deps and the
+  payload's digest, canonical at every depth), so a tombstone keeps that header and its signature and drops only the
+  payload (keeping `{ authorRef }`): it PROVES ITSELF. It is checked like any statement, a lane takes it only for a kind
+  it compacts (`compactableKinds`; only the membership lane's `member-props`), it hands the fold its authorRef and
+  nothing else, a catch-up may serve it, and a member who joins later accepts it and keeps the causal edge, so every
+  device folds the same roster (`tombstoneProvesItself.test.js`, `lateJoinerAfterCompaction.relay.test.js`). A planted
+  one has no valid signature and is refused. (Compaction was paused on 2026-11-12 until this held, and is on again.)
 - **The spine chain** (`createAuthorChain` + the generic `signSpine`) — for events where **EQUIVOCATION is an
   attack**: governance (proposals/votes), **roles** (admin promote/demote), **membership** (join/leave/evict),
   **key rotations**. A per-author hash-chain with fork-proofs, filterable by `kind`: each entry points at its

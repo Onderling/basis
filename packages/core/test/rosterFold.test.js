@@ -234,6 +234,19 @@ describe('foldRoster — the deterministic membership head', () => {
     expect(r2.members).not.toContain(bob.pubKey);
   });
 
+  it("a member's NEWEST member-props held only as a tombstone (stripped by whoever passed it on) is not read as 'no properties': the earlier ones stand", async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const older = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', handle: 'bob' }, parent: join.hash });
+    const newest = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Robert' }, parent: older.hash });
+    // the tombstone keeps the signed header and drops the payload but for `authorRef` (format v2)
+    const stripped = { ...newest, tombstone: true, payload: { authorRef: bob.pubKey } };
+    const r = foldRoster([join, older, stripped], { founders: [founder.pubKey] });
+    expect(r.members).toContain(bob.pubKey);
+    expect(r.props[bob.pubKey]?.displayName, 'the earlier name stands; nothing is cleared').toBe('Bob');
+    expect(r.props[bob.pubKey]?.handle).toBe('bob');
+  });
+
   it('a fork is not a fork until there are two: a clean chain keeps everything (unchanged)', async () => {
     const { founder, bob, mallory } = await ids();
     const joinBob = body(bob, 'join', bob);

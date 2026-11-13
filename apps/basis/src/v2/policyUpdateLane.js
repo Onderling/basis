@@ -26,6 +26,7 @@
  * The governance fold ignores this kind (it branches on propose/vote/resolve): a policy-update is a carried fact.
  */
 import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
+import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES } from './circlePolicy.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -47,6 +48,14 @@ const DENY_ORDER = Object.freeze({
 const rank = (order, v) => { const i = order.indexOf(v); return i < 0 ? order.length : i; };
 
 /**
+ * "WHO DECIDES" per act, strictest first (Opus re-reviewing the membership gate, 2026-11-13): two admins' settings at
+ * one version used to take the whole `governance` part from the hash-first statement, so a tightening beside an
+ * unrelated change was lost on every device by hash order alone, and the receiver gates judge by this merge. A vote of
+ * all members asks the most consent; the admins together next; the drawn sample (held back) before any one admin.
+ */
+const GOVERNANCE_DENY_ORDER = Object.freeze(['member-vote', 'admin-quorum', 'random-sample', 'any-admin']);
+
+/**
  * Merge policies stated at the same version into one, deny-wins. `policies` are ordered by statement hash
  * (descending) so the base — and every axis without a deny order — is the same on every device.
  * @param {object[]} policies
@@ -59,6 +68,14 @@ export function denyWinsMerge(policies) {
   for (const [axis, order] of Object.entries(DENY_ORDER)) {
     const vals = policies.map((p) => p?.[axis]).filter((v) => v !== undefined);
     if (vals.length) out[axis] = vals.reduce((a, b) => (rank(order, b) < rank(order, a) ? b : a));
+  }
+  // per governed act, the strictest class any statement at this version asked (one that names none adds nothing)
+  if (policies.some((p) => p?.governance && typeof p.governance === 'object')) {
+    out.governance = { ...(base?.governance ?? {}) };
+    for (const action of GOVERNANCE_ACTIONS) {
+      const vals = policies.map((p) => p?.governance?.[action]).filter((v) => GOVERNANCE_CLASSES.includes(v));
+      if (vals.length) out.governance[action] = vals.reduce((a, b) => (rank(GOVERNANCE_DENY_ORDER, b) < rank(GOVERNANCE_DENY_ORDER, a) ? b : a));
+    }
   }
   // A feature is on only if every statement at this version turned it on.
   const featureKeys = new Set(policies.flatMap((p) => Object.keys(p?.features ?? {})));

@@ -22,7 +22,9 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   // `onUnpin(key)`; `pinnedActIds` marks the own acts already pinned (☆ / ★ toggles through `onTogglePin(actId)`)
   pinned = [], onOpenPin, onUnpin, pinnedActIds = [], onTogglePin,
   // the kept conversation (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to empty it
-  turns = [], onForget } = {}) {
+  turns = [], onForget,
+  // what can be typed here: `suggestFor(value)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
+  suggestFor = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';
@@ -98,6 +100,27 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       lf.appendChild(go);
       lf.addEventListener('submit', (e) => { e.preventDefault(); onRead(li.value); });
       sec['plus-line'].appendChild(lf);
+      // as the person types: the lines the "+" reads here that start with it; a tap puts one in the line to finish
+      if (typeof suggestFor === 'function' && !act) {
+        const ul = document.createElement('ul');
+        ul.className = 'circle-vandaag-plus__suggest';
+        const show = () => {
+          ul.innerHTML = '';
+          for (const s of suggestFor(li.value) ?? []) {
+            const item = document.createElement('li');
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__suggestion';
+            b.textContent = s;
+            b.addEventListener('click', () => { li.value = s; show(); li.focus(); });
+            item.appendChild(b);
+            ul.appendChild(item);
+          }
+        };
+        li.addEventListener('input', show);
+        sec['plus-line'].appendChild(ul);
+        show();
+      }
     }
   }
   if (asking) {

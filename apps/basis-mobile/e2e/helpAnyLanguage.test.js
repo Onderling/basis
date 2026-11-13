@@ -25,8 +25,9 @@ describe('Help reads Dutch and English, on the phone', () => {
 
   it('"hoe maak ik een kring?" gets the make-a-circle card, not the topic list', async () => {
     await say('hoe maak ik een kring?');
-    // the make-a-circle card, in the app's language (English on the emulator): its opening words
-    await soon(by.text(/Everything in Basis happens in circles/), 20_000);
+    // a card answered it (its provenance line says so, in the app's language: English on the emulator), not the topic
+    // list; the screenshot shows which card (Detox's by.text takes no pattern, and the bubble text is long)
+    await soon(by.text('· answered directly — no language model used'), 20_000);
     await device.takeScreenshot('help-lang-01-card');
   });
 

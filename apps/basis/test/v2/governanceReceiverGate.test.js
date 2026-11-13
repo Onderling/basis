@@ -3,7 +3,7 @@
  * Over a real fold (`foldGovernance`) of governance events, as a device holds them.
  */
 import { describe, it, expect } from 'vitest';
-import { writeSkippedTheVote, writeNeedsVote } from '../../src/v2/governanceReceiverGate.js';
+import { writeSkippedTheVote, writeNeedsVote, isFoundingWrite } from '../../src/v2/governanceReceiverGate.js';
 import { foldGovernance, proposeEvent, voteEvent, resolveEvent } from '../../src/v2/governanceLog.js';
 import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 
@@ -80,6 +80,8 @@ describe('a settings change', () => {
     ]);
     expect(writeSkippedTheVote({ action: 'changePolicy', body: stated({ proposalId: 'p2' }), policy: quorum, members: twoAdmins, proposals })).toBe(false);
     expect(writeSkippedTheVote({ action: 'changePolicy', body: stated(), policy: quorum, members: twoAdmins, proposals })).toBe(true);
-    expect(writeSkippedTheVote({ action: 'changePolicy', body: { payload: { policy: quorum, version: 1 } }, policy: quorum, members: twoAdmins, proposals: [] })).toBe(false);
+    // the founding write is exempt in the chain (isFoundingWrite: version 1 BY A FOUNDER), not here
+    expect(isFoundingWrite({ author: 'a0', payload: { version: 1 } }, [{ ref: 'a0', role: 'admin', via: 'founder' }])).toBe(true);
+    expect(isFoundingWrite({ author: 'a1', payload: { version: 1 } }, [{ ref: 'a1', role: 'admin', via: 'role' }])).toBe(false);
   });
 });

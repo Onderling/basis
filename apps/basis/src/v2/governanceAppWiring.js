@@ -12,6 +12,7 @@ import { makeCircleGovernance } from './governanceHost.js';
 import { removeCircleMember } from './circleMembershipHygiene.js';
 import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
 import { refusedCarriedChanges } from './governanceReceiverGate.js';
+import { denyWinsMerge } from './policyUpdateLane.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
@@ -103,7 +104,7 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
   try {
     const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     members = (Array.isArray(r?.members) ? r.members : [])
-      .map((m) => ({ ref: m.webid ?? m.pubKey ?? m.ref, role: m.role === 'admin' ? 'admin' : 'member' }))
+      .map((m) => ({ ref: m.webid ?? m.pubKey ?? m.ref, role: m.role === 'admin' ? 'admin' : 'member', ...(m.adminVia ? { via: m.adminVia } : {}) }))
       .filter((m) => m.ref);
   } catch { members = []; }
 
@@ -148,12 +149,18 @@ export function policyEnactor({ setPolicy = null, statePolicy = null } = {}) {
   if (typeof setPolicy !== 'function') return null;
   return async (circleId, patch, meta = {}) => {
     try { await setPolicy(circleId, patch); } catch { return { ok: false, error: 'policy-write-failed' }; }
-    if (typeof statePolicy === 'function') { try { await statePolicy(circleId, { proposalId: meta?.proposalId ?? null }); } catch { /* the catch-up reconciles */ } }
-    return { ok: true };
+    if (typeof statePolicy !== 'function') return { ok: true, stated: false };
+    // A change that was never STATED has nothing for the catch-up to carry: the other members would never get it (Opus,
+    // reviewing). Try twice; a second failure is said (`stated: false`), never reported as a plain success. The deciding
+    // proposal rides into the statement (the receiver gate checks it).
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try { if (await statePolicy(circleId, { proposalId: meta?.proposalId ?? null })) return { ok: true, stated: true }; } catch { /* tried again below */ }
+    }
+    return { ok: true, stated: false };
   };
 }
 
-export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, statePolicy = null, spineGate = null, agent = null }) {
+export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, statePolicy = null, policyVersionOf = null, spineGate = null, agent = null }) {
   // Governance rides the RAIL, period: signed, circle-scoped, receiver-verified. The unsigned legacy
   // path was deleted with the cutover (one chained-statement primitive remains — signSpine); a composition
   // without a per-circle signer is a wiring bug, surfaced here rather than as silently-unsigned governance.
@@ -190,7 +197,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
 
   const governance = makeCircleGovernance({
     callSkill, appendGovernanceEvent, getPolicy, getMembers,
-    localActorRef: refIn, newProposalId: genId, now, setPolicy: policyEnactor({ setPolicy, statePolicy }),
+    localActorRef: refIn, newProposalId: genId, now, setPolicy: policyEnactor({ setPolicy, statePolicy }), policyVersionOf,
     // with this device's agent, an enacted removal is the WHOLE removal the members panel makes (unbind the member's
     // circle address, re-record the authorize snapshot), not the bare substrate op
     ...(agent ? { removeMember: (circleId, memberWebid) => removeCircleMember({ agent, callSkill, circleId, memberWebid }) } : {}),
@@ -251,7 +258,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     let policy = {}; let members = []; let state = { events: [], disputed: new Set() };
     try { [policy, members, state] = await Promise.all([getPolicy(circleId), getMembers(circleId), rail.readVerified(circleId)]); } catch { return []; }
     const { proposals } = foldGovernance(state?.events ?? [], { policy: policy ?? {}, members, now: now(), disputed: state?.disputed ?? new Set() });
-    return refusedCarriedChanges({ bodies, policy: policy ?? {}, members, proposals });
+    return refusedCarriedChanges({ bodies, policy: policy ?? {}, members, proposals, merge: denyWinsMerge });
   };
   // the view, with the refused changes beside the proposals: who made each (named like a subject), never applied
   const view = async (circleId, opts = {}) => {

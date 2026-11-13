@@ -4586,6 +4586,7 @@ function shellGovernance({ myWebid = '' } = {}) {
     // an enacted settings change: written here, then stated on the lane so every member's device applies it
     setPolicy: (cid, patch) => policyStore.update(cid, patch),
     statePolicy: (cid, meta) => circlePolicyLane.state(cid, meta),
+    policyVersionOf: (cid) => circlePolicyLane.headVersion(cid),   // a rules change is stamped with the settings version held
   });
 }
 

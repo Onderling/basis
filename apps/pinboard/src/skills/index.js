@@ -3637,7 +3637,7 @@ export function buildSkills({
       // no emitter / a failed emit still writes the head (store-local degrade, unchanged).
       let statement = null;
       if (typeof rulesUpdateEmit === 'function') {
-        try { statement = await rulesUpdateEmit({ groupId: a.groupId, rules: a.rules, version: newVersion, ...(typeof a.proposalId === 'string' && a.proposalId ? { proposalId: a.proposalId } : {}) }); }
+        try { statement = await rulesUpdateEmit({ groupId: a.groupId, rules: a.rules, version: newVersion, ...(typeof a.proposalId === 'string' && a.proposalId ? { proposalId: a.proposalId } : {}), ...(Number.isFinite(Number.parseInt(a.policyVersion, 10)) ? { policyVersion: Number.parseInt(a.policyVersion, 10) } : {}) }); }
         catch { statement = null; /* the fan is best-effort — catch-up reconciles */ }
       }
       const [item] = await store.addItems([{

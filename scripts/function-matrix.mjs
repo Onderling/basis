@@ -41,7 +41,7 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'feedback', name: 'Feedback to the maker', cells: {
     web: { file: 'apps/basis/test-browser/feedback-path-box.spec.js', test: 'a visitor writes to the maker' },
-    mobile: null,   // feedbackDoorMobile is a unit of the door
+    mobile: { file: 'apps/basis-mobile/e2e/feedbackDoor.test.js', test: 'a note written there reaches the maker, and the answer shows in the thread' },
     box: { file: 'apps/basis/test/alphaFeedbackPath.relay.test.js', test: 'what the person writes lands on the box' },
   } },
   { id: 'personas', name: 'Personas', cells: {

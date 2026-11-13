@@ -142,8 +142,8 @@ export function createHeldSends({ now = () => Date.now(), lifetimeMs = HELD_SEND
     while (held.length > max) end(held.shift(), 'evicted');
   };
   return {
-    hold({ to, payload, opts = {}, since = null } = {}) {
-      const e = { to, payload, opts, since: Number.isFinite(since) ? since : now() };
+    hold({ to, payload, opts = {}, since = null, settle = null } = {}) {
+      const e = { to, payload, opts, since: Number.isFinite(since) ? since : now(), ...(typeof settle === 'function' ? { settle } : {}) };
       place(e);
       return e;
     },

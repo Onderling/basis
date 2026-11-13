@@ -262,3 +262,19 @@ describe('createInviteExchange: the one answer to a signed ask this device just 
     expect(personAllowedBy({ inviteExchange: 'screen-refusal' })).toEqual({ allowedBy: 'invite-exchange', side: 'screen-refusal' });
   });
 });
+
+describe('createHeldSends keeps how a held send ends', () => {
+  it('an entry\'s settle survives a take and a put-back, and is what the end reports to', () => {
+    let t = 0; const ended = [];
+    const h = createHeldSends({ now: () => t, lifetimeMs: 10, max: 4, onEnded: (e, why) => { ended.push(why); e.settle?.({ delivered: false, ended: why }); } });
+    let told = null;
+    h.hold({ to: 'a', payload: { msgId: 'm1' }, settle: (r) => { told = r; } });
+    const [e] = h.take();
+    expect(typeof e.settle).toBe('function');
+    h.putBack(e);
+    t = 11;
+    expect(h.take()).toEqual([]);
+    expect(ended).toEqual(['expired']);
+    expect(told).toEqual({ delivered: false, ended: 'expired' });
+  });
+});

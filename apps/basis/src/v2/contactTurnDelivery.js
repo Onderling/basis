@@ -43,8 +43,18 @@ export async function trackContactTurn({ messageId, sent, deliveryMap = null } =
   const mark = (state, reason) => { try { deliveryMap?.set?.(messageId, state, reason ? { reason } : undefined); } catch { /* the map is a mirror */ } };
   mark(DELIVERY.PENDING, null);
   let outcome;
-  try { outcome = deliveryAfterContactSend(await sent); }
+  let res = null;
+  try { res = await sent; outcome = deliveryAfterContactSend(res); }
   catch { outcome = { state: DELIVERY.FAILED, reason: null }; }
   mark(outcome.state, outcome.reason);
+  // HELD for an address this device does not know yet (the send gate): the hold ends later, sent or not sent, and the
+  // bubble follows it, so it never says "waiting" for a message that will not go
+  const held = res?.fallback ?? res?.sent ?? null;
+  if (held?.held === true && held.later && typeof held.later.then === 'function') {
+    let after;
+    try { after = await held.later; } catch { after = { delivered: false, reason: null }; }
+    outcome = deliveryAfterContactSend({ sent: after });
+    mark(outcome.state, outcome.reason);
+  }
   return outcome;
 }

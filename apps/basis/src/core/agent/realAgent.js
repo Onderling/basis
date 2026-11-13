@@ -6639,7 +6639,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * caller's circle that disagrees with the roster → refused; otherwise the circle the caller named, or the person path
    * unchanged. Below it, `wireSend` is the only wire call and writes the decision record.
    */
-  async function peerSend(to, payload, sendOpts = {}, { heldSince = null } = {}) {
+  async function peerSend(to, payload, sendOpts = {}, { heldSince = null, settle = null } = {}) {
     const o = sendOpts ?? {};
     // A BLOCKED ADDRESS gets no DIRECT contact from this device (Frits 2026-11-12: a block is about direct contact; the
     // secure agent enforces nothing): a direct payload (directDoors.js) to it is refused with the reason, nothing on the
@@ -6674,11 +6674,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     // device holds about `to`. None ('none') → HELD as 'unknown-address': nothing on the wire, the caller told it waits,
     // and it goes once this device learns who `to` is (a contact lands, a roster read binds it), within its lifetime.
     const sent = decision.kind === 'person' ? { ...decision, ...(await personSendFacts(to, payload).then(personAllowedBy, () => ({ allowedBy: 'none' }))) } : decision;
-    if (sent.allowedBy === 'none') return holdUnknownAddress(to, payload, o, sent, heldSince);
+    if (sent.allowedBy === 'none') return holdUnknownAddress(to, payload, o, sent, heldSince, settle);
     return sendCircleScoped(to, payload, decision.circleId ? { ...o, circleId: decision.circleId } : o, sent);
   }
   const heldSends = createHeldSends({
-    onEnded: (_e, why) => { try { structuredLog.warn('agent', 'send.held-ended', { reason: 'unknown-address', why }); } catch { /* never breaks a send */ } },
+    onEnded: (e, why) => {
+      try { structuredLog.warn('agent', 'send.held-ended', { reason: 'unknown-address', why }); } catch { /* never breaks a send */ }
+      // the send that waited says how it ended: it did not go (the caller's bubble turns not-sent, with the reason)
+      try { e?.settle?.({ held: false, delivered: false, reason: 'unknown-address', ended: why }); } catch { /* a report never breaks the hold */ }
+    },
   });
   // THE RETRY of the held sends: one one-shot timer, re-armed after each pass only while something is still held (a
   // retry of pending work, not a clock: the host's one clock is its tick, and the agent core has none)
@@ -6691,9 +6695,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     }, HELD_SEND_RECHECK_MS);
     heldRecheck.unref?.();
   }
-  function holdUnknownAddress(to, payload, o, decision, heldSince = null) {
-    heldSends.hold({ to, payload, opts: o, since: heldSince });
-    const held = { held: true, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: 'unknown-address' };
+  function holdUnknownAddress(to, payload, o, decision, heldSince = null, settle = null) {
+    // the FIRST hold makes the promise of how this send ends (`later`): sent once a re-judge finds a reason, or not sent
+    // at its lifetime's end; a re-judge that holds it again keeps the same one
+    let later = null;
+    let finish = settle;
+    if (typeof finish !== 'function') later = new Promise((resolve) => { finish = resolve; });
+    heldSends.hold({ to, payload, opts: o, since: heldSince, settle: finish });
+    const held = { held: true, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: 'unknown-address', ...(later ? { later } : {}) };
     // one record per send, at its FIRST hold (a re-judge that still finds no reason is not a new send)
     if (heldSince == null) { try { structuredLog.info('agent', 'send.decision', sendDecisionFields(decision, null, held)); } catch { /* the log never breaks a send */ } }
     armHeldRetry();
@@ -6706,7 +6715,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (redriving) return redriving;
     redriving = (async () => {
       for (const e of heldSends.take()) {
-        try { await peerSend(e.to, e.payload, e.opts ?? {}, { heldSince: e.since }); } catch { /* the send's own record says what happened */ }
+        let r;
+        try { r = await peerSend(e.to, e.payload, e.opts ?? {}, { heldSince: e.since, settle: e.settle }); }
+        catch (err) { r = { held: false, delivered: false, error: err?.message ?? String(err) }; }
+        // sent now (or refused for another reason): the waiting send's promise gets that answer; held again keeps it open
+        if (r?.held !== true) { try { e.settle?.(r); } catch { /* a report never breaks the re-drive */ } }
       }
     })().finally(() => { redriving = null; });
     return redriving;

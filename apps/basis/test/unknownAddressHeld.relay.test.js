@@ -31,6 +31,7 @@ describe('a person-key send to an address this device knows nothing about is hel
     expect(r?.reason, JSON.stringify(r)).toBe('unknown-address');
     expect(r?.delivered).toBe(false);
     expect(r?.held, 'the caller is told it waits on this device, not that it failed for good').toBe(true);
+    expect(typeof r?.later?.then, 'the hold promises how it ends (sent later, or not sent at its time limit)').toBe('function');
   }, 30_000);
 
   it('a contact turn to her is held too, and she sees no request', async () => {

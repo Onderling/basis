@@ -689,6 +689,10 @@
         "text": "Waiting for a connection. It goes by itself once there is one.",
         "doc": "A message to a contact is held on this device because it has no connection to send on (no connection point yet). Not a failure: it leaves by itself once there is one, and the bubble moves on. Pairs with the pending state."
       },
+      "unknown_address": {
+        "text": "Not sent: this device does not know who that address is. Add their card first, then send again.",
+        "doc": "A contact turn the send gate held (no reason to send on the person key) and gave up at its time limit: not sent, and why."
+      },
       "peer_unreachable": {
         "text": "Not reached, maybe offline (tap to retry)",
         "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."

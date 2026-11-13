@@ -1655,7 +1655,8 @@ Ledger: L663, L855, L856, L858.
 device log, the chat retention class, with "Forget this conversation"). Measured while reviewing it: a turn is never
 carried to a member or another device and is never in a bug report, but the personal history mirror and the export
 archive follow the whole device log with no filter. So the conversation would sit, sealed, on the person's pod or in
-a file: past the chat retention window, and past Forget (a restore would bring a forgotten conversation back).
+a file: past the chat retention window, and past Forget (a restore would bring a forgotten conversation back; the
+build's red-first test measures that).
 
 **Decision:** every entry kind declares whether the mirror keeps it (one required field in the entry-kind table,
 `packages/item-store`; a guard is red for a kind without it). The mirror and the export read only that field. Left
@@ -1684,13 +1685,16 @@ wanted it kept. Ledger: L875, L668.
 storage place". A walk over the relay and one shared pod measured what the existing pod-only data move does: with
 two repairs (the pod listing and the pod chat read-back each read the wrong shape, so no chat was ever read back from
 a real pod) a chat line crosses on the pod alone. But a join and a removal still travel member to member, a removal
-does not arrive without the relay, and items (tasks, notes) are fanned as in any circle. So only chat keeps to the
-pod, and members still learn each other's device and relay addresses.
+does not arrive without the relay, and a task does not cross without the relay either (measured; items have no pod
+read-back, so by reading they are fanned as in any circle). So only chat keeps to the pod, and members still learn
+each other's device and relay addresses.
 
 **Decision:** the repairs land; the posture gets no name of its own and is not offered when a circle is made. Naming
 it "central" now would promise the privacy property it does not have. The name and the offer come together with
 membership and items on the pod (new carriers), after the alpha, if the posture is wanted at all.
 
 **Where it stands in the code:** the pod-only data move is reachable only under the policy value `personal`
-(`apps/basis/src/v2/circleDataPolicy.js`), which nobody can select; the two walks pin what crosses and what does not
+(`apps/basis/src/v2/circleDataPolicy.js`). The create wizard does not offer that value (`OFFERED_STORAGE_POSTURES`
+is none and shared, and the wizard's choice overrides a template's `personal` preference); a circle that already
+holds it, or one made programmatically, can still have it. The two walks pin what crosses and what does not
 (`apps/basis/test/centralPodCircle.relay.test.js`, `centralPodMembership.relay.test.js`). Ledger: L745, L610.

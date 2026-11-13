@@ -61,6 +61,8 @@ kernel's roster fold; every shell composes the same binding).
   judged by it after ANOTHER admin tightened (no device can tell them from an honest admin who was offline); it is
   signed, attributable and shown. Two admins' settings at one version merge "who decides" strictest-first per act
   (member vote, then the admins together, then any one admin): `denyWinsMerge`'s governance order.
+  Accepted with it: a voted LOOSENING that arrives beside another admin's unrelated change at the same version (which
+  carries the old, stricter class) loses until a later version states it again.
 - **The roster and the caretaker:** `packages/core/src/security/rosterFold.js` (`foldRoster`, `caretakerOrder`),
   folded by pinboard's `deriveRoster`.
 - **Screens:** web `apps/basis/web/v2/circleGovernancePanel.js`; phone `CircleGovernanceScreen.js`; the doors' callers

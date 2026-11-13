@@ -148,12 +148,18 @@ export function policyEnactor({ setPolicy = null, statePolicy = null } = {}) {
   if (typeof setPolicy !== 'function') return null;
   return async (circleId, patch, meta = {}) => {
     try { await setPolicy(circleId, patch); } catch { return { ok: false, error: 'policy-write-failed' }; }
-    if (typeof statePolicy === 'function') { try { await statePolicy(circleId, { proposalId: meta?.proposalId ?? null }); } catch { /* the catch-up reconciles */ } }
-    return { ok: true };
+    if (typeof statePolicy !== 'function') return { ok: true, stated: false };
+    // A change that was never STATED has nothing for the catch-up to carry: the other members would never get it (Opus,
+    // reviewing). Try twice; a second failure is said (`stated: false`), never reported as a plain success. The deciding
+    // proposal rides into the statement (the receiver gate checks it).
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try { if (await statePolicy(circleId, { proposalId: meta?.proposalId ?? null })) return { ok: true, stated: true }; } catch { /* tried again below */ }
+    }
+    return { ok: true, stated: false };
   };
 }
 
-export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, statePolicy = null, spineGate = null, agent = null }) {
+export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, statePolicy = null, policyVersionOf = null, spineGate = null, agent = null }) {
   // Governance rides the RAIL, period: signed, circle-scoped, receiver-verified. The unsigned legacy
   // path was deleted with the cutover (one chained-statement primitive remains — signSpine); a composition
   // without a per-circle signer is a wiring bug, surfaced here rather than as silently-unsigned governance.
@@ -190,7 +196,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
 
   const governance = makeCircleGovernance({
     callSkill, appendGovernanceEvent, getPolicy, getMembers,
-    localActorRef: refIn, newProposalId: genId, now, setPolicy: policyEnactor({ setPolicy, statePolicy }),
+    localActorRef: refIn, newProposalId: genId, now, setPolicy: policyEnactor({ setPolicy, statePolicy }), policyVersionOf,
     // with this device's agent, an enacted removal is the WHOLE removal the members panel makes (unbind the member's
     // circle address, re-record the authorize snapshot), not the bare substrate op
     ...(agent ? { removeMember: (circleId, memberWebid) => removeCircleMember({ agent, callSkill, circleId, memberWebid }) } : {}),

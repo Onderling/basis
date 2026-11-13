@@ -39,6 +39,9 @@ export function makeCircleGovernance({
   // the WHOLE removal (`removeCircleMember`: the substrate op, then unbind the member's circle address and re-record the
   // authorize snapshot), when the wiring has this device's agent; else the bare pinboard op
   removeMember = null,
+  // the settings version this device holds for a circle: a rules change it enacts is stamped with it, and every
+  // receiving device judges that change by THAT version's rule (the receiver gate)
+  policyVersionOf = null,
 }) {
   if (typeof readGovernanceState !== 'function') {
     throw new Error('makeCircleGovernance: readGovernanceState is required (the rail\'s verified events + disputed set)');
@@ -53,7 +56,11 @@ export function makeCircleGovernance({
         ? removeMember(circleId, subject)
         : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
     }
-    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject, ...(proposalId ? { proposalId } : {}) });
+    if (action === 'changeRule') {
+      let policyVersion = null;
+      try { policyVersion = typeof policyVersionOf === 'function' ? await policyVersionOf(circleId) : null; } catch { policyVersion = null; }
+      return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject, ...(proposalId ? { proposalId } : {}), ...(Number.isFinite(policyVersion) ? { policyVersion } : {}) });
+    }
     if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role });
     if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject, { proposalId }) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };

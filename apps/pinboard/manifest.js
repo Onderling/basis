@@ -1424,6 +1424,8 @@ export const pinboardManifest = {
         { name: 'rules',   kind: 'object', required: true },
         // the proposal that decided this change, where the circle's rule asked for one (governance enact passes it)
         { name: 'proposalId', kind: 'string', required: false },
+        // the settings version the author held: every receiver judges this change by that version's rule
+        { name: 'policyVersion', kind: 'number', required: false },
       ],
       resolves: [{ field: 'rules', policy: 'content' }],
       surfaces: {

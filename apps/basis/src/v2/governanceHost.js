@@ -51,17 +51,17 @@ export function makeCircleGovernance({
   // `proposalId` rides into the enacted change's statement, so every receiving device can check the decision (the
   // receiver gate, governanceReceiverGate.js)
   async function enact(circleId, action, subject, proposalId = null) {
+    // the decision rides what is enacted: the proposal and the settings version this device holds (the receiver gate)
+    let policyVersion = null;
+    try { policyVersion = typeof policyVersionOf === 'function' ? await policyVersionOf(circleId) : null; } catch { policyVersion = null; }
+    const decided = { ...(proposalId ? { proposalId } : {}), ...(Number.isFinite(policyVersion) ? { policyVersion } : {}) };
     if (action === 'removeMember') {
       return typeof removeMember === 'function'
-        ? removeMember(circleId, subject)
-        : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
+        ? removeMember(circleId, subject, decided)
+        : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful', ...decided });
     }
-    if (action === 'changeRule') {
-      let policyVersion = null;
-      try { policyVersion = typeof policyVersionOf === 'function' ? await policyVersionOf(circleId) : null; } catch { policyVersion = null; }
-      return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject, ...(proposalId ? { proposalId } : {}), ...(Number.isFinite(policyVersion) ? { policyVersion } : {}) });
-    }
-    if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role });
+    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject, ...decided });
+    if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role, ...decided });
     if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject, { proposalId }) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };
     return { ok: false, error: 'unknown-action' };

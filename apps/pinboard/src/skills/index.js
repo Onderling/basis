@@ -3855,7 +3855,8 @@ export function buildSkills({
       if (typeof emitSpine !== 'function') return { error: 'spine-unavailable' };
       const res = await emitSpine({
         kind: 'role', circleId: _groupId, subject: a.memberWebid,
-        payload: { role: a.role }, actor: from,
+        // the decision rides the statement: the proposal that decided it and the settings version held (the receiver gate)
+        payload: { role: a.role, ...(typeof a.proposalId === 'string' && a.proposalId ? { proposalId: a.proposalId } : {}), ...(Number.isFinite(Number.parseInt(a.policyVersion, 10)) ? { policyVersion: Number.parseInt(a.policyVersion, 10) } : {}) }, actor: from,
       });
       if (!res) return { error: 'not-signed' };   // no per-circle signer → nothing lands unsigned
       // handed to the person's main device to sign (`held`: it is offline) — not applied yet, and the screen says so

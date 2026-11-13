@@ -200,7 +200,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     localActorRef: refIn, newProposalId: genId, now, setPolicy: policyEnactor({ setPolicy, statePolicy }), policyVersionOf,
     // with this device's agent, an enacted removal is the WHOLE removal the members panel makes (unbind the member's
     // circle address, re-record the authorize snapshot), not the bare substrate op
-    ...(agent ? { removeMember: (circleId, memberWebid) => removeCircleMember({ agent, callSkill, circleId, memberWebid }) } : {}),
+    ...(agent ? { removeMember: (circleId, memberWebid, decided = {}) => removeCircleMember({ agent, callSkill, circleId, memberWebid, ...decided }) } : {}),
     // The fold's input: VERIFIED events + the disputed (equivocator) ref set, from the rail's read.
     readGovernanceState: (circleId) => rail.readVerified(circleId),
   });

@@ -239,7 +239,19 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
   /** What a catch-up sends on must still be what its author signed, checked here, now (as the circle entry rail's). */
   const checkSigned = (circleId, statement) => !!statement && statement.tombstone !== true && safeVerify(statement, circleId)?.ok === true;
 
-  return { appendMessage, signEntry, ingest, verify, storedStatements, hasEntry, checkSigned };
+  /** A STORED chat entry, judged as an arrival (a history restore runs it before the entry lands). A line with no
+   *  statement is a local one that never fanned (a bot bubble, a self-scoped line, a send not yet signed): nothing to
+   *  check. A signed one must verify, and the text the bubble shows must be the text that was signed. */
+  const checkEntry = (entry) => {
+    if (!entry || entry.type !== CHAT_LANE) return false;
+    const p = entry.payload ?? {};
+    if (p.statement === undefined || p.statement === null) return true;
+    if (typeof p.circleId !== 'string' || !checkSigned(p.circleId, p.statement)) return false;
+    const asText = (x) => (typeof x === 'string' ? x : '');   // a landing renders no text as '' (ingest above)
+    return asText(p.text) === asText(p.statement.body?.payload?.text);
+  };
+
+  return { entryKind: CHAT_LANE, appendMessage, signEntry, ingest, verify, storedStatements, hasEntry, checkSigned, checkEntry };
 }
 
 /**

@@ -55,7 +55,7 @@ import { createSealingBackend } from '@onderling/pseudo-pod';            // the 
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
 import {
-  createHistoryMirror, hydrateHistory, exportHistoryArchive,
+  createHistoryMirror, hydrateHistory, exportHistoryArchive, restoreCheckFor,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
 } from '../../v2/historyMirror.js'; // the personal history store: sealed follower sink + instant-restore hydrate + archive export
 import {
@@ -6495,13 +6495,16 @@ export async function createRealHouseholdAgent(opts = {}) {
   // a device log the append lands on an ephemeral log — the live fan still carries the statement
   // (receivers verify at their OWN rail); only local restart durability degrades, like the other
   // riders.
+  // ONE governance rail for this composition's riders (rules, policy) and the restore's check: the same lane and
+  // declaration, so one instance (the shells' receive-side rail is another over the same log, as before).
+  const governanceRail = makeGovernanceRail({
+    eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+    circleIdentityFor,
+    myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
+    callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+  });
   const rulesUpdateEmit = makeRulesUpdateEmitter({
-    rail: makeGovernanceRail({
-      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
-      circleIdentityFor,
-      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
-    }),
+    rail: governanceRail,
     fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
@@ -6510,12 +6513,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE POLICY-UPDATE RIDER — the same rail and fan as the rules one, a different kind. The shells call it (as
   // `emitPolicyUpdate`) when an admin saves the circle's policy and when the create wizard writes the first one.
   const policyUpdateEmit = makePolicyUpdateEmitter({
-    rail: makeGovernanceRail({
-      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
-      circleIdentityFor,
-      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      callSkill: (...a) => callSkill(...a),
-    }),
+    rail: governanceRail,
     fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
@@ -9396,6 +9394,8 @@ export async function createRealHouseholdAgent(opts = {}) {
             eventLog:     opts.deviceLog,
             recencyDays:  Number(paramsService.register.valueOf(HISTORY_RECENCY_DAYS_KEY)) || 30,
             maxPerCircle: Number(paramsService.register.valueOf(HISTORY_RECENCY_MAX_KEY)) || 500,
+            // THE RESTORE IS AN ARRIVAL: every signed lane's statements are checked before they land.
+            admit: restoreCheckFor([membershipRail, itemsRail, chatRail, keyRail, grantsRail, governanceRail]),
           });
           skip = r.hydratedIds;
           if (typeof console !== 'undefined') console.info(`[history-restore] recent window live: ${r.recent} entries (tail follows)`);

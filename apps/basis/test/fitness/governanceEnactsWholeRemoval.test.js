@@ -12,8 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const SHELL_FILES = [
   '../../web/v2/circleApp.js',
-  '../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js',
-  '../../../basis-mobile/src/screens/v2/CircleGovernanceScreen.js',
+  '../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js',   // the phone's one binding (governanceOneBindingPerShell)
 ];
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 

@@ -97,7 +97,7 @@ import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } fr
 // re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
 // makes a removal a security change rather than a list edit. web ≡ mobile by construction.
 import { leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
-import { removeMemberDoor, changeRulesDoor, changeRoleDoor, readCircleRules, rulesForSave } from '../../src/v2/governanceDoors.js';
+import { removeMemberDoor, changeRulesDoor, changeRoleDoor, changeSettingsDoor, readCircleRules, rulesForSave } from '../../src/v2/governanceDoors.js';
 // "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
@@ -4570,19 +4570,22 @@ async function materializeVandaag() {
 /** Mij's own governance binding for its reads (made once, on first need). */
 let mijGov = null;
 
-/** The circle governance as the shell binds it (settings, Mij's "wat wacht op jou"): one binding, one set of options. */
+/**
+ * THE circle governance binding of this shell: every screen that decides (settings, members, rules, Decisions, reports,
+ * Mij's "wat wacht op jou") binds through here, so they all decide with one set of options (governanceOneBindingPerShell).
+ */
 function shellGovernance({ myWebid = '' } = {}) {
   return bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
     // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
     myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
     spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
+    // an enacted settings change: written here, then stated on the lane so every member's device applies it
+    setPolicy: (cid, patch) => policyStore.update(cid, patch),
+    statePolicy: (cid) => circlePolicyLane.state(cid),
   });
 }
 
@@ -8781,14 +8784,7 @@ function removeReportedItem(circleId, targetType, targetRef) {
 async function fileCircleReport(circleId, targetType, targetRef, targetLabel = null, reason = '') {
   let myWebid = '';
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    circleIdentityFor: circleIdentityForShell,
-    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-  });
+  const gov = shellGovernance({ myWebid });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
   catch { return { ok: false }; }
 }
@@ -8799,19 +8795,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
 async function showGovernance(id) {
   let myWebid = '';
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    agent: _peerAgent,   // an enacted removal is the whole removal (unbind + the authorize snapshot)
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    removeReported: removeReportedItem,
-    circleIdentityFor: circleIdentityForShell,
-    spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
-  });
+  const gov = shellGovernance({ myWebid });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
   back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
@@ -8849,11 +8833,10 @@ async function showGovernance(id) {
         try { await gov.override({ circleId: id, proposalId, actor: { ref: myWebid } }); } catch { /* */ }
         await rerender();
       },
+      // who decides an action is a SETTING: it goes through the circle's settings rule (a proposal where the admins or
+      // the circle decide settings together) and is stated on the lane, like every other setting
       onSetClass: async (action, cls) => {
-        try {
-          const cur = (await policyStore.get(id)) ?? {};
-          await policyStore.update(id, mergeCirclePolicy(cur, { governance: { [action]: cls } }));
-        } catch { /* */ }
+        try { await changeSettingsDoor({ governance: gov, circleId: id, patch: { governance: { [action]: cls } }, actorRef: mySelfIn(id) ?? myWebid }); } catch { /* */ }
         await rerender();
       },
       // "review & remove" an equivocator: open a removeMember decision (its class applies).

@@ -109,3 +109,21 @@ export async function changeRoleDoor({ governance, callSkill, circleId, memberWe
   catch (err) { return { outcome: 'refused', reason: err?.message ?? 'propose-failed' }; }
   return { ...doorOutcome(r), ...(r?.result ? { result: r.result } : {}) };
 }
+
+/**
+ * CHANGE A CIRCLE SETTING (a policy patch, e.g. who decides an action), through the circle's settings class: where
+ * any admin may, written at once and stated on the lane (the binding's settings enactor); otherwise a proposal opens.
+ * @param {object} a
+ * @param {{propose: Function}} a.governance
+ * @param {string} a.circleId
+ * @param {object} a.patch
+ * @param {string|null} a.actorRef
+ */
+export async function changeSettingsDoor({ governance, circleId, patch, actorRef = null } = {}) {
+  if (typeof governance?.propose !== 'function') return { outcome: 'refused', reason: 'no-governance' };
+  if (typeof circleId !== 'string' || !circleId || !patch || typeof patch !== 'object') return { outcome: 'refused', reason: 'missing-args' };
+  let r;
+  try { r = await governance.propose({ circleId, action: 'changePolicy', subject: patch, ...(actorRef ? { actor: { ref: actorRef } } : {}) }); }
+  catch (err) { return { outcome: 'refused', reason: err?.message ?? 'propose-failed' }; }
+  return doorOutcome(r);
+}

@@ -102,7 +102,9 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     await soon(by.text('Delete'), 10_000);
     await soon(by.text('Hide'), 10_000);
     await device.takeScreenshot('msg-05b-thread-more');
-    await device.pressBack();   // closes the sheet, the thread stays
+    // the ⋯ opens the platform's own dialog (Hide, Delete, Cancel): Cancel closes it, the thread stays (Android's back
+    // key went past the dialog and left the thread)
+    await element(by.text('Cancel')).tap();
     await soon(by.id('contact-thread-screen'), 10_000);
   });
 

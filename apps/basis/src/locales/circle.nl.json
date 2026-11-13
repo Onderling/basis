@@ -10437,6 +10437,10 @@
   "settings_home": {
     "title": "Instellingen",
     "help": "Hulp",
+    "help_missing": {
+      "text": "Het Hulp-gesprek staat (nog) niet op dit apparaat.",
+      "doc": "Gezegd als de persoon Hulp opent (Instellingen, de intro's meer) en dit apparaat geen Hulp-kring heeft."
+    },
     "appearance": "Weergave",
     "per_circle": "Per kring",
     "no_circles": "Je zit nog in geen enkele kring.",

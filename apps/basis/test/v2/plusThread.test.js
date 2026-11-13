@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { EventLog } from '../../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { createPlusThread, plusThreadId, plusAnswerLine } from '../../src/v2/plusThread.js';
@@ -109,6 +111,23 @@ describe('one exchange in the "+" thread (the duty both shells run)', () => {
     const { plus } = boot();
     await plus.exchange('iets', async () => null, { t });
     expect(plus.turns().map((x) => x.who)).toEqual(['you']);
+  });
+
+  it('reads ONE result shape, {error, done, card, actId} (what the shared readers and the phone sheet speak); no other spelling', async () => {
+    const { plus } = boot();
+    await plus.exchange('a', async () => ({ actId: PLUS_ACTS[0].id }), { t });
+    await plus.exchange('b', async () => ({ circleCard: { line: 'b', to: [] } }), { t });
+    await plus.exchange('c', async () => ({ ownActId: PLUS_ACTS[0].id }), { t });
+    expect(plus.turns().map((x) => x.who)).toEqual(['you', 'assistant', 'you', 'you']);
+  });
+
+  it('both shells hand it that shape: web\'s read returns card and actId, never circleCard or ownActId', () => {
+    const web = readFileSync(fileURLToPath(new URL('../../web/v2/circleApp.js', import.meta.url)), 'utf8');
+    const at = web.indexOf('await plusThreadNow().exchange(text,');
+    expect(at).toBeGreaterThan(-1);
+    const body = web.slice(at, web.indexOf('}, { t });', at));
+    expect(body).toMatch(/return \{ error, card: circleCard, actId: /);
+    expect(body).not.toMatch(/ownActId/);
   });
 });
 

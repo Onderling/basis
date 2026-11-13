@@ -397,13 +397,15 @@ export const PLUS_SUGGESTIONS_SHOWN = param({ key: 'assistant.plusSuggestionsSho
  * proven by the gate-words guard to give its rule's op), kept only where the "+" reads it with this person's circles
  * (`plusLineOutcome`: the circle filter, so a line that would do nothing is never offered). Computed once per sheet
  * open from the same circles the read uses.
- * @param {{circles?: object[], acts?: object[], manifestsByOrigin?: object, words?: object}} [o]
+ * @param {{circles?: object[], acts?: object[], manifestsByOrigin?: object, words?: object, lang?: string|null}} [o]  lang: the person's language, whose examples come first
  * @returns {string[]}
  */
-export function plusSuggestionPool({ circles = [], acts = PLUS_ACTS, manifestsByOrigin, words = GATE_WORDS } = {}) {
+export function plusSuggestionPool({ circles = [], acts = PLUS_ACTS, manifestsByOrigin, words = GATE_WORDS, lang = null } = {}) {
   const seen = new Set();
   const out = [];
-  for (const entries of Object.values(words ?? {})) {
+  // the person's own language first; the others after it, since the "+" reads every language's lines
+  const langs = Object.keys(words ?? {}).sort((a, b) => (b === lang) - (a === lang));
+  for (const entries of langs.map((l) => words[l])) {
     for (const [id, entry] of Object.entries(entries ?? {})) {
       if (id.startsWith('_')) continue;   // a word list, not a rule
       for (const ex of entry?.examples ?? []) {

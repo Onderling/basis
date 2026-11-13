@@ -48,6 +48,15 @@ kernel's roster fold; every shell composes the same binding).
   `refusedCarriedChanges`), applied in `rulesUpdateLane.js` `applyRulesUpdates` and `policyUpdateLane.js`
   `applyPolicyUpdates`; every shell (web, phone, box) hands them `readPolicy` and `membersOf`. A device trusts its own
   tally of the votes, never a recorded "approved" alone.
+- **The membership gate:** a removal or a role change made without the vote the circle's rule asks takes effect on no
+  member's device. `governanceReceiverGate.js` `membershipGateFor`, handed to the kernel's `foldRoster` as
+  `governedGate` by pinboard's roster read (`membershipRead.governedGateFor`): no settings statement ever asked a vote →
+  one fold as before; otherwise a two-pass read (the first pass gives the members the tally counts). Every removal,
+  role change and rules change is stamped with the settings version its device had seen (`policyVersion`, at
+  `membershipEmit` and the rules emitter, whichever path wrote it); an author's own later settings change draws its
+  line through their own hash chain (`membershipUpTo`, `authorChainCut.js`), so what they signed before it keeps its
+  stamp. Never asked for a person's own acts (leaving, stepping down, the caretaker's acknowledgement). Admissions
+  (`join`) are not gated: the policy has no admission class yet.
 - **The roster and the caretaker:** `packages/core/src/security/rosterFold.js` (`foldRoster`, `caretakerOrder`),
   folded by pinboard's `deriveRoster`.
 - **Screens:** web `apps/basis/web/v2/circleGovernancePanel.js`; phone `CircleGovernanceScreen.js`; the doors' callers
@@ -70,16 +79,15 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   admin-quorum is not applied; the voted one is), `test/fitness/receiverGateWiredInEveryShell.test.js`; refused
   changes shown: `refusedChangesShown.test.js`.
 - The drawn sample and the wizard's answer: `randomSampleClass.test.js`.
+- The membership gate: `membershipGate.test.js`, and walked with three real agents in
+  `membershipGate.walk.test.js` (a lone removal under "admins decide together" holds on every device; under any-admin
+  it removes; a removal made under any-admin stays after the circle tightens).
 - The caretaker over a real relay: `test/v2/caretakerHandover.relay.test.js`; a removed member refused on every
   member's device: `removedMemberRefusedEverywhere.relay.test.js`; the classes and tallies:
   `governanceDecision.test.js`, `governanceHost.test.js`, `governanceOrchestrator.test.js`.
 
 ## Decided, not built
 
-- **The membership lane is not yet gated.** A removal or a role change carried WITHOUT its vote is still applied by the
-  kernel's roster fold (the doors make an honest app ask; a modified app is not refused there yet). Design in review
-  (L663): an injected predicate in the roster fold beside the rules gate, a two-pass read to break the
-  roster↔tally cycle.
 - **The drawn sample is held back for the alpha** (`DRAWN_SAMPLE_ENABLED = false`): its draw was seeded by the
   proposal's own hash (the proposer could re-word until it suits them) and drawn from the roster at fold time (an
   admitting admin could steer it). No circle can hold the class until the fixed draw is in: each eligible member's

@@ -1646,3 +1646,51 @@ written on a device whose copy of its author's membership chain lags names an ol
 between are refused everywhere (a removal among them leaves the member in; L855). Where it lives:
 `apps/basis/src/v2/governanceReceiverGate.js`, the kernel's `foldRoster` (`governedGate`), `docs/catalogue/governance.md`.
 Ledger: L663, L855, L856, L858.
+
+## 2026-11-13 — What the history mirror keeps is declared per kind; the conversation with the assistant and what was heard nearby stay out (Fable's ruling, recorded at Frits's request)
+
+**Status:** decided; the build is its own change, before the alpha. Frits can reverse it here.
+
+**Context:** the "+" now opens on the person's kept conversation with the assistant (`assistant-turn` entries on the
+device log, the chat retention class, with "Forget this conversation"). Measured while reviewing it: a turn is never
+carried to a member or another device and is never in a bug report, but the personal history mirror and the export
+archive follow the whole device log with no filter. So the conversation would sit, sealed, on the person's pod or in
+a file: past the chat retention window, and past Forget (a restore would bring a forgotten conversation back).
+
+**Decision:** every entry kind declares whether the mirror keeps it (one required field in the entry-kind table,
+`packages/item-store`; a guard is red for a kind without it). The mirror and the export read only that field. Left
+out:
+
+- **the conversation with the assistant** (`assistant-turn`): Forget has to be final, and the sheet says the
+  conversation ages out;
+- **what was heard nearby** (`nearby-line`, `nearby-card`): those are other people's lines with the room's retention;
+  a copy on a pod outlives the room.
+
+Everything else is mirrored as before, the audit kinds included. What a line to the assistant MADE (a list entry, an
+appointment) is a store row and is mirrored as before.
+
+**Alternatives:** filter on the kind's sync policy `none` (rejected: that policy says what is carried between devices
+and members, not what a person's own record keeps; 14 kinds declare it, and the filter would drop the audit trail the
+mirror exists for); filter the one kind by name (rejected: a list of one that the next kind forgets).
+
+**The price:** after a lost device the conversation with the assistant is gone, also for someone who would have
+wanted it kept. Ledger: L875, L668.
+
+## 2026-11-13 — A posture's name is a promise: no "central pod" circle type until members stop learning each other's addresses (Fable's ruling, recorded at Frits's request)
+
+**Status:** decided for the alpha; what comes after is Frits's call.
+
+**Context:** a circle on one central pod was asked for as "members not exchanging contact data, just a central
+storage place". A walk over the relay and one shared pod measured what the existing pod-only data move does: with
+two repairs (the pod listing and the pod chat read-back each read the wrong shape, so no chat was ever read back from
+a real pod) a chat line crosses on the pod alone. But a join and a removal still travel member to member, a removal
+does not arrive without the relay, and items (tasks, notes) are fanned as in any circle. So only chat keeps to the
+pod, and members still learn each other's device and relay addresses.
+
+**Decision:** the repairs land; the posture gets no name of its own and is not offered when a circle is made. Naming
+it "central" now would promise the privacy property it does not have. The name and the offer come together with
+membership and items on the pod (new carriers), after the alpha, if the posture is wanted at all.
+
+**Where it stands in the code:** the pod-only data move is reachable only under the policy value `personal`
+(`apps/basis/src/v2/circleDataPolicy.js`), which nobody can select; the two walks pin what crosses and what does not
+(`apps/basis/test/centralPodCircle.relay.test.js`, `centralPodMembership.relay.test.js`). Ledger: L745, L610.

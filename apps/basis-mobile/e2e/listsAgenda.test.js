@@ -1,19 +1,22 @@
-/* global device, element, by */
+/* global device, element, by, waitFor */
 // A circle's LISTS on the phone, with a REAL second person (e2e/support/relayPeer.mjs).
 //
-// Bram (a real agent node on a relay the emulator reaches) has a circle with lists switched on (his signed policy
-// update). The phone joins by his invite, opens the circle's lists from the ⋯ menu, makes a list and adds an entry;
-// Bram's own store holds it. Bram adds an entry; the phone shows it on the same list. Each step leaves a screenshot.
-// Runs against the RELEASE APK; deletes the app, so emulator only.
+// In the alpha a circle's lists are reached from Vandaag: the person puts a lists block on their page, scoped to one
+// circle (Customise → Lists → which circle); the circle's own ⋯ menu does not offer them (alphaSurface.js). Web twin:
+// `vandaag-lists-block.spec.js`. Bram (a real agent node on a relay the emulator reaches) has a circle with lists
+// switched on (his signed policy update). The phone joins by his invite and puts that circle's lists on Vandaag. Bram
+// makes a list with an entry: the phone's block shows it. The phone ticks it off: Bram's store has it no longer open.
+// Bram adds another: the phone's block shows that too. Each step leaves a screenshot. Release APK, emulator only.
 
 const { launch, isVisible, soon, tapSoon, firstBoot, emulatorOnly } = require('./support/ui');
 const { startPeer, joinByInvite } = require('./support/peer');
 
 const LIST = 'Boodschappen';
+const CIRCLE = 'Lijsten Kring';
 let peer = null;
 let ready = null;
 
-/** Bram's own lists, asked until `pred` holds (the phone's write crosses the relay). */
+/** Bram's own lists, asked until `pred` holds (a write crosses the relay). */
 async function bramHolds(pred, tries = 20) {
   let last = null;
   for (let i = 0; i < tries; i += 1) {
@@ -25,10 +28,21 @@ async function bramHolds(pred, tries = 20) {
   throw new Error(`Bram never held it; his lists: ${JSON.stringify(last)}`);
 }
 
-describe("a circle's lists on the phone — a real second person over the relay", () => {
+/** Vandaag shows `text` (the block re-reads when the tab is shown again). */
+async function vandaagShows(text, tries = 12) {
+  for (let i = 0; i < tries; i += 1) {
+    if (await isVisible(by.text(text))) return true;
+    await new Promise((r) => setTimeout(r, 5000));
+    await tapSoon(by.id('circle-tab-circles')).catch(() => {});
+    await tapSoon(by.id('circle-tab-screens')).catch(() => {});
+  }
+  return false;
+}
+
+describe("a circle's lists on the phone's Vandaag — a real second person over the relay", () => {
   beforeAll(async () => {
     emulatorOnly('listsAgenda');
-    peer = await startPeer(['--talk', '--features', 'lists', '--circle', 'Lijsten Kring']);
+    peer = await startPeer(['--talk', '--features', 'lists', '--circle', CIRCLE]);
     ready = peer.ready;
     await launch({ fresh: true });
     await firstBoot();
@@ -42,52 +56,46 @@ describe("a circle's lists on the phone — a real second person over the relay"
     await joinByInvite({ invite: ready.invite, circleId: ready.circleId, shot: 'lists-01-join' });
   });
 
-  it('opens the circle\'s lists from the ⋯ menu (lists are on: Bram\'s policy reached the phone)', async () => {
-    await tapSoon(by.id(`circle-tile-${ready.circleId}`));
-    let open = false;
-    for (let i = 0; i < 10 && !open; i += 1) {
-      await tapSoon(by.id('circle-detail-more'));
-      open = await isVisible(by.id('circle-detail-lists'));
-      if (!open) {
-        await tapSoon(by.id('circle-detail-more'));   // close, wait for the policy to land, try again
-        await new Promise((r) => setTimeout(r, 5000));
-      }
-    }
-    await device.takeScreenshot('lists-02-menu');
-    if (!open) throw new Error('no Lists entry in the ⋯ menu: the circle\'s lists never switched on here');
-    await tapSoon(by.id('circle-detail-lists'));
-    await soon(by.id('circle-lists'));
+  it("puts the circle's lists on Vandaag: Customise → Lists → the circle", async () => {
+    await tapSoon(by.id('circle-tab-screens'));
+    await tapSoon(by.id('vandaag-customise'));
+    // the sheet lists the page's blocks first; "add" is below them: scroll the sheet until it shows
+    // (it sits at the sheet's foot, under the home bar: half of it showing is enough to tap)
+    await waitFor(element(by.id('customise-add-lists'))).toBeVisible().whileElement(by.id('customise-scroll')).scroll(300, 'down');
+    await element(by.id('customise-add-lists')).tap();
+    await device.takeScreenshot('lists-02-added-block');
+    // the new Lists block asks which circle: its own chip with the circle's name (other blocks name the circle too)
+    const chip = by.text(CIRCLE).withAncestor(by.id('customise-type-lists'));
+    await waitFor(element(chip)).toBeVisible().whileElement(by.id('customise-scroll')).scroll(150, 'up');
+    await element(chip).tap();
+    await device.takeScreenshot('lists-03-picked-circle');
+    await tapSoon(by.id('customise-done'));
   });
 
-  it('makes a list and adds an entry; Bram holds both', async () => {
-    await soon(by.id('lists-new-input'));
-    await element(by.id('lists-new-input')).tap();
-    await element(by.id('lists-new-input')).typeText(LIST);
-    await tapSoon(by.id('lists-create-list'));
-    await tapSoon(by.text(LIST));
-    await soon(by.id('lists-add-input'));
-    await element(by.id('lists-add-input')).tap();
-    await element(by.id('lists-add-input')).typeText('melk');
-    await tapSoon(by.id('lists-add-submit'));
-    await soon(by.text('melk'));
-    await device.takeScreenshot('lists-03-added');
-    await bramHolds((ls) => ls.some((l) => l.list === LIST && l.entries.includes('melk')));
-  });
-
-  it("Bram adds an entry, and it appears on the phone's list", async () => {
-    peer.send({ do: 'list-add', list: LIST, text: 'brood' });
+  it("Bram makes a list with an entry: the phone's block shows it", async () => {
+    peer.send({ do: 'list-create', list: LIST });
+    await peer.next('list-created', () => true, 20_000);
+    peer.send({ do: 'list-add', list: LIST, text: 'melk' });
     const added = await peer.next('list-added', () => true, 20_000);
     if (!added.ok) throw new Error(`Bram could not add: ${JSON.stringify(added.result)}`);
-    let seen = false;
-    for (let i = 0; i < 12 && !seen; i += 1) {
-      seen = await isVisible(by.text('brood'));
-      if (!seen) {
-        await new Promise((r) => setTimeout(r, 5000));
-        await tapSoon(by.id('lists-back')).catch(() => {});   // to the index and back: the list re-reads
-        await tapSoon(by.text(LIST)).catch(() => {});
-      }
-    }
-    await device.takeScreenshot('lists-04-bram');
-    if (!seen) throw new Error("Bram's entry never showed on the phone's list");
+    const seen = await vandaagShows('melk');
+    await device.takeScreenshot('lists-04-melk');
+    if (!seen) throw new Error("Bram's entry never showed in the phone's lists block");
+  });
+
+  it('the phone ticks it off, and Bram has it no longer open', async () => {
+    const lists = await bramHolds((ls) => ls.some((l) => l.list === LIST && l.ids?.melk));
+    const id = lists.find((l) => l.list === LIST).ids.melk;
+    await tapSoon(by.id(`row-act-${id}`));
+    await device.takeScreenshot('lists-05-ticked');
+    await bramHolds((ls) => ls.some((l) => l.list === LIST && !l.entries.includes('melk')));
+  });
+
+  it("Bram adds another entry, and it appears in the phone's block", async () => {
+    peer.send({ do: 'list-add', list: LIST, text: 'brood' });
+    await peer.next('list-added', () => true, 20_000);
+    const seen = await vandaagShows('brood');
+    await device.takeScreenshot('lists-06-brood');
+    if (!seen) throw new Error("Bram's second entry never showed on the phone");
   });
 });

@@ -29,6 +29,13 @@ describe('the "+" line: own acts, else the circle act — at once when the circl
     });
   });
 
+  it("a circle with the lists app but NOT that list does not read it (the lists table decides holding, not the manifest's gate)", () => {
+    // found in the browser: the person's Help circle has no Boodschappen, but the tasks manifest's own phrasing reads
+    // "zet melk op …" as a new task "melk", so a card asked "Help or Plus Kring"
+    const r = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('help', 'Help', ['lists', 'tasks'], []), circle('c1', 'Thuis', ['lists', 'tasks'], [SHOP])] });
+    expect(r).toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c1' });
+  });
+
   it('two circles hold it: a card with both to choose from, nothing runs', () => {
     const r = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', ['lists'], [SHOP]), circle('c2', 'Ouders', ['lists'], [SHOP])] });
     expect(r).toMatchObject({ kind: 'circle', atOnce: false, circleId: null, to: [{ circleId: 'c1', name: 'Thuis' }, { circleId: 'c2', name: 'Ouders' }] });

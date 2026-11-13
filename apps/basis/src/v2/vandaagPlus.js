@@ -259,11 +259,11 @@ export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifest
   const m = /^([^:]{1,60}):\s*(.+)$/u.exec(text);
   const named = m ? all.filter((c) => c?.name && String(c.name).trim().toLowerCase() === m[1].trim().toLowerCase()) : [];
   const [scope, rest] = named.length === 1 ? [named, m[2]] : [all, text];
-  const readers = [];
-  for (const c of scope) {
-    const command = circleReading(rest, c);
-    if (command) readers.push({ circle: c, command });
-  }
+  // a line that names a list some circle HOLDS is about that list: those circles read it, and a manifest's looser
+  // phrasing elsewhere does not count (the tasks gate reads "zet melk op …" as a new task anywhere)
+  const read = scope.map((c) => ({ circle: c, ...circleReading(rest, c) })).filter((x) => x.command);
+  const byList = read.filter((x) => x.fromLists);
+  const readers = byList.length ? byList : read;
   if (!readers.length) return null;
   const to = readers.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }));
   const pick = readers.length === 1 ? readers[0] : null;
@@ -274,7 +274,10 @@ export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifest
   };
 }
 
-/** One circle's reading of a line: the box's lists table first, then the circle's manifests' gate; only an op it offers. */
+/**
+ * One circle's reading of a line: the box's lists table first (`fromLists`: the circle holds the list it names), then the
+ * circle's manifests' gate; only an op it offers. `{command: null}` when it reads nothing.
+ */
 function circleReading(text, c) {
   const ms = Object.values(c?.manifestsByOrigin ?? {}).filter(Boolean);
   const av = c?.availability ?? null;
@@ -294,7 +297,9 @@ function circleReading(text, c) {
     return null;
   };
   const lists = Array.isArray(c?.lists) ? c.lists : [];
-  return (lists.length ? tryRules(listsGateRules(null, lists, { greeting: false }), false) : null) ?? tryRules(renderGate(ms), true);
+  const fromLists = lists.length ? tryRules(listsGateRules(null, lists, { greeting: false }), false) : null;
+  if (fromLists) return { command: fromLists, fromLists: true };
+  return { command: tryRules(renderGate(ms), true), fromLists: false };
 }
 
 /** Whether a circle offers an op (the + menu's entries, or an op its manifests declare). */

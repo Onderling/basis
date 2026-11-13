@@ -32,6 +32,7 @@
  * author signed.
  */
 
+import { isMirroredKind } from '@onderling/item-store';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 
 /** Mirror switch — OFF by default (the mirror writes only after the person turns it on). */
@@ -57,6 +58,9 @@ export function createHistoryMirror({
   laneId = 'root',
   skip = null,
   filter = null,
+  // what the person's own record keeps: each kind declares it (`mirrored`, entryKinds; docs/decisions.md 2026-11-13).
+  // The conversation with the assistant and what was heard nearby stay out; a test may stand in for an older mirror.
+  keeps = (e) => isMirroredKind(e?.type),
   onFlush = null,
   batchMax = 50,
   flushMs = 2000,
@@ -135,6 +139,7 @@ export function createHistoryMirror({
 
   function onAppend(entry) {
     if (!entry || !Number.isFinite(entry.seq) || entry.seq <= cursor.lastSeq) return;
+    if (!keeps(entry)) return;
     if (filter && !filter(entry)) return;
     buffer.push(entry);
     if (buffer.length >= batchMax) flush();
@@ -159,7 +164,7 @@ export function createHistoryMirror({
       // The log's read surface is query() (most-recent-first); mirror ascending.
       const backlog = (typeof eventLog.query === 'function' ? eventLog.query() : [])
         .filter((e) => Number.isFinite(e?.seq) && e.seq > cursor.lastSeq && !(skip?.has?.(e.id))
-          && (!filter || filter(e)))
+          && keeps(e) && (!filter || filter(e)))
         .sort((a, b) => a.seq - b.seq);
       buffer = backlog.concat(buffer);
       unsubscribe = eventLog.subscribe(onAppend);
@@ -236,6 +241,8 @@ export async function hydrateHistory({
   now = Date.now,
   logger = console,
   admit = null,
+  // a mirror written before kinds declared it may hold what the record no longer keeps: never brought back
+  keeps = (e) => isMirroredKind(e?.type),
 } = {}) {
   if (!source || typeof source.list !== 'function') throw new Error('hydrateHistory: a DataSource-shaped source is required');
   if (!eventLog || typeof eventLog.hydrate !== 'function') throw new Error('hydrateHistory: an event log with hydrate() is required');
@@ -250,7 +257,7 @@ export async function hydrateHistory({
   for (const key of keys) {
     try {
       const batch = JSON.parse(await source.read(key));
-      for (const e of (batch?.entries ?? [])) {
+      for (const e of (batch?.entries ?? []).filter((x) => keeps(x))) {
         if (!e || typeof e.id !== 'string' || !e.id || byId.has(e.id)) continue;
         // THE RESTORE IS AN ARRIVAL: a statement lands only if it verifies here, the check a peer's statement passes.
         // The seal proves the batch is the owner's; it does not prove each statement in it is what its author signed.

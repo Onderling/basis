@@ -134,4 +134,5 @@ export {
   entryKind, isSystemKind, isAuditKind, retentionOf, retentionWindowFor,
   conversationKinds, kindWakes, governanceWakes,
   SIGNS, SUBJECT, ACCEPTS, SYNC, bindingOf,   // the binding columns — declared 2026-09-15, read by a fitness test until the rails read them
+  isMirroredKind,   // what the person's own history mirror keeps (docs/decisions.md 2026-11-13)
 } from './entryKinds.js';

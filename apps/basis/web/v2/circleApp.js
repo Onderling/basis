@@ -4606,6 +4606,8 @@ let _pendingPinOpen = null;
 function runMeAction(id) {
   if (id === 'share-contact') { showShareMyContact(); return; }
   if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
+  // the person's ongoing conversation with the assistant: the "+" sheet
+  if (id === 'assistant') { showVandaagPlus(); }
 }
 
 /** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */
@@ -5428,6 +5430,8 @@ function showSettingsHome() {
     onOpenPerCircle: showSettingsCircleChooser,
     // another door at the foot (feedback): its op, through the waist, naming this screen's id (never words)
     onOpenDoor: (d) => {
+      // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same)
+      if (d?.target?.kind === 'nav' && d.target.to === 'help') { showDetail(HELP_CIRCLE_ID); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })

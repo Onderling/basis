@@ -6431,6 +6431,10 @@
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
     },
+    "assistant": {
+      "text": "Assistant",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
+    },
     "share_contact": {
       "text": "Share my card",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
@@ -10406,6 +10410,7 @@
   },
   "settings_home": {
     "title": "Settings",
+    "help": "Help",
     "appearance": "Appearance",
     "per_circle": "Per circle",
     "no_circles": "You are not in any circle yet.",

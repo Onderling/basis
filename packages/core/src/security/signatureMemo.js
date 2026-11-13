@@ -101,6 +101,85 @@ export function createSignatureMemo({ maxBytes = SIGNATURE_MEMO_MAX_BYTES, verif
   };
 }
 
+/**
+ * THE VERDICT MEMO, one level up: remember that EXACTLY this input checked out under a pure check, so the work around
+ * the signature (the canonical form, the payload digest, the header hash) is not redone either. A cold start on the
+ * Samsung ran the statement check 554 times over 71 distinct statements and the circle-link proof 920 times over 23
+ * addresses: the signature was already remembered, the canonical form and the hashes around it were not (~2.7 ms each).
+ *
+ * The same rule as the signature memo, and the key is the whole input:
+ *   • only a pure check whose answer depends on its input alone (a statement's own validity, never an authority);
+ *   • the key is the caller's exact input as bytes (`JSON.stringify` of the statement plus what was asked of it), never
+ *     a hash the content claims: a copy changed anywhere, or written in another key order, misses and is checked;
+ *   • only a pass is stored; a refusal is checked again every time;
+ *   • bounded in bytes, least recently used out first.
+ * @param {object} [o]
+ * @param {number} [o.maxBytes]
+ * @returns {{ has: (key: string) => boolean, remember: (key: string) => void, readonly size: number, readonly bytes: number }}
+ */
+export function createVerdictMemo({ maxBytes = VERDICT_MEMO_MAX_BYTES } = {}) {
+  const ok = new Map();   // key → its cost in bytes
+  let bytes = 0;
+  return {
+    has(key) {
+      const c = ok.get(key);
+      if (c === undefined) return false;
+      ok.delete(key); ok.set(key, c);
+      return true;
+    },
+    remember(key) {
+      if (typeof key !== 'string' || ok.has(key)) return;
+      const cost = key.length * 2 + ENTRY_OVERHEAD_BYTES;
+      ok.set(key, cost); bytes += cost;
+      while (bytes > maxBytes && ok.size > 1) {
+        const [oldest, c] = ok.entries().next().value;
+        ok.delete(oldest); bytes -= c;
+      }
+    },
+    get size() { return ok.size; },
+    get bytes() { return bytes; },
+  };
+}
+
+/**
+ * The exact key for a verdict: the value's JSON, or null when JSON would make two different inputs look the same (a
+ * non-finite number or a value with `toJSON`, both written as something else, or an `undefined` inside an array, written
+ * as null). A null key is never remembered, so such an input is always checked in full.
+ * @param {*} value
+ * @returns {string|null}
+ */
+export function exactVerdictKey(value) {
+  const LOSSY = {};
+  try {
+    return JSON.stringify(value, function exact(k, v) {
+      if (typeof v === 'number' && !Number.isFinite(v)) throw LOSSY;
+      if (v === undefined && Array.isArray(this)) throw LOSSY;
+      // `this[k]` is the value before its toJSON ran (a Date, a Buffer): its JSON is not the value itself
+      const raw = this?.[k];
+      if (raw !== null && typeof raw === 'object' && typeof raw.toJSON === 'function') throw LOSSY;
+      return v;
+    }) ?? null;
+  } catch { return null; }
+}
+
+/**
+ * The verdict memo's bound, in BYTES of keys held. A statement's key is its JSON (~0.5–2 KB), so 4 MiB holds a few
+ * thousand verdicts: every statement a phone reads at a start, several times over.
+ */
+const VERDICT_MEMO_MAX_BYTES = param({ key: 'security.verdictMemoMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 * 1024 * 1024 });
+
+const processVerdictMemos = new Map();
+/**
+ * The process's verdict memo for one named check ('spine', 'circle-link'): one per check, so one check's pass is never
+ * read as another's. In memory only, like the signature memo.
+ * @param {string} name
+ */
+export function processVerdictMemo(name) {
+  if (typeof name !== 'string' || !name) throw new Error('processVerdictMemo: a check needs its name');
+  if (!processVerdictMemos.has(name)) processVerdictMemos.set(name, createVerdictMemo());
+  return processVerdictMemos.get(name);
+}
+
 let processMemo = null;
 /**
  * THE process's one memo (verify-once, step A): every rail, the chat rail and the named checks (a circle-link proof, a

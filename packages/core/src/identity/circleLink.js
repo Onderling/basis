@@ -13,7 +13,7 @@
 // the attacker can't sign, and a replay only re-asserts the same identity into the same
 // circle (idempotent). See docs — NOTE-identity-and-linkability Decision B (signing proof).
 import nacl from 'tweetnacl';
-import { processSignatureMemo } from '../security/signatureMemo.js';
+import { processSignatureMemo, processVerdictMemo } from '../security/signatureMemo.js';
 import { deriveCircleSeed } from './circleAddress.js';
 import { encode as b64encode } from '../crypto/b64.js';
 
@@ -49,8 +49,17 @@ export function signCircleLinkFromSeed(derivationSeed, circleId, groupId, addres
  *   `verifySignature` — the pure signature check, default the process's memo under the name 'circle-link'
  * @returns {boolean}
  */
-export function verifyCircleLink({ groupId, address, proof, verifySignature = processSignatureMemo().verifierFor('circle-link') } = {}) {
+export function verifyCircleLink({ groupId, address, proof, verifySignature, verdictMemo } = {}) {
   if (!groupId || typeof address !== 'string' || !address || typeof proof !== 'string' || !proof) return false;
-  try { return verifySignature(circleLinkMessage(groupId, address), proof, address) === true; }
-  catch { return false; }
+  // A pass for exactly these three is remembered (the process's verdict memo unless the caller brings its own check):
+  // a roster re-derivation asks the same proofs again and again. Never a refusal.
+  const memo = verdictMemo ?? (verifySignature ? null : processVerdictMemo('circle-link'));
+  const key = memo ? `${String(groupId)}\u0000${address}\u0000${proof}` : null;
+  if (memo?.has(key)) return true;
+  const check = verifySignature ?? processSignatureMemo().verifierFor('circle-link');
+  let good = false;
+  try { good = check(circleLinkMessage(groupId, address), proof, address) === true; }
+  catch { good = false; }
+  if (good) memo?.remember(key);
+  return good;
 }

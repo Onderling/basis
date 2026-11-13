@@ -99,3 +99,31 @@ export async function gateCarriedWrites({ rail, circleId, action, bodies = [], p
   for (const body of bodies) (writeSkippedTheVote({ action, body, policy, members, proposals }) ? skipped : kept).push(body);
   return { kept, skipped };
 }
+
+/** The carried changes the gate judges, by statement kind. */
+const GATED_KINDS = Object.freeze([['rules-update', 'changeRule'], ['policy-update', 'changePolicy']]);
+
+/**
+ * THE CHANGES MADE WITHOUT THE VOTE, as the governance view shows them: every admin's carried rules or settings change
+ * that this device refused (it skipped the vote its circle requires) and that is newer than the newest one it applied.
+ * Kept on the lane, never applied, and SHOWN (Frits 2026-11-10). A non-admin's change is not listed: the lane drops it
+ * before any vote is asked.
+ * @param {object} a
+ * @param {object[]} a.bodies     the rail's verified statement bodies (authors resolved to refs)
+ * @param {object} a.policy
+ * @param {Array<{ref: string, role: string}>} a.members
+ * @param {Array<object>} a.proposals
+ * @returns {Array<{action: 'changeRule'|'changePolicy', by: string, version: number, hash: string}>}
+ */
+export function refusedCarriedChanges({ bodies = [], policy = {}, members = [], proposals = [] } = {}) {
+  const admins = new Set((Array.isArray(members) ? members : []).filter((m) => m?.role === 'admin').map((m) => m.ref));
+  const out = [];
+  for (const [kind, action] of GATED_KINDS) {
+    const judged = (Array.isArray(bodies) ? bodies : [])
+      .filter((b) => b?.kind === kind && b.payload && admins.has(b.author))
+      .map((b) => ({ b, version: Number.parseInt(b.payload.version, 10) || 0, skipped: writeSkippedTheVote({ action, body: b, policy, members, proposals }) }));
+    const head = Math.max(0, ...judged.filter((j) => !j.skipped).map((j) => j.version));
+    for (const j of judged) if (j.skipped && j.version > head) out.push({ action, by: j.b.author, version: j.version, hash: j.b.hash });
+  }
+  return out;
+}

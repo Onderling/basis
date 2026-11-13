@@ -60,6 +60,15 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
     container.appendChild(warn);
   }
 
+  // changes made WITHOUT the vote this circle requires: every device refused them (the receiver gate); shown so the
+  // members see that it happened (kept and shown, never applied)
+  for (const r of view?.refused ?? []) {
+    const line = el('div', 'circle-governance__disputed circle-governance__refused');
+    line.dataset.refused = r.hash ?? '';
+    line.appendChild(el('span', 'circle-governance__disputed-line', tr(`circle.governance.refused_${r.action}`, { who: r.label || r.by })));
+    container.appendChild(line);
+  }
+
   const open = view?.open ?? [];
   if (!open.length) {
     container.appendChild(el('p', 'circle-governance__empty', tr('circle.governance.none')));

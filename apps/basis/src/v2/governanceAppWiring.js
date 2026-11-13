@@ -11,6 +11,7 @@ import { selfRefIn } from './selfRef.js';
 import { makeCircleGovernance } from './governanceHost.js';
 import { removeCircleMember } from './circleMembershipHygiene.js';
 import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
+import { refusedCarriedChanges } from './governanceReceiverGate.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
@@ -241,9 +242,29 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     isAdmin: iAmAdmin,
   });
 
+  // THE CHANGES MADE WITHOUT THE VOTE (the receiver gate's refusals, shown): an admin's rules or settings change this
+  // device did not apply because it skipped the vote the circle requires. Judged by the same gate the applies use.
+  const refusedChanges = async (circleId) => {
+    let bodies = [];
+    try { ({ bodies = [] } = await rail.readVerifiedBodies(circleId)); } catch { return []; }
+    if (!bodies.some((b) => b?.kind === 'rules-update' || b?.kind === 'policy-update')) return [];
+    let policy = {}; let members = []; let state = { events: [], disputed: new Set() };
+    try { [policy, members, state] = await Promise.all([getPolicy(circleId), getMembers(circleId), rail.readVerified(circleId)]); } catch { return []; }
+    const { proposals } = foldGovernance(state?.events ?? [], { policy: policy ?? {}, members, now: now(), disputed: state?.disputed ?? new Set() });
+    return refusedCarriedChanges({ bodies, policy: policy ?? {}, members, proposals });
+  };
+  // the view, with the refused changes beside the proposals: who made each (named like a subject), never applied
+  const view = async (circleId, opts = {}) => {
+    const base = await governance.view(circleId, opts);
+    let refused = [];
+    try { refused = await refusedChanges(circleId); } catch { refused = []; }
+    const label = typeof opts?.labelForSubject === 'function' ? opts.labelForSubject : (r) => r;
+    return { ...base, refused: refused.map((r) => ({ ...r, label: label(r.by, r.action) || r.by })) };
+  };
+
   // `appendGovernanceEvent` / `appendReportEvent`: what the POINT runs for a sibling's forwarded act (the same signing,
   // fan and report readers as an act of its own)
-  return { ...governance, reports, rail, appendGovernanceEvent, appendReportEvent };
+  return { ...governance, view, refusedChanges, reports, rail, appendGovernanceEvent, appendReportEvent };
 }
 
 /**

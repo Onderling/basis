@@ -7545,6 +7545,14 @@
       "text": "tegenstrijdige historie van {{who}} — bewijs bijgevoegd",
       "doc": "Governance L3 — equivocation (fork-proof) alert."
     },
+    "refused_changeRule": {
+      "text": "{{who}} heeft de regels veranderd zonder de stemming die deze kring vraagt. De wijziging wordt niet toegepast.",
+      "doc": "Governance: an admin's rules change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened (Frits 2026-11-10: kept and shown, never applied)."
+    },
+    "refused_changePolicy": {
+      "text": "{{who}} heeft de instellingen veranderd zonder de stemming die deze kring vraagt. De wijziging wordt niet toegepast.",
+      "doc": "Governance: an admin's settings change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened."
+    },
     "review_remove": {
       "text": "Bekijk & verwijder",
       "doc": "Governance L3 — open a removeMember review on a disputed member."

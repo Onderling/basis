@@ -49,6 +49,7 @@ import { bindCircleAddressKeysFor } from '../../../basis/src/v2/householdRosterP
 import { DEFAULT_CIRCLE_POLICY } from '../../../basis/src/v2/circlePolicy.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from'../../../basis/src/v2/circleInvite.js';
 import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
+import { withCoMemberRoutes, contactSendRoute } from '../../../basis/src/v2/contactsSource.js';
 
 const arg = (name, fallback = null) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -85,7 +86,7 @@ const call = (app, op, args) => peer.agent.callSkill(app, op, args);
 // the circle this peer is in: its own (founded here), or, in `--join` mode, the phone's once the invite arrives
 let groupId = (joinMode || makerMode) ? null : `walk-${Date.now().toString(36)}`;
 if (!joinMode && !makerMode) {
-await createCircle(peer, { groupId, name: circleName });
+await createCircle(peer, { groupId, name: circleName, handle });   // named, as a founder in a shell is
 await bindCircleAddresses([peer], groupId);
 await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId });
 
@@ -249,15 +250,24 @@ if (talk) {
         const r = await sendCircleChat(peer, { groupId, msgId: `peer-${Date.now().toString(36)}`, text: cmd.text });
         say({ step: 'circle-said', ok: !r?.error, error: r?.error ?? null });
       } else if (cmd.do === 'contact-say') {
-        let to = lastFrom;
-        if (!to) {
+        // who: the person it last heard from, else the first other member of the circle (by their circle id, as a
+        // Contacten row names a co-member)
+        let who = lastFrom;
+        if (!who) {
           const roster = await readRoster(peer, groupId);
           const mine = new Set([peer.pubKey, peer.agent.circleSelf?.(groupId)?.webid].filter(Boolean));
-          const other = (roster ?? []).map((m) => m.webid ?? m.pubKey ?? null).find((id) => id && !mine.has(id));
-          to = other ?? null;
+          who = (roster ?? []).map((m) => m.webid ?? m.pubKey ?? null).find((id) => id && !mine.has(id)) ?? null;
         }
-        if (!to) { say({ step: 'contact-said', ok: false, error: 'nobody to talk to yet' }); return; }
-        const { sent } = peer.contactThreadChannel.sendTurn({ peerAddr: to, threadId: to, text: cmd.text });
+        if (!who) { say({ step: 'contact-said', ok: false, error: 'nobody to talk to yet' }); return; }
+        // where: as a shell's Contacten sends it (contactsSource): a co-member is written to at their circle address in
+        // the circle we share, never at their circle id; someone who wrote first keeps the address they wrote from
+        const [row] = await withCoMemberRoutes([{ contactId: who, source: 'peer', isBot: false }], {
+          circleIds: async () => [groupId], membersOf: (cid) => readRoster(peer, cid),
+        });
+        const route = contactSendRoute(row, who);
+        if (route.blocked) { say({ step: 'contact-said', ok: false, to: null, reason: route.blocked }); return; }
+        const to = route.to;
+        const { sent } = peer.contactThreadChannel.sendTurn({ peerAddr: to, threadId: who, text: cmd.text });
         const r = await sent;
         // the send's answer is `{ sent: { delivered, held, reason }, itemId }`: a held, undelivered turn is not ok, and says why
         const delivered = r?.sent?.delivered ?? r?.delivered;

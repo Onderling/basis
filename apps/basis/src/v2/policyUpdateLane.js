@@ -25,6 +25,7 @@
  *
  * The governance fold ignores this kind (it branches on propose/vote/resolve): a policy-update is a carried fact.
  */
+import { gateCarriedWrites } from './governanceReceiverGate.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -103,14 +104,15 @@ export function makePolicyUpdateEmitter({ rail, fan = null } = {}) {
   if (!rail || typeof rail.append !== 'function') {
     throw new Error('makePolicyUpdateEmitter: a governance-lane rail is required');
   }
-  return async function emitPolicyUpdate({ groupId, policy, version } = {}) {
+  return async function emitPolicyUpdate({ groupId, policy, version, proposalId = null } = {}) {
     if (typeof groupId !== 'string' || !groupId) return null;
     const v = Number.parseInt(version, 10);
     if (!Number.isFinite(v) || v < 1) return null;
     if (!policy || typeof policy !== 'object') return null;
     let res = null;
     try {
-      res = await rail.append(groupId, { kind: POLICY_UPDATE_KIND, subject: `policy-v${v}`, payload: { policy, version: v } });
+      // the proposal that decided this change, where the circle's rule asked for one: every receiver checks it
+      res = await rail.append(groupId, { kind: POLICY_UPDATE_KIND, subject: `policy-v${v}`, payload: { policy, version: v, ...(typeof proposalId === 'string' && proposalId ? { proposalId } : {}) } });
     } catch { res = null; }
     if (!res) return null;
     if (typeof fan === 'function') {
@@ -156,12 +158,16 @@ export async function nextPolicyVersion(headStore, circleId) {
  * @param {object} a
  * @param {{storedStatements: Function, readVerifiedBodies: Function}} a.rail  the receive-side governance rail
  * @param {string} a.circleId
- * @param {() => Promise<Set<string>>} a.adminsOf    the circle's current admin refs on this device's roster
+ * @param {(circleId: string) => Promise<Array<{ref: string, role: string}>>} [a.membersOf]  the circle's roster on this
+ *   device (what the shells hand: a member-vote tally needs every member, not only the admins)
+ * @param {() => Promise<Set<string>>} [a.adminsOf]    the admin refs alone (without `membersOf`)
+ * @param {(circleId: string) => Promise<object|null>} [a.readPolicy]  the policy in force here: the receiver gate judges
+ *   each change by the circle's settings rule (governanceReceiverGate.js)
  * @param {{read: Function, write: Function}} a.headStore
  * @param {(circleId: string, policy: object) => Promise<*>} a.writePolicy  replaces the device's policy for the circle
- * @returns {Promise<{applied: boolean, version?: number}>}
+ * @returns {Promise<{applied: boolean, version?: number, skipped?: number}>}
  */
-export async function applyPolicyUpdates({ rail, circleId, adminsOf, headStore, writePolicy } = {}) {
+export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adminsOf = null, readPolicy = null, headStore, writePolicy } = {}) {
   if (!rail || typeof circleId !== 'string' || !circleId || typeof writePolicy !== 'function' || !headStore) {
     return { applied: false };
   }
@@ -170,10 +176,21 @@ export async function applyPolicyUpdates({ rail, circleId, adminsOf, headStore, 
   if (!present) return { applied: false };
   let bodies = [];
   try { bodies = (await rail.readVerifiedBodies(circleId))?.bodies ?? []; } catch { return { applied: false }; }
-  let admins = new Set();
-  try { admins = (await adminsOf?.(circleId)) ?? new Set(); } catch { admins = new Set(); }
-  const won = foldPolicyUpdates(bodies, { admins });
-  if (!won) return { applied: false };
+  let members = [];
+  try {
+    members = typeof membersOf === 'function'
+      ? ((await membersOf(circleId)) ?? [])
+      : [...((await adminsOf?.(circleId)) ?? new Set())].map((ref) => ({ ref, role: 'admin' }));
+  } catch { members = []; }
+  const admins = new Set(members.filter((m) => m?.role === 'admin').map((m) => m.ref));
+  // THE RECEIVER GATE: where the circle's settings rule asks for a vote, an admin's change counts only with the proposal
+  // that decided it; one that skipped the vote stays on the lane (the governance view shows it) and is never applied.
+  let policy = {};
+  try { policy = (typeof readPolicy === 'function' ? await readPolicy(circleId) : null) ?? {}; } catch { policy = {}; }
+  const changes = bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author));
+  const { kept, skipped } = await gateCarriedWrites({ rail, circleId, action: 'changePolicy', bodies: changes, policy, members });
+  const won = foldPolicyUpdates(kept, { admins });
+  if (!won) return { applied: false, ...(skipped.length ? { skipped: skipped.length } : {}) };
   const head = await headStore.read(circleId);
   if (head && (won.version < head.version || (won.version === head.version && won.key === head.key))) return { applied: false };
   let statement = null;
@@ -203,13 +220,13 @@ export async function preservedPolicyStatementsFor({ headStore, circleId } = {})
  * @param {(circleId: string, policy: object) => Promise<*>} a.writePolicy
  * @param {(circleId: string) => Promise<Set<string>>} a.adminsOf
  */
-export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePolicy, adminsOf } = {}) {
+export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePolicy, membersOf = null, adminsOf = null } = {}) {
   // The receive rail this device folds the lane with — handed over by the shell when it builds it, and remembered from
   // every apply, so a SAVE can bring the head up to date before it counts one past it.
   let knownRail = null;
   const apply = (circleId, rail) => {
     if (rail) knownRail = rail;
-    return applyPolicyUpdates({ rail: rail ?? knownRail, circleId, adminsOf, headStore, writePolicy });
+    return applyPolicyUpdates({ rail: rail ?? knownRail, circleId, membersOf, adminsOf, readPolicy, headStore, writePolicy });
   };
   return {
     /**
@@ -221,7 +238,7 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
      * admin saw "saved" (L144). It states one past the lane's head, makes its own statement the head, and puts the
      * saved policy back locally — applying the lane may have written the older one there, and the save is now newest.
      */
-    async state(circleId) {
+    async state(circleId, { proposalId = null } = {}) {
       const emit = typeof emitter === 'function' ? emitter() : null;
       if (typeof emit !== 'function' || typeof circleId !== 'string' || !circleId) return null;
       const policy = await readPolicy(circleId).catch(() => null);
@@ -230,7 +247,7 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
       const version = await nextPolicyVersion(headStore, circleId);
       let statement = null;
       try {
-        statement = await emit({ groupId: circleId, policy, version });
+        statement = await emit({ groupId: circleId, policy, version, ...(proposalId ? { proposalId } : {}) });
         if (statement?.body?.hash) await headStore.write(circleId, { version, key: statement.body.hash, statement });
       } finally {
         // The admin's save stays the local truth whether or not the lane took it: applying the lane above may have
@@ -247,12 +264,22 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
 }
 
 /**
- * The `adminsOf` every shell hands the lane: the circle's admins on THIS device's roster, read through the roster op.
- * One definition for web, mobile and the box. A shell whose `callSkill` binds after boot passes a wrapper that
- * reaches it lazily. An unreadable roster reads as no admins, so the lane applies nothing rather than trusting anyone.
+ * The `membersOf` every shell hands the lane: the circle's roster on THIS device (`{ref, role}`), read through the
+ * roster op. One definition for web, mobile and the box. A shell whose `callSkill` binds after boot passes a wrapper
+ * that reaches it lazily. An unreadable roster reads as nobody, so the lane applies nothing rather than trusting anyone.
  * @param {(app: string, op: string, args: object) => Promise<*>} callSkill
- * @returns {(circleId: string) => Promise<Set<string>>}
+ * @returns {(circleId: string) => Promise<Array<{ref: string, role: 'admin'|'member'}>>}
  */
+export function membersOfViaSkill(callSkill) {
+  return async (circleId) => {
+    let res = null;
+    try { res = typeof callSkill === 'function' ? await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }) : null; }
+    catch { res = null; }
+    return (res?.members ?? []).filter((m) => m?.webid).map((m) => ({ ref: m.webid, role: m.role === 'admin' ? 'admin' : 'member' }));
+  };
+}
+
+/** The admin refs alone, from the same roster read (`membersOfViaSkill`'s admins). */
 export function adminsOfViaSkill(callSkill) {
   return async (circleId) => {
     let res = null;

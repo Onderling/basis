@@ -25,6 +25,8 @@
  * is the durable head, exactly the items-lane relationship.
  */
 
+import { gateCarriedWrites } from './governanceReceiverGate.js';
+
 /**
  * The write half: append + fan one rules-update statement. Built by the host (realAgent) over its
  * governance-lane rail; injected into pinboard as `rulesUpdateEmit` (the membershipEmit pattern).
@@ -38,7 +40,7 @@ export function makeRulesUpdateEmitter({ rail, fan = null } = {}) {
   if (!rail || typeof rail.append !== 'function') {
     throw new Error('makeRulesUpdateEmitter: a governance-lane rail is required');
   }
-  return async function emitRulesUpdate({ groupId, rules, version } = {}) {
+  return async function emitRulesUpdate({ groupId, rules, version, proposalId = null } = {}) {
     if (typeof groupId !== 'string' || !groupId) return null;
     const v = Number.parseInt(version, 10);
     if (!Number.isFinite(v) || v < 1) return null;
@@ -48,7 +50,8 @@ export function makeRulesUpdateEmitter({ rail, fan = null } = {}) {
       res = await rail.append(groupId, {
         kind: 'rules-update',
         subject: `rules-v${v}`,
-        payload: { rules, version: v },
+        // the proposal that decided this change, where the circle's rule asked for one: every receiver checks it
+        payload: { rules, version: v, ...(typeof proposalId === 'string' && proposalId ? { proposalId } : {}) },
       });
     } catch { res = null; }
     if (!res) return null;
@@ -92,9 +95,11 @@ export async function preservedRulesStatementsFor({ callSkill, circleId } = {}) 
  * @param {{storedStatements: Function, readVerifiedBodies: Function}} a.rail  the receive-side governance rail
  * @param {Function} a.callSkill
  * @param {string} a.circleId
- * @returns {Promise<{applied: boolean, version?: number}>}
+ * @param {(circleId: string) => Promise<object|null>} a.readPolicy  the circle's policy on this device: the receiver
+ *   gate judges each change by the circle's rule for changing the rules (governanceReceiverGate.js)
+ * @returns {Promise<{applied: boolean, version?: number, skipped?: number}>}
  */
-export async function applyRulesUpdates({ rail, callSkill, circleId } = {}) {
+export async function applyRulesUpdates({ rail, callSkill, circleId, readPolicy = null } = {}) {
   if (!rail || typeof callSkill !== 'function' || typeof circleId !== 'string' || !circleId) {
     return { applied: false };
   }
@@ -115,16 +120,22 @@ export async function applyRulesUpdates({ rail, callSkill, circleId } = {}) {
   if (updates.length === 0) return { applied: false };
 
   // Receiver-enforced authority: the author must be an ADMIN on this device's roster.
-  let admins = new Set();
+  let members = [];
   try {
     const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
-    admins = new Set((Array.isArray(r?.members) ? r.members : [])
-      .filter((m) => m && m.role === 'admin')
-      .map((m) => m.webid ?? m.addr ?? m.ref)
-      .filter(Boolean));
-  } catch { admins = new Set(); }
-  const authorised = updates.filter((b) => admins.has(b.author));
-  if (authorised.length === 0) return { applied: false };
+    members = (Array.isArray(r?.members) ? r.members : [])
+      .map((m) => ({ ref: m?.webid ?? m?.addr ?? m?.ref, role: m?.role === 'admin' ? 'admin' : 'member' }))
+      .filter((m) => m.ref);
+  } catch { members = []; }
+  const admins = new Set(members.filter((m) => m.role === 'admin').map((m) => m.ref));
+  const byAdmins = updates.filter((b) => admins.has(b.author));
+  if (byAdmins.length === 0) return { applied: false };
+  // THE RECEIVER GATE: where the circle's rule asks for a vote, a change counts only with the proposal that decided it.
+  // A change that skipped the vote stays on the lane (the governance view shows it) and is never applied here.
+  let policy = {};
+  try { policy = (typeof readPolicy === 'function' ? await readPolicy(circleId) : null) ?? {}; } catch { policy = {}; }
+  const { kept: authorised, skipped } = await gateCarriedWrites({ rail, circleId, action: 'changeRule', bodies: byAdmins, policy, members });
+  if (authorised.length === 0) return { applied: false, ...(skipped.length ? { skipped: skipped.length } : {}) };
 
   // The winner: highest version; a version tie breaks on statement hash — deterministic, so two
   // admins racing the same bump converge to ONE doc on every device.

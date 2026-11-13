@@ -12,8 +12,8 @@ kernel's roster fold; every shell composes the same binding).
   screen, web and phone); see the settled ones as history.
 - As an admin, set WHO DECIDES each governed action: one admin (`any-admin`), the admins together (`admin-quorum`, a
   majority of the admins; a single admin is the quorum), the whole circle (`member-vote`, a majority of all members),
-  or a few drawn members (`random-sample`, see below). Who decides is itself a setting: changing it follows the
-  settings class.
+  or, after the alpha, a few drawn members (`random-sample`, built and held back, see below). Who decides is itself a
+  setting: changing it follows the settings class.
 - Remove a member, make someone an admin or an admin a member again, change the rules, change a setting: each goes
   through the circle's rule. Where one admin may decide it is done at once (with a propose + resolve trail); otherwise
   a proposal opens and the screen says so. An admin may always step down from their OWN role; that never waits.
@@ -24,8 +24,8 @@ kernel's roster fold; every shell composes the same binding).
   rules without the vote this circle requires. The change is not applied.") and no device applies it.
 - When the last admin leaves, the circle passes to a caretaker computed from the log (every device names the same
   person; nobody is asked).
-- Found a circle by answering the conflict question: "an admin decides", "the circle votes", or "two random members
-  mediate"; the answer decides who removes members.
+- Found a circle by answering the conflict question: "an admin decides" (the default) or "the circle votes"; the
+  answer decides who removes members. ("Two random members mediate" returns with the drawn sample, after the alpha.)
 
 ## Where
 
@@ -80,9 +80,11 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   kernel's roster fold (the doors make an honest app ask; a modified app is not refused there yet). Design in review
   (L663): an injected predicate in the roster fold beside the rules gate, a two-pass read to break the
   roster↔tally cycle.
-- **The drawn sample** is drawn from the CURRENT roster (a drawn member who leaves is replaced by the next in the
-  order), not from a frozen roster at proposal time; one sample setting per circle, no screen yet to change its size
-  or rule.
+- **The drawn sample is held back for the alpha** (`DRAWN_SAMPLE_ENABLED = false`): its draw was seeded by the
+  proposal's own hash (the proposer could re-word until it suits them) and drawn from the roster at fold time (an
+  admitting admin could steer it). No circle can hold the class until the fixed draw is in: each eligible member's
+  device signs a fixed message over the proposal (a value nobody can vary), the seed covers ALL eligible members of the
+  roster frozen at the proposal. The decision code is built and tested.
 - **A decision is judged by the policy in force on the receiving device**, not the policy at the time it was made.
 - **Polls with a real circle effect** (a typed poll item whose outcome is told or enacts a governed action): L737.
 

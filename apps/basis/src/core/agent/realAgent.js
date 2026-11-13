@@ -3637,14 +3637,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     const seen = new Set(reply.circles.map(idOf).filter(Boolean));
     const circles = [...reply.circles];
     const left = Array.isArray(reply.left) ? [...reply.left] : reply.left;
+    // …with the NAMES and the REMOVED tiles too: the default's reply names only its own circles, so a persona's circle
+    // merged without its name read as its id on every tile and header (found by the phone's personas walk).
+    const names = { ...((reply.names && typeof reply.names === 'object') ? reply.names : {}) };
+    const removed = Array.isArray(reply.removed) ? [...reply.removed] : reply.removed;
     for (const [pid, rt] of personas) {
       if (pid === 'default' || !rt?.chatId?.pubKey) continue;
       let theirs = null;
       try { theirs = (await chatAgent.invoke(pinboardAgentRef.current.address, 'listMyCircles', parts, { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null; } catch { theirs = null; }
       for (const c of theirs?.circles ?? []) { const id = idOf(c); if (id && !seen.has(id)) { seen.add(id); circles.push(c); } }
+      for (const [id, name] of Object.entries(theirs?.names ?? {})) if (!(id in names) && typeof name === 'string' && name) names[id] = name;
       if (Array.isArray(left) && Array.isArray(theirs?.left)) for (const l of theirs.left) if (!left.includes(l)) left.push(l);
+      if (Array.isArray(removed) && Array.isArray(theirs?.removed)) for (const r of theirs.removed) if (r?.id && !removed.some((x) => x?.id === r.id)) removed.push(r);
     }
-    return { ...reply, circles, ...(left !== undefined ? { left } : {}) };
+    return { ...reply, circles, names, ...(left !== undefined ? { left } : {}), ...(removed !== undefined ? { removed } : {}) };
   };
   // WHO GREETED THIS DEVICE survives a reload. The security layer's bindings — "this key is Bea",
   // established by her greeting — lived in memory only, so a reload (every web session) or a restart

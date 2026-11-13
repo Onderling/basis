@@ -798,6 +798,13 @@ because of this reads `"reason":"point-mismatch"` with each candidate as `kind:w
 
 Each one produced an APK that did not carry the code it was built to test.
 
+- **A worktree made by `plans/tools/mk-worktree.sh` has no `react-native-libsodium`** (2026-11-13): the phone's
+  native signature check (pinned 1.7.0 in `apps/basis-mobile/package.json`) was installed in one probe worktree only,
+  and the script copies `node_modules` from the shared checkout, which never got it. The release bundle then fails at
+  `:app:createBundleReleaseJsAndAssets` with "Unable to resolve module react-native-libsodium from App.js". CI installs
+  fresh and is fine. Fix for a local build: hardlink the installed package (with its postinstall's prebuilt
+  `libsodium/`) from a worktree that has it, `cp -al <that>/apps/basis-mobile/node_modules/react-native-libsodium
+  apps/basis-mobile/node_modules/`; its `libsodium-wrappers` dependency is already in the tree.
 - **Build only the app's test APK**: `./gradlew :app:assembleRelease :app:assembleAndroidTest -DtestBuildType=release`
   (what `.detoxrc.js` runs). A bare `assembleAndroidTest` also builds every library module's tests and dies on
   `:expo-dev-client:mergeDebugAndroidTestJavaResource` (6 × `META-INF/LICENSE.md`). The app already picks one; the

@@ -52,6 +52,8 @@ export const SCREEN_SECTIONS = Object.freeze({
   // own acts and bookmarks that open a circle's op there) and their own acts (a note, an appointment, …). The "+" makes
   // things; Share my card and Scan live on Mij.
   plusSheet: Object.freeze([
+    // the kept conversation with the assistant (the last turns, oldest first), above the line it continues
+    Object.freeze({ id: 'plus-thread', titleKey: null }),
     Object.freeze({ id: 'plus-line', titleKey: null }),
     Object.freeze({ id: 'plus-pinned', titleKey: 'circle.vandaag.pinned_title' }),
     Object.freeze({ id: 'plus-own',  titleKey: null }),

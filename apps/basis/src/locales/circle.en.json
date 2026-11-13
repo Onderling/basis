@@ -958,6 +958,10 @@
       "text": "Fine. Then pick a topic yourself:",
       "doc": "Task #13 Phase 2 — heading above the set-topic chips after the user declines forwarding (or types /help)."
     },
+    "all_topics": {
+      "text": "All topics",
+      "doc": "Help: the chip after the five likeliest topics of an unanswered question; it posts every topic."
+    },
     "no_llm_topics": {
       "text": "Without an assistant I can only answer these set topics. Pick one:",
       "doc": "Task #13 Phase 2 — honest fallback on a MISS when NO assistant is connected: only the fixed topics can be answered."
@@ -1560,8 +1564,16 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
-      "text": "I could not read that — fill in the fields below.",
+      "text": "I could not read that.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_forget": {
+      "text": "Forget this conversation",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Your conversation with the assistant",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
     },
     "act_done": {
       "text": "Done",
@@ -5899,6 +5911,14 @@
       "text": "Show",
       "doc": "The thread header's control when the contact is hidden: show them in Contacts again (the person's own act; a message from them does the same)."
     },
+    "more": {
+      "text": "More",
+      "doc": "A contact thread: the ⋯ button that holds Hide and Delete."
+    },
+    "self_here": {
+      "text": "You are {{name}} here; what does this contact see of you?",
+      "doc": "A contact thread: the avatar top right, the persona you are in this thread; its tap shows what the contact sees of you."
+    },
     "hide_note": {
       "text": "Only from your list. Their circles and this conversation stay; a message from them brings them back.",
       "doc": "What hiding IS and is not, said under the control (amendment 3: Contacts only — their circles, roster row and member card are untouched). Never a notification."
@@ -6430,6 +6450,10 @@
     "scan": {
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "assistant": {
+      "text": "Assistant",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
     },
     "share_contact": {
       "text": "Share my card",
@@ -10406,6 +10430,7 @@
   },
   "settings_home": {
     "title": "Settings",
+    "help": "Help",
     "appearance": "Appearance",
     "per_circle": "Per circle",
     "no_circles": "You are not in any circle yet.",

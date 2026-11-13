@@ -14,10 +14,11 @@ const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, backToLauncher, em
 const { startPeer, joinByInvite } = require('./support/peer');
 
 const stamp = Date.now().toString(36);
-const PHONE_LINE = `hallo kring ${stamp}`;
-const PEER_LINE = `hoi anna ${stamp}`;
-const PEER_DM = `even apart ${stamp}`;
-const PHONE_DM = `prima ${stamp}`;
+// each line starts with a capital: the composer capitalises a sent line's first letter, and these are compared exactly
+const PHONE_LINE = `Hallo kring ${stamp}`;
+const PEER_LINE = `Hoi anna ${stamp}`;
+const PEER_DM = `Even apart ${stamp}`;
+const PHONE_DM = `Prima ${stamp}`;
 let peer = null;
 let ready = null;
 
@@ -89,6 +90,17 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     await soon(by.id('contact-thread-screen'), 30_000);
     await soon(by.text(PEER_DM), 60_000);
     await device.takeScreenshot('msg-05-thread');
+  });
+
+  it("the thread's header: who you are here (the lens) and the ⋯ that holds Hide and Delete", async () => {
+    await soon(by.id('contact-thread-self'), 20_000);
+    await soon(by.id('contact-thread-more'), 20_000);
+    await element(by.id('contact-thread-more')).tap();
+    await soon(by.text('Delete'), 10_000);
+    await soon(by.text('Hide'), 10_000);
+    await device.takeScreenshot('msg-05b-thread-more');
+    await device.pressBack();   // closes the sheet, the thread stays
+    await soon(by.id('contact-thread-screen'), 10_000);
   });
 
   it("the phone's answer in the thread reaches Bram's stored thread", async () => {

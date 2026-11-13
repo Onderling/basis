@@ -123,7 +123,7 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
 
     // ── 3. L125: the level changed later on A1 → A2 follows ────────────────────────────────────────────
     await openThread(A1.page, bId);
-    await A1.page.locator('.cc-cthread__lens').click();
+    await A1.page.locator('.cc-cthread__self').click();
     await A1.page.locator('.cc-lens__level').selectOption('full');
     await A1.page.locator('.cc-lens__ok').click();
     await expect.poll(async () => (await bookRow(A2.page, bId))?.revealPreset ?? null, { timeout: 60_000, message: 'the change reached A2' }).toBe('full');
@@ -131,6 +131,7 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
 
     // ── 4. L114: delete on A1 → hidden with the deletion on record on A2, and A2 left the pair circle ───
     await openThread(A1.page, bId);
+    await A1.page.locator('.cc-cthread__more').click();   // Delete lives in the ⋯
     await A1.page.locator('.cc-cthread__delete').click();
     await A1.page.locator('.cc-confirm__accept').click();
     await expect.poll(async () => { const r = await bookRow(A2.page, bId); return r ? { hidden: r.hidden, deleted: Number.isFinite(r.deletedAt) } : null; },

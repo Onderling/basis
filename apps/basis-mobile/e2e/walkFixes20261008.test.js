@@ -5,13 +5,13 @@
 //   1. Opening ANY circle painted a red screen ("Text strings must be rendered within a <Text> component") — three
 //      spaces between `(<>` and a comment became a text node inside the circle screen's <View>.
 //   2. On a cold start the launcher said "No circles yet." for seconds, for an account that HAD a circle — the empty
-//      state painted in the gaps of its boot retry.
+//      state painted in the gaps of its boot retry. (Walked in firstFiveMinutes now, after it makes its first circle:
+//      a fresh install here has no launcher circle since Help is a contact.)
 //   3. A contact's Hide / "What they see" / Delete lay past the right edge of the thread header — untappable.
 //
 // Runs against the RELEASE APK (embedded JS bundle), like the rest of this suite. A fresh install is enough: the app
 // provisions its help circle on first boot (a circle to open), and a person is added by opening their card as a link.
 
-const EMPTY = 'No circles yet.';
 // A second PERSON, as the app's own encoder writes their card (e2e/support/makeContactCard.mjs; pinned by
 // test/e2eContactCardFixture.test.js) — a person's thread carries Hide / "What they see" / Delete; a bot's does not.
 const PERSON = require('./support/contactCard.fixture.json');
@@ -80,23 +80,6 @@ describe('the walk of 2026-10-08, pinned', () => {
     await device.takeScreenshot('walk-fixes-contact-more');
     await expect(element(by.text('Delete'))).toBeVisible();
     await device.pressBack();
-  });
-
-  // SKIPPED (2026-11-13): its premise was that a fresh install has a circle on the launcher (the help circle's tile).
-  // Help is a contact now, so a fresh install has no launcher circle; this needs a walk that first makes one
-  // (firstFiveMinutes does) before it can say anything. Kept, not deleted, until that walk carries the check.
-  it.skip('a cold start never says "No circles yet." to an account that has a circle', async () => {
-    await launch({ fresh: false });
-    await waitFor(element(by.id('circle-launcher'))).toBeVisible().withTimeout(90_000);
-    // Watch the launcher until the tile is there: the empty state must not appear at any point on the way.
-    const until = Date.now() + 90_000;
-    let tile = false;
-    while (Date.now() < until) {
-      if (await isVisible(by.text(EMPTY))) throw new Error(`"${EMPTY}" painted for an account that has a circle`);
-      if (await isVisible(by.id('circle-launcher'))) { tile = true; break; }
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    if (!tile) throw new Error('the circle tile never appeared');
   });
 
   it('a circle opens — the conversation and its composer, no red screen', async () => {

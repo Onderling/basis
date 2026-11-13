@@ -20,16 +20,7 @@ import { EventLog } from '../../src/eventLog.js';
  * Subtypes the shells' table registers that the harness leaves out ON PURPOSE. Every entry needs a reason; an entry the
  * harness now answers must be removed (the test fails on it). Adding here is a decision, not a way to go green.
  */
-const KNOWN_GAPS = {
-  // The items catch-up (circleLanes.js `task`): a member who joins after a list, chore or appointment was made does
-  // not pull it from a harness node. Found by this test (2026-11-13). Composed the shells' way, one full run of the
-  // harness suites had 12 failing files (each green alone); a second had only appListFanTwoDevice, which also fails in
-  // full runs without it. One bad run is not a verdict either way: it is added after a few clean full runs with it. A
-  // walk that needs a joiner to see older items makes them after the join meanwhile.
-  'circle-items-catchup-request': 'items catch-up not composed yet (see above)',
-  'circle-items-catchup-batch':   'items catch-up not composed yet (see above)',
-  'circle-items-catchup-offer':   'items catch-up not composed yet (see above)',
-};
+const KNOWN_GAPS = {};
 
 let node = null;
 afterAll(async () => { if (node) await teardown(node).catch(() => {}); });

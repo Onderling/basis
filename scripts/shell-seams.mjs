@@ -55,6 +55,9 @@ export const SEAMS = Object.freeze([
   // pairing form asks (the active self preselected) — the shared decision is `connectionSelfChoice`. The box pairs no
   // screen through a form.
   { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
+  // A NEW MEMBER IS NAMED AS THEIR FIRST LINE LANDS: a sender the roster cannot place yet (one this device admitted, a
+  // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles
+  { id: 'roster-reread-for-unplaced-sender', pattern: /sendersToPlace\(/, shells: ['web', 'mobile'], why: 'without it a member who has just joined shows as "Onbekend lid" on their first line until the circle is reopened' },
   { id: 'second-persona-join-refusal', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the wizard cannot say before the submit that the person is already in the circle as another persona' },
   // A SCREEN'S DATA IS A HEAD: Vandaag's blocks kept current by the circles' changes and the event log (`screenHead.js`),
   // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time

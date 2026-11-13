@@ -750,21 +750,34 @@ export class Transport extends Emitter {
    * @returns {string|null}
    */
   appMessageIdFor(envelopeId) {
+    return this.sentEnvelopeFor(envelopeId)?.msgId ?? null;
+  }
+
+  /**
+   * What this transport remembers about an outgoing envelope: the app's message id (or null), who it went to, and the
+   * payload's kind (`subtype` or `type`). Kept on THIS device only, bounded, never sent: a report naming only the
+   * envelope (the relay's give-up) can then say what was lost and for whom. Null when unknown.
+   * @param {string} envelopeId
+   * @returns {{msgId: string|null, to: string|null, subtype: string|null}|null}
+   */
+  sentEnvelopeFor(envelopeId) {
     return (typeof envelopeId === 'string' && this.#appMessageIds.get(envelopeId)) || null;
   }
 
-  #noteAppMessageId(envelope) {
-    const msgId = envelope?.payload?.msgId;
-    if (typeof envelope?._id !== 'string' || typeof msgId !== 'string' || !msgId) return;
+  #noteAppMessageId(to, envelope) {
+    if (typeof envelope?._id !== 'string') return;
+    const p = envelope.payload;
+    const msgId = typeof p?.msgId === 'string' && p.msgId ? p.msgId : null;
+    const kind = typeof p?.subtype === 'string' ? p.subtype : (typeof p?.type === 'string' ? p.type : null);
     if (this.#appMessageIds.size >= Transport.#APP_MESSAGE_IDS_CAP) {
       this.#appMessageIds.delete(this.#appMessageIds.keys().next().value);   // the oldest — Map keeps insertion order
     }
-    this.#appMessageIds.set(envelope._id, msgId);
+    this.#appMessageIds.set(envelope._id, { msgId, to: typeof to === 'string' ? to : null, subtype: kind });
   }
 
   /** Apply SecurityLayer (if set) and call _put. */
   async _send(to, envelope) {
-    this.#noteAppMessageId(envelope);   // before encryption — the payload is opaque after it
+    this.#noteAppMessageId(to, envelope);   // before encryption — the payload is opaque after it
     const outgoing = this.#securityLayer
       ? this.#securityLayer.encrypt(envelope)
       : envelope;

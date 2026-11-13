@@ -25,6 +25,17 @@ describe('appMessageIdFor', () => {
     expect(t.appMessageIdFor(null)).toBe(null);
   });
 
+  it('remembers, for every outgoing envelope, who it went to and what kind it was (a give-up can say what was lost)', async () => {
+    const t = new Probe();
+    await t.sendOneWay('peer.a', { msgId: 'm1', subtype: 'circle-chat', text: 'hoi' });
+    await t.sendOneWay('peer.b', { type: 'circle-governance-broadcast' });
+    const [a, b] = t.put.map((p) => p.envelope);
+    expect(t.sentEnvelopeFor(a._id)).toEqual({ msgId: 'm1', to: 'peer.a', subtype: 'circle-chat' });
+    expect(t.sentEnvelopeFor(b._id)).toEqual({ msgId: null, to: 'peer.b', subtype: 'circle-governance-broadcast' });
+    expect(t.appMessageIdFor(b._id), 'an id-less payload still maps to no app id').toBe(null);
+    expect(t.sentEnvelopeFor('never-sent')).toBe(null);
+  });
+
   it('is bounded — the oldest entry goes first, and the newest are always answerable', async () => {
     const t = new Probe();
     for (let i = 0; i < 2005; i++) await t.sendOneWay('peer', { msgId: `m${i}` });

@@ -27,6 +27,11 @@
  *   {"do":"contact-say","text":"…"}    a contact turn to the person it last heard from, else the first other member
  * and answers each with `{"step":"circle-said"|"contact-said","ok":…}`.
  *
+ * `--join` makes the peer a person who JOINS the phone's circle instead of founding one (the first-five-minutes story:
+ * the phone makes the circle and its invite brings the peer in). It prints `{"step":"ready","waitingForInvite":true}` and joins
+ * on `{"do":"join","invite":"onderling-invite://…"}` (the link the phone's invite card shows), the way the shells join
+ * (`joinCircleFromInvite`), then answers `{"step":"joined","ok":…,"circleId":…}`. `--talk` works the same after.
+ *
  * Run from apps/basis-mobile; the agent code is imported from the basis app's test support.
  */
 import { startJourneyRelay } from '../../../basis/test/support/testRelay.js';
@@ -37,7 +42,7 @@ import {
 } from '../../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../../basis/src/v2/householdRosterPairing.js';
 import { DEFAULT_CIRCLE_POLICY } from '../../../basis/src/v2/circlePolicy.js';
-import { buildCircleInviteUri } from '../../../basis/src/v2/circleInvite.js';
+import { buildCircleInviteUri, joinCircleFromInvite } from'../../../basis/src/v2/circleInvite.js';
 import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 
 const arg = (name, fallback = null) => {
@@ -63,6 +68,7 @@ const lanAddress = () => {
 };
 const phoneHost = arg('phone-host', lanAddress() ?? '10.0.2.2');
 const talk = process.argv.includes('--talk');
+const joinMode = process.argv.includes('--join');
 
 const relay = await startJourneyRelay();
 const relayUrl = phoneHost === '10.0.2.2' ? relay.url : `ws://${phoneHost}:${new URL(relay.url).port}`;
@@ -70,12 +76,14 @@ say({ step: 'relay', url: relayUrl });
 const peer = await bootRealAgentNode(handle, { itemsLane: true, contactChannel: talk });
 await connectNodesOverRelay([peer], { relayUrl });
 
-const groupId = `walk-${Date.now().toString(36)}`;
+const call = (app, op, args) => peer.agent.callSkill(app, op, args);
+// the circle this peer is in: its own (founded here), or, in `--join` mode, the phone's once the invite arrives
+let groupId = joinMode ? null : `walk-${Date.now().toString(36)}`;
+if (!joinMode) {
 await createCircle(peer, { groupId, name: circleName });
 await bindCircleAddresses([peer], groupId);
 await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId });
 
-const call = (app, op, args) => peer.agent.callSkill(app, op, args);
 // `--features lists,calendar`: the admin switches circle features ON, as the settings screen's save does: a signed
 // policy update on the governance lane, which every member (the phone too) folds into its copy of the policy
 const features = (arg('features', '') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -95,6 +103,12 @@ if (offering) {
   say({ step: 'offering', set: !!set?.ok, released: !!shown?.ok, said: said?.ok ? said.via ?? true : said });
 }
 
+}
+
+if (joinMode) {
+  await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
+  say({ step: 'ready', waitingForInvite: true, relayUrl });
+} else {
 const port = new URL(relay.url).port;
 const invite = await buildCircleInviteUri({
   callSkill: call, circleId: groupId,
@@ -111,6 +125,29 @@ say({
     circleAddress: String(peer.agent.circleAddressFor?.(groupId) ?? '').slice(0, 12),
   },
 });
+}
+
+if (joinMode) {
+  // JOINING: the phone's invite, the way a shell joins (the wizard's own call), then the circle's addresses bound
+  readline.createInterface({ input: process.stdin }).on('line', async (line) => {
+    let cmd = null;
+    try { cmd = JSON.parse(line); } catch { return; }
+    if (cmd?.do !== 'join' || groupId) return;
+    try {
+      const r = await joinCircleFromInvite({
+        inviteUri: cmd.invite, callSkill: call, sendPeerRedeem: peer.sendPeerRedeem, handle, rulesAccepted: true,
+        circleAddressFor: (cid) => peer.agent.circleAddressFor(cid),
+        signCircleLink: (src, dst, addr) => peer.agent.signCircleLink?.(src, dst, addr) ?? null,
+      });
+      if (r?.ok) {
+        groupId = r.circleId;
+        await bindCircleAddresses([peer], groupId).catch(() => {});
+        await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId }).catch(() => {});
+      }
+      say({ step: 'joined', ok: !!r?.ok, circleId: r?.circleId ?? null, error: r?.ok ? null : (r?.reason ?? r?.error ?? null) });
+    } catch (err) { say({ step: 'joined', ok: false, error: String(err?.message ?? err) }); }
+  });
+}
 
 if (talk) {
   // HEARING: what landed in the peer's own stores (its chat log, its stored contact threads), polled — the same
@@ -118,7 +155,7 @@ if (talk) {
   const heardChat = new Set(); const heardTurns = new Set(); let lastFrom = null;
   const listen = async () => {
     for (const e of peer.chatEvents) {
-      if (!e?.id || heardChat.has(e.id) || e.actor === peer.pubKey || e.payload?.circleId !== groupId || !e.payload?.text) continue;
+      if (!groupId || !e?.id || heardChat.has(e.id) || e.actor === peer.pubKey || e.payload?.circleId !== groupId || !e.payload?.text) continue;
       heardChat.add(e.id);
       say({ step: 'circle-heard', text: e.payload.text });
     }

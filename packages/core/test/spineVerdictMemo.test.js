@@ -104,6 +104,8 @@ describe('the verdict memo over verifySpine', () => {
     expect(exactVerdictKey({ a: Number.NaN })).toBeNull();
     expect(exactVerdictKey({ d: new Date(0) })).toBeNull();
     expect(exactVerdictKey({ xs: [1, undefined] })).toBeNull();
+    expect(exactVerdictKey({ f: () => 1 })).toBeNull();
+    expect(exactVerdictKey({ s: Symbol('x') })).toBeNull();
     expect(exactVerdictKey({ a: 1, b: 'x', c: null })).toBe('{"a":1,"b":"x","c":null}');
   });
 
@@ -128,5 +130,10 @@ describe('the verdict memo over the circle-link proof', () => {
     expect(calls.n).toBe(1);
     expect(verifyCircleLink({ groupId: 'other', address: a.pubKey, proof, verifySignature: verify, verdictMemo: memo })).toBe(false);
     expect(calls.n).toBe(2);
+    // never coerced: a group id that is not the string asked before is keyed apart, so the memo answers exactly as the
+    // full check does (which reads the id through String() in the signed message)
+    const full = verifyCircleLink({ groupId: [CID], address: a.pubKey, proof, verifySignature: verify });
+    expect(verifyCircleLink({ groupId: [CID], address: a.pubKey, proof, verifySignature: verify, verdictMemo: memo })).toBe(full);
+    expect(memo.size).toBe(full ? 2 : 1);
   });
 });

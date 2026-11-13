@@ -143,8 +143,8 @@ export function createVerdictMemo({ maxBytes = VERDICT_MEMO_MAX_BYTES } = {}) {
 
 /**
  * The exact key for a verdict: the value's JSON, or null when JSON would make two different inputs look the same (a
- * non-finite number or a value with `toJSON`, both written as something else, or an `undefined` inside an array, written
- * as null). A null key is never remembered, so such an input is always checked in full.
+ * non-finite number or a value with `toJSON`, both written as something else, an `undefined` inside an array, written
+ * as null, or a function, symbol or bigint, which JSON drops or refuses). A null key is never remembered, so such an input is always checked in full.
  * @param {*} value
  * @returns {string|null}
  */
@@ -153,6 +153,7 @@ export function exactVerdictKey(value) {
   try {
     return JSON.stringify(value, function exact(k, v) {
       if (typeof v === 'number' && !Number.isFinite(v)) throw LOSSY;
+      if (typeof v === 'function' || typeof v === 'symbol' || typeof v === 'bigint') throw LOSSY;   // JSON drops or refuses these
       if (v === undefined && Array.isArray(this)) throw LOSSY;
       // `this[k]` is the value before its toJSON ran (a Date, a Buffer): its JSON is not the value itself
       const raw = this?.[k];

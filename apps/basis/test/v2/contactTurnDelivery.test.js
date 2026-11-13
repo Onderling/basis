@@ -171,3 +171,27 @@ describe('who may confirm MY turn to a contact', () => {
     await expect(contactReceiptAddresses({ channel: ch, pair: null })('never-sent')).resolves.toBeNull();
   });
 });
+
+describe('a turn HELD for an unknown address ends honestly (the send gate)', () => {
+  it('held: pending first; when the hold ENDS (expired, evicted) the bubble says it did not go, and why', async () => {
+    const map = createDeliveryStateMap();
+    let end;
+    const later = new Promise((r) => { end = r; });
+    const sent = Promise.resolve({ sent: { held: true, delivered: false, reason: 'unknown-address', later } });
+    const done = trackContactTurn({ messageId: 'm-held', sent, deliveryMap: map });
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(map.get('m-held')?.state ?? map.get('m-held')).toBe(DELIVERY.PENDING);
+    end({ held: false, delivered: false, reason: 'unknown-address', ended: 'expired' });
+    const out = await done;
+    expect(out).toEqual({ state: DELIVERY.FAILED, reason: 'unknown-address' });
+    expect(DELIVERY_REASON_LABELS['unknown-address'], 'the failed bubble has words for why').toBeTruthy();
+  });
+
+  it('held, then sent once the device learned who it is: the bubble moves on as a send that left', async () => {
+    const map = createDeliveryStateMap();
+    const sent = Promise.resolve({ sent: { held: true, delivered: false, reason: 'unknown-address', later: Promise.resolve({ delivered: true }) } });
+    const out = await trackContactTurn({ messageId: 'm-later', sent, deliveryMap: map });
+    expect(out.state).not.toBe(DELIVERY.PENDING);
+    expect(out.state).not.toBe(DELIVERY.FAILED);
+  });
+});

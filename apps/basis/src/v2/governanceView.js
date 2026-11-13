@@ -46,6 +46,16 @@ function lastVoteOf(votes, ref) {
 }
 
 /**
+ * Who or what a proposal is about, as a line a person reads: a member (a removal; a role change's member), never an
+ * object printed as text. A rules or settings change is about the whole circle: no subject line (the action says it).
+ */
+function subjectLabelOf(p, labelForSubject) {
+  if (typeof p.subject === 'string') return labelForSubject(p.subject, p.action);
+  if (p.action === 'changeRole' && typeof p.subject?.member === 'string') return labelForSubject(p.subject.member, p.action);
+  return '';
+}
+
+/**
  * @param {object} a
  * @param {{proposals: Array}} a.fold           the governanceLog fold
  * @param {{ref?:string, role?:string}} [a.viewer]  the current member (drives can-vote/override)
@@ -65,7 +75,7 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       proposalId: p.proposalId,
       action: p.action,
       subject: p.subject,
-      subjectLabel: labelForSubject(p.subject, p.action),
+      subjectLabel: subjectLabelOf(p, labelForSubject),
       by: p.by,
       decisionClass: cls,
       status: p.status,

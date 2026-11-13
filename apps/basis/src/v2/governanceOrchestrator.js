@@ -23,13 +23,15 @@ import { decisionDeadlineDays } from './circlePolicy.js';
 
 export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, newProposalId, now = () => 0, canEnact = () => true } = {}) {
   async function enactAndClose(circleId, proposal, by) {
-    let ok = true;
-    try { const r = await enact(circleId, proposal.action, proposal.subject); ok = r?.ok !== false; }
+    let ok = true; let result = null;
+    // an op REFUSES by `{ok:false}` or by `{error}` (pinboard's skills answer the second): either is not enacted
+    try { result = await enact(circleId, proposal.action, proposal.subject); ok = result?.ok !== false && !result?.error; }
     catch { ok = false; }
     await appendEvent(circleId, resolveEvent({
       proposalId: proposal.proposalId, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, by, at: now(),
     }));
-    return ok;
+    // the op's own answer rides back: what a screen says can depend on it (a role change handed to the main device)
+    return { ok, result };
   }
 
   // Re-read the log, resolve the proposal's status, and act on a terminal result.
@@ -45,8 +47,8 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     const mayEnact = canEnact(ctx);
     if (p.status === DECISION_STATUS.APPROVED) {
       if (!mayEnact) return { ok: true, status: DECISION_STATUS.APPROVED, proposalId, awaitingEnactment: true, tally: p.decision.tally };
-      const ok = await enactAndClose(circleId, p, enactor);
-      return { ok, status: DECISION_STATUS.APPROVED, proposalId, enacted: ok, tally: p.decision.tally };
+      const { ok, result } = await enactAndClose(circleId, p, enactor);
+      return { ok, status: DECISION_STATUS.APPROVED, proposalId, enacted: ok, result, tally: p.decision.tally };
     }
     if (p.status === DECISION_STATUS.REJECTED) {
       if (!mayEnact) return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, awaitingClose: true, tally: p.decision.tally };
@@ -68,8 +70,8 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
       if (immediate.status !== DECISION_STATUS.APPROVED) return { ok: false, status: immediate.status, reason: immediate.reason };
       const proposalId = newProposalId();
       await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: null, at: t }));
-      const ok = await enactAndClose(circleId, { proposalId, action, subject }, actor?.ref);
-      return { ok, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, proposalId, enacted: ok };
+      const { ok, result } = await enactAndClose(circleId, { proposalId, action, subject }, actor?.ref);
+      return { ok, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, proposalId, enacted: ok, result };
     }
 
     // admin-quorum / member-vote — open the proposal, auto-cast the proposer's yes, then tally.
@@ -104,8 +106,8 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
       deadline: p.deadline, now: now(), override: true,
     });
     if (d.status !== DECISION_STATUS.APPROVED) return { ok: false, status: d.status, reason: d.reason };
-    const ok = await enactAndClose(circleId, p, actor?.ref);
-    return { ok, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, proposalId, reason: 'admin-override' };
+    const { ok, result } = await enactAndClose(circleId, p, actor?.ref);
+    return { ok, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, proposalId, reason: 'admin-override', result };
   }
 
   return { propose, vote, override, tally };

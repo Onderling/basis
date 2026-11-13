@@ -24,7 +24,8 @@ describe('the admin controls what the circle shared out — web ≡ mobile', () 
     expect(WEB).toMatch(/revokeAllForMember\(/);
     expect(PODS).toMatch(/return revokeAllForMember\(/);
     expect(HOST).toMatch(/revokeForRemoved=\{\(webid\) => revokeOutboundForMember\(/);
-    expect(PANEL).toMatch(/if \(r\?\.ok && m\.webid && typeof revokeForRemoved === 'function'\)/);
+    // only after a removal that was DONE (the governance door: a proposal that is still open has removed nobody)
+    expect(PANEL).toMatch(/if \(r\.outcome === 'done' && m\.webid && typeof revokeForRemoved === 'function'\)/);
   });
   it('both say the same words for a stop and for a removal\'s revoke', () => {
     expect(WEB).toMatch(/stopShareWords\(r, s\)/);

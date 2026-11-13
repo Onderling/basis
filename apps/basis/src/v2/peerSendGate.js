@@ -29,7 +29,7 @@ export const INVITE_EXCHANGE_MAX = param({ key: 'sendGate.inviteExchangeMax', sc
 
 /**
  * THE PERSON KEY'S ALLOWLIST. A send that is no circle's and no own device's leaves on the person key ONLY for one of
- * these reasons; anything else is 'none' (recorded today; held as 'unknown-address' once the gate enforces it). Data, in
+ * these reasons; anything else is 'none', and the send is HELD as 'unknown-address' (createHeldSends) until this device learns who it is. Data, in
  * one place: a new case is an entry here with its reason, never a silent fallback. Each entry answers from FACTS the agent
  * hands in (what this device holds), never from a caller's option, so no caller can name an entry for itself. Ordered
  * most specific first, the person's address-fallback setting LAST, so `allowedBy` names the real reason.
@@ -38,8 +38,8 @@ export const INVITE_EXCHANGE_MAX = param({ key: 'sendGate.inviteExchangeMax', sc
 export const PERSON_ALLOWLIST = Object.freeze([
   Object.freeze({
     id: 'invite-exchange',
-    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal), and the one request a scanned pairing code sends to the scanned key (the invite names the inviter\'s cross-circle id by decision, so this buys no link)',
-    matches: (f) => f?.inviteExchange === 'joiner' || f?.inviteExchange === 'answer' || f?.inviteExchange === 'refusal' || f?.inviteExchange === 'pairing',
+    reason: 'the invite exchange: the joiner to the address on an invite it is redeeming now, and the inviter\'s one reply to a well-formed request (the answer when it proved its code, else the refusal), and the one request a scanned pairing code sends to the scanned key (the invite names the inviter\'s cross-circle id by decision, so this buys no link); and the ONE answer to an address that just asked this device by a statement it signed and this device checked: a bot\'s link statement to the app identity whose link offer it checked (chained to its root, fresh, nonce spent), a box\'s refusal to the screen key whose own offer it read',
+    matches: (f) => ['joiner', 'answer', 'refusal', 'pairing', 'link-answer', 'screen-refusal'].includes(f?.inviteExchange),
     detail: (f) => ({ side: f.inviteExchange }),
   }),
   Object.freeze({
@@ -94,13 +94,15 @@ export function contactOriginOf(row) {
  * only, so a send of one side never uses up another side's registration (an address that is both, two devices inviting
  * each other), and a send that is no part of it (a contact message to an address with an open redeem) is not named so.
  * @param {object|null} payload
- * @returns {'joiner'|'reply'|'pairing'|null}
+ * @returns {'joiner'|'reply'|'pairing'|'link-answer'|'screen-refusal'|null}
  */
 export function exchangeKindOf(payload) {
   if (!payload || typeof payload !== 'object') return null;
   if (payload.subtype === 'group-redeem-request') return 'joiner';
   if (payload.subtype === 'group-redeem-response') return 'reply';
   if (payload.__pairReq && typeof payload.__pairReq === 'object') return 'pairing';
+  if (payload.subtype === 'identity-link') return 'link-answer';
+  if (payload.subtype === 'screen-offer-refused') return 'screen-refusal';
   return null;
 }
 
@@ -115,6 +117,49 @@ export function exchangeKindOf(payload) {
  * handler `agent.sendPeerMessage`, one call is one pass, and hold-forward redelivery happens below the gate (the secure
  * agent's queue), so nothing re-enters it for the same reply.
  */
+/**
+ * How long a person-key send with no allowlist reason waits for this device to learn who the address is (a contact
+ * landing, a roster read): a card being added or a roster arriving takes seconds, not hours.
+ */
+export const HELD_SEND_LIFETIME_MS = param({ key: 'sendGate.heldSendLifetimeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60_000 });
+/** At most this many such sends wait at once on a device; past it the oldest goes. */
+export const HELD_SEND_MAX = param({ key: 'sendGate.heldSendMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
+/** How often the held sends are judged again while any wait (a contact can land through any op; a timer catches all). */
+export const HELD_SEND_RECHECK_MS = param({ key: 'sendGate.heldSendRecheckMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3_000 });
+
+/**
+ * THE HELD SENDS: a person-key send that no allowlist entry names ('unknown-address') waits here instead of leaving on
+ * the person key. Bounded (the oldest goes past `max`) and never standing (an entry ends at its lifetime, counted from
+ * its FIRST hold, also when it is put back after a re-judge). `onEnded(entry, 'expired'|'evicted')` reports an end.
+ * The agent takes them all when it learns something (a roster read, the recheck tick), judges each again and puts back
+ * the ones still unknown.
+ */
+export function createHeldSends({ now = () => Date.now(), lifetimeMs = HELD_SEND_LIFETIME_MS, max = HELD_SEND_MAX, onEnded = null } = {}) {
+  let held = [];
+  const end = (e, why) => { try { onEnded?.(e, why); } catch { /* a report never breaks the hold */ } };
+  const place = (e) => {
+    held.push(e);
+    while (held.length > max) end(held.shift(), 'evicted');
+  };
+  return {
+    hold({ to, payload, opts = {}, since = null, settle = null } = {}) {
+      const e = { to, payload, opts, since: Number.isFinite(since) ? since : now(), ...(typeof settle === 'function' ? { settle } : {}) };
+      place(e);
+      return e;
+    },
+    putBack(e) { if (e) place(e); },
+    take() {
+      const t = now();
+      const all = held; held = [];
+      return all.filter((e) => {
+        if (t - e.since > lifetimeMs) { end(e, 'expired'); return false; }
+        return true;
+      });
+    },
+    get size() { return held.length; },
+  };
+}
+
 export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVITE_EXCHANGE_LIFETIME_MS, max = INVITE_EXCHANGE_MAX } = {}) {
   /** address → { n, until }: redeems open toward that inviter */
   const joiners = new Map();
@@ -122,9 +167,19 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
   const replies = new Map();
   /** address → { n, until }: pairing codes scanned toward that key */
   const pairings = new Map();
+  /** `${side}\u0000${address}` → { until }: the one answer owed to an address whose signed ask this device just checked */
+  const asked = new Map();
   const sweep = () => {
     const t = now();
-    for (const m of [joiners, replies, pairings]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
+    for (const m of [joiners, replies, pairings, asked]) for (const [a, e] of m) if (e.until <= t) m.delete(a);
+  };
+  const owe = (side, address) => {
+    if (typeof address !== 'string' || !address) return;
+    sweep();
+    const key = `${side}\u0000${address}`;
+    asked.delete(key);
+    asked.set(key, { until: now() + lifetimeMs });
+    bound(asked);
   };
   const bound = (m) => { while (m.size > max) m.delete(m.keys().next().value); };
   const reply = (address, side) => {
@@ -173,6 +228,10 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
     refuseParsedRequest(address) { reply(address, 'refusal'); },
     /** INVITER: a request from `address` proved its code; its ONE answer may go back (replaces a refusal registration). */
     answerProvenRequest(address) { reply(address, 'answer'); },
+    /** A BOT checked a link offer (or a turn's device statement) from the app identity `address`: its ONE statement may go back. */
+    expectLinkAnswer(address) { owe('link-answer', address); },
+    /** A BOX read the screen `address`'s own offer and will not take it: its ONE refusal may go back. */
+    expectScreenRefusal(address) { owe('screen-refusal', address); },
     /**
      * The gate asks, once per send, for the side the payload IS (`exchangeKindOf`): 'joiner' | 'answer' | 'refusal' (a
      * reply, now consumed) | 'pairing' | null. No kind: no part of the exchange, so null.
@@ -188,9 +247,15 @@ export function createInviteExchange({ now = () => Date.now(), lifetimeMs = INVI
       }
       if (kind === 'joiner') return joiners.has(address) ? 'joiner' : null;
       if (kind === 'pairing') return pairings.has(address) ? 'pairing' : null;
+      if (kind === 'link-answer' || kind === 'screen-refusal') {
+        const key = `${kind}\u0000${address}`;
+        if (!asked.has(key)) return null;
+        asked.delete(key);
+        return kind;
+      }
       return null;
     },
-    get size() { sweep(); return joiners.size + replies.size + pairings.size; },
+    get size() { sweep(); return joiners.size + replies.size + pairings.size + asked.size; },
   };
 }
 
@@ -207,11 +272,12 @@ export function createCircleAddressIndex() {
   const byCircle = new Map();
   /** address → Set<circleId> */
   const byAddress = new Map();
+  const unindex = (map, key, circleId) => {
+    const cs = map.get(key);
+    if (cs) { cs.delete(circleId); if (cs.size === 0) map.delete(key); }
+  };
   const drop = (circleId) => {
-    for (const a of byCircle.get(circleId) ?? []) {
-      const cs = byAddress.get(a);
-      if (cs) { cs.delete(circleId); if (cs.size === 0) byAddress.delete(a); }
-    }
+    for (const a of byCircle.get(circleId) ?? []) unindex(byAddress, a, circleId);
     byCircle.delete(circleId);
   };
   return {

@@ -19,13 +19,22 @@ const read = (name) => readFileSync(fileURLToPath(new URL(`../src/screens/v2/${n
 describe('the contact thread header', () => {
   const src = read('ContactThreadScreen.js');
 
-  it('puts the actions in their own row, after the title row closes', () => {
-    const actionsAt = src.indexOf('testID="contact-thread-actions"');
-    expect(actionsAt).toBeGreaterThan(-1);
-    for (const id of ['contact-thread-hide', 'contact-thread-lens', 'contact-thread-delete']) {
-      const at = src.indexOf(`testID="${id}"`);
-      expect(at, id).toBeGreaterThan(actionsAt);
-    }
+  it('the title row ends with who you are here (its tap opens the lens) and the ⋯; the title gives way to both', () => {
+    const titleAt = src.indexOf('<Text style={styles.title} numberOfLines={1}');
+    const selfAt = src.indexOf('testID="contact-thread-self"');
+    const moreAt = src.indexOf('testID="contact-thread-more"');
+    expect(titleAt).toBeGreaterThan(-1);
+    expect(selfAt, 'the avatar of who you are here').toBeGreaterThan(titleAt);
+    expect(moreAt, 'the ⋯').toBeGreaterThan(selfAt);
+    expect(src.slice(selfAt - 200, selfAt)).toMatch(/onPress=\{openLens\}/);
+  });
+
+  it('the ⋯ reaches Hide / Show (with its note) and Delete: none of the acts is a button that can run off the edge', () => {
+    const more = src.slice(src.indexOf('const openMore = useCallback'), src.indexOf('}, [name, hidden, toggleHidden, confirmDelete]);'));
+    expect(more).toMatch(/toggleHidden\(\)/);
+    expect(more).toMatch(/confirmDelete\(\)/);
+    expect(more).toMatch(/circle\.contacts\.hide_note/);
+    for (const gone of ['contact-thread-hide"', 'contact-thread-lens"', 'contact-thread-delete"']) expect(src).not.toContain(`testID="${gone}`);
   });
 
   it('that row wraps rather than running off the screen', () => {

@@ -24,6 +24,10 @@ import { matchesFilter } from './filter.js';
 import {
   ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, RETENTION_DEFAULTS,
 } from '@onderling/item-store';
+import { log } from '@onderling/logger';
+
+/** Types already said to be unregistered (once per type per process: the log names a fact once). */
+const UNREGISTERED_SAID = new Set();
 
 /**
  * Per-CLASS retention defaults (one-log step D). "Retention of what?" is the right question — one number
@@ -333,6 +337,12 @@ export class EventLog {
     // `ts` stays as given (when it was said); `landedAt` is this device's clock (when it arrived here), which is what
     // "new since I looked" compares, so a line the relay held for hours still counts once it lands.
     const { seq: _ignored, landedAt: _theirs, ...rest } = event;
+    // a type the entry-kind table does not know is plumbing by default (never mirrored, never wakes): say so once, so
+    // the next one gets declared rather than silently treated as the conservative unknown
+    if (typeof event.type === 'string' && !(event.type in ENTRY_KINDS) && !UNREGISTERED_SAID.has(event.type)) {
+      UNREGISTERED_SAID.add(event.type);
+      log.warn('event-log', 'kind.unregistered', { type: event.type });
+    }
     const stored = { ...rest, landedAt: landedAt ?? this.#now(), seq: (this.#seq += 1) };
     const current = this.#idx && this.#idx.version === this.#version;
     this.#events.unshift(stored);

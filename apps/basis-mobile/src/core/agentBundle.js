@@ -1014,12 +1014,20 @@ export async function bootAgentBundle(opts = {}) {
     _pointsList = store.list();
     return r;
   };
-  pairSeams.onJoined = ({ circleId, invite = null } = {}) => makeCircleReachable({
+  // ONE "after a join" for every join screen (the launcher's wizard, the chat screen's, the pair flow): record the
+  // invite's connection point(s), register this device's per-circle address, bind the members' addresses, pull the
+  // circle's lanes. There were two, and the one the join screens got did not record the point: after a restart the
+  // phone was on no relay and every line waited ("No connection point"). Web has one (`circleOnJoined`).
+  const onCircleJoined = ({ circleId, invite = null } = {}) => makeCircleReachable({
     agent, circleId, invite,
     recordPoints: recordPointsFromInvite,
     registerCirclePresence,
+    // The joiner pulls the circle's lanes (authority and content, `JOIN_PULL_LANES`) from the members it
+    // now knows — the screen that builds the lane table fills `laneCatchUps` (ChatScreen); before it has,
+    // the reconnect kick covers it.
     pullLanes: (cid) => pullCircleLanes(laneCatchUpsRef.current, cid, { callSkill }),
   });
+  pairSeams.onJoined = onCircleJoined;
   return {
     catalogue,
     manifestsByOrigin,
@@ -1044,13 +1052,25 @@ export async function bootAgentBundle(opts = {}) {
      * `CircleLauncherScreen`, so joining from anywhere else left the member on the roster at an address
      * their own device had never registered — unreachable until the app was relaunched.
      */
-    onCircleJoined: ({ circleId } = {}) => makeCircleReachable({
-      agent, circleId, registerCirclePresence,
-      // The joiner pulls the circle's lanes (authority and content, `JOIN_PULL_LANES`) from the members it
-      // now knows — the screen that builds the lane table fills `laneCatchUps` (ChatScreen); before it has,
-      // the reconnect kick covers it.
-      pullLanes: (cid) => pullCircleLanes(laneCatchUpsRef.current, cid, { callSkill }),
-    }),
+    onCircleJoined,
+    /**
+     * THE JOIN WIZARD'S SEAMS, one set for both of its hosts (the launcher's join and the chat screen's wizard host,
+     * where a tapped invite link lands). The chat screen once passed none of the address seams, so a join from a link
+     * wrote no membership record and the next start did not know the circle was a persona's.
+     */
+    joinWizardSeams: {
+      sendPeerRedeem,
+      circleAddressFor: (cid) => agent?.circleAddressFor?.(cid) ?? null,
+      signCircleLink: (cid, gid, addr) => agent?.signCircleLink?.(cid, gid, addr) ?? null,
+      // which persona this device holds a circle as: the join warns before a second persona of the person joins it
+      profileIdOf: (cid) => agent?.profileIdOf?.(cid) ?? null,
+      // be on the circle's endpoint BEFORE the redeem: the invite names it, and a relay-only admin hears only that
+      dialEndpoint: (url) => reconnectPeer({ relayUrl: url }),
+      activeEndpointUrl: () => {
+        try { const live = agent?.relays?.list?.().map((r) => r.url) ?? []; if (live.length) return live; } catch { /* below */ }
+        return _activeRelayUrl ?? null;
+      },
+    },
     /** The pair roster for contacts (L105): the screen's redeem handler hands it every admission. */
     pairRoster,
     /** The lane table's catch-ups, set by the screen that builds them (`bundle.laneCatchUps = lanes.catchUps`). */

@@ -12,6 +12,7 @@ import { makeCircleGovernance } from './governanceHost.js';
 import { removeCircleMember } from './circleMembershipHygiene.js';
 import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
 import { refusedCarriedChanges } from './governanceReceiverGate.js';
+import { denyWinsMerge } from './policyUpdateLane.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
@@ -103,7 +104,7 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
   try {
     const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     members = (Array.isArray(r?.members) ? r.members : [])
-      .map((m) => ({ ref: m.webid ?? m.pubKey ?? m.ref, role: m.role === 'admin' ? 'admin' : 'member' }))
+      .map((m) => ({ ref: m.webid ?? m.pubKey ?? m.ref, role: m.role === 'admin' ? 'admin' : 'member', ...(m.adminVia ? { via: m.adminVia } : {}) }))
       .filter((m) => m.ref);
   } catch { members = []; }
 
@@ -257,7 +258,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     let policy = {}; let members = []; let state = { events: [], disputed: new Set() };
     try { [policy, members, state] = await Promise.all([getPolicy(circleId), getMembers(circleId), rail.readVerified(circleId)]); } catch { return []; }
     const { proposals } = foldGovernance(state?.events ?? [], { policy: policy ?? {}, members, now: now(), disputed: state?.disputed ?? new Set() });
-    return refusedCarriedChanges({ bodies, policy: policy ?? {}, members, proposals });
+    return refusedCarriedChanges({ bodies, policy: policy ?? {}, members, proposals, merge: denyWinsMerge });
   };
   // the view, with the refused changes beside the proposals: who made each (named like a subject), never applied
   const view = async (circleId, opts = {}) => {

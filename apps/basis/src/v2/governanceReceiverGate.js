@@ -190,30 +190,29 @@ export async function judgeWithProposals(judge, load) {
   return judge(proposals, {});
 }
 
-/** The carried changes the gate judges, by statement kind. */
-const GATED_KINDS = Object.freeze([['rules-update', 'changeRule'], ['policy-update', 'changePolicy']]);
-
 /**
  * THE CHANGES MADE WITHOUT THE VOTE, as the governance view shows them: every admin's carried rules or settings change
- * that this device refused (it skipped the vote its circle requires) and that is newer than the newest one it applied.
- * Kept on the lane, never applied, and SHOWN (Frits 2026-11-10). A non-admin's change is not listed: the lane drops it
- * before any vote is asked.
+ * this device refused, judged EXACTLY as the applies judge them (the settings chain; a rules change by the settings
+ * version it was stamped with), and newer than the newest one of its kind that was kept. Kept on the lane, never
+ * applied, and SHOWN (Frits 2026-11-10). A non-admin's change is not listed (the lane drops it before any vote is
+ * asked); a rules change whose stamp the chain does not know yet is waiting, not refused.
  * @param {object} a
  * @param {object[]} a.bodies     the rail's verified statement bodies (authors resolved to refs)
- * @param {object} a.policy
- * @param {Array<{ref: string, role: string}>} a.members
+ * @param {object} a.policy       the policy in force now (for an unstamped rules change)
+ * @param {Array<{ref: string, role: string, via?: string}>} a.members
  * @param {Array<object>} a.proposals
+ * @param {(policies: object[]) => object} a.merge   the settings lane's same-version merge (deny-wins)
  * @returns {Array<{action: 'changeRule'|'changePolicy', by: string, version: number, hash: string}>}
  */
-export function refusedCarriedChanges({ bodies = [], policy = {}, members = [], proposals = [] } = {}) {
+export function refusedCarriedChanges({ bodies = [], policy = {}, members = [], proposals = [], merge = (ps) => ps[0], now = Date.now() } = {}) {
   const admins = new Set((Array.isArray(members) ? members : []).filter((m) => m?.role === 'admin').map((m) => m.ref));
+  const of = (kind) => (Array.isArray(bodies) ? bodies : []).filter((b) => b?.kind === kind && b.payload && admins.has(b.author));
+  const chain = judgePolicyChain({ bodies: of('policy-update'), members, proposals, merge, now });
+  const rules = judgeRulesWrites({ bodies: of('rules-update'), chain, currentPolicy: policy, members, proposals, now });
   const out = [];
-  for (const [kind, action] of GATED_KINDS) {
-    const judged = (Array.isArray(bodies) ? bodies : [])
-      .filter((b) => b?.kind === kind && b.payload && admins.has(b.author))
-      .map((b) => ({ b, version: Number.parseInt(b.payload.version, 10) || 0, skipped: writeSkippedTheVote({ action, body: b, policy, members, proposals }) }));
-    const head = Math.max(0, ...judged.filter((j) => !j.skipped).map((j) => j.version));
-    for (const j of judged) if (j.skipped && j.version > head) out.push({ action, by: j.b.author, version: j.version, hash: j.b.hash });
+  for (const [action, kept, skipped] of [['changePolicy', chain.kept, chain.skipped], ['changeRule', rules.kept, rules.skipped]]) {
+    const head = Math.max(0, ...kept.map(versionOf));
+    for (const b of skipped) if (versionOf(b) > head) out.push({ action, by: b.author, version: versionOf(b), hash: b.hash });
   }
   return out;
 }

@@ -33,6 +33,20 @@ describe('the changes made without the vote', () => {
     expect(out).toEqual([]);
   });
 
+  it('a legitimate tightening is never listed (Opus: judged by the rule BEFORE it, not by its own stricter rule)', () => {
+    const loose = normalizeCirclePolicy({ governance: { changePolicy: 'any-admin' } });
+    const tight = normalizeCirclePolicy({ governance: { changePolicy: 'member-vote' } });
+    const withFounder = members.map((m) => (m.ref === 'a0' ? { ...m, via: 'founder' } : m));
+    const bodies = [
+      { kind: 'policy-update', author: 'a0', hash: 'p1', payload: { policy: loose, version: 1 } },
+      { kind: 'policy-update', author: 'a1', hash: 'p2', payload: { policy: tight, version: 2 } },
+    ];
+    expect(refusedCarriedChanges({ bodies, policy: tight, members: withFounder, proposals: [] })).toEqual([]);
+    // …while a lone change AFTER it (now a vote is needed) is listed
+    const lone = { kind: 'policy-update', author: 'a1', hash: 'p3', payload: { policy: loose, version: 3 } };
+    expect(refusedCarriedChanges({ bodies: [...bodies, lone], policy: tight, members: withFounder, proposals: [] }).map((r) => r.version)).toEqual([3]);
+  });
+
   it('a member\'s change is not listed (the lane drops it before any vote is asked)', () => {
     expect(refusedCarriedChanges({ bodies: [rulesBody('m0', 3)], policy: quorum, members, proposals: [] })).toEqual([]);
   });

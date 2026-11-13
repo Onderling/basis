@@ -25,7 +25,7 @@
  * is the durable head, exactly the items-lane relationship.
  */
 
-import { judgePolicyChain, judgeRulesWrites, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
+import { chainOfBodies, judgePolicyChain, judgeRulesWrites, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
 import { denyWinsMerge, POLICY_UPDATE_KIND } from './policyUpdateLane.js';
 
 /**
@@ -145,7 +145,7 @@ export async function applyRulesUpdates({ rail, callSkill, circleId, readPolicy 
   const { kept: authorised, skipped } = await judgeWithProposals(
     (proposals, need) => {
       const chain = judgePolicyChain({ bodies: policyChanges, members, proposals, merge: denyWinsMerge, need });
-      return judgeRulesWrites({ bodies: byAdmins, chain, currentPolicy: policy, members, proposals, need });
+      return judgeRulesWrites({ bodies: byAdmins, chain, currentPolicy: policy, members, proposals, need, chainOf: chainOfBodies(bodies) });
     },
     () => proposalsOn({ rail, circleId, policy, members }),
   );

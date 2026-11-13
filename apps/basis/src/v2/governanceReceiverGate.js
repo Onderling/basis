@@ -33,6 +33,34 @@
 import { changeNeedsVote, normalizeCirclePolicy } from './circlePolicy.js';
 import { DECISION_STATUS, resolveGovernance } from './governanceDecision.js';
 import { foldGovernance } from './governanceLog.js';
+import { inAuthorChainUpTo } from './authorChainCut.js';
+
+/**
+ * AN AUTHOR'S OWN SETTINGS CHANGES, as lines in their own chain (found walking the membership gate, 2026-11-13): an
+ * admin who wrote settings version v signs everything AFTER it under v or later; what they signed BEFORE it keeps the
+ * version it carries. Before/after is the author's own hash chain, never a clock or arrival order: on the governance
+ * lane the settings statement itself is the line; on the membership lane (another lane, another chain) the line is
+ * `membershipUpTo`, the author's membership chain tip the settings statement names. A floor seeded from the version
+ * alone undid the author's own earlier acts: a removal made under any-admin returned once the same admin tightened.
+ * @returns {Map<string, Array<{version: number, hash: string, membershipUpTo: string|null}>>}
+ */
+/** A lane's bodies by hash: the `chainOf` the author-chain walk reads. */
+export function chainOfBodies(bodies = []) {
+  const m = new Map();
+  for (const b of Array.isArray(bodies) ? bodies : []) if (typeof b?.hash === 'string') m.set(b.hash, b);
+  return (h) => m.get(h) ?? null;
+}
+
+function ownSettingsLines(kept = []) {
+  const out = new Map();
+  for (const b of kept) {
+    if (typeof b?.author !== 'string') continue;
+    const upTo = b.payload?.membershipUpTo;
+    if (!out.has(b.author)) out.set(b.author, []);
+    out.get(b.author).push({ version: versionOf(b), hash: b.hash ?? null, membershipUpTo: typeof upTo === 'string' && upTo ? upTo : null });
+  }
+  return out;
+}
 
 /** Does a write of `action` need a decided proposal? THE one rule the doors ask too (`changeNeedsVote`, circlePolicy.js). */
 export const writeNeedsVote = (policy, action, members = []) => changeNeedsVote(policy, action, Array.isArray(members) ? members : []);
@@ -158,18 +186,23 @@ export function judgePolicyChain({ bodies = [], members = [], proposals = [], me
  * @param {object} a.currentPolicy
  * @param {Array<{ref: string, role: string}>} a.members
  * @param {Array<object>} a.proposals
+ * @param {(hash: string) => object|null} [a.chainOf]  the governance lane's bodies by hash (the authors' own chains)
  * @returns {{kept: object[], skipped: object[], waiting: object[]}}
  */
-export function judgeRulesWrites({ bodies = [], chain, currentPolicy = {}, members = [], proposals = [], now = Date.now(), need = null } = {}) {
+export function judgeRulesWrites({ bodies = [], chain, currentPolicy = {}, members = [], proposals = [], now = Date.now(), need = null, chainOf = null } = {}) {
   const kept = []; const skipped = []; const waiting = [];
-  const floor = new Map();   // author → the lowest stamp they may still use
-  for (const b of chain?.kept ?? []) floor.set(b.author, Math.max(floor.get(b.author) ?? 0, versionOf(b)));
+  const floor = new Map();   // author → the lowest stamp they may still use (their own earlier stamps, by rules version)
+  const lines = ownSettingsLines(chain?.kept ?? []);
+  // signed AFTER a settings change of their own that is above the stamp: the settings statement is on this same lane,
+  // so it is the line itself
+  const afterOwnLine = (b, stamp) => (lines.get(b.author) ?? []).some((l) => l.version > stamp
+    && !(typeof chainOf === 'function' && typeof l.hash === 'string' && typeof b.hash === 'string' && inAuthorChainUpTo(chainOf, b.author, l.hash, b.hash)));
   for (const b of [...bodies].sort((x, y) => versionOf(x) - versionOf(y) || (x.hash < y.hash ? -1 : 1))) {
     const stamp = Number.parseInt(b?.payload?.policyVersion, 10);
     let policy;
     if (!Number.isFinite(stamp)) policy = currentPolicy;
     else if (stamp > (chain?.seen ?? chain?.head ?? 0)) { waiting.push(b); continue; }
-    else if (stamp < (floor.get(b.author) ?? 0)) { skipped.push(b); continue; }
+    else if (stamp < (floor.get(b.author) ?? 0) || afterOwnLine(b, stamp)) { skipped.push(b); continue; }
     else policy = chain.policyAt(stamp);
     if (Number.isFinite(stamp)) floor.set(b.author, Math.max(floor.get(b.author) ?? 0, stamp));
     (writeSkippedTheVote({ action: 'changeRule', body: b, policy, members, proposals, now, need }) ? skipped : kept).push(b);
@@ -217,7 +250,7 @@ export function refusedCarriedChanges({ bodies = [], policy = {}, members = [], 
   const admins = new Set((Array.isArray(members) ? members : []).filter((m) => m?.role === 'admin').map((m) => m.ref));
   const of = (kind) => (Array.isArray(bodies) ? bodies : []).filter((b) => b?.kind === kind && b.payload && admins.has(b.author));
   const chain = judgePolicyChain({ bodies: of('policy-update'), members, proposals, merge, now });
-  const rules = judgeRulesWrites({ bodies: of('rules-update'), chain, currentPolicy: policy, members, proposals, now });
+  const rules = judgeRulesWrites({ bodies: of('rules-update'), chain, currentPolicy: policy, members, proposals, now, chainOf: chainOfBodies(bodies) });
   const out = [];
   for (const [action, kept, skipped] of [['changePolicy', chain.kept, chain.skipped], ['changeRule', rules.kept, rules.skipped]]) {
     const head = Math.max(0, ...kept.map(versionOf));
@@ -242,11 +275,17 @@ export function refusedCarriedChanges({ bodies = [], policy = {}, members = [], 
  * @param {object} a.currentPolicy
  * @param {Array<{ref: string, role: string}>} a.members                the first-pass roster
  * @param {Array<object>} a.proposals
+ * @param {(hash: string) => object|null} [a.chainOf]  the MEMBERSHIP lane's stored bodies by hash (raw author keys)
  * @returns {(statement: object, ctx: {admins: Set<string>}) => boolean}
  */
-export function membershipGateFor({ chain, currentPolicy = {}, members = [], proposals = [], now = Date.now() } = {}) {
-  const floor = new Map();
-  for (const b of chain?.kept ?? []) floor.set(b.author, Math.max(floor.get(b.author) ?? 0, versionOf(b)));
+export function membershipGateFor({ chain, currentPolicy = {}, members = [], proposals = [], now = Date.now(), chainOf = null } = {}) {
+  const floor = new Map();   // author → the lowest stamp they may still use (their own earlier stamps, in the fold's order)
+  const lines = ownSettingsLines(chain?.kept ?? []);
+  // signed AFTER a settings change of their own above the stamp: before it only when it is in the author's membership
+  // chain up to the tip that settings statement named (none named → nothing of theirs is provably before it)
+  const afterOwnLine = (s, stamp) => (lines.get(s.author) ?? []).some((l) => l.version > stamp
+    && !(typeof chainOf === 'function' && l.membershipUpTo && typeof s.hash === 'string'
+      && inAuthorChainUpTo(chainOf, s.authorKey ?? s.author, l.membershipUpTo, s.hash)));
   return (s, { admins } = {}) => {
     const action = s?.kind === 'evict' ? 'removeMember' : s?.kind === 'role' ? 'changeRole' : null;
     if (!action) return true;
@@ -255,7 +294,7 @@ export function membershipGateFor({ chain, currentPolicy = {}, members = [], pro
     let policy;
     if (!Number.isFinite(stamp)) policy = currentPolicy;
     else if (stamp > (chain?.seen ?? chain?.head ?? 0)) return false;        // a rule this device has not seen yet
-    else if (stamp < (floor.get(s.author) ?? 0)) return false;               // signed under a rule the author had left
+    else if (stamp < (floor.get(s.author) ?? 0) || afterOwnLine(s, stamp)) return false;   // signed under a rule the author had left
     else policy = chain.policyAt(stamp);
     if (Number.isFinite(stamp)) floor.set(s.author, Math.max(floor.get(s.author) ?? 0, stamp));
     const atDepth = [...(admins ?? [])].map((ref) => ({ ref, role: 'admin' }));

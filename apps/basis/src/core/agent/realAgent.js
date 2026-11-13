@@ -129,7 +129,7 @@ import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 // …and the circle POLICY, the same way: a signed statement on the governance lane, caught up by joiners.
 import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../../v2/policyUpdateLane.js';
 import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
-import { judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
+import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
@@ -6378,7 +6378,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         try { ({ bodies = [] } = await bound.readVerifiedBodies(circleId)); } catch { bodies = []; }
         const proposals = await proposalsOn({ rail: bound, circleId, policy: normalizeCirclePolicy({}), members });
         const chain = judgePolicyChain({ bodies: bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author)), members, proposals, merge: denyWinsMerge });
-        return membershipGateFor({ chain, currentPolicy: chain.policyAt(chain.head), members, proposals });
+        // the membership lane's own bodies (raw author keys): an author's earlier removals sit in their chain before the
+        // tip their later settings change named
+        let spine = [];
+        try { spine = (membershipRail?.storedStatements?.(circleId) ?? []).map((x) => x?.body).filter(Boolean); } catch { spine = []; }
+        return membershipGateFor({ chain, currentPolicy: chain.policyAt(chain.head), members, proposals, chainOf: chainOfBodies(spine) });
       };
     };
     // the ceremony retirements alone — what the spineless roster folds (they bind by the root's reveal, no recursion)
@@ -6592,6 +6596,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       groupId: circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
+    // where my membership chain in the circle stood (the line the receivers judge my earlier removals and role changes by)
+    membershipUpToFor: (circleId) => authorChainTip(circleId, circleAddressFor(circleId)),
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan

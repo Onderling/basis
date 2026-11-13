@@ -39,6 +39,22 @@ describe('the membership gate', () => {
     expect(gate(evict('a0', 'm0', { policyVersion: 1 }), { admins })).toBe(false);
     expect(gate(evict('a1', 'm0', { policyVersion: 7 }), { admins })).toBe(false);
   });
+  it('the line is the author\'s OWN chain: what they signed before their tightening keeps its stamp, what they sign after does not', () => {
+    // a0's membership chain: e1 (the removal, under any-admin) ← e2; the tightening (version 2) names e2 as where it stood
+    const e1 = { kind: 'evict', author: 'a0', authorKey: 'k0', subject: 'm0', hash: 'e1', parentHash: null, payload: { policyVersion: 1 } };
+    const e2 = { kind: 'role', author: 'a0', authorKey: 'k0', subject: 'a1', hash: 'e2', parentHash: 'e1', payload: { role: 'admin', policyVersion: 1 } };
+    const later = { kind: 'evict', author: 'a0', authorKey: 'k0', subject: 'm1', hash: 'e3', parentHash: 'e2', payload: { policyVersion: 1 } };   // backdated stamp
+    const forked = { kind: 'evict', author: 'a0', authorKey: 'k0', subject: 'm1', hash: 'e4', parentHash: 'e1', payload: { policyVersion: 1 } }; // claims an early parent
+    const raw = new Map([e1, e2, later, forked].map((b) => [b.hash, { ...b, author: 'k0' }]));   // the stored lane holds raw keys
+    const lined = judgePolicyChain({ bodies: [
+      { kind: 'policy-update', author: 'a0', hash: 'p1', payload: { policy: loose, version: 1 } },
+      { kind: 'policy-update', author: 'a0', hash: 'p2', payload: { policy: tight, version: 2, membershipUpTo: 'e2' } },
+    ], members, proposals: [] });
+    const gate = () => membershipGateFor({ chain: lined, currentPolicy: tight, members, chainOf: (h) => raw.get(h) ?? null });
+    expect(gate()(e1, { admins }), 'the removal before the line stands').toBe(true);
+    expect(gate()(later, { admins }), 'after the line, a stamp below it does not').toBe(false);
+    expect(gate()(forked, { admins }), 'nor one that claims an early parent').toBe(false);
+  });
   it('an author\'s stamps never go back in the fold\'s order', () => {
     const gate = membershipGateFor({ chain, currentPolicy: tight, members });
     expect(gate(evict('a1', 'm0', { policyVersion: 2 }), { admins })).toBe(false);   // needs a vote (and moves a1's floor to 2)

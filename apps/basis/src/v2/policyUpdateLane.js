@@ -100,7 +100,7 @@ export function foldPolicyUpdates(bodies, { admins } = {}) {
  * @param {(circleId: string, statement: object) => void|Promise<*>} [a.fan]  best-effort fan
  * @returns {(u: {groupId: string, policy: object, version: number}) => Promise<object|null>}
  */
-export function makePolicyUpdateEmitter({ rail, fan = null } = {}) {
+export function makePolicyUpdateEmitter({ rail, fan = null, membershipUpToFor = null } = {}) {
   if (!rail || typeof rail.append !== 'function') {
     throw new Error('makePolicyUpdateEmitter: a governance-lane rail is required');
   }
@@ -112,7 +112,11 @@ export function makePolicyUpdateEmitter({ rail, fan = null } = {}) {
     let res = null;
     try {
       // the proposal that decided this change, where the circle's rule asked for one: every receiver checks it
-      res = await rail.append(groupId, { kind: POLICY_UPDATE_KIND, subject: `policy-v${v}`, payload: { policy, version: v, ...(typeof proposalId === 'string' && proposalId ? { proposalId } : {}) } });
+      // `membershipUpTo`: the tip of my own membership chain in this circle — what I signed there BEFORE this change keeps
+      // the settings version it carries; whatever I sign after is judged by this one or later (the receivers' line)
+      let upTo = null;
+      try { upTo = typeof membershipUpToFor === 'function' ? (membershipUpToFor(groupId) ?? null) : null; } catch { upTo = null; }
+      res = await rail.append(groupId, { kind: POLICY_UPDATE_KIND, subject: `policy-v${v}`, payload: { policy, version: v, ...(typeof proposalId === 'string' && proposalId ? { proposalId } : {}), ...(typeof upTo === 'string' && upTo ? { membershipUpTo: upTo } : {}) } });
     } catch { res = null; }
     if (!res) return null;
     if (typeof fan === 'function') {

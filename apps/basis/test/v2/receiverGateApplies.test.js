@@ -137,6 +137,20 @@ describe('a rules change is judged by the settings version its author held', () 
     expect(r.applied).toBe(false);
   });
 
+  it('the line is the author\'s own chain: a change they signed BEFORE their tightening keeps its stamp', async () => {
+    // a0's own governance chain: p1 ← r-before ← p2 (the tightening) ← r-after
+    const lane = [
+      { kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'p1', parentHash: null, payload: { policy: loose, version: 1 } },
+      { kind: 'rules-update', author: 'a0', hash: 'r-before', parentHash: 'p1', payload: { rules, version: 2, policyVersion: 1 } },
+      { kind: POLICY_UPDATE_KIND, author: 'a0', hash: 'p2', parentHash: 'r-before', payload: { policy: tight, version: 2 } },
+    ];
+    expect((await applyRulesUpdates({ rail: rail(lane), callSkill: call([]), circleId: CIRCLE, readPolicy: async () => tight })).applied, 'signed before the line').toBe(true);
+    const after = { kind: 'rules-update', author: 'a0', hash: 'r-after', parentHash: 'p2', payload: { rules, version: 3, policyVersion: 1 } };
+    const recorded = [];
+    await applyRulesUpdates({ rail: rail([...lane, after]), callSkill: call(recorded), circleId: CIRCLE, readPolicy: async () => tight });
+    expect(recorded.map((x) => x.version ?? x.rules?.version ?? x), 'signed after the line, stamped below it: not applied').not.toContain(3);
+    expect(recorded.map((x) => x.version ?? x.rules?.version ?? x), 'the change before the line is the one applied').toContain(2);
+  });
   it('a stamp the chain does not know yet waits; no stamp is judged by the rule in force now', async () => {
     expect((await applyRulesUpdates({ rail: rail([...policyLane, rulesBody('a1', { policyVersion: 9 })]), callSkill: call([]), circleId: CIRCLE, readPolicy: async () => tight })).applied).toBe(false);
     expect((await applyRulesUpdates({ rail: rail([...policyLane, rulesBody('a1', {})]), callSkill: call([]), circleId: CIRCLE, readPolicy: async () => tight })).applied).toBe(false);

@@ -27,6 +27,7 @@
  */
 import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES } from './circlePolicy.js';
+import { processRefusalLog } from './refusalLog.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -215,6 +216,8 @@ export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adm
     () => proposalsOn({ rail, circleId, policy, members }),
   );
   const won = foldPolicyUpdates(kept, { admins });
+  // every refusal says why (L857): a settings change the circle's rule did not allow
+  for (let i = 0; i < skipped.length; i += 1) processRefusalLog().note({ tag: 'gate', lane: 'governance', check: 'settings', reason: 'not allowed by the circle rule' });
   if (!won) return { applied: false, ...(skipped.length ? { skipped: skipped.length } : {}) };
   const head = await headStore.read(circleId);
   if (head && (won.version < head.version || (won.version === head.version && won.key === head.key))) return { applied: false };

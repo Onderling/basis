@@ -188,7 +188,9 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
+import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
+import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { replyLine } from '../../src/v2/replyLine.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
@@ -4623,6 +4625,15 @@ function mountPlusButton() {
   document.body.appendChild(b);
 }
 
+// the "+" is the person's kept assistant thread: its turns are the bot's own turn entries on THIS shell's log (the
+// chat retention class, never carried), one thread per person; composed once, again when the person changes
+let _plusThread = null;
+function plusThreadNow() {
+  const id = plusThreadId(circleHouseholdAgent?.identity?.chat?.pubKey ?? null);
+  if (!_plusThread || _plusThread.threadId !== id) _plusThread = createPlusThread({ threads: createBotThreads({ eventLog, store: memoryThreadStore() }), threadId: id });
+  return _plusThread;
+}
+
 function showVandaagPlus({ edit = null } = {}) {
   const { card, close } = _restoreOverlay();
   // opened on an own row: its act, its words, its id — Save changes it, Remove takes it away
@@ -4660,6 +4671,14 @@ function showVandaagPlus({ edit = null } = {}) {
     return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
+  // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
+  const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+    id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
+    lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
+  })));
+  let suggestionPool = [];
+  plusCircles().then((circles) => { suggestionPool = plusSuggestionPool({ circles }); }).catch(() => {});
   // a circle's act the line read: as the person, through the waist with the circle named, so the circle's own doors
   // and governance decide (the "+" has no authority the circle's composer lacks); the reply line says what happened
   const runInCircle = async (command, circleId) => {
@@ -4675,6 +4694,9 @@ function showVandaagPlus({ edit = null } = {}) {
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
+    turns: plusThreadNow().turns(),
+    suggestFor: (typed) => plusSuggest(suggestionPool, typed),
+    onForget: () => { plusThreadNow().forget(); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
@@ -4707,21 +4729,28 @@ function showVandaagPlus({ edit = null } = {}) {
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
       line = text; circleCard = null; done = null;
+      // one exchange in the kept thread (the shared duty): the line heard, the read run, what it answered kept
+      await plusThreadNow().exchange(text, async () => {
       // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
       // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
-      const circles = await Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
-        id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
-        lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
-      })));
+      const circles = await plusCircles();
       const o = plusLineOutcome(text, { circles });
       const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
-      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return; }
+      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return { error, done }; }
       if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }
       else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
+      return { error, circleCard, ownActId: r?.actId ?? null };
+      }, { t });
       paint();
     },
-    onCircleRun: async (circleId) => { const card = circleCard; circleCard = null; if (card) await runInCircle(card.command, circleId); },
+    onCircleRun: async (circleId) => {
+      const card = circleCard; circleCard = null;
+      if (!card) return;
+      // the pick on the card: no new line, the run's answer kept (the same shared exchange)
+      await plusThreadNow().exchange(null, async () => { await runInCircle(card.command, circleId); return { error, done }; }, { t });
+      paint();
+    },
     onCircleCancel: () => { circleCard = null; error = null; paint(); },
     onSave: async (id, filled) => {
       values = filled;

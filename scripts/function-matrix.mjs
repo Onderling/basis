@@ -46,7 +46,9 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'personas', name: 'Personas', cells: {
     web: null,      // persona-switcher is one page narrowing its own view; nobody else sees the persona (Fable 2026-11-10)
-    mobile: null,   // personaSwitcherParity is a parity test
+    // the phone joins a circle as a new persona made in the join wizard; the other member's roster has the persona, its
+    // lines arrive from it, and after a restart it still speaks there as the persona
+    mobile: { file: 'apps/basis-mobile/e2e/personas.test.js', test: 'after a restart the phone still speaks in the circle as the persona' },
     // a box enrolled with persona W rejoins W's circle as W (never the general persona) and keeps it through a membership
     // change — named by Fable 2026-11-05
     box: { file: 'apps/basis/test/personaOnTheBox.relay.test.js', test: 'on its first start it rejoins Y AS W' },

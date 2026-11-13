@@ -62,12 +62,13 @@ describe('a planted tombstone does not change who is in my circle', () => {
     expect(folded.members).not.toContain('MALLORY');
   });
 
-  it('a member-props tombstone carries nothing but its authorRef, whatever its stored payload says', async () => {
+  it('a planted member-props tombstone (no signature over its header) is refused outright (format v2)', async () => {
     const s = await setup();
     const forged = { tombstone: true, body: { v: s.join.body.v, kind: 'member-props', circleId: CID, subject: s.member.pubKey, author: s.member.pubKey, parentHash: s.props.body.hash, deps: [], hash: '1'.repeat(64), payload: { authorRef: s.member.pubKey, displayName: 'Mallory was here', role: 'admin' } } };
     const { bodies, folded } = await fold(s, [entry(s.join, s.join.body.hash), entry(s.props, s.props.body.hash), entry(forged, forged.body.hash)]);
-    const tomb = bodies.find((b) => b.hash === forged.body.hash);
-    expect(tomb?.payload).toEqual({ authorRef: s.member.pubKey });
+    // format v2: a tombstone keeps its signed header, so one nobody signed is not taken at all (before v2 it was taken,
+    // its payload forced to the authorRef alone, and the fake depth edge stayed)
+    expect(bodies.find((b) => b.hash === forged.body.hash)).toBeUndefined();
     expect(folded.admins).toEqual([s.founder.pubKey]);
     expect(JSON.stringify(folded.props ?? {})).not.toContain('Mallory was here');
   });

@@ -53,6 +53,10 @@ export const CHAT_CATCHUP_SUBTYPES = Object.freeze({
  * @param {Function} a.callSkill  the waist (roster lookups for the key↔ref binding)
  * @param {Function} [a.verifyBinding]  override the roster binding verifier (tests)
  */
+/** The actors a chat line may carry without a signature: the shells' own optimistic line (`'me'`, web
+ *  `LOCAL_ACTOR` and the phone's appendCircleMessage) and the local bot's bubbles and notices (`'bot'`). */
+const UNSIGNED_LOCAL_ACTORS = new Set(['me', 'bot']);
+
 export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.append !== 'function') {
@@ -239,7 +243,22 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
   /** What a catch-up sends on must still be what its author signed, checked here, now (as the circle entry rail's). */
   const checkSigned = (circleId, statement) => !!statement && statement.tombstone !== true && safeVerify(statement, circleId)?.ok === true;
 
-  return { appendMessage, signEntry, ingest, verify, storedStatements, hasEntry, checkSigned };
+  /** A STORED chat entry, judged as an arrival (a history restore runs it before the entry lands). A signed one must
+   *  verify, and the text the bubble shows must be the text that was signed. A line with no statement never fanned: it
+   *  lands only when it is this person's own (the shells' local actor, or this device's self in the circle) or the
+   *  local bot's; one naming anyone else would show as THEIR message, so it is refused like a bad signature. */
+  const checkEntry = (entry) => {
+    if (!entry || entry.type !== CHAT_LANE) return false;
+    const p = entry.payload ?? {};
+    if (p.statement === undefined || p.statement === null) {
+      return UNSIGNED_LOCAL_ACTORS.has(entry.actor) || (typeof p.circleId === 'string' && entry.actor === refIn(p.circleId));
+    }
+    if (typeof p.circleId !== 'string' || !checkSigned(p.circleId, p.statement)) return false;
+    const asText = (x) => (typeof x === 'string' ? x : '');   // a landing renders no text as '' (ingest above)
+    return asText(p.text) === asText(p.statement.body?.payload?.text);
+  };
+
+  return { entryKind: CHAT_LANE, appendMessage, signEntry, ingest, verify, storedStatements, hasEntry, checkSigned, checkEntry };
 }
 
 /**

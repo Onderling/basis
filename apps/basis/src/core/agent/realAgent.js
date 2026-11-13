@@ -55,7 +55,7 @@ import { createSealingBackend } from '@onderling/pseudo-pod';            // the 
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
 import {
-  createHistoryMirror, hydrateHistory, exportHistoryArchive,
+  createHistoryMirror, hydrateHistory, exportHistoryArchive, restoreCheckFor,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
 } from '../../v2/historyMirror.js'; // the personal history store: sealed follower sink + instant-restore hydrate + archive export
 import {
@@ -787,6 +787,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circles (and every circle while only the default runs) are the default's, as before.
   const circlePersonas = new Map();   // circleId → profileId (non-default only)
   let onPersonaStarted = null;   // set once the own store exists: a persona that starts writes its device-map row
+  let peerConnected = false;   // the transport is up (connectPeerTransport ran): a persona circle mapped later dials at once
   const personaOf = (circleId) => personas.get(circlePersonas.get(circleId)) ?? persona;
   // the root this device derives a circle's per-circle keys from: the persona's circle root
   const circleSeedFor = (circleId) => personaOf(circleId).circleSeed;
@@ -2000,6 +2001,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
         // the circle is now this persona's: its keys and its traffic follow (the default is the map's absence)
         if (profileId === 'default') circlePersonas.delete(circleId); else circlePersonas.set(circleId, profileId);
+        // …and the persona is on that circle's relay on its own socket: a circle can become the persona's AFTER the
+        // connect (its record lands later than the boot), and the connect's reopen did not see it then
+        if (peerConnected && circlePersonas.get(circleId) === profileId) reopenPersonaSockets({ only: circleId }).catch(() => { /* said inside */ });
         // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
         // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
         // A persona's circle too: it reaches the devices holding that persona only (the follow's `siblings(circleId)`).
@@ -2558,6 +2562,25 @@ export async function createRealHouseholdAgent(opts = {}) {
     const self = personas.get(pid);
     if (!self?.enrolledDevice || !self.deviceDerivationSeed) return null;
     try { return deviceDelegationPubKey(self.deviceDerivationSeed); } catch { return null; }
+  };
+  /** Each persona this device runs, on a socket of its own at every relay point of the circles it holds here. Best-effort
+   *  per socket (one relay down must not cost the others); the boot does not wait for the sockets to open. */
+  const reopenPersonaSockets = async ({ only = null } = {}) => {
+    const wanted = new Map();   // `${url}@${personaKey}` → { url, identity }
+    for (const [cid, pid] of circlePersonas) {
+      if (only && cid !== only) continue;
+      const rt = personas.get(pid);
+      if (!rt?.chatId?.pubKey) continue;
+      let points = [];
+      try { points = opts.circlePointsFor?.(cid) ?? []; } catch { points = []; }
+      for (const url of points) {
+        if (typeof url === 'string' && /^wss?:\/\//.test(url)) wanted.set(`${url}@${rt.chatId.pubKey}`, { url, identity: rt.chatId });
+      }
+    }
+    for (const { url, identity } of wanted.values()) {
+      try { await sa.relays.add(url, { identity }); }
+      catch (err) { console.warn(`[persona] could not reopen its socket on ${url}: ${err?.message ?? err}`); }
+    }
   };
   /** Every self's device address on this device: registered as an identity of ours and on that self's own relay
    *  sockets (never another self's: a socket holding two selves' addresses would link them at the relay). */
@@ -3639,14 +3662,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     const seen = new Set(reply.circles.map(idOf).filter(Boolean));
     const circles = [...reply.circles];
     const left = Array.isArray(reply.left) ? [...reply.left] : reply.left;
+    // …with the NAMES and the REMOVED tiles too: the default's reply names only its own circles, so a persona's circle
+    // merged without its name read as its id on every tile and header (found by the phone's personas walk).
+    const names = { ...((reply.names && typeof reply.names === 'object') ? reply.names : {}) };
+    const removed = Array.isArray(reply.removed) ? [...reply.removed] : reply.removed;
     for (const [pid, rt] of personas) {
       if (pid === 'default' || !rt?.chatId?.pubKey) continue;
       let theirs = null;
       try { theirs = (await chatAgent.invoke(pinboardAgentRef.current.address, 'listMyCircles', parts, { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null; } catch { theirs = null; }
       for (const c of theirs?.circles ?? []) { const id = idOf(c); if (id && !seen.has(id)) { seen.add(id); circles.push(c); } }
+      for (const [id, name] of Object.entries(theirs?.names ?? {})) if (!(id in names) && typeof name === 'string' && name) names[id] = name;
       if (Array.isArray(left) && Array.isArray(theirs?.left)) for (const l of theirs.left) if (!left.includes(l)) left.push(l);
+      if (Array.isArray(removed) && Array.isArray(theirs?.removed)) for (const r of theirs.removed) if (r?.id && !removed.some((x) => x?.id === r.id)) removed.push(r);
     }
-    return { ...reply, circles, ...(left !== undefined ? { left } : {}) };
+    return { ...reply, circles, names, ...(left !== undefined ? { left } : {}), ...(removed !== undefined ? { removed } : {}) };
   };
   // WHO GREETED THIS DEVICE survives a reload. The security layer's bindings — "this key is Bea",
   // established by her greeting — lived in memory only, so a reload (every web session) or a restart
@@ -6555,29 +6584,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // a device log the append lands on an ephemeral log — the live fan still carries the statement
   // (receivers verify at their OWN rail); only local restart durability degrades, like the other
   // riders.
+  // ONE governance rail for this composition's riders (rules, policy) and the restore's check: the same lane and
+  // declaration, so one instance (the shells' receive-side rail is another over the same log, as before).
+  const governanceRail = makeGovernanceRail({
+    eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+    circleIdentityFor,
+    myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
+    callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+  });
   // THE SETTINGS VERSION THIS DEVICE HAS SEEN for a circle: the highest signature-checked settings statement on its
   // governance lane. What a removal, a role change or a rules change is stamped with when its caller passed none.
-  let seenRailMemo = null;
   function policyVersionSeen(circleId) {
-    seenRailMemo ??= makeGovernanceRail({
-      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
-      circleIdentityFor, myRef: circleSelfRef, callSkill: (...a) => callSkill(...a),
-    });
     let max = 0;
     try {
-      for (const st of seenRailMemo?.storedStatements?.(circleId) ?? []) {
-        if (st?.body?.kind === POLICY_UPDATE_KIND && seenRailMemo.checkSigned(circleId, st)) max = Math.max(max, Number.parseInt(st.body.payload?.version, 10) || 0);
+      for (const st of governanceRail?.storedStatements?.(circleId) ?? []) {
+        if (st?.body?.kind === POLICY_UPDATE_KIND && governanceRail.checkSigned(circleId, st)) max = Math.max(max, Number.parseInt(st.body.payload?.version, 10) || 0);
       }
     } catch { /* nothing seen */ }
     return max;
   }
   const rulesUpdateEmit = makeRulesUpdateEmitter({
-    rail: makeGovernanceRail({
-      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
-      circleIdentityFor,
-      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
-    }),
+    rail: governanceRail,
     fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
@@ -6586,12 +6613,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE POLICY-UPDATE RIDER — the same rail and fan as the rules one, a different kind. The shells call it (as
   // `emitPolicyUpdate`) when an admin saves the circle's policy and when the create wizard writes the first one.
   const policyUpdateEmit = makePolicyUpdateEmitter({
-    rail: makeGovernanceRail({
-      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
-      circleIdentityFor,
-      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      callSkill: (...a) => callSkill(...a),
-    }),
+    rail: governanceRail,
     fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
@@ -9524,6 +9546,8 @@ export async function createRealHouseholdAgent(opts = {}) {
             eventLog:     opts.deviceLog,
             recencyDays:  Number(paramsService.register.valueOf(HISTORY_RECENCY_DAYS_KEY)) || 30,
             maxPerCircle: Number(paramsService.register.valueOf(HISTORY_RECENCY_MAX_KEY)) || 500,
+            // THE RESTORE IS AN ARRIVAL: every signed lane's statements are checked before they land.
+            admit: restoreCheckFor([membershipRail, itemsRail, chatRail, keyRail, grantsRail, governanceRail]),
           });
           skip = r.hydratedIds;
           if (typeof console !== 'undefined') console.info(`[history-restore] recent window live: ${r.recent} entries (tail follows)`);
@@ -10160,6 +10184,11 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (typeof console !== 'undefined') console.warn('[realAgent] rendezvous enable failed (continuing without direct WebRTC):', err?.message ?? err);
         }
       }
+      // EVERY PERSONA BACK ON ITS CIRCLES' RELAYS, each on a socket of its own (never the general persona's). The join
+      // opens that socket (`bindCirclePersona`); without this a restart left every persona circle without one: its lines
+      // waited and nothing addressed to it arrived. The points are the shell's record of which relay each circle rides.
+      peerConnected = true;
+      await reopenPersonaSockets().catch((err) => { console.warn(`[persona] sockets not reopened at connect: ${err?.message ?? err}`); });
       // revokes owed to a node the person owns (a contact deleted while it was away): told now that this device is on
       retryPendingRevokes().catch(() => {});
       // every self's device address on its own relay sockets, so the person's other devices can reach this one

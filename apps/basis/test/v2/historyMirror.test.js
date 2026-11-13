@@ -32,7 +32,8 @@ async function sealedSourceFor(identity, map) {
   return createSealedPodDataSource({ podSource: memoryPodSource(map), podUrl: 'mem://', strategy });
 }
 
-const entry = (id, text) => ({ id, app: 'circle', type: 'chat-message', payload: { text } });
+// `actor: 'me'`: what the shells write for a person's own line before it is signed (a restore admits no unsigned line in anyone else's name)
+const entry = (id, text) => ({ id, app: 'circle', type: 'chat-message', actor: 'me', payload: { text } });
 
 describe('the history mirror — sealed follower of the device log', () => {
   it('mirrors appends as sealed batches + a head; the backend bytes carry NO plaintext', async () => {

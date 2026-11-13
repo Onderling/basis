@@ -6,7 +6,8 @@
 // `vandaag-lists-block.spec.js`. Bram (a real agent node on a relay the emulator reaches) has a circle with lists
 // switched on (his signed policy update). The phone joins by his invite and puts that circle's lists on Vandaag. Bram
 // makes a list with an entry: the phone's block shows it. The phone ticks it off: Bram's store has it no longer open.
-// Bram adds another: the phone's block shows that too. Each step leaves a screenshot. Release APK, emulator only.
+// Bram adds another: the phone's block shows that too. The phone types a line in the list's add field: Bram holds it.
+// Each step leaves a screenshot. Release APK, emulator only.
 
 const { launch, isVisible, soon, tapSoon, firstBoot, emulatorOnly } = require('./support/ui');
 const { startPeer, joinByInvite } = require('./support/peer');
@@ -97,5 +98,15 @@ describe("a circle's lists on the phone's Vandaag — a real second person over 
     const seen = await vandaagShows('brood');
     await device.takeScreenshot('lists-06-brood');
     if (!seen) throw new Error("Bram's second entry never showed on the phone");
+  });
+
+  it("the phone adds a line under the list on Vandaag, and Bram holds it", async () => {
+    const lists = await bramHolds((ls) => ls.some((l) => l.list === LIST && l.id));
+    const listId = lists.find((l) => l.list === LIST).id;
+    await soon(by.id(`list-add-input-${listId}`), 30_000);
+    await element(by.id(`list-add-input-${listId}`)).replaceText('zeep');
+    await tapSoon(by.id(`list-add-send-${listId}`));
+    await device.takeScreenshot('lists-07-zeep-added');
+    await bramHolds((ls) => ls.some((l) => l.list === LIST && l.entries.includes('zeep')));
   });
 });

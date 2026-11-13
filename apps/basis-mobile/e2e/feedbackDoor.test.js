@@ -36,8 +36,13 @@ describe('feedback from the phone: the door, the maker receives it, the answer c
 
   it("Today's card adds a connection point: the maker's relay", async () => {
     await tapSoon(by.id('circle-tab-screens'), 30_000);
-    await tapSoon(by.id('onb-reach-add'), 30_000);
-    await soon(by.id('point-add-input'), 30_000);
+    // a tap while the app is still starting is lost (the sheet never opens): tap until the field shows
+    let open = false;
+    for (let i = 0; i < 5 && !open; i += 1) {
+      await tapSoon(by.id('onb-reach-add'), 30_000);
+      open = (await firstOf([by.id('point-add-input')], 8_000)) === 0;
+    }
+    if (!open) { await device.takeScreenshot('fb-01a-no-point-sheet'); throw new Error('the connection point sheet never opened'); }
     await element(by.id('point-add-input')).replaceText(maker.ready.relayUrl);
     await tapSoon(by.id('point-add-submit'));
     await new Promise((r) => setTimeout(r, 3000));
@@ -64,7 +69,14 @@ describe('feedback from the phone: the door, the maker receives it, the answer c
   it('a note written there reaches the maker, and the answer shows in the thread', async () => {
     await element(by.id('contact-thread-input')).replaceText(NOTE);
     await tapSoon(by.id('contact-thread-send'));
-    const heard = await maker.next('contact-heard', (m) => String(m.text ?? '').toLowerCase().includes(NOTE.toLowerCase()), 90_000);
+    const heard = await maker.next('contact-heard', (m) => String(m.text ?? '').toLowerCase().includes(NOTE.toLowerCase()), 90_000)
+      .catch(async (err) => {
+        // say WHICH branch: nothing arrived, it fell to no lane (unrouted), or the maker refused the turn
+        await device.takeScreenshot('fb-03a-not-heard');
+        maker.send({ do: 'dump' });
+        const dump = await maker.next('dump', () => true, 20_000).catch(() => null);
+        throw new Error(`${err.message}\nthe maker holds: ${JSON.stringify(dump)}`);
+      });
     maker.send({ do: 'contact-say', text: ANSWER });
     const said = await maker.next('contact-said', () => true, 60_000);
     if (!said.ok) throw new Error(`the maker's answer did not go out: ${JSON.stringify(said)} (heard from ${heard.from})`);

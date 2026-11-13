@@ -37,7 +37,7 @@
  */
 import { startJourneyRelay } from '../../../basis/test/support/testRelay.js';
 import readline from 'node:readline';
-import { makerRootKeyStore, MAKER_HANDLE, MAKER_RELAY_PORT, MAKER_CARD_RELAY } from './makerCard.mjs';
+import { makerRootKeyStore, MAKER_HANDLE, MAKER_RELAY_PORT, lanAddress } from './makerCard.mjs';
 import { networkInterfaces } from 'node:os';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, teardown, sendCircleChat, readRoster,
@@ -63,20 +63,14 @@ const handle = process.argv.includes('--maker') ? MAKER_HANDLE : arg('handle', '
 // fell to live NKN — a harness artefact that looked like a lost message (found by instrumenting the route, 2026-11-11).
 // So both sides dial the host's LAN address, which the emulator reaches too. `--phone-host` overrides it; 10.0.2.2 is
 // only a last resort (the host cannot dial it, so the two names come back).
-const lanAddress = () => {
-  for (const list of Object.values(networkInterfaces())) {
-    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) return a.address;
-  }
-  return null;
-};
 const phoneHost = arg('phone-host', lanAddress() ?? '10.0.2.2');
 const makerMode = process.argv.includes('--maker');
 const talk = process.argv.includes('--talk') || makerMode;
 const joinMode = process.argv.includes('--join');
 
-// the maker's relay is on the fixed port its card names (the phone dials it as the card says, 10.0.2.2:port)
+// the maker's relay is on the fixed port its card names; both sides dial it under the LAN address, as the card says
 const relay = await startJourneyRelay(makerMode ? { port: MAKER_RELAY_PORT } : {});
-const relayUrl = (phoneHost === '10.0.2.2' || makerMode) ? relay.url : `ws://${phoneHost}:${new URL(relay.url).port}`;
+const relayUrl = phoneHost === '10.0.2.2' ? relay.url : `ws://${phoneHost}:${new URL(relay.url).port}`;
 say({ step: 'relay', url: relayUrl });
 // `--maker`: the feedback contact an e2e build carries (e2e/support/makerCard.mjs): a FIXED root seed, so this peer is
 // the same person on every run and its card is the one baked into that build
@@ -117,10 +111,15 @@ if (makerMode) {
   // the feedback contact: in no circle, reachable as a person; its card (made by its own op) is what the walk compares
   // with the card the e2e build carries
   await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
+  // the feedback persona is OPEN to first messages, as the deployed one is (decisions.md 2026-11-12: "the feedback
+  // persona is open"): a person's default is 'request', which holds a stranger's note as a message request and keeps
+  // it out of the thread (the walk's first runs: sent, never in the maker's thread, nothing refused)
+  const firstMessages = await peer.agent.setFirstMessages('open');
+  if (firstMessages !== 'open') throw new Error(`the maker could not open its door to first messages: ${firstMessages}`);
   const card = (await call('pinboard', 'getContactShareQr', {}).catch(() => null))?.payload ?? null;
   // `webid`: who it is (the build's card names the same one; the live card adds this run's relay, so cards differ)
-  // `relayUrl` here is the one the PHONE dials: the card's (the maker itself is on 127.0.0.1, the same relay)
-  say({ step: 'ready', maker: true, webid: peer.pubKey, card, relayUrl: MAKER_CARD_RELAY });
+  // `relayUrl`: the one spelling both sides dial, the same the e2e build's card names (made at build time)
+  say({ step: 'ready', maker: true, webid: peer.pubKey, card, relayUrl });
 } else if (joinMode) {
   await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
   say({ step: 'ready', waitingForInvite: true, relayUrl });
@@ -201,6 +200,8 @@ if (talk) {
           turns: turns.map((x) => ({ contactId: x.contactId, origin: x.origin, text: x.text ?? null })),
           unrouted: (peer.received ?? []).map((r) => r?.payload?.type ?? r?.payload?.subtype ?? typeof r?.payload),
           refused: peer.contactTurnsRefused ?? [],
+          // first messages held as requests (the door), not in a thread: a held note is THIS branch
+          requests: ((await call('pinboard', 'listMessageRequests', {}).catch(() => null))?.requests ?? []).map((q) => ({ from: q?.contactId ?? q?.from ?? null, text: q?.text ?? null })),
         });
       } else if (cmd.do === 'roster') {
         // the circle's members as the peer's own roster has them (its own rows left out): who joined, under which name

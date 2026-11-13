@@ -785,6 +785,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circles (and every circle while only the default runs) are the default's, as before.
   const circlePersonas = new Map();   // circleId → profileId (non-default only)
   let onPersonaStarted = null;   // set once the own store exists: a persona that starts writes its device-map row
+  let peerConnected = false;   // the transport is up (connectPeerTransport ran): a persona circle mapped later dials at once
   const personaOf = (circleId) => personas.get(circlePersonas.get(circleId)) ?? persona;
   // the root this device derives a circle's per-circle keys from: the persona's circle root
   const circleSeedFor = (circleId) => personaOf(circleId).circleSeed;
@@ -1998,6 +1999,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
         // the circle is now this persona's: its keys and its traffic follow (the default is the map's absence)
         if (profileId === 'default') circlePersonas.delete(circleId); else circlePersonas.set(circleId, profileId);
+        // …and the persona is on that circle's relay on its own socket: a circle can become the persona's AFTER the
+        // connect (its record lands later than the boot), and the connect's reopen did not see it then
+        if (peerConnected && circlePersonas.get(circleId) === profileId) reopenPersonaSockets({ only: circleId }).catch(() => { /* said inside */ });
         // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
         // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
         // A persona's circle too: it reaches the devices holding that persona only (the follow's `siblings(circleId)`).
@@ -2559,6 +2563,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   /** Every self's device address on this device: registered as an identity of ours and on that self's own relay
    *  sockets (never another self's: a socket holding two selves' addresses would link them at the relay). */
+  /** Each persona this device runs, on a socket of its own at every relay point of the circles it holds here. Best-effort
+   *  per socket (one relay down must not cost the others); the boot does not wait for the sockets to open. */
+  const reopenPersonaSockets = async ({ only = null } = {}) => {
+    const wanted = new Map();   // `${url}@${personaKey}` → { url, identity }
+    for (const [cid, pid] of circlePersonas) {
+      if (only && cid !== only) continue;
+      const rt = personas.get(pid);
+      if (!rt?.chatId?.pubKey) continue;
+      let points = [];
+      try { points = opts.circlePointsFor?.(cid) ?? []; } catch { points = []; }
+      for (const url of points) {
+        if (typeof url === 'string' && /^wss?:\/\//.test(url)) wanted.set(`${url}@${rt.chatId.pubKey}`, { url, identity: rt.chatId });
+      }
+    }
+    for (const { url, identity } of wanted.values()) {
+      try { await sa.relays.add(url, { identity }); }
+      catch (err) { console.warn(`[persona] could not reopen its socket on ${url}: ${err?.message ?? err}`); }
+    }
+  };
   const registerDeviceAddresses = async () => {
     for (const [pid, self] of personas) {
       const address = deviceAddressOf(pid);
@@ -10032,6 +10055,11 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (typeof console !== 'undefined') console.warn('[realAgent] rendezvous enable failed (continuing without direct WebRTC):', err?.message ?? err);
         }
       }
+      // EVERY PERSONA BACK ON ITS CIRCLES' RELAYS, each on a socket of its own (never the general persona's). The join
+      // opens that socket (`bindCirclePersona`); without this a restart left every persona circle without one: its lines
+      // waited and nothing addressed to it arrived. The points are the shell's record of which relay each circle rides.
+      peerConnected = true;
+      await reopenPersonaSockets().catch((err) => { console.warn(`[persona] sockets not reopened at connect: ${err?.message ?? err}`); });
       // revokes owed to a node the person owns (a contact deleted while it was away): told now that this device is on
       retryPendingRevokes().catch(() => {});
       // every self's device address on its own relay sockets, so the person's other devices can reach this one

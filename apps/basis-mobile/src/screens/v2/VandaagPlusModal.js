@@ -20,8 +20,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   edit = null,
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
   selves = [], writeAsSelf = null,
-  // the line named something that lives in a circle: the sheet opens it there (`onOpenCircle(id)`), never acts on it
-  onOpenCircle = null,
+  // the line read to an act more than one circle holds: the card asks which; a pick → `onCircleRun(card, circleId)`, which
+  // runs it as the person and answers `{done}` (what it did) or `{error}`; nothing runs before a pick
+  onCircleRun = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
   // an act that makes nothing (feedback): the host runs it at once — the sheet only hands it over
@@ -37,9 +38,10 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [busy, setBusy] = useState(false);
   const [asSelf, setAsSelf] = useState(writeAsSelf);
   const [line, setLine] = useState('');
-  const [referral, setReferral] = useState(null);
+  const [card, setCard] = useState(null);
+  const [done, setDone] = useState(null);
   useEffect(() => {
-    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); setReferral(null); return; }
+    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); setCard(null); setDone(null); return; }
     if (edit?.act) { setActId(edit.act.id); setValues(edit.values ?? {}); setAsSelf(edit.asSelf ?? 'default'); }  // changed as the self that made it
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
@@ -62,13 +64,24 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     setBusy(false);
     if (said) setError(said);
   };
-  // the free line: what it understood picks the act and fills the fields below (editable before Save), never a circle
+  // the free line: an own act picks the act and fills the fields below (editable before Save); a circle's act ran at
+  // once (`done`) or asks which circle (`card`)
   const read = async () => {
+    setDone(null);
     const r = await onRead?.(line);
-    setReferral(Array.isArray(r?.referral) && r.referral.length ? r.referral : null);
-    if (r?.referral) setError(null);
+    setCard(r?.card && Array.isArray(r.card.to) && r.card.to.length ? r.card : null);
+    if (r?.card) setError(null);
+    else if (r && 'done' in r) { setDone(r.done ?? null); setError(null); }
     else if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
     else if (r?.error) setError(r.error);
+  };
+  const runIn = async (circleId) => {
+    const c = card;
+    setCard(null);
+    setBusy(true);
+    const r = await onCircleRun?.(c, circleId);
+    setBusy(false);
+    if (r?.error) setError(r.error); else { setDone(r?.done ?? null); setError(null); }
   };
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -154,10 +167,17 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               </View>
             );
           })}
-          {referral ? referral.map((r) => (
-            <Btn key={r.circleId} label={t('circle.vandaag.plus_referral', { name: r.name || t('circle.screens.untitled') })}
-              onPress={() => onOpenCircle?.(r.circleId)} testID={`vandaag-plus-referral-${r.circleId}`} style={styles.btnAt} />
-          )) : null}
+          {card ? (
+            <View testID="vandaag-plus-card">
+              <Text style={styles.label}>{t('circle.vandaag.plus_circle_ask', { line: card.line ?? '' })}</Text>
+              {card.to.map((r) => (
+                <Btn key={r.circleId} label={t('circle.vandaag.plus_circle_in', { name: r.name || t('circle.screens.untitled') })}
+                  onPress={() => runIn(r.circleId)} disabled={busy} testID={`vandaag-plus-card-in-${r.circleId}`} style={styles.btnAt} />
+              ))}
+              <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => setCard(null)} testID="vandaag-plus-card-no" style={styles.btnAt} />
+            </View>
+          ) : null}
+          {done ? <Text style={styles.label} testID="vandaag-plus-done">{done}</Text> : null}
           {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
           {/* the way out, not one of the acts */}
           <Btn variant="ghost" onPress={onClose} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />

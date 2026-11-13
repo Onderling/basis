@@ -70,6 +70,17 @@ describe('the "+" line: own acts, else the circle act — at once when the circl
   });
 });
 
+describe('a MODEL reading never acts in a circle', () => {
+  it("the model is asked the own scope's acts only; its answer naming a circle's op is no reading", async () => {
+    const { plusReadWithModel } = await import('../../src/v2/vandaagPlus.js');
+    let bounds = null;
+    const ask = async (_line, b) => { bounds = b; return { actId: 'addToList', values: { list: 'Boodschappen', text: 'melk', circleId: 'c1' } }; };
+    expect(await plusReadWithModel('melk halen voor thuis', { ask })).toBeNull();
+    expect(bounds.scope).not.toMatch(/^c1$/);
+    expect(bounds.acts.map((a) => a.actId)).not.toContain('addToList');
+  });
+});
+
 describe("the sheet's own acts, most used first (this device's counts, an 'own' key space)", () => {
   it('orders by the own counts; acts never used keep their declared order after', async () => {
     const { orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE } = await import('../../src/v2/vandaagPlus.js');

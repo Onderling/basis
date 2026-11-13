@@ -38,14 +38,15 @@ async function door({ tellApp = null } = {}) {
   const users = createBotUsers({ store: memStore() });
   await users.admit({ channel: 'telegram', uid: '42', displayName: 'Ann' });
   await users.admit({ channel: 'telegram', uid: '7', displayName: 'Bert' });
-  const asked = []; const toApp = []; const revoked = []; const sentPrivately = [];
+  const asked = []; const toApp = []; const revoked = []; const sentPrivately = []; const answers = [];
   let grants = [{ viewPubKey: ann.webid, actingAs: ANN, label: 'telefoon', ops: ['lists.listLists'] }, { viewPubKey: 'OTHER-SCREEN', actingAs: ANN, ops: [] }];
   const tombstones = createLinkTombstones({ vault: memVault() });
   const link = createIdentityLink({
     users, botAddress: () => BOT, tombstones,
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
     sendPrivately: async (person, text) => { sentPrivately.push({ person, text }); return { ok: true }; },
-    tellApp: tellApp ?? (async (key, payload) => { toApp.push({ key, payload }); }),
+    tellApp: tellApp ?? (async (key, payload) => { toApp.push({ key, payload, registered: answers.includes(key) }); }),
+    expectAnswer: (key) => { answers.push(key); },
     listGrants: async () => grants,
     revokeView: async (viewPubKey) => { revoked.push(viewPubKey); grants = grants.filter((g) => g.viewPubKey !== viewPubKey); return true; },
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: BOT, relayUrl: 'wss://r', botName: '@bot' }),
@@ -151,7 +152,8 @@ describe('the identity link through the door', () => {
     // the profile key is never what the person is found by at the door
     expect(await d.users.find('web', ann.webid)).toBeNull();
     expect((await d.users.find('web', ann.webid, { linkedRoot: ann.root }))?.id).toBe(ANN);
-    expect(d.toApp).toEqual([{ key: ann.webid, payload: expect.objectContaining({ subtype: IDENTITY_LINK_SUBTYPE, statement: expect.objectContaining({ bot: BOT, row: ANN, root: ann.root }) }) }]);
+    // registered as the one answer to the offer the bot just checked, before it left (the send gate lets exactly it go)
+    expect(d.toApp).toEqual([{ key: ann.webid, registered: true, payload: expect.objectContaining({ subtype: IDENTITY_LINK_SUBTYPE, statement: expect.objectContaining({ bot: BOT, row: ANN, root: ann.root }) }) }]);
   });
 
   it('an app that does not answer never holds the reply: link, relink and unlink answer at once, the app is told after', async () => {
@@ -171,7 +173,8 @@ describe('the identity link through the door', () => {
     expect(told, 'nothing told while the app is away').toEqual([]);
     release();
     await new Promise((r) => { setTimeout(r, 0); });
-    expect(told.map((x) => Boolean(x.payload.unlinked))).toEqual([false, false, true]);
+    // the link and the 'already linked' answer are told; the unlink is not (no fresh ask behind it: the send gate)
+    expect(told.map((x) => Boolean(x.payload.unlinked))).toEqual([false, false]);
   });
 
   it('the same code button tapped again after the link: "already linked", never "no link is waiting"', async () => {
@@ -238,7 +241,8 @@ describe('the identity link through the door', () => {
     expect(r.ok).toBe(true);
     expect(await d.users.find('web', ann.webid, { linkedRoot: ann.root })).toBeNull();
     expect(d.revoked).toEqual([ann.webid]);
-    expect(d.toApp.at(-1)).toMatchObject({ key: ann.webid, payload: { subtype: IDENTITY_LINK_SUBTYPE, unlinked: true, statement: { bot: BOT, row: ANN, root: ann.root } } });
+    // the unlink is not told to the app (no fresh ask behind it, so the send gate would hold it): the app learns it when it next speaks
+    expect(d.toApp.some((x) => x.payload?.unlinked === true)).toBe(false);
   });
 });
 

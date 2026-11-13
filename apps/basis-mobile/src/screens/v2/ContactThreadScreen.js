@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
+import { contactSendRoute } from '../../../../basis/src/v2/contactsSource.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { earlierRoomMessages } from '../../../../basis/src/v2/nearbyKept.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
@@ -43,6 +44,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   const registry = bundle?.contactSkills ?? null;
   const contactId = contact?.contactId;
   const peerAddr = contact?.peerAddr ?? contactId;
+  // where a turn goes: a co-member shown from the peer graph is written to at their circle address (the send gate)
+  const sendTo = useMemo(() => contactSendRoute(contact, peerAddr), [contact, peerAddr]);
   // THE SAME "+" AS A CIRCLE'S COMPOSER (web parity): the projector's contact-scoped entries, each run as an op addressed
   // to this contact (a file today). A walk found no way to send a file here but the `/send-file` slash.
   const contactAttach = useMemo(() => attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' }), []);
@@ -143,9 +146,10 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   const onRetryDelivery = useCallback((msgId) => {
     const m = messages.find((x) => x.messageId === msgId && x.origin === 'user' && !x.file);
     if (!m || !channel) return;   // a file retries through its own op; a turn that is not mine has nothing to retry
-    const { sent } = channel.sendTurn({ peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
+    if (sendTo.blocked) return;
+    const { sent } = channel.sendTurn({ peerAddr: sendTo.to ?? peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
     trackContactTurn({ messageId: msgId, sent, deliveryMap: deliveryStateMap }).catch(() => {});
-  }, [messages, channel, peerAddr, contactId, floor, deliveryStateMap]);
+  }, [messages, channel, peerAddr, sendTo, contactId, floor, deliveryStateMap]);
   // Verbergen / Tonen (L106, web parity — contactThread.js's header control): every person gets the control — a
   // contact from the book, and a stranger who wrote to me (hiding them puts them in the book, hidden). A bot
   // does not: a bot is removed, not hidden. `null` keeps the header without it. The mark is the book's — the ONE
@@ -248,12 +252,13 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     // The echo is what LEFT the device: with a floor, the redacted text. The bubble carries the send's state from here
     // on (pending → the verdict; a receipt moves it further): no "versturen…" line and no error line for a typed turn —
     // the chip says it, and a tap on it retries (web parity: showContactThread's onSend).
+    if (sendTo.blocked) return;   // the line under the thread says why; nothing leaves
     let turn;
-    try { turn = channel.sendTurn({ peerAddr, threadId: contactId, text, floor }); }
+    try { turn = channel.sendTurn({ peerAddr: sendTo.to ?? peerAddr, threadId: contactId, text, floor }); }
     catch { setError(true); return; }   // the turn never got an id: nothing is on screen to carry a state
     setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: turn.text, messageId: turn.messageId }]);
     await trackContactTurn({ messageId: turn.messageId, sent: turn.sent, deliveryMap: deliveryStateMap });
-  }, [input, channel, peerAddr, contactId, commands, runSkill, floor, deliveryStateMap]);
+  }, [input, channel, peerAddr, sendTo, contactId, commands, runSkill, floor, deliveryStateMap]);
 
   return (
     <View style={styles.wrap} testID="contact-thread-screen">
@@ -371,6 +376,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         {busy && <Text style={styles.sending}>{t('circle.contacts.sending')}</Text>}
       </ScrollView>
 
+      {sendTo.blocked ? <Text style={styles.error} testID="contact-thread-write-needs-card">{t('circle.contacts.write_needs_card', { name })}</Text> : null}
       {error && <Text style={styles.error}>{t('circle.contacts.send_failed', { name })}</Text>}
 
       {skills.length > 0 && (

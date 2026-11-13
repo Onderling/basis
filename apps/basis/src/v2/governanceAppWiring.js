@@ -9,6 +9,7 @@
  */
 import { selfRefIn } from './selfRef.js';
 import { makeCircleGovernance } from './governanceHost.js';
+import { removeCircleMember } from './circleMembershipHygiene.js';
 import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -134,7 +135,28 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  *   `opts.to` NARROWS the recipient set — the report channel passes the circle's admin refs, so a report
  *   never lands on the device of the person it is about.
  */
-export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, spineGate = null }) {
+/**
+ * THE SETTINGS ENACTOR every binding uses: write the policy to this device's store, then STATE it on the governance lane
+ * so every member's device applies it (`circlePolicyLane.state`). A write that failed is not stated. Without a store
+ * there is no enactor, and governance refuses the enact rather than faking one.
+ * @param {{setPolicy: ((circleId: string, patch: object) => Promise<*>)|null, statePolicy: ((circleId: string) => Promise<*>)|null}} a
+ * @returns {((circleId: string, patch: object) => Promise<{ok: boolean}>)|null}
+ */
+export function policyEnactor({ setPolicy = null, statePolicy = null } = {}) {
+  if (typeof setPolicy !== 'function') return null;
+  return async (circleId, patch) => {
+    try { await setPolicy(circleId, patch); } catch { return { ok: false, error: 'policy-write-failed' }; }
+    if (typeof statePolicy !== 'function') return { ok: true, stated: false };
+    // A change that was never STATED has nothing for the catch-up to carry: the other members would never get it (Opus,
+    // reviewing). Try twice; a second failure is said (`stated: false`), never reported as a plain success.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try { if (await statePolicy(circleId)) return { ok: true, stated: true }; } catch { /* tried again below */ }
+    }
+    return { ok: true, stated: false };
+  };
+}
+
+export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null, statePolicy = null, spineGate = null, agent = null }) {
   // Governance rides the RAIL, period: signed, circle-scoped, receiver-verified. The unsigned legacy
   // path was deleted with the cutover (one chained-statement primitive remains — signSpine); a composition
   // without a per-circle signer is a wiring bug, surfaced here rather than as silently-unsigned governance.
@@ -171,7 +193,10 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
 
   const governance = makeCircleGovernance({
     callSkill, appendGovernanceEvent, getPolicy, getMembers,
-    localActorRef: refIn, newProposalId: genId, now, setPolicy,
+    localActorRef: refIn, newProposalId: genId, now, setPolicy: policyEnactor({ setPolicy, statePolicy }),
+    // with this device's agent, an enacted removal is the WHOLE removal the members panel makes (unbind the member's
+    // circle address, re-record the authorize snapshot), not the bare substrate op
+    ...(agent ? { removeMember: (circleId, memberWebid) => removeCircleMember({ agent, callSkill, circleId, memberWebid }) } : {}),
     // The fold's input: VERIFIED events + the disputed (equivocator) ref set, from the rail's read.
     readGovernanceState: (circleId) => rail.readVerified(circleId),
   });

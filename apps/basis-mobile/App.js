@@ -704,7 +704,6 @@ export default function App() {
           podAuth={podAuth}
           eventLog={eventLogRef.current}
           circleRecipePendingStore={circleRecipePendingStoreRef.current}
-          circleRulesPendingStore={circleRulesPendingStoreRef.current}
           circlePolicyLane={circlePolicyLaneRef.current}
           /* no onBack (no chat shell to fall back to) +
              no onChatRoute (the circle view IS the chat, no route). */

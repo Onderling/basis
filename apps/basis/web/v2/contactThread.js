@@ -52,6 +52,7 @@ export function renderContactThread(container, {
   skills = [],
   busy = false,
   error = null,
+  cannotWrite = false,     // a co-member no shared circle shows an address for: say so instead of sending (the send gate)
   t,
   onSend,
   onBack,
@@ -303,6 +304,13 @@ export function renderContactThread(container, {
   }
   container.appendChild(log);
 
+  if (cannotWrite) {
+    const why = document.createElement('div');
+    why.className = 'cc-cthread__error';
+    why.dataset.reason = 'write-needs-card';
+    why.textContent = tr('circle.contacts.write_needs_card', { name });
+    container.appendChild(why);
+  }
   if (error) {
     const err = document.createElement('div');
     err.className = 'cc-cthread__error';

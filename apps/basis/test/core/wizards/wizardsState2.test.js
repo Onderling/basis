@@ -424,7 +424,7 @@ describe('createGroupState', () => {
     const s = CG.initialState();
     expect(s.step).toBe(1);
     expect(s.accessPolicy).toBe('invite-only');
-    expect(s.conflictPolicy).toBe('mediation');
+    expect(s.conflictPolicy).toBe('admin-decides');   // mediation is held back for the alpha (DRAWN_SAMPLE_ENABLED)
     expect(s.storagePolicy).toBe('none');
     expect(s.keyRotationMode).toBe('admin-only');
   });
@@ -508,7 +508,7 @@ describe('createGroupState', () => {
     expect(r.agreements).toBeUndefined();          // 5.5a — no doc field set
     expect(r.accessPolicy).toBe('invite-only');
     expect(r.leavePolicy).toBe('anyone');
-    expect(r.conflictPolicy).toBe('mediation');
+    expect(r.conflictPolicy).toBe('admin-decides');
   });
 
   it('buildRulesObjectFromState parses CSV lists + spreads the rules doc', () => {
@@ -525,7 +525,7 @@ describe('createGroupState', () => {
     expect(r.conflict).toBe('Mediation by two.');
     expect(r.admission).toBe('Admins must approve.');
     // The machine-readable conflict ENUM coexists with the doc's free text.
-    expect(r.conflictPolicy).toBe('mediation');
+    expect(r.conflictPolicy).toBe('admin-decides');
   });
 
   it('finalSubmit happy-path: calls createGroupV2 with composed rules', async () => {

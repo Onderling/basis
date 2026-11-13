@@ -41,7 +41,7 @@ describe('the rules screen saves through the circle\'s rule for changing the rul
     const { gov, callSkill } = host({ changeRule: 'any-admin' });
     const r = await changeRulesDoor({ governance: gov, circleId: 'c1', rules: edited, actorRef: 'a0' });
     expect(r.outcome).toBe('done');
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'editGroupRules', { groupId: 'c1', rules: edited });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'editGroupRules', { groupId: 'c1', rules: edited, proposalId: expect.any(String) });
   });
 
   it('the admins decide together (the default): a proposal opens, the rules are not written yet', async () => {

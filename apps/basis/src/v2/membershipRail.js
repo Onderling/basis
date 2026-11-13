@@ -9,6 +9,7 @@
  * AUTHORITATIVE membership — the wall-clock exit path retires with this rider.
  */
 import { selfRefIn } from './selfRef.js';
+import { inAuthorChainUpTo } from './authorChainCut.js';
 import { verifyCeremonyReveal, isCeremonyKind, ceremonyRevealFacts, PERSON_KEY_KIND } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -65,18 +66,6 @@ export function addressBindsOnRow(row, author, atSeq = null, { hash = null, chai
   });
 }
 
-/** Is `hash` the statement `upTo` or one of its ancestors along `author`'s own parent chain? `chainOf(hash)` → the body. */
-export function inAuthorChainUpTo(chainOf, author, upTo, hash) {
-  if (hash === upTo) return true;
-  let at = upTo;
-  for (let steps = 0; steps < 100000 && at; steps++) {
-    const b = chainOf(at);
-    if (!b || b.author !== author) return false;   // a gap, or the chain leaves the author: not provably before the cut
-    at = b.parentHash ?? null;
-    if (at === hash) return true;
-  }
-  return false;
-}
 
 export function rosterBindingVerifier(callSkill) {
   // NO re-entrancy breaker, BY CONSTRUCTION (2026-08-21): this verifier reads the roster

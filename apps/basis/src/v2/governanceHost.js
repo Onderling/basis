@@ -39,21 +39,30 @@ export function makeCircleGovernance({
   // the WHOLE removal (`removeCircleMember`: the substrate op, then unbind the member's circle address and re-record the
   // authorize snapshot), when the wiring has this device's agent; else the bare pinboard op
   removeMember = null,
+  // the settings version this device holds for a circle: a rules change it enacts is stamped with it, and every
+  // receiving device judges that change by THAT version's rule (the receiver gate)
+  policyVersionOf = null,
 }) {
   if (typeof readGovernanceState !== 'function') {
     throw new Error('makeCircleGovernance: readGovernanceState is required (the rail\'s verified events + disputed set)');
   }
   // Map a governed action to the REAL op. removeMember/editGroupRules are pinboard skills;
   // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
-  async function enact(circleId, action, subject) {
+  // `proposalId` rides into the enacted change's statement, so every receiving device can check the decision (the
+  // receiver gate, governanceReceiverGate.js)
+  async function enact(circleId, action, subject, proposalId = null) {
+    // the decision rides what is enacted: the proposal and the settings version this device holds (the receiver gate)
+    let policyVersion = null;
+    try { policyVersion = typeof policyVersionOf === 'function' ? await policyVersionOf(circleId) : null; } catch { policyVersion = null; }
+    const decided = { ...(proposalId ? { proposalId } : {}), ...(Number.isFinite(policyVersion) ? { policyVersion } : {}) };
     if (action === 'removeMember') {
       return typeof removeMember === 'function'
-        ? removeMember(circleId, subject)
-        : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
+        ? removeMember(circleId, subject, decided)
+        : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful', ...decided });
     }
-    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject });
-    if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role });
-    if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject) : { ok: false, error: 'no-setPolicy' };
+    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject, ...decided });
+    if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role, ...decided });
+    if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject, { proposalId }) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };
     return { ok: false, error: 'unknown-action' };
   }

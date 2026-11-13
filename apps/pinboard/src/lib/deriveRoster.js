@@ -123,6 +123,10 @@ export function deriveRoster({
   // task #80 — the circle's CURRENT rules version (see the caller). Only read to build the fold's
   // rules gate below; `null` (no rules item / legacy caller) leaves joins ungated.
   rulesVersion = null,
+  // THE GOVERNED GATE (the circle's "who decides" at the receiver), built by the host from the circle's governance
+  // lane: another person's removal or role change takes effect only where the circle's rule allowed it. Only on the
+  // authoritative path; null leaves the fold as it was.
+  governedGate = null,
 } = {}) {
   /** webid → derived record, built FROM the trail. */
   const kindProven = new Set();   // the rows the fold proved a function profile: only they carry `provenKind`
@@ -291,6 +295,7 @@ export function deriveRoster({
       founderKinds: founderKinds ?? {},
       seed: { members: seedMembers, admins: seedAdmins },
       ...(rulesGate ? { rulesGate } : {}),
+      ...(foldAuthoritative && typeof governedGate === 'function' ? { governedGate } : {}),
     });
     saidByWebid = folded.props ?? Object.create(null);
     if (typeof onFolded === 'function') { try { onFolded(folded); } catch { /* the host's reaction never breaks a read */ } }

@@ -569,7 +569,9 @@ export async function removeMember({
     //
     // Best-effort, and REPORTED: a removal must complete even when the notice cannot be delivered, but
     // the caller is told which happened rather than being left to assume the good case.
-    try { told = !!(await emitSpine?.({ kind: 'evict', circleId: _groupId, subject: memberWebid, actor: from })); }
+    // the decision rides the statement: the proposal that decided it and the settings version held (the receiver gate)
+    const decided = { ...(typeof a.proposalId === 'string' && a.proposalId ? { proposalId: a.proposalId } : {}), ...(Number.isFinite(Number.parseInt(a.policyVersion, 10)) ? { policyVersion: Number.parseInt(a.policyVersion, 10) } : {}) };
+    try { told = !!(await emitSpine?.({ kind: 'evict', circleId: _groupId, subject: memberWebid, ...(Object.keys(decided).length ? { payload: decided } : {}), actor: from })); }
     catch { told = false; }
 
     // Now close it: rotate the key + drop them from the MemberMap, so the fan-out stops and what comes

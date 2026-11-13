@@ -163,6 +163,9 @@ function depthOf(stmts) {
  *   pre-spine materialised HEAD at cutover (the current trail-derived roster). Seed members/admins are the
  *   starting state; UNLIKE founders they are ordinary members (evictable, demotable). Absent (the default) the
  *   fold starts from the founders alone, exactly as before — so pure-spine callers are unchanged.
+ * @param {(statement: object, ctx: {admins: Set<string>}) => boolean} [opts.governedGate]  the circle's "who decides" at
+ *   the receiver: asked for another person's `evict` / `role` (never a person's own acts); false → it does not take
+ *   effect. Absent → unchanged (the kernel holds no policy).
  * @param {{ versions?: string[]|Set<string> }} [opts.rulesGate]  RULES-GATED JOINS (task #80, sitting-A
  *   decision). When present, a `join` folds ONLY if its signed payload carries a non-empty
  *   `rulesAccepted` string — and, when `versions` is a non-empty set, one that is IN it (the set of
@@ -179,7 +182,12 @@ function depthOf(stmts) {
  *   `'founder'` · `'role'` · `` `caretaker:<hash>` `` (see the note where `adminVia` is built), plus
  *   which caretakers have SIGNED for their own appointment (`caretakerAcknowledged`: ref → seed hash).
  */
-export function foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {} } = {}) {
+export function foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {}, governedGate = null } = {}) {
+  // THE GOVERNED GATE (the circle's "who decides" at the receiver): the host may hand one predicate, asked for another
+  // person's `evict` and `role` only, with the admins at THIS depth; a statement it refuses does not take effect. Never
+  // asked for a person's own acts (a self-leave, stepping down from one's own admin role, the caretaker's
+  // acknowledgement). Absent: the fold is what it was; the kernel holds no policy.
+  const governed = (s, admins) => typeof governedGate !== 'function' || governedGate(s, { admins }) === true;
   const shaped = (Array.isArray(statements) ? statements : []).filter(
     (s) => s && typeof s === 'object'
       && typeof s.author === 'string' && typeof s.subject === 'string' && typeof s.hash === 'string',
@@ -326,6 +334,8 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // erasing the very provenance the statement exists to record.
       if (s.author === s.subject && typeof p.caretakerFor === 'string' && p.caretakerFor) continue;
       const role = p.role;
+      const ownStepDown = s.author === s.subject && role === 'member';
+      if (!ownStepDown && !governed(s, adminBefore)) continue;   // the circle's rule asked for a vote this change lacks
       if (role === 'admin') promoted.add(s.subject);
       // A FOUNDER IS DEMOTABLE (Frits, 2026-08-23) — once the circle has another admin, which the
       // last-admin rule below supplies without a second condition here. The organiser who moves away
@@ -368,7 +378,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     }
     for (const s of batch) {
       if (s.kind === 'leave' && s.author === s.subject) { removed.add(s.subject); removedBy.set(s.subject, s.hash); if (!removedHow.has(s.subject)) removedHow.set(s.subject, 'leave'); }
-      else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject)) { removed.add(s.subject); removedBy.set(s.subject, s.hash); removedHow.set(s.subject, 'evict'); }
+      else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject) && governed(s, adminBefore)) { removed.add(s.subject); removedBy.set(s.subject, s.hash); removedHow.set(s.subject, 'evict'); }
     }
     const joined = new Set();
     for (const s of batch) {

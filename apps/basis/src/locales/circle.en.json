@@ -7513,6 +7513,10 @@
       "member_vote": {
         "text": "member vote",
         "doc": "Decision-class — a majority of the whole circle must agree."
+      },
+      "random_sample": {
+        "text": "drawn members decide",
+        "doc": "Decision class random-sample: members drawn from the proposal's own hash decide (the wizard's two-member mediation: two drawn, both agree; a larger draw by majority is a drawn jury). Frits 2026-11-10."
       }
     },
     "status": {
@@ -7556,6 +7560,14 @@
     "disputed_line": {
       "text": "conflicting history from {{who}} — evidence attached",
       "doc": "Governance L3 — equivocation (fork-proof) alert."
+    },
+    "refused_changeRule": {
+      "text": "{{who}} changed the rules without the vote this circle requires. The change is not applied.",
+      "doc": "Governance: an admin's rules change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened (Frits 2026-11-10: kept and shown, never applied)."
+    },
+    "refused_changePolicy": {
+      "text": "{{who}} changed the settings without the vote this circle requires. The change is not applied.",
+      "doc": "Governance: an admin's settings change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened."
     },
     "review_remove": {
       "text": "Review & remove",

@@ -110,7 +110,7 @@ export function buildPhoneInboundWiring({
   // Any governance change (the live fan, or a catch-up batch) may carry a rules-update statement —
   // fold it into the local rules head; the pre-scan is cheap and no-ops for vote churn.
   const govChanged = (cid) => {
-    if (govRail) applyRulesUpdates({ rail: govRail, callSkill: bundle.callSkill, circleId: cid }).catch(() => {});
+    if (govRail) applyRulesUpdates({ rail: govRail, callSkill: bundle.callSkill, circleId: cid, readPolicy: circlePolicyLane?.readPolicy ?? null }).catch(() => {});
     // …and the circle's policy, the same way (a joiner catches the founder's up here)
     if (govRail) circlePolicyLane?.apply(cid, govRail).catch(() => {});
   };

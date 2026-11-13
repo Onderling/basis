@@ -1349,6 +1349,9 @@ export const pinboardManifest = {
         { name: 'groupId',      kind: 'string', required: true, ...ID_NONEMPTY  },
         { name: 'memberWebid',  kind: 'string', required: true, ...STR_NONEMPTY },
         { name: 'role',         kind: 'enum', of: ['admin', 'member'], required: true },
+        // the decision that enacted it (governance): its proposal and the settings version held (the receiver gate)
+        { name: 'proposalId',    kind: 'string', required: false },
+        { name: 'policyVersion', kind: 'number', required: false },
       ],
       // A role is a SPINE fact: equivocation is an attack (two conflicting promotions from one
       // author are a fork-proof), and every device must fold the same answer to who runs the circle.
@@ -1375,6 +1378,9 @@ export const pinboardManifest = {
         { name: 'memberStableId',  kind: 'string' },
         { name: 'reason',          kind: 'string' },
         { name: 'policy',          kind: 'object' },
+        // the decision that enacted it (governance): its proposal and the settings version held (the receiver gate)
+        { name: 'proposalId',    kind: 'string', required: false },
+        { name: 'policyVersion', kind: 'number', required: false },
       ],
       surfaces: {
         chat: { hint: 'Remove a member from a circle. Admin-only; forces a key rotation and reseal.' },
@@ -1422,6 +1428,10 @@ export const pinboardManifest = {
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rules',   kind: 'object', required: true },
+        // the proposal that decided this change, where the circle's rule asked for one (governance enact passes it)
+        { name: 'proposalId', kind: 'string', required: false },
+        // the settings version the author held: every receiver judges this change by that version's rule
+        { name: 'policyVersion', kind: 'number', required: false },
       ],
       resolves: [{ field: 'rules', policy: 'content' }],
       surfaces: {

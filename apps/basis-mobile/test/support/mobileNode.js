@@ -105,7 +105,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const { createSettingsPodMedium } = await import('../../../basis/src/v2/settingsPodMedium.js');
   const { createHistoryPodMedium } = await import('../../../basis/src/v2/historyMirror.js');
   const { createRegistryPodMedium } = await import('../../../basis/src/v2/registryCarrier.js');
-  const { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } = await import('../../../basis/src/v2/policyUpdateLane.js');
+  const { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } = await import('../../../basis/src/v2/policyUpdateLane.js');
   const { asyncStorageRelayIo } = await import('../../../basis/src/v2/relayPref.js');
   const { makePeerRouter } = await import('../../../basis/src/core/handlers/peerRouter.js');
   const {
@@ -135,7 +135,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     headStore: makePolicyHeadStore(AsyncStorage),
     readPolicy: (cid) => policyStore.get(cid),
     writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy); pods.forgetCircleSealStrategyFor(cid); return r; },
-    adminsOf: adminsOfViaSkill((...a) => bundle?.callSkill?.(...a)),
+    membersOf: membersOfViaSkill((...a) => bundle?.callSkill?.(...a)),
   });
 
   // the relay this phone is set to — in ITS storage, read by the boot's own connect

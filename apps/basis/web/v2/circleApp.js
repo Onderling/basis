@@ -236,7 +236,7 @@ import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, open
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../src/v2/enrollOffer.js';
 import { installWebSignatureEquation } from '../../src/v2/signatureEquations.js';
 import { runStartQueue, startQueueSiblings } from '../../src/v2/startQueue.js';
@@ -1157,7 +1157,7 @@ const circlePolicyLane = makeCirclePolicyLane({
     circleMediaCompositions.delete(cid);
     return r;
   },
-  adminsOf: adminsOfViaSkill((...a) => rawCallSkill?.(...a)),
+  membersOf: membersOfViaSkill((...a) => rawCallSkill?.(...a)),   // the roster the receiver gate counts
 });
 // α.1c — per-circle recipe book store (multi-recipe per circle, one active).
 // localStorage now; pod io can swap in later without touching callers.
@@ -4592,7 +4592,8 @@ function shellGovernance({ myWebid = '' } = {}) {
     spineGate: circleHouseholdAgent?.spineGate ?? null,   // spine acts only from the point
     // an enacted settings change: written here, then stated on the lane so every member's device applies it
     setPolicy: (cid, patch) => policyStore.update(cid, patch),
-    statePolicy: (cid) => circlePolicyLane.state(cid),
+    statePolicy: (cid, meta) => circlePolicyLane.state(cid, meta),
+    policyVersionOf: (cid) => circlePolicyLane.headVersion(cid),   // a rules change is stamped with the settings version held
   });
 }
 
@@ -9612,7 +9613,7 @@ async function boot() {
       // statement — fold it into the local rules head, then re-render. Fire-and-forget: the apply
       // pre-scans the lane cheaply and no-ops when nothing rules-shaped landed.
       const govChanged = (cid) => {
-        applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
+        applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy }).catch(() => {});
         circlePolicyLane.apply(cid, govShellRail).catch(() => {});
         if (getActiveCircle() === cid) _govRerender?.();
       };
@@ -9759,7 +9760,7 @@ async function boot() {
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.
-            applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
+            applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy }).catch(() => {});
             circlePolicyLane.apply(cid, govShellRail).catch(() => {});
             if (getActiveCircle() === cid) _govRerender?.();
           } }),

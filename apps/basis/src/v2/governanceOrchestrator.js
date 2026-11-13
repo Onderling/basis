@@ -25,7 +25,7 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
   async function enactAndClose(circleId, proposal, by) {
     let ok = true; let result = null;
     // an op REFUSES by `{ok:false}` or by `{error}` (pinboard's skills answer the second): either is not enacted
-    try { result = await enact(circleId, proposal.action, proposal.subject); ok = result?.ok !== false && !result?.error; }
+    try { result = await enact(circleId, proposal.action, proposal.subject, proposal.proposalId); ok = result?.ok !== false && !result?.error; }
     catch { ok = false; }
     await appendEvent(circleId, resolveEvent({
       proposalId: proposal.proposalId, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, by, at: now(),
@@ -103,7 +103,7 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     if (!p || p.closed) return { ok: false, reason: 'no-open-proposal' };
     const d = resolveGovernance({
       action: p.action, policy: ctx.policy, actor, members: ctx.members, votes: p.votes,
-      deadline: p.deadline, now: now(), override: true,
+      deadline: p.deadline, now: now(), override: true, seed: p.seed, subject: p.subject, by: p.by,
     });
     if (d.status !== DECISION_STATUS.APPROVED) return { ok: false, status: d.status, reason: d.reason };
     const { ok, result } = await enactAndClose(circleId, p, actor?.ref);

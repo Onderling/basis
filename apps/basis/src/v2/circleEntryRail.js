@@ -191,9 +191,19 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     // Report whether this statement is NEW here — a windowed catch-up's progress guard must not count a
     // re-delivered duplicate as progress (that is how two diverged peers would page forever).
     const id = entryId(statement);
-    const existed = typeof eventLog.entryById === 'function' ? eventLog.entryById(id) !== null : eventLog.query({}).some((e) => e && e.id === id);
+    const prior = typeof eventLog.entryById === 'function' ? eventLog.entryById(id) : (eventLog.query({}).find((e) => e && e.id === id) ?? null);
+    // A FULL statement takes the place of a tombstone that ARRIVED with its hash (the header both signed). A tombstone
+    // proves itself, so anyone holding a statement can strip it and pass it on; the log keeps the first write of a
+    // membership entry, so without this the full one arriving later was a "duplicate" and a member's current properties
+    // were gone here for good. Never in place of one THIS device compacted (its fold called it superseded: the bytes stay
+    // gone), and never the other way round (a tombstone does not replace a full statement: the first write stays).
+    if (prior && prior.payload?.tombstone === true && prior.compactedHere !== true && statement.tombstone !== true
+      && typeof eventLog.compactEntries === 'function') {
+      eventLog.compactEntries([id], (e) => ({ ...e, payload: statement }));
+      return { ok: true, entry: eventLog.entryById?.(id) ?? prior, existed: false };
+    }
     const entry = eventLog.appendSilentEntry({ circleId, kind: entryKind, payload: statement, id });
-    return { ok: true, entry, existed };
+    return { ok: true, entry, existed: !!prior };
   }
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */
@@ -336,7 +346,9 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     if (ids.length === 0) return 0;
     // only a kind this lane compacts: tombstoning anything else would be read back as planted and dropped
     const live = new Set(eventLog.query({}).filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body && e.payload.tombstone !== true && compactable.has(e.payload.body.kind)).map((e) => e.id));
-    return eventLog.compactEntries(ids.filter((id) => live.has(id)), (e) => ({ ...e, payload: tombstoneOf(e.payload) }));
+    // `compactedHere`: THIS device's fold called it superseded (so a re-sent original never brings the bytes back), as
+    // opposed to a tombstone that ARRIVED (which may be a live statement someone stripped: the full one replaces it)
+    return eventLog.compactEntries(ids.filter((id) => live.has(id)), (e) => ({ ...e, payload: tombstoneOf(e.payload), compactedHere: true }));
   }
 
   /**

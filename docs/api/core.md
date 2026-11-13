@@ -4264,8 +4264,8 @@ exactVerdictKey(value)
 ```
 
 The exact key for a verdict: the value's JSON, or null when JSON would make two different inputs look the same (a
-non-finite number or a value with `toJSON`, both written as something else, or an `undefined` inside an array, written
-as null). A null key is never remembered, so such an input is always checked in full.
+non-finite number or a value with `toJSON`, both written as something else, an `undefined` inside an array, written
+as null, or a function, symbol or bigint, which JSON drops or refuses). A null key is never remembered, so such an input is always checked in full.
 
 **Parameters**
 

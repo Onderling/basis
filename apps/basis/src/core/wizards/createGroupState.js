@@ -27,7 +27,7 @@ export { OFFERING_AXES };
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
 import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat } from '../../v2/circleTemplates.js';
-import { CIRCLE_POLICY_ENUMS, CIRCLE_FEATURES } from '../../v2/circlePolicy.js';
+import { CIRCLE_POLICY_ENUMS, CIRCLE_FEATURES, DRAWN_SAMPLE_ENABLED } from '../../v2/circlePolicy.js';
 import { INVITE_CEILING_FALLBACK } from '@onderling-app/pinboard/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
@@ -58,11 +58,15 @@ export const LEAVE_POLICIES = Object.freeze([
 /** The conflict answer → the class that decides a removal (the drawn pair is `random-sample`, size 2, unanimous). */
 export const CONFLICT_TO_CLASS = Object.freeze({ 'admin-decides': 'any-admin', mediation: 'random-sample', vote: 'member-vote' });
 
-export const CONFLICT_POLICIES = Object.freeze([
+/** Every conflict answer the wizard knows. */
+export const ALL_CONFLICT_POLICIES = Object.freeze([
   { id: 'admin-decides', label: 'Admin decides' },
   { id: 'mediation',     label: 'Mediation by two random members' },
   { id: 'vote',          label: 'Member vote' },
 ]);
+
+/** The conflict answers the wizard OFFERS ("two random members mediate" only once the drawn sample is enabled). */
+export const CONFLICT_POLICIES = Object.freeze(ALL_CONFLICT_POLICIES.filter((p) => DRAWN_SAMPLE_ENABLED || p.id !== 'mediation'));
 
 /**
  * The wizard's storage choices. The IDS are not written here — they are the canonical posture names,
@@ -349,7 +353,7 @@ export function policyPatchFromState(state) {
   // The conflict question COMPILES too (Frits 2026-11-10: make the mediation real): who decides a removal (and a
   // report, which rides the removal class) is what the founder answered. It used to be text in the rules, read by
   // nothing, while any one admin removed whoever they liked.
-  const removal = CONFLICT_TO_CLASS[s.conflictPolicy];
+  const removal = s.conflictPolicy === 'mediation' && !DRAWN_SAMPLE_ENABLED ? null : CONFLICT_TO_CLASS[s.conflictPolicy];   // the drawn sample is held back
   if (removal) {
     patch.governance = { ...(patch.governance ?? {}), removeMember: removal };
     if (removal === 'random-sample') patch.decisionSample = { size: 2, rule: 'unanimous' };   // two drawn members, both agree
@@ -422,7 +426,7 @@ function blankState() {
     // Step 3 — rules & conflict
     // 5.5a — structured v2 rules doc (purpose syncs from Step 1 at submit).
     rulesDoc:              { ...DEFAULT_RULES_DOC },
-    conflictPolicy:        'mediation',
+    conflictPolicy:        DRAWN_SAMPLE_ENABLED ? 'mediation' : 'admin-decides',   // mediation is held back for the alpha
     // Step 4 — offerings (5.5c): a list of `{name,openness,posture,status,radius}`
     // rows; rows without a name are dropped at submit.
     offerings:             [],

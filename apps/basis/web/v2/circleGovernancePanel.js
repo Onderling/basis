@@ -8,7 +8,7 @@
  * governance host factory + re-invokes on each action. Unit-testable under happy-dom.
  */
 
-import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../src/v2/circlePolicy.js';
+import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../src/v2/circlePolicy.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 import { deadlineLine } from '../../src/v2/governanceView.js';
@@ -182,7 +182,7 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
       row.dataset.action = action;
       row.appendChild(el('span', 'circle-governance__setting-action', tr(`circle.governance.action.${action}`)));
       const select = el('select', 'circle-governance__setting-select');
-      for (const cls of GOVERNANCE_CLASSES) {
+      for (const cls of OFFERED_GOVERNANCE_CLASSES) {
         const opt = el('option', null, tr(`circle.governance.class.${CLASS_KEY[cls]}`));
         opt.value = cls;
         select.appendChild(opt);

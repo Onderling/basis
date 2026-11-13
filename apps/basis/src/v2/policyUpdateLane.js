@@ -25,7 +25,7 @@
  *
  * The governance fold ignores this kind (it branches on propose/vote/resolve): a policy-update is a carried fact.
  */
-import { gateCarriedWrites } from './governanceReceiverGate.js';
+import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -183,12 +183,16 @@ export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adm
       : [...((await adminsOf?.(circleId)) ?? new Set())].map((ref) => ({ ref, role: 'admin' }));
   } catch { members = []; }
   const admins = new Set(members.filter((m) => m?.role === 'admin').map((m) => m.ref));
-  // THE RECEIVER GATE: where the circle's settings rule asks for a vote, an admin's change counts only with the proposal
-  // that decided it; one that skipped the vote stays on the lane (the governance view shows it) and is never applied.
+  // THE RECEIVER GATE: the admins' changes in version order, each judged by the policy the previous kept one produced
+  // (never by the policy in force now: that rolled a legitimate tightening back); where that rule asked for a vote, a
+  // change counts only with the proposal that decided it, and one that skipped it stays on the lane, never applied.
   let policy = {};
   try { policy = (typeof readPolicy === 'function' ? await readPolicy(circleId) : null) ?? {}; } catch { policy = {}; }
   const changes = bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author));
-  const { kept, skipped } = await gateCarriedWrites({ rail, circleId, action: 'changePolicy', bodies: changes, policy, members });
+  const { kept, skipped } = await judgeWithProposals(
+    (proposals, need) => judgePolicyChain({ bodies: changes, members, proposals, merge: denyWinsMerge, need }),
+    () => proposalsOn({ rail, circleId, policy, members }),
+  );
   const won = foldPolicyUpdates(kept, { admins });
   if (!won) return { applied: false, ...(skipped.length ? { skipped: skipped.length } : {}) };
   const head = await headStore.read(circleId);
@@ -257,7 +261,9 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
       return statement;
     },
     apply,
-    /** The policy in force on this device: what the rules apply's receiver gate judges a rules change by. */
+    /** The policy in force on this device: what the rules apply's receiver gate judges an unstamped rules change by. */
+    /** The settings version this device holds: a rules change it writes is stamped with it (the receiver gate). */
+    headVersion: async (circleId) => (await headStore.read(circleId).catch(() => null))?.version ?? 0,
     readPolicy: (circleId) => readPolicy(circleId),
     /** The shell hands over its receive rail when it builds it. */
     useRail(rail) { if (rail) knownRail = rail; },
@@ -277,7 +283,8 @@ export function membersOfViaSkill(callSkill) {
     let res = null;
     try { res = typeof callSkill === 'function' ? await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }) : null; }
     catch { res = null; }
-    return (res?.members ?? []).filter((m) => m?.webid).map((m) => ({ ref: m.webid, role: m.role === 'admin' ? 'admin' : 'member' }));
+    // `via`: how an admin holds the role (`'founder'` · `'role'` · caretaker): the founding write is a founder's
+    return (res?.members ?? []).filter((m) => m?.webid).map((m) => ({ ref: m.webid, role: m.role === 'admin' ? 'admin' : 'member', ...(m.adminVia ? { via: m.adminVia } : {}) }));
   };
 }
 

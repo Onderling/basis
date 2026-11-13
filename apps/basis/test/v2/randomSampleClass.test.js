@@ -7,13 +7,15 @@
 import { describe, it, expect } from 'vitest';
 import { resolveGovernance, drawSample, DECISION_STATUS } from '../../src/v2/governanceDecision.js';
 import { foldGovernance, proposeEvent } from '../../src/v2/governanceLog.js';
-import { normalizeCirclePolicy, changeNeedsVote, GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS } from '../../src/v2/circlePolicy.js';
-import { policyPatchFromState, CONFLICT_TO_CLASS } from '../../src/core/wizards/createGroupState.js';
+import { normalizeCirclePolicy, changeNeedsVote, GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS, DRAWN_SAMPLE_ENABLED, OFFERED_GOVERNANCE_CLASSES } from '../../src/v2/circlePolicy.js';
+import { policyPatchFromState, CONFLICT_TO_CLASS, CONFLICT_POLICIES, ALL_CONFLICT_POLICIES, initialState } from '../../src/core/wizards/createGroupState.js';
 import { buildGovernanceView } from '../../src/v2/governanceView.js';
 
 const members = ['a0', 'm1', 'm2', 'm3', 'm4', 'm5'].map((ref) => ({ ref, role: ref === 'a0' ? 'admin' : 'member' }));
-const pair = normalizeCirclePolicy({ governance: { removeMember: 'random-sample' } });
-const jury = normalizeCirclePolicy({ governance: { removeMember: 'random-sample' }, decisionSample: { size: 3, rule: 'majority' } });
+// RAW policies: the class is held back for the alpha (DRAWN_SAMPLE_ENABLED false), so normalising a policy maps it to the
+// action's default; the decision code is tested as the post-alpha build will use it
+const pair = { governance: { removeMember: 'random-sample' } };
+const jury = { governance: { removeMember: 'random-sample' }, decisionSample: { size: 3, rule: 'majority' } };
 const base = { action: 'removeMember', members, seed: 'h-proposal', subject: 'm5', by: 'a0' };
 
 describe('the draw', () => {
@@ -78,12 +80,19 @@ describe('through the fold, the view and the one rule', () => {
   });
 });
 
-describe('the wizard\'s conflict answer decides removals', () => {
-  it('"two random members mediate" → random-sample, two drawn, both agree; "admin decides" → any-admin; "vote" → member-vote', () => {
-    expect(policyPatchFromState({ conflictPolicy: 'mediation' })).toMatchObject({ governance: { removeMember: 'random-sample' }, decisionSample: { size: 2, rule: 'unanimous' } });
+describe('held back for the alpha: no circle holds the drawn sample, nothing offers it', () => {
+  it('normalising maps it to the action\'s default; the offered classes leave it out', () => {
+    expect(DRAWN_SAMPLE_ENABLED).toBe(false);
+    expect(normalizeCirclePolicy({ governance: { removeMember: 'random-sample' } }).governance.removeMember).toBe('any-admin');
+    expect(OFFERED_GOVERNANCE_CLASSES).not.toContain('random-sample');
+  });
+  it('the wizard does not offer "two random members mediate"; its default is "admin decides"; the other answers compile', () => {
+    expect(CONFLICT_POLICIES.map((p) => p.id)).toEqual(['admin-decides', 'vote']);
+    expect(ALL_CONFLICT_POLICIES.map((p) => p.id)).toContain('mediation');
+    expect(initialState().conflictPolicy).toBe('admin-decides');
+    expect(policyPatchFromState({ conflictPolicy: 'mediation' }).governance?.removeMember).toBeUndefined();
     expect(policyPatchFromState({ conflictPolicy: 'admin-decides' }).governance.removeMember).toBe('any-admin');
     expect(policyPatchFromState({ conflictPolicy: 'vote' }).governance.removeMember).toBe('member-vote');
-    expect(policyPatchFromState({ conflictPolicy: 'vote', consensusRequired: true }).governance).toEqual({ changePolicy: 'admin-quorum', removeMember: 'member-vote' });
     expect(Object.keys(CONFLICT_TO_CLASS).sort()).toEqual(['admin-decides', 'mediation', 'vote']);
   });
 });

@@ -21,7 +21,7 @@ import { useTheme } from './themeContext.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
 import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
-import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
+import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
 
 // `governance`: the launcher's ONE binding (governanceOneBindingPerShell) — this screen decides with the same options as
@@ -230,7 +230,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
               <View key={action} style={styles.setting} testID={`gov-setting-${action}`}>
                 <Text style={styles.settingAction}>{t(`circle.governance.action.${action}`)}</Text>
                 <View style={styles.classRow}>
-                  {GOVERNANCE_CLASSES.map((cls) => (
+                  {OFFERED_GOVERNANCE_CLASSES.map((cls) => (
                     <Pressable
                       key={cls}
                       onPress={() => onSetClass(action, cls)}

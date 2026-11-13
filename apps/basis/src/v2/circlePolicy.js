@@ -24,6 +24,19 @@ export const CIRCLE_FEATURES = [
 export const GOVERNANCE_ACTIONS = ['removeMember', 'rotateKey', 'changeRule', 'changePolicy'];
 export const GOVERNANCE_CLASSES = ['any-admin', 'admin-quorum', 'member-vote', 'random-sample'];
 
+/**
+ * THE DRAWN SAMPLE IS HELD BACK FOR THE ALPHA (Fable + Opus, 2026-11-13, reviewing the first build): its draw is seeded
+ * by the proposal's own hash, which the proposer can grind, and drawn from the roster at fold time, which an admitting
+ * admin can steer. The fix (a witness value per member over a fixed message, from ALL eligible members of the roster
+ * frozen at the proposal) is the post-alpha build. Until then no circle holds the class: normalising maps it to the
+ * action's default, no screen offers it, and the wizard does not offer "two random members mediate". The decision code
+ * stays, tested, for that build.
+ */
+export const DRAWN_SAMPLE_ENABLED = false;
+
+/** The classes a circle may hold and a screen offers (the drawn sample only once it is enabled). */
+export const OFFERED_GOVERNANCE_CLASSES = Object.freeze(GOVERNANCE_CLASSES.filter((c) => DRAWN_SAMPLE_ENABLED || c !== 'random-sample'));
+
 /** Each class's word key under `circle.governance.class.*` — one map for every screen that names a class. */
 export const GOVERNANCE_CLASS_KEYS = Object.freeze({
   'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote', 'random-sample': 'random_sample',
@@ -349,7 +362,7 @@ export function normalizeGovernance(stored = {}) {
   const g = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
   const out = {};
   for (const action of GOVERNANCE_ACTIONS) {
-    out[action] = GOVERNANCE_CLASSES.includes(g[action]) ? g[action] : DEFAULT_GOVERNANCE[action];
+    out[action] = OFFERED_GOVERNANCE_CLASSES.includes(g[action]) ? g[action] : DEFAULT_GOVERNANCE[action];
   }
   return out;
 }

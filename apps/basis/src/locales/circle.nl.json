@@ -1566,6 +1566,14 @@
       "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."
     },
+    "plus_forget": {
+      "text": "Vergeet dit gesprek",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Je gesprek met de assistent",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
+    },
     "act_done": {
       "text": "Klaar",
       "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."

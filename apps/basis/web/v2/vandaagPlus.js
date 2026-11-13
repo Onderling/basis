@@ -20,7 +20,9 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   acts = PLUS_ACTS,
   // Vastgezet: the pins to paint (`paintablePins`, each with its `label` and `key`); a tap → `onOpenPin(pin)`, × →
   // `onUnpin(key)`; `pinnedActIds` marks the own acts already pinned (☆ / ★ toggles through `onTogglePin(actId)`)
-  pinned = [], onOpenPin, onUnpin, pinnedActIds = [], onTogglePin } = {}) {
+  pinned = [], onOpenPin, onUnpin, pinnedActIds = [], onTogglePin,
+  // the kept conversation (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to empty it
+  turns = [], onForget } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';
@@ -54,6 +56,27 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       container.appendChild(b);
     }
   } else {
+    // the conversation so far: what the person said and what the "+" answered, kept across opens
+    if (!editing && Array.isArray(turns) && turns.length) {
+      const list = document.createElement('ol');
+      list.className = 'circle-vandaag-plus__thread';
+      list.setAttribute('aria-label', tr('circle.vandaag.plus_thread'));
+      for (const turn of turns) {
+        const li = document.createElement('li');
+        li.className = `circle-vandaag-plus__turn circle-vandaag-plus__turn--${turn.who === 'you' ? 'you' : 'assistant'}`;
+        li.textContent = turn.text;
+        list.appendChild(li);
+      }
+      sec['plus-thread'].appendChild(list);
+      if (typeof onForget === 'function') {
+        const f = document.createElement('button');
+        f.type = 'button';
+        f.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__forget';
+        f.textContent = tr('circle.vandaag.plus_forget');
+        f.addEventListener('click', () => onForget());
+        sec['plus-thread'].appendChild(f);
+      }
+    }
     // the free line: say it; what was understood picks the act and fills the fields below (editable before Save)
     if (!editing && typeof onRead === 'function') {
       const lf = document.createElement('form');

@@ -1563,6 +1563,14 @@
       "text": "I could not read that — fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."
     },
+    "plus_forget": {
+      "text": "Forget this conversation",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Your conversation with the assistant",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
+    },
     "act_done": {
       "text": "Done",
       "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."

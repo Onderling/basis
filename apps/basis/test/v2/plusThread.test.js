@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { EventLog } from '../../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
+import { createPlusThread, plusThreadId, plusAnswerLine } from '../../src/v2/plusThread.js';
+import { PLUS_ACTS } from '../../src/v2/vandaagPlus.js';
+import { forYouRows } from '../../src/v2/userScreenBlocks.js';
 
 // The "+" is the person's assistant thread: what they type and what it answered are KEPT (the bot's own turn entries
 // on the device log, the chat retention class), so the sheet opens on the conversation so far.
@@ -60,5 +62,28 @@ describe('the "+" thread: one kept conversation', () => {
   it('a person without a self has no thread (nothing is kept under an empty id)', () => {
     expect(plusThreadId(null)).toBeNull();
     expect(plusThreadId('')).toBeNull();
+  });
+
+  it('a "+" turn is the person\'s own: it never shows as news ("Nieuw voor jou") beside the circles', () => {
+    const { log, plus } = boot();
+    plus.heard('zet melk op de boodschappen');
+    plus.answered('✓ melk staat op Boodschappen');
+    log.append({ id: 'c1', type: 'chat-message', app: 'basis', ts: Date.now(), actor: 'bram', payload: { circleId: 'kring', text: 'hoi allemaal' } });
+    const rows = forYouRows({ eventLog: log, circles: [{ id: 'kring', name: 'Kring', kind: 'circle' }], myRefs: ['me'], t: (k) => k });
+    const ids = rows.map((r) => r.id);
+    expect(ids, 'the circle line is news').toContain('c1');
+    expect(ids.filter((id) => String(id).startsWith('bot-turn:')), 'a "+" turn shown as news').toEqual([]);
+  });
+
+});
+
+describe('what the "+" answers in its thread', () => {
+  const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
+  it('what went wrong first, then what a circle act did, then the which-circle question, then the act it read', () => {
+    expect(plusAnswerLine({ error: 'mislukt', done: 'gedaan', t })).toBe('mislukt');
+    expect(plusAnswerLine({ done: '✓ melk staat op Boodschappen', t })).toBe('✓ melk staat op Boodschappen');
+    expect(plusAnswerLine({ circleCard: { line: 'nieuwe taak verven' }, t })).toBe('circle.vandaag.plus_circle_ask:{"line":"nieuwe taak verven"}');
+    expect(plusAnswerLine({ ownActId: PLUS_ACTS[0].id, t })).toBeTruthy();
+    expect(plusAnswerLine({ t })).toBeNull();
   });
 });

@@ -6,6 +6,7 @@
  * an appointment) is a store row and stays; the words are the conversation around it. One model both shells paint.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { PLUS_ACTS, plusLabel } from './vandaagPlus.js';
 
 /** How many of the last turns the "+" sheet shows above its line. */
 export const PLUS_TURNS_SHOWN = param({ key: 'assistant.plusTurnsShown', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
@@ -33,4 +34,18 @@ export function createPlusThread({ threads, threadId } = {}) {
     /** Empty the thread now; returns how many turns went. */
     forget() { return threadId ? threads.memory.forget(threadId) : 0; },
   };
+}
+
+/**
+ * What the "+" answers in the thread to one read of its line, in the person's words (null: nothing to say yet):
+ * what went wrong; else what a circle act did (its reply line); else the which-circle question the card asks; else the
+ * own act the line was read as (its form opens below to finish it).
+ * @param {{error?: string|null, done?: string|null, circleCard?: {line?: string}|null, ownActId?: string|null, t: Function}} a
+ */
+export function plusAnswerLine({ error = null, done = null, circleCard = null, ownActId = null, t } = {}) {
+  if (error) return error;
+  if (done) return done;
+  if (circleCard) return t('circle.vandaag.plus_circle_ask', { line: circleCard.line ?? '' });
+  const act = ownActId ? PLUS_ACTS.find((a) => a.id === ownActId) : null;
+  return act ? plusLabel(t, act) : null;
 }

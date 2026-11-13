@@ -358,7 +358,11 @@ answer is a **sealed follower**. Turned on (it is off by default), the mirror co
 batch by batch, into storage the person controls — the pod first, though any read/write/delete/list backend
 fits. It adds no second authority: it follows, and restore hydrates those batches back through the *same*
 verify-on-ingest gates a peer's statements pass, so a tampered mirror can corrupt nothing — it can only fail
-to verify.
+to verify. The seal proves a batch is the owner's, not that each statement in it is what its author signed, so restore
+is an ARRIVAL: every entry is handed to the rail that owns its lane (`restoreCheckFor`), which checks the statement's
+signature, circle and declared kind (a chat line also that the text shown is the text signed); an entry it refuses
+never lands and is counted. Whose key a statement is (the author↔member binding) is not judged at restore, since the
+roster is being restored at the same moment; every read decides it, as for a peer's statement.
 
 Three properties make it worth knowing:
 
@@ -641,7 +645,7 @@ the honest tail is named below the table rather than dropped.
 | Tasks are correctly per-circle, and their store is **not** on the fan-out path | ✅ RESOLVED (wave 2) — the one-store collapse put the tasks store on the `ensureCircleSync` fan-out; a task now crosses A→B, proven + guarded by `appTaskFanTwoDevice` (one store per circle + per-type sync arrival) |
 | `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | ✅ RESOLVED (wave 2) — the circle-infra was renamed (`addCirclePeer`, `getCircleScope`, `ensureCircleSync`, …); the remaining `household` is a legitimate template/app name, not circle machinery |
 | Five **in-process agents** (host, household, tasks, pinboard, folio), each with its own key and vault, two with their own policy engine and trust registry | ◐ PARTLY (found 2026-10-23; decided the same day: two agents, the peer façade and the host) — household, tasks and folio are folded onto the host. **The circle engine's agent (pinboard) is the last one beside the host**, with its own key; until it folds, its ops are judged by its own engine. `scripts/lint-agent-count.mjs` holds the count and only lets it shrink, and checks that the Agent home names the same agents |
-| A send to the **person key** is allowed only for the reasons on one list (`PERSON_ALLOWLIST`, `src/v2/peerSendGate.js`) | ◐ RECORDED, NOT ENFORCED — every person-key send records which entry let it through (`allowedBy`); a send that matches none (`none`) still leaves. Enforcing it (held as `unknown-address`) waits until the recorded decisions show no legitimate send would be stopped |
+| A send to the **person key** is allowed only for the reasons on one list (`PERSON_ALLOWLIST`, `src/v2/peerSendGate.js`) | ✅ ENFORCED (2026-11-13) — a person-key send that matches no entry does not leave: it is held as `unknown-address` (`createHeldSends`, bounded in count and lifetime) and judged again when a roster read lands; every send still records which entry let it through (`allowedBy`) |
 | The **inbound handler map** (which subtype goes to which handler) is one shared composition (`src/v2/inboundWiring.js`) | ◐ MOBILE ONLY — the phone composes it; web (`circleApp.js`) and the box still build their own through `makePeerRouter`. That they route the same subtypes is pinned by `shellsRouteTheSameSubtypes`, not by construction |
 | Every peer send leaves through the one send gate | ◐ ONE DECLARED EXCEPTION — the screen view (a granted screen on another device) runs its own secure agent and sends outside `peerSend`; `oneSendGate.test.js` names it as the only exception |
 | A member removed from a circle stops being that circle's address at once | ◐ LAGS ONE READ — the gate's circle-address index (`createCircleAddressIndex`) drops a removed member's address at that circle's next non-empty roster read, not at the removal |
@@ -912,7 +916,11 @@ the person path. The person path is allowed only for the reasons on ONE list (`P
 (a joiner to the invite it is redeeming, the inviter's one answer or refusal, the one request a scanned pairing code
 sends — a registry bounded in count and time, never standing), a view this self granted, a contact in this self's book
 (at an address the row names, or one the identity link proves is theirs), and the person's address-fallback setting
-last. Each send writes ONE record (`agent/send.decision`: codes and scalars, never an address or a circle id) — what was
+last. A person-key send that matches none of them is HELD, never sent (`unknown-address`): the bubble shows pending, the
+send is judged again when a roster read lands, and it ends at its lifetime or the hold's bound, logged either way. A
+co-member is not on that list: they are written to at their circle address, as this device's circle self (the shared
+Contacten read gives their row that address, `withCoMemberRoutes`), and a co-member no shared circle shows an address
+for cannot be written to from there until their card is in the book. Each send writes ONE record (`agent/send.decision`: codes and scalars, never an address or a circle id) — what was
 decided, each candidate transport and why it is or is not eligible, the one chosen, the outcome — so a failure on a
 phone names its branch in the copy-log door without a new instrument. The transport layer still never learns that a
 circle exists; the circle travels down as points (§ Reachability). Two rules below the gate: an answer to a circle
@@ -1233,7 +1241,9 @@ persona the registry holds: under root custody each derives from the resident ro
 the personas a ceremony handed it. Each has its own chat identity, person key, device delegation and per-circle
 addresses; a circle recorded under a persona takes its keys from that persona, and the persona's person address is
 registered only on that persona's own relay sockets (a socket holding two selves' addresses would link them at the
-relay). A persona also issues its grants as itself (2026-10-31): each held self keeps its own grant set on its own
+relay). Those sockets are reopened at every connect, not only by the join: each running persona dials every relay point
+of the circles it holds, and a circle that maps to a persona after the connect dials at once, so a restart does not
+leave a persona's circles silent. A persona also issues its grants as itself (2026-10-31): each held self keeps its own grant set on its own
 lane, a capability token is signed by the self that grants it, and an act that issues names its self — the screen
 asks, the single self is preselected, and with several selves and none named the act is refused, never defaulted to
 the general persona, because a grant issued by the default would let its holder link the persona to it. Four properties
@@ -1384,6 +1394,15 @@ Nothing a peer sends is trusted for *being sent*; it is trusted for *verifying*.
 Verify-on-read verifies each distinct signed statement once per process; what binds is re-decided every read. Only the
 pure signature check is remembered (`createSignatureMemo`, keyed by the exact signed bytes, so a statement changed after
 it was checked is checked again); whose key it is, whether it is still bound, retired or revoked, is decided afresh.
+A statement that PASSED, asked exactly the same again, is also answered from a verdict memo without its canonical form
+and hashes (`createVerdictMemo`: a spine statement, a circle-link proof; keyed by the exact inputs, a refusal never
+remembered). **One signature check, one rule.** Every Ed25519 check passes one strict byte rule first
+(`packages/core/src/crypto/ed25519Strict.js`); behind it sits ONE equation per process: tweetnacl unless a shell hands
+a faster one, which the kernel takes only if it gives the reference answer on twelve edge-case vectors and accepts an
+honest signature and refuses it tampered. The box hands `node:crypto`, the web WebCrypto (as a batch, after its own
+self-test; without Ed25519 in the browser tweetnacl stays), the phone libsodium's C over JSI
+(`react-native-libsodium`, pinned). On the phone that took one check from about 60 ms to about 0.1 ms; a
+`lint-one-signature-check` guard keeps any other check from appearing.
 
 **The lanes.** Four kinds of circle state ride the same rail with per-lane semantics: **membership**
 (catch-up is pull-everything, because completeness is the point of a roster), **governance** (proposals

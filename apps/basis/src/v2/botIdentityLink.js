@@ -65,13 +65,16 @@ export function createLinkTombstones({ vault }) {
  * @param {(person: string, q: {text: string, buttons: Array<{id: string, label: string}>}) => Promise<{ok: boolean}>} a.ask
  * @param {(person: string, text: string) => Promise<{ok: boolean}>} a.sendPrivately
  * @param {(key: string, payload: object) => Promise<void>} a.tellApp  a peer message to the app's chat identity (signed by the bot)
+ * @param {(key: string) => void} [a.expectAnswer]  registers the ONE answer to an app identity whose signed ask (a link
+ *   offer, a turn's device statement) this bot just checked: the send gate lets exactly that statement leave on the
+ *   person key (the box composes the agent's `inviteExchange.expectLinkAnswer`)
  * @param {() => Promise<Array<{viewPubKey: string}>>} a.listGrants
  * @param {(viewPubKey: string) => Promise<boolean>} a.revokeView
  * @param {() => {appUrl: string|null, botAddress: string|null, relayUrl: string|null, botName?: string|null}} a.where
  * @param {() => number} [a.now]
  * @param {() => number} [a.rand]
  */
-export function createIdentityLink({ users, botAddress, tombstones, ask, sendPrivately, tellApp, listGrants, revokeView, where, now = Date.now, rand = Math.random, turnWindowMs = LINKED_TURN_WINDOW_MS }) {
+export function createIdentityLink({ users, botAddress, tombstones, ask, sendPrivately, tellApp, expectAnswer = null, listGrants, revokeView, where, now = Date.now, rand = Math.random, turnWindowMs = LINKED_TURN_WINDOW_MS }) {
   if (!tombstones || typeof tombstones.has !== 'function') throw new TypeError('createIdentityLink: the tombstones are required');
   const pending = new Map();   // person → { root, webid, deviceId, nonce, until }
   const nonces = createNonceWindow({ now });
@@ -83,7 +86,12 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
   });
   // never awaited: an app's device that is away must not hold the person's reply (the household's link steps took 23 s,
   // the send waiting on a device that was not there)
-  const tell = (key, payload) => Promise.resolve().then(() => tellApp(key, payload)).catch(() => { /* the link stands; the app hears it on its next offer */ });
+  // Every statement told is the answer to a signed ask checked just before (an offer, a turn's device statement), so it
+  // is registered as that one answer first; nothing else is told.
+  const tell = (key, payload) => {
+    try { expectAnswer?.(key); } catch { /* without the registration the gate holds it; the app hears it on its next offer */ }
+    return Promise.resolve().then(() => tellApp(key, payload)).catch(() => { /* the link stands; the app hears it on its next offer */ });
+  };
   return {
     /** `/koppel` alone: the link the person's Basis app opens, to their private door. */
     async start(person, text) {
@@ -154,7 +162,8 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
         for (const g of (await listGrants().catch(() => [])) ?? []) {
           if (g?.viewPubKey === r.key) { try { await revokeView(r.key); } catch { /* the grant's TTL ends it */ } }
         }
-        void tell(r.key, { subtype: IDENTITY_LINK_SUBTYPE, unlinked: true, statement: { bot: botAddress(), row: person, root: r.root, at: now() } });
+        // NOT told: no fresh ask stands behind an unlink, so nothing may leave on the person key to that identity; the
+        // app learns it when it next speaks to this bot (Fable's ruling on the send gate, 2026-11-12)
       }
       return { ok: true };
     },

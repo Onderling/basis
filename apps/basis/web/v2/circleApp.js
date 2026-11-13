@@ -238,6 +238,7 @@ import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../src/v2/enrollOffer.js';
+import { installWebSignatureEquation } from '../../src/v2/signatureEquations.js';
 import { runStartQueue, startQueueSiblings } from '../../src/v2/startQueue.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
@@ -314,6 +315,7 @@ import { loadRecipeForReview, applyReviewedRecipe } from '../../src/v2/recipeCon
 // S6.C (per-circle) — gate an app's surfaces by the circle's policy.features.
 import { isAppSurfaceEnabled } from '../../src/v2/appFeature.js';
 import { renderContactThread } from './contactThread.js';
+import { contactSendRoute } from '../../src/v2/contactsSource.js';
 import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -3427,6 +3429,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   // a draft to start the composer with (the feedback door's prefill): it stays in the composer until the person sends
   if (typeof draft === 'string' && draft) thread.draft = draft;
   thread.name = name; thread.peerAddr = peerAddr;
+  // where a turn goes: a co-member shown from the peer graph is written to at their circle address (the send gate)
+  thread.sendTo = contactSendRoute(row, peerAddr);
   // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
   // every turn, and said in the header so the participant knows before typing.
   const floor = presendFloorFor(row);
@@ -3511,7 +3515,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   const onRetryDelivery = (msgId) => {
     const m = thread.messages.find((x) => x.messageId === msgId && x.origin === 'user' && !x.file);
     if (!m) return;   // a file retries through its own op; a turn that is not mine has nothing to retry
-    const { sent } = circleContactChannel.sendTurn({ peerAddr: thread.peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
+    if (thread.sendTo?.blocked) return;
+    const { sent } = circleContactChannel.sendTurn({ peerAddr: thread.sendTo?.to ?? thread.peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
     trackContactTurn({ messageId: msgId, sent, deliveryMap: deliveryStateMap }).catch(() => {});
   };
   const unsubscribeDelivery = deliveryStateMap.subscribe((msgId, state) => {
@@ -3522,6 +3527,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   });
   const rerender = () => renderContactThread(rootEl, {
     deliveryStateFor, deliveryReasonFor, onRetryDelivery,
+    cannotWrite: !!thread.sendTo?.blocked,
     attachMenu: contactAttach, onAttachCommand: onContactAttach,
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
@@ -3584,7 +3590,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
       // The bubble carries the send's state from here on (pending → the verdict; a receipt moves it further):
       // no "versturen…" line under the list and no error line — the chip says it, and a tap on it retries.
       let turn;
-      try { turn = circleContactChannel.sendTurn({ peerAddr: thread.peerAddr, threadId: contactId, text, floor }); }
+      if (thread.sendTo?.blocked) { rerender(); return; }   // the line says why; nothing leaves
+      try { turn = circleContactChannel.sendTurn({ peerAddr: thread.sendTo?.to ?? thread.peerAddr, threadId: contactId, text, floor }); }
       catch { error = true; rerender(); return; }   // the turn never got an id: nothing is on screen to carry a state
       thread.messages.push({ origin: 'user', text: turn.text, messageId: turn.messageId });
       rerender();
@@ -9241,6 +9248,9 @@ async function showSettings(id) {
 let offerPendingAtBoot = false;
 
 async function boot() {
+  // THE SIGNATURE CHECK: WebCrypto's batch behind the one strict rule, after its self-test (the vectors, an honest and a
+  // tampered signature); a browser without Ed25519 in WebCrypto keeps tweetnacl. Reads then check ahead in one batch.
+  try { const eq = await installWebSignatureEquation(globalThis.crypto?.subtle); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); } catch { /* tweetnacl stays */ }
   try { offerPendingAtBoot = !!(await pendingEnrollOffer(window.localStorage)); } catch { offerPendingAtBoot = false; }
   // ── THE FIRST AWAITED ACT: finish a ceremony's clear, if one is owed ──────────────────────────────────
   // The add-a-device ceremony (and the owner-root restore) leaves a `forget-pending` note in the vault, and

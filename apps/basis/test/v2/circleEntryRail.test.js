@@ -352,3 +352,34 @@ describe('a read gives the thread back: checking never holds it for long (fast s
     expect(worst, 'the read held the thread').toBeLessThan(150);
   });
 });
+
+describe('the rail — a read checks ahead in one batch where the fast check is a batch (the web)', () => {
+  it('one batch, then every synchronous check answered from memory; a tampered statement is still refused', async () => {
+    const { useSignatureEquation } = await import('@onderling/core');
+    const nacl = (await import('tweetnacl')).default;
+    let batches = 0;
+    await useSignatureEquation({
+      name: 'test-batch',
+      verify: (m, s, k) => nacl.sign.detached.verify(m, s, k),
+      verifyBatch: async (items) => { batches += 1; return items.map(({ msg, sig, key }) => nacl.sign.detached.verify(msg, sig, key)); },
+    });
+    batches = 0;   // the install vetted the batch once; count the read only
+    try {
+      const log = fakeEventLog();
+      const me = await member('webid:me');
+      let syncChecks = 0;
+      const memo = createSignatureMemo({ verify: (m, s, k) => { syncChecks += 1; return AgentIdentity.verify(m, s, k); } });
+      const rail = railFor(log, me, { signatureMemo: memo });
+      await rail.append('c1', { kind: 'propose', subject: 'p1', payload: { text: 'een' } });
+      await rail.append('c1', { kind: 'vote', subject: 'p1', payload: { vote: 'yes' } });
+      // the second statement's stored signature is damaged after it landed
+      const damaged = log.entries[1];
+      damaged.payload = { ...damaged.payload, sig: (damaged.payload.sig[0] === 'A' ? 'B' : 'A') + damaged.payload.sig.slice(1) };
+      syncChecks = 0;
+      const { events } = await rail.readVerified('c1');
+      expect(batches).toBe(1);
+      expect(events.map((e) => e.event)).toEqual(['propose']);
+      expect(syncChecks, 'the good one from memory; only the damaged one checked again (a false is never remembered)').toBe(1);
+    } finally { useSignatureEquation(null); }
+  });
+});

@@ -49,7 +49,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import nodeCrypto, { randomBytes } from 'node:crypto';
 import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -135,6 +135,7 @@ import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPers
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
+import { installBoxSignatureEquation } from '../src/v2/signatureEquations.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
 import { runStartQueue, startQueueSiblings } from '../src/v2/startQueue.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
@@ -287,6 +288,9 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-household-cache': contentPaths.household,
     'cc-tasks-cache': contentPaths.tasks,
   };
+  // THE SIGNATURE CHECK: node:crypto behind the one strict rule (taken only if it agrees on the edge-case vectors and on an
+  // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
+  { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
   try {
     const forgot = await runPendingForget({
       markerVault: vault,
@@ -1225,6 +1229,7 @@ if (tgToken || inboxDoor.bridge) {
     },
     // a screen whose offer was not taken is told, so it says so instead of waiting
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
+    expectRefusal: (viewPubKey) => agent.inviteExchange?.expectScreenRefusal?.(viewPubKey),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
     grant: async (g) => {
       const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
@@ -1261,6 +1266,7 @@ if (tgToken || inboxDoor.bridge) {
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
     tellApp: (key, payload) => agent.sendPeerMessage(key, payload),
+    expectAnswer: (key) => agent.inviteExchange?.expectLinkAnswer?.(key),
     listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
     revokeView: async (viewPubKey) => {
       const revoked = (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true;

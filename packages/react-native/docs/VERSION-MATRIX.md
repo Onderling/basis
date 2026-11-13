@@ -36,6 +36,11 @@ expo-file-system                   ~18.0.12
 @react-native-async-storage/async-storage  ^1.24.0
 
 # Native modules
+react-native-libsodium              1.7.0       (EXACT pin: the phone's Ed25519 check over JSI; ships libsodium 1.0.21
+                                              PREBUILT in libsodium/build.tgz, unpacked by its postinstall — an accepted
+                                              risk for the alpha; a public release builds libsodium in CI from the signed
+                                              source with the package's build.sh. Measured 2026-11-12 on a Samsung A33:
+                                              ~0.07 ms a check vs ~59 ms tweetnacl; +2.26 MB native libs over 4 ABIs)
 react-native-ble-plx              ^3.5.1
 react-native-keychain             ^10.0.0
 react-native-screens               ~3.34.0

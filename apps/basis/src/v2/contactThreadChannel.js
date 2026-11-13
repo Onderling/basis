@@ -161,13 +161,14 @@ export function createContactThreadChannel({
   // a circle member's card, held until the person answers them (answering makes the contact)
   const memberCards = new Map();
   const MEMBER_CARDS_MAX = 500;
-  /** The person writes to `peerAddr`: a member's held card goes into the book now (their answer is the choice). */
+  /** The person writes to `peerAddr`: a member's held card goes into the book now (their answer is the choice). The
+   *  turn waits for it: the send gate asks the book, and an answer judged before the card landed was held as unknown. */
   const adoptMemberCard = (peerAddr) => {
     const id = resolveId(peerAddr);
     const held = memberCards.get(id) ?? memberCards.get(peerAddr);
-    if (!held || typeof onCard !== 'function') return;
+    if (!held || typeof onCard !== 'function') return null;   // nothing to adopt: the send is not delayed a tick
     memberCards.delete(id); memberCards.delete(peerAddr);
-    Promise.resolve(onCard({ contactId: id, fromAddr: held.fromAddr, card: held.card })).catch(() => {});
+    return Promise.resolve(onCard({ contactId: id, fromAddr: held.fromAddr, card: held.card })).catch(() => {});
   };
   const doorFor = () => (requestDoor ??= createMessageRequestDoor({
     isKnown: (key) => messageRequests.isKnown(key),
@@ -362,7 +363,7 @@ export function createContactThreadChannel({
     if (!peerAddr) throw new Error('contactThreadChannel.sendTurn: peerAddr is required');
     if (typeof sendToPeer !== 'function') throw new Error('contactThreadChannel: sendToPeer is required');
     // answering a circle member who wrote first is choosing them: their held card goes into the book
-    adoptMemberCard(peerAddr);
+    const adopted = adoptMemberCard(peerAddr);
     const id = messageId ?? mkId();
     rememberSentTo(id, threadId, peerAddr);
     // The pre-send floor: what a contact declared is applied HERE, the one place every shell's turn
@@ -390,6 +391,7 @@ export function createContactThreadChannel({
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
     const sent = (async () => {
+      if (adopted) await adopted;   // the answer's card is in the book before the gate judges the send
       // a person on the block list gets no direct message from this device: refused with its reason, nothing on the wire
       if (typeof messageRequests?.isBlocked === 'function' && await blockedNow(resolveId(peerAddr), peerAddr)) return { held: false, delivered: false, refused: 'blocked', reason: 'blocked' };
       let self = null;

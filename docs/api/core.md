@@ -491,7 +491,7 @@ Uses vitest's expect, so it must run inside a vitest test.
 
 ### `ED25519_EDGE_VECTORS`
 
-**Kind:** constant · **Import:** `ED25519_EDGE_VECTORS` from `'@onderling/core/conformance'`
+**Kind:** constant · **Import:** `ED25519_EDGE_VECTORS` from `'@onderling/core'`, `'@onderling/core/conformance'`
 
 Ed25519 conformance: the 12 published edge-case vectors and the answer the platform's strict rule gives on each.
 
@@ -504,13 +504,13 @@ by running `ed25519Disagreements(verify)` and expecting an empty list. Runner-ag
 
 ### `ED25519_ACCEPTED`
 
-**Kind:** constant · **Import:** `ED25519_ACCEPTED` from `'@onderling/core/conformance'`
+**Kind:** constant · **Import:** `ED25519_ACCEPTED` from `'@onderling/core'`, `'@onderling/core/conformance'`
 
 The vector indexes that are VALID under the strict rule.
 
 ### `ed25519Disagreements`
 
-**Kind:** function · **Import:** `ed25519Disagreements` from `'@onderling/core/conformance'`
+**Kind:** function · **Import:** `ed25519Disagreements` from `'@onderling/core'`, `'@onderling/core/conformance'`
 
 ```js
 ed25519Disagreements(verify)
@@ -641,6 +641,82 @@ package barrel as `b64decode`.
 - `str` `string` — base64url-encoded input
 
 **Returns:** `Uint8Array` — decoded bytes
+
+## `src/crypto/ed25519Strict.js`
+
+### `strictSignatureShapeOk`
+
+**Kind:** function · **Import:** `strictSignatureShapeOk` from `'@onderling/core'`
+
+```js
+strictSignatureShapeOk(sig, key)
+```
+
+The byte rule alone (no equation): may this (signature, key) pair be handed to a library at all?
+
+**Parameters**
+
+- `sig` `Uint8Array` — 64 bytes
+- `key` `Uint8Array` — 32 bytes
+
+### `verifyEd25519StrictBatch`
+
+**Kind:** function · **Import:** `verifyEd25519StrictBatch` from `'@onderling/core'`
+
+```js
+async verifyEd25519StrictBatch(items)
+```
+
+Many checks at once, each with the byte rule in front: the installed equation's `verifyBatch` when it has one (an
+async check such as WebCrypto, which never blocks the thread), else one by one.
+
+**Parameters**
+
+- `items` `Array<{msg: Uint8Array, sig: Uint8Array, key: Uint8Array}>`
+
+**Returns:** `Promise<boolean[]>`
+
+### `useSignatureEquation`
+
+**Kind:** function · **Import:** `useSignatureEquation` from `'@onderling/core'`
+
+```js
+async useSignatureEquation(eq)
+```
+
+A FASTER EQUATION, installed once by the shell (node:crypto on the box, WebCrypto's batch on the web; a native module
+on the phone later), BEHIND the byte rule. Taken only if, with the rule in front, it gives the platform's answer on
+the twelve edge-case vectors, accepts an honest signature and refuses that signature tampered; otherwise the current
+equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never replaceable. An
+equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path. A `verifyBatch`
+is vetted HERE too, through the batch itself (the vectors with the rule in front, an honest and a tampered
+signature): the one place the rule "nothing faster without agreeing" lives, for every shell. Async for that reason.
+
+**Parameters**
+
+- `eq` `{name: string, verify?: (msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean, verifyBatch?: (items: Array<{msg: Uint8Array, sig: Uint8Array, key: Uint8Array}>) => Promise<boolean[]>}|null`
+
+**Returns:** `Promise<{ok: boolean, name: string, reason?: string, disagreements?: Array<object>}>`
+
+### `signatureEquationBatches`
+
+**Kind:** function · **Import:** `signatureEquationBatches` from `'@onderling/core'`
+
+```js
+signatureEquationBatches()
+```
+
+Does the installed equation check a batch off the thread (WebCrypto)? A read then checks ahead, as one batch.
+
+### `signatureEquationName`
+
+**Kind:** function · **Import:** `signatureEquationName` from `'@onderling/core'`
+
+```js
+signatureEquationName()
+```
+
+Which equation answers now ('tweetnacl' until a shell installs one). For diagnostics.
 
 ## `src/discovery/GossipProtocol.js`
 
@@ -4150,7 +4226,7 @@ and hands it to every rail and check; the only writer is the real check below, a
 - `[o.maxBytes]` `number` — the bound, in bytes of keys held
 - `[o.verify]` `(msg: string, sig: string, pubKey: string) => boolean` — the real check (default AgentIdentity.verify)
 
-**Returns:** `{ verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }`
+**Returns:** `{ checkBatch: (verifier: string, items: Array<{msg: string, sig: string, pubKey: string}>) => Promise<number>, verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }`
 
 ### `processSignatureMemo`
 

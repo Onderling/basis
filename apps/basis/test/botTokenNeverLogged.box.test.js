@@ -99,9 +99,12 @@ describe('the bot token never reaches a log', () => {
     cleanup.push(() => { child.kill('SIGKILL'); });
     const lines = () => { try { return readdirSync(walks).flatMap((f) => readFileSync(path.join(walks, f), 'utf8').split('\n').filter(Boolean)); } catch { return []; } };
     const t0 = Date.now();
-    while (Date.now() - t0 < 60_000 && !(/device-runner: up/.test(out) && lines().length > 3)) await new Promise((r) => { setTimeout(r, 300); });
+    // wait for the line this case is about (the relay address, printed with its credential replaced) as well as the start:
+    // under load it can come after "up", and asserting at "up" was a race (CI, 2026-11-12)
+    const REDACTED = '/bot\u27e8redacted\u27e9';
+    while (Date.now() - t0 < 60_000 && !(/device-runner: up/.test(out) && lines().length > 3 && out.includes(REDACTED))) await new Promise((r) => { setTimeout(r, 300); });
     expect(/device-runner: up/.test(out), out.slice(-1500)).toBe(true);
-    expect(out).toContain('/bot\u27e8redacted\u27e9');   // the address was printed, its credential replaced
+    expect(out).toContain(REDACTED);   // the address was printed, its credential replaced
     expect(out).not.toContain(SECRET);
     expect(lines().join('\n')).not.toContain(SECRET);
   }, 90_000);

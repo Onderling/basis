@@ -43,7 +43,9 @@ export async function run({ relayUrl }) {
       type: 'p2p-chat', subtype: 'file-share', sentAt: Date.now(),
       file: { id: 'foto-1', name: 'foto.jpg', mime: 'image/jpeg', size: 180_000, dataB64: bigB64 },
     };
-    const res = await anne.agent.sendPeerMessage(addressOf(bram), big);
+    // to a co-member as the product sends: their circle address in the circle they share, inside that circle (the send
+    // gate never lets a co-member be reached on the person key)
+    const res = await anne.agent.sendPeerMessage(bram.agent.circleAddressFor(CIRCLE) ?? addressOf(bram), big, { circleId: CIRCLE });
     const receipt = res?.result ?? res;
     check('[BIG] the send reports HOW it travelled: chunked, with a count',
       receipt?.chunked === true && Number.isInteger(receipt.chunks) && receipt.chunks > 1,
@@ -60,7 +62,7 @@ export async function run({ relayUrl }) {
       type: 'p2p-chat', subtype: 'file-share', sentAt: Date.now(),
       file: { id: 'note-1', name: 'notitie.txt', mime: 'text/plain', size: 40, dataB64: 'aGFsbG8=' },
     };
-    const res2 = await anne.agent.sendPeerMessage(addressOf(bram), small);
+    const res2 = await anne.agent.sendPeerMessage(bram.agent.circleAddressFor(CIRCLE) ?? addressOf(bram), small, { circleId: CIRCLE });
     const receipt2 = res2?.result ?? res2;
     check('[SMALL] a 40-byte file is NOT chunked (one envelope, no tax)',
       receipt2?.chunked !== true, JSON.stringify(receipt2)?.slice(0, 120));

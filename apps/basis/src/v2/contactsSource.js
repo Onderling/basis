@@ -285,6 +285,55 @@ export async function nameCoMembersFromCircles(rows = [], { circleIds = null, me
     ? { ...r, name: handleOf.get(r.contactId), namedBy: 'circle' } : r)));
 }
 
+/**
+ * WHERE A CO-MEMBER CONTACTEN SHOWS IS WRITTEN TO (the send gate, 2026-11-12). Contacten merges the peer graph into the
+ * book's rows, so it shows people I share a circle with though I hold no card of theirs. A person in one of my circles
+ * is reached at THEIR circle address as MY circle self, never on my person key (that would link my circle self to my
+ * person across every circle we share). So a peer-graph person's row (not a bot, not a kept contact, no pair circle)
+ * gains `writeTo: { peerAddr, circleId }`, their proven address in the first shared circle that names one; a co-member
+ * no shared circle shows an address for gets `writeTo: { blocked: 'no-circle-address' }`, and the thread says why instead
+ * of sending. A kept contact keeps its road, and so does someone who is no co-member (they wrote first: a link, a card).
+ * @param {object[]} rows
+ * @param {{ circleIds: () => Promise<string[]>, membersOf: (circleId: string) => Promise<object[]>, isPairCircle?: (id: string) => boolean }} o
+ */
+export async function withCoMemberRoutes(rows = [], { circleIds = null, membersOf = null, isPairCircle = isPairCircleId } = {}) {
+  const needs = (r) => r && !r.isBot && r.source !== 'contact' && !r.pairCircleId && typeof r.contactId === 'string' && r.contactId;
+  if (!rows.some(needs)) return rows;
+  const routeOf = new Map();   // webid → { peerAddr, circleId }
+  const seenIn = new Set();     // webids on a shared circle's roster, with or without a proven address
+  if (typeof circleIds === 'function' && typeof membersOf === 'function') {
+    let ids = [];
+    try { ids = ((await circleIds()) ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null))).filter((c) => typeof c === 'string' && c && !isPairCircle(c)); } catch { ids = []; }
+    for (const id of ids) {
+      let members = [];
+      try { members = (await membersOf(id)) ?? []; } catch { members = []; }
+      for (const m of members) {
+        if (typeof m?.webid !== 'string' || !m.webid || routeOf.has(m.webid)) continue;
+        seenIn.add(m.webid);
+        if (typeof m.circleAddress === 'string' && m.circleAddress && m.circleAddress !== m.webid) routeOf.set(m.webid, { peerAddr: m.circleAddress, circleId: id });
+      }
+    }
+  }
+  // someone who is NOT a co-member (they wrote first: a shared link, a scanned card) keeps the row's own road: the send
+  // gate decides there (an answer keeps their card first); only a co-member is routed, or told why not
+  return rows.map((r) => {
+    if (!needs(r) || !seenIn.has(r.contactId)) return r;
+    return { ...r, writeTo: routeOf.get(r.contactId) ?? { blocked: 'no-circle-address' } };
+  });
+}
+
+/**
+ * Where a contact thread sends a turn, from its Contacten row: the co-member route `withCoMemberRoutes` gave it, else
+ * the thread's own address. `blocked` names why nothing may be sent (no shared circle names an address for them).
+ * @param {object|null} row
+ * @param {string|null} fallback  the thread's address (a kept contact's, a bot's)
+ * @returns {{ to: string|null, blocked: string|null }}
+ */
+export function contactSendRoute(row, fallback = null) {
+  if (row?.writeTo?.blocked) return { to: null, blocked: row.writeTo.blocked };
+  return { to: row?.writeTo?.peerAddr ?? fallback ?? null, blocked: null };
+}
+
 /** The book's rows, through the one row mapper. */
 export async function loadBookRows(callSkill) {
   if (typeof callSkill !== 'function') return [];
@@ -329,7 +378,11 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
   const linkNamed = await nameLinkOpeners(coNamed, {
     links: async () => (await callSkill('pinboard', 'listSharedCards', {}))?.links ?? [],
   });
-  return withNameMarkers(linkNamed, names);
+  const routed = await withCoMemberRoutes(linkNamed, {
+    circleIds: async () => (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [],
+    membersOf,
+  });
+  return withNameMarkers(routed, names);
 }
 
 /**

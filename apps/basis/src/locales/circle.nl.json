@@ -5916,6 +5916,14 @@
       "text": "Tonen",
       "doc": "The thread header's control when the contact is hidden: show them in Contacten again (the person's own act; a message from them does the same)."
     },
+    "more": {
+      "text": "Meer",
+      "doc": "A contact thread: the ⋯ button that holds Hide and Delete."
+    },
+    "self_here": {
+      "text": "Hier ben je {{name}}; wat ziet dit contact van je?",
+      "doc": "A contact thread: the avatar top right, the persona you are in this thread; its tap shows what the contact sees of you."
+    },
     "hide_note": {
       "text": "Alleen uit je lijst. Hun kringen en dit gesprek blijven; een bericht van hen brengt ze terug.",
       "doc": "What hiding IS and is not, said under the control (amendment 3: Contacten only — their circles, roster row and member card are untouched). Never a notification."

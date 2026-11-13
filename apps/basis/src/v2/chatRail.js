@@ -351,8 +351,11 @@ export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eve
       }
     } catch { sinceTs = 0; }
     let rows = [];
-    try { rows = (await podReadSince(circleId, { sinceTs: Math.max(0, sinceTs - OVERLAP_MS) })) ?? []; }
-    catch { return { ingested: 0 }; }
+    try {
+      // the shells hand the shared custody's reader, which answers `{items, truncated}`; a bare array is read as is
+      const read = await podReadSince(circleId, { sinceTs: Math.max(0, sinceTs - OVERLAP_MS) });
+      rows = Array.isArray(read) ? read : (Array.isArray(read?.items) ? read.items : []);
+    } catch { return { ingested: 0 }; }
     let ingested = 0;
     for (const row of rows) {
       const statement = row?.event;

@@ -41,7 +41,8 @@ export function podStorageBackend(podClient, { isNotFound, base = null } = {}) {
     throw new Error('podStorageBackend: a PodClient with read/write/list is required');
   }
   const absent = typeof isNotFound === 'function' ? isNotFound : (err) => err?.code === 'NOT_FOUND';
-  const root = (typeof base === 'string' && /^https?:\/\//.test(base)) ? base.replace(/\/*$/, '/') : null;
+  // any absolute container (an https pod, or an in-memory `pseudo-pod://` one); a base that is not absolute is no base
+  const root = (typeof base === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(base)) ? base.replace(/\/*$/, '/') : null;
   const at = (ref) => (!root || /^[a-z][a-z0-9+.-]*:\/\//i.test(String(ref)) ? String(ref) : `${root}${String(ref).replace(/^\/+/, '')}`);
   const back = (uri) => (root && typeof uri === 'string' && uri.startsWith(root) ? uri.slice(root.length) : uri);
 
@@ -65,9 +66,11 @@ export function podStorageBackend(podClient, { isNotFound, base = null } = {}) {
     }
 
     async list(prefix = '') {
-      const entries = await podClient.list(at(prefix));
-      // PodClient.list yields `[{ uri, ... }]`; a simpler client may yield bare ref strings.
-      return (Array.isArray(entries) ? entries : []).map((e) => back(e && typeof e === 'object' ? e.uri : e)).filter(Boolean);
+      const listed = await podClient.list(at(prefix));
+      // PodClient.list yields `{ container, entries: [{ uri, ... }] }`; a simpler client may yield the bare array (of
+      // entries or ref strings). Reading only the array made every real pod list as empty.
+      const entries = Array.isArray(listed) ? listed : (Array.isArray(listed?.entries) ? listed.entries : []);
+      return entries.map((e) => back(e && typeof e === 'object' ? e.uri : e)).filter(Boolean);
     }
   }
 

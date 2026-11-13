@@ -38,6 +38,22 @@ describe('podStorageBackend with a base', () => {
     expect(c.m.has('https://other.pod/x')).toBe(true);
   });
 
+  it('a base on any absolute scheme is honoured (an in-memory pod is pseudo-pod://), not silently dropped', async () => {
+    const c = fakeClient();
+    const b = podStorageBackend(c, { base: 'pseudo-pod://central/circles/c1' });
+    await b.put('c1/0001-m1', 'X');
+    expect([...c.m.keys()]).toEqual(['pseudo-pod://central/circles/c1/c1/0001-m1']);
+    expect(await b.list('c1/')).toEqual(['c1/0001-m1']);
+  });
+
+  it('lists through a client shaped like PodClient ({container, entries}), not only a bare array', async () => {
+    const c = fakeClient();
+    const real = { ...c, list: async (prefix) => ({ container: prefix, entries: await c.list(prefix) }) };
+    const b = podStorageBackend(real, { base: BASE });
+    await b.put('c1/0001-m1', 'X');
+    expect(await b.list('c1/')).toEqual(['c1/0001-m1']);
+  });
+
   it('without a base nothing changes', async () => {
     const c = fakeClient();
     const b = podStorageBackend(c);

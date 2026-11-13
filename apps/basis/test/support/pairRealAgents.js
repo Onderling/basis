@@ -76,7 +76,8 @@ import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
-import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
 import { carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeItemsPeerHandler, ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
@@ -141,8 +142,17 @@ const LIVE_NODES = new Set();
  * makes — so an address-revoke fanned to it lands; two walks had wired that by hand. The full suite
  * stayed green: the equilibrium tests keep the minimal composition, which has no rail.)
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true, podWebId = null } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true, podWebId = null, centralPod = null } = {}) {
   const routerRef = { fn: null };
+  // A CENTRAL POD (opt-in, `makeCentralPod()`): the shared custody module both shells compose
+  // (`createCirclePodCustody`), over ONE pod every node of the walk is handed, with the posture the walk names.
+  // The shells hand the same three seams: the send path's data move, the pod write, the pod chat read-back.
+  const podCustody = centralPod ? createCirclePodCustody({
+    ensureCirclePod: async (cid) => ({ podClient: centralPod.clientFor(label), circleRootUri: `${centralPod.root}circles/${cid}` }),
+    policyFor: async () => ({ pod: centralPod.pod ?? 'personal', storagePosture: centralPod.storagePosture ?? 'p0' }),
+    sealStrategyFor: async () => null,
+  }) : null;
+  const podAgentOpts = podCustody ? { pinboardCircleDataMove: podCustody.circleSendDataMove, pinboardPodWrite: podCustody.circlePodWrite } : {};
   // The device log the lane rides. Handed to the factory below exactly as both shells hand theirs.
   const deviceLog = itemsLane ? new EventLog({ initial: [], muted: [] }) : null;
   const received = [];
@@ -183,6 +193,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // walk that needs the opt-in path says so (`agentOpts: { allowAddressFallback: true }`); with the harness defaulting it
     // ON, a walk proved the opt-in path and hid every case where the production default does not deliver.
     allowAddressFallback: false,
+    // the central pod's send seams (empty without one)
+    ...podAgentOpts,
     // Per-test agent options, threaded straight into the production factory. The one this exists
     // for today is `allowAddressFallback: false` — the per-user "rather undeliverable than routed
     // over my one global key" setting. A test that claims to prove per-circle addressing works
@@ -335,6 +347,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // (`circleLanes.js`), so a walk can pull a circle's conversation from a member by address the way
   // the enrol/restore consume does (`contentPulls`).
   const chatCatchUp = makeFrontierReplay({ rail: chatRail, sendToPeer: sendPeer, subtypes: CHAT_CATCHUP_SUBTYPES });
+  // the pod chat read-back the lane table builds (`circleLanes.catchUps.podChat`), on a central-pod node only
+  const podChatCatchUp = podCustody ? makePodChatCatchUp({ rail: chatRail, podReadSince: podCustody.circlePodReadSince, dataMoveFor: podCustody.circleSendDataMove, eventLog: chatEventLog }) : null;
   // The membership lane's catch-up pair (registered below when the node has the rail), exposed on the node so a
   // walk can run the pull a fresh joiner makes (`requestCircle`) instead of replaying the admin's spine by hand.
   const membershipCatchUp = agent.membershipRail
@@ -532,7 +546,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     handlerSubtypes: Object.keys(handlers),
     // this device's presence in a circle: its per-circle address bound on its transport (the shells' `registerCirclePresence`)
     registerPresence: (cid) => pairSeams.bindSelf?.(cid),
-    keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
+    keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, podChatCatchUp, podCustody, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
   // a re-key moved this persona's circle addresses: register them as the shells do
   agent.onCircleRootMoved?.(async ({ circleIds }) => { await bindCircleAddresses([node], circleIds); });
@@ -870,6 +884,25 @@ export async function postSealed({ admin, members = [], groupId, text }) {
 // change then flows through the production path: the admin's pinboard `removeMember` op → the control-agent
 // router → the producer's control agent → `emitKeyEvent` → the sink → the fan. No harness stand-in on the
 // remove path; the sink records the admin's own copy + fans the rotation to the remaining members over the bus.
+
+/**
+ * ONE pod a whole walk shares — the central pod of a central-pod circle (an in-memory backend every node's client
+ * reads and writes). `pod` is the posture the custody resolves (`personal` = the pod-only data move), so a walk can
+ * measure "one shared pod, nothing fanned" before a posture names it.
+ */
+export function makeCentralPod({ pod = 'personal', storagePosture = 'p0' } = {}) {
+  const backend = createMemoryBackend();
+  const root = 'pseudo-pod://central/';
+  const clients = new Map();
+  const clientFor = (who) => {
+    if (!clients.has(who)) {
+      const pseudoPod = createPseudoPod({ backend, mode: 'standalone', deviceId: 'central' });
+      clients.set(who, new PodClient({ podRoot: root, auth: { getAuthHeaders: async () => ({}) }, pseudoPod }));
+    }
+    return clients.get(who);
+  };
+  return { backend, root, pod, storagePosture, clientFor };
+}
 
 /** A node-shaped in-memory pod client (createPseudoPod + PodClient), the node analogue of the web host's
  *  `makeCirclePodClient` — an ephemeral per-circle pseudo-pod, no OIDC/CSS. */

@@ -73,3 +73,20 @@ describe('checkEntry — a stored chat line judged as an arrival (what a history
     expect(rail.checkEntry({ ...entry, actor: undefined, payload: local })).toBe(false);
   });
 });
+
+describe('makePodChatCatchUp — reads what the shared pod custody hands it', () => {
+  // The shells hand `circlePodReadSince` (circlePodCustody.js), which answers `{items, truncated}`; the catch-up
+  // iterated the answer as an array, so on a pod-only circle it threw before ingesting a single row.
+  const row = (msgId) => ({ event: { body: { payload: { msgId } }, sig: 'sig' } });
+  for (const [shape, answer] of [['the custody\'s {items, truncated}', { items: [row('m1'), row('m2')], truncated: false }], ['a bare array', [row('m1'), row('m2')]]]) {
+    it(`ingests every row from ${shape}`, async () => {
+      const { makePodChatCatchUp } = await import('../../src/v2/chatRail.js');
+      const ingested = [];
+      const rail = { ingest: async (cid, st) => { ingested.push(st.body.payload.msgId); return { ok: true }; } };
+      const up = makePodChatCatchUp({ rail, podReadSince: async () => answer, eventLog: { query: () => [] } });
+      const r = await up.catchUpCircle('c1');
+      expect(ingested).toEqual(['m1', 'm2']);
+      expect(r.ingested).toBe(2);
+    });
+  }
+});

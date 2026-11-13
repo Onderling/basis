@@ -923,7 +923,7 @@
 }
 
 .cc-cthread { display: flex; flex-direction: column; height: 100%; padding-bottom: 12px; }
-.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; padding-right: 44px; }   /* clear the fixed header avatar (top-right), so the ⋯ is never under it */
 .cc-cthread__lang { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
 .cc-cthread__lang-btn { cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; padding: 3px 9px; background: transparent; border: none; color: var(--ink-soft); }
 .cc-cthread__lang-btn.is-active { background: var(--accent); color: var(--accent-contrast); }

@@ -88,7 +88,8 @@ export function createBannerDriver({ readRows, selvesOn = null, onSource = null,
   let known = null;
   let timer = null;
   let running = Promise.resolve();
-  const dismiss = () => { if (timer) clearTimer(timer); timer = null; hide?.(); };
+  let shown = null;   // the banner on screen now, so a recheck can tell its thing has been opened another way
+  const dismiss = () => { if (timer) clearTimer(timer); timer = null; shown = null; hide?.(); };
   const once = async () => {
     let rows = [];
     try { rows = (await readRows()) ?? []; } catch { return; }
@@ -96,6 +97,7 @@ export function createBannerDriver({ readRows, selvesOn = null, onSource = null,
     known = r.known;
     if (!r.banner) return;
     if (timer) clearTimer(timer);
+    shown = r.banner;
     show(r.banner);
     timer = setTimer(dismiss, durationMs);
   };
@@ -103,5 +105,8 @@ export function createBannerDriver({ readRows, selvesOn = null, onSource = null,
     // readings run one after another, so two pokes in a burst never show the same row twice
     poke: () => { running = running.then(once, once); return running; },
     dismiss,
+    // a shell calls this when it opens a thread or a circle: a banner for what is now on screen has said its piece,
+    // and it would lie over that screen's header
+    recheck: () => { if (shown?.open && typeof onSource === 'function' && onSource(shown.open)) dismiss(); },
   };
 }

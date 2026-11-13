@@ -22,7 +22,28 @@ export const CIRCLE_FEATURES = [
 // features. The tally + threshold live in governanceDecision.js (this file only holds
 // the policy shape). See docs/decisions.md (2026-07-25).
 export const GOVERNANCE_ACTIONS = ['removeMember', 'rotateKey', 'changeRule', 'changePolicy'];
-export const GOVERNANCE_CLASSES = ['any-admin', 'admin-quorum', 'member-vote'];
+export const GOVERNANCE_CLASSES = ['any-admin', 'admin-quorum', 'member-vote', 'random-sample'];
+
+/** Each class's word key under `circle.governance.class.*` — one map for every screen that names a class. */
+export const GOVERNANCE_CLASS_KEYS = Object.freeze({
+  'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote', 'random-sample': 'random_sample',
+});
+
+/**
+ * THE DRAWN SAMPLE (`random-sample`, Frits 2026-11-10): a few members drawn from the proposal's own hash decide, all
+ * of them (`unanimous`: the wizard's "two random members mediate") or most of them (`majority`: a drawn jury). One
+ * setting per circle; the draw itself is in governanceDecision.js.
+ */
+export const DECISION_SAMPLE_RULES = Object.freeze(['unanimous', 'majority']);
+export const DEFAULT_DECISION_SAMPLE = Object.freeze({ size: 2, rule: 'unanimous' });
+export function normalizeDecisionSample(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  const n = Number.parseInt(r.size, 10);
+  return {
+    size: Number.isFinite(n) && n >= 1 && n <= 9 ? n : DEFAULT_DECISION_SAMPLE.size,
+    rule: DECISION_SAMPLE_RULES.includes(r.rule) ? r.rule : DEFAULT_DECISION_SAMPLE.rule,
+  };
+}
 // Defaults: the mechanical/safety actions are an admin's call; rule/policy changes want
 // admin agreement; member-vote is opt-in per circle for any action.
 export const DEFAULT_GOVERNANCE = {
@@ -87,10 +108,12 @@ export function changeNeedsVote(policy, action, members = null) {
   if (!cls) return true;   // an unknown action is never let through on its own
   if (cls === 'any-admin') return false;
   if (cls === 'admin-quorum') {
+    // an EMPTY roster is one not yet read (a circle always has an admin): unknown, so a vote is needed (fail closed)
+    if (Array.isArray(members) && members.length === 0) return true;
     const admins = Array.isArray(members) ? members.filter((m) => m?.role === 'admin').length : (policy?.admins?.length ?? 0);
     return admins >= 2;
   }
-  return true;   // member-vote — the vote is the point, whatever the roster size
+  return true;   // member-vote / random-sample — the vote is the point, whatever the roster size
 }
 
 /**
@@ -240,6 +263,8 @@ export const DEFAULT_CIRCLE_POLICY = {
   // Phase 4 §5 (L4) — per-action decision-class map (admin-set). Absent action ⇒ its
   // DEFAULT_GOVERNANCE class. See governanceDecision.js for the resolver.
   governance:       { ...DEFAULT_GOVERNANCE },
+  // who a `random-sample` decision draws, and how they decide (only read where an action uses that class)
+  decisionSample:   { ...DEFAULT_DECISION_SAMPLE },
   // Decision 4 (2026-08-29) — which rendered notices (membership / governance) the conversation shows by
   // default; every member may override privately per circle (`normalizeMemberOverride.notices`).
   notices:          { ...DEFAULT_NOTICES },
@@ -442,6 +467,7 @@ export function normalizeCirclePolicy(stored = {}) {
     // `changePolicy: 'admin-quorum'` unless the map already says otherwise — the boolean gated
     // exactly this question and is retired from the policy shape.
     notices:            normalizeNotices(p.notices),
+    decisionSample:     normalizeDecisionSample(p.decisionSample),
     governance:         normalizeGovernance(
       p.consensusRequired === true && !(p.governance && p.governance.changePolicy)
         ? { ...(p.governance ?? {}), changePolicy: 'admin-quorum' }

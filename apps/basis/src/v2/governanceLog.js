@@ -81,10 +81,11 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
   const proposals = [];
   for (const p of byId.values()) {
     if (p.action === null) continue;   // votes/resolves with no matching propose — drop
-    const decision = resolveGovernance({ action: p.action, policy, actor, members, votes: p.votes, deadline: p.deadline, now });
+    const decision = resolveGovernance({ action: p.action, policy, actor, members, votes: p.votes, deadline: p.deadline, now, seed: p._proposeHash ?? p.proposalId, subject: p.subject, by: p.by });
     proposals.push({
       proposalId: p.proposalId, action: p.action, subject: p.subject, by: p.by, deadline: p.deadline,
       proposedAt: p._proposedAt, votes: p.votes, closed: p.closed,
+      seed: p._proposeHash ?? p.proposalId,   // what a drawn sample (`random-sample`) is drawn from
       // a closed proposal keeps its recorded outcome; an open one shows the live decision.
       status: p.closed ? (p.closedStatus ?? DECISION_STATUS.REJECTED) : decision.status,
       decision,

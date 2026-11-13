@@ -7501,6 +7501,10 @@
       "member_vote": {
         "text": "stemming leden",
         "doc": "Decision-class — a majority of the whole circle must agree."
+      },
+      "random_sample": {
+        "text": "gelote leden beslissen",
+        "doc": "Decision class random-sample: members drawn from the proposal's own hash decide (the wizard's two-member mediation: two drawn, both agree; a larger draw by majority is a drawn jury). Frits 2026-11-10."
       }
     },
     "status": {

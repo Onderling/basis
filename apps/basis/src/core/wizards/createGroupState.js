@@ -55,6 +55,9 @@ export const LEAVE_POLICIES = Object.freeze([
   { id: 'notify-first', label: 'Leavers notify the circle before going' },
 ]);
 
+/** The conflict answer → the class that decides a removal (the drawn pair is `random-sample`, size 2, unanimous). */
+export const CONFLICT_TO_CLASS = Object.freeze({ 'admin-decides': 'any-admin', mediation: 'random-sample', vote: 'member-vote' });
+
 export const CONFLICT_POLICIES = Object.freeze([
   { id: 'admin-decides', label: 'Admin decides' },
   { id: 'mediation',     label: 'Mediation by two random members' },
@@ -342,6 +345,14 @@ export function policyPatchFromState(state) {
   // saves directly (any-admin, the lived default). The boolean never reaches the policy shape.
   if (s.consensusRequired !== undefined) {
     patch.governance = { changePolicy: s.consensusRequired ? 'admin-quorum' : 'any-admin' };
+  }
+  // The conflict question COMPILES too (Frits 2026-11-10: make the mediation real): who decides a removal (and a
+  // report, which rides the removal class) is what the founder answered. It used to be text in the rules, read by
+  // nothing, while any one admin removed whoever they liked.
+  const removal = CONFLICT_TO_CLASS[s.conflictPolicy];
+  if (removal) {
+    patch.governance = { ...(patch.governance ?? {}), removeMember: removal };
+    if (removal === 'random-sample') patch.decisionSample = { size: 2, rule: 'unanimous' };   // two drawn members, both agree
   }
   // Decision 3 — the two fields the reader has always asked for and nobody ever wrote. Without them a
   // circle cannot remember which template made it, so its conversation has no relation to the kind its

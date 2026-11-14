@@ -29,6 +29,15 @@ const SEALED_POSTURES = new Set(['p2', 'p3']);
 export function isSealedPosture(posture) { return SEALED_POSTURES.has(posture); }
 
 /**
+ * Does this circle seal, by its policy: `true`, `false`, or `null` while the policy is NOT KNOWN yet (not read, or the read
+ * failed). A policy that was read and names no posture is a plaintext circle (p0). Unknown is never the plaintext answer:
+ * a write into a circle whose posture is not known yet is refused like a sealed one.
+ * @param {object|null|undefined} policy
+ * @returns {boolean|null}
+ */
+export function sealedAnswer(policy) { return policy == null ? null : isSealedPosture(policy.storagePosture ?? 'p0'); }
+
+/**
  * A sealed circle's producer is built only with the device's per-circle sealing key pair (the address key's image):
  * the key every member's grant wraps to. Without it there is NO producer yet — never a stand-in key. A random
  * per-circle key kept in the vault used to stand in when the agent was not up yet (a page that opened a circle before

@@ -44,7 +44,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture,
+  scopePinboardCallSkill, scopedWriteFailureKey, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture, sealedAnswer,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -1967,6 +1967,7 @@ const circleStrategyFlight = createSingleFlight();
 
 async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
+  if (policy == null) return null;   // not known yet: no answer to keep (mobile parity)
   return circleStrategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
 }
 
@@ -2109,6 +2110,9 @@ function makeCirclePodClient(circleId) {
  */
 async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
+  // No policy yet: the posture is unknown, so build nothing and keep nothing (mobile parity) — a producer made now would
+  // be the default p0 one, kept for the circle for the page's life.
+  if (policy == null) return null;
   return circlePodFlight(circleId, () => buildCirclePod(circleId, policy));
 }
 
@@ -7344,8 +7348,10 @@ async function showDetail(id) {
   // circle view; v2 §1 says chat IS the circle view (CONVERSATION tab).  The
   // CONVERSATION render lands in.
   let detailPolicy = null;
-  try { detailPolicy = await policyStore.get(id); }
-  catch { /* fresh circle / read failure → fall through */ }
+  // read with no record → {} (a plaintext circle, mobile parity); a FAILED read stays null: the posture is not known,
+  // and an unknown posture builds no producer and refuses a write (never the plaintext answer)
+  try { detailPolicy = (await policyStore.get(id)) ?? {}; }
+  catch { /* read failure → not known */ }
   try { _openOverride = (await overrideStore.get(id)) ?? {}; } catch { _openOverride = {}; }
   showCircle(id, circle, detailPolicy);
 }
@@ -7463,7 +7469,7 @@ function showCircle(id, circle, policy) {
   };
   const pinboardCall = scopePinboardCallSkill(
     rawCallSkill, id, () => getCircleSealStrategy(id, policy), getPinboardMedia,
-    { sealed: () => isSealedPosture(policy?.storagePosture) },
+    { sealed: () => sealedAnswer(policy) },
   );
   // Stand up this circle's pod producer (sealing identity + control agent for a sealed
   // posture), then seed its group-key roster with members who joined before it was live.
@@ -7784,7 +7790,7 @@ function showCircle(id, circle, policy) {
       });
       noticeboardPendingAttachment = null;   // consumed on success; keep it on failure so the user can retry
     }
-    catch { globalThis.alert?.(t('circle.noticeboard.post_failed')); }
+    catch (err) { globalThis.alert?.(t(scopedWriteFailureKey(err))); }
     noticeboardBusy = false;
     await loadNoticeboard();
   }

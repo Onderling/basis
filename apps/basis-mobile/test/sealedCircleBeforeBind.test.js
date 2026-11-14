@@ -10,8 +10,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { isSealed } from '@onderling/pod-client';
 import { initCirclePods, getCircleSealStrategy, setCircleKeyEventWiring } from '../src/core/circlePods.js';
-import { scopePinboardCallSkill } from '../../basis/src/v2/circlePinboardScope.js';
-import { isSealedPosture } from '../../basis/src/v2/circlePodProducer.js';
+import { scopePinboardCallSkill, scopedWriteFailureKey } from '../../basis/src/v2/circlePinboardScope.js';
+import { isSealedPosture, sealedAnswer } from '../../basis/src/v2/circlePodProducer.js';
 import { useTestContentSeal } from './support/contentSeal.js';
 import { bindCircleKeyPairs } from './support/circleKeyPairs.js';
 
@@ -52,5 +52,24 @@ describe('a sealed circle before the agent is bound', () => {
     const post = written.find((w) => w.op === 'postRequest');
     expect(post, 'the post is written').toBeTruthy();
     expect(isSealed(post.args.text), `stored sealed, got ${String(post.args.text).slice(0, 20)}`).toBe(true);
+  });
+
+  it('a circle whose policy is not read yet refuses a write too: unknown is never the plaintext answer', async () => {
+    initCirclePods(mockAsyncStorage());
+    bindCircleKeyPairs();
+    const written = [];
+    const callSkill = async (app, op, args) => { written.push({ op, args }); return { ok: true }; };
+    let policy = null;   // the circle view opened before its policy was read
+    const pinboardCall = scopePinboardCallSkill(callSkill, 'not-known-yet', () => getCircleSealStrategy('not-known-yet', policy), null,
+      { sealed: () => sealedAnswer(policy) });
+    let refused = null;
+    try { await pinboardCall('pinboard', 'postRequest', { text: 'te vroeg' }); } catch (err) { refused = err; }
+    expect(refused?.message).toBe('sealed-circle-key-not-ready');
+    expect(written).toEqual([]);
+    expect(scopedWriteFailureKey(refused), 'the person is told why').toBe('circle.noticeboard.key_not_ready');
+    // a circle READ with no posture is a plaintext one: its write goes on
+    policy = {};
+    await pinboardCall('pinboard', 'postRequest', { text: 'gewoon' });
+    expect(written.map((w) => w.args.text)).toEqual(['gewoon']);
   });
 });

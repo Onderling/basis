@@ -55,7 +55,7 @@ import {
   defineSkill, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
-  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain,
+  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain, causalPlace,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
@@ -405,12 +405,12 @@ async function _findLatestActiveCode(store, groupId) {
 // Household sealed-pod membership hooks. Best-effort + gated: no-op without a control-agent (instances
 // that don't run a sealed pod) or without the joiner's sealing public key. A failure here never breaks
 // the membership audit — key management is recoverable, the redemption record is the source of truth.
-async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null }) {
+async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null, admittedBy = null }) {
   if (!controlAgent || !sealingPublicKey || !webId) return;
   // Forward groupId so a per-circle control-agent ROUTER can route the grant to the right
   // circle's producer (basis runs one pinboard agent + N per-circle control agents). A
   // single (non-routing) control agent simply ignores the extra field.
-  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}) }); }
+  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}), ...(admittedBy ? { admittedBy } : {}) }); }
   catch { metrics?.record?.('control-agent-grant-failed'); }
 }
 async function revokePodAccess(controlAgent, { webId, force = false, policy = 'graceful', groupId, metrics }) {
@@ -674,6 +674,45 @@ async function getGroupRulesCore(scope, a, ctx) {
     if (tsB > tsA || (tsB === tsA && it.id > latest.id)) latest = it;
   }
   return { rules: latest };
+}
+
+/**
+ * IS THIS MEMBER STILL IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? The question every join's key grant asks again on
+ * each recompute (a grant recomputed after a lost race must not put back someone removed meanwhile). Read from the SAME
+ * fold as the invite verdict (projectCircleRoster: the roster plus each subject's last exit), placed in the membership
+ * lane's own CAUSAL order (causalPlace over the statements the fold was given: an ancestry path in the deps-DAG, the same
+ * on every device that has folded both; never a clock, never the fold's depth tiebreak):
+ *   'out'  — their last exit (a leave or an eviction) comes AFTER `after`;
+ *   'in'   — `after` is folded and no exit of theirs follows it (none at all, or the last one is before it);
+ * `after` absent: the member's last folded join (the roster seed, a repeated redeem, a device's owner).
+ *   null   — it cannot be placed: `after` is not folded on this device yet, the exit is not held, or the exit and the
+ *            admission are CONCURRENT (neither saw the other). The caller treats null as "cannot say": nothing written.
+ */
+async function memberStatusCore(scope, a) {
+  const groupId = a?.groupId ?? scope.groupId;
+  const webid = typeof a?.webid === 'string' && a.webid ? a.webid : null;
+  const asked = typeof a?.after === 'string' && a.after ? a.after : null;
+  if (!groupId || !webid) return { status: null, reason: 'args' };
+  let folded = null; let statements = [];
+  const rows = await projectCircleRoster({
+    store: scope.store, groupId, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
+    selfSigner: scope.selfSigner ?? null, observeFold: (f, s) => { folded = f; statements = Array.isArray(s) ? s : []; },
+  });
+  if (!Array.isArray(rows) || !folded) return { status: null, reason: 'no-fold' };
+  // no admission named (the roster seed, a repeated redeem, a device's owner): their LAST folded join; someone on the
+  // folded roster with no join at all was admitted by the circle's CREATION (a founder) or its seed, and is in
+  const after = asked ?? folded.lastJoinBy?.[webid] ?? null;
+  if (!asked && !after) {
+    const onRoster = Array.isArray(folded.members) && folded.members.includes(webid);
+    return onRoster ? { status: 'in' } : { status: null, reason: 'no-admission' };
+  }
+  if (!statements.some((s) => s?.hash === after)) return { status: null, reason: 'admission-not-folded' };
+  const exit = folded.lastExitBy?.[webid] ?? null;
+  if (!exit) return { status: 'in' };
+  const place = causalPlace(statements, after, exit);
+  if (place === 'after') return { status: 'out' };
+  if (place === 'before') return { status: 'in' };
+  return { status: null, reason: place === 'concurrent' ? 'concurrent' : 'exit-not-held' };
 }
 
 async function listGroupMembersCore(scope, a, ctx) {
@@ -1037,7 +1076,7 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     onFolded: (folded) => {
       if (typeof membershipRead?.compact === 'function' && Array.isArray(folded?.superseded) && folded.superseded.length) membershipRead.compact(groupId, folded.superseded).catch(() => {});
       // a caller that needs more of the fold than the rows (the invite verdict: each subject's last exit)
-      if (typeof observeFold === 'function') { try { observeFold(folded); } catch { /* a reader never breaks the read */ } }
+      if (typeof observeFold === 'function') { try { observeFold(folded, spineStatements); } catch { /* a reader never breaks the read */ } }
     },
   };
   // THE GOVERNED GATE (the circle's "who decides" at the receiver): the host says first whether this circle needs one
@@ -1187,6 +1226,7 @@ export const PINBOARD_CORES = Object.freeze({
   getHolidayMode:   getHolidayModeCore,
   getGroupRules:    getGroupRulesCore,
   listGroupMembers: listGroupMembersCore,
+  memberStatus: memberStatusCore,
   respondToItem:    respondToItemCore,
   signOutOfPod:     signOutOfPodCore,
   addContact:       addContactCore,
@@ -3264,6 +3304,11 @@ export function buildSkills({
      *   — return the members of a group as MemberMap entries.
      *   `groupId` defaults to the bundle's current group.
      */
+    wire('memberStatus', {
+      description: 'Is a member still in, after the admission a key change follows? in / out / null (cannot place), in the membership lane\'s causal order.',
+      visibility:  'private',
+    }),
+
     wire('listGroupMembers', {
       description: 'List the members of a group. To a member peer: identity + keys + address + role + handle + their own release only (allowlist); a non-member peer is refused; the local shell gets the full view. circleAddress when known).',
       visibility:  'authenticated',

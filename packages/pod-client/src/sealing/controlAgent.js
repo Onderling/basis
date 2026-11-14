@@ -175,14 +175,22 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
      */
 
     /** Enroll a device: wrap the current group key to one more recipient (no member-roster change). */
-    async grantRecipient({ publicKey } = {}) {
+    async grantRecipient({ publicKey, isMember = null } = {}) {
       if (typeof publicKey !== 'string' || !publicKey) throw new Error('grantRecipient: publicKey required');
-      const { written, base } = await changeKeyResource(keyStore, (cur) => {
+      let dropped = false;
+      const { written, base } = await changeKeyResource(keyStore, async (cur) => {
         if (!cur) throw new Error('grantRecipient: no group key yet (bootstrap the circle first)');
+        // the device's owner, asked on every compute (as a join is): out → no enrolment; no answer → nothing written
+        if (typeof isMember === 'function') {
+          const answer = await isMember();
+          if (answer === false) { dropped = true; return null; }
+          if (answer !== true) throw new MemberUnknownError();
+          dropped = false;
+        }
         if ((cur.recipients ?? []).includes(publicKey)) return null;
         return grantMember(cur, { newRecipient: publicKey, granterPrivateKey: controllerKey.privateKey, currentRecipients: cur.recipients ?? [] });
       });
-      if (!written) return { keyResource: base, granted: false };
+      if (!written) return { keyResource: base, granted: false, ...(dropped ? { dropped: true } : {}) };
       await emitKeyEvent(written);
       return { keyResource: written, granted: true };
     },

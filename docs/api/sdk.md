@@ -60,6 +60,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `CapabilityToken` | class | [`core.md`](core.md#capabilitytoken) |
 | `caretakerOrder` | function | [`core.md`](core.md#caretakerorder) |
 | `carriedSenderCredential` | function | [`core.md`](core.md#carriedsendercredential) |
+| `causalPlace` | function | [`core.md`](core.md#causalplace) |
 | `CEREMONY_KINDS` | constant | [`core.md`](core.md#ceremony_kinds) |
 | `ceremonyCommitment` | function | [`core.md`](core.md#ceremonycommitment) |
 | `ceremonyRevealFacts` | function | [`core.md`](core.md#ceremonyrevealfacts) |

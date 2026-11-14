@@ -33,7 +33,7 @@ const keyFanRoster = async (circleId) => {
 };
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
 import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
-import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster, createProducerKeyWait, isSealedPosture, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
+import { createCirclePodProducer, createCircleControlAgentRouter, notePodAgentFor, seedCircleRoster, createProducerKeyWait, isSealedPosture, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
 import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
@@ -321,6 +321,11 @@ async function buildCirclePod(circleId, policy) {
 // bootAgentBundle as `pinboardControlAgent`. V0: routes to a live (opened) circle's producer.
 // every join's key change re-asks whether the member is still in after the admission it follows (web parity)
 export const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
+  // an admission before the circle was opened builds its producer (a pod circle), or keeps the joiner's pod WebID in
+  // this device's pod-agents note for the seed (web parity)
+  policyOf: (gid) => _defaultPolicyOf(gid),
+  ensureCirclePod: (gid, policy) => ensureCirclePod(gid, policy),
+  notePodAgent: (gid, webId, podAgent) => notePodAgentFor({ vault: circleVault, circleId: gid, webId, podAgent }),
   memberStatusOf: memberStatusReader((...a) => (typeof _keyEventWiring?.callSkill === 'function' ? _keyEventWiring.callSkill(...a) : Promise.reject(new Error('not bound')))),
   // after each membership event it handles: one audience round on the key owner's device (web parity)
   audienceCheck: (gid, prod) => runKeyAudienceCheck({ circleId: gid, producer: prod, callSkill: _keyEventWiring?.callSkill }),

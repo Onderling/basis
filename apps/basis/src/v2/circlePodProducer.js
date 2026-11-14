@@ -23,6 +23,7 @@
  */
 import { createCircleControlAgent } from './circleControlAgent.js';
 import { processRefusalLog } from './refusalLog.js';
+import { circleHasPod } from './circleDataPolicy.js';
 
 const SEALED_POSTURES = new Set(['p2', 'p3']);
 
@@ -252,7 +253,23 @@ export async function createCirclePodProducer({
  * @param {(circleId:string) => (object|Promise<object|null>)} getProducer  resolve a circle's producer.
  * @returns {{ addMember: Function, removeMember: Function }}
  */
-export function createCircleControlAgentRouter(getProducer, { refusals = null, memberStatusOf = null, audienceCheck = null } = {}) {
+/**
+ * Keep a joiner's pod WebID in this device's pod-agents note for a circle whose producer is not built yet: the producer
+ * reads the note when it is built, and the seed's grant then names that WebID. Device-local (the producer's own vault
+ * key): never the roster, the lane or the pod.
+ * @param {{ vault: {get: Function, set: Function}, circleId: string, webId: string, podAgent: string, groupKeyPrefix?: string }} a
+ */
+export async function notePodAgentFor({ vault, circleId, webId, podAgent, groupKeyPrefix = 'cc.circle-groupkey' }) {
+  if (!vault || !circleId || !webId || typeof podAgent !== 'string' || !podAgent) return false;
+  const key = `${groupKeyPrefix}:pod-agents:${circleId}`;
+  let saved = {};
+  try { const raw = await vault.get(key); if (raw) saved = JSON.parse(raw) ?? {}; } catch { saved = {}; }
+  if (saved[webId] === podAgent) return false;
+  await vault.set(key, JSON.stringify({ ...saved, [webId]: podAgent }));
+  return true;
+}
+
+export function createCircleControlAgentRouter(getProducer, { refusals = null, memberStatusOf = null, audienceCheck = null, policyOf = null, ensureCirclePod = null, notePodAgent = null } = {}) {
   // Best-effort, and LOUD when it fails. Sealing degrading gracefully is the intended posture — a
   // membership event must not fail because a circle's pod is unreachable. But this catch sat between
   // the caller and every key operation, so a control-agent that threw looked exactly like one that
@@ -286,6 +303,18 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null, m
   return {
     async addMember({ webId, publicKey, role, groupId, podAgent = null, admittedBy = null }) {
       if (!webId || !publicKey) return;
+      // AN ADMISSION NEVER ROUTES ITS GRANT TO NOTHING. The producer is built when the circle is opened; an admission
+      // before that (the circle not opened since a restart) found none, and the joiner's pod WebID, which travels only
+      // to this grant, was lost. So: build the producer for a pod circle now; with still none, keep the WebID in this
+      // device's pod-agents note for the seed to use when the producer is built.
+      if (groupId && typeof ensureCirclePod === 'function' && typeof policyOf === 'function' && !(await getProducer(groupId))?.controlAgent) {
+        try { const policy = await policyOf(groupId); if (policy && circleHasPod(policy.pod)) await ensureCirclePod(groupId, policy); }
+        catch { /* the note below keeps the WebID */ }
+      }
+      if (podAgent && typeof notePodAgent === 'function' && !(await getProducer(groupId))?.controlAgent) {
+        try { await notePodAgent(groupId, webId, podAgent); } catch { /* nothing more to keep */ }
+        return;
+      }
       // asked again on EVERY compute of the key change: is the member still in after the admission this grant follows
       // (`admittedBy`: the join's hash; none: their last folded join)? in → go on, out → the change is dropped (the
       // removal stands), cannot place → MemberUnknownError: nothing written, refusal-logged

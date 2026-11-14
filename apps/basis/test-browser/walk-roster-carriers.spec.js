@@ -207,6 +207,11 @@ test('two joiners who never met reach each other at per-circle addresses', async
       log(`STEP1 ${label} holds the other joiner at a per-circle address`, 'PASS', '');
     }
 
+    // the circle is SEALED (the wizard makes every circle p2) and has no pod: its key reaches a joiner only as key
+    // statements, and the key-establish to C was refused while C's address was not answering yet (the red after train
+    // ae). So a line landing at C below, with no reload, is C holding the circle key.
+    const posture = await A.page.evaluate(async (cid) => (await window.onderlingCirclePolicy?.get(cid))?.storagePosture ?? null, circle);
+    expect(posture, 'the circle is sealed (p2)').toBe('p2');
     // and a line each way lands (the address fallback is off on a fresh profile: no global-key route to take)
     for (const peer of [B, C]) await intoChat(peer.page, circle);
     for (const [from, to] of [[B, C], [C, B]]) {

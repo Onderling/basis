@@ -64,6 +64,13 @@ export const SEAMS = Object.freeze([
   // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles
   // A SEALED CIRCLE'S PRODUCER WAITS FOR THE KEY PAIR: a page or app that asks for a circle's producer before its agent
   // is up gets none (no stand-in key), and the shell builds it when the agent binds. The box builds no circle producer.
+  // THE KEY'S AUDIENCE FOLLOWS THE MEMBERSHIP: after a producer's roster seed and after each membership event the
+  // router handles, one audience round on the key owner's device takes out a holder the lane places out. The box builds
+  // no circle producer.
+  { id: 'key-audience-check', pattern: /runKeyAudienceCheck\(/, shells: ['web', 'mobile'], why: 'a member whose removal was lost would keep the circle key for good: nothing else compares the key file with the membership' },
+  // THE POD READ-BACK ON OPENING AND ON COMING TO THE FRONT: a pod circle's messages wait on its pod; reading them back
+  // only once per start left a device that missed that moment with nothing. The box holds circles by relay catch-up.
+  { id: 'pod-read-back', pattern: /createPodReadBack\(/, shells: ['web', 'mobile'], why: 'a device whose one read-back at start found the pod out of reach read none of its pod circles\' messages until the next start' },
   { id: 'producer-waits-for-key-pair', pattern: /createProducerKeyWait\(/, shells: ['web', 'mobile'], why: 'a producer built before the agent opened the circle key with a random key nobody wrapped to, and kept it for the page\'s life: the member could not read the shared pod' },
   { id: 'roster-reread-for-unplaced-sender', pattern: /sendersToPlace\(/, shells: ['web', 'mobile'], why: 'without it a member who has just joined shows as "Onbekend lid" on their first line until the circle is reopened' },
   { id: 'second-persona-join-refusal', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the wizard cannot say before the submit that the person is already in the circle as another persona' },

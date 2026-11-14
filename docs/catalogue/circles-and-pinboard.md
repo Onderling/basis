@@ -27,6 +27,18 @@ catalogue baseline until it is.
 - **Who asks**: the per-circle control-agent router (`apps/basis/src/v2/circlePodProducer.js`), on every compute of a
   join's key change and of a device's enrolment (the device's owner); out drops the change, null writes nothing and
   goes to the refusal log (`member-unknown`). Both shells and the relay harness compose it the same way.
+- **The audience round** (`apps/basis/src/v2/keyAudienceCheck.js`, `runKeyAudienceCheck`): on the KEY OWNER's device only
+  (the producer that holds the circle's root), after the producer's roster seed and after each membership event the
+  router handles. A holder the membership lane places out whose removal never reached the key file (a crash, a device
+  offline) is revoked with a ban, one per round, and the lane is asked again inside the write. Who a key belongs to
+  comes ONLY from this device's grant notes (the producer's `keyHolders`, in its vault beside the pod-agents note, never
+  on the pod, the roster or the lane): written when this device's grant ADDED the key (a join, or a device enrolled with
+  its owner named), never when the key was already a recipient, never re-attributed, removed by this device's revoke.
+  An address on a roster row is not used: a link proof does not bind a person. The controller and the device's own key
+  are kept; a key no grant here noted ('unmapped': a holder another instance granted) and one it cannot place are kept
+  and counted; a read that fails revokes nothing. A recipient-sealed (p3) circle is skipped out loud, once per circle
+  per start. The round's line carries counts only. Holders another instance granted wait for a link proof that binds
+  the person.
 - **Re-driven by**: the roster seed at the next producer start (`seedCircleRoster`), which grants every member on the
   roster by their last join, so a grant that failed after the join stood is made then.
 
@@ -38,6 +50,10 @@ catalogue baseline until it is.
 - `packages/core/test/causalPlace.test.js`: after / before / concurrent / not held, and the fold's last exit and join
   by statement.
 - `apps/basis/test/sharedPodJoinerOpensKey.relay.test.js`: through the app's join, the joiner opens the stored key.
+- `apps/basis/test/keyAudienceCheck.relay.test.js`: a lost removal and the removed member's device taken out, one per
+  round; a member keeping the key; an unnoted key kept and counted; a holder another instance granted kept and counted;
+  a grant that finds the key already there leaves no note. `keyAudienceCheck.test.js`: one rotation per round, the
+  status asked again inside the write, counts, a failed read revokes nothing, p3 said once, a non-owner does nothing.
 
 ## Decided, not built
 
@@ -45,7 +61,8 @@ catalogue baseline until it is.
 
 ## Open rows
 
-- The audience check on the key owner's device (drops a holder the membership no longer has): its own row.
+- Holders nobody can name (unmapped keys): the count is in the device's log only; showing it to an admin is a row for
+  after the alpha. The grant record for recipient-sealed (p3) circles: its own row.
 
 ## Decisions that bind this area
 

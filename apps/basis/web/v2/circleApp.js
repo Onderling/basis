@@ -44,7 +44,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, scopedWriteFailureKey, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture, sealedAnswer, memberStatusReader,
+  scopePinboardCallSkill, scopedWriteFailureKey, createPodReadBack, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture, sealedAnswer, memberStatusReader, runKeyAudienceCheck,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -1524,6 +1524,7 @@ let itemsCatchUpShell = null;         // the items lane's catch-up (serves store
 let chatCatchUpShell = null;
 let shownCircleId = null;           // the circle on screen (the start queue pulls it first)         // the chat lane's catch-up (windowed frontier replay + the consent rung)
 let podChatCatchUpShell = null;      // pod-only circles' statement read-back (the pod is the meeting point)
+let podReadBackShell = null;         // the read-back on opening a circle and on coming back to the front
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
@@ -1956,6 +1957,8 @@ function recordCircleKeyEvent(circleId, event) {
 // every join's key change re-asks whether the member is still in after the admission it follows (memberStatus)
 const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
   memberStatusOf: memberStatusReader((...a) => (typeof rawCallSkill === 'function' ? rawCallSkill(...a) : Promise.reject(new Error('not booted')))),
+  // after each membership event it handles: one audience round on the key owner's device
+  audienceCheck: (gid, prod) => runKeyAudienceCheck({ circleId: gid, producer: prod, callSkill: rawCallSkill }),
 });
 
 /**
@@ -2218,7 +2221,13 @@ const producerKeyWait = createProducerKeyWait();
 /** Stand up a circle's producer and seed its group-key roster — what opening the circle does, and what the bind re-drives. */
 function ensureCirclePodSeeded(circleId, policy) {
   return ensureCirclePod(circleId, policy)
-    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey }).then(() => prod); return prod; });
+    .then((prod) => {
+      if (!prod?.controlAgent) return prod;
+      return seedCircleRoster({ callSkill: rawCallSkill, circleId, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey })
+        // the producer has started and its roster is seeded: one audience round (the key owner's device only)
+        .then(() => runKeyAudienceCheck({ circleId, producer: prod, callSkill: rawCallSkill }))
+        .then(() => prod);
+    });
 }
 
 /* ─── Connectivity Phase 3 — LIVE shared-pod key custody (MEMBER-SIDE) ─────────────────────────────
@@ -9845,6 +9854,18 @@ async function boot() {
       itemsCatchUpShell    = circleLanes.catchUps.task;
       chatCatchUpShell    = circleLanes.catchUps.chat;
       podChatCatchUpShell = circleLanes.catchUps.podChat;
+      // the pod read-back also runs when a circle is opened and when the page comes back to the front (no timer)
+      if (podChatCatchUpShell && !podReadBackShell) {
+        podReadBackShell = createPodReadBack({
+          catchUp: podChatCatchUpShell,
+          listCircleIds: async () => ((await rawCallSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean),
+        });
+        try {
+          globalThis.document?.addEventListener?.('visibilitychange', () => {
+            if (globalThis.document?.visibilityState === 'visible') podReadBackShell?.onForeground().catch(() => {});
+          });
+        } catch { /* no document: nothing to hear */ }
+      }
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
       // recipes per-circle; the editor pulls on mount + passes via
       // γ.3's `incomingRecipe` opt.

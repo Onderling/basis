@@ -135,7 +135,8 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     await device.takeScreenshot('msg-05d-second-is-a-request');
     if (!held) throw new Error("Bram's message after the switch went off is not a request: lost");
     await soon(by.text(PEER_DM2).withAncestor(by.id('contacts-requests')), 20_000);
-    if ((await firstOf([by.text('bram').withAncestor(by.id('contacts-requests')), by.text('Bram').withAncestor(by.id('contacts-requests'))], 10_000)) < 0) {
+    // named as he is in the circle, not as a card's claim ("Says they are …"): the request holds no card
+    if ((await firstOf([by.text('bram, from your circle'), by.text('Bram, from your circle')], 10_000)) < 0) {
       throw new Error('the request does not show Bram by his name in the circle');
     }
     // accepted without a card: his message moves into his thread

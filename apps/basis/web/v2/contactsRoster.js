@@ -59,7 +59,7 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
       li.dataset.from = r.from;
       const name = document.createElement('span');
       name.className = 'cc-requests__name';
-      name.textContent = r.name ? tr('circle.contacts.requests.says', { name: r.name }) : tr('circle.contacts.requests.no_name');
+      name.textContent = r.name ? tr(r.label, { name: r.name }) : tr(r.label);   // the shared row decides which (messageRequestRows)
       li.appendChild(name);
       if (r.firstLine) {
         const line = document.createElement('span');

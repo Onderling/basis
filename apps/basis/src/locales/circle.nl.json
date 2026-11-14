@@ -6131,6 +6131,9 @@
         "text": "Zegt {{name}} te zijn",
         "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {{name}} is that name."
       },
+      "member": {
+        "text": "{{name}}, uit je kring"
+      },
       "no_name": {
         "text": "Iemand zonder naam",
         "doc": "A request row whose sender's card gives no name."

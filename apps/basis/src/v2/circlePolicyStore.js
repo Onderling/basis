@@ -26,7 +26,16 @@ import {
 } from './circlePolicy.js';
 import { withDerivedChatFeature } from './conversationKinds.js';
 
-export function createCirclePolicyStore({ load, save, versions } = {}) {
+export function createCirclePolicyStore({ load, save, versions, marks = null } = {}) {
+  // THE POLICY OF A JOINED CIRCLE IS NOT KNOWN UNTIL IT ARRIVED. A read with no record answers the defaults (p0, a
+  // plaintext circle), which is right for a circle this device created and wrong for one it JOINED: until the founder's
+  // policy reached it, a joiner held a sealed circle as p0 and its first noticeboard post went out in the clear
+  // (2026-11-14). `marks` (device-local, never the pod) holds a PENDING mark from the join until the policy arrives;
+  // while it stands `get` says so (`policyPending: true`), and every posture reader treats that as not known.
+  const pendingOf = async (circleId) => {
+    if (!marks) return false;
+    try { return (await marks.load(circleId))?.pending === true; } catch { return false; }
+  };
   return {
     async get(circleId) {
       let raw = null;
@@ -34,10 +43,16 @@ export function createCirclePolicyStore({ load, save, versions } = {}) {
       // Decision 3 (2026-07-29) — `features.chat` is a VIEW of `conversationKinds`, not a second place to
       // store the same fact. Derived on read rather than rewritten on save, so there is one place that
       // decides it; `update` still merges the raw patch, so nothing is lost.
-      return withDerivedChatFeature(normalizeCirclePolicy(raw));
+      const policy = withDerivedChatFeature(normalizeCirclePolicy(raw));
+      return (await pendingOf(circleId)) ? { ...policy, policyPending: true } : policy;
     },
-    async update(circleId, patch) {
-      const current = await this.get(circleId);
+    /** A circle this device has just JOINED: its policy is not known until it arrives (`update(…, { seen: true })`). */
+    async markPending(circleId) {
+      if (!marks || !circleId) return;
+      try { await marks.save(circleId, { pending: true }); } catch { /* best-effort: the mark is device-local */ }
+    },
+    async update(circleId, patch, { seen = false } = {}) {
+      const { policyPending: _pending, ...current } = await this.get(circleId);
       const next = mergeCirclePolicy(current, patch);
       // γ.2 — capture BEFORE save.  Capture failures must not break the
       // write; the adapter swallows internally but defensive try here
@@ -46,6 +61,8 @@ export function createCirclePolicyStore({ load, save, versions } = {}) {
         try { await versions.capture(circleId, next); } catch { /* capture is best-effort */ }
       }
       if (save) await save(circleId, next);
+      // the circle's own policy arrived (the policy lane, the join's reply): its posture is known from here on
+      if (seen && marks) { try { await marks.save(circleId, { pending: false }); } catch { /* best-effort */ } }
       return next;
     },
     /** γ.2 — newest-first history; `[]` when no adapter or no history. */
@@ -83,7 +100,16 @@ export function createCirclePolicyStore({ load, save, versions } = {}) {
  */
 export function localCirclePolicyStore(storage = globalThis.localStorage) {
   const sealed = sealedKeyValue(storage, { name: 'the circle policy' });
-  return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed) });
+  return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed), marks: localPolicyPendingMarks(storage) });
+}
+
+/** The device-local 'policy pending' marks (key `cc.circlePolicyPending.<circleId>`): never the pod. */
+export function localPolicyPendingMarks(storage = globalThis.localStorage) {
+  const key = (id) => `cc.circlePolicyPending.${id}`;
+  return {
+    load: async (id) => { try { const s = await storage?.getItem(key(id)); return s ? JSON.parse(s) : null; } catch { return null; } },
+    save: async (id, value) => { try { await storage?.setItem(key(id), JSON.stringify(value)); } catch { /* quota / disabled */ } },
+  };
 }
 
 /** localStorage-backed load/save (web). Key: `cc.circlePolicy.<circleId>`. */

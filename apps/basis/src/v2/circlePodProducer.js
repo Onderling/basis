@@ -37,7 +37,8 @@ export function isSealedPosture(posture) { return SEALED_POSTURES.has(posture); 
  * @param {object|null|undefined} policy
  * @returns {boolean|null}
  */
-export function sealedAnswer(policy) { return policy == null ? null : isSealedPosture(policy.storagePosture ?? 'p0'); }
+// a JOINED circle whose policy has not arrived yet (`policyPending`) is not known either: its writes are refused
+export function sealedAnswer(policy) { return (policy == null || policy.policyPending === true) ? null : isSealedPosture(policy.storagePosture ?? 'p0'); }
 
 /**
  * A sealed circle's producer is built only with the device's per-circle sealing key pair (the address key's image):

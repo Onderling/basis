@@ -36,9 +36,11 @@ describe('a joined circle before its policy arrived', () => {
 
     // at once, before anything else: open and post
     await bram.openCircle(G);
+    // the open circle's scoped call is built ONCE, as the open screen builds it (its policy may land after)
+    const call = await bram.circleCall(G);
     const outcomes = [];
     for (let i = 0; i < 40; i += 1) {
-      const r = await (await bram.circleCall(G))('pinboard', 'postRequest', { intent: 'ask', text: `vraag ${i}`, groupId: G }).catch((e) => ({ thrown: e?.message ?? String(e) }));
+      const r = await call('pinboard', 'postRequest', { intent: 'ask', text: `vraag ${i}`, groupId: G }).catch((e) => ({ thrown: e?.message ?? String(e) }));
       const stored = String(r?.message ?? '').replace(/^.*Posted:\s*/, '');
       outcomes.push(r?.ok === true ? (stored.startsWith('fp1:') ? 'sealed' : 'CLEAR') : 'refused');
       if (r?.ok === true) break;
@@ -46,5 +48,26 @@ describe('a joined circle before its policy arrived', () => {
     }
     expect(outcomes, `no post was written in the clear: ${JSON.stringify(outcomes)}`).not.toContain('CLEAR');
     expect(outcomes.at(-1), `once the policy (and key) landed, the post is sealed: ${JSON.stringify(outcomes)}`).toBe('sealed');
+  }, 120_000);
+
+  // THE FOUNDER SIDE: the create is not done until its policy statement is written. A founder phone that restarts right
+  // after 'Create' still holds the statement, so a joiner learns the circle is sealed (never holds it as plaintext).
+  it('a founder who restarts right after Create: the joiner still learns the circle is sealed', async () => {
+    const G2 = 'founder-restarts-after-create';
+    relay = relay ?? await startJourneyRelay();
+    for (const n of [anna, bram]) { try { await n?.dispose?.(); } catch { /* */ } }
+    anna = await bootMobileNode({ name: 'anna', relayUrl: relay.url });
+    const { state: made } = await createCircle(anna, { groupId: G2, name: 'Meteen weg', handle: 'anna' });
+    await anna.persistPolicy(G2, policyPatchFromState(made));   // what the create modal awaits before it reports done
+    const disk = await anna.snapshot();                         // …and the app is closed at once
+    await anna.dispose();
+    anna = await bootMobileNode({ name: 'anna', relayUrl: relay.url, restoreFrom: disk });
+    await anna.bundle.registerCirclePresence?.([G2]);
+    bram = await bootMobileNode({ name: 'bram', relayUrl: relay.url });
+    bram.sendPeerRedeem = bram.bundle.sendPeerRedeem;
+    bram.onJoined = bram.bundle.onCircleJoined;
+    const joined = await joinExistingCircle(anna, bram, { groupId: G2, handle: 'bram' });
+    expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);
+    expect(await until(async () => (await bram.policyOf(G2))?.storagePosture === 'p2' ? true : null, { timeout: 30_000, step: 500 }), `Bram holds the circle as sealed: ${JSON.stringify((await bram.policyOf(G2))?.storagePosture)}`).toBe(true);
   }, 120_000);
 });

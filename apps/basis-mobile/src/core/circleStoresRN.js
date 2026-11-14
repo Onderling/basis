@@ -86,7 +86,8 @@ export function makeCirclePolicyStoreRN(rawStorage, { getPodWriter } = {}) {
   // γ.2 — version capture wired ABOVE the tier so snapshots happen
   // regardless of whether the write lands in AsyncStorage or pod.
   const versions = asyncStorageObjectVersions('policy', rawStorage);
-  return createCirclePolicyStore({ ...tieredPolicyIo(localIo, podIo), versions });
+  // the 'policy pending' marks of joined circles: device-local AsyncStorage, never the pod
+  return createCirclePolicyStore({ ...tieredPolicyIo(localIo, podIo), versions, marks: asyncKeyedIo('cc.circlePolicyPending.', rawStorage) });
 }
 
 export function makeMemberOverrideStoreRN(storage) {

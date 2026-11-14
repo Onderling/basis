@@ -152,7 +152,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     emitter: () => bundle?.agent?.emitPolicyUpdate ?? null,
     headStore: makePolicyHeadStore(AsyncStorage),
     readPolicy: (cid) => policyStore.get(cid),
-    writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy); pods.forgetCircleSealStrategyFor(cid); return r; },
+    writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); pods.forgetCircleSealStrategyFor(cid); return r; },
     membersOf: membersOfViaSkill((...a) => bundle?.callSkill?.(...a)),
   });
 
@@ -174,6 +174,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     onSettingsKeyMismatch: () => { flags.settingsKeyMismatch += 1; },
     onSettingsConflicts: () => { flags.settingsConflicts += 1; },
     getSharedWithMePodWriter: () => podWriterRef.current,   // App.js's getCirclePodWriter: null until a pod sign-in
+    markPolicyPending: (cid) => policyStore.markPending(cid),   // App.js's: a joined circle's policy not known yet
     pinboardControlAgent: pods.circleControlAgentRouter,
     provisionCircleMedium: pods.provisionCircleMedium,
     deviceLog: eventLog,
@@ -289,7 +290,8 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
      *  policy store, and the founder's first policy on the lane. */
     persistPolicy: async (groupId, patch) => {
       await policyStore.update?.(groupId, patch);
-      circlePolicyLane?.state(groupId).catch(() => {});
+      await circlePolicyLane?.state(groupId).catch(() => {});   // as the create modal's: awaited and flushed
+      await flushPendingSaves().catch(() => {});
     },
     /** Whether this phone can seal for the circle now: its circle pods hold a group key for it (the seal strategy the
      *  send path asks for; null while the key is not on this device). */
@@ -301,9 +303,9 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
       const policy = (await policyStore.get?.(circleId)) ?? null;
       return scopePinboardCallSkill(
         bundle.callSkill, circleId,
-        () => pods.getCircleSealStrategy(circleId, policy),
+        (p) => pods.getCircleSealStrategy(circleId, p ?? policy),
         async () => { const comp = await getCircleMediaComposition(circleId, policy); return comp?.mediaGateway ? { mediaGateway: comp.mediaGateway, localActor: pods.getCircleActorWebId() || 'me', t } : null; },
-        { sealed: () => sealedAnswer(policy) },
+        { sealed: (p) => sealedAnswer(p ?? policy), policyNow: () => policyStore.get?.(circleId) },
       );
     },
     /** Open a sealed text with this phone's own strategy for the circle (what its open path uses): the plaintext, or

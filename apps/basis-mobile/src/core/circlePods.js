@@ -257,7 +257,7 @@ export async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
   // No policy yet (a circle view opens before its policy is read from the store): the posture is unknown, so build
   // nothing and keep nothing — a producer made now would be the default p0 one, cached for the circle for good.
-  if (policy == null) return null;
+  if (policy == null || policy.policyPending === true) return null;   // not known (a joined circle's policy not arrived)
   return podFlight(circleId, () => buildCirclePod(circleId, policy));
 }
 
@@ -354,7 +354,7 @@ export async function seedCircleRosterFor({ circleId, policy, callSkill }) {
 /** Resolve (+ cache) a circle's content seal/open strategy via the device's own sealing identity. */
 export async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
-  if (policy == null) return null;   // not known yet: no answer to keep (see ensureCirclePod)
+  if (policy == null || policy.policyPending === true) return null;   // not known yet: no answer to keep (see ensureCirclePod)
   return strategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
 }
 

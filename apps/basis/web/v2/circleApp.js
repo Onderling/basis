@@ -1164,7 +1164,7 @@ const circlePolicyLane = makeCirclePolicyLane({
   // A policy that arrives can change the circle's storage posture — so what was composed from the old one (the seal
   // strategy, the media gateway, both cached per circle, a cached "none" included) is dropped and rebuilt on next use.
   writePolicy: async (cid, policy) => {
-    const r = await policyStore.update(cid, policy);
+    const r = await policyStore.update(cid, policy, { seen: true });   // the circle's policy arrived: known from here on
     circleSealStrategies.delete(cid);
     circleMediaCompositions.delete(cid);
     return r;
@@ -1509,6 +1509,8 @@ function circleOnJoined({ circleId, invite = null }) {
     // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
     registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
     pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: itemsCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
+    // its posture is not known until its policy arrives (the policy lane's write clears the mark)
+    markPolicyPending: (cid) => policyStore.markPending(cid),
   });
 }
 let circlePairRoster = null;     // the pair roster for contacts (L105) — composed with the contact channel
@@ -1979,7 +1981,7 @@ const circleStrategyFlight = createSingleFlight();
 
 async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
-  if (policy == null) return null;   // not known yet: no answer to keep (mobile parity)
+  if (policy == null || policy.policyPending === true) return null;   // not known yet: no answer to keep (mobile parity)
   return circleStrategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
 }
 
@@ -2129,7 +2131,7 @@ async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
   // No policy yet: the posture is unknown, so build nothing and keep nothing (mobile parity) — a producer made now would
   // be the default p0 one, kept for the circle for the page's life.
-  if (policy == null) return null;
+  if (policy == null || policy.policyPending === true) return null;   // not known (a joined circle's policy not arrived)
   return circlePodFlight(circleId, () => buildCirclePod(circleId, policy));
 }
 
@@ -7264,7 +7266,9 @@ function openCreateCircleWizard() {
       const gid = reply?.groupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
       // the founder's first policy (the wizard wrote it locally) goes on the lane, so a joiner catches it up
-      if (gid) circlePolicyLane.state(gid).catch(() => {});
+      // …awaited and flushed: the create is not done until the statement is written (a page closed right after 'Create'
+      // lost it, and a joiner then held the sealed circle as plaintext)
+      if (gid) { await circlePolicyLane.state(gid).catch(() => {}); await flushPendingSaves().catch(() => {}); }
       try { circlesCache = await loadLauncherCircles(); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
     },
   });
@@ -7494,8 +7498,9 @@ function showCircle(id, circle, policy) {
       : null;
   };
   const pinboardCall = scopePinboardCallSkill(
-    rawCallSkill, id, () => getCircleSealStrategy(id, policy), getPinboardMedia,
-    { sealed: () => sealedAnswer(policy) },
+    rawCallSkill, id, (p) => getCircleSealStrategy(id, p ?? policy), getPinboardMedia,
+    // the policy as it is at each write (a joined circle's policy lands after the view was built)
+    { sealed: (p) => sealedAnswer(p ?? policy), policyNow: () => policyStore.get(id) },
   );
   // Stand up this circle's pod producer (sealing identity + control agent for a sealed
   // posture), then seed its group-key roster with members who joined before it was live.

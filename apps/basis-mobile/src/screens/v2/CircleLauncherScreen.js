@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import { flushPendingSaves } from '@onderling/local-store';
 import Btn from './Btn.js';
 import { GOVERNANCE_OPEN_ACTION } from '../../../../basis/src/v2/governanceNotices.js';
 import { pendingEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
@@ -2785,6 +2786,7 @@ export default function CircleLauncherScreen({
         items={items}
         resolveSkill={resolveSkill}
         rawCallSkill={bundle?.callSkill}
+        policyNow={(cid) => policyStore.get(cid)}
         // One function, not the whole bundle (this file's style, stated in CircleDetail's props): the
         // removed-from-a-circle line reads the verified membership statements to name WHO removed you.
         readMembershipStatements={async (cid) => {
@@ -3062,7 +3064,10 @@ export default function CircleLauncherScreen({
           getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
           persistPolicy={async (groupId, patch) => {
             await policyStore.update?.(groupId, patch);
-            circlePolicyLane?.state(groupId).catch(() => {});   // the founder's first policy, on the lane
+            // the founder's first policy, on the lane — AWAITED and flushed: the create is not done until the statement is
+            // written (a phone closed right after 'Create' lost it, and a joiner then held the sealed circle as plaintext)
+            await circlePolicyLane?.state(groupId).catch(() => {});
+            await flushPendingSaves().catch(() => {});
           }}
           // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
           shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
@@ -3237,6 +3242,8 @@ function CircleDetail({
   // the self's ref in a circle (`agent.circleSelf(cid).webid`) — one function, not the bundle; null → the device's ref
   selfIn = null,
   circle, items, resolveSkill, rawCallSkill, catalogue: rawCatalogue, policy, override = null, myListTasks = [],
+  // the circle's policy as it is now (one function, not the store): read at each scoped write
+  policyNow = null,
   deliveryStateMap = null,
   registerCircleBotSink = null,
   onAcceptFallback = null,
@@ -3301,10 +3308,11 @@ function CircleDetail({
   }, [circle?.id, policy]);
   const pinboardCall = useMemo(
     () => scopePinboardCallSkill(
-      rawCallSkill, circle?.id, () => getCircleSealStrategy(circle?.id, policy), getPinboardMedia,
-      { sealed: () => sealedAnswer(policy) },
+      rawCallSkill, circle?.id, (p) => getCircleSealStrategy(circle?.id, p ?? policy), getPinboardMedia,
+      // the policy as it is at each write (a joined circle's policy lands after the screen was built) — web parity
+      { sealed: (p) => sealedAnswer(p ?? policy), policyNow: typeof policyNow === 'function' && circle?.id ? () => policyNow(circle.id) : null },
     ),
-    [rawCallSkill, circle?.id, policy, getPinboardMedia],
+    [rawCallSkill, circle?.id, policy, getPinboardMedia, policyNow],
   );
   // Resolve this circle's sealed-media composition for the noticeboard: gate the 📎 affordance
   // (null for p0/p1 → hidden, web parity `circleMedia ? ... : null`) + open sealed full images on

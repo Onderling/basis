@@ -65,6 +65,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     await picker.selectOption(buurt);
     await A.page.locator('.cc-wizard-input').first().fill('Proeftuin');
     await fillFounderHandle(A.page, 'anna');
+    await A.page.locator('input[type="radio"][value="neighbourhood"]:visible').first().check();   // the kind, asked here
     for (let i = 0; i < 5; i += 1) { await A.page.locator('.cc-wizard-btn-primary').first().click(); await A.page.waitForTimeout(300); }
     await expect(A.page.locator('.cc-wizard-review'), 'the review names the founding persona').toContainText('Buurt');
     await A.page.locator('.cc-wizard-btn-primary').first().click();

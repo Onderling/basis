@@ -83,6 +83,7 @@ export { itemCircleId, isInCircle, scopeItems }       from './v2/circleScope.js'
 export { scopePinboardCallSkill, scopedWriteFailureKey, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES, NOTICEBOARD_REFRESH_EVENTS } from './v2/circlePinboardScope.js';
 export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster, createProducerKeyWait, SealingKeyPairMissingError, isSealedPosture, sealedAnswer, memberStatusReader } from './v2/circlePodProducer.js';
 export { checkKeyAudience, runKeyAudienceCheck } from './v2/keyAudienceCheck.js';
+export { createPodReadBack } from './v2/podReadBack.js';
 export { realPodRouting, podRootFromWebid, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
 export { runStartQueue, startQueueSiblings, START_LANES } from './v2/startQueue.js';

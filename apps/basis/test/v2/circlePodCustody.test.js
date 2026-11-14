@@ -69,3 +69,14 @@ describe('createCirclePodCustody — seal-or-refuse write', () => {
     expect(await circlePodReadSince('c1', {})).toEqual({ items: [] });
   });
 });
+
+describe('a sealed circle whose key does not open reads nothing back, and says so', () => {
+  it('circlePodReadSince returns no items and writes the refusal log line', async () => {
+    const { processRefusalLog } = await import('../../src/v2/refusalLog.js');
+    const note = vi.spyOn(processRefusalLog(), 'note');
+    const { circlePodReadSince } = createCirclePodCustody(makeDeps({ pod: 'shared', storagePosture: 'p2', strategy: null }));
+    expect(await circlePodReadSince('c1', { since: 0 })).toEqual({ items: [] });
+    expect(note).toHaveBeenCalledWith(expect.objectContaining({ reason: 'pod-key-not-opened' }));
+    note.mockRestore();
+  });
+});

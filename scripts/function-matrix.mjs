@@ -97,7 +97,8 @@ export const FUNCTIONS = Object.freeze([
   { id: 'governance', name: 'Governance (proposals, votes, roles, removal, signed reports)', cells: {
     // the proposal half; roles, removal and signed reports come with the governance-by-role work
     web: { file: 'apps/basis/test-browser/walk-member-proposes-policy.spec.js', test: 'Save is a proposal; the admin' },
-    mobile: null,   // adminRoleControlGreyed is a unit
+    // the phone as a member: its Save is a proposal, the admin (a real agent on the relay) says yes, the phone holds it
+    mobile: { file: 'apps/basis-mobile/e2e/governanceProposal.test.js', test: "Bram, the admin, says yes: the phone holds the circle's new settings" },
     // the box OBEYING the circle (screen-admin-box is the admin's screen, not the box) — Fable 2026-11-10
     box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the box forgets the circle and its record of it goes' },
   } },

@@ -47,6 +47,7 @@ import {
 } from '../../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../../basis/src/v2/householdRosterPairing.js';
 import { DEFAULT_CIRCLE_POLICY } from '../../../basis/src/v2/circlePolicy.js';
+import { bindCircleGovernance, makeGovernanceBroadcast } from '../../../basis/src/v2/governanceAppWiring.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from'../../../basis/src/v2/circleInvite.js';
 import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 import { withCoMemberRoutes, contactSendRoute } from '../../../basis/src/v2/contactsSource.js';
@@ -85,6 +86,8 @@ await connectNodesOverRelay([peer], { relayUrl });
 const call = (app, op, args) => peer.agent.callSkill(app, op, args);
 // the circle this peer is in: its own (founded here), or, in `--join` mode, the phone's once the invite arrives
 let groupId = (joinMode || makerMode) ? null : `walk-${Date.now().toString(36)}`;
+// the circle's settings as this peer (its admin) last stated them: what an accepted proposal is applied over
+let settings = { policy: DEFAULT_CIRCLE_POLICY, version: 1 };
 if (!joinMode && !makerMode) {
 await createCircle(peer, { groupId, name: circleName, handle });   // named, as a founder in a shell is
 await bindCircleAddresses([peer], groupId);
@@ -96,6 +99,7 @@ const features = (arg('features', '') ?? '').split(',').map((x) => x.trim()).fil
 if (features.length) {
   const policy = { ...DEFAULT_CIRCLE_POLICY, features: { ...DEFAULT_CIRCLE_POLICY.features, ...Object.fromEntries(features.map((f) => [f, true])) } };
   const st = await peer.agent.emitPolicyUpdate?.({ groupId, policy, version: 2 }).catch((e) => ({ error: String(e?.message ?? e) }));
+  if (st && !st.error) settings = { policy, version: 2 };
   say({ step: 'features', on: features, ok: !!st && !st?.error });
 }
 await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
@@ -246,6 +250,44 @@ if (talk) {
         if (open.length !== 1) { say({ step, ok: false, error: `${open.length} open tasks hold "${cmd.text}"` }); return; }
         const r = await call('tasks', cmd.do === 'task-claim' ? 'claimTask' : 'completeTask', { circleId: groupId, id: open[0].id });
         say({ step, ok: !r?.error && r?.result?.ok !== false, id: open[0].id, result: r ?? null });
+      } else if (cmd.do === 'gov-accept') {
+        // THE ADMIN ACCEPTS A MEMBER'S SETTINGS PROPOSAL, as an admin's settings screen does: the governance binding the
+        // shells compose (signed on this peer's log, fanned to the circle), a yes on the open changePolicy proposal, and
+        // the orchestrator enacts it: the patch applied over the settings this peer holds, then stated on the lane
+        try {
+        const merge = (base, patch) => {
+          const out = { ...base };
+          for (const [k, v] of Object.entries(patch ?? {})) out[k] = (v && typeof v === 'object' && !Array.isArray(v) && base?.[k] && typeof base[k] === 'object') ? merge(base[k], v) : v;
+          return out;
+        };
+        const gov = bindCircleGovernance({
+          eventLog: peer.chatEventLog, callSkill: call, getPolicy: async () => settings.policy, myRef: () => peer.pubKey,
+          genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: makeGovernanceBroadcast(call),
+          circleIdentityFor: peer.agent.circleIdentityFor, agent: peer.agent,
+          setPolicy: async (_cid, patch) => { settings = { ...settings, policy: merge(settings.policy, patch) }; },
+          statePolicy: async (cid, meta = {}) => {
+            const version = settings.version + 1;
+            const st = await peer.agent.emitPolicyUpdate({ groupId: cid, policy: settings.policy, version, ...(meta?.proposalId ? { proposalId: meta.proposalId } : {}) });
+            if (st?.body?.hash) settings = { ...settings, version };
+            return st;
+          },
+          policyVersionOf: async () => settings.version,
+        });
+        // bounded by the clock, not by a count (a view can be slow): the walk waits longer than this, so it always hears
+        // which branch it was: no proposal here, or the vote and the tally
+        let open = []; let seen = null;
+        const until = Date.now() + 90_000;
+        while (!open.length && Date.now() < until) {
+          const view = await gov.view(groupId);
+          seen = { open: (view?.open ?? []).map((x) => x?.action ?? null), closed: (view?.closed ?? []).length, events: peer.chatEventLog.query({}).length };
+          open = (view?.open ?? []).filter((x) => x?.action === 'changePolicy');
+          if (!open.length) await new Promise((r) => { setTimeout(r, 2000); });
+        }
+        if (!open.length) { say({ step: 'gov-accepted', ok: false, why: 'no open settings proposal reached the peer', seen }); return; }
+        const v = await gov.vote({ circleId: groupId, proposalId: open[0].proposalId, voter: peer.pubKey, choice: 'yes' });
+        const t = await gov.tally({ circleId: groupId, proposalId: open[0].proposalId });
+        say({ step: 'gov-accepted', ok: t?.status === 'approved' && (t.enacted === true || t.closed === true), vote: v, tally: t, version: settings.version, subject: open[0].subject ?? null });
+        } catch (err) { say({ step: 'gov-accepted', ok: false, error: String(err?.message ?? err) }); }
       } else if (cmd.do === 'circle-say') {
         const r = await sendCircleChat(peer, { groupId, msgId: `peer-${Date.now().toString(36)}`, text: cmd.text });
         say({ step: 'circle-said', ok: !r?.error, error: r?.error ?? null });

@@ -25,17 +25,25 @@ import {
   normalizeMemberOverride, mergeMemberOverride,
 } from './circlePolicy.js';
 import { withDerivedChatFeature } from './conversationKinds.js';
+import { processRefusalLog } from './refusalLog.js';
 
-export function createCirclePolicyStore({ load, save, versions, marks = null } = {}) {
+export function createCirclePolicyStore({ load, save, versions, marks = null, onMarkNotWritten = null } = {}) {
   // THE POLICY OF A JOINED CIRCLE IS NOT KNOWN UNTIL IT ARRIVED. A read with no record answers the defaults (p0, a
   // plaintext circle), which is right for a circle this device created and wrong for one it JOINED: until the founder's
   // policy reached it, a joiner held a sealed circle as p0 and its first noticeboard post went out in the clear
   // (2026-11-14). `marks` (device-local, never the pod) holds a PENDING mark from the join until the policy arrives;
   // while it stands `get` says so (`policyPending: true`), and every posture reader treats that as not known.
+  // FAILS CLOSED: a mark that cannot be READ counts as pending (a storage error never makes a joined circle plaintext),
+  // and what this run marked or cleared is held in memory as well, so a mark that could not be WRITTEN still holds.
+  const inMemory = new Map();   // circleId → pending (true/false), this run
   const pendingOf = async (circleId) => {
     if (!marks) return false;
-    try { return (await marks.load(circleId))?.pending === true; } catch { return false; }
+    if (inMemory.has(circleId)) return inMemory.get(circleId);
+    try { return (await marks.load(circleId))?.pending === true; } catch { return true; }
   };
+  const said = typeof onMarkNotWritten === 'function'
+    ? onMarkNotWritten
+    : () => processRefusalLog().note({ tag: 'policy', lane: 'policy', check: 'pending-mark', reason: 'policy-mark-not-written' });
   return {
     async get(circleId) {
       let raw = null;
@@ -49,7 +57,9 @@ export function createCirclePolicyStore({ load, save, versions, marks = null } =
     /** A circle this device has just JOINED: its policy is not known until it arrives (`update(…, { seen: true })`). */
     async markPending(circleId) {
       if (!marks || !circleId) return;
-      try { await marks.save(circleId, { pending: true }); } catch { /* best-effort: the mark is device-local */ }
+      inMemory.set(circleId, true);
+      // not written: said, and the circle stays not-known for this run (the mark in memory)
+      try { await marks.save(circleId, { pending: true }); } catch (err) { try { said(err?.message ?? String(err)); } catch { /* a report never breaks the join */ } }
     },
     async update(circleId, patch, { seen = false } = {}) {
       const { policyPending: _pending, ...current } = await this.get(circleId);
@@ -62,7 +72,10 @@ export function createCirclePolicyStore({ load, save, versions, marks = null } =
       }
       if (save) await save(circleId, next);
       // the circle's own policy arrived (the policy lane, the join's reply): its posture is known from here on
-      if (seen && marks) { try { await marks.save(circleId, { pending: false }); } catch { /* best-effort */ } }
+      if (seen && marks) {
+        inMemory.set(circleId, false);
+        try { await marks.save(circleId, { pending: false }); } catch { /* the run knows it; the next start reads the store */ }
+      }
       return next;
     },
     /** γ.2 — newest-first history; `[]` when no adapter or no history. */
@@ -103,12 +116,16 @@ export function localCirclePolicyStore(storage = globalThis.localStorage) {
   return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed), marks: localPolicyPendingMarks(storage) });
 }
 
-/** The device-local 'policy pending' marks (key `cc.circlePolicyPending.<circleId>`): never the pod. */
+/**
+ * The device-local 'policy pending' marks (key `cc.circlePolicyPending.<circleId>`): never the pod. Errors are NOT
+ * swallowed here: the store fails closed on them (an unreadable mark is pending; an unwritten one is said and held).
+ * @param {{getItem: Function, setItem: Function}} storage  localStorage, AsyncStorage or the box's file store
+ */
 export function localPolicyPendingMarks(storage = globalThis.localStorage) {
   const key = (id) => `cc.circlePolicyPending.${id}`;
   return {
-    load: async (id) => { try { const s = await storage?.getItem(key(id)); return s ? JSON.parse(s) : null; } catch { return null; } },
-    save: async (id, value) => { try { await storage?.setItem(key(id), JSON.stringify(value)); } catch { /* quota / disabled */ } },
+    load: async (id) => { if (!storage) throw new Error('no storage'); const s = await storage.getItem(key(id)); return s ? JSON.parse(s) : null; },
+    save: async (id, value) => { if (!storage) throw new Error('no storage'); await storage.setItem(key(id), JSON.stringify(value)); },
   };
 }
 

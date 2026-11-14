@@ -11,6 +11,7 @@
  * vitest exercises the round-trip with a mock and the RN screens pass the
  * real AsyncStorage instance.
  */
+import { localPolicyPendingMarks } from '../../../basis/src/v2/circlePolicyStore.js';
 import {
   createCirclePolicyStore,
   createMemberOverrideStore,
@@ -87,7 +88,7 @@ export function makeCirclePolicyStoreRN(rawStorage, { getPodWriter } = {}) {
   // regardless of whether the write lands in AsyncStorage or pod.
   const versions = asyncStorageObjectVersions('policy', rawStorage);
   // the 'policy pending' marks of joined circles: device-local AsyncStorage, never the pod
-  return createCirclePolicyStore({ ...tieredPolicyIo(localIo, podIo), versions, marks: asyncKeyedIo('cc.circlePolicyPending.', rawStorage) });
+  return createCirclePolicyStore({ ...tieredPolicyIo(localIo, podIo), versions, marks: localPolicyPendingMarks(rawStorage) });
 }
 
 export function makeMemberOverrideStoreRN(storage) {

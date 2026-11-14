@@ -38,6 +38,10 @@ export const KEY_REFUSAL_CODES = Object.freeze([...KEY_REFUSAL_CODES_LIST]);
  * verifier through the listener realAgent sets.
  */
 const LINK_REFUSAL_CODES_LIST = ['earlier-link-proof'];
+
+/** The circle policy's code: a joined circle's 'policy pending' mark could not be written (it is held in memory for the run). */
+const POLICY_REFUSAL_CODES_LIST = ['policy-mark-not-written'];
+export const POLICY_REFUSAL_CODES = Object.freeze([...POLICY_REFUSAL_CODES_LIST]);
 export const LINK_REFUSAL_CODES = Object.freeze([...LINK_REFUSAL_CODES_LIST]);
 
 /**
@@ -63,6 +67,8 @@ export const REFUSAL_CODES = Object.freeze([
   ...KEY_REFUSAL_CODES_LIST,
   // a circle link proof signed over the earlier message (circle + address, no member)
   ...LINK_REFUSAL_CODES_LIST,
+  // a joined circle's policy-pending mark not written (held in memory for the run)
+  ...POLICY_REFUSAL_CODES_LIST,
 ]);
 const KNOWN = new Set(REFUSAL_CODES);
 const DETAIL_MAX = 32;

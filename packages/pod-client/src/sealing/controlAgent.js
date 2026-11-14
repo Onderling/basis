@@ -164,7 +164,8 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
       // key change was already made still grants it and takes the member in
       await sharing.grant({ containerUri, agent: aclAgentOf(mm), modes });
       members = [...members, mm];
-      return { keyResource: written ?? base, members: members.slice() };
+      // `added`: THIS call's write put the key in the file (it was not a recipient before) — what a holder note may follow
+      return { keyResource: written ?? base, members: members.slice(), added: !!written };
     },
 
     /**
@@ -201,10 +202,13 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
      * default — nothing pod-fetchable remains for the island; what it already downloaded cannot
      * be clawed back, by any system).
      */
-    async revokeRecipient({ publicKey, policy = 'ban' } = {}) {
+    async revokeRecipient({ publicKey, policy = 'ban', stillOut = null } = {}) {
       if (typeof publicKey !== 'string' || !publicKey) throw new Error('revokeRecipient: publicKey required');
-      const { written, base } = await changeKeyResource(keyStore, (cur) => {
+      // `stillOut` (the audience round): asked on EVERY compute, so a holder re-admitted between the round's read and this
+      // write is not rotated out: anything but a plain true drops the change
+      const { written, base } = await changeKeyResource(keyStore, async (cur) => {
         if (!cur || !(cur.recipients ?? []).includes(publicKey)) return null;
+        if (typeof stillOut === 'function' && (await stillOut()) !== true) return null;
         const holders = new Set(cur.recipients ?? []);
         holders.delete(publicKey);
         const next = rotateGroupKeyResource({ previous: cur, recipients: recipientsWithController([...holders]) });

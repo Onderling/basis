@@ -116,7 +116,7 @@ export function buildPhoneInboundWiring({
   };
   const { handlers, lanes } = buildInboundWiring({
     agent, callSkill, publishEvent,
-    // the circle's policy for the redeem reply (web parity)
+    // the circle's storage posture for the redeem reply (web parity)
     policyOf: typeof circlePolicyLane?.readPolicy === 'function' ? (gid) => circlePolicyLane.readPolicy(gid) : null,
     eventLog, govRail, onGovChange: govChanged,
     lanes: {

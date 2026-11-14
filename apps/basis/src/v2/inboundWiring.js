@@ -110,7 +110,7 @@ export function buildInboundWiring({
       propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
       // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
       inviteExchange: agent?.inviteExchange ?? null,
-      // the circle's policy rides the reply (the joiner knows its posture at once)
+      // the circle's storage posture rides the reply (a sealing one makes the joiner's circle known sealed at once)
       ...(typeof policyOf === 'function' ? { policyOf } : {}),
       logger,
     })),

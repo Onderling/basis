@@ -199,12 +199,14 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
  *   relays). The pair-roster join has no `onDispatched`, so a pair circle never recorded its point at all.
  * @returns {Promise<{points: string[], registered: boolean, bound: number, skipped: number, pulled: boolean}>}
  */
-export async function makeCircleReachable({ agent, circleId, invite = null, recordPoints = null, registerCirclePresence, pullLanes, markPolicyPending = null, policy = null, adoptPolicy = null } = {}) {
-  // a JOINED circle's posture is not known until its policy arrives: the admin's reply carried it (adopted, known at
-  // once), or it is marked pending first, before anything can write in it
-  if (circleId && policy && typeof policy === 'object' && typeof adoptPolicy === 'function') {
-    try { await adoptPolicy(circleId, policy); } catch { if (typeof markPolicyPending === 'function') { try { await markPolicyPending(circleId); } catch { /* said by the store */ } } }
-  } else if (typeof markPolicyPending === 'function' && circleId) { try { await markPolicyPending(circleId); } catch { /* the mark is best-effort */ } }
+export async function makeCircleReachable({ agent, circleId, invite = null, recordPoints = null, registerCirclePresence, pullLanes, markPolicyPending = null, postureHint = null, hintSealedPosture = null } = {}) {
+  // a JOINED circle's posture is not known until its policy arrives: marked pending first, before anything can write in
+  // it. The admin's reply may name the storage posture: a hint the store takes only when it SEALS (known sealed at once);
+  // anything else leaves the circle pending (refused) until the signed policy arrives by the lane.
+  if (typeof markPolicyPending === 'function' && circleId) { try { await markPolicyPending(circleId); } catch { /* the mark is best-effort */ } }
+  if (circleId && typeof postureHint === 'string' && typeof hintSealedPosture === 'function') {
+    try { await hintSealedPosture(circleId, postureHint); } catch { /* stays pending: refused, never plaintext */ }
+  }
   let points = [];
   if (invite && typeof recordPoints === 'function') {
     try { points = (await recordPoints({ invite, circleId }))?.recorded ?? []; }

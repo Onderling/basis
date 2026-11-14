@@ -64,8 +64,8 @@ export function makeHandleGroupRedeemRequest({
   // The agent's invite-exchange registrations (`agent.inviteExchange`): the one reply to a well-formed request (its answer
   // when it proved its code, else its refusal) may go back on the person key (the send gate's person-key allowlist).
   inviteExchange = null,
-  // the circle's policy as this admin holds it (its policy store): carried in the reply, so the joiner knows the circle's
-  // posture the moment the join returns (until then a joined circle's posture is not known and its writes are refused)
+  // the circle's policy as this admin holds it (its policy store): only its STORAGE POSTURE rides the reply, a hint the
+  // joiner takes only when it seals (an unsigned object from one device never stands in for the signed policy)
   policyOf = null,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
@@ -136,11 +136,12 @@ export function makeHandleGroupRedeemRequest({
         // …and the join this admin just signed for them: a joiner who left no longer hears the circle's fan, so the
         // statement that lets its own fold count it in again rides back with the answer (the joiner's rail verifies it).
         if (result.joinStatement?.body && result.joinStatement?.sig) reply.joinStatement = result.joinStatement;
-        // …and the circle's policy (never a 'not known' one: an admin whose own policy is pending sends none)
+        // …and the circle's storage posture, ONLY (never a 'not known' one: an admin whose own policy is pending sends
+        // none). A hint in the safe direction: the joiner takes it only when it seals; the signed policy comes by the lane.
         if (typeof policyOf === 'function') {
           try {
             const pol = await policyOf(groupId);
-            if (pol && typeof pol === 'object' && pol.policyPending !== true) { const { policyPending: _p, ...clean } = pol; reply.policy = clean; }
+            if (pol && typeof pol === 'object' && pol.policyPending !== true && typeof pol.storagePosture === 'string') reply.storagePosture = pol.storagePosture;
           } catch { /* the governance lane still carries it */ }
         }
       }

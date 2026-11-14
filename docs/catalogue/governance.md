@@ -87,7 +87,9 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
 - The drawn sample and the wizard's answer: `randomSampleClass.test.js`.
 - The membership gate: `membershipGate.test.js`, and walked with three real agents in
   `membershipGate.walk.test.js` (a lone removal under "admins decide together" holds on every device; under any-admin
-  it removes; a removal made under any-admin stays after the circle tightens).
+  it removes; a removal made under any-admin stays after the circle tightens), and over a real relay in
+  `membershipGate.relay.test.js`: a lone removal and a lone promotion hold on the other admin's device; the same
+  removal and promotion, proposed and voted yes by both admins, take effect on both devices (red with the gate off).
 - The caretaker over a real relay: `test/v2/caretakerHandover.relay.test.js`; a removed member refused on every
   member's device: `removedMemberRefusedEverywhere.relay.test.js`; the classes and tallies:
   `governanceDecision.test.js`, `governanceHost.test.js`, `governanceOrchestrator.test.js`.

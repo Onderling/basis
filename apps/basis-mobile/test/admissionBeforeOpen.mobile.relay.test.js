@@ -61,4 +61,42 @@ describe('an admission on a founder phone that has not opened the circle since i
     post(anna, 'van anna aan bram');
     expect(await until(() => chatIn(bram).includes('van anna aan bram'), { timeout: 30_000, step: 250 }), `Bram's phone reads Anna's line: ${JSON.stringify(chatIn(bram))}`).toBe(true);
   }, 180_000);
+
+  // THE KEY'S CONSUMER: the scoped write (the noticeboard through the circle's scope), each way, after Anna's real restart
+  // and without her opening the circle before Bram posts.
+  it('a noticeboard post each way through the circle\'s scope: Anna reads Bram\'s, Bram reads Anna\'s', async () => {
+    const G2 = 'admitted-before-open-post';
+    relay = relay ?? await startJourneyRelay();
+    for (const n of [anna, bram]) { try { await n?.dispose?.(); } catch { /* */ } }
+    anna = await bootMobileNode({ name: 'anna', relayUrl: relay.url });
+    const { state: made } = await createCircle(anna, { groupId: G2, name: 'Bord', handle: 'anna' });
+    await anna.persistPolicy(G2, policyPatchFromState(made));
+    expect(await until(() => anna.eventLog.query({}).some((e) => e?.type === 'governance' && JSON.stringify(e).includes(G2) && /policy-update/.test(JSON.stringify(e))), { timeout: 15_000, step: 200 })).toBe(true);
+    const disk = await anna.snapshot();
+    await anna.dispose();
+    anna = await bootMobileNode({ name: 'anna', relayUrl: relay.url, restoreFrom: disk });
+    await anna.bundle.registerCirclePresence?.([G2]);
+
+    bram = await bootMobileNode({ name: 'bram', relayUrl: relay.url });
+    bram.sendPeerRedeem = bram.bundle.sendPeerRedeem;
+    bram.onJoined = bram.bundle.onCircleJoined;
+    const joined = await joinExistingCircle(anna, bram, { groupId: G2, handle: 'bram' });
+    expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);
+    expect(await until(async () => (await bram.policyOf(G2))?.storagePosture === 'p2', { timeout: 30_000, step: 500 })).toBe(true);
+
+    await bram.openCircle(G2);
+    const bramCall = await bram.circleCall(G2);
+    const bramPost = await bramCall('pinboard', 'postRequest', { intent: 'ask', text: 'wie heeft een ladder', groupId: G2 }).catch((e) => ({ thrown: e?.message ?? String(e) }));
+
+    await anna.openCircle(G2);
+    const annaCall = await anna.circleCall(G2);
+    const texts = async (call) => ((await call('pinboard', 'listFeed', { groupId: G2 }).catch(() => null))?.items ?? []).map((i) => i?.text ?? '').filter(Boolean);
+    const annaSaw = await until(async () => ((await texts(annaCall)).includes('wie heeft een ladder') ? true : null), { timeout: 20_000, step: 500 });
+
+    const annaPost = await annaCall('pinboard', 'postRequest', { intent: 'ask', text: 'wie leent een boor', groupId: G2 }).catch((e) => ({ thrown: e?.message ?? String(e) }));
+    const bramSaw = await until(async () => ((await texts(bramCall)).includes('wie leent een boor') ? true : null), { timeout: 20_000, step: 500 });
+
+    expect(annaSaw, 'Anna reads Bram\'s post').toBe(true);
+    expect(bramSaw, 'Bram reads Anna\'s post').toBe(true);
+  }, 240_000);
 });

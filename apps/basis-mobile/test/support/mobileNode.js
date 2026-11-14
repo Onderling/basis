@@ -94,6 +94,9 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
   const { attachPinboardPodFor, circlePodWriterFor } = await import('../../src/core/phonePodSession.js');
   const { composePhonePodReadBack } = await import('../../src/core/phonePodReadBack.js');
+  const { scopePinboardCallSkill } = await import('../../../basis/src/v2/circlePinboardScope.js');
+  const { sealedAnswer } = await import('../../../basis/src/v2/circlePodProducer.js');
+  const { getCircleMediaComposition } = await import('../../src/core/circleMedia.js');
   // imported in THIS phone's module graph (a later boot resets the registry; a lazy import would get the other phone's)
   const { feedHouseholdRoster } = await import('../../../basis/src/v2/householdRosterPairing.js');
   const { subscribeContactReplies } = await import('../../src/core/contactReplyInbox.js');
@@ -291,6 +294,18 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     /** Whether this phone can seal for the circle now: its circle pods hold a group key for it (the seal strategy the
      *  send path asks for; null while the key is not on this device). */
     canSeal: async (circleId) => !!(await pods.getCircleSealStrategy(circleId, (await policyStore.get?.(circleId)) ?? null).catch(() => null)),
+    /** The circle screen's pinboard call (CircleLauncherScreen's `pinboardCall`): the waist scoped to the circle, its
+     *  writes sealed with the circle's key (or refused while the key is not on this device), its lists filtered to it. */
+    circleCall: async (circleId) => {
+      // the screen holds the circle's policy in its state; read once here, as the open circle does
+      const policy = (await policyStore.get?.(circleId)) ?? null;
+      return scopePinboardCallSkill(
+        bundle.callSkill, circleId,
+        () => pods.getCircleSealStrategy(circleId, policy),
+        async () => { const comp = await getCircleMediaComposition(circleId, policy); return comp?.mediaGateway ? { mediaGateway: comp.mediaGateway, localActor: pods.getCircleActorWebId() || 'me', t } : null; },
+        { sealed: () => sealedAnswer(policy) },
+      );
+    },
     /** The circle's policy as this phone's policy store holds it (what the circle pods read). */
     policyOf: async (circleId) => (await policyStore.get?.(circleId)) ?? null,
     /** The app's pod read-back (ChatScreen's): `comeToFront()` is what AppState 'active' calls. */

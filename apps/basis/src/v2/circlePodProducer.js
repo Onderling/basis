@@ -304,11 +304,12 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null, m
     async addMember({ webId, publicKey, role, groupId, podAgent = null, admittedBy = null }) {
       if (!webId || !publicKey) return;
       // AN ADMISSION NEVER ROUTES ITS GRANT TO NOTHING. The producer is built when the circle is opened; an admission
-      // before that (the circle not opened since a restart) found none, and the joiner's pod WebID, which travels only
-      // to this grant, was lost. So: build the producer for a pod circle now; with still none, keep the WebID in this
+      // before that (the circle not opened since a restart) found none: no key change, no key event, the newcomer had no
+      // key (and on a pod circle the joiner's pod WebID, which travels only to this grant, was lost). So: build the
+      // producer now for any circle that seals or has a pod; with still none, keep the WebID in this
       // device's pod-agents note for the seed to use when the producer is built.
       if (groupId && typeof ensureCirclePod === 'function' && typeof policyOf === 'function' && !(await getProducer(groupId))?.controlAgent) {
-        try { const policy = await policyOf(groupId); if (policy && circleHasPod(policy.pod)) await ensureCirclePod(groupId, policy); }
+        try { const policy = await policyOf(groupId); if (policy && (isSealedPosture(policy.storagePosture) || circleHasPod(policy.pod))) await ensureCirclePod(groupId, policy); }
         catch { /* the note below keeps the WebID */ }
       }
       if (podAgent && typeof notePodAgent === 'function' && !(await getProducer(groupId))?.controlAgent) {

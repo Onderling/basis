@@ -71,6 +71,15 @@ walk spawns it, waits for its `{"step":"ready","invite":…,"circleId":…}` lin
 - "Mesh transport ready" runtime assertion (needs nknLib in test env)
 - #253 step 4 special-case buttons ([Help with], [Start DM], [Download])
 
+## Typing into the "+" sheet
+
+Detox's `typeText` and `replaceText` put the words in the "+" line's native field **without the sheet's
+`onChangeText` ever firing**, so the read gets an empty line and answers "I could not read that." (measured 2026-11-14
+with a probe: no change event at all; typed for real through the input method, every key fired and the line ran).
+`plusCircleAct.test.js` types through the device's input method (`adb shell input text`) after waiting for the keyboard,
+and checks the field holds the words before it taps Read. Other fields (the wizard's name, the composer) take Detox
+typing; check a new one with `toHaveText` before blaming what reads it.
+
 ## TestID convention
 
 The shell sprinkles stable `testID="..."` props on:

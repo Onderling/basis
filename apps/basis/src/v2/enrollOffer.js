@@ -500,10 +500,13 @@ const SEND = { guarantee: 'hold-forward', asPerson: true };
  * to seed the roster from) and `relays` the ones the circle rides. `claimPrimary`: a restore claims the primary
  * device once per consume (the caller says when). Returns the honest row `{circleId, ok, steps, error?}`.
  */
-export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, registerCirclePresence = null, contentPulls = null } = {}, c, { claimPrimary = false } = {}) {
+export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, registerCirclePresence = null, contentPulls = null, markPolicyPending = null } = {}, c, { claimPrimary = false } = {}) {
   const row = { circleId: c?.id ?? null, ok: true, steps: [] };
   if (!agent || typeof callSkill !== 'function' || typeof sendPeerMessage !== 'function') return { ...row, ok: false, error: 'unwired' };
   if (!c || typeof c.id !== 'string' || !c.id || typeof c.address !== 'string' || !c.address) return { ...row, ok: false, error: 'malformed-entry' };
+  // The circle arrives WITHOUT its policy (an own device's carry, an enrolment, a restore): its posture is not known until
+  // the policy arrives, so it is marked pending FIRST, as a join's post-step does (writes in it are refused until then)
+  if (typeof markPolicyPending === 'function') { try { await markPolicyPending(c.id); } catch { /* the store says a failed mark itself */ } }
   const relays = Array.isArray(c.relays) ? c.relays.filter((u) => typeof u === 'string' && u) : [];
   // Be where the circle is, before asking anyone anything. Best-effort per url; the primary stays what it is.
   for (const url of relays) {

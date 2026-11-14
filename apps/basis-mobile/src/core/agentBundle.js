@@ -1025,6 +1025,8 @@ export async function bootAgentBundle(opts = {}) {
     // now knows — the screen that builds the lane table fills `laneCatchUps` (ChatScreen); before it has,
     // the reconnect kick covers it.
     pullLanes: (cid) => pullCircleLanes(laneCatchUpsRef.current, cid, { callSkill }),
+    // its posture is not known until its policy arrives (App.js hands the policy store's mark; the lane's write clears it)
+    markPolicyPending: typeof opts.markPolicyPending === 'function' ? opts.markPolicyPending : null,
   });
   pairSeams.onJoined = onCircleJoined;
   return {
@@ -1078,6 +1080,8 @@ export async function bootAgentBundle(opts = {}) {
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,
+    // a circle that arrives without its policy is marked pending (App.js hands the policy store's mark)
+    markPolicyPending: typeof opts.markPolicyPending === 'function' ? opts.markPolicyPending : null,
     emitMemberProps,
     disclosureShareMemo,
     /** Say a persona's release on one circle (the create wizard's founding persona; web parity). */

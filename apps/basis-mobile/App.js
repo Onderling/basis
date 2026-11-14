@@ -288,7 +288,7 @@ export default function App() {
       headStore: makePolicyHeadStore(AsyncStorage),
       readPolicy: (cid) => policyStore.get(cid),
       // a policy that arrives may change the circle's storage posture — drop the strategy composed from the old one
-      writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy); forgetCircleSealStrategyFor(cid); return r; },
+      writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); forgetCircleSealStrategyFor(cid); return r; },
       membersOf: membersOfViaSkill((...a) => bundleRef.current?.callSkill?.(...a)),   // the roster the receiver gate counts
     });
   }
@@ -506,6 +506,8 @@ export default function App() {
           // (received sealed copies mirror to the user's pod once signed in; local-only while null). Same
           // thunk the launcher's other tiered stores read (getCirclePodWriter → circlePodWriterRef.current).
           getSharedWithMePodWriter: getCirclePodWriter,
+          // a JOINED circle's posture is not known until its policy arrives: the join marks it pending in the policy store
+          markPolicyPending: (cid) => makeCirclePolicyStoreRN(AsyncStorage).markPending(cid),
           // S4 — multi-member sealing: route pinboard redeem/leave to the circle's producer.
           pinboardControlAgent: circleControlAgentRouter,
           // Cache-mode mirroring (RN parity): a pod-backed circle's store rides a cache-mode PseudoPod.

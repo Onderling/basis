@@ -502,6 +502,8 @@ export default function ChatScreen({
     if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {
       globalThis.__onderlingEnrollOfferConsumed = true;
       const enrolDeps = {
+        // a circle that arrives without its policy: its posture not known until the policy lands (web parity)
+        markPolicyPending: bundle.markPolicyPending ?? null,
         agent: bundle.agent,
         callSkill: bundle.callSkill,
         sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),

@@ -198,13 +198,18 @@ export function scopedWriteFailureKey(err) {
   return 'circle.noticeboard.post_failed';
 }
 
-export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia, { sealed = null } = {}) {
+export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia, { sealed = null, policyNow = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return callSkill;
   return async (appOrigin, opId, args = {}) => {
     if (appOrigin !== 'pinboard') return callSkill(appOrigin, opId, args);
+    // THE POLICY AS IT IS NOW (`policyNow`, the store's live read): an open screen built this call with the policy it
+    // read then; a joined circle's policy that was not known yet lands later, and the screen must not stay refused (or
+    // keep a posture that changed) until it is re-opened. The strategy getter and `sealed` receive it.
+    const live = (typeof policyNow === 'function' && (SCOPED_WRITE_OPS.has(opId) || SCOPED_LIST_OPS.has(opId)))
+      ? await Promise.resolve().then(() => policyNow()).catch(() => undefined) : undefined;
     const strategy = (typeof getSealStrategy === 'function'
       && (SCOPED_WRITE_OPS.has(opId) || SCOPED_LIST_OPS.has(opId)))
-      ? await getSealStrategy().catch(() => null) : null;
+      ? await Promise.resolve().then(() => getSealStrategy(live)).catch(() => null) : null;
     if (SCOPED_WRITE_OPS.has(opId)) {
       const scoped = { ...args };
       if (scoped.groupId == null) scoped.groupId = circleId;   // don't clobber an explicit scope
@@ -214,7 +219,7 @@ export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, get
       // whose posture is NOT KNOWN yet (`sealed()` is null: its policy is not read), is REFUSED, never written in the
       // clear: "no strategy" is the plaintext answer only for a circle known not to seal. Every scoped write, not only a
       // post with text: a member whose key does not open can do nothing in a sealed circle, which is right.
-      if (!strategy && typeof sealed === 'function' && sealed() !== false) throw new Error('sealed-circle-key-not-ready');
+      if (!strategy && typeof sealed === 'function' && sealed(live) !== false) throw new Error('sealed-circle-key-not-ready');
       if (strategy && typeof scoped.text === 'string' && scoped.text) {
         scoped.text = strategy.seal(scoped.text);
       }

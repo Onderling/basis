@@ -199,9 +199,14 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
  *   relays). The pair-roster join has no `onDispatched`, so a pair circle never recorded its point at all.
  * @returns {Promise<{points: string[], registered: boolean, bound: number, skipped: number, pulled: boolean}>}
  */
-export async function makeCircleReachable({ agent, circleId, invite = null, recordPoints = null, registerCirclePresence, pullLanes, markPolicyPending = null } = {}) {
-  // a JOINED circle's posture is not known until its policy arrives: marked first, before anything can write in it
+export async function makeCircleReachable({ agent, circleId, invite = null, recordPoints = null, registerCirclePresence, pullLanes, markPolicyPending = null, postureHint = null, hintSealedPosture = null } = {}) {
+  // a JOINED circle's posture is not known until its policy arrives: marked pending first, before anything can write in
+  // it. The admin's reply may name the storage posture: a hint the store takes only when it SEALS (known sealed at once);
+  // anything else leaves the circle pending (refused) until the signed policy arrives by the lane.
   if (typeof markPolicyPending === 'function' && circleId) { try { await markPolicyPending(circleId); } catch { /* the mark is best-effort */ } }
+  if (circleId && typeof postureHint === 'string' && typeof hintSealedPosture === 'function') {
+    try { await hintSealedPosture(circleId, postureHint); } catch { /* stays pending: refused, never plaintext */ }
+  }
   let points = [];
   if (invite && typeof recordPoints === 'function') {
     try { points = (await recordPoints({ invite, circleId }))?.recorded ?? []; }

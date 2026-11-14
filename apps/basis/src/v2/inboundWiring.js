@@ -64,7 +64,7 @@ export function buildInboundWiring({
   agent, callSkill, publishEvent = () => {},
   lanes: laneOpts = {}, eventLog = null, govRail = null, onGovChange = () => {},
   contactChannel = null, onContactReply = null, onContactMessage = null,
-  pendingRedeems = null, onAdmitted = null, grantSealedAudience = null,
+  pendingRedeems = null, onAdmitted = null, grantSealedAudience = null, policyOf = null,
   applyIncomingReceipt = null, nearbyRoom = null,
   recipe = null, rules = null, calendar = null,
   deliverToContactThread = null, notePeer = () => {},
@@ -110,6 +110,8 @@ export function buildInboundWiring({
       propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
       // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
       inviteExchange: agent?.inviteExchange ?? null,
+      // the circle's storage posture rides the reply (a sealing one makes the joiner's circle known sealed at once)
+      ...(typeof policyOf === 'function' ? { policyOf } : {}),
       logger,
     })),
     ...(pendingRedeems ? { 'group-redeem-response': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemResponse({ pendingMap: pendingRedeems })) } : {}),

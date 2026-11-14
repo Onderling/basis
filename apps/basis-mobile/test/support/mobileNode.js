@@ -175,6 +175,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     onSettingsConflicts: () => { flags.settingsConflicts += 1; },
     getSharedWithMePodWriter: () => podWriterRef.current,   // App.js's getCirclePodWriter: null until a pod sign-in
     markPolicyPending: (cid) => policyStore.markPending(cid),   // App.js's: a joined circle's policy not known yet
+    hintSealedPosture: async (cid, p) => { const took = await policyStore.hintSealedPosture(cid, p); if (took) pods.forgetCircleSealStrategyFor(cid); return took; },   // App.js's
     pinboardControlAgent: pods.circleControlAgentRouter,
     provisionCircleMedium: pods.provisionCircleMedium,
     deviceLog: eventLog,

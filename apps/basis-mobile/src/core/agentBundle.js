@@ -1017,8 +1017,10 @@ export async function bootAgentBundle(opts = {}) {
   // invite's connection point(s), register this device's per-circle address, bind the members' addresses, pull the
   // circle's lanes. There were two, and the one the join screens got did not record the point: after a restart the
   // phone was on no relay and every line waited ("No connection point"). Web has one (`circleOnJoined`).
-  const onCircleJoined = ({ circleId, invite = null } = {}) => makeCircleReachable({
+  const onCircleJoined = ({ circleId, invite = null, postureHint = null } = {}) => makeCircleReachable({
     agent, circleId, invite,
+    // the storage posture from the admin's reply: a hint the policy store takes only when it seals (App.js hands it)
+    postureHint, hintSealedPosture: typeof opts.hintSealedPosture === 'function' ? opts.hintSealedPosture : null,
     recordPoints: recordPointsFromInvite,
     registerCirclePresence,
     // The joiner pulls the circle's lanes (authority and content, `JOIN_PULL_LANES`) from the members it

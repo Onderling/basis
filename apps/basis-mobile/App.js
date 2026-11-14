@@ -508,6 +508,7 @@ export default function App() {
           getSharedWithMePodWriter: getCirclePodWriter,
           // a JOINED circle's posture is not known until its policy arrives: the join marks it pending in the policy store
           markPolicyPending: (cid) => makeCirclePolicyStoreRN(AsyncStorage).markPending(cid),
+          hintSealedPosture: async (cid, p) => { const took = await makeCirclePolicyStoreRN(AsyncStorage).hintSealedPosture(cid, p); if (took) forgetCircleSealStrategyFor(cid); return took; },
           // S4 — multi-member sealing: route pinboard redeem/leave to the circle's producer.
           pinboardControlAgent: circleControlAgentRouter,
           // Cache-mode mirroring (RN parity): a pod-backed circle's store rides a cache-mode PseudoPod.

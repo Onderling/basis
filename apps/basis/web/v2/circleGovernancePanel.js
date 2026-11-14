@@ -38,9 +38,17 @@ function el(tag, cls, text) {
  * @param {(reportId:string)=>void} [opts.onDismissReport]
  * @param {(reportId:string)=>void} [opts.onActReport]
  */
-export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed, reports = [], onDismissReport, onActReport } = {}) {
+export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed, reports = [], onDismissReport, onActReport, errorKey = null } = {}) {
   const tr = translatorOr(t, 'circleGovernancePanel.js');
   container.innerHTML = '';
+  // a vote that did not go through says so (voteFailedLine): it must not look cast
+  if (errorKey) {
+    const err = document.createElement('p');
+    err.className = 'circle-governance__error';
+    err.setAttribute('role', 'alert');
+    err.textContent = tr(errorKey);
+    container.appendChild(err);
+  }
   container.classList.add('circle-governance');
 
   container.appendChild(el('h2', 'circle-governance__title', tr('circle.governance.title')));

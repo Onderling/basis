@@ -13,6 +13,7 @@
  * Flagged for device verification.
  */
 import Btn from './Btn.js';
+import { GOVERNANCE_OPEN_ACTION } from '../../../../basis/src/v2/governanceNotices.js';
 import { pendingEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
 import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2/plusPins.js';
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
@@ -4209,6 +4210,8 @@ function CircleDetail({
     if (button?.id === 'delivery:allow-fallback') { onAcceptFallback?.(); return; }
     // The caretaker signing for the appointment nobody made (the notice bubble's button).
     if (button?.id === 'caretaker:acknowledge') { acknowledgeCaretakerNotice(); return; }
+    // "A decision opened" leads in: the Decisions screen, the same target as the circle menu's entry (web parity)
+    if (button?.id === GOVERNANCE_OPEN_ACTION) { onGovernance?.(); return; }
     // Task #13 — an onboarding option (onboarding:*) or help affordance (help:topic:* / help:consent:*)
     // routes to the shared onboarding/help handlers before anything else.
     if (typeof button?.id === 'string' && task13ButtonRef.current?.(button.id)) return;

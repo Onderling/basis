@@ -237,6 +237,8 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
+import { GOVERNANCE_OPEN_ACTION } from '../../src/v2/governanceNotices.js';
+import { voteFailedLine } from '../../src/v2/governanceView.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
@@ -8051,6 +8053,8 @@ function showCircle(id, circle, policy) {
         if (b?.action === 'delivery:allow-fallback') { acceptFallbackOffer(); return; }
         // The caretaker signing for the appointment nobody made (the notice bubble's button).
         if (b?.action === 'caretaker:acknowledge') { acknowledgeCaretakerNotice(); return; }
+        // "A decision opened" leads in: the Decisions screen, the same call the circle menu's entry makes
+        if (b?.action === GOVERNANCE_OPEN_ACTION) { showGovernance(id); return; }
         circleEmbedButtonTap?.(b);
       },
       // tap a "See also" embed chip → open the screen where the item lives (S6.B panel).
@@ -8893,6 +8897,7 @@ async function showGovernance(id) {
   const host = document.createElement('div');
   rootEl.appendChild(host);
 
+  let govErrorKey = null;   // the line a failed vote leaves on the screen (voteFailedLine), until the next vote
   const rerender = async () => {
     let ctx = { policy: {}, members: [] };
     try { ctx = await gov.getContext(id); } catch { /* empty view on read failure */ }
@@ -8911,11 +8916,13 @@ async function showGovernance(id) {
     let reports = [];
     if (isAdmin) { try { reports = (await gov.reports.list(id)).open; } catch { /* */ } }
     renderGovernancePanel(host, {
-      view, t, policy: ctx.policy, isAdmin, reports,
+      view, t, policy: ctx.policy, isAdmin, reports, errorKey: govErrorKey,
       onDismissReport: async (reportId) => { try { await gov.reports.dismiss({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
       onActReport:     async (reportId) => { try { await gov.reports.act({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
       onVote: async (proposalId, choice) => {
-        try { await gov.vote({ circleId: id, proposalId, voter: myWebid, choice }); } catch { /* */ }
+        let vr = null;
+        try { vr = await gov.vote({ circleId: id, proposalId, voter: myWebid, choice }); } catch (err) { vr = err; }
+        govErrorKey = voteFailedLine(vr);   // a vote that did not go through says so on the screen
         await rerender();
       },
       onOverride: async (proposalId) => {

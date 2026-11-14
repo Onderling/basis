@@ -7627,6 +7627,14 @@
       "text": "Why are you reporting this member?",
       "doc": "Governance §8 — prompt for the report reason."
     },
+    "vote_failed": {
+      "text": "Your vote did not go through. Try again.",
+      "doc": "Shown on the Decisions screen when a vote was refused or failed: a vote that did not go through must not look cast."
+    },
+    "open_from_notice": {
+      "text": "Go to Decisions",
+      "doc": "The button on the line that says a decision opened: opens the circle’s Decisions screen (the same place as the circle menu’s entry)."
+    },
     "notify_vote_opened": {
       "text": "A decision opened: {{action}} — your vote may be needed",
       "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)."

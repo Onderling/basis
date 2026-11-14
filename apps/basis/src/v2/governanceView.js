@@ -120,3 +120,14 @@ export function deadlineLine(deadline, { t, now = new Date(), locale } = {}) {
   if (!when) return '';
   return when === t('circle.when.closed') ? when : t('circle.governance.deadline', { when });
 }
+
+/**
+ * A VOTE THAT FAILED MUST NOT LOOK CAST (L887, 2026-11-14): the line a shell shows after a vote, from what the vote
+ * answered. Null when it went through (pending, approved, awaiting an admin's enactment); the failure line when it was
+ * refused, threw, or answered nothing. Both shells paint it; neither decides it.
+ * @param {unknown} result  what `governance.vote` resolved to, or the error it threw
+ * @returns {string|null} a locale key
+ */
+export function voteFailedLine(result) {
+  return result && typeof result === 'object' && !(result instanceof Error) && result.ok === true ? null : 'circle.governance.vote_failed';
+}

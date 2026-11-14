@@ -19,7 +19,7 @@ import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
-import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
+import { buildSubjectLabeler, deadlineLine, voteFailedLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
@@ -31,6 +31,8 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState({ view: { open: [], closed: [] }, isAdmin: false, policy: null });
+  // the line a failed vote leaves on the screen (voteFailedLine, web twin), until the next vote
+  const [errorKey, setErrorKey] = useState(null);
   const ctxRef = useRef({ gov: null, myWebid: '' });
 
   const load = useCallback(async () => {
@@ -61,7 +63,9 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
 
   const onVote = useCallback(async (proposalId, choice) => {
     const { gov, myWebid } = ctxRef.current;
-    try { await gov?.vote({ circleId, proposalId, voter: myWebid, choice }); } catch { /* */ }
+    let r = null;
+    try { r = await gov?.vote({ circleId, proposalId, voter: myWebid, choice }); } catch (err) { r = err; }
+    setErrorKey(voteFailedLine(r));   // a vote that did not go through says so: it must not look cast
     await load();
   }, [circleId, load]);
 
@@ -101,6 +105,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
       <Pressable onPress={onBack} accessibilityRole="button" style={styles.back} testID="circle-governance-back">
         <Text style={styles.backText}>{`← ${t('circle.back')}`}</Text>
       </Pressable>
+      {errorKey ? <Text style={{ color: theme.color.danger ?? '#c0392b', marginBottom: 8 }} accessibilityRole="alert" testID="circle-governance-error">{t(errorKey)}</Text> : null}
       <Text style={styles.title}>{t('circle.governance.title')}</Text>
 
       {/* changes made WITHOUT the vote this circle requires: every device refused them (the receiver gate); shown so the

@@ -7630,6 +7630,12 @@
       "text": "Waarom meld je dit lid?",
       "doc": "Governance §8 — prompt for the report reason."
     },
+    "vote_failed": {
+      "text": "Je stem is niet doorgekomen. Probeer het nog eens."
+    },
+    "open_from_notice": {
+      "text": "Naar Besluiten"
+    },
     "notify_vote_opened": {
       "text": "Er is een besluit geopend: {{action}} — je stem is misschien nodig",
       "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)."

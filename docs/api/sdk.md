@@ -369,6 +369,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `buildKeyEvent` | function | [`pod-client.md`](pod-client.md#buildkeyevent) |
 | `CapabilityAuth` | class | [`pod-client.md`](pod-client.md#capabilityauth) |
 | `CapabilityError` | class | [`pod-client.md`](pod-client.md#capabilityerror) |
+| `changeKeyResource` | function | [`pod-client.md`](pod-client.md#changekeyresource) |
 | `chooseSealScheme` | function | [`pod-client.md`](pod-client.md#choosesealscheme) |
 | `circleStorageClient` | function | [`pod-client.md`](pod-client.md#circlestorageclient) |
 | `collapseKeyEvents` | function | [`pod-client.md`](pod-client.md#collapsekeyevents) |
@@ -404,6 +405,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `isSealed` | function | [`pod-client.md`](pod-client.md#issealed) |
 | `KEY_EVENT_KIND` | constant | [`pod-client.md`](pod-client.md#key_event_kind) |
 | `keyIdOf` | function | [`pod-client.md`](pod-client.md#keyidof) |
+| `KeyWriteContendedError` | class | [`pod-client.md`](pod-client.md#keywritecontendederror) |
 | `makeGroupOpener` | function | [`pod-client.md`](pod-client.md#makegroupopener) |
 | `makeGroupSealer` | function | [`pod-client.md`](pod-client.md#makegroupsealer) |
 | `makeOpener` | function | [`pod-client.md`](pod-client.md#makeopener) |
@@ -411,6 +413,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `MalformedResourceError` | class | [`pod-client.md`](pod-client.md#malformedresourceerror) |
 | `mapSourceCode` | function | [`pod-client.md`](pod-client.md#mapsourcecode) |
 | `MAX_KEYS_PER_VERSION` | constant | [`pod-client.md`](pod-client.md#max_keys_per_version) |
+| `MemberUnknownError` | class | [`pod-client.md`](pod-client.md#memberunknownerror) |
 | `MemoryTombstones` | class | [`pod-client.md`](pod-client.md#memorytombstones) |
 | `messageRef` | function | [`pod-client.md`](pod-client.md#messageref) |
 | `migrateVaultToPod` | function | [`pod-client.md`](pod-client.md#migratevaulttopod) |

@@ -10,10 +10,26 @@
 //
 // Pure orchestration: pod I/O is injected — `sharing.grant/revoke`, and a `keyStore` {read,write} that
 // persists the key resource to the pod (e.g. /.keys/group-vN.json via a SealedPodClient or PodClient).
+//
+// THE STORED RESOURCE IS WHO HOLDS THE KEY. Every change here is computed on the resource as stored, through the
+// shared key-resource write (keyResourceWrite.js: serialised in this process, compare-and-swap across devices when
+// the store offers `writeIfUnchanged`). A join adds ONE key to the stored recipients; it never rebuilds the list
+// from this agent's in-memory roster, which knows nothing of a device enrolled by grantRecipient, a canonical-share
+// grantee, or a member another device of the founder added — a rebuild silently took the key from all of them.
 
 import { grantMember, rotateGroupKeyResource, buildGroupKeyResource, banFromHistory, unwrapGroupKey } from './groupKeyResource.js';
 import { buildKeyEvent } from './keyEventsLog.js';
 import { generateGroupKey } from './envelope.js';
+import { changeKeyResource } from './keyResourceWrite.js';
+
+/** The roster could not say whether the member is still a member: the join's key change is NOT made (never a yes). */
+export class MemberUnknownError extends Error {
+  constructor() {
+    super('the roster cannot say yet whether this member is still a member — the group key was not changed');
+    this.name = 'MemberUnknownError';
+    this.code = 'MEMBER_UNKNOWN';
+  }
+}
 
 function normalizeMember(m) {
   if (!m || !m.webId || !m.publicKey) throw new Error('control-agent: member needs { webId, publicKey }');
@@ -85,12 +101,11 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
     return bootstrapping;
   }
   async function bootstrapOnce() {
-    if (await keyStore.read()) return null;
-    const pubs = recipientsWithController(members.map((m) => m.publicKey));
-    const res = buildGroupKeyResource({ version: 1, groupKey: generateGroupKey(), recipients: pubs });
-    await keyStore.write(res);
-    await emitKeyEvent(res);
-    return res;
+    const { written } = await changeKeyResource(keyStore, (cur) => (cur ? null : buildGroupKeyResource({
+      version: 1, groupKey: generateGroupKey(), recipients: recipientsWithController(members.map((m) => m.publicKey)),
+    })));
+    if (written) await emitKeyEvent(written);
+    return written;
   }
 
   return {
@@ -99,8 +114,14 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
     podAgents: () => Object.fromEntries(members.filter((x) => x.podAgent).map((x) => [x.webId, x.podAgent])),
     bootstrap,
 
-    /** Join: grant ACL + add the member to the group key (O(1) re-wrap, or bootstrap the first key). */
-    async addMember({ webId, publicKey, role = 'member', podAgent = null }) {
+    /**
+     * Join: grant ACL + add the member to the group key (O(1) re-wrap, or bootstrap the first key).
+     *
+     * `isMember` (optional) — asked on EVERY compute, so a join recomputed after a lost race on a base where the
+     * member was just removed does not put them back: `true` adds, `false` drops this change (`{ dropped: true }`),
+     * anything else (the roster cannot answer yet) throws MemberUnknownError — it never proceeds as a yes.
+     */
+    async addMember({ webId, publicKey, role = 'member', podAgent = null, isMember = null }) {
       const m = normalizeMember({ webId, publicKey, role, podAgent });
       // Idempotent: a member already holding the group key (same sealing public key) is a
       // no-op — no re-grant, no re-wrap, no roster duplication. Re-wrapping the SAME key to
@@ -118,16 +139,29 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
         return { keyResource: await keyStore.read(), members: members.slice() };
       }
       const mm = withSavedPodAgent(m);
+      let dropped = false;
+      const { written, base } = await changeKeyResource(keyStore, async (cur) => {
+        if (typeof isMember === 'function') {
+          const answer = await isMember();
+          if (answer === false) { dropped = true; return null; }   // removed meanwhile: the removal stands
+          if (answer !== true) throw new MemberUnknownError();
+          dropped = false;
+        }
+        if (!cur) {   // no key yet: the first one, sealed to this agent's roster + the joiner
+          return buildGroupKeyResource({ version: 1, groupKey: generateGroupKey(), recipients: [...recipientsWithController(members.map((x) => x.publicKey)), m.publicKey] });
+        }
+        if ((cur.recipients ?? []).includes(m.publicKey)) return null;   // already holds this version
+        return grantMember(cur, {
+          newRecipient: m.publicKey, granterPrivateKey: controllerKey.privateKey,
+          currentRecipients: recipientsWithController(cur.recipients ?? []),
+        });
+      });
+      if (dropped) return { keyResource: base, members: members.slice(), dropped: true };
+      // the pod access follows the key: granted only once the join stands (a dropped join opens nothing)
       await sharing.grant({ containerUri, agent: aclAgentOf(mm), modes });
-      const cur = await keyStore.read();
-      const currentPubs = recipientsWithController(members.map((x) => x.publicKey));
-      const next = cur
-        ? grantMember(cur, { newRecipient: m.publicKey, granterPrivateKey: controllerKey.privateKey, currentRecipients: currentPubs })
-        : buildGroupKeyResource({ version: 1, groupKey: generateGroupKey(), recipients: [...currentPubs, m.publicKey] });
-      await keyStore.write(next);
-      await emitKeyEvent(next);   // the new roster's key-event — the added member is now a recipient in the log too
+      if (written) await emitKeyEvent(written);   // the new roster's key-event — the added member is now a recipient in the log too
       members = [...members, mm];
-      return { keyResource: next, members: members.slice() };
+      return { keyResource: written ?? base, members: members.slice() };
     },
 
     /**
@@ -140,17 +174,14 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
     /** Enroll a device: wrap the current group key to one more recipient (no member-roster change). */
     async grantRecipient({ publicKey } = {}) {
       if (typeof publicKey !== 'string' || !publicKey) throw new Error('grantRecipient: publicKey required');
-      const cur = await keyStore.read();
-      if (!cur) throw new Error('grantRecipient: no group key yet (bootstrap the circle first)');
-      if ((cur.recipients ?? []).includes(publicKey)) return { keyResource: cur, granted: false };
-      const next = grantMember(cur, {
-        newRecipient: publicKey,
-        granterPrivateKey: controllerKey.privateKey,
-        currentRecipients: cur.recipients ?? [],
+      const { written, base } = await changeKeyResource(keyStore, (cur) => {
+        if (!cur) throw new Error('grantRecipient: no group key yet (bootstrap the circle first)');
+        if ((cur.recipients ?? []).includes(publicKey)) return null;
+        return grantMember(cur, { newRecipient: publicKey, granterPrivateKey: controllerKey.privateKey, currentRecipients: cur.recipients ?? [] });
       });
-      await keyStore.write(next);
-      await emitKeyEvent(next);
-      return { keyResource: next, granted: true };
+      if (!written) return { keyResource: base, granted: false };
+      await emitKeyEvent(written);
+      return { keyResource: written, granted: true };
     },
 
     /**
@@ -161,22 +192,16 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
      */
     async revokeRecipient({ publicKey, policy = 'ban' } = {}) {
       if (typeof publicKey !== 'string' || !publicKey) throw new Error('revokeRecipient: publicKey required');
-      const cur = await keyStore.read();
-      if (!cur || !(cur.recipients ?? []).includes(publicKey)) {
-        return { keyResource: cur ?? null, rotated: false };
-      }
-      const holders = new Set(cur.recipients ?? []);
-      holders.delete(publicKey);
-      let next = rotateGroupKeyResource({
-        previous: cur,
-        recipients: recipientsWithController([...holders]),
+      const { written, base } = await changeKeyResource(keyStore, (cur) => {
+        if (!cur || !(cur.recipients ?? []).includes(publicKey)) return null;
+        const holders = new Set(cur.recipients ?? []);
+        holders.delete(publicKey);
+        const next = rotateGroupKeyResource({ previous: cur, recipients: recipientsWithController([...holders]) });
+        return policy === 'ban' ? banFromHistory(next, { excludePubKey: publicKey, controllerPrivateKey: controllerKey.privateKey }) : next;
       });
-      if (policy === 'ban') {
-        next = banFromHistory(next, { excludePubKey: publicKey, controllerPrivateKey: controllerKey.privateKey });
-      }
-      await keyStore.write(next);
-      await emitKeyEvent(next);
-      return { keyResource: next, rotated: true };
+      if (!written) return { keyResource: base ?? null, rotated: false };
+      await emitKeyEvent(written);
+      return { keyResource: written, rotated: true };
     },
 
     /**
@@ -200,7 +225,6 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
       await sharing.revoke({ containerUri, agent: aclAgentOf(target), modes });
       delete savedPodAgents[target.webId];
       const remaining = members.filter((x) => x.webId !== target.webId);
-      const cur = await keyStore.read();
       // Rotate to EVERY CURRENT KEY-HOLDER minus the departing member — not to the roster alone.
       //
       // This resource can hold recipients who are NOT roster members: an out-of-circle CANONICAL SHARE
@@ -210,16 +234,12 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
       // fixed in item-store/circleShareEnforcement; this is the third place it appeared, so the rule is:
       // a rotation's audience is derived from the CURRENT HOLDERS minus the departing party, never from the
       // roster alone). `cur.recipients` IS that holder set — every prior rotation already pruned it.
-      const holders = new Set([...(cur?.recipients ?? []), ...remaining.map((x) => x.publicKey)]);
-      holders.delete(target.publicKey);          // the one party this rotation is meant to evict
-      let next = rotateGroupKeyResource({
-        previous: cur,
-        recipients: recipientsWithController([...holders]),
+      const { written: next } = await changeKeyResource(keyStore, (cur) => {
+        const holders = new Set([...(cur?.recipients ?? []), ...remaining.map((x) => x.publicKey)]);
+        holders.delete(target.publicKey);          // the one party this rotation is meant to evict
+        const rotated = rotateGroupKeyResource({ previous: cur, recipients: recipientsWithController([...holders]) });
+        return policy === 'ban' ? banFromHistory(rotated, { excludePubKey: target.publicKey, controllerPrivateKey: controllerKey.privateKey }) : rotated;
       });
-      if (policy === 'ban') {
-        next = banFromHistory(next, { excludePubKey: target.publicKey, controllerPrivateKey: controllerKey.privateKey });
-      }
-      await keyStore.write(next);
       // The rotation as a log key-event: sealed to the REMAINING recipients only, so the departed — absent from
       // it — never folds the new version in and cannot open post-removal content (backward secrecy, no pod).
       await emitKeyEvent(next);

@@ -23,6 +23,7 @@
  */
 import { createCircleSealingIdentity } from './circleSealingIdentity.js';
 import { createCircleControlAgent } from './circleControlAgent.js';
+import { processRefusalLog } from './refusalLog.js';
 
 const SEALED_POSTURES = new Set(['p2', 'p3']);
 
@@ -182,7 +183,7 @@ export async function createCirclePodProducer({
  * @param {(circleId:string) => (object|Promise<object|null>)} getProducer  resolve a circle's producer.
  * @returns {{ addMember: Function, removeMember: Function }}
  */
-export function createCircleControlAgentRouter(getProducer) {
+export function createCircleControlAgentRouter(getProducer, { refusals = null } = {}) {
   // Best-effort, and LOUD when it fails. Sealing degrading gracefully is the intended posture — a
   // membership event must not fail because a circle's pod is unreachable. But this catch sat between
   // the caller and every key operation, so a control-agent that threw looked exactly like one that
@@ -200,6 +201,10 @@ export function createCircleControlAgentRouter(getProducer) {
         `[circlePods] ${what} did not reach circle ${groupId}'s group key → the key audience is unchanged:`,
         err?.message ?? err,
       );
+      // a key change that was NOT made says so in the device's log, with its reason (never an id): another device kept
+      // changing the key, or the roster could not say whether the member is still a member
+      const reason = err?.code === 'KEY_WRITE_CONTENDED' ? 'key-write-contended' : err?.code === 'MEMBER_UNKNOWN' ? 'member-unknown' : null;
+      if (reason) (refusals ?? processRefusalLog()).note({ tag: 'key', lane: 'key', check: String(what).split(' ')[0], reason });
     }
   };
   return {

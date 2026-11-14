@@ -502,7 +502,7 @@ export class PodClient extends Emitter {
     const writeOpts = { ...opts };
     delete writeOpts.conflictPolicy; // not for the source layer
     delete writeOpts._suppressConflictEvent;
-    if (!opts.force && !opts.ifMatch) {
+    if (!opts.force && !opts.ifMatch && !opts.ifNoneMatch) {
       const known = this.#etagMap.get(uri);
       if (known?.etag)              writeOpts.ifMatch         = known.etag;
       else if (known?.lastModified) writeOpts.ifUnmodifiedSince = known.lastModified;

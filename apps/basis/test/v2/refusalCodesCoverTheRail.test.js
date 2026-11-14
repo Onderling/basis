@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { refusalCode, REFUSAL_CODES, DOOR_REFUSAL_CODES } from '../../src/v2/refusalLog.js';
+import { refusalCode, REFUSAL_CODES, DOOR_REFUSAL_CODES, KEY_REFUSAL_CODES } from '../../src/v2/refusalLog.js';
 
 const SOURCE = fileURLToPath(new URL('../../../../packages/core/src/security/spineStatement.js', import.meta.url));
 
@@ -22,7 +22,7 @@ function reasonsInSource() {
 }
 
 // codes the set holds for refusals that do not come from the statement check's reason strings
-const NOT_FROM_THE_STATEMENT_CHECK = new Set(['unverifiable', 'key-not-bound-to-its-member', 'not-allowed-by-the-circle-rule', ...DOOR_REFUSAL_CODES]);
+const NOT_FROM_THE_STATEMENT_CHECK = new Set(['unverifiable', 'key-not-bound-to-its-member', 'not-allowed-by-the-circle-rule', ...DOOR_REFUSAL_CODES, ...KEY_REFUSAL_CODES]);
 
 describe('the refusal codes cover the statement check', () => {
   const reasons = reasonsInSource();

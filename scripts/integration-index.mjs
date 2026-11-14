@@ -33,6 +33,7 @@ export const INTEGRATION_TESTS = [
   { file: 'packages/oidc-session/test/SolidVault.css.test.js',         proves: 'SolidVault Solid-OIDC (DPoP) client-credentials login + authenticated fetch against a real IdP.' },
   { file: 'packages/pod-onboarding/test/resourceUri.css.test.js',      proves: 'The canonical pod storage-layout URIs resolve against a real pod.' },
   { file: 'apps/basis/test/circlePodProducer.css.test.js',            proves: 'Per-circle producer on a real pod: sealed round-trip + roster growth + survives-restart re-hydration (p2/p3).' },
+  { file: 'apps/basis/test/circleKeyFileRace.css.test.js',            proves: 'Two instances of the founder adding members to one circle key file on a real pod at the same moment: every member ends up holding the key (compare-and-swap on the ETag, recompute on a 412).' },
   { file: 'apps/basis/test/circleSealing.css.test.js',                proves: 'Circle group key persists on the pod + sealed content round-trips; leave rotates the key (forward secrecy).' },
   { file: 'apps/basis/test/circlePod2Pod.css.test.js',                proves: 'Cross-pod sealed circle delivery between two separate CSS accounts/pods — a member reads with their OWN auth, so this is also the only proof the circle ACL grant is REAL.', needs: { acp: true } },
   { file: 'apps/basis/test/circlePodGrantToPodWebId.css.test.js',     proves: 'A member named by a roster ref is granted on the pod WebID they joined with: refused before, reads after, refused again when the owner reloads and removes them.', needs: { acp: true } },

@@ -41,6 +41,7 @@ import { flushPendingSaves } from '@onderling/local-store';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
 import { createPeek } from '../../src/v2/circlePeek.js';
+import { myCircleIds } from '../../src/v2/myCircleIds.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
@@ -9858,7 +9859,7 @@ async function boot() {
       if (podChatCatchUpShell && !podReadBackShell) {
         podReadBackShell = createPodReadBack({
           catchUp: podChatCatchUpShell,
-          listCircleIds: async () => ((await rawCallSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean),
+          listCircleIds: () => myCircleIds(rawCallSkill),
         });
         try {
           globalThis.document?.addEventListener?.('visibilitychange', () => {
@@ -10151,8 +10152,7 @@ async function boot() {
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {
-            const r = await rawCallSkill('pinboard', 'listMyCircles', {});
-            const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+            const ids = await myCircleIds(rawCallSkill);
             await podChatCatchUpShell?.catchUpAll(ids);
           } catch { /* best-effort — the next reconnect retries */ }
         })();

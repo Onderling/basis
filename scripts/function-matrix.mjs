@@ -98,6 +98,8 @@ export const FUNCTIONS = Object.freeze([
     // the proposal half; roles, removal and signed reports come with the governance-by-role work
     web: { file: 'apps/basis/test-browser/walk-member-proposes-policy.spec.js', test: 'Save is a proposal; the admin' },
     // the phone as a member: its Save is a proposal, the admin (a real agent on the relay) says yes, the phone holds it
+    // (its admin half: governanceAdmin.test.js, the phone removes a member and that member's device drops the circle; the
+    // REPORT half waits on a surface question: the alpha trims the governance panel, the only place an admin sees a report)
     mobile: { file: 'apps/basis-mobile/e2e/governanceProposal.test.js', test: "Bram, the admin, says yes: the phone holds the circle's new settings" },
     // the box OBEYING the circle (screen-admin-box is the admin's screen, not the box) — Fable 2026-11-10
     box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the box forgets the circle and its record of it goes' },

@@ -194,6 +194,28 @@ if (talk) {
   };
   setInterval(() => { listen().catch((err) => say({ step: 'listen-error', error: String(err?.message ?? err) })); }, 1000);
 
+  // THE GOVERNANCE BINDING THE SHELLS COMPOSE (bindCircleGovernance + the broadcast), over this peer's log: what its
+  // commands decide, vote and report through. Settings changes it enacts are applied over the settings it holds and
+  // stated on the lane as the next version.
+  const merge = (base, patch) => {
+    const out = { ...base };
+    for (const [k, v] of Object.entries(patch ?? {})) out[k] = (v && typeof v === 'object' && !Array.isArray(v) && base?.[k] && typeof base[k] === 'object') ? merge(base[k], v) : v;
+    return out;
+  };
+  const govBinding = () => bindCircleGovernance({
+    eventLog: peer.chatEventLog, callSkill: call, getPolicy: async () => settings.policy, myRef: () => peer.pubKey,
+    genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: makeGovernanceBroadcast(call),
+    circleIdentityFor: peer.agent.circleIdentityFor, agent: peer.agent,
+    setPolicy: async (_cid, patch) => { settings = { ...settings, policy: merge(settings.policy, patch) }; },
+    statePolicy: async (cid, meta = {}) => {
+      const version = settings.version + 1;
+      const st = await peer.agent.emitPolicyUpdate({ groupId: cid, policy: settings.policy, version, ...(meta?.proposalId ? { proposalId: meta.proposalId } : {}) });
+      if (st?.body?.hash) settings = { ...settings, version };
+      return st;
+    },
+    policyVersionOf: async () => settings.version,
+  });
+
   // SPEAKING: one JSON command per stdin line.
   readline.createInterface({ input: process.stdin }).on('line', async (line) => {
     let cmd = null;
@@ -255,24 +277,7 @@ if (talk) {
         // shells compose (signed on this peer's log, fanned to the circle), a yes on the open changePolicy proposal, and
         // the orchestrator enacts it: the patch applied over the settings this peer holds, then stated on the lane
         try {
-        const merge = (base, patch) => {
-          const out = { ...base };
-          for (const [k, v] of Object.entries(patch ?? {})) out[k] = (v && typeof v === 'object' && !Array.isArray(v) && base?.[k] && typeof base[k] === 'object') ? merge(base[k], v) : v;
-          return out;
-        };
-        const gov = bindCircleGovernance({
-          eventLog: peer.chatEventLog, callSkill: call, getPolicy: async () => settings.policy, myRef: () => peer.pubKey,
-          genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: makeGovernanceBroadcast(call),
-          circleIdentityFor: peer.agent.circleIdentityFor, agent: peer.agent,
-          setPolicy: async (_cid, patch) => { settings = { ...settings, policy: merge(settings.policy, patch) }; },
-          statePolicy: async (cid, meta = {}) => {
-            const version = settings.version + 1;
-            const st = await peer.agent.emitPolicyUpdate({ groupId: cid, policy: settings.policy, version, ...(meta?.proposalId ? { proposalId: meta.proposalId } : {}) });
-            if (st?.body?.hash) settings = { ...settings, version };
-            return st;
-          },
-          policyVersionOf: async () => settings.version,
-        });
+        const gov = govBinding();
         // bounded by the clock, not by a count (a view can be slow): the walk waits longer than this, so it always hears
         // which branch it was: no proposal here, or the vote and the tally
         let open = []; let seen = null;
@@ -288,6 +293,22 @@ if (talk) {
         const t = await gov.tally({ circleId: groupId, proposalId: open[0].proposalId });
         say({ step: 'gov-accepted', ok: t?.status === 'approved' && (t.enacted === true || t.closed === true), vote: v, tally: t, version: settings.version, subject: open[0].subject ?? null });
         } catch (err) { say({ step: 'gov-accepted', ok: false, error: String(err?.message ?? err) }); }
+      } else if (cmd.do === 'report-file') {
+        // A MEMBER FILES A REPORT, as the report sheet does: a signed statement on the governance rail, fanned to its
+        // readers only (the circle's admins and the reporter). The target: the circle's other member (the phone).
+        try {
+          const mine = new Set([peer.pubKey, peer.agent.circleSelf?.(groupId)?.webid].filter(Boolean));
+          const other = (await readRoster(peer, groupId)).find((m) => !mine.has(m?.webid ?? m?.pubKey ?? null));
+          const target = other?.webid ?? other?.pubKey ?? null;
+          if (!target) { say({ step: 'report-filed', ok: false, why: 'no other member on the peer\'s roster' }); return; }
+          const r = await govBinding().reports.file({ circleId: groupId, targetType: 'member', targetRef: target, reason: cmd.reason ?? 'walk report' });
+          say({ step: 'report-filed', ok: r?.ok === true, reportId: r?.reportId ?? null, target });
+        } catch (err) { say({ step: 'report-filed', ok: false, error: String(err?.message ?? err) }); }
+      } else if (cmd.do === 'my-circles') {
+        // the circles the peer's own device holds (after a removal, the removed circle is gone from it)
+        const circles = ((await call('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? [])
+          .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+        say({ step: 'my-circles', circles, holds: circles.includes(groupId), circleId: groupId });
       } else if (cmd.do === 'circle-say') {
         const r = await sendCircleChat(peer, { groupId, msgId: `peer-${Date.now().toString(36)}`, text: cmd.text });
         say({ step: 'circle-said', ok: !r?.error, error: r?.error ?? null });

@@ -67,6 +67,13 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
         line.textContent = r.firstLine;
         li.appendChild(line);
       }
+      // what the held messages could not keep (the text cut, a file left off): one plain line each
+      for (const key of r.notes ?? []) {
+        const note = document.createElement('span');
+        note.className = 'cc-requests__note';
+        note.textContent = tr(key);
+        li.appendChild(note);
+      }
       const btns = document.createElement('span');
       btns.className = 'cc-requests__acts';
       const act = (key, labelKey, fn) => {

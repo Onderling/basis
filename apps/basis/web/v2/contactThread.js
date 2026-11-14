@@ -15,6 +15,7 @@ import { sectionsOf } from '../../src/v2/screenSections.js';
 import { buildDeliveryChip } from './circleView.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
+import { heldNoteKey } from '../../src/v2/heldNote.js';
 import { paintFace } from './faceView.js';
 import { buildAttachControl } from './attachControl.js';
 
@@ -232,6 +233,15 @@ export function renderContactThread(container, {
       sys.className = 'cc-cthread__system';
       sys.textContent = tr(markerKey);
       log.appendChild(sys);
+    }
+    // A turn the door held after a refusal says what it could not keep (the text cut, a file left off): one plain line
+    // on that turn, so the person does not take it for the whole message. web≡mobile with ContactThreadScreen.
+    const heldKey = heldNoteKey(m.held);
+    if (heldKey) {
+      const note = document.createElement('div');
+      note.className = 'cc-cthread__system cc-cthread__held';
+      note.textContent = tr(heldKey);
+      log.appendChild(note);
     }
     const row = document.createElement('div');
     const side = m.origin === 'user' ? 'user' : 'bot';

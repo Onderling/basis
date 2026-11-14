@@ -6117,6 +6117,16 @@
       "text": "Blocked on this device",
       "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
     },
+    "held": {
+      "cut": {
+        "text": "This message was too long and was cut short.",
+        "doc": "One plain line on a message held after its text was cut to the request's size bound: the person must not take it for the whole message."
+      },
+      "file": {
+        "text": "A file came with this message and was not kept.",
+        "doc": "One plain line on a message held after the file that came with it was left off (a request keeps no files)."
+      }
+    },
     "requests": {
       "title": {
         "text": "Requests",

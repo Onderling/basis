@@ -114,6 +114,9 @@ export async function createCirclePodProducer({
   sharing,
   bootstrap = true,
   ownsRoot = true,
+  // whether THIS device may establish the circle's first key (`selfMayEstablishKey`: its self is an admin there). Absent:
+  // allowed, as before (a composition that does not say). A member's device never mints a first key of its own.
+  mayEstablish = null,
   keyEventLog = null,
   sealingKeyPair = null,
   controllerKeyPrefix = 'cc.circle-controller-key',
@@ -211,10 +214,16 @@ export async function createCirclePodProducer({
   // (otherwise only the abstract controller key could). Dedupe by publicKey.
   const selfEntry = { webId: `circle:${circleId}:self`, publicKey: selfKey.publicKey, role: 'member' };
   const fullRoster = roster.some((m) => m?.publicKey === selfKey.publicKey) ? roster : [...roster, selfEntry];
+  // ONLY A DEVICE THAT MAY ADMIT ESTABLISHES THE CIRCLE'S FIRST KEY. In a circle without a pod every device 'owns' the
+  // root (its own local store), so a member's producer minted its own first key (at its bootstrap, and in addMember
+  // when its key store was empty) and sealed under it, unreadable to the founder (2026-11-14). A member's device takes
+  // the key from the key log instead (strategyFromKeyLog).
+  let mayMint = true;
+  if (typeof mayEstablish === 'function') { try { mayMint = (await mayEstablish()) === true; } catch { mayMint = false; } }
   const controlAgent = createCircleControlAgent({
     circleId, storagePosture, podClient,
     sharing: sharing ?? memorySharing(),
-    controllerKey, circleRootUri: root, roster: fullRoster, podAgents: savedPodAgents,
+    controllerKey, circleRootUri: root, roster: fullRoster, podAgents: savedPodAgents, mayEstablish: mayMint,
     // No-pod distribution: the control agent fans every versioned key AS a log key-event through this
     // sink (rotation on remove → fanned to the REMAINING members only, backward secrecy). Absent → pod-only.
     keyEventLog,
@@ -237,7 +246,7 @@ export async function createCirclePodProducer({
     try { const raw = await vault.get(groupKeyVaultKey); saved = raw ? JSON.parse(raw) : null; } catch { saved = null; }
     if (saved) { try { await controlAgent.restoreIfEmpty(saved); } catch { /* fresh bootstrap below */ } }
   }
-  if (bootstrap && ownsRoot && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
+  if (bootstrap && ownsRoot && controlAgent && mayMint) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
   return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey, ownsRoot, controllerPublicKey: controllerKey.publicKey, keyHolders };
 }

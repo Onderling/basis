@@ -31,8 +31,8 @@ const keyFanRoster = async (circleId) => {
     return Array.isArray(r?.members) ? r.members : [];
   } catch { return []; }
 };
-import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
-import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
+import { createKeyEventStore, wrapStrategyWithKeyEventFold, strategyFromKeyLog } from '../../../basis/src/v2/keyEventStore.js';
+import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore, selfMayEstablishKey } from '../../../basis/src/v2/keyRail.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, notePodAgentFor, seedCircleRoster, createProducerKeyWait, isSealedPosture, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
@@ -298,6 +298,8 @@ async function buildCirclePod(circleId, policy) {
       // only the pod that holds the circle's root takes access rules from this device (web parity)
       sharing: ownsRoot ? sharing : undefined,
       ownsRoot,
+      // only a device whose self may admit in the circle mints its first key (the key rail's own rule)
+      mayEstablish: () => selfMayEstablishKey({ callSkill: _keyEventWiring?.callSkill, circleId, selfRef: _keyEventWiring?.circleSelfRef?.(circleId) ?? null }),
       // G11 — no-pod key distribution: rotations fan as log key-events (web parity, see makeCircleKeyEventLog).
       keyEventLog: makeCircleKeyEventLog(circleId),
     });
@@ -360,6 +362,11 @@ async function buildCircleSealStrategy(circleId, policy) {
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
       strat = await prod.controlAgent.sealingStrategy(idKey.privateKey);
+      // a MEMBER's device holds no key resource of its own (it may not establish one): its strategy is the key log's,
+      // the founder's key events folded and opened with this device's key pair (null until one reached it)
+      if (!strat && idKey?.privateKey) {
+        strat = strategyFromKeyLog({ events: circleKeyEventStore.list(circleId), groupId: circleId, posture: policy?.storagePosture, privateKey: idKey.privateKey });
+      }
       // G11 — no-pod defence-in-depth: content sealed under a version carried only in the key-event LOG
       // (a rotation fanned to this device) still opens. Shared wrapper; lazy read at open time (web parity).
       if (strat && idKey?.privateKey) {

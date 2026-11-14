@@ -386,8 +386,8 @@ import { createActionFrequencyStore } from '../../src/v2/actionFrequency.js';
 import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
 // No-pod group-key rotation, RECEIVE side: record a fanned key-event into the local per-circle log +
 // fold the recorded events into the key chain on a content read (the counterpart to the key-event log sink).
-import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../src/v2/keyEventStore.js';
-import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../src/v2/keyRail.js';
+import { createKeyEventStore, wrapStrategyWithKeyEventFold, strategyFromKeyLog } from '../../src/v2/keyEventStore.js';
+import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore, selfMayEstablishKey } from '../../src/v2/keyRail.js';
 // OBJ-2 membership — the peer-redeem handshake (joiner ⇄ admin) is shared core; v2 just wires the
 // same three factories the classic shells use (groupRedeem.js) into its peer router + join glue.
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../../src/core/handlers/groupRedeem.js';
@@ -1992,6 +1992,11 @@ async function buildCircleSealStrategy(circleId, policy) {
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
       strat = await prod.controlAgent.sealingStrategy(idKey.privateKey);
+      // a MEMBER's device holds no key resource of its own (it may not establish one): its strategy is the key log's,
+      // the founder's key events folded and opened with this device's key pair (null until one reached it)
+      if (!strat && idKey?.privateKey) {
+        strat = strategyFromKeyLog({ events: circleKeyEventStore.list(circleId), groupId: circleId, posture: policy?.storagePosture, privateKey: idKey.privateKey });
+      }
       // No-pod defence-in-depth: wrap the reader so content sealed under a group-key version carried in the
       // LOG (a key-event fanned to this device, not the pod key resource) still opens. The pod strategy is
       // tried FIRST and unchanged; only on its miss do we trial the chain FOLDED from the recorded key-events,
@@ -2207,6 +2212,8 @@ async function buildCirclePod(circleId, policy) {
       // member's own device would try the founder's pod and be refused
       sharing: ownsRoot ? sharing : undefined,
       ownsRoot,
+      // only a device whose self may admit in the circle mints its first key (the key rail's own rule)
+      mayEstablish: () => selfMayEstablishKey({ callSkill: rawCallSkill, circleId, selfRef: (_peerAgent?.circleSelf?.(circleId)?.webid ?? _peerAgent?.identity?.chat?.pubKey ?? null) }),
       keyEventLog,
     });
     circlePods.set(circleId, producer);

@@ -50,6 +50,7 @@ catalogue baseline until it is.
 ## Decisions that bind this area
 
 - One sealing key family: a member's key is wrapped to the image of their proven per-circle address (2026-09-04).
+- A per-circle address is proven by a signature that names the member (circle, address, member); a copied proof verifies for no one else, the earlier proof is refused, and one address belongs to one member in a circle (2026-11-14).
 
 <!-- catalogue-ops
 pinboard: memberStatus

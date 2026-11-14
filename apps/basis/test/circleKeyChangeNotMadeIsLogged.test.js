@@ -33,7 +33,7 @@ describe('a key change that was not made is logged', () => {
   });
   it('a device enrolment that kept losing the race', async () => {
     const { router, refusals } = routerThrowing(new KeyWriteContendedError(4));
-    await router.grantRecipient({ publicKey: 'pk', groupId: 'c1' });
+    await router.grantRecipient({ publicKey: 'pk', groupId: 'c1', ownerWebId: 'ref:bea' });
     expect(refusals.note).toHaveBeenCalledWith(expect.objectContaining({ check: 'enrolling', reason: 'key-write-contended' }));
   });
   it('any other failure stays a warning only, and no id reaches the refusal log', async () => {

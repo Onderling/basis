@@ -65,6 +65,19 @@ describe('a key grant follows membership', () => {
     expect(opens(await keyFile(), B), 'B kept the key throughout').toBe(true);
   }, 90_000);
 
+  it('a device enrolment with no owner named is refused, unless it is this device\'s own address', async () => {
+    const calls = [];
+    const controlAgent = { grantRecipient: async (a) => { calls.push(a); return { granted: true }; } };
+    const notes = [];
+    const router = createCircleControlAgentRouter(() => ({ controlAgent }), { memberStatusOf: async () => 'in', refusals: { note: (r) => notes.push(r) } });
+    const warn = console.warn; console.warn = () => {};
+    try { await router.grantRecipient({ publicKey: 'pk', groupId: 'g' }); } finally { console.warn = warn; }
+    expect(calls, 'no owner, no flag: nothing enrolled').toEqual([]);
+    expect(notes.map((n) => n.reason)).toEqual(['member-unknown']);
+    await router.grantRecipient({ publicKey: 'own', groupId: 'g', ownDevice: true });
+    expect(calls.map((c) => c.publicKey)).toEqual(['own']);
+  });
+
   it('a status read that cannot answer stops the change: nothing written', async () => {
     const writes = [];
     const controlAgent = { addMember: async ({ isMember }) => { if ((await isMember()) !== true) throw Object.assign(new Error('cannot say'), { code: 'MEMBER_UNKNOWN' }); writes.push(1); } };

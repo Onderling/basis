@@ -54,23 +54,50 @@ export function createCirclePolicyStore({ load, save, versions, marks = null, on
       const policy = withDerivedChatFeature(normalizeCirclePolicy(raw));
       return (await pendingOf(circleId)) ? { ...policy, policyPending: true } : policy;
     },
-    /** A circle this device has just JOINED: its policy is not known until it arrives (`update(…, { seen: true })`). */
+    /**
+     * A circle that has just ARRIVED here (a join, an own device's carry, an enrolment, a restore): its policy is not
+     * known until it arrives (`update(…, { seen: true })`). The arrival step runs again for circles a device already
+     * holds, so a circle whose policy this device has SEEN is never marked again (it would refuse every sealed write
+     * until a statement happened to arrive again). Seen rests on: this run's knowledge; else the stored mark
+     * (`pending: false`); else, when there is no mark at all (the marks store gone), the policy RECORD carrying a
+     * posture: a record is written with one only when the circle was not pending (its creator's, or the arrived policy),
+     * never by a write made while it was pending. A mark that cannot be read: marked (fails closed).
+     */
     async markPending(circleId) {
       if (!marks || !circleId) return;
+      if (inMemory.get(circleId) === false) return;
+      let stored; let unreadable = false;
+      try { stored = await marks.load(circleId); } catch { unreadable = true; }
+      if (!unreadable && stored?.pending === false) { inMemory.set(circleId, false); return; }
+      if (!unreadable && stored == null) {
+        let raw = null;
+        try { raw = load ? await load(circleId) : null; } catch { raw = null; }
+        if (raw && typeof raw === 'object' && typeof raw.storagePosture === 'string') {
+          inMemory.set(circleId, false);
+          try { await marks.save(circleId, { pending: false }); } catch { /* the record still says it on the next start */ }
+          return;
+        }
+      }
       inMemory.set(circleId, true);
       // not written: said, and the circle stays not-known for this run (the mark in memory)
       try { await marks.save(circleId, { pending: true }); } catch (err) { try { said(err?.message ?? String(err)); } catch { /* a report never breaks the join */ } }
     },
     async update(circleId, patch, { seen = false } = {}) {
-      const { policyPending: _pending, ...current } = await this.get(circleId);
+      const { policyPending: pendingNow, ...current } = await this.get(circleId);
       const next = mergeCirclePolicy(current, patch);
+      // a write made while the circle's policy is NOT KNOWN (a joiner's own toggle) stores no posture of its own unless
+      // it names one: the record must never pass for the arrived policy (see `markPending`); a read still answers the
+      // defaults' posture, and the pending mark says it is not known
+      const toSave = (pendingNow === true && !seen && !Object.prototype.hasOwnProperty.call(patch ?? {}, 'storagePosture'))
+        ? (({ storagePosture: _sp, ...rest }) => rest)(next)
+        : next;
       // γ.2 — capture BEFORE save.  Capture failures must not break the
       // write; the adapter swallows internally but defensive try here
       // in case of a malformed external adapter.
       if (versions && typeof versions.capture === 'function') {
         try { await versions.capture(circleId, next); } catch { /* capture is best-effort */ }
       }
-      if (save) await save(circleId, next);
+      if (save) await save(circleId, toSave);
       // the circle's own policy arrived (the policy lane, the join's reply): its posture is known from here on
       if (seen && marks) {
         inMemory.set(circleId, false);

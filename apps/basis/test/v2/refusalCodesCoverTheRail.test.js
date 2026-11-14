@@ -22,7 +22,7 @@ function reasonsInSource() {
 }
 
 // codes the set holds for refusals that do not come from the statement check's reason strings
-const NOT_FROM_THE_STATEMENT_CHECK = new Set(['unverifiable', 'key-not-bound-to-its-member', 'not-allowed-by-the-circle-rule', ...DOOR_REFUSAL_CODES, ...KEY_REFUSAL_CODES]);
+const NOT_FROM_THE_STATEMENT_CHECK = new Set(['unverifiable', 'key-not-bound-to-its-member', 'not-allowed-by-the-circle-rule', 'no-sealing-key-pair', ...DOOR_REFUSAL_CODES, ...KEY_REFUSAL_CODES]);
 
 describe('the refusal codes cover the statement check', () => {
   const reasons = reasonsInSource();

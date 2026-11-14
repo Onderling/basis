@@ -6307,6 +6307,14 @@
       "text": "Posted.",
       "doc": "S1 — toast after a post is created."
     },
+    "key_not_ready": {
+      "text": "This circle's key is not on this device yet. Try again in a moment.",
+      "doc": "Shown when a write into a sealed circle is refused because this device cannot seal for it yet (its key pair or the circle's policy is not there yet): nothing was written in the clear. Wording Frits's."
+    },
+    "media_unavailable": {
+      "text": "Pictures cannot be sealed for this circle on this device yet.",
+      "doc": "Shown when a post with a picture is refused because the circle's sealed-media gateway is not there: no picture goes out unsealed."
+    },
     "post_failed": {
       "text": "Couldn’t post — try again.",
       "doc": "S1 — shown when postRequest fails."

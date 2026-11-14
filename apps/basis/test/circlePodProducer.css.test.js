@@ -14,6 +14,7 @@
  *   npx vitest run test/circlePodProducer.css.test.js
  */
 import { describe, it, expect, beforeAll } from 'vitest';
+import { produceWithPair } from './support/deviceSealingKeyPair.js';
 
 const CSS_URL = process.env.CSS_URL;
 const HAVE_OIDC = !!(process.env.CSS_CLIENT_ID && process.env.CSS_CLIENT_SECRET);
@@ -59,7 +60,7 @@ SUITE('per-circle producer — real-pod routing (CSS)', () => {
     const vault = new MemVault();
     const bob = generateKeypair();
 
-    const prod = await createCirclePodProducer({
+    const prod = await produceWithPair({
       circleId, storagePosture: 'p2', vault,
       generateKeypair,
       makePodClient: () => podClient,                  // route to the REAL pod
@@ -95,7 +96,7 @@ SUITE('per-circle producer — real-pod routing (CSS)', () => {
     const vault = new MemVault();
     const outsider = generateKeypair();
 
-    const prod = await createCirclePodProducer({
+    const prod = await produceWithPair({
       circleId, storagePosture: 'p3', vault,
       generateKeypair,
       makePodClient: () => podClient,
@@ -140,7 +141,7 @@ SUITE('per-circle producer — real-pod routing (CSS)', () => {
 
     // --- session 1: bootstrap the circle + seal an item onto the real pod ---
     const podA = await makeRealPodClient();
-    const prodA = await createCirclePodProducer({
+    const prodA = await produceWithPair({
       circleId, storagePosture: 'p3', vault, generateKeypair,
       makePodClient: () => podA, circleRootUri: rootUri,
     });
@@ -153,7 +154,7 @@ SUITE('per-circle producer — real-pod routing (CSS)', () => {
 
     // --- the "restart": a brand-new producer + fresh pod client, SAME persistent vault ---
     const podB = await makeRealPodClient();
-    const prodB = await createCirclePodProducer({
+    const prodB = await produceWithPair({
       circleId, storagePosture: 'p3', vault, generateKeypair,   // SAME vault → controller key + identity re-hydrate
       makePodClient: () => podB, circleRootUri: rootUri,
     });

@@ -76,6 +76,7 @@ import {
 // implementation, called by web (circleApp) and the mobile launcher too.
 import { feedHouseholdRoster } from '../../../basis/src/v2/householdRosterPairing.js';
 import { composePhonePodReadBack } from '../core/phonePodReadBack.js';
+import { myCircleIds } from '../../../basis/src/v2/myCircleIds.js';
 import { computeEmbedButtons } from '../../../basis/src/core/embedButtons.js';
 import { embedButtonText } from '../../../basis/src/v2/replyEmbeds.js';
 import { makeCalendarOutboundHook }
@@ -533,9 +534,7 @@ export default function ChatScreen({
       globalThis.__onderlingPodChatCatchUpKicked = true;
       setTimeout(async () => {
         try {
-          const r = await bundle.callSkill('pinboard', 'listMyCircles', {});
-          const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
-          await podChatCatchUp.catchUpAll(ids);
+          await podChatCatchUp.catchUpAll(await myCircleIds(bundle.callSkill));
         } catch { /* best-effort — the next launch retries */ }
       }, 4000);
     }
@@ -551,9 +550,7 @@ export default function ChatScreen({
       wireBackgroundSync({
         runOnce: async () => {
           try {
-            const r = await bundle.callSkill('pinboard', 'listMyCircles', {});
-            const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
-            if (podChatCatchUp) await podChatCatchUp.catchUpAll(ids);
+            if (podChatCatchUp) await podChatCatchUp.catchUpAll(await myCircleIds(bundle.callSkill));
             if (chatCatchUp) await chatCatchUp.requestAll({ callSkill: bundle.callSkill });
           } catch { /* a background slot is best-effort; the next slot retries */ }
         },

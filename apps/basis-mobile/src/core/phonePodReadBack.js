@@ -5,6 +5,7 @@
  * builds the same one, so a story's "the phone comes back to the front" goes through this entry.
  */
 import { createPodReadBack } from '../../../basis/src/v2/podReadBack.js';
+import { myCircleIds } from '../../../basis/src/v2/myCircleIds.js';
 
 /**
  * @param {{ podChatCatchUp: object|null, callSkill: Function }} a
@@ -14,6 +15,6 @@ export function composePhonePodReadBack({ podChatCatchUp, callSkill }) {
   if (!podChatCatchUp || typeof callSkill !== 'function') return null;
   return createPodReadBack({
     catchUp: podChatCatchUp,
-    listCircleIds: async () => ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean),
+    listCircleIds: () => myCircleIds(callSkill),
   });
 }

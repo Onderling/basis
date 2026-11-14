@@ -4,7 +4,7 @@
  */
 import { feedbackLink } from './feedbackContact.js';
 import { parsePairingOffer } from './connectionPairing.js';
-import { screenLabel } from './botScreens.js';
+import { screenLabel } from './screenDoor.js';
 import { personNamed, linkedKeyOf } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';

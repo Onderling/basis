@@ -9,6 +9,7 @@ import { test, expect } from '@playwright/test';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { encodePairingOffer } from '../src/v2/connectionPairing.js';
+import { screenCode } from '../src/v2/screenDoor.js';
 
 test.setTimeout(150_000);
 
@@ -31,6 +32,8 @@ test('a device with two selves pairs a screen as the self chosen in the form', a
 
   const view = await AgentIdentity.generate(new VaultMemory());
   await form.locator('.cc-mydata__connection-offer').fill(encodePairingOffer({ viewPubKey: view.pubKey, nonce: 'n-spec', label: 'werkscherm' }));
+  // the screen door: the person picks, from three, the code their screen shows (only then the ticks)
+  await form.locator(`.cc-mydata__connection-code[data-code="${await screenCode(view.pubKey, 'n-spec')}"]`).click();
   // the form asks which self the screen is for
   const self = form.locator('.cc-mydata__connection-self');
   await expect(self, 'the form asks which self the screen is for').toBeVisible({ timeout: 10_000 });

@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { createBotScreens } from '../src/v2/botScreens.js';
 import { verifyTelegramLaunch, telegramLaunchHash, launchDataFrom } from '../src/v2/telegramLaunch.js';
-import { screenCode } from '../src/v2/botScreens.js';
+import { screenCode } from '../src/v2/screenDoor.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 import { EventLog } from '../src/eventLog.js';
 

@@ -10,7 +10,8 @@ import { createTelegramRunner } from '../src/telegram/runner.js';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
-import { createBotScreens, parseScreenLink, screenCode } from '../src/v2/botScreens.js';
+import { createBotScreens, parseScreenLink } from '../src/v2/botScreens.js';
+import { screenCode } from '../src/v2/screenDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { EventLog } from '../src/eventLog.js';
 

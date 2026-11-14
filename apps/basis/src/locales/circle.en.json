@@ -7099,6 +7099,54 @@
       "text": "This pairing code is incomplete.",
       "doc": "Refusal: key or nonce missing."
     },
+    "connection_pick_code": {
+      "text": "Which code does the other screen show? Pick that one.",
+      "doc": "The screen door: three codes, the person picks the one their screen shows (before any tick)."
+    },
+    "connection_none_of_these": {
+      "text": "None of these",
+      "doc": "The screen door: the code on my screen is not among the three (nothing is connected)."
+    },
+    "connection_scan": {
+      "text": "Scan the code on the screen",
+      "doc": "Phone: opens the camera to read the pairing code the other screen shows."
+    },
+    "connection_offer_pairing-not-an-offer": {
+      "text": "This pairing code is incomplete.",
+      "doc": "Refusal (screen door): no key or nonce in the offer."
+    },
+    "connection_offer_pairing-other-relay": {
+      "text": "That screen waits on another relay than this device, so it cannot be connected from here.",
+      "doc": "Refusal (screen door): the offer's relay is not one this device is on (the grant could never reach it)."
+    },
+    "connection_offer_pairing-nonce-replayed": {
+      "text": "This pairing code was already used. Make a new one on the screen.",
+      "doc": "Refusal (screen door): an offer whose nonce was already granted here."
+    },
+    "connection_offer_pairing-nothing-pending": {
+      "text": "Paste the pairing code again.",
+      "doc": "Refusal (screen door): a pick with no offer waiting."
+    },
+    "connection_offer_pairing-expired": {
+      "text": "Too late. Make a new pairing code on the screen.",
+      "doc": "Refusal (screen door): the pick came after the offer's lifetime."
+    },
+    "connection_offer_pairing-wrong-code": {
+      "text": "That is not the code on your screen, so nothing was connected. Make a new pairing code on the screen.",
+      "doc": "Refusal (screen door): the picked code is not the screen's (or 'none of these'); the offer is gone."
+    },
+    "connection_offer_pairing-no-pick": {
+      "text": "Pick the code your screen shows first.",
+      "doc": "Refusal: a grant asked for before the right pick."
+    },
+    "connection_offer_nothing-picked": {
+      "text": "Tick at least one thing it may see or do.",
+      "doc": "Refusal: the ticks grant nothing."
+    },
+    "connection_offer_grant-failed": {
+      "text": "Connecting did not work. Try again.",
+      "doc": "Refusal: the grant op failed."
+    },
     "mnemonic_written": {
       "text": "Written down",
       "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."

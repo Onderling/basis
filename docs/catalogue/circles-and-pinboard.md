@@ -30,13 +30,15 @@ catalogue baseline until it is.
 - **The audience round** (`apps/basis/src/v2/keyAudienceCheck.js`, `runKeyAudienceCheck`): on the KEY OWNER's device only
   (the producer that holds the circle's root), after the producer's roster seed and after each membership event the
   router handles. A holder the membership lane places out whose removal never reached the key file (a crash, a device
-  offline, a member another instance admitted) is revoked with a ban, one per round. The controller and the device's
-  own key are kept; every other recipient is asked about through `pinboard` op `keyHoldersStatus {groupId, keys}`, which
-  maps a key to people only by this device's VERIFIED addresses (the redemption rows' proven primary address and the
-  proof-carrying pairs an announcement added, kept after an exit) and asks `memberStatus` for each. In, unmapped and
-  cannot-place are kept and counted; a read that fails revokes nothing that round; a key that maps to several people
-  is kept unless every one of them is out. A recipient-sealed (p3) circle is skipped out loud: its outside grantees
-  have no record. The round's line carries counts only.
+  offline) is revoked with a ban, one per round, and the lane is asked again inside the write. Who a key belongs to
+  comes ONLY from this device's grant notes (the producer's `keyHolders`, in its vault beside the pod-agents note, never
+  on the pod, the roster or the lane): written when this device's grant ADDED the key (a join, or a device enrolled with
+  its owner named), never when the key was already a recipient, never re-attributed, removed by this device's revoke.
+  An address on a roster row is not used: a link proof does not bind a person. The controller and the device's own key
+  are kept; a key no grant here noted ('unmapped': a holder another instance granted) and one it cannot place are kept
+  and counted; a read that fails revokes nothing. A recipient-sealed (p3) circle is skipped out loud, once per circle
+  per start. The round's line carries counts only. Holders another instance granted wait for a link proof that binds
+  the person.
 - **Re-driven by**: the roster seed at the next producer start (`seedCircleRoster`), which grants every member on the
   roster by their last join, so a grant that failed after the join stood is made then.
 
@@ -48,11 +50,10 @@ catalogue baseline until it is.
 - `packages/core/test/causalPlace.test.js`: after / before / concurrent / not held, and the fold's last exit and join
   by statement.
 - `apps/basis/test/sharedPodJoinerOpensKey.relay.test.js`: through the app's join, the joiner opens the stored key.
-- `apps/basis/test/keyAudienceCheck.relay.test.js`: a lost removal taken out by the round, a member keeping the key, a
-  key nobody can name kept and counted; a member this instance never knew (removeMember there: removed:false) taken out
-  by the round the router runs after the event. `keyAudienceCheck.test.js`: one rotation per round, counts, a failed
-  read revokes nothing, p3 said once, a non-owner does nothing. `apps/pinboard/test/keyHoldersFromRedemptions.test.js`:
-  devices and former members map, unproven pairs do not.
+- `apps/basis/test/keyAudienceCheck.relay.test.js`: a lost removal and the removed member's device taken out, one per
+  round; a member keeping the key; an unnoted key kept and counted; a holder another instance granted kept and counted;
+  a grant that finds the key already there leaves no note. `keyAudienceCheck.test.js`: one rotation per round, the
+  status asked again inside the write, counts, a failed read revokes nothing, p3 said once, a non-owner does nothing.
 
 ## Decided, not built
 
@@ -68,5 +69,5 @@ catalogue baseline until it is.
 - One sealing key family: a member's key is wrapped to the image of their proven per-circle address (2026-09-04).
 
 <!-- catalogue-ops
-pinboard: memberStatus keyHoldersStatus
+pinboard: memberStatus
 -->

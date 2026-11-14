@@ -185,6 +185,23 @@ export async function createCirclePodProducer({
   // The pod WebIDs members gave at redemption (roster ref → WebID): kept on THIS device only, never on the roster or
   // the pod, so the next boot's roster seed grants and later revokes the identity a member's pod session holds.
   const podAgentsVaultKey = `${groupKeyPrefix}:pod-agents:${circleId}`;
+  // WHO EACH KEY WAS GRANTED FOR, by THIS device (the audience round's only source): written when this device's grant
+  // ADDED the key to the file, never when the key was already a recipient (so presenting someone else's address finds
+  // the key there and leaves no note); the first note for a key stands; this device's revoke removes it. Beside the
+  // pod-agents note: this device only, never on the pod, the roster or the lane.
+  const holderNotesVaultKey = `${groupKeyPrefix}:key-holders:${circleId}`;
+  let holderNotes = {};
+  try { const raw = await vault.get(holderNotesVaultKey); if (raw) holderNotes = JSON.parse(raw) ?? {}; } catch { holderNotes = {}; }
+  const saveHolderNotes = async () => { try { await vault.set(holderNotesVaultKey, JSON.stringify(holderNotes)); } catch { /* best-effort */ } };
+  const keyHolders = {
+    of: (key) => (typeof holderNotes[key] === 'string' ? holderNotes[key] : null),
+    async note(key, person) {
+      if (typeof key !== 'string' || !key || typeof person !== 'string' || !person || holderNotes[key]) return false;
+      holderNotes[key] = person; await saveHolderNotes(); return true;
+    },
+    async forget(key) { if (!(key in holderNotes)) return false; delete holderNotes[key]; await saveHolderNotes(); return true; },
+    forgetPerson: async (person) => { let n = 0; for (const [k, p] of Object.entries(holderNotes)) if (p === person) { delete holderNotes[k]; n += 1; } if (n) await saveHolderNotes(); return n; },
+  };
   let savedPodAgents = {};
   try { const raw = await vault.get(podAgentsVaultKey); if (raw) savedPodAgents = JSON.parse(raw) ?? {}; } catch { savedPodAgents = {}; }
 
@@ -221,7 +238,7 @@ export async function createCirclePodProducer({
   }
   if (bootstrap && ownsRoot && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
-  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey, ownsRoot, controllerPublicKey: controllerKey.publicKey };
+  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey, ownsRoot, controllerPublicKey: controllerKey.publicKey, keyHolders };
 }
 
 /**
@@ -275,11 +292,19 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null, m
       const isMember = typeof memberStatusOf === 'function'
         ? async () => { const st = await memberStatusOf(groupId, webId, admittedBy); return st === 'in' ? true : st === 'out' ? false : null; }
         : null;
-      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role, podAgent, isMember }), `granting ${webId}`);
+      await route(groupId, async (ca) => {
+        const out = await ca.addMember({ webId, publicKey, role, podAgent, isMember });
+        if (out?.added) { const prod = await getProducer(groupId); await prod?.keyHolders?.note?.(publicKey, webId); }
+        return out;
+      }, `granting ${webId}`);
     },
     async removeMember({ webId, force, policy, groupId }) {
       if (!webId) return;
-      await route(groupId, (ca) => ca.removeMember({ webId, force, policy }), `revoking ${webId}`);
+      await route(groupId, async (ca) => {
+        const out = await ca.removeMember({ webId, force, policy });
+        if (out?.removed) { const prod = await getProducer(groupId); await prod?.keyHolders?.forgetPerson?.(webId); }
+        return out;
+      }, `revoking ${webId}`);
     },
     // Device-grained audience surgery (the custody arc): the member stays; one of their devices'
     // sealing keys joins or leaves the group key's audience.
@@ -296,11 +321,19 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null, m
       const isMember = (typeof memberStatusOf === 'function' && ownerWebId)
         ? async () => { const st = await memberStatusOf(groupId, ownerWebId, null); return st === 'in' ? true : st === 'out' ? false : null; }
         : null;
-      return route(groupId, (ca) => ca.grantRecipient?.({ publicKey, isMember }), 'enrolling a device');
+      return route(groupId, async (ca) => {
+        const out = await ca.grantRecipient?.({ publicKey, isMember });
+        if (out?.granted && ownerWebId) { const prod = await getProducer(groupId); await prod?.keyHolders?.note?.(publicKey, ownerWebId); }
+        return out;
+      }, 'enrolling a device');
     },
     async revokeRecipient({ publicKey, policy, groupId }) {
       if (!publicKey) return;
-      return route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }), 'revoking a device');
+      return route(groupId, async (ca) => {
+        const out = await ca.revokeRecipient?.({ publicKey, policy });
+        if (out?.rotated) { const prod = await getProducer(groupId); await prod?.keyHolders?.forget?.(publicKey); }
+        return out;
+      }, 'revoking a device');
     },
   };
 }

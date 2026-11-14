@@ -13,7 +13,7 @@
  * in-memory here (session-scoped, like the per-circle pseudo-pod); durability across reloads is a later step that
  * swaps this Map for a vault-/log-backed implementation behind the same interface.
  */
-import { KEY_EVENT_KIND, readKeyChain, openAcrossKeyChain, makeOpener, collapseKeyEvents } from '@onderling/pod-client';
+import { KEY_EVENT_KIND, readKeyChain, openAcrossKeyChain, makeOpener, collapseKeyEvents, foldKeyEvents, resolveCircleStorage } from '@onderling/pod-client';
 
 /** Group a key-event with no explicit groupId under one bucket, so a store used for a single unnamed circle still works. */
 const NO_GROUP = '\u0000nogroup';
@@ -140,4 +140,22 @@ export function wrapStrategyWithKeyEventFold(strat, { listEvents, groupId, priva
       }
     },
   };
+}
+
+/**
+ * A MEMBER'S STRATEGY FROM THE KEY LOG. A device that may not establish a circle's first key (only a device whose
+ * self may admit does) holds no key resource of its own in a circle without a pod; what it holds is the key log: the
+ * founder's key events, each wrapping the group key to the members. Folded (`foldKeyEvents`) they ARE a key resource,
+ * so the strategy is the one the control agent builds over its key store (`resolveCircleStorage`): it seals under the
+ * current version and opens every version this device was given. Null while no key event reached this device: its
+ * scoped writes are then refused ('sealed-circle-key-not-ready'), never sealed under a key of its own making.
+ * @param {{ events: object[], groupId: string, posture: string, privateKey: string }} a
+ */
+export function strategyFromKeyLog({ events, groupId, posture, privateKey }) {
+  // p2 only: a p3 circle seals to the roster's keys, not under a group key (the control agent's own path)
+  if (!Array.isArray(events) || !events.length || !privateKey || posture !== 'p2') return null;
+  let resource = null;
+  try { resource = foldKeyEvents(events, { groupId }); } catch { resource = null; }
+  if (!resource) return null;
+  try { return resolveCircleStorage({ posture, resource, privateKey }); } catch { return null; }
 }

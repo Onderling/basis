@@ -24,7 +24,6 @@ const HAVE = !!(CSS_URL && process.env.CSS_A_CLIENT_ID && process.env.CSS_A_CLIE
   && process.env.CSS_B_CLIENT_ID && process.env.CSS_B_CLIENT_SECRET && process.env.CSS_B_WEBID);
 const SUITE = HAVE ? describe : describe.skip;
 
-const CIRCLE = 'pod-sync-phone';
 const TEXT = 'de sleutel ligt onder de mat';
 
 /** A client-credentials bearer token from the CSS: what the app's session holds after a sign-in. */
@@ -54,62 +53,78 @@ async function signedIn(node, who) {
 }
 const chatIn = (node) => node.eventLog.query({}).map((e) => e?.payload?.text ?? e?.payload?.payload?.text ?? null).filter(Boolean);
 
-SUITE('syncing through a pod, on the phone', () => {
+/** The walk: Anna's phone founds a shared-pod circle, Bram's joins, Bram goes away, Anna posts and stops, the relay goes,
+ *  Bram comes back to the front and must hold the post read from the pod. `openBeforeJoin`: whether Anna's circle view
+ *  was open (its pod producer built) when she admitted Bram. */
+async function walk({ circle, openBeforeJoin }) {
   let relay; let anna; let bram;
-  afterAll(async () => {
+  try {
+      relay = await startJourneyRelay();
+      anna = await bootMobileNode({ name: 'anna', relayUrl: relay.url });
+      bram = await bootMobileNode({ name: 'bram', relayUrl: relay.url });
+      // the join wizard's seams as the launcher hands them: the phone's own peer redeem and post-join step
+      bram.sendPeerRedeem = bram.bundle.sendPeerRedeem;
+      bram.onJoined = bram.bundle.onCircleJoined;
+      await signedIn(anna, 'A');
+      await signedIn(bram, 'B');
+
+      const { created, state: made } = await createCircle(anna, { groupId: circle, name: 'Pod samen', storage: 'shared', groupPodUri: `${process.env.CSS_A_WEBID.replace(/profile\/card#me$/, '')}circles/${circle}/`, handle: 'anna' });
+      // …and what the phone's create wizard does next: the chosen policy into the phone's own policy store
+      await anna.persistPolicy(circle, policyPatchFromState(made));
+      // the launcher shows the new circle: its view builds the circle's pod producer before anyone is invited (or, the
+      // founder's app restarted and has not opened the circle since, it is opened only after the admission)
+      if (openBeforeJoin) await anna.openCircle(circle);
+      const joined = await joinExistingCircle(anna, bram, { groupId: circle, handle: 'bram', podUrl: created?.storage?.groupPodUri ?? null });
+      expect(joined.joined?.ok, `Bram's phone joined: ${JSON.stringify(joined.joined)}`).toBe(true);
+      await anna.bundle.registerCirclePresence?.([circle]);
+      if (!openBeforeJoin) await anna.openCircle(circle);
+      // the circle's pod policy reaches the joiner by its post-join governance pull
+      expect(await until(async () => (await bram.policyOf(circle))?.pod === 'shared', { timeout: 30_000, step: 500 }), 'Bram\'s phone holds the circle as a shared-pod circle').toBe(true);
+      // …and the newcomer holds the others' per-circle addresses (the presence signal after the join clears the early sends)
+      const annaRow = async () => ((await bram.callSkill('pinboard', 'listGroupMembers', { groupId: circle }))?.members ?? [])
+        .find((m) => m?.webid && m.webid !== bram.agent.circleSelf?.(circle)?.webid && m.webid !== bram.pubKey && m.circleAddress);
+      expect(await until(annaRow, { timeout: 30_000, step: 500 }), 'Bram\'s phone holds Anna\'s per-circle address').toBeTruthy();
+
+      // Bram away: his phone off the relay (its socket removed, as when the app is closed)
+      await bram.agent.relays.remove(relay.url);
+      expect((bram.agent.relays.list() ?? []).some((x) => x.url === relay.url && x.connected), 'Bram is off the relay').toBe(false);
+      // Anna posts as the circle screen does (CircleLauncherScreen: appendCircleMessage + broadcastFanOut): the line on
+      // her event log, then the shared fan-out over the phone's waist, the chat rail signing the entry
+      // a pod write logged after the send (the log line starts with its epoch ms; the ring buffer keeps the latest lines)
+      const sentAt = Date.now();
+      const wroteAfterSend = () => anna.copyLog().split('\n').some((l) => /pod\/pod\.write/.test(l) && Number(l.trim().split(/\s+/)[0]) >= sentAt);
+      const msgId = `circle-${circle}-${Date.now()}-pod`;
+      const ts = Date.now();
+      anna.eventLog.append(circleChatMessageEvent({ msgId, ts, circleId: circle, actor: 'me', text: TEXT }));
+      broadcastCircleFanOut({
+        rawCallSkill: anna.bundle.callSkill, circleId: circle, msgId, text: TEXT, ts,
+        deliveryStateMap: anna.deliveryMap, onChange: () => {},
+        signStatement: (cid, mid) => anna.bundle.agent?.chatRail?.signEntry?.(cid, mid) ?? null,
+      });
+      expect(await until(() => wroteAfterSend(), { timeout: 20_000, step: 250 }), 'Anna\'s post was written to the circle\'s pod').toBe(true);
+      // Anna stops, and the relay is gone: nothing Bram reads now can come from either
+      await anna.dispose();
+      anna = null;
+      await relay.close();
+
+      // Bram comes back to the front: the app's own entry (ChatScreen's pod read-back, AppState 'active')
+      const r = await bram.comeToFront();
+      expect(r?.ingested, `the read-back read the post from the pod: ${JSON.stringify(r)}`).toBeGreaterThan(0);
+      expect(chatIn(bram), 'Bram\'s phone holds Anna\'s post').toContain(TEXT);
+  } finally {
     for (const n of [anna, bram]) { try { await n?.dispose?.(); } catch { /* */ } }
     try { await relay?.close?.(); } catch { /* */ }
-  });
+  }
+}
 
+SUITE('syncing through a pod, on the phone', () => {
   it('Bram, away while Anna posted, comes back to the front with no relay and reads the post from the pod', async () => {
-    relay = await startJourneyRelay();
-    anna = await bootMobileNode({ name: 'anna', relayUrl: relay.url });
-    bram = await bootMobileNode({ name: 'bram', relayUrl: relay.url });
-    // the join wizard's seams as the launcher hands them: the phone's own peer redeem and post-join step
-    bram.sendPeerRedeem = bram.bundle.sendPeerRedeem;
-    bram.onJoined = bram.bundle.onCircleJoined;
-    await signedIn(anna, 'A');
-    await signedIn(bram, 'B');
+    await walk({ circle: 'pod-sync-phone', openBeforeJoin: true });
+  }, 240_000);
 
-    const { created, state: made } = await createCircle(anna, { groupId: CIRCLE, name: 'Pod samen', storage: 'shared', groupPodUri: `${process.env.CSS_A_WEBID.replace(/profile\/card#me$/, '')}circles/${CIRCLE}/`, handle: 'anna' });
-    // …and what the phone's create wizard does next: the chosen policy into the phone's own policy store
-    await anna.persistPolicy(CIRCLE, policyPatchFromState(made));
-    // the launcher shows the new circle: its view builds the circle's pod producer before anyone is invited
-    await anna.openCircle(CIRCLE);
-    const joined = await joinExistingCircle(anna, bram, { groupId: CIRCLE, handle: 'bram', podUrl: created?.storage?.groupPodUri ?? null });
-    expect(joined.joined?.ok, `Bram's phone joined: ${JSON.stringify(joined.joined)}`).toBe(true);
-    await anna.bundle.registerCirclePresence?.([CIRCLE]);
-    // the circle's pod policy reaches the joiner by its post-join governance pull
-    expect(await until(async () => (await bram.policyOf(CIRCLE))?.pod === 'shared', { timeout: 30_000, step: 500 }), 'Bram\'s phone holds the circle as a shared-pod circle').toBe(true);
-    // …and the newcomer holds the others' per-circle addresses (the presence signal after the join clears the early sends)
-    const annaRow = async () => ((await bram.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [])
-      .find((m) => m?.webid && m.webid !== bram.agent.circleSelf?.(CIRCLE)?.webid && m.webid !== bram.pubKey && m.circleAddress);
-    expect(await until(annaRow, { timeout: 30_000, step: 500 }), 'Bram\'s phone holds Anna\'s per-circle address').toBeTruthy();
-
-    // Bram away: his phone off the relay (its socket removed, as when the app is closed)
-    await bram.agent.relays.remove(relay.url);
-    expect((bram.agent.relays.list() ?? []).some((x) => x.url === relay.url && x.connected), 'Bram is off the relay').toBe(false);
-    // Anna posts as the circle screen does (CircleLauncherScreen: appendCircleMessage + broadcastFanOut): the line on
-    // her event log, then the shared fan-out over the phone's waist, the chat rail signing the entry
-    const podWrites = () => anna.copyLog().split('\n').filter((l) => /pod\/pod\.write/.test(l)).length;
-    const writesBefore = podWrites();
-    const msgId = `circle-${CIRCLE}-${Date.now()}-pod`;
-    const ts = Date.now();
-    anna.eventLog.append(circleChatMessageEvent({ msgId, ts, circleId: CIRCLE, actor: 'me', text: TEXT }));
-    broadcastCircleFanOut({
-      rawCallSkill: anna.bundle.callSkill, circleId: CIRCLE, msgId, text: TEXT, ts,
-      deliveryStateMap: anna.deliveryMap, onChange: () => {},
-      signStatement: (cid, mid) => anna.bundle.agent?.chatRail?.signEntry?.(cid, mid) ?? null,
-    });
-    expect(await until(() => podWrites() > writesBefore, { timeout: 20_000, step: 250 }), 'Anna\'s post was written to the circle\'s pod').toBe(true);
-    // Anna stops, and the relay is gone: nothing Bram reads now can come from either
-    await anna.dispose();
-    anna = null;
-    await relay.close();
-
-    // Bram comes back to the front: the app's own entry (ChatScreen's pod read-back, AppState 'active')
-    const r = await bram.comeToFront();
-    expect(r?.ingested, `the read-back read the post from the pod: ${JSON.stringify(r)}`).toBeGreaterThan(0);
-    expect(chatIn(bram), 'Bram\'s phone holds Anna\'s post').toContain(TEXT);
+  // An admission on the key owner's device before its producer is built (the circle not opened since a restart) must
+  // still grant the joiner's pod: the grant does not route to nothing, the pod WebID is not lost.
+  it('Anna admitted Bram before her phone had opened the circle: Bram still reads the post from the pod', async () => {
+    await walk({ circle: 'pod-sync-phone-late', openBeforeJoin: false });
   }, 240_000);
 });

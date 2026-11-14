@@ -46,6 +46,8 @@ export function createCircleControlAgent({
   roster = [],
   keyEventLog = null,
   podAgents = {},
+  // whether this device may establish the circle's first key (only a device whose self may admit)
+  mayEstablish = true,
 } = {}) {
   if (!circleId) throw new Error('createCircleControlAgent: circleId is required');
   if (!SEALED_POSTURES.has(storagePosture)) return null;   // p0/p1 → no sealing, no control agent
@@ -71,6 +73,7 @@ export function createCircleControlAgent({
     keyEventLog,
     groupId: circleId,
     podAgents,
+    mayEstablish,
   });
 
   return {

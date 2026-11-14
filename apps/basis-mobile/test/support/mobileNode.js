@@ -77,15 +77,26 @@ const until = async (pred, { timeoutMs, what }) => {
  *   `contactReplies` (the contact-thread inbox), `mainBubbles` (calendar lines), `unrouted` (envelopes the router
  *   handed to the default handler), `catchUpOffers` (the consent question; allowed by default, as a tap would).
  */
-export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000, nknLib = liveNknStub() }) {
+export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000, nknLib = liveNknStub(), restoreFrom = null }) {
   if (!name || !relayUrl) throw new Error('bootMobileNode: name and relayUrl are required');
   vi.resetModules();
   const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+  // A RESTART: what the same phone held on its disk, put back before anything boots (`node.snapshot()` before its
+  // dispose). Everything a phone keeps across launches lives in these two stores here.
+  const fsStub = await import('expo-file-system');
+  const { flushPendingSaves } = await import('@onderling/local-store');
+  if (restoreFrom) {
+    await AsyncStorage.multiSet(restoreFrom.asyncStorage ?? []);
+    fsStub.__load?.(restoreFrom.files ?? []);
+  }
   const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
   const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
   const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
   const { attachPinboardPodFor, circlePodWriterFor } = await import('../../src/core/phonePodSession.js');
   const { composePhonePodReadBack } = await import('../../src/core/phonePodReadBack.js');
+  const { scopePinboardCallSkill } = await import('../../../basis/src/v2/circlePinboardScope.js');
+  const { sealedAnswer } = await import('../../../basis/src/v2/circlePodProducer.js');
+  const { getCircleMediaComposition } = await import('../../src/core/circleMedia.js');
   // imported in THIS phone's module graph (a later boot resets the registry; a lazy import would get the other phone's)
   const { feedHouseholdRoster } = await import('../../../basis/src/v2/householdRosterPairing.js');
   const { subscribeContactReplies } = await import('../../src/core/contactReplyInbox.js');
@@ -141,7 +152,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     emitter: () => bundle?.agent?.emitPolicyUpdate ?? null,
     headStore: makePolicyHeadStore(AsyncStorage),
     readPolicy: (cid) => policyStore.get(cid),
-    writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy); pods.forgetCircleSealStrategyFor(cid); return r; },
+    writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); pods.forgetCircleSealStrategyFor(cid); return r; },
     membersOf: membersOfViaSkill((...a) => bundle?.callSkill?.(...a)),
   });
 
@@ -163,6 +174,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     onSettingsKeyMismatch: () => { flags.settingsKeyMismatch += 1; },
     onSettingsConflicts: () => { flags.settingsConflicts += 1; },
     getSharedWithMePodWriter: () => podWriterRef.current,   // App.js's getCirclePodWriter: null until a pod sign-in
+    markPolicyPending: (cid) => policyStore.markPending(cid),   // App.js's: a joined circle's policy not known yet
     pinboardControlAgent: pods.circleControlAgentRouter,
     provisionCircleMedium: pods.provisionCircleMedium,
     deviceLog: eventLog,
@@ -265,6 +277,8 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   return {
     name,
     bundle,
+    /** What this phone holds on its disk now: hand it to `bootMobileNode({ restoreFrom })` after `dispose()` to restart it. */
+    snapshot: async () => ({ _flushed: await flushPendingSaves?.(), asyncStorage: await AsyncStorage.multiGet(await AsyncStorage.getAllKeys()), files: fsStub.__dump?.() ?? [] }),
     /** Sign in to a pod as App.js does once its session holds tokens: the session into the circle pods' ref, the
      *  shared-with-me writer built from it, pinboard's item store attached to the person's pod. */
     signInToPod: async (session) => {
@@ -276,7 +290,30 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
      *  policy store, and the founder's first policy on the lane. */
     persistPolicy: async (groupId, patch) => {
       await policyStore.update?.(groupId, patch);
-      circlePolicyLane?.state(groupId).catch(() => {});
+      await circlePolicyLane?.state(groupId).catch(() => {});   // as the create modal's: awaited and flushed
+      await flushPendingSaves().catch(() => {});
+    },
+    /** Whether this phone can seal for the circle now: its circle pods hold a group key for it (the seal strategy the
+     *  send path asks for; null while the key is not on this device). */
+    canSeal: async (circleId) => !!(await pods.getCircleSealStrategy(circleId, (await policyStore.get?.(circleId)) ?? null).catch(() => null)),
+    /** The circle screen's pinboard call (CircleLauncherScreen's `pinboardCall`): the waist scoped to the circle, its
+     *  writes sealed with the circle's key (or refused while the key is not on this device), its lists filtered to it. */
+    circleCall: async (circleId) => {
+      // the screen holds the circle's policy in its state; read once here, as the open circle does
+      const policy = (await policyStore.get?.(circleId)) ?? null;
+      return scopePinboardCallSkill(
+        bundle.callSkill, circleId,
+        (p) => pods.getCircleSealStrategy(circleId, p ?? policy),
+        async () => { const comp = await getCircleMediaComposition(circleId, policy); return comp?.mediaGateway ? { mediaGateway: comp.mediaGateway, localActor: pods.getCircleActorWebId() || 'me', t } : null; },
+        { sealed: (p) => sealedAnswer(p ?? policy), policyNow: () => policyStore.get?.(circleId) },
+      );
+    },
+    /** Open a sealed text with this phone's own strategy for the circle (what its open path uses): the plaintext, or
+     *  null when this device holds no key that opens it. */
+    openSealed: async (circleId, sealed) => {
+      const strat = await pods.getCircleSealStrategy(circleId, (await policyStore.get?.(circleId)) ?? null).catch(() => null);
+      if (!strat?.open) return null;
+      try { const out = await strat.open(sealed); return typeof out === 'string' ? out : (out?.text ?? out ?? null); } catch { return null; }
     },
     /** The circle's policy as this phone's policy store holds it (what the circle pods read). */
     policyOf: async (circleId) => (await policyStore.get?.(circleId)) ?? null,

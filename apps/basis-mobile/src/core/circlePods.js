@@ -31,9 +31,9 @@ const keyFanRoster = async (circleId) => {
     return Array.isArray(r?.members) ? r.members : [];
   } catch { return []; }
 };
-import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
-import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
-import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster, createProducerKeyWait, isSealedPosture, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
+import { createKeyEventStore, wrapStrategyWithKeyEventFold, strategyFromKeyLog } from '../../../basis/src/v2/keyEventStore.js';
+import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore, selfMayEstablishKey } from '../../../basis/src/v2/keyRail.js';
+import { createCirclePodProducer, createCircleControlAgentRouter, notePodAgentFor, seedCircleRoster, createProducerKeyWait, isSealedPosture, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
 import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
@@ -257,7 +257,7 @@ export async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
   // No policy yet (a circle view opens before its policy is read from the store): the posture is unknown, so build
   // nothing and keep nothing — a producer made now would be the default p0 one, cached for the circle for good.
-  if (policy == null) return null;
+  if (policy == null || policy.policyPending === true) return null;   // not known (a joined circle's policy not arrived)
   return podFlight(circleId, () => buildCirclePod(circleId, policy));
 }
 
@@ -298,11 +298,18 @@ async function buildCirclePod(circleId, policy) {
       // only the pod that holds the circle's root takes access rules from this device (web parity)
       sharing: ownsRoot ? sharing : undefined,
       ownsRoot,
+      // only a device whose self may admit in the circle mints its first key (the key rail's own rule)
+      // (asked only with the agent's wiring bound, which a sealed circle's producer waits for; a stub boot without it is
+      // the single-device composition, as before)
+      mayEstablish: _keyEventWiring?.callSkill ? () => selfMayEstablishKey({ callSkill: _keyEventWiring.callSkill, circleId, selfRef: _keyEventWiring?.circleSelfRef?.(circleId) ?? null }) : null,
       // G11 — no-pod key distribution: rotations fan as log key-events (web parity, see makeCircleKeyEventLog).
       keyEventLog: makeCircleKeyEventLog(circleId),
     });
   } catch (err) {
     // asked for before the agent is bound: no producer YET, and nothing cached — built on the bind (web parity)
+    // cannot tell yet whether this device may establish the circle's first key (its roster not readable, or not holding
+    // this self yet): nothing built, NOTHING KEPT, asked again at the next ask (web parity)
+    if (err?.code === 'ESTABLISH_NOT_KNOWN') return null;
     if (err?.code === 'NO_SEALING_KEY_PAIR') {
       if (!_keyEventWiring) { producerKeyWait.note(circleId, policy); return null; }
       // the agent IS bound and still gives no key pair: a fault, said, not a wait nobody drains again (web parity)
@@ -321,6 +328,11 @@ async function buildCirclePod(circleId, policy) {
 // bootAgentBundle as `pinboardControlAgent`. V0: routes to a live (opened) circle's producer.
 // every join's key change re-asks whether the member is still in after the admission it follows (web parity)
 export const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
+  // an admission before the circle was opened builds its producer (a pod circle), or keeps the joiner's pod WebID in
+  // this device's pod-agents note for the seed (web parity)
+  policyOf: (gid) => _defaultPolicyOf(gid),
+  ensureCirclePod: (gid, policy) => ensureCirclePod(gid, policy),
+  notePodAgent: (gid, webId, podAgent) => notePodAgentFor({ vault: circleVault, circleId: gid, webId, podAgent }),
   memberStatusOf: memberStatusReader((...a) => (typeof _keyEventWiring?.callSkill === 'function' ? _keyEventWiring.callSkill(...a) : Promise.reject(new Error('not bound')))),
   // after each membership event it handles: one audience round on the key owner's device (web parity)
   audienceCheck: (gid, prod) => runKeyAudienceCheck({ circleId: gid, producer: prod, callSkill: _keyEventWiring?.callSkill }),
@@ -342,7 +354,7 @@ export async function seedCircleRosterFor({ circleId, policy, callSkill }) {
 /** Resolve (+ cache) a circle's content seal/open strategy via the device's own sealing identity. */
 export async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
-  if (policy == null) return null;   // not known yet: no answer to keep (see ensureCirclePod)
+  if (policy == null || policy.policyPending === true) return null;   // not known yet: no answer to keep (see ensureCirclePod)
   return strategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
 }
 
@@ -354,7 +366,12 @@ async function buildCircleSealStrategy(circleId, policy) {
     const prod = await ensureCirclePod(circleId, policy);
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
-      strat = await prod.controlAgent.sealingStrategy(idKey.privateKey);
+      // a MEMBER's device of a circle without a pod may not establish its key: its strategy is the KEY LOG's (the
+      // founder's key events folded, opened with this device's key pair; null until one reached it), so a rotation's
+      // new version is what its next write seals under. Everyone else: the key resource, as before.
+      strat = (prod.keyFromLog === true)
+        ? (idKey?.privateKey ? strategyFromKeyLog({ events: circleKeyEventStore.list(circleId), groupId: circleId, posture: policy?.storagePosture, privateKey: idKey.privateKey }) : null)
+        : await prod.controlAgent.sealingStrategy(idKey.privateKey);
       // G11 — no-pod defence-in-depth: content sealed under a version carried only in the key-event LOG
       // (a rotation fanned to this device) still opens. Shared wrapper; lazy read at open time (web parity).
       if (strat && idKey?.privateKey) {

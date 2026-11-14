@@ -1542,7 +1542,12 @@ key behind `address`. Deny-by-default — anything missing or malformed is `fals
 onEarlierCircleLink(fn)
 ```
 
-@param {(() => void)|null} fn  called once per refused proof that the earlier message verifies
+ONE listener per process: the last setter wins. Harmless, as it only reports (several persona runtimes in one process
+set the same refusal log); a caller that needs it per agent keys it there.
+
+**Parameters**
+
+- `fn` `(() => void)|null` — called once per earlier proof (per process), the first time it is refused
 
 ## `src/identity/deviceDelegation.js`
 

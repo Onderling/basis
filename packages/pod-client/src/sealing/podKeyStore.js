@@ -55,7 +55,8 @@ export function createPodKeyStore({ podClient, uri } = {}) {
      * COMPARE-AND-SWAP: write `resource` only while the stored key resource is still the one `cur` was read as —
      * a conditional PUT on the ETag of the read that produced `cur` (`cur` null: only while nothing is stored).
      * Returns false when another writer changed it in between (412 / conflict): the caller re-reads and applies
-     * its own change on the newest base. A `cur` whose read carried no ETag cannot be compared: plain write.
+     * its own change on the newest base. A `cur` whose read carried no ETag cannot be compared: refused on an http(s)
+     * pod (KEY_WRITE_UNCONDITIONED), a plain write on an in-memory or pseudo store.
      */
     async writeIfUnchanged(resource, cur) {
       const payload = JSON.stringify(resource);
@@ -63,7 +64,15 @@ export function createPodKeyStore({ podClient, uri } = {}) {
       if (cur == null) opts = { contentType: 'application/json', ifMatch: null, ifNoneMatch: '*', _suppressConflictEvent: true };
       else {
         const etag = readEtags.get(cur);
-        if (!etag) { await podClient.write(uri, payload, { contentType: 'application/json' }); return true; }
+        if (!etag) {
+          // a real pod that gave no ETag cannot be compared against: a plain write there would bring the lost update back
+          // silently, so it is refused (the caller reports it); an in-memory or pseudo store without one writes plainly
+          if (/^https?:/i.test(uri)) {
+            throw Object.assign(new Error('the pod gave no ETag for the key file: the change was not written (it could undo another writer\'s)'), { code: 'KEY_WRITE_UNCONDITIONED' });
+          }
+          await podClient.write(uri, payload, { contentType: 'application/json' });
+          return true;
+        }
         opts = { contentType: 'application/json', ifMatch: etag, _suppressConflictEvent: true };
       }
       try {

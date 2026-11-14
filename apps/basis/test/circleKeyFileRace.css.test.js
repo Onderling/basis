@@ -13,7 +13,7 @@ const CSS_URL = process.env.CSS_URL;
 const HAVE_OIDC = !!(process.env.CSS_CLIENT_ID && process.env.CSS_CLIENT_SECRET);
 const SUITE = CSS_URL && HAVE_OIDC ? describe : describe.skip;
 
-let PodClient, SolidOidcAuth, generateKeypair, unwrapGroupKey, VaultMemory, SolidVault, createCircleControlAgent;
+let PodClient, SolidOidcAuth, generateKeypair, unwrapGroupKey, VaultMemory, SolidVault, createCircleControlAgent, createCirclePodProducer;
 
 beforeAll(async () => {
   if (!CSS_URL || !HAVE_OIDC) return;
@@ -21,6 +21,7 @@ beforeAll(async () => {
   ({ VaultMemory } = await import('@onderling/vault'));
   ({ SolidVault } = await import('@onderling/oidc-session'));
   ({ createCircleControlAgent } = await import('../src/v2/circleControlAgent.js'));
+  ({ createCirclePodProducer } = await import('../src/v2/circlePodProducer.js'));
 });
 
 SUITE('the circle key file under two writers on a real pod (CSS)', () => {
@@ -56,5 +57,23 @@ SUITE('the circle key file under two writers on a real pod (CSS)', () => {
     const stored = await one.keyStore.read();
     for (const m of members) expect(opens(stored, m.kp.privateKey), `${m.webId} holds the key`).toBe(true);
     expect(opens(stored, founder.privateKey), 'the founder still holds it').toBe(true);
+  }, 120_000);
+
+  it('a second instance that starts with an older vault copy keeps the pod file\'s members', async () => {
+    const circleId = `restore-${generateKeypair().publicKey.replace(/[^a-zA-Z0-9]/g, '').slice(-10)}`;
+    const circleRootUri = `${podBase}/${circleId}`;
+    const founderPair = generateKeypair();
+    const vaultA = new VaultMemory();
+    const start = async (vault) => createCirclePodProducer({
+      circleId, storagePosture: 'p2', vault, generateKeypair, sealingKeyPair: founderPair,
+      makePodClient: () => makeRealPodClient(), circleRootUri, sharing: noAcl,
+    });
+    const a = await start(vaultA);
+    const vaultB = new VaultMemory();
+    for (const k of [`cc.circle-controller-key:${circleId}`, `cc.circle-groupkey:${circleId}`]) { const v = await vaultA.get(k); if (v != null) await vaultB.set(k, v); }
+    const member = generateKeypair();
+    await a.controlAgent.addMember({ webId: 'ref:member', publicKey: member.publicKey });
+    const b = await start(vaultB);
+    expect(opens(await b.controlAgent.keyStore.read(), member.privateKey), 'the older copy did not overwrite the pod').toBe(true);
   }, 120_000);
 });

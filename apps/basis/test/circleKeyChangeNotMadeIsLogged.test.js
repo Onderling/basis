@@ -26,6 +26,11 @@ describe('a key change that was not made is logged', () => {
     await router.addMember({ webId: 'ref:bea', publicKey: 'pk', groupId: 'c1' });
     expect(refusals.note).toHaveBeenCalledWith(expect.objectContaining({ reason: 'member-unknown' }));
   });
+  it('a key change refused because the pod gave no ETag', async () => {
+    const { router, refusals } = routerThrowing(Object.assign(new Error('no etag'), { code: 'KEY_WRITE_UNCONDITIONED' }));
+    await router.addMember({ webId: 'ref:bea', publicKey: 'pk', groupId: 'c1' });
+    expect(refusals.note).toHaveBeenCalledWith(expect.objectContaining({ reason: 'key-write-unconditioned' }));
+  });
   it('a device enrolment that kept losing the race', async () => {
     const { router, refusals } = routerThrowing(new KeyWriteContendedError(4));
     await router.grantRecipient({ publicKey: 'pk', groupId: 'c1' });

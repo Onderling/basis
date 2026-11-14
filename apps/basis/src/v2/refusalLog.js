@@ -29,7 +29,7 @@ export const DOOR_REFUSAL_CODES = Object.freeze([...DOOR_REFUSAL_CODES_LIST]);
  * key (the bounded compare-and-swap ran out) or the roster could not say whether the member is still a member. The
  * next producer start's roster seed re-drives a join. Held against the router by circleKeyChangeNotMadeIsLogged.test.js.
  */
-const KEY_REFUSAL_CODES_LIST = ['key-write-contended', 'member-unknown'];
+const KEY_REFUSAL_CODES_LIST = ['key-write-contended', 'member-unknown', 'key-write-unconditioned'];
 export const KEY_REFUSAL_CODES = Object.freeze([...KEY_REFUSAL_CODES_LIST]);
 
 /**

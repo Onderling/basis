@@ -138,11 +138,6 @@ export async function createCirclePodProducer({
   let savedPodAgents = {};
   try { const raw = await vault.get(podAgentsVaultKey); if (raw) savedPodAgents = JSON.parse(raw) ?? {}; } catch { savedPodAgents = {}; }
 
-  const savedRes = await vault.get(groupKeyVaultKey);
-  if (savedRes && ownsRoot) {
-    try { await podClient.write(keyResourceUri, savedRes, { contentType: 'application/json' }); } catch { /* fresh-bootstrap below */ }
-  }
-
   // Include THIS device's own per-circle sealing identity in the bootstrap roster, so the
   // local member is a recipient of the group key and can seal/open the circle's content
   // (otherwise only the abstract controller key could). Dedupe by publicKey.
@@ -167,6 +162,13 @@ export async function createCirclePodProducer({
     try { if (controlAgent?.podAgents) await vault.set(podAgentsVaultKey, JSON.stringify(controlAgent.podAgents())); } catch { /* best-effort */ }
   }
 
+  // The vault copy goes back ONLY where the pod holds nothing (the in-memory pod after a reload); on a pod that holds the
+  // file, the pod wins and the copy is refreshed from it below (persistGroupKey). Through the one key-resource write.
+  if (ownsRoot && controlAgent) {
+    let saved = null;
+    try { const raw = await vault.get(groupKeyVaultKey); saved = raw ? JSON.parse(raw) : null; } catch { saved = null; }
+    if (saved) { try { await controlAgent.restoreIfEmpty(saved); } catch { /* fresh bootstrap below */ } }
+  }
   if (bootstrap && ownsRoot && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
   return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey };
@@ -203,7 +205,7 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null } 
       );
       // a key change that was NOT made says so in the device's log, with its reason (never an id): another device kept
       // changing the key, or the roster could not say whether the member is still a member
-      const reason = err?.code === 'KEY_WRITE_CONTENDED' ? 'key-write-contended' : err?.code === 'MEMBER_UNKNOWN' ? 'member-unknown' : null;
+      const reason = { KEY_WRITE_CONTENDED: 'key-write-contended', MEMBER_UNKNOWN: 'member-unknown', KEY_WRITE_UNCONDITIONED: 'key-write-unconditioned' }[err?.code] ?? null;
       if (reason) (refusals ?? processRefusalLog()).note({ tag: 'key', lane: 'key', check: String(what).split(' ')[0], reason });
     }
   };

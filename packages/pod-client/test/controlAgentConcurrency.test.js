@@ -131,3 +131,30 @@ describe('podKeyStore.writeIfUnchanged over a pseudo-pod', () => {
     expect((await b.read()).by).toBe('a');
   });
 });
+
+describe('a join whose pod access failed after the key change', () => {
+  it('emits the key event once, and a retry still grants access and takes the member in', async () => {
+    const store = casBacking(); const ck = generateKeypair(); const bea = generateKeypair();
+    const events = [];
+    let failOnce = true;
+    const sharing = { grant: vi.fn(async () => { if (failOnce) { failOnce = false; throw new Error('pod refused'); } }), revoke: vi.fn(async () => {}) };
+    const agent = createControlAgent({ sharing, containerUri: 'https://pod/c/', keyStore: store.view(), controllerKey: ck, keyEventLog: { append: (e) => { events.push(e); } }, groupId: 'c' });
+    await expect(agent.addMember({ webId: 'ref:bea', publicKey: bea.publicKey })).rejects.toThrow('pod refused');
+    expect(events.length, 'the key event went out with the key change').toBe(1);
+    await agent.addMember({ webId: 'ref:bea', publicKey: bea.publicKey });
+    expect(sharing.grant).toHaveBeenCalledTimes(2);
+    expect(agent.members().map((m) => m.webId)).toContain('ref:bea');
+    expect(opens(store.current(), bea.privateKey)).toBe(true);
+  });
+});
+
+describe('podKeyStore on a real pod that gives no ETag', () => {
+  it('refuses the conditional write instead of a plain one (the lost update would come back silently)', async () => {
+    const writes = [];
+    const podClient = { read: async () => ({ content: { version: 1 } }), write: async (u, b, o) => { writes.push(o); } };
+    const ks = createPodKeyStore({ podClient, uri: 'https://pod.example/circles/c/.keys/group.json' });
+    const cur = await ks.read();
+    await expect(ks.writeIfUnchanged({ version: 1, by: 'me' }, cur)).rejects.toMatchObject({ code: 'KEY_WRITE_UNCONDITIONED' });
+    expect(writes).toEqual([]);
+  });
+});

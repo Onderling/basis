@@ -157,9 +157,12 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
         });
       });
       if (dropped) return { keyResource: base, members: members.slice(), dropped: true };
-      // the pod access follows the key: granted only once the join stands (a dropped join opens nothing)
-      await sharing.grant({ containerUri, agent: aclAgentOf(mm), modes });
+      // the key-event goes out as soon as the key change stands, before anything that can still throw: a retry after a
+      // failed ACL grant finds the key already written and writes nothing, so an event left for later would never go
       if (written) await emitKeyEvent(written);   // the new roster's key-event — the added member is now a recipient in the log too
+      // the pod access follows the key: granted only once the join stands (a dropped join opens nothing); a retry whose
+      // key change was already made still grants it and takes the member in
+      await sharing.grant({ containerUri, agent: aclAgentOf(mm), modes });
       members = [...members, mm];
       return { keyResource: written ?? base, members: members.slice() };
     },

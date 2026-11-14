@@ -328,3 +328,22 @@ describe('the admin\'s post-join propagation', () => {
     expect(out).toEqual({ toCircle: 0, toNewMember: 0, announced: 0 });
   });
 });
+
+describe('the newcomer is alive when the circle tells them its addresses', () => {
+  it('signals the newcomer present (clears a give-up their not-yet-answering address earned) before the fan to them', async () => {
+    const rows = [
+      { webid: ME, pubKey: ME },
+      { webid: BRAM, pubKey: BRAM, circleAddress: addressOf(3), circleAddressProof: proofOf(3) },
+      { webid: CATO, pubKey: CATO, circleAddress: addressOf(4), circleAddressProof: proofOf(4) },
+    ];
+    const { agent, log } = fakeAgent({ rows });
+    const order = [];
+    agent.presenceSignal = async (addr) => { order.push(`presence:${addr}`); return { flushed: 0 }; };
+    const call = agent.callSkill;
+    agent.callSkill = async (app, op, args) => { if (op === 'broadcastCircleAddresses') order.push(`fan:${(args.to ?? []).join(',')}`); return call(app, op, args); };
+    await propagateCircleAddressesAfterJoin({ agent, circleId: CIRCLE, newMemberWebid: CATO, logger: QUIET });
+    expect(order[0], 'presence first').toBe(`presence:${CATO}`);
+    expect(order).toContain(`fan:${CATO}`);
+    expect(log.skills.length).toBeGreaterThan(0);
+  });
+});

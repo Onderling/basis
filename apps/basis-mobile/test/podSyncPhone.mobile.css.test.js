@@ -74,6 +74,8 @@ SUITE('syncing through a pod, on the phone', () => {
     const { created, state: made } = await createCircle(anna, { groupId: CIRCLE, name: 'Pod samen', storage: 'shared', groupPodUri: `${process.env.CSS_A_WEBID.replace(/profile\/card#me$/, '')}circles/${CIRCLE}/`, handle: 'anna' });
     // …and what the phone's create wizard does next: the chosen policy into the phone's own policy store
     await anna.persistPolicy(CIRCLE, policyPatchFromState(made));
+    // the launcher shows the new circle: its view builds the circle's pod producer before anyone is invited
+    await anna.openCircle(CIRCLE);
     console.info('[pod-sync-phone] created', JSON.stringify({ podBacked: created?.podBacked, podUrl: created?.podUrl, storage: created?.storage }));
     const joined = await joinExistingCircle(anna, bram, { groupId: CIRCLE, handle: 'bram', podUrl: created?.storage?.groupPodUri ?? null });
     expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);

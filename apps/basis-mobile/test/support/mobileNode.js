@@ -307,6 +307,9 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     openCircle: async (circleId) => {
       openCircle = circleId;
       try { await feedHouseholdRoster({ agent: bundle.agent, circleId }); } catch { /* best-effort, as the launcher */ }
+      // …and what the circle view does on mount (CircleLauncherScreen): build the circle's pod producer and seed its
+      // group-key roster with the members already in (a no-op for a circle without a pod)
+      try { await pods.seedCircleRosterFor({ circleId, policy: (await policyStore.get?.(circleId)) ?? null, callSkill: bundle.callSkill }); } catch { /* best-effort, as the view */ }
     },
     async dispose() {
       unsubscribe?.();

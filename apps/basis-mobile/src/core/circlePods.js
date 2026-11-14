@@ -299,7 +299,9 @@ async function buildCirclePod(circleId, policy) {
       sharing: ownsRoot ? sharing : undefined,
       ownsRoot,
       // only a device whose self may admit in the circle mints its first key (the key rail's own rule)
-      mayEstablish: () => selfMayEstablishKey({ callSkill: _keyEventWiring?.callSkill, circleId, selfRef: _keyEventWiring?.circleSelfRef?.(circleId) ?? null }),
+      // (asked only with the agent's wiring bound, which a sealed circle's producer waits for; a stub boot without it is
+      // the single-device composition, as before)
+      mayEstablish: _keyEventWiring?.callSkill ? () => selfMayEstablishKey({ callSkill: _keyEventWiring.callSkill, circleId, selfRef: _keyEventWiring?.circleSelfRef?.(circleId) ?? null }) : null,
       // G11 — no-pod key distribution: rotations fan as log key-events (web parity, see makeCircleKeyEventLog).
       keyEventLog: makeCircleKeyEventLog(circleId),
     });

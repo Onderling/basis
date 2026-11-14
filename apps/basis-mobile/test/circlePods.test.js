@@ -122,8 +122,10 @@ describe('mobile circlePods — G11 no-pod rotation wiring', () => {
     const keys = {};   // webid → sealing publicKey (filled once granted)
     bindKeyPairs({
       sendPeer: (addr, payload) => { sent.push({ addr, payload }); },
+      // this device is the circle's admin (only a device whose self may admit establishes the first key)
+      circleSelfRef: () => 'did:anna',
       callSkill: async (_o, opId) => (opId === 'listGroupMembers'
-        ? { members: [bram, cato].map((m) => ({ ...m, sealingPublicKey: keys[m.webid] })) }
+        ? { members: [{ webid: 'did:anna', role: 'admin' }, ...[bram, cato].map((m) => ({ ...m, sealingPublicKey: keys[m.webid] }))] }
         : {}),
     });
 

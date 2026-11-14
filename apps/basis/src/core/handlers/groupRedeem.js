@@ -376,6 +376,8 @@ export function makeHandleGroupRedeemResponse({
       try { clearTimeout(entry.timer); } catch { /* defensive */ }
     }
     pendingMap.delete(requestId);
-    entry.resolve(payload);
+    // the reply's VERIFIED sender rides along: a reply is matched by its request id alone, so what it says about the
+    // admin (their per-circle address and its proof) is taken only when the admin sent it (joinGroupState)
+    entry.resolve({ ...payload, repliedBy: typeof _fromAddr === 'string' && _fromAddr ? _fromAddr : null });
   };
 }

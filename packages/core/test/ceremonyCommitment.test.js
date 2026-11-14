@@ -37,7 +37,7 @@ describe('the ceremony commitment — who may retire a device address', () => {
     expect(verifyCeremonyCommitmentDeclaration({ circleId: 'a', circleAddress: address, commitment, proof })).toBe(true);
     const ann = circleAddressAnnouncement({
       circleId: 'a', memberWebid: 'webid:x', circleAddress: address,
-      circleAddressProof: signCircleLinkFromSeed(seed, 'a', 'a', address),
+      circleAddressProof: signCircleLinkFromSeed(seed, 'a', 'a', address, 'webid:x'),
       ceremonyCommitment: commitment, ceremonyCommitmentProof: proof,
     });
     expect(verifyCircleAddressAnnouncement(ann, 'a')?.ceremonyCommitment).toBe(commitment);

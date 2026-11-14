@@ -32,8 +32,9 @@ const ADMIN  = 'pk-admin';
 
 const seedOf = (n) => new Uint8Array(32).fill(n);
 const addressOf = (n, circle = CIRCLE) => deriveCircleAddress(seedOf(n), circle);
-const proofOf = (n, circle = CIRCLE, addr = null) =>
-  signCircleLinkFromSeed(seedOf(n), circle, circle, addr ?? deriveCircleAddress(seedOf(n), circle));
+// the proof names the member whose row the address goes on: Bram's by default, the admin's for the admin's seed
+const proofOf = (n, circle = CIRCLE, addr = null, member = n === ADMIN_SEED ? ADMIN : BRAM) =>
+  signCircleLinkFromSeed(seedOf(n), circle, circle, addr ?? deriveCircleAddress(seedOf(n), circle), member);
 
 const BRAM_SEED = 3;
 const ADMIN_SEED = 7;
@@ -127,7 +128,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     await recordJoin(bundle);
 
     const res = await announceAdmin(bundle, {
-      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(ADMIN_SEED)),
+      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(ADMIN_SEED), ADMIN),
     });
     expect(res.ok).toBe(false);
     expect((await rowFor(bundle, BRAM))?.circleAddress).toBeUndefined();
@@ -190,7 +191,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     const again = await announce(bundle, { circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT), primary: true });
     expect(again.unchanged).toBe(true);
     // an UNPROVEN primary is refused like any unproven address
-    const forged = await announce(bundle, { circleAddress: addressOf(12), circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12)), primary: true });
+    const forged = await announce(bundle, { circleAddress: addressOf(12), circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12), BRAM), primary: true });
     expect(forged.ok).toBe(false);
     expect((await rowFor(bundle, BRAM)).circleAddress).toBe(addressOf(NEXT));
   });
@@ -216,7 +217,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
 
     const res = await announce(bundle, {
       circleAddress: addressOf(12),
-      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12)),
+      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12), BRAM),
     });
     expect(res.ok).toBe(false);
     expect((await rowFor(bundle, BRAM)).circleAddresses).toEqual([addressOf(BRAM_SEED)]);
@@ -246,11 +247,11 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     // own. An announce that patched the first shape only would appear to work and change nothing.
     const NEXT = 13;
     const res = await announce(bundle, {
-      memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT),
+      memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT, CIRCLE, null, ADMIN),
     });
     expect(res.ok).toBe(true);
     expect((await rowFor(bundle, ADMIN)).circleAddresses, 'added behind the primary — the mirror row follows the same rule').toEqual([addressOf(ADMIN_SEED), addressOf(NEXT)]);
-    const chose = await announce(bundle, { memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT), primary: true });
+    const chose = await announce(bundle, { memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT, CIRCLE, null, ADMIN), primary: true });
     expect(chose.ok).toBe(true);
     expect((await rowFor(bundle, ADMIN)).circleAddress, 'and the admin\'s choice of primary lands on the mirror row').toBe(addressOf(NEXT));
   });
@@ -285,11 +286,39 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     const res = await callSkill(bundle.agent, 'recordCircleAddressAnnouncement', {
       groupId: CIRCLE,
       circleAddress: addressOf(STRANGER_SEED),
-      circleAddressProof: proofOf(STRANGER_SEED),
+      circleAddressProof: proofOf(STRANGER_SEED, CIRCLE, null, 'pk-stranger'),   // a good proof: membership is what refuses
     }, 'pk-stranger');
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('not-a-member');
     expect(await rowFor(bundle, 'pk-stranger')).toBeNull();
+  });
+
+  it('a member who COPIES another member\'s address and proof onto their own row is refused: the proof names the other member', async () => {
+    const bundle = await buildBundle();
+    await recordJoin(bundle);
+    await announce(bundle);   // Bram's proven address is on Bram's row
+
+    const res = await callSkill(bundle.agent, 'recordCircleAddressAnnouncement', {
+      groupId: CIRCLE, circleAddress: addressOf(BRAM_SEED), circleAddressProof: proofOf(BRAM_SEED),
+    }, ADMIN);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('unproven-address');
+    expect((await rowFor(bundle, ADMIN))?.circleAddresses ?? []).not.toContain(addressOf(BRAM_SEED));
+  });
+
+  it('one address, one member: a proof that names a SECOND member for an address another member holds is refused', async () => {
+    const bundle = await buildBundle();
+    await recordJoin(bundle);
+    await announce(bundle);   // Bram holds his address
+
+    // the key behind Bram's address signs a proof naming the admin (the key holder colluding, or one person reusing it)
+    const res = await callSkill(bundle.agent, 'recordCircleAddressAnnouncement', {
+      groupId: CIRCLE, circleAddress: addressOf(BRAM_SEED), circleAddressProof: proofOf(BRAM_SEED, CIRCLE, null, ADMIN),
+    }, ADMIN);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('address-held-by-another-member');
+    expect((await rowFor(bundle, ADMIN))?.circleAddress).not.toBe(addressOf(BRAM_SEED));
+    expect((await rowFor(bundle, BRAM)).circleAddress, 'the earlier holder keeps it').toBe(addressOf(BRAM_SEED));
   });
 
   it('a REMOTE member CAN re-announce their own address (the ordinary re-announce over the wire)', async () => {

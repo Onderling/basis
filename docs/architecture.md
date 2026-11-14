@@ -1241,6 +1241,10 @@ get to look like several by owning several devices, and the app will not manufac
 `root → profile → per-circle address` (decisions 2026-07-14), so two profiles are **two people on the wire**:
 different chat identities, different per-circle addresses, nothing a co-member can join up — unlinkable by
 default, linkable only by the person's choice. "Persona" is the user-facing word for a profile you present.
+**The persona is the unit of linkability** (decided 2026-11-14): within one persona, its circles are recognisably the
+same persona to someone in two of them (the roster lists the persona's key in each), and a circle's proof that an
+address is a member's names that member (`circleLink.js`: circle, address, member; the verifier takes the member from
+the row, so a copied proof verifies for no one else). One address belongs to one member in a circle.
 **Every persona runs as its own person on the wire.** The agent starts a runtime (`personaRuntime.js`) for every
 persona the registry holds: under root custody each derives from the resident root; a delegated device runs only
 the personas a ceremony handed it. Each has its own chat identity, person key, device delegation and per-circle

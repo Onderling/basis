@@ -191,6 +191,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `normalizeDiscoverability` | function | [`core.md`](core.md#normalizediscoverability) |
 | `offeringMatches` | function | [`core.md`](core.md#offeringmatches) |
 | `OfflineTransport` | class | [`core.md`](core.md#offlinetransport) |
+| `onEarlierCircleLink` | function | [`core.md`](core.md#onearliercirclelink) |
 | `openFromPersonKey` | function | [`core.md`](core.md#openfrompersonkey) |
 | `openSealed` | function | [`core.md`](core.md#opensealed) |
 | `openTunnelOW` | function | [`core.md`](core.md#opentunnelow) |

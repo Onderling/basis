@@ -32,7 +32,7 @@ const ADMIN  = 'pk-admin';           // the admin, known to a joiner only throug
 /** The admin's REAL per-circle identity: an address derived from their profile seed, plus its proof. */
 const ADMIN_SEED = new Uint8Array(32).fill(7);
 const ADMIN_CIRCLE_ADDRESS = deriveCircleAddress(ADMIN_SEED, CIRCLE);
-const ADMIN_PROOF = signCircleLinkFromSeed(ADMIN_SEED, CIRCLE, CIRCLE, ADMIN_CIRCLE_ADDRESS);
+const ADMIN_PROOF = signCircleLinkFromSeed(ADMIN_SEED, CIRCLE, CIRCLE, ADMIN_CIRCLE_ADDRESS, ADMIN);
 
 /** A joiner-side agent whose reliable sender records the addresses the fan is handed. */
 async function buildJoinerBundle({ sends = [], members = [] } = {}) {
@@ -89,7 +89,7 @@ describe('joiner side — recording the admin per-circle address', () => {
     const bundle = await buildJoinerBundle();
     await recordJoin(bundle, {
       confirmedByCircleAddress: ADMIN_CIRCLE_ADDRESS,
-      confirmedByCircleAddressProof: signCircleLinkFromSeed(ADMIN_SEED, CIRCLE, 'some-other-circle', ADMIN_CIRCLE_ADDRESS),
+      confirmedByCircleAddressProof: signCircleLinkFromSeed(ADMIN_SEED, CIRCLE, 'some-other-circle', ADMIN_CIRCLE_ADDRESS, ADMIN),
     });
     expect((await adminRow(bundle))?.circleAddress).toBeUndefined();
   });
@@ -164,7 +164,7 @@ describe("joiner side — the joiner's OWN row is complete AT REDEEM (wave 1 bat
   // The joiner's real per-circle identity, exactly as the wizard presents it to the admin.
   const MY_SEED = new Uint8Array(32).fill(9);
   const MY_CIRCLE_ADDRESS = deriveCircleAddress(MY_SEED, CIRCLE);
-  const MY_PROOF = signCircleLinkFromSeed(MY_SEED, CIRCLE, CIRCLE, MY_CIRCLE_ADDRESS);
+  const MY_PROOF = signCircleLinkFromSeed(MY_SEED, CIRCLE, CIRCLE, MY_CIRCLE_ADDRESS, ME);
 
   const myRow = async (bundle) => {
     const roster = await callSkill(bundle.agent, 'listGroupMembers', { groupId: CIRCLE });

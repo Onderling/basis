@@ -26,8 +26,10 @@ const QUIET = { warn() {}, info() {} };
 
 const seedOf = (n) => new Uint8Array(32).fill(n);
 const addressOf = (n, circle = CIRCLE) => deriveCircleAddress(seedOf(n), circle);
-const proofOf = (n, circle = CIRCLE) =>
-  signCircleLinkFromSeed(seedOf(n), circle, circle, deriveCircleAddress(seedOf(n), circle));
+// the proof names the member whose address it is: seed 3 is Bram's, 4 Cato's, any other this device's (ME)
+const memberOfSeed = (n) => ({ 3: 'pk-bram', 4: 'pk-cato' })[n] ?? 'pk-me';
+const proofOf = (n, circle = CIRCLE, member = memberOfSeed(n)) =>
+  signCircleLinkFromSeed(seedOf(n), circle, circle, deriveCircleAddress(seedOf(n), circle), member);
 
 const ME = 'pk-me';
 const BRAM = 'pk-bram';
@@ -44,7 +46,8 @@ function fakeAgent({ rows = [], selfWebid = ME, seed = MY_SEED } = {}) {
   const agent = {
     identity: { chat: { pubKey: selfWebid } },
     circleAddressFor: (cid) => deriveCircleAddress(seedOf(seed), cid),
-    signCircleLink:   (cid, gid, addr) => signCircleLinkFromSeed(seedOf(seed), cid, gid, addr),
+    // as the host's: the member defaults to this device's self in the circle
+    signCircleLink:   (cid, gid, addr, member = selfWebid) => signCircleLinkFromSeed(seedOf(seed), cid, gid, addr, member),
     registerPeerAddress: (address, pubKey, opts) => { log.registered.push({ address, pubKey, opts }); return true; },
     recordCircleSenders: async ({ circleId, members }) => {
       log.snapshots.push({ circleId, keys: members.map((m) => m.circleAddress ?? m.pubKey) });
@@ -233,7 +236,7 @@ describe('receiving an announcement', () => {
     const elsewhere = {
       circleId: 'werk-7', memberWebid: BRAM,
       circleAddress: addressOf(3, 'werk-7'),
-      circleAddressProof: signCircleLinkFromSeed(seedOf(3), 'werk-7', 'werk-7', addressOf(3, 'werk-7')),
+      circleAddressProof: signCircleLinkFromSeed(seedOf(3), 'werk-7', 'werk-7', addressOf(3, 'werk-7'), BRAM),
     };
     const res = await handler('pk-admin', envelopeOf([elsewhere]));
     expect(res.recorded).toBe(0);

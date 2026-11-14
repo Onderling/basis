@@ -55,7 +55,7 @@ import {
   defineSkill, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
-  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain,
+  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain, memberStatusFrom,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
@@ -405,12 +405,12 @@ async function _findLatestActiveCode(store, groupId) {
 // Household sealed-pod membership hooks. Best-effort + gated: no-op without a control-agent (instances
 // that don't run a sealed pod) or without the joiner's sealing public key. A failure here never breaks
 // the membership audit — key management is recoverable, the redemption record is the source of truth.
-async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null }) {
+async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null, admittedBy = null }) {
   if (!controlAgent || !sealingPublicKey || !webId) return;
   // Forward groupId so a per-circle control-agent ROUTER can route the grant to the right
   // circle's producer (basis runs one pinboard agent + N per-circle control agents). A
   // single (non-routing) control agent simply ignores the extra field.
-  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}) }); }
+  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}), ...(admittedBy ? { admittedBy } : {}) }); }
   catch { metrics?.record?.('control-agent-grant-failed'); }
 }
 async function revokePodAccess(controlAgent, { webId, force = false, policy = 'graceful', groupId, metrics }) {
@@ -674,6 +674,36 @@ async function getGroupRulesCore(scope, a, ctx) {
     if (tsB > tsA || (tsB === tsA && it.id > latest.id)) latest = it;
   }
   return { rules: latest };
+}
+
+/**
+ * IS THIS MEMBER STILL IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? The question every join's key grant asks again on
+ * each recompute (a grant recomputed after a lost race must not put back someone removed meanwhile). Read from the SAME
+ * fold as the invite verdict (projectCircleRoster: the roster plus each subject's last exit), placed in the membership
+ * lane's own CAUSAL order (causalPlace over the statements the fold was given: an ancestry path in the deps-DAG, the same
+ * on every device that has folded both; never a clock, never the fold's depth tiebreak):
+ *   'out'  — their last exit (a leave or an eviction) comes AFTER `after`;
+ *   'in'   — `after` is folded and no exit of theirs follows it (none at all, or the last one is before it);
+ * `after` absent: the member's last folded join (the roster seed, a repeated redeem, a device's owner).
+ * 'in' needs the named statement to be a join of THIS subject AND the subject on the folded roster (memberStatusFrom).
+ * A member with no join at all (a founder, a seeded member) is 'in'; once removed the answer is null, not 'out' (no
+ * admission to place the exit after): safe, the key change is not made. PRIVATE: no peer may ask it ('is X still in'
+ * answered to a peer would be a disclosure about a third person).
+ *   null   — it cannot be placed: `after` is not folded on this device yet, the exit is not held, or the exit and the
+ *            admission are CONCURRENT (neither saw the other). The caller treats null as "cannot say": nothing written.
+ */
+async function memberStatusCore(scope, a) {
+  const groupId = a?.groupId ?? scope.groupId;
+  const webid = typeof a?.webid === 'string' && a.webid ? a.webid : null;
+  const asked = typeof a?.after === 'string' && a.after ? a.after : null;
+  if (!groupId || !webid) return { status: null, reason: 'args' };
+  let folded = null; let statements = [];
+  const rows = await projectCircleRoster({
+    store: scope.store, groupId, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
+    selfSigner: scope.selfSigner ?? null, observeFold: (f, s) => { folded = f; statements = Array.isArray(s) ? s : []; },
+  });
+  if (!Array.isArray(rows) || !folded) return { status: null, reason: 'no-fold' };
+  return memberStatusFrom({ folded, statements, webid, after: asked });
 }
 
 async function listGroupMembersCore(scope, a, ctx) {
@@ -1037,7 +1067,7 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     onFolded: (folded) => {
       if (typeof membershipRead?.compact === 'function' && Array.isArray(folded?.superseded) && folded.superseded.length) membershipRead.compact(groupId, folded.superseded).catch(() => {});
       // a caller that needs more of the fold than the rows (the invite verdict: each subject's last exit)
-      if (typeof observeFold === 'function') { try { observeFold(folded); } catch { /* a reader never breaks the read */ } }
+      if (typeof observeFold === 'function') { try { observeFold(folded, spineStatements); } catch { /* a reader never breaks the read */ } }
     },
   };
   // THE GOVERNED GATE (the circle's "who decides" at the receiver): the host says first whether this circle needs one
@@ -1187,6 +1217,7 @@ export const PINBOARD_CORES = Object.freeze({
   getHolidayMode:   getHolidayModeCore,
   getGroupRules:    getGroupRulesCore,
   listGroupMembers: listGroupMembersCore,
+  memberStatus: memberStatusCore,
   respondToItem:    respondToItemCore,
   signOutOfPod:     signOutOfPodCore,
   addContact:       addContactCore,
@@ -3264,6 +3295,11 @@ export function buildSkills({
      *   — return the members of a group as MemberMap entries.
      *   `groupId` defaults to the bundle's current group.
      */
+    wire('memberStatus', {
+      description: 'Is a member still in, after the admission a key change follows? in / out / null (cannot place), in the membership lane\'s causal order.',
+      visibility:  'private',
+    }),
+
     wire('listGroupMembers', {
       description: 'List the members of a group. To a member peer: identity + keys + address + role + handle + their own release only (allowlist); a non-member peer is refused; the local shell gets the full view. circleAddress when known).',
       visibility:  'authenticated',
@@ -4212,10 +4248,22 @@ export function buildSkills({
       const persona = typeof a.persona === 'string' && a.persona.trim() ? a.persona.trim() : null;
       const request = await bundle.messageRequests.get(a.from, { persona });
       if (!request) return { error: 'no-such-request' };
-      // A REQUEST WITHOUT A CARD (a co-member never answered, or a turn held after a refusal): nothing to put in the book.
-      // Accept moves the held turns onto the thread and takes the request out; the book row comes when the person answers,
-      // as for a member who may write (their answer is the choice).
-      const added = request.card ? await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset }) : { contact: null };
+      // A REQUEST WITHOUT A CARD. From a member of one of this self's circles (named as in the circle): Accept IS the
+      // choice (Frits 2026-11-14), so they go into the book now, by their identity and their circle name, as an answer
+      // would have put them there; their next message lands in the thread. From a stranger (a turn held after a
+      // refusal, no card): nothing to put in the book, as before; the held turns go onto the thread.
+      const asMember = !request.card && request.member === true;
+      const added = request.card
+        ? await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset })
+        : asMember
+          ? { contact: await bundle.contacts.addContact({
+            webid: a.from,
+            ...(request.name ? { displayName: request.name } : {}),
+            ...(persona ? { persona } : {}),
+            ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
+            trustLevel: 'bekend',
+          }) }
+          : { contact: null };
       if (added?.error) return added;
       await bundle.messageRequests.remove(a.from, { persona });
       metrics?.record?.('message-request-accepted');

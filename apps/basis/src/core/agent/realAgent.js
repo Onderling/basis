@@ -3194,7 +3194,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    *  the members and this address), otherwise on the key lane from this device's own state. */
   const rotatePastOwnOld = async (circleId, oldAddresses) => {
     const ctl = opts.pinboardControlAgent;
-    const viaProducer = await ctl?.grantRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(circleId)) }).catch(() => null);
+    const viaProducer = await ctl?.grantRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(circleId)), ownDevice: true }).catch(() => null);
     if (viaProducer) {
       for (const a of oldAddresses) await ctl.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(a), policy: 'ban' }).catch(() => null);
       return { circleId, producer: true };
@@ -3208,7 +3208,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const rows = await callSkill('pinboard', 'listGroupMembers', { groupId: act.circleId }).then((r) => r?.members ?? []).catch(() => []);
     if (act.op === 'grant-self') {
       // the point wraps the current key to the address IT presents — no key travels in the act
-      await ctl.grantRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(act.circleId)) });
+      await ctl.grantRecipient?.({ groupId: act.circleId, publicKey: sealingPublicKeyFromNetworkKey(circleAddressFor(act.circleId)), ownDevice: true });
       return;
     }
     if (act.op === 'add' || act.op === 'remove') {

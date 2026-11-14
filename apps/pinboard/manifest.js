@@ -941,6 +941,18 @@ export const pinboardManifest = {
       },
     },
     {
+      // Asked again on every recompute of a key change that adds someone: is the member still in, after the admission the
+      // change follows (`after`: the join statement's hash; absent: their last folded join)? 'in' / 'out' / null when it
+      // cannot be placed in the membership lane's causal order. Plumbing for the key router, no person-facing door; NOT
+      // `appliesTo: member` (that is the roster's list, `listGroupMembers`, which a capability ask must keep resolving to).
+      id:   'memberStatus', visibility: 'private', group: 'data', verb: 'list',
+      params: [
+        { name: 'webid', kind: 'string', required: true },
+        { name: 'after', kind: 'string', required: false },
+      ],
+      surfaces: { internal: true },
+    },
+    {
       id:   'getGroupRules', visibility: 'authenticated', group: 'data', verb: 'list',
       params: [],
       surfaces: {

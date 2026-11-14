@@ -20,7 +20,7 @@
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
-import { processRefusalLog } from '../../src/v2/refusalLog.js';
+import { processRefusalLog, noteKeyFanFailed } from '../../src/v2/refusalLog.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
 import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -41,6 +41,7 @@ import { flushPendingSaves } from '@onderling/local-store';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
 import { createPeek } from '../../src/v2/circlePeek.js';
+import { myCircleIds } from '../../src/v2/myCircleIds.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
@@ -2160,6 +2161,7 @@ async function buildCirclePod(circleId, policy) {
       // chain and rotateKey authority at their key rail. Fail-closed: no signer → no fan.
       emitStatement: (gid, event) => _peerAgent?.keyEmit?.(gid ?? circleId, event) ?? null,
       statementSubtype: KEY_STATEMENT_BROADCAST,
+      onFanFailed: noteKeyFanFailed,   // the fan runs on after the append; a failure is said
       // THE FAN — through the waist, like every other lane, so the statement leaves under this
       // member's per-circle address. A direct peer send is signed with the canonical identity and
       // is refused at every receiver inside a circle.
@@ -9858,7 +9860,7 @@ async function boot() {
       if (podChatCatchUpShell && !podReadBackShell) {
         podReadBackShell = createPodReadBack({
           catchUp: podChatCatchUpShell,
-          listCircleIds: async () => ((await rawCallSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean),
+          listCircleIds: () => myCircleIds(rawCallSkill),
         });
         try {
           globalThis.document?.addEventListener?.('visibilitychange', () => {
@@ -10151,8 +10153,7 @@ async function boot() {
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {
-            const r = await rawCallSkill('pinboard', 'listMyCircles', {});
-            const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+            const ids = await myCircleIds(rawCallSkill);
             await podChatCatchUpShell?.catchUpAll(ids);
           } catch { /* best-effort — the next reconnect retries */ }
         })();

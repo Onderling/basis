@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 74
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 75
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -53,6 +53,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
 | `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
 | `mobile-buttons` | — | the phone's twin of lint-unstyled-buttons: a button on the phone wears the one button family |
+| `my-circle-ids` | — | the circles this device is in are read through ONE reader (`apps/basis/src/v2/myCircleIds.js`) |
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |

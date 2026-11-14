@@ -1206,8 +1206,11 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
         // records it only if the proof holds, exactly as the admin does with ours on the way in. Without
         // this the joiner knows the admin only as `confirmedBy` — a global signing key — and a send to
         // them is refused whenever the per-user address-fallback setting is off.
-        ...(peerReply.circleAddress ? { confirmedByCircleAddress: peerReply.circleAddress } : {}),
-        ...(peerReply.circleAddressProof ? { confirmedByCircleAddressProof: peerReply.circleAddressProof } : {}),
+        // …only from the admin's OWN reply: the proof is checked against the invite's admin as its member, and a reply
+        // is matched by its request id alone, so a reply someone else sent does not get to place an address on the
+        // admin's row (the join itself goes on; the admin's address then arrives by their announce)
+        ...(peerReply.repliedBy === inv.adminPeerAddr && peerReply.circleAddress ? { confirmedByCircleAddress: peerReply.circleAddress } : {}),
+        ...(peerReply.repliedBy === inv.adminPeerAddr && peerReply.circleAddressProof ? { confirmedByCircleAddressProof: peerReply.circleAddressProof } : {}),
         ...(typeof peerReply.confirmedByDisplay === 'string' && peerReply.confirmedByDisplay ? { confirmedByDisplay: peerReply.confirmedByDisplay } : {}),
         // the admin's signed join for this redeem — ingested on this side's own membership rail, which judges it
         ...(peerReply.joinStatement?.body && peerReply.joinStatement?.sig ? { joinStatement: peerReply.joinStatement } : {}),

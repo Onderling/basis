@@ -7632,7 +7632,7 @@
       "doc": "How the Decisions screen names a reported member the admin’s roster no longer holds: never their key."
     },
     "enact": {
-      "text": "Enact",
+      "text": "Carry out",
       "doc": "An admin's button on an approved decision that waits: carries it out (the default is that an admin does this explicitly)."
     },
     "enacted": {
@@ -7641,7 +7641,7 @@
     },
     "enact_failed": {
       "text": "This could not be carried out. Try again.",
-      "doc": "Shown when an admin’s Enact did not go through: it must not look done."
+      "doc": "Shown when an admin’s Carry out did not go through: it must not look done."
     },
     "vote_failed": {
       "text": "Your vote did not go through. Try again.",

@@ -1482,17 +1482,20 @@ with no visible cause.
 **Kind:** function · **Import:** `circleLinkMessage` from `'@onderling/core'`
 
 ```js
-circleLinkMessage(groupId, address)
+circleLinkMessage(groupId, address, memberRef)
 ```
 
-The canonical challenge a linkable joiner signs. Deterministic; binds join + address.
+The canonical challenge a link proof signs: the circle, the address AND THE MEMBER whose address it is in that circle
+(their identity there). Without the member, a proof said only "whoever holds this address's key linked it to this
+circle", and a member could put a copy of another member's address and proof on their own roster row (the roster then
+showed it as the copier's device, and a device bound it to the copier as a person). v1 (circle + address) is refused.
 
 ### `signCircleLink`
 
 **Kind:** function · **Import:** `signCircleLink` from `'@onderling/core'`
 
 ```js
-signCircleLink(identity, groupId, address)
+signCircleLink(identity, groupId, address, memberRef)
 ```
 
 Sign the link challenge with the SOURCE circle's identity → the base64url proof to present
@@ -1505,7 +1508,7 @@ alongside the address. `identity` is `circleIdentity(derivationSeed, sourceCircl
 **Kind:** function · **Import:** `signCircleLinkFromSeed` from `'@onderling/core'`
 
 ```js
-signCircleLinkFromSeed(derivationSeed, circleId, groupId, address)
+signCircleLinkFromSeed(derivationSeed, circleId, groupId, address, memberRef)
 ```
 
 Vault-free variant: sign the challenge straight from the profile seed + source circleId
@@ -1519,7 +1522,7 @@ the redeem seam so a joiner can prove control of the address they present.
 **Kind:** function · **Import:** `verifyCircleLink` from `'@onderling/core'`
 
 ```js
-verifyCircleLink({ groupId, address, proof, verifySignature, verdictMemo } = {})
+verifyCircleLink({ groupId, address, memberRef, proof, verifySignature, verdictMemo } = {})
 ```
 
 Verify a presented linkage: the proof must be a signature over the challenge by the private
@@ -1530,6 +1533,16 @@ key behind `address`. Deny-by-default — anything missing or malformed is `fals
 - `a` `{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}` — `verifySignature` — the pure signature check, default the process's memo under the name 'circle-link'
 
 **Returns:** `boolean`
+
+### `onEarlierCircleLink`
+
+**Kind:** function · **Import:** `onEarlierCircleLink` from `'@onderling/core'`
+
+```js
+onEarlierCircleLink(fn)
+```
+
+@param {(() => void)|null} fn  called once per refused proof that the earlier message verifies
 
 ## `src/identity/deviceDelegation.js`
 

@@ -18,6 +18,7 @@ describe('the key-event sink\'s direct fan names its circle', () => {
       sendOptions: { guarantee: 'hold-forward' },
     });
     await sink.append(event);
+    await new Promise((r) => { setTimeout(r, 0); });   // the fan runs on after the append returns
     expect(sent.map((s) => s.addr)).toEqual(['a', 'b']);
     for (const s of sent) expect(s.opts).toEqual({ guarantee: 'hold-forward', circleId: 'c-1' });
   });
@@ -32,6 +33,7 @@ describe('the key-event sink\'s direct fan names its circle', () => {
       fanStatement: async () => { throw new Error('waist down'); },
     });
     await sink.append(event);
+    await new Promise((r) => { setTimeout(r, 0); });   // the fan runs on after the append returns
     expect(sent).toEqual([{ circleId: 'c-1' }]);
   });
 });

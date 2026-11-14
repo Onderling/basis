@@ -53,7 +53,7 @@ import { buildHouseholdDataSource } from '../../../basis/src/household/persist.j
 // keys). Mirror of web circleApp.js's module-level `policyStore`: the composition-root's `policyOf` reads the
 // LIVE per-circle `sharePosture` from here instead of the deny-by-default `{}`.
 import { makeCirclePolicyStoreRN } from './circleStoresRN.js';
-import { processRefusalLog } from '../../../basis/src/v2/refusalLog.js';
+import { processRefusalLog, noteKeyFanFailed } from '../../../basis/src/v2/refusalLog.js';
 import { runKeyAudienceCheck } from '../../../basis/src/v2/keyAudienceCheck.js';
 // pod versioning — the RN twin of web's src/web/circleVersioning.js (expo-crypto hash;
 // crypto.subtle fallback for vitest/web). One store per circle, on the circle pod's own backend.
@@ -162,6 +162,7 @@ function makeCircleKeyEventLog(circleId) {
       ? (_keyEventWiring.keyEmit(gid ?? circleId, event) ?? null)
       : undefined),
     statementSubtype: KEY_STATEMENT_BROADCAST,
+    onFanFailed: noteKeyFanFailed,   // the fan runs on after the append; a failure is said (web parity)
     // THE FAN — through the waist (web parity), so the statement leaves under this member's
     // per-circle address. A direct peer send carries the canonical identity and is refused at
     // every receiver inside a circle.

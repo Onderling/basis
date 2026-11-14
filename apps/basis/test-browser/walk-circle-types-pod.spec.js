@@ -91,6 +91,8 @@ async function createWithStorage(page, name, { storage, podUri = null, handle = 
   await page.locator('.cc-wizard-input:visible').first().waitFor({ timeout: 15_000 });
   await page.locator('.cc-wizard-input:visible').nth(0).fill(name);
   await fillFounderHandle(page, handle);
+  // the kind, asked on the first step (never assumed)
+  await page.locator('input[type="radio"][value="household"]:visible').first().check();
   // the storage choice lives behind the first step's "advanced" fold; opened, the wizard walks every step
   await page.locator('details[data-role="advanced"] > summary').first().click();
   await page.waitForTimeout(500);

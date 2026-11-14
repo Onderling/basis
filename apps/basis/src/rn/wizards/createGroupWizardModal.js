@@ -24,7 +24,7 @@ import {
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl, withinMs, POLICY_WRITE_BOUND_MS,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
-  CIRCLE_KINDS, setKind, setSize, setStoragePolicy, setChatEnabled, chatAdvice, policyPatchFromState,
+  CREATE_KIND_CHOICES, chooseKind, setSize, setStoragePolicy, setChatEnabled, chatAdvice, policyPatchFromState,
   LLM_TOOL_CHOICES, AGENTS_CHOICES, FEATURE_CHOICES, setLlmTool, setAgents, setConsensus, setFeature,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
@@ -189,7 +189,50 @@ export default function CreateGroupWizardModal({
                     hint={t('circle.join.wizard.handle.intro')}
                   />
                 ) : null}
-                {/* EVERYTHING ELSE behind one fold: the kind, who founds it, its purpose and tags here — and, opened, the
+                {/* THE KIND AND THE PURPOSE, asked here and never assumed (web twin): the kind's template fills what the
+                    circle can do; its sentence goes into the purpose field as a suggestion the person sees and can change
+                    ("other": none). A neighbourhood also asks its size, with the chat advice. */}
+                <View testID="create-group-kind">
+                  <RadioGroup
+                    label={t('circle.kindPicker')}
+                    value={state.kind ?? null}
+                    options={attachConsequences('kind',
+                      CREATE_KIND_CHOICES.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })), t)}
+                    onChange={(k) => setState((s) => chooseKind(s, k, t))}
+                    consequenceLabel={t('common.consequences')}
+                  />
+                </View>
+                {state.kind === 'neighbourhood' && (
+                  <>
+                    <RadioGroup
+                      label={t('circle.size.label')}
+                      value={state.size ?? null}
+                      options={attachConsequences('size', [
+                        { id: 'small', label: t('circle.size.small') },
+                        { id: 'large', label: t('circle.size.large') },
+                      ], t)}
+                      onChange={(sz) => setState((s) => setSize(s, sz))}
+                      consequenceLabel={t('common.consequences')}
+                    />
+                    {chatAdvice(state).reasonKey ? (
+                      <Warn>{t(chatAdvice(state).reasonKey)}</Warn>
+                    ) : null}
+                    <Checkbox
+                      label={t('circle.chatToggle')}
+                      checked={!!state.features?.chat}
+                      onToggle={() => setState((s) => setChatEnabled(s, !s.features?.chat))}
+                      testID="create-group-chat-toggle"
+                    />
+                  </>
+                )}
+                <Field
+                  label={t('circle.wizard.create.purpose')}
+                  value={state.purpose}
+                  onChangeText={(v) => setState((s) => ({ ...s, purpose: v }))}
+                  placeholder={t('circle.wizard.create.purpose_placeholder')}
+                  testID="create-group-purpose"
+                />
+                {/* EVERYTHING ELSE behind one fold: who founds it, who sees whose name, its tags — and, opened, the
                     further steps. Closed, the defaults stand and Next goes to the review. */}
                 <Pressable accessibilityRole="button" accessibilityState={{ expanded: state.advanced === true }}
                   onPress={() => setState((s) => setAdvanced(s, !(s.advanced === true)))} testID="create-group-advanced">
@@ -198,40 +241,6 @@ export default function CreateGroupWizardModal({
                 {state.advanced ? (
                   <>
                     <Text style={styles.podDisclosure}>{t('circle.wizard.create.advanced_hint')}</Text>
-                    {/* N1+E8 — kind picker.  Applies the matching template
-                        (β.4) in place; for a neighbourhood it also surfaces the size
-                        question + chat advice (noticeboard-first, chat off). */}
-                    <RadioGroup
-                      label={t('circle.kindPicker')}
-                      value={state.kind ?? null}
-                      options={attachConsequences('kind',
-                        CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })), t)}
-                      onChange={(k) => setState((s) => setKind(s, k))}
-                      consequenceLabel={t('common.consequences')}
-                    />
-                    {state.kind === 'neighbourhood' && (
-                      <>
-                        <RadioGroup
-                          label={t('circle.size.label')}
-                          value={state.size ?? null}
-                          options={attachConsequences('size', [
-                            { id: 'small', label: t('circle.size.small') },
-                            { id: 'large', label: t('circle.size.large') },
-                          ], t)}
-                          onChange={(sz) => setState((s) => setSize(s, sz))}
-                          consequenceLabel={t('common.consequences')}
-                        />
-                        {chatAdvice(state).reasonKey ? (
-                          <Warn>{t(chatAdvice(state).reasonKey)}</Warn>
-                        ) : null}
-                        <Checkbox
-                          label={t('circle.chatToggle')}
-                          checked={!!state.features?.chat}
-                          onToggle={() => setState((s) => setChatEnabled(s, !s.features?.chat))}
-                          testID="create-group-chat-toggle"
-                        />
-                      </>
-                    )}
                     {/* who sees whose name: per pair unless chosen here — never widened by the kind */}
                     <RadioGroup
                       label={t('circle.wizard.create.reveal_label')}
@@ -259,12 +268,6 @@ export default function CreateGroupWizardModal({
                         </Text>
                       </>
                     )}
-                    <Field
-                      label={t('circle.wizard.create.purpose')}
-                      value={state.purpose}
-                      onChangeText={(v) => setState((s) => ({ ...s, purpose: v }))}
-                      placeholder={purposeOrDefault({ kind: state.kind }, t)}
-                    />
                     <Field
                       label={t('circle.wizard.create.tags')}
                       value={state.tags}

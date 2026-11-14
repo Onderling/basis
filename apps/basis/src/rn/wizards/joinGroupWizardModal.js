@@ -171,7 +171,8 @@ export default function JoinGroupWizardModal({
                         ? t(`circle.rules.q.${key}`) : key;
                       return (
                         <View key={key} style={{ marginBottom: 8 }}>
-                          <Text style={{ fontWeight: '600', marginBottom: 2 }}>{label}</Text>
+                          {/* the theme's ink: unstyled, it fell back to the platform's black on a dark box (walk, 2026-11) */}
+                          <Text style={styles.rulesQ}>{label}</Text>
                           <Text style={styles.rulesText}>{v}</Text>
                         </View>
                       );
@@ -363,6 +364,7 @@ function sheetStyles(theme) {
     scroll: { flexGrow: 1 },
     rulesBlock: { padding: 10, backgroundColor: c.consentBg ?? c.card ?? '#f7f7f7', borderRadius: 8 },
     rulesText: { fontSize: 13, color: c.ink ?? '#222', lineHeight: 18 },
+    rulesQ: { fontWeight: '600', marginBottom: 2, color: c.ink ?? '#222' },
     loading: { fontSize: 13, color: c.inkSoft ?? '#666', fontStyle: 'italic' },
     subLabel: { fontSize: 12, color: c.inkSoft ?? '#555', fontWeight: '600', marginTop: 8 },
   });

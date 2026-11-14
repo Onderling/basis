@@ -44,7 +44,9 @@ function makeCallSkill() {
 describe('#4 link proof — joiner emits a proof the admin verifies', () => {
   const seed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('me');
   const circleAddressFor = (cid) => deriveCircleAddress(seed, cid);
-  const signCircleLink = (cid, gid, addr) => signCircleLinkFromSeed(seed, cid, gid, addr);
+  // as the host's: the member is this device's self in the joining circle (the redeem's sender there)
+  const ME = 'pk-me';
+  const signCircleLink = (cid, gid, addr, member = ME) => signCircleLinkFromSeed(seed, cid, gid, addr, member);
 
   it('presents the SOURCE address + a valid proof; the admin accepts it', async () => {
     const { callSkill, redeemArgs } = makeCallSkill();
@@ -54,13 +56,15 @@ describe('#4 link proof — joiner emits a proof the admin verifies', () => {
     expect(redeemArgs.circleAddress).toBe(deriveCircleAddress(seed, SOURCE));
     expect(typeof redeemArgs.circleAddressProof).toBe('string');
     // the admin's verifier accepts it (bound to the JOINING circle)
-    expect(verifyCircleLink({ groupId: JOINING, address: redeemArgs.circleAddress, proof: redeemArgs.circleAddressProof })).toBe(true);
+    expect(verifyCircleLink({ groupId: JOINING, address: redeemArgs.circleAddress, memberRef: ME, proof: redeemArgs.circleAddressProof })).toBe(true);
+    // …and only for this joiner: the same proof on another member's row is refused
+    expect(verifyCircleLink({ groupId: JOINING, address: redeemArgs.circleAddress, memberRef: 'pk-copier', proof: redeemArgs.circleAddressProof })).toBe(false);
   });
 
   it('the emitted proof does NOT verify for a different joining circle (no cross-circle replay)', async () => {
     const { callSkill, redeemArgs } = makeCallSkill();
     await finalSubmit({ state: linkableState(), callSkill, circleAddressFor, signCircleLink });
-    expect(verifyCircleLink({ groupId: 'some-other-circle', address: redeemArgs.circleAddress, proof: redeemArgs.circleAddressProof })).toBe(false);
+    expect(verifyCircleLink({ groupId: 'some-other-circle', address: redeemArgs.circleAddress, memberRef: ME, proof: redeemArgs.circleAddressProof })).toBe(false);
   });
 
   it('a forged proof (attacker who only knows the address) is rejected by the admin', async () => {
@@ -68,8 +72,8 @@ describe('#4 link proof — joiner emits a proof the admin verifies', () => {
     // attacker presents the victim's SOURCE address but signs with THEIR OWN key
     const victimAddress = deriveCircleAddress(seed, SOURCE);
     const attackerSeed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('attacker');
-    const forged = signCircleLinkFromSeed(attackerSeed, SOURCE, JOINING, victimAddress);
-    expect(verifyCircleLink({ groupId: JOINING, address: victimAddress, proof: forged })).toBe(false);
+    const forged = signCircleLinkFromSeed(attackerSeed, SOURCE, JOINING, victimAddress, ME);
+    expect(verifyCircleLink({ groupId: JOINING, address: victimAddress, memberRef: ME, proof: forged })).toBe(false);
     void redeemArgs;
   });
 

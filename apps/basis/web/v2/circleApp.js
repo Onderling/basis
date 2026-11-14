@@ -8891,7 +8891,7 @@ async function showGovernance(id) {
   const gov = shellGovernance({ myWebid });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
-  back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
+  back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = t('circle.back');   // the key carries its own arrow
   back.addEventListener('click', () => { _govRerender = null; showDetail(id); });
   rootEl.appendChild(back);
   const host = document.createElement('div');
@@ -8917,7 +8917,7 @@ async function showGovernance(id) {
     let reports = [];
     if (isAdmin) { try { reports = (await gov.reports.list(id)).open; } catch { /* */ } }
     renderGovernancePanel(host, {
-      view, t, policy: ctx.policy, isAdmin, reports, errorKey: govErrorKey, noticeKey: govNoticeKey,
+      view, t, policy: ctx.policy, isAdmin, reports, errorKey: govErrorKey, noticeKey: govNoticeKey, reportNameOf: nameOf,
       // the admin's Enact (L893): the way vote travels, through the circle's governance handle (governance.resolve is
       // the declared op its statement names); it says what it did, or why it could not
       onEnact: async (proposalId) => {

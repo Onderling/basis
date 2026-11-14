@@ -32,7 +32,7 @@ describe('circle detail bar — projected from manifest.actions', () => {
     // 2026-09-13 — an admin removes and promotes from the UI). The gates beneath it are unchanged and
     // observable through `gatedActions`: memberDirectory + houseRules on → viewAs + rules; lists + notes
     // off → files hidden; share is mobile-only → absent on web.
-    expect(barActions(el)).toEqual(['back', 'invite', 'settings', 'admin']);
+    expect(barActions(el)).toEqual(['back', 'invite', 'settings', 'admin', 'governance']);   // Decisions back since 2026-11-14
     const gated = gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
     expect(gated).toContain('viewAs');
     expect(gated).toContain('rules');

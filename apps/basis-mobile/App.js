@@ -66,13 +66,12 @@ import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { sealedLocalBackend, sealedKeyValue } from '../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { backendSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
-import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
+import { attachPinboardPodFor, circlePodWriterFor } from './src/core/phonePodSession.js';
 // γ-next.recipe — per-circle pending-recipe cache (AsyncStorage-backed).
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeCircleRecipePendingStoreRN } from './src/core/circleRecipePendingStorageRN.js';
 import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, getCirclePodFetch, getActiveRealPodRouting, getCirclePodWebId } from './src/core/circlePods.js';
-import { discoverPodRoot } from '../basis/src/web/podStorage.js';
 // γ-next.rules — per-circle pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen reads on rules-screen open + clears after the
@@ -325,16 +324,12 @@ export default function App() {
   // S4 — when signed in, route pinboard's items to the user's REAL pod (web parity with
   // circleApp). Same attachPod seam; the RN authenticated fetch is the OidcSessionRN bearer.
   // Best-effort; fires on session restore + once the bundle is up (whichever lands later).
+  // the sign-in's steps live in src/core/phonePodSession.js (the phone in Node runs the same ones)
   const maybeAttachPinboardPod = useCallback(async () => {
-    const session = sessionRef.current;
-    const agent = bundleRef.current?.agent;
-    if (!agent?.attachPinboardPod || !session?.isAuthenticated?.() || !session.webid) return;
-    const sessionShim = { fetch: session.getAuthenticatedFetch(), webid: session.webid };
-    const podRoot = await discoverPodRoot(sessionShim).catch(() => null);
-    if (podRoot) agent.attachPinboardPod({ podRoot, webid: session.webid, fetch: sessionShim.fetch }).catch(() => {});
+    await attachPinboardPodFor({ session: sessionRef.current, agent: bundleRef.current?.agent });
   }, []);
   const refreshCirclePodWriter = useCallback(async () => {
-    const w = await buildCirclePodWriter(sessionRef.current).catch(() => null);
+    const w = await circlePodWriterFor(sessionRef.current);
     circlePodWriterRef.current = w;
     if (w) dlog.boot('circle pod writer ready @', w.podRoot);
     maybeAttachPinboardPod();   // restore completed → attach pinboard's item store too

@@ -59,7 +59,10 @@ export const FUNCTIONS = Object.freeze([
     // two members of a shared-pod circle: B away while A posts, A stops, B comes back with every WebSocket closed and
     // reads the post from the pod (the page is seen reading it)
     web: { file: 'apps/basis/test-browser/walk-pod-sync.spec.js', test: 'a member who was away reads the post from the pod, with the relay out of reach' },
-    mobile: null,   // circlePods is a unit
+    // the phone in Node on a real Solid server (CI's live-pod job): Bram's phone, away while Anna's posted in their
+    // shared-pod circle, comes back to the front with no relay and reads the post from the pod (the app's own read-back
+    // entry, his own per-circle key)
+    mobile: { file: 'apps/basis-mobile/test/podSyncPhone.mobile.css.test.js', test: 'Bram, away while Anna posted, comes back to the front with no relay and reads the post from the pod' },
     box: NA('the box holds circles by relay and catch-up; its registry mirror is covered under restore and devices'),
   } },
   // REQUIRED on all three: the circle types a person can MAKE in the alpha, normal and shared pod (storage 'shared': the

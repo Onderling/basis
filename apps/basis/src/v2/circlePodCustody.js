@@ -14,6 +14,7 @@
 // a circle's pod producer — web-woven today, RN later) + the policy and seal-strategy resolvers; everything
 // here is pure of web/RN specifics. Reuses existing primitives only — no new crypto.
 
+import { processRefusalLog } from './refusalLog.js';
 import {
   podStorageBackend, writeSealedMessage, readSealedMessage, readSealedMessagesSince,
 } from '@onderling/pod-client';
@@ -77,7 +78,12 @@ export function createCirclePodCustody({ ensureCirclePod, policyFor, sealStrateg
   /** Range-query + open the circle's shared-pod rows since a ts (the pod chat catch-up's reader). */
   async function circlePodReadSince(circleId, q) {
     const c = await resolveCirclePodCustody(circleId);
-    if (!c || (c.sealed && !c.strategy)) return { items: [] };       // no pod / can't open → fall back to the local mirror
+    if (!c) return { items: [] };                                      // no pod → fall back to the local mirror
+    if (c.sealed && !c.strategy) {
+      // a sealed circle whose key this device cannot open reads NOTHING back from its pod: said, never silent
+      processRefusalLog().note({ tag: 'pod', lane: 'pod-chat', check: 'read-back', reason: 'pod-key-not-opened' });
+      return { items: [] };
+    }
     return readSealedMessagesSince(c.backend, c.strategy?.open ?? null, { circleId, ...q });
   }
 

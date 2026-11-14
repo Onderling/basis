@@ -66,6 +66,7 @@ catalogue baseline until it is.
 
 ## Decisions that bind this area
 
+- The invite door: a peer redeem reaches all of a person's devices (one address); a device that has never held a code for the circle stays silent, so the code holder's answer is the one heard. The price: an answer now tells someone who already has the circle id and the address that this device holds an invite for it (accepted 2026-11-14; the id travels only in invites).
 - One sealing key family: a member's key is wrapped to the image of their proven per-circle address (2026-09-04).
 
 <!-- catalogue-ops

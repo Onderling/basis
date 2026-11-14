@@ -275,6 +275,10 @@ export async function verifyMembershipCodeForPeer({
 
   const all = await store.listOpen({ type: 'membership-code' });
   const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
+  // NOT WHERE THE INVITE LIVES. A person's devices share one address, so a peer redeem reaches all of them, and the
+  // joiner takes the first reply. A device holding no code for this circle at all (a sibling that never minted one) says
+  // so, and the handler stays silent: its "invalid code" would otherwise overtake the answer of the device that holds it.
+  if (forGroup.length === 0) return { error: 'no-code-here' };
   const now = Date.now();
   const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
   if (!valid) return { error: 'invalid-or-expired-code' };

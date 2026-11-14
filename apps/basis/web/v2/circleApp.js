@@ -20,6 +20,7 @@
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
+import { processRefusalLog } from '../../src/v2/refusalLog.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
 import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -43,7 +44,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster,
+  scopePinboardCallSkill, scopedWriteFailureKey, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture, sealedAnswer,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -574,7 +575,11 @@ async function getCircleShareEnforcement(circleId, policy) {
         if (typeof console !== 'undefined') console.warn('[circleApp] share enforcement unavailable:', err?.message ?? err);
         return null;
       }
-    })());
+    })().then((enf) => {
+      // "none" is not kept: the producer it needs may come with the agent's bind, or a later policy
+      if (!enf) _shareEnforcementByCircle.delete(circleId);
+      return enf;
+    }));
   }
   return _shareEnforcementByCircle.get(circleId);
 }
@@ -1962,6 +1967,7 @@ const circleStrategyFlight = createSingleFlight();
 
 async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
+  if (policy == null) return null;   // not known yet: no answer to keep (mobile parity)
   return circleStrategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
 }
 
@@ -1989,7 +1995,9 @@ async function buildCircleSealStrategy(circleId, policy) {
       }
     }
   } catch { strat = null; }
-  circleSealStrategies.set(circleId, strat);
+  // "none" is the plaintext answer, so it is kept only for a circle that does not seal; a sealed circle without a strategy
+  // (no key pair yet, a key not opened yet) asks again next time instead of being written in the clear for good
+  if (strat || !isSealedPosture(policy?.storagePosture)) circleSealStrategies.set(circleId, strat);
   return strat;
 }
 
@@ -2002,7 +2010,11 @@ const devMediaBucket = makeDevMediaBucket();
 const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
 function getCircleMediaComposition(circleId, policy) {
   if (!circleMediaCompositions.has(circleId)) {
-    circleMediaCompositions.set(circleId, resolveCircleMediaComposition(circleId, policy).catch(() => null));
+    circleMediaCompositions.set(circleId, resolveCircleMediaComposition(circleId, policy).catch(() => null).then((c) => {
+      // "none" is not kept (mobile parity): the key pair may come with the agent's bind, or a policy may make it seal
+      if (!c) circleMediaCompositions.delete(circleId);
+      return c;
+    }));
   }
   return circleMediaCompositions.get(circleId);
 }
@@ -2098,6 +2110,9 @@ function makeCirclePodClient(circleId) {
  */
 async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
+  // No policy yet: the posture is unknown, so build nothing and keep nothing (mobile parity) — a producer made now would
+  // be the default p0 one, kept for the circle for the page's life.
+  if (policy == null) return null;
   return circlePodFlight(circleId, () => buildCirclePod(circleId, policy));
 }
 
@@ -2184,9 +2199,23 @@ async function buildCirclePod(circleId, policy) {
     circlePods.set(circleId, producer);
     return producer;
   } catch (err) {
+    // a sealed circle asked for before this page's agent is up: no producer YET (never a stand-in key) — noted, and
+    // built when the agent binds (producerKeyWait.drain below)
+    if (err?.code === 'NO_SEALING_KEY_PAIR') {
+      if (!_peerAgent) { producerKeyWait.note(circleId, policy); return null; }
+      // the agent IS bound and still gives no key pair: a fault, said, not a wait nobody drains again
+      processRefusalLog().note({ tag: 'key', lane: 'key', check: 'producer', reason: 'no-sealing-key-pair' });
+    }
     if (typeof console !== 'undefined') console.warn('[circleApp] ensureCirclePod failed:', err?.message ?? err);
     return null;
   }
+}
+/** The sealed circles whose producer waits for this page's agent (their key pairs come with it). */
+const producerKeyWait = createProducerKeyWait();
+/** Stand up a circle's producer and seed its group-key roster — what opening the circle does, and what the bind re-drives. */
+function ensureCirclePodSeeded(circleId, policy) {
+  return ensureCirclePod(circleId, policy)
+    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey }).then(() => prod); return prod; });
 }
 
 /* ─── Connectivity Phase 3 — LIVE shared-pod key custody (MEMBER-SIDE) ─────────────────────────────
@@ -2371,10 +2400,6 @@ function buildCircleBot(agent) {
   circleCoreAgent = agent.sa?.agent ?? null;   // the core chat agent — discoverA2A's hello/native-upgrade target
   if (typeof window !== 'undefined') {
     window.onderlingCirclePods = circlePods;   // S4 debug / e2e seam
-    // e2e: drive a producer for any posture (verifies browser-safe sealing crypto end-to-end).
-    window.onderlingMakeCirclePod = (circleId, storagePosture = 'p2', roster = []) =>
-      createCirclePodProducer({ circleId, storagePosture, vault: circleVault, roster,
-        generateKeypair: podGenerateKeypair, makePodClient: makeCirclePodClient });
     window.onderlingSealingKit = { generateKeypair: podGenerateKeypair, createSealedPodClient, scopePinboardCallSkill };
   }
   circleContactSkills = createContactSkillRegistry({ peerGraph: circlePeerGraph, sendTask: sendContactTask });
@@ -7323,8 +7348,10 @@ async function showDetail(id) {
   // circle view; v2 §1 says chat IS the circle view (CONVERSATION tab).  The
   // CONVERSATION render lands in.
   let detailPolicy = null;
-  try { detailPolicy = await policyStore.get(id); }
-  catch { /* fresh circle / read failure → fall through */ }
+  // read with no record → {} (a plaintext circle, mobile parity); a FAILED read stays null: the posture is not known,
+  // and an unknown posture builds no producer and refuses a write (never the plaintext answer)
+  try { detailPolicy = (await policyStore.get(id)) ?? {}; }
+  catch { /* read failure → not known */ }
   try { _openOverride = (await overrideStore.get(id)) ?? {}; } catch { _openOverride = {}; }
   showCircle(id, circle, detailPolicy);
 }
@@ -7442,12 +7469,12 @@ function showCircle(id, circle, policy) {
   };
   const pinboardCall = scopePinboardCallSkill(
     rawCallSkill, id, () => getCircleSealStrategy(id, policy), getPinboardMedia,
+    { sealed: () => sealedAnswer(policy) },
   );
   // Stand up this circle's pod producer (sealing identity + control agent for a sealed
   // posture), then seed its group-key roster with members who joined before it was live.
   // Best-effort + fire-and-forget; never blocks the circle.
-  ensureCirclePod(id, policy)
-    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId: id, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey }); })
+  ensureCirclePodSeeded(id, policy)
     .catch(() => { /* best-effort; plain shared path on failure */ });
   // media — resolve this circle's sealed-media composition (async: the seal strategy
   // rides the pod producer). Until it resolves — and for a p0/p1 circle FOREVER (null) —
@@ -7763,7 +7790,7 @@ function showCircle(id, circle, policy) {
       });
       noticeboardPendingAttachment = null;   // consumed on success; keep it on failure so the user can retry
     }
-    catch { globalThis.alert?.(t('circle.noticeboard.post_failed')); }
+    catch (err) { globalThis.alert?.(t(scopedWriteFailureKey(err))); }
     noticeboardBusy = false;
     await loadNoticeboard();
   }
@@ -9970,6 +9997,12 @@ async function boot() {
         },
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
+      // the agent is up, so are its per-circle sealing key pairs: build the producers that waited for them
+      producerKeyWait.drain((id, pol) => {
+        // what was derived while the circle had no producer goes, so the next ask builds it on the producer
+        circleSealStrategies.delete(id); circleMediaCompositions.delete(id); _shareEnforcementByCircle.delete(id);
+        return ensureCirclePodSeeded(id, pol);
+      }).catch(() => {});
       refreshUnreadMyRefs();
       readMarks.refresh().catch(() => {});
       // a sibling's marks landed in the own store: re-read the set

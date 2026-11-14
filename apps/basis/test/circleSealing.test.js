@@ -1,24 +1,16 @@
 /**
  * Per-circle sealing — the SAFE offline slice of the S4 pod foundation
- * (circleSealingIdentity + circleControlAgent). Drives the REAL @onderling/pod-client
+ * (circleControlAgent). Drives the REAL @onderling/pod-client
  * sealing substrate against an in-memory pod + mock ACL sharing — no real Solid
- * pod, no OIDC. Proves: a per-circle sealing identity is stable + scoped, and a
+ * pod, no OIDC. Proves: a
  * p2 circle's control agent bootstraps, grants ACL + seals the group key on join,
  * and revokes + rotates (forward secrecy) on leave.
  */
 import { describe, it, expect } from 'vitest';
 import { generateKeypair } from '@onderling/pod-client';
-import { createCircleSealingIdentity } from '../src/v2/circleSealingIdentity.js';
 import { createCircleControlAgent } from '../src/v2/circleControlAgent.js';
 
 // ── in-memory fakes (no pod / no OIDC) ───────────────────────────────────────
-class MemVault {
-  #m = new Map();
-  async get(k) { return this.#m.get(k); }
-  async set(k, v) { this.#m.set(k, String(v)); }
-  async delete(k) { this.#m.delete(k); }
-  async has(k) { return this.#m.has(k); }
-}
 class MemPodClient {
   #m = new Map();
   async read(uri) {
@@ -31,32 +23,6 @@ function mockSharing() {
   const grants = []; const revokes = [];
   return { grant: async (o) => { grants.push(o); }, revoke: async (o) => { revokes.push(o); }, grants, revokes };
 }
-
-describe('createCircleSealingIdentity', () => {
-  it('creates + persists a per-circle sealing identity, stable across reloads', async () => {
-    const vault = new MemVault();
-    const k1 = await createCircleSealingIdentity({ circleId: 'c1', store: vault }).ensure();
-    expect(k1.publicKey).toBeTruthy();
-    // a fresh wrapper over the same vault loads the SAME key (persisted).
-    const k2 = await createCircleSealingIdentity({ circleId: 'c1', store: vault }).ensure();
-    expect(k2.publicKey).toBe(k1.publicKey);
-
-    const entry = await createCircleSealingIdentity({ circleId: 'c1', store: vault }).rosterEntry('did:alice', 'member');
-    expect(entry).toMatchObject({ webId: 'did:alice', publicKey: k1.publicKey, role: 'member' });
-  });
-
-  it('scopes by circle: two circles get different sealing keys', async () => {
-    const vault = new MemVault();
-    const a = await createCircleSealingIdentity({ circleId: 'a', store: vault }).ensure();
-    const b = await createCircleSealingIdentity({ circleId: 'b', store: vault }).ensure();
-    expect(a.publicKey).not.toBe(b.publicKey);
-  });
-
-  it('rejects a missing circleId or store', () => {
-    expect(() => createCircleSealingIdentity({ store: new MemVault() })).toThrow(/circleId/);
-    expect(() => createCircleSealingIdentity({ circleId: 'c' })).toThrow(/store/);
-  });
-});
 
 describe('createCircleControlAgent', () => {
   it('p0/p1 → null (no sealing, no control agent)', () => {

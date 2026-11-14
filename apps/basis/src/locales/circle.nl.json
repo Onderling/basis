@@ -6309,6 +6309,14 @@
       "text": "Geplaatst.",
       "doc": "S1 — toast after a post is created."
     },
+    "key_not_ready": {
+      "text": "De sleutel van deze kring staat nog niet op dit apparaat. Probeer het zo opnieuw.",
+      "doc": "Shown when a write into a sealed circle is refused because this device cannot seal for it yet (its key pair or the circle's policy is not there yet): nothing was written in the clear. Wording Frits's."
+    },
+    "media_unavailable": {
+      "text": "Foto's kunnen voor deze kring op dit apparaat nog niet versleuteld worden.",
+      "doc": "Shown when a post with a picture is refused because the circle's sealed-media gateway is not there: no picture goes out unsealed."
+    },
     "post_failed": {
       "text": "Kon niet plaatsen — probeer opnieuw.",
       "doc": "S1 — shown when postRequest fails."

@@ -77,6 +77,7 @@ SUITE('e2e: mobile sign-in → real-pod seal (CSS)', () => {
     const circleId = `e2e-${generateKeypair().publicKey.replace(/[^a-zA-Z0-9]/g, '').slice(-10)}`;
     const prod = await createCirclePodProducer({
       circleId, storagePosture: 'p2', vault: new MemVault(), generateKeypair,
+      sealingKeyPair: generateKeypair(),   // the device's per-circle key pair, as the app's agent hands it
       makePodClient: routing.makePodClient, circleRootUri: routing.circleRootUri(circleId),
     });
     expect(prod.controlAgent).not.toBeNull();

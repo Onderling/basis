@@ -22,6 +22,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { produceWithPair } from '../support/deviceSealingKeyPair.js';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart, MemoryStorageBackend } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import {
@@ -31,7 +32,6 @@ import {
 import { PodClient } from '@onderling/pod-client';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createNeighbourhoodAgent } from '@onderling-app/pinboard';
-import { createCirclePodProducer } from '../../src/v2/circlePodProducer.js';
 import { EventLog } from '../../src/eventLog.js';
 import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 
@@ -60,7 +60,7 @@ function makePodClient(circleId) {
 /** Stand up a REAL p2 circle producer + resolve THIS device's live {seal,open} from its control agent. */
 async function liveCircleSealOpen(circleId) {
   const vault = new MemVault();
-  const producer = await createCirclePodProducer({
+  const producer = await produceWithPair({
     circleId, storagePosture: 'p2', vault, generateKeypair, makePodClient,
   });
   const idKey = await producer.sealingIdentity.ensure();

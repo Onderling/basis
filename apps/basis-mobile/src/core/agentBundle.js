@@ -1080,6 +1080,8 @@ export async function bootAgentBundle(opts = {}) {
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,
+    // a circle that arrives without its policy is marked pending (App.js hands the policy store's mark)
+    markPolicyPending: typeof opts.markPolicyPending === 'function' ? opts.markPolicyPending : null,
     emitMemberProps,
     disclosureShareMemo,
     /** Say a persona's release on one circle (the create wizard's founding persona; web parity). */

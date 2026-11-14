@@ -10142,6 +10142,8 @@ async function boot() {
         // consume runs after a recovery-file import: the file's peers are stashed as an offer, and
         // the import door calls this rather than waiting for the next launch.
         const enrolDeps = {
+          // a circle that arrives without its policy: its posture not known until the policy lands
+          markPolicyPending: (cid) => policyStore.markPending(cid),
           agent,
           callSkill: rawCallSkill,
           sendPeerMessage: (to, payload, opts2) => agent.sendPeerMessage(to, payload, opts2),

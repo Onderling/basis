@@ -54,6 +54,7 @@ import { buildHouseholdDataSource } from '../../../basis/src/household/persist.j
 // LIVE per-circle `sharePosture` from here instead of the deny-by-default `{}`.
 import { makeCirclePolicyStoreRN } from './circleStoresRN.js';
 import { processRefusalLog } from '../../../basis/src/v2/refusalLog.js';
+import { runKeyAudienceCheck } from '../../../basis/src/v2/keyAudienceCheck.js';
 // pod versioning — the RN twin of web's src/web/circleVersioning.js (expo-crypto hash;
 // crypto.subtle fallback for vitest/web). One store per circle, on the circle pod's own backend.
 import { circleVersioningFor } from './circleVersioning.js';
@@ -320,16 +321,21 @@ async function buildCirclePod(circleId, policy) {
 // every join's key change re-asks whether the member is still in after the admission it follows (web parity)
 export const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
   memberStatusOf: memberStatusReader((...a) => (typeof _keyEventWiring?.callSkill === 'function' ? _keyEventWiring.callSkill(...a) : Promise.reject(new Error('not bound')))),
+  // after each membership event it handles: one audience round on the key owner's device (web parity)
+  audienceCheck: (gid, prod) => runKeyAudienceCheck({ circleId: gid, producer: prod, callSkill: _keyEventWiring?.callSkill }),
 });
 
 /** Ensure a circle's producer, then seed its group-key roster with prior members (web parity). */
 export async function seedCircleRosterFor({ circleId, policy, callSkill }) {
   const prod = await ensureCirclePod(circleId, policy);
   if (!prod?.controlAgent) return 0;
-  return seedCircleRoster({
+  const n = await seedCircleRoster({
     callSkill, circleId, router: circleControlAgentRouter,
     deriveSealingKey: podSealingPublicKeyFromNetworkKey,
   });
+  // the producer has started and its roster is seeded: one audience round (the key owner's device only; web parity)
+  await runKeyAudienceCheck({ circleId, producer: prod, callSkill });
+  return n;
 }
 
 /** Resolve (+ cache) a circle's content seal/open strategy via the device's own sealing identity. */

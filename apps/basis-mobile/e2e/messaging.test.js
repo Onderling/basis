@@ -1,4 +1,4 @@
-/* global device, element, by */
+/* global device, element, by, waitFor */
 // MESSAGING ON THE PHONE, end to end with a real second person (the function matrix's messaging × mobile cell).
 //
 // Bram (e2e/support/relayPeer.mjs --talk: a real agent node on a relay the emulator reaches) has a circle. The phone
@@ -18,6 +18,7 @@ const stamp = Date.now().toString(36);
 const PHONE_LINE = `Hallo kring ${stamp}`;
 const PEER_LINE = `Hoi anna ${stamp}`;
 const PEER_DM = `Even apart ${stamp}`;
+const PEER_DM2 = `Nog een vraag ${Date.now().toString(36)}`;
 const PHONE_DM = `Prima ${stamp}`;
 let peer = null;
 let ready = null;
@@ -106,6 +107,37 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     // key went past the dialog and left the thread)
     await element(by.text('Cancel')).tap();
     await soon(by.id('contact-thread-screen'), 10_000);
+  });
+
+  it('switched off later, a member who already wrote stays a conversation: the door is for a FIRST message', async () => {
+    // the choice is on the persona's card in the person's editor (the header avatar): off = "ask first, like anyone else"
+    await backToLauncher();
+    await tapSoon(by.id('header-avatar'), 20_000);
+    await soon(by.id('circle-aboutme-panel'), 20_000);
+    const off = by.id('mij-first-contact-default-circleMembersMayWrite-false');
+    await waitFor(element(off)).toBeVisible().whileElement(by.id('mij-scroll')).scroll(300, 'down');
+    await element(off).tap();
+    await device.takeScreenshot('msg-05c-members-ask-first');
+    await tapSoon(by.id('circle-aboutme-panel-close'));
+    // Bram's FIRST message came in while it was on; his next one is not a first message, so it lands in his thread
+    // (decision 2026-11-12: "off: their first private message is a request"). The request case is walked from a fresh
+    // install with the setting off before anyone writes: e2e/messagingRequest.test.js.
+    peer.send({ do: 'contact-say', text: PEER_DM2 });
+    const said = await peer.next('contact-said', () => true, 60_000);
+    if (!said.ok) throw new Error(`Bram could not write: ${JSON.stringify(said)}`);
+    let row = -1;
+    for (let i = 0; i < 8 && row < 0; i += 1) {
+      await tapSoon(by.id('circle-tab-circles'));
+      await tapSoon(by.id('circle-tab-contacten'));
+      await soon(by.id('contacts-screen'));
+      row = await firstOf([by.text('bram'), by.text('Bram')], 5_000);
+    }
+    if (row < 0) throw new Error('Bram is gone from Contacten');
+    if (await isVisible(by.id('contacts-requests'))) throw new Error("a member who already wrote became a request when the setting went off");
+    await element(row === 0 ? by.text('bram') : by.text('Bram')).atIndex(0).tap();
+    await soon(by.id('contact-thread-screen'), 30_000);
+    await soon(by.text(PEER_DM2), 60_000);   // not dropped: it stands in his thread
+    await device.takeScreenshot('msg-05d-second-in-thread');
   });
 
   it("the phone's answer in the thread reaches Bram's stored thread", async () => {

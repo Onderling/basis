@@ -126,3 +126,35 @@ describe('J-NP2 — the admin-offline case is a typed NOTICE, not a generic fail
   });
 });
 
+
+describe("the admin's per-circle address on a peer redeem reply is taken only from the admin's own reply", () => {
+  // The joiner records the admin's address + proof with the proof's member = the invite's admin. A reply is matched by
+  // its request id; whoever sent it, the proof would have named the member it was told to. So the address is recorded
+  // only when the reply's verified sender IS the invite's admin; another sender's reply still completes the join.
+  const state = () => ({ invite: { kind: 'membershipCode', code: 'C', groupId: 'g1', adminPeerAddr: 'admin-addr' }, handle: 'jan', existingSelves: [], linkChoice: 'fresh' });
+  const run = async (repliedBy) => {
+    const remote = {};
+    const callSkill = vi.fn(async (app, op, args) => {
+      if (op === 'redeemMembershipCode') return { error: 'invalid-or-expired-code' };
+      if (op === 'recordRemoteRedemption') { Object.assign(remote, args); return { ok: true }; }
+      return { ok: true };
+    });
+    const reply = { ok: true, codeId: 'k', circleAddress: 'ADMIN-CIRCLE-ADDR', circleAddressProof: 'PROOF', ...(repliedBy ? { repliedBy } : {}) };
+    await finalSubmit({ state: state(), callSkill, sendPeerRedeem: async () => reply });
+    return remote;
+  };
+  it('the admin\'s own reply: the address and proof are passed on (the substrate verifies them)', async () => {
+    const r = await run('admin-addr');
+    expect(r.confirmedBy).toBe('admin-addr');
+    expect(r.confirmedByCircleAddress).toBe('ADMIN-CIRCLE-ADDR');
+    expect(r.confirmedByCircleAddressProof).toBe('PROOF');
+  });
+  it('a reply from anyone else (or with no known sender): the join goes on, no address is recorded for the admin', async () => {
+    for (const by of ['someone-else', null]) {
+      const r = await run(by);
+      expect(r.confirmedBy).toBe('admin-addr');
+      expect(r.confirmedByCircleAddress).toBeUndefined();
+      expect(r.confirmedByCircleAddressProof).toBeUndefined();
+    }
+  });
+});

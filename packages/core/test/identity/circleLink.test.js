@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { Bootstrap } from '../../src/identity/Bootstrap.js';
+import { AgentIdentity } from '../../src/identity/AgentIdentity.js';
 import { deriveCircleAddress, circleIdentity } from '../../src/identity/circleAddress.js';
 import { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircleLink, onEarlierCircleLink } from '../../src/identity/circleLink.js';
 
@@ -92,6 +93,23 @@ describe('circle link proof', () => {
       const forged = encode(attackerId.sign(`onderling-circle-link-v1|werk-7|${address}`));
       expect(verifyCircleLink({ groupId: 'werk-7', address, memberRef: ME, proof: forged })).toBe(false);
       expect(heard, 'a forged proof is not an earlier one').toBe(1);
+    } finally { onEarlierCircleLink(null); }
+  });
+
+  it('the same earlier proof asked again: one check of the earlier message, one report', async () => {
+    const s = seedFor('me');
+    const sourceId = await circleIdentity(s, 'circle-42', new VaultMemory());
+    const address = deriveCircleAddress(s, 'circle-42');
+    const { encode } = await import('../../src/crypto/b64.js');
+    const v1 = encode(sourceId.sign(`onderling-circle-link-v1|werk-8|${address}`));
+    const asked = [];
+    const verifySignature = (msg, sig, key) => { asked.push(msg); return AgentIdentity.verify(msg, sig, key); };
+    let heard = 0;
+    onEarlierCircleLink(() => { heard += 1; });
+    try {
+      for (let i = 0; i < 3; i++) expect(verifyCircleLink({ groupId: 'werk-8', address, memberRef: ME, proof: v1, verifySignature })).toBe(false);
+      expect(asked.filter((m) => m.startsWith('onderling-circle-link-v1|')), 'the earlier message checked once').toHaveLength(1);
+      expect(heard).toBe(1);
     } finally { onEarlierCircleLink(null); }
   });
 

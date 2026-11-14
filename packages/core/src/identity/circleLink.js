@@ -83,10 +83,26 @@ export function verifyCircleLink({ groupId, address, memberRef, proof, verifySig
  * against the earlier message, and a match is reported: no circle id, no address, only that it happened.
  */
 let earlierListener = null;
-/** @param {(() => void)|null} fn  called once per refused proof that the earlier message verifies */
+/**
+ * ONE listener per process: the last setter wins. Harmless, as it only reports (several persona runtimes in one process
+ * set the same refusal log); a caller that needs it per agent keys it there.
+ * @param {(() => void)|null} fn  called once per earlier proof (per process), the first time it is refused
+ */
 export function onEarlierCircleLink(fn) { earlierListener = typeof fn === 'function' ? fn : null; }
+// The earlier proofs this process has met, keyed like the verdict memo: a roster read re-checks every row, and a phone
+// with old circles would otherwise pay a second signature check per old row per read. Met once, checked and reported
+// once. Bounded: oldest out first (only a real signature by the address's key over the earlier message gets in).
+const EARLIER_MAX = 1024;
+const earlierSeen = new Set();
 function noteIfEarlier(groupId, address, proof, check) {
   try {
-    if (check(`onderling-circle-link-v1|${String(groupId)}|${String(address)}`, proof, address) === true) earlierListener();
+    const key = exactVerdictKey(['v1', groupId, address, proof]);
+    if (key && earlierSeen.has(key)) return;
+    if (check(`onderling-circle-link-v1|${String(groupId)}|${String(address)}`, proof, address) !== true) return;
+    if (key) {
+      earlierSeen.add(key);
+      if (earlierSeen.size > EARLIER_MAX) earlierSeen.delete(earlierSeen.values().next().value);
+    }
+    earlierListener?.();
   } catch { /* a report never breaks a check */ }
 }

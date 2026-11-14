@@ -37,7 +37,6 @@ export { makeContactTurnFan, makeContactTurnPeerHandler, contactTurnToWire, CONT
 export { listContacts, peerToContactRow, pinboardContactToRow, mergeContacts } from './v2/contactsSource.js';
 // S4 (pinboard dissolution — pod foundation, SAFE offline slice): per-circle sealing
 // identity + control-agent composition over the @onderling/pod-client sealing substrate.
-export { createCircleSealingIdentity } from './v2/circleSealingIdentity.js';
 export { createCircleControlAgent } from './v2/circleControlAgent.js';
 export { addBotToGraph } from './v2/addBot.js';
 // The pure, offline help-answer engine (ported onderling.org matcher + cards):
@@ -81,8 +80,8 @@ export { circleSourcesFromAgent, makeResolvingCallSkill, DEFAULT_CIRCLE_ORIGINS 
 export { loadCircleItems, normalizeContentItem }      from './v2/circleContent.js';
 export { quickCreateCircle }                          from './v2/circleCreate.js';
 export { itemCircleId, isInCircle, scopeItems }       from './v2/circleScope.js';
-export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES, NOTICEBOARD_REFRESH_EVENTS } from './v2/circlePinboardScope.js';
-export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from './v2/circlePodProducer.js';
+export { scopePinboardCallSkill, scopedWriteFailureKey, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES, NOTICEBOARD_REFRESH_EVENTS } from './v2/circlePinboardScope.js';
+export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster, createProducerKeyWait, SealingKeyPairMissingError, isSealedPosture, sealedAnswer } from './v2/circlePodProducer.js';
 export { realPodRouting, podRootFromWebid, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
 export { runStartQueue, startQueueSiblings, START_LANES } from './v2/startQueue.js';

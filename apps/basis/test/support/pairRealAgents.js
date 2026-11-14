@@ -967,6 +967,8 @@ export async function sealCircleViaProducer({ admin, members = [], groupId }) {
   const producer = await createCirclePodProducer({
     circleId: groupId, storagePosture: 'p2', vault: new VaultMemory(),
     generateKeypair: podGenerateKeypair, makePodClient: makeNodePodClient,
+    // the admin's own per-circle sealing key pair, as both shells hand it (the agent's derivation)
+    sealingKeyPair: admin.agent.circleSealingKeyPairFor(groupId),
     keyEventLog,
   });
   admin.circlePods.set(groupId, producer);

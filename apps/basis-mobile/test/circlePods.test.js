@@ -4,7 +4,7 @@
  * + an injected mock AsyncStorage vault. Proves a p2 circle resolves a working seal/open
  * strategy and a p0 circle resolves none (cleartext).
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -13,11 +13,14 @@ import {
   circleSendDataMove, circlePodWrite, circlePodReadSince, circleResolveRef,
 } from '../src/core/circlePods.js';
 import { rotateKeyEvent, sealWithGroupKey } from '@onderling/pod-client';
+import { bindCircleKeyPairs } from './support/circleKeyPairs.js';
 import { useTestContentSeal } from './support/contentSeal.js';
 
 // A real device holds a content key before any circle store exists; these tests build one without an
 // agent, so they announce the key the same way boot does. Without it every local write refuses, by design.
 useTestContentSeal();
+
+const bindKeyPairs = bindCircleKeyPairs;
 
 function mockAsyncStorage() {
   const m = new Map();
@@ -29,6 +32,7 @@ function mockAsyncStorage() {
 }
 
 describe('mobile circlePods', () => {
+  beforeEach(() => bindKeyPairs());
   it('p2 circle resolves a content seal/open strategy that round-trips', async () => {
     initCirclePods(mockAsyncStorage());
     const strat = await getCircleSealStrategy('mob-p2', { storagePosture: 'p2' });
@@ -108,6 +112,7 @@ describe('mobile circlePods', () => {
 // basis's noPodKeyRotationThreeDevice.test.js — these tests pin the RN chain around them: the bundle-injected
 // wiring feeds the EMIT sink, and a key-event recorded on RECEIVE feeds the seal strategy's fold.
 describe('mobile circlePods — G11 no-pod rotation wiring', () => {
+  beforeEach(() => bindKeyPairs());
   it('removing a member fans the rotation key-event to the REMAINING members only', async () => {
     initCirclePods(mockAsyncStorage());
     const sent = [];
@@ -115,7 +120,7 @@ describe('mobile circlePods — G11 no-pod rotation wiring', () => {
     const bram = { webid: 'did:bram', addr: 'addr:bram' };
     const cato = { webid: 'did:cato', addr: 'addr:cato' };
     const keys = {};   // webid → sealing publicKey (filled once granted)
-    setCircleKeyEventWiring({
+    bindKeyPairs({
       sendPeer: (addr, payload) => { sent.push({ addr, payload }); },
       callSkill: async (_o, opId) => (opId === 'listGroupMembers'
         ? { members: [bram, cato].map((m) => ({ ...m, sealingPublicKey: keys[m.webid] })) }

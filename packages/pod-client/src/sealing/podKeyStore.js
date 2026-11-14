@@ -16,13 +16,15 @@ import { unwrapGroupKey } from './groupKeyResource.js';
  *
  * @param {{ read: Function, write: Function }} podClient   a PodClient-shaped client
  * @param {string} uri                                      the key-resource URI (e.g. <pod>/.keys/group.json)
- * @returns {{ read: () => Promise<object|null>, write: (resource:object) => Promise<void> }}
+ * @returns {{ read: () => Promise<object|null>, write: (resource:object) => Promise<void>, writeIfUnchanged: (resource:object, cur:object|null) => Promise<boolean> }}
  */
 export function createPodKeyStore({ podClient, uri } = {}) {
   if (!podClient || typeof podClient.read !== 'function' || typeof podClient.write !== 'function') {
     throw new Error('createPodKeyStore: a PodClient with read/write is required');
   }
   if (!uri) throw new Error('createPodKeyStore: a key-resource uri is required');
+  // the ETag each parsed resource was read with, so a later conditional write can name the version it built on
+  const readEtags = new WeakMap();
   return {
     async read() {
       let res;
@@ -34,16 +36,52 @@ export function createPodKeyStore({ podClient, uri } = {}) {
       }
       const body = typeof res === 'string' ? res : res?.content;
       if (body == null) return null;
+      const etag = (res && typeof res === 'object' && typeof res.etag === 'string') ? res.etag : null;
       // A PodClient auto-decodes an application/json resource to an OBJECT (its
       // `auto`/unknown decode path JSON-parses for us), while an in-memory client
       // hands back the raw JSON string. Accept either — JSON.parse on an object
       // would yield "[object Object]" → SyntaxError → a spurious null, which would
       // make the control agent rebuild the group key and silently drop members.
-      if (typeof body === 'object') return body;
-      try { return JSON.parse(body); } catch { return null; }
+      let parsed = null;
+      if (typeof body === 'object') parsed = body;
+      else { try { parsed = JSON.parse(body); } catch { parsed = null; } }
+      if (parsed && typeof parsed === 'object') readEtags.set(parsed, etag);
+      return parsed;
     },
     async write(resource) {
       await podClient.write(uri, JSON.stringify(resource), { contentType: 'application/json' });
+    },
+    /**
+     * COMPARE-AND-SWAP: write `resource` only while the stored key resource is still the one `cur` was read as —
+     * a conditional PUT on the ETag of the read that produced `cur` (`cur` null: only while nothing is stored).
+     * Returns false when another writer changed it in between (412 / conflict): the caller re-reads and applies
+     * its own change on the newest base. A `cur` whose read carried no ETag cannot be compared: refused on an http(s)
+     * pod (KEY_WRITE_UNCONDITIONED), a plain write on an in-memory or pseudo store.
+     */
+    async writeIfUnchanged(resource, cur) {
+      const payload = JSON.stringify(resource);
+      let opts;
+      if (cur == null) opts = { contentType: 'application/json', ifMatch: null, ifNoneMatch: '*', _suppressConflictEvent: true };
+      else {
+        const etag = readEtags.get(cur);
+        if (!etag) {
+          // a real pod that gave no ETag cannot be compared against: a plain write there would bring the lost update back
+          // silently, so it is refused (the caller reports it); an in-memory or pseudo store without one writes plainly
+          if (/^https?:/i.test(uri)) {
+            throw Object.assign(new Error('the pod gave no ETag for the key file: the change was not written (it could undo another writer\'s)'), { code: 'KEY_WRITE_UNCONDITIONED' });
+          }
+          await podClient.write(uri, payload, { contentType: 'application/json' });
+          return true;
+        }
+        opts = { contentType: 'application/json', ifMatch: etag, _suppressConflictEvent: true };
+      }
+      try {
+        await podClient.write(uri, payload, opts);
+        return true;
+      } catch (err) {
+        if (err && (err.code === 'CONFLICT' || err.status === 412 || err.status === 409 || err.name === 'ConflictError')) return false;
+        throw err;
+      }
     },
   };
 }

@@ -6,7 +6,7 @@
  * identities, instantiates createControlAgent, or wraps the circle pod-client." This
  * is that producer: for ONE circle it composes the S4 sealing substrate into a
  * per-circle storage producer —
- *   • a per-circle X25519 sealing identity (always, vault-backed), and
+ *   • the device's per-circle X25519 sealing key pair (the address key's image, handed in by the agent), and
  *   • for a SEALED posture (p2/p3): a per-circle control agent over the circle's
  *     pod-client — bootstrapped, holding the recipient-wrapped group key, ready to
  *     grant/seal on join and revoke/rotate on leave (forward secrecy).
@@ -21,10 +21,62 @@
  * storage in the browser, NO OIDC/CSS) — a real Solid pod-client is the env-gated
  * swap later. p0/p1 circles seal nothing → `controlAgent` is null (plain storage).
  */
-import { createCircleSealingIdentity } from './circleSealingIdentity.js';
 import { createCircleControlAgent } from './circleControlAgent.js';
+import { processRefusalLog } from './refusalLog.js';
 
 const SEALED_POSTURES = new Set(['p2', 'p3']);
+
+/** Does this storage posture seal content on the device (p2 group key, p3 recipient seal)? */
+export function isSealedPosture(posture) { return SEALED_POSTURES.has(posture); }
+
+/**
+ * Does this circle seal, by its policy: `true`, `false`, or `null` while the policy is NOT KNOWN yet (not read, or the read
+ * failed). A policy that was read and names no posture is a plaintext circle (p0). Unknown is never the plaintext answer:
+ * a write into a circle whose posture is not known yet is refused like a sealed one.
+ * @param {object|null|undefined} policy
+ * @returns {boolean|null}
+ */
+export function sealedAnswer(policy) { return policy == null ? null : isSealedPosture(policy.storagePosture ?? 'p0'); }
+
+/**
+ * A sealed circle's producer is built only with the device's per-circle sealing key pair (the address key's image):
+ * the key every member's grant wraps to. Without it there is NO producer yet — never a stand-in key. A random
+ * per-circle key kept in the vault used to stand in when the agent was not up yet (a page that opened a circle before
+ * its agent existed): the device then opened the circle's key with a key nobody had wrapped to ("not a recipient"),
+ * and kept doing so, because the producer was cached for the page's life. The shell notes the circle and builds the
+ * producer when the key pair is there (`createProducerKeyWait`).
+ */
+export class SealingKeyPairMissingError extends Error {
+  constructor(circleId) {
+    super(`circle ${String(circleId).slice(0, 12)}… is sealed and this device has no sealing key pair for it yet — no producer until it has`);
+    this.name = 'SealingKeyPairMissingError';
+    this.code = 'NO_SEALING_KEY_PAIR';
+    this.circleId = circleId;
+  }
+}
+
+/**
+ * The circles whose producer waits for this device's key pair, and the one re-drive: when the shell binds its agent
+ * (the moment the key pairs exist), it drains the list through its own `ensureCirclePod`. No timer: the bind is the
+ * event. Both shells compose it (the box builds no circle producer).
+ * @returns {{ note: (circleId:string, policy:object) => void, drain: (ensure:(circleId:string, policy:object)=>Promise<any>) => Promise<number>, size: () => number }}
+ */
+export function createProducerKeyWait() {
+  const waiting = new Map();   // circleId → the policy it was asked with
+  return {
+    note(circleId, policy) { if (circleId) waiting.set(circleId, policy); },
+    async drain(ensure) {
+      const list = [...waiting.entries()];
+      waiting.clear();
+      let n = 0;
+      for (const [circleId, policy] of list) {
+        try { if (await ensure(circleId, policy)) n += 1; } catch { /* the shell's ensure reports its own failure */ }
+      }
+      return n;
+    },
+    size: () => waiting.size,
+  };
+}
 
 /** A no-op ACL sharing: an in-memory pseudo-pod has no ACL layer; real grant/revoke is env-gated. */
 function memorySharing() {
@@ -91,15 +143,14 @@ export async function createCirclePodProducer({
   // ONE sealing key family (2026-09-04): the device's sealing keypair is the ed2curve image of its
   // per-circle ADDRESS key, handed in by the agent (`circleSealingKeyPairFor`). Every grant in the
   // circle already wraps to `sealingPublicKeyFromNetworkKey(address)`; opening with anything else
-  // meant a member's own group key was wrapped to a key it did not hold. The random per-circle vault
-  // identity remains only for a host with no agent (the producer's own tests).
-  const sealingIdentity = (sealingKeyPair?.publicKey && sealingKeyPair?.privateKey)
-    ? {
-      ensure: async () => sealingKeyPair,
-      publicKey: async () => sealingKeyPair.publicKey,
-      rosterEntry: async (webId, role = 'member') => ({ webId: String(webId), publicKey: sealingKeyPair.publicKey, role }),
-    }
-    : createCircleSealingIdentity({ circleId, store: vault });
+  // meant a member's own group key was wrapped to a key it did not hold. No key pair → no producer
+  // (SealingKeyPairMissingError): there is no stand-in key.
+  if (!sealingKeyPair?.publicKey || !sealingKeyPair?.privateKey) throw new SealingKeyPairMissingError(circleId);
+  const sealingIdentity = {
+    ensure: async () => sealingKeyPair,
+    publicKey: async () => sealingKeyPair.publicKey,
+    rosterEntry: async (webId, role = 'member') => ({ webId: String(webId), publicKey: sealingKeyPair.publicKey, role }),
+  };
   const selfKey = await sealingIdentity.ensure();   // {publicKey, privateKey}
   if (typeof generateKeypair !== 'function' || typeof makePodClient !== 'function') {
     throw new Error('createCirclePodProducer: a sealed (p2/p3) circle needs generateKeypair + makePodClient');
@@ -137,11 +188,6 @@ export async function createCirclePodProducer({
   let savedPodAgents = {};
   try { const raw = await vault.get(podAgentsVaultKey); if (raw) savedPodAgents = JSON.parse(raw) ?? {}; } catch { savedPodAgents = {}; }
 
-  const savedRes = await vault.get(groupKeyVaultKey);
-  if (savedRes && ownsRoot) {
-    try { await podClient.write(keyResourceUri, savedRes, { contentType: 'application/json' }); } catch { /* fresh-bootstrap below */ }
-  }
-
   // Include THIS device's own per-circle sealing identity in the bootstrap roster, so the
   // local member is a recipient of the group key and can seal/open the circle's content
   // (otherwise only the abstract controller key could). Dedupe by publicKey.
@@ -166,6 +212,13 @@ export async function createCirclePodProducer({
     try { if (controlAgent?.podAgents) await vault.set(podAgentsVaultKey, JSON.stringify(controlAgent.podAgents())); } catch { /* best-effort */ }
   }
 
+  // The vault copy goes back ONLY where the pod holds nothing (the in-memory pod after a reload); on a pod that holds the
+  // file, the pod wins and the copy is refreshed from it below (persistGroupKey). Through the one key-resource write.
+  if (ownsRoot && controlAgent) {
+    let saved = null;
+    try { const raw = await vault.get(groupKeyVaultKey); saved = raw ? JSON.parse(raw) : null; } catch { saved = null; }
+    if (saved) { try { await controlAgent.restoreIfEmpty(saved); } catch { /* fresh bootstrap below */ } }
+  }
   if (bootstrap && ownsRoot && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
   return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey };
@@ -182,7 +235,7 @@ export async function createCirclePodProducer({
  * @param {(circleId:string) => (object|Promise<object|null>)} getProducer  resolve a circle's producer.
  * @returns {{ addMember: Function, removeMember: Function }}
  */
-export function createCircleControlAgentRouter(getProducer) {
+export function createCircleControlAgentRouter(getProducer, { refusals = null } = {}) {
   // Best-effort, and LOUD when it fails. Sealing degrading gracefully is the intended posture — a
   // membership event must not fail because a circle's pod is unreachable. But this catch sat between
   // the caller and every key operation, so a control-agent that threw looked exactly like one that
@@ -200,6 +253,10 @@ export function createCircleControlAgentRouter(getProducer) {
         `[circlePods] ${what} did not reach circle ${groupId}'s group key → the key audience is unchanged:`,
         err?.message ?? err,
       );
+      // a key change that was NOT made says so in the device's log, with its reason (never an id): another device kept
+      // changing the key, or the roster could not say whether the member is still a member
+      const reason = { KEY_WRITE_CONTENDED: 'key-write-contended', MEMBER_UNKNOWN: 'member-unknown', KEY_WRITE_UNCONDITIONED: 'key-write-unconditioned' }[err?.code] ?? null;
+      if (reason) (refusals ?? processRefusalLog()).note({ tag: 'key', lane: 'key', check: String(what).split(' ')[0], reason });
     }
   };
   return {

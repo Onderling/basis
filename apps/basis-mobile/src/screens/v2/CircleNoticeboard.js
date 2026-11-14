@@ -17,7 +17,7 @@ import { pickAndEncodeImage } from '../../v2/attachmentPicker.js';
 // embeds[] — cross-object reference chips ("See also"), shared with web.
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { enrichEmbedsWithTitles } from '../../../../basis/src/v2/embedResolve.js';
-import { isNoticeboardPost, responderChoices, NOTICEBOARD_REFRESH_EVENTS } from '../../../../basis/src/v2/circlePinboardScope.js';
+import { isNoticeboardPost, responderChoices, NOTICEBOARD_REFRESH_EVENTS, scopedWriteFailureKey } from '../../../../basis/src/v2/circlePinboardScope.js';
 import { NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 import { memberLabelFor } from '../../../../basis/src/v2/circleStream.js';
 import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
@@ -143,7 +143,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     try {
       const att = await pickAndEncodeImage();
       if (att) setAttachment(att);
-    } catch { setError(true); }
+    } catch { setError('circle.noticeboard.post_failed'); }
   }, []);
 
   const submitPost = useCallback(async () => {
@@ -160,7 +160,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       });
       setAttachment(null);
     }
-    catch { setError(true); }
+    catch (err) { setError(scopedWriteFailureKey(err)); }   // the sentence decided once for both shells
     setBusy(false);
     reload();
   }, [text, intent, dueText, attachment, callSkill, reload]);
@@ -281,7 +281,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       )}
       </>)}
       {busy && <Text style={styles.busy}>{t('circle.noticeboard.posting')}</Text>}
-      {error && <Text style={styles.error}>{t('circle.noticeboard.post_failed')}</Text>}
+      {error && <Text style={styles.error}>{t(error)}</Text>}
 
       {posts.length === 0 ? (
         <Text style={styles.empty}>{t('circle.noticeboard.empty')}</Text>

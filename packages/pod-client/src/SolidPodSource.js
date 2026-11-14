@@ -279,15 +279,16 @@ export class SolidPodSource extends DataSource {
     const t0          = Date.now();
 
     // If the caller wants conflict detection, do a manual PUT so we can
-    // attach `If-Match`.  `overwriteFile` does not surface request-init.
-    if (opts.ifMatch) {
+    // attach `If-Match` (or `If-None-Match: *` — "only while nothing is there").
+    // `overwriteFile` does not surface request-init.
+    if (opts.ifMatch || opts.ifNoneMatch) {
       let res;
       try {
         res = await this.#fetch(fullUri, {
           method: 'PUT',
           headers: {
             'Content-Type': contentType,
-            'If-Match':     opts.ifMatch,
+            ...(opts.ifMatch ? { 'If-Match': opts.ifMatch } : { 'If-None-Match': opts.ifNoneMatch }),
           },
           body: blob,
         });

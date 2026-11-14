@@ -1,14 +1,11 @@
 /**
  * `listMyCircles` answers plain ids. The pod read-back on coming back to the front, its boot kick and the phone's
  * background slot read their circles from it; mapped as objects, every id became nothing and they read no circle.
+ * (No shell maps the answer as objects only: scripts/lint-my-circle-ids.mjs, in `npm run guards`.)
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { circleIdsFrom, myCircleIds } from '../../src/v2/myCircleIds.js';
 import { createPodReadBack } from '../../src/v2/podReadBack.js';
-
-const at = (rel) => fileURLToPath(new URL(rel, import.meta.url));
 
 describe("the circles this device is in, from listMyCircles's answer", () => {
   it('plain ids (what the op answers) come back as ids; object rows too; anything else is dropped', () => {
@@ -28,11 +25,4 @@ describe("the circles this device is in, from listMyCircles's answer", () => {
     expect(read).toEqual(['a', 'b']);
   });
 
-  it('no shell maps the op\'s answer as objects only (the read that found no circle)', () => {
-    const files = ['../../web/v2/circleApp.js', '../../../basis-mobile/src/screens/ChatScreen.js'];
-    const hits = files.flatMap((f) => readFileSync(at(f), 'utf8').split('\n')
-      .map((line, i) => (/\.map\(\(b\) => b\?\.groupId \?\? b\?\.id\)/.test(line) ? `${f.split('/').pop()}:${i + 1}` : null))
-      .filter(Boolean));
-    expect(hits, 'read listMyCircles through myCircleIds / circleIdsFrom').toEqual([]);
-  });
 });

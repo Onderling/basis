@@ -7630,6 +7630,15 @@
       "text": "Waarom meld je dit lid?",
       "doc": "Governance §8 — prompt for the report reason."
     },
+    "enact": {
+      "text": "Uitvoeren"
+    },
+    "enacted": {
+      "text": "Gedaan: het besluit is uitgevoerd."
+    },
+    "enact_failed": {
+      "text": "Dit kon niet worden uitgevoerd. Probeer het nog eens."
+    },
     "vote_failed": {
       "text": "Je stem is niet doorgekomen. Probeer het nog eens."
     },

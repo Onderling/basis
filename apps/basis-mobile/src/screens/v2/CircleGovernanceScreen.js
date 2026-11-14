@@ -19,7 +19,7 @@ import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
-import { buildSubjectLabeler, deadlineLine, voteFailedLine } from '../../../../basis/src/v2/governanceView.js';
+import { buildSubjectLabeler, deadlineLine, voteFailedLine, enactOutcomeLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
@@ -33,6 +33,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
   const [model, setModel] = useState({ view: { open: [], closed: [] }, isAdmin: false, policy: null });
   // the line a failed vote leaves on the screen (voteFailedLine, web twin), until the next vote
   const [errorKey, setErrorKey] = useState(null);
+  const [noticeKey, setNoticeKey] = useState(null);   // what an admin's Enact did (enactOutcomeLine, web twin)
   const ctxRef = useRef({ gov: null, myWebid: '' });
 
   const load = useCallback(async () => {
@@ -65,7 +66,17 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
     const { gov, myWebid } = ctxRef.current;
     let r = null;
     try { r = await gov?.vote({ circleId, proposalId, voter: myWebid, choice }); } catch (err) { r = err; }
-    setErrorKey(voteFailedLine(r));   // a vote that did not go through says so: it must not look cast
+    setErrorKey(voteFailedLine(r)); setNoticeKey(null);   // a vote that did not go through says so: it must not look cast
+    await load();
+  }, [circleId, load]);
+
+  // the admin's Enact (L893): the way vote travels, through the circle's governance handle; it says what it did, or why not
+  const onEnact = useCallback(async (proposalId) => {
+    const { gov } = ctxRef.current;
+    let r = null;
+    try { r = await gov?.tally({ circleId, proposalId }); } catch (err) { r = err; }
+    const line = enactOutcomeLine(r);
+    setErrorKey(line.failed ? line.key : null); setNoticeKey(line.failed ? null : line.key);
     await load();
   }, [circleId, load]);
 
@@ -105,7 +116,8 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
       <Pressable onPress={onBack} accessibilityRole="button" style={styles.back} testID="circle-governance-back">
         <Text style={styles.backText}>{`← ${t('circle.back')}`}</Text>
       </Pressable>
-      {errorKey ? <Text style={{ color: theme.color.danger ?? '#c0392b', marginBottom: 8 }} accessibilityRole="alert" testID="circle-governance-error">{t(errorKey)}</Text> : null}
+      {errorKey ? <Text style={{ color: theme.color.danger, marginBottom: 8 }} accessibilityRole="alert" testID="circle-governance-error">{t(errorKey)}</Text> : null}
+      {noticeKey ? <Text style={{ marginBottom: 8 }} accessibilityRole="text" testID="circle-governance-notice">{t(noticeKey)}</Text> : null}
       <Text style={styles.title}>{t('circle.governance.title')}</Text>
 
       {/* changes made WITHOUT the vote this circle requires: every device refused them (the receiver gate); shown so the
@@ -150,7 +162,15 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
                 <Text style={styles.tally} testID={`governance-deadline-${row.id ?? ''}`}>{deadlineLine(row.deadline, { t, locale: dateLocaleOf(t) })}</Text>
               ) : null),
               'proposal-awaiting': () => (row.approved && row.awaitingEnactment ? (
-                <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
+                <View>
+                  <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
+                  {/* the admin's act (L893): who sees it is one shared decision (row.canEnact) */}
+                  {row.canEnact ? (
+                    <Pressable onPress={() => onEnact(row.proposalId)} accessibilityRole="button" testID={`governance-enact-${row.proposalId}`}>
+                      <Text style={styles.awaiting}>{t('circle.governance.enact')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : null),
               'proposal-vote': () => (row.canVote ? (
                 <View style={styles.actions}>

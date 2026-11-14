@@ -94,7 +94,8 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   it removes; a removal made under any-admin stays after the circle tightens), and over a real relay in
   `membershipGate.relay.test.js`: a lone removal and a lone promotion hold on the other admin's device; the same
   removal and promotion, proposed and voted yes by both admins, take effect on both devices (red with the gate off);
-  where the members decide, a plain member's yes completes the vote and the removal lands on both devices.
+  where the members decide, a plain member's yes approves the removal, and it lands on both devices once an admin's
+  device enacts it (the admin's act; by default nothing enacts on its own).
 - The door on both shells' menus: `alphaSurface.test.js` and the phone's `circleDetailActionsProjection.test.js`.
 - The caretaker over a real relay: `test/v2/caretakerHandover.relay.test.js`; a removed member refused on every
   member's device: `removedMemberRefusedEverywhere.relay.test.js`; the classes and tallies:

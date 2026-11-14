@@ -101,6 +101,10 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       // It was dead until 2026-07-26: the flag existed only on `tally()`'s return value, never on a row,
       // so `row.awaitingEnactment` was always undefined and the chip never appeared on either platform.
       awaitingEnactment: p.status === DECISION_STATUS.APPROVED && !p.closed,
+      // WHO SEES "ENACT" (L893, 2026-11-14): the default is that an admin enacts explicitly (Decision B), and only an
+      // admin/caretaker device enacts (Decision A); a caretaker IS an admin in the roster. Everyone else keeps the
+      // waiting line. One decision both shells read.
+      canEnact: p.status === DECISION_STATUS.APPROVED && !p.closed && isAdmin,
     };
   });
 
@@ -130,4 +134,16 @@ export function deadlineLine(deadline, { t, now = new Date(), locale } = {}) {
  */
 export function voteFailedLine(result) {
   return result && typeof result === 'object' && !(result instanceof Error) && result.ok === true ? null : 'circle.governance.vote_failed';
+}
+
+/**
+ * ENACTING SAYS WHAT IT DID, OR WHY IT COULD NOT (L893, 2026-11-14): the line after an admin's Enact, from what the
+ * handle's `tally` answered. Done when it enacted (or the proposal is closed now); otherwise it could not, and it must
+ * not look done. Both shells paint it; neither decides it.
+ * @param {unknown} result
+ * @returns {{key: string, failed: boolean}}
+ */
+export function enactOutcomeLine(result) {
+  const done = !!result && typeof result === 'object' && !(result instanceof Error) && result.ok !== false && (result.enacted === true || result.closed === true);
+  return done ? { key: 'circle.governance.enacted', failed: false } : { key: 'circle.governance.enact_failed', failed: true };
 }

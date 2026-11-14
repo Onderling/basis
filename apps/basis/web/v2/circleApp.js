@@ -238,7 +238,7 @@ import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/c
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
 import { GOVERNANCE_OPEN_ACTION } from '../../src/v2/governanceNotices.js';
-import { voteFailedLine } from '../../src/v2/governanceView.js';
+import { voteFailedLine, enactOutcomeLine } from '../../src/v2/governanceView.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
@@ -8898,6 +8898,7 @@ async function showGovernance(id) {
   rootEl.appendChild(host);
 
   let govErrorKey = null;   // the line a failed vote leaves on the screen (voteFailedLine), until the next vote
+  let govNoticeKey = null;  // what an admin's Enact did (enactOutcomeLine)
   const rerender = async () => {
     let ctx = { policy: {}, members: [] };
     try { ctx = await gov.getContext(id); } catch { /* empty view on read failure */ }
@@ -8916,13 +8917,22 @@ async function showGovernance(id) {
     let reports = [];
     if (isAdmin) { try { reports = (await gov.reports.list(id)).open; } catch { /* */ } }
     renderGovernancePanel(host, {
-      view, t, policy: ctx.policy, isAdmin, reports, errorKey: govErrorKey,
+      view, t, policy: ctx.policy, isAdmin, reports, errorKey: govErrorKey, noticeKey: govNoticeKey,
+      // the admin's Enact (L893): the way vote travels, through the circle's governance handle (governance.resolve is
+      // the declared op its statement names); it says what it did, or why it could not
+      onEnact: async (proposalId) => {
+        let r = null;
+        try { r = await gov.tally({ circleId: id, proposalId }); } catch (err) { r = err; }
+        const line = enactOutcomeLine(r);
+        govErrorKey = line.failed ? line.key : null; govNoticeKey = line.failed ? null : line.key;
+        await rerender();
+      },
       onDismissReport: async (reportId) => { try { await gov.reports.dismiss({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
       onActReport:     async (reportId) => { try { await gov.reports.act({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
       onVote: async (proposalId, choice) => {
         let vr = null;
         try { vr = await gov.vote({ circleId: id, proposalId, voter: myWebid, choice }); } catch (err) { vr = err; }
-        govErrorKey = voteFailedLine(vr);   // a vote that did not go through says so on the screen
+        govErrorKey = voteFailedLine(vr); govNoticeKey = null;   // a vote that did not go through says so on the screen
         await rerender();
       },
       onOverride: async (proposalId) => {

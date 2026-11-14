@@ -110,9 +110,10 @@ describe('the membership gate, over the relay', () => {
   }, 180_000);
 
   // THE MEMBER'S VOTE (L887: the Decisions screen is the door a member votes through; this is what that vote does): where
-  // the MEMBERS decide removals, the founder's proposal alone does not remove; a plain member's yes completes the count,
-  // the founder's device (an admin's) enacts it with its proposal, and the removal lands on the member's own device.
-  it('members decide removals: a plain member\'s yes completes the vote and the removal lands on both devices', async () => {
+  // the MEMBERS decide removals, the founder's proposal alone does not remove; a plain member's yes APPROVES it, and the
+  // removal lands only when an admin's device enacts it (here the founder's `tally`, the admin's act: L893 gives the
+  // shells that act), on the member's own device too.
+  it('members decide removals: a plain member\'s yes approves it; the admin\'s act enacts it and the removal lands on both devices', async () => {
     const C = 'gate-relay-member-vote';
     await circleOf3(C, { removeMember: 'member-vote', changePolicy: 'any-admin' }, { promote: false });
     expect(await roleOn(bram, C, bram.pubKey), 'bram is a plain member here').toBe('member');

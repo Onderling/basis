@@ -4,7 +4,8 @@
  * join. A removes Cas on Beheer: under that rule it opens a proposal, it does not remove. Bea hears of it as the line
  * "A decision opened" in the circle's conversation, taps its button, lands on the Decisions screen and votes yes there.
  * Her yes APPROVES it; the circle enacts by an admin's act (the default), so both devices show it approved and waiting
- * for an admin, and Cas is still in. (The admin's Enact is its own step, built with its own row.)
+ * for an admin, and Cas is still in. Then A taps Enact (L893): it says what it did, and the removal lands on all three
+ * devices, Cas's own included.
  *
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay test-browser/walk-decision-line.spec.js
  */
@@ -20,7 +21,7 @@ const RE = /besluit samen/i;
 const openWalk = async (page) => { await gotoCircles(page); await openCircleMatching(page, RE); };
 const rosterNames = async (page) => ((await readRoster(page))?.names ?? []).map((n) => String(n ?? '').toLowerCase());
 
-test('a member taps "A decision opened", votes on the Decisions screen, and the decision is approved and waits for an admin', async ({ browser }) => {
+test('a member taps "A decision opened" and votes; approved, it waits for an admin, who enacts it, and the removal lands on all three', async ({ browser }) => {
   let A = null; let B = null; let C = null;
   try {
     A = await bootPeer(browser, 'A'); B = await bootPeer(browser, 'B'); C = await bootPeer(browser, 'C');
@@ -89,6 +90,22 @@ test('a member taps "A decision opened", votes on the Decisions screen, and the 
     await openWalk(B.page);
     expect((await rosterNames(B.page)).some((n) => /cas/.test(n)), 'not enacted yet: Cas is still in').toBe(true);
     log('STEP6 approved and waiting on both devices; Cas still in until an admin enacts', 'PASS', '');
+
+    // THE ADMIN'S ACT (L893): A taps Enact on the approved card; it says what it did, and the removal lands on all three
+    await openWalk(A.page);
+    expect(await openMore(A.page, 'governance')).toBe(true);
+    const enact = A.page.locator('.circle-governance__enact').first();
+    await expect(enact, 'the admin sees Enact on the approved card').toBeVisible({ timeout: 30_000 });
+    await enact.click();
+    await expect(A.page.locator('.circle-governance__notice'), 'Enact says what it did').toBeVisible({ timeout: 30_000 });
+    await expect(A.page.locator('.circle-governance__error')).toHaveCount(0);
+    await A.page.locator('.cc-governance__back').first().click().catch(() => {});
+    log('STEP7 the admin enacted it', 'PASS', '');
+    await expect.poll(async () => { await openWalk(A.page); return (await rosterNames(A.page)).some((n) => /cas/.test(n)); }, { timeout: 120_000, intervals: [4_000], message: "the removal lands on the admin's device" }).toBe(false);
+    await expect.poll(async () => { await openWalk(B.page); return (await rosterNames(B.page)).some((n) => /cas/.test(n)); }, { timeout: 150_000, intervals: [5_000], message: "the removal lands on Bea's device" }).toBe(false);
+    // Cas's own device: the circle moves to the removed list (a read-only tile marked removed, until Cas closes it)
+    await expect.poll(async () => { await gotoCircles(C.page); return C.page.locator('.circle-tile[data-removed="true"]', { hasText: RE }).count(); }, { timeout: 150_000, intervals: [5_000], message: "Cas's own device shows the circle as removed" }).toBe(1);
+    log('STEP8 the removal landed on all three', 'PASS', '');
   } finally {
     await teardown([A, B, C].filter(Boolean));
   }

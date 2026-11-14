@@ -7627,6 +7627,18 @@
       "text": "Why are you reporting this member?",
       "doc": "Governance §8 — prompt for the report reason."
     },
+    "enact": {
+      "text": "Enact",
+      "doc": "An admin's button on an approved decision that waits: carries it out (the default is that an admin does this explicitly)."
+    },
+    "enacted": {
+      "text": "Done: the decision is carried out.",
+      "doc": "Shown after an admin enacted an approved decision."
+    },
+    "enact_failed": {
+      "text": "This could not be carried out. Try again.",
+      "doc": "Shown when an admin’s Enact did not go through: it must not look done."
+    },
     "vote_failed": {
       "text": "Your vote did not go through. Try again.",
       "doc": "Shown on the Decisions screen when a vote was refused or failed: a vote that did not go through must not look cast."

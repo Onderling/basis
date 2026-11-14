@@ -932,7 +932,7 @@ export async function finalSubmit({
     if (typeof onStage === 'function') { try { onStage(state.submitStage); } catch { /* cosmetic */ } }
     if (result && result.groupId && typeof onJoined === 'function') {
       // …with the invite it redeemed: the circle's connection point is recorded there, before presence and the pull.
-      try { await onJoined({ circleId: result.groupId, invite: state.invite ?? null }); }
+      try { await onJoined({ circleId: result.groupId, invite: state.invite ?? null, ...(result.policy ? { policy: result.policy } : {}) }); }
       catch { /* reachability is repaired on the next circles load either way */ }
     }
     // Record this circle membership into the profile registry (restore-data) so a restored device knows its
@@ -1227,6 +1227,8 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
         message: `✓ Joined circle "${inv.groupId}" as ${state.handle} (confirmed by admin over peer-bridge).`,
         groupId: inv.groupId,
         handle:  state.handle,
+        // the circle's policy, only from the admin's OWN reply (a reply is matched by its request id alone)
+        ...(peerReply.repliedBy === inv.adminPeerAddr && peerReply.policy && typeof peerReply.policy === 'object' ? { policy: peerReply.policy } : {}),
       };
     }
     if (redeem?.ok === false || redeem?.error) {

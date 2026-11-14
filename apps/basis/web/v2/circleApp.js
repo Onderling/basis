@@ -1498,8 +1498,10 @@ actState.subscribe((current) => {
  * bind the other members' addresses, and PULL the circle's pull-all lanes — the `create`, earlier joins, roles,
  * evictions and keys all predate the join and are fanned to nobody after the fact.
  */
-function circleOnJoined({ circleId, invite = null }) {
+function circleOnJoined({ circleId, invite = null, policy = null }) {
   return makeCircleReachable({
+    // the circle's policy from the admin's reply: adopted as seen (its strategy rebuilt from it)
+    policy, adoptPolicy: async (cid, p) => { await policyStore.update(cid, p, { seen: true }); circleSealStrategies.delete(cid); circleMediaCompositions.delete(cid); },
     agent: _peerAgent,
     circleId,
     invite,
@@ -9987,6 +9989,8 @@ async function boot() {
           // admin verifies an incoming redeem + replies; joiner resolves the pending request on response.
           'group-redeem-request':    blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
+            // the circle's policy rides the reply (the joiner knows its posture at once)
+            policyOf: (gid) => policyStore.get(gid),
             // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
             // …and an open invite catches up: an admin's own admission is a local write, so the membership lane's
             // signal (circlesChangedUnderneath) never fires for it

@@ -64,6 +64,9 @@ export function makeHandleGroupRedeemRequest({
   // The agent's invite-exchange registrations (`agent.inviteExchange`): the one reply to a well-formed request (its answer
   // when it proved its code, else its refusal) may go back on the person key (the send gate's person-key allowlist).
   inviteExchange = null,
+  // the circle's policy as this admin holds it (its policy store): carried in the reply, so the joiner knows the circle's
+  // posture the moment the join returns (until then a joined circle's posture is not known and its writes are refused)
+  policyOf = null,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -133,6 +136,13 @@ export function makeHandleGroupRedeemRequest({
         // …and the join this admin just signed for them: a joiner who left no longer hears the circle's fan, so the
         // statement that lets its own fold count it in again rides back with the answer (the joiner's rail verifies it).
         if (result.joinStatement?.body && result.joinStatement?.sig) reply.joinStatement = result.joinStatement;
+        // …and the circle's policy (never a 'not known' one: an admin whose own policy is pending sends none)
+        if (typeof policyOf === 'function') {
+          try {
+            const pol = await policyOf(groupId);
+            if (pol && typeof pol === 'object' && pol.policyPending !== true) { const { policyPending: _p, ...clean } = pol; reply.policy = clean; }
+          } catch { /* the governance lane still carries it */ }
+        }
       }
     } catch (err) {
       // the exception stays on this device (its text can carry internals); the joiner hears the catch-all code

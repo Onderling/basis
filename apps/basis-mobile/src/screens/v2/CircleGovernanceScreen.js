@@ -18,6 +18,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
+import Btn from './Btn.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
 import { buildSubjectLabeler, deadlineLine, voteFailedLine, enactOutcomeLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
@@ -166,9 +167,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
                   <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
                   {/* the admin's act (L893): who sees it is one shared decision (row.canEnact) */}
                   {row.canEnact ? (
-                    <Pressable onPress={() => onEnact(row.proposalId)} accessibilityRole="button" testID={`governance-enact-${row.proposalId}`}>
-                      <Text style={styles.awaiting}>{t('circle.governance.enact')}</Text>
-                    </Pressable>
+                    <Btn variant="primary" onPress={() => onEnact(row.proposalId)} label={t('circle.governance.enact')} testID={`governance-enact-${row.proposalId}`} />
                   ) : null}
                 </View>
               ) : null),
@@ -261,6 +260,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
                       onPress={() => onSetClass(action, cls)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: cls === current }}
+                      testID={`gov-setting-${action}-${cls}`}
                       style={[styles.classBtn, cls === current && styles.classBtnActive]}
                     >
                       <Text style={[styles.classText, cls === current && styles.classTextActive]}>{t(`circle.governance.class.${CLASS_KEY[cls]}`)}</Text>

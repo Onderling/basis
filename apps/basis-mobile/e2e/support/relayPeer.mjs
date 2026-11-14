@@ -293,6 +293,24 @@ if (talk) {
         const t = await gov.tally({ circleId: groupId, proposalId: open[0].proposalId });
         say({ step: 'gov-accepted', ok: t?.status === 'approved' && (t.enacted === true || t.closed === true), vote: v, tally: t, version: settings.version, subject: open[0].subject ?? null });
         } catch (err) { say({ step: 'gov-accepted', ok: false, error: String(err?.message ?? err) }); }
+      } else if (cmd.do === 'gov-vote') {
+        // A MEMBER VOTES, as the Decisions screen's vote does: a yes on the open proposal of one action
+        // (`cmd.action`, removeMember by default), through the governance binding the shells compose
+        try {
+          const gov = govBinding();
+          const action = cmd.action ?? 'removeMember';
+          let open = []; let seen = null;
+          const until = Date.now() + 90_000;
+          while (!open.length && Date.now() < until) {
+            const view = await gov.view(groupId);
+            seen = (view?.open ?? []).map((x) => x?.action ?? null);
+            open = (view?.open ?? []).filter((x) => x?.action === action);
+            if (!open.length) await new Promise((r) => { setTimeout(r, 2000); });
+          }
+          if (!open.length) { say({ step: 'gov-voted', ok: false, why: `no open ${action} proposal reached the peer`, seen }); return; }
+          const v = await gov.vote({ circleId: groupId, proposalId: open[0].proposalId, voter: peer.pubKey, choice: cmd.choice ?? 'yes' });
+          say({ step: 'gov-voted', ok: v?.ok === true, vote: v, proposalId: open[0].proposalId });
+        } catch (err) { say({ step: 'gov-voted', ok: false, error: String(err?.message ?? err) }); }
       } else if (cmd.do === 'report-file') {
         // A MEMBER FILES A REPORT, as the report sheet does: a signed statement on the governance rail, fanned to its
         // readers only (the circle's admins and the reporter). The target: the circle's other member (the phone).

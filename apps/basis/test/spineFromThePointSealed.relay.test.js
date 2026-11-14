@@ -91,7 +91,7 @@ describe('the key lane from the point, sealed', () => {
     const lostAddr = deriveCircleAddress(lostSeed, CIRCLE);
     const ann = ownCircleAddressAnnouncementFromSeed({ derivationSeed: lostSeed, circleId: CIRCLE, memberWebid: A.pubKey });
     await A.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: CIRCLE, ...ann });
-    await A.circleControlAgentRouter.grantRecipient({ groupId: CIRCLE, publicKey: sealingPublicKeyFromNetworkKey(lostAddr) });
+    await A.circleControlAgentRouter.grantRecipient({ groupId: CIRCLE, publicKey: sealingPublicKeyFromNetworkKey(lostAddr), ownerWebId: A.pubKey });   // the announce handler names the owner
     const lostKey = sealingPublicKeyFromNetworkKey(lostAddr);
     const { foldKeyEvents } = await import('@onderling/pod-client');
     // the CURRENT recipients, as the key fold reads the phone's key lane (a grant adds to a version; a rotation moves on)

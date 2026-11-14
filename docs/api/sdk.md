@@ -60,6 +60,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `CapabilityToken` | class | [`core.md`](core.md#capabilitytoken) |
 | `caretakerOrder` | function | [`core.md`](core.md#caretakerorder) |
 | `carriedSenderCredential` | function | [`core.md`](core.md#carriedsendercredential) |
+| `causalPlace` | function | [`core.md`](core.md#causalplace) |
 | `CEREMONY_KINDS` | constant | [`core.md`](core.md#ceremony_kinds) |
 | `ceremonyCommitment` | function | [`core.md`](core.md#ceremonycommitment) |
 | `ceremonyRevealFacts` | function | [`core.md`](core.md#ceremonyrevealfacts) |
@@ -178,6 +179,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `maxExposure` | function | [`core.md`](core.md#maxexposure) |
 | `MEMBER_KINDS` | constant | [`core.md`](core.md#member_kinds) |
 | `MEMBER_PROPS_FIELDS` | constant | [`core.md`](core.md#member_props_fields) |
+| `memberStatusFrom` | function | [`core.md`](core.md#memberstatusfrom) |
 | `MemoryAdapter` | class | [`core.md`](core.md#memoryadapter) |
 | `MemorySource` | class | [`core.md`](core.md#memorysource) |
 | `MemoryStorageBackend` | class | [`core.md`](core.md#memorystoragebackend) |

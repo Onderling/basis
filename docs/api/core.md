@@ -3954,6 +3954,54 @@ household bot on its own node says so on its row, the circle paints it a bot and
 quiet for its name. Self-said, not an authority: a person who says `function` only silences their own name. The same
 two words a profile record holds (`PROFILE_KINDS` in agent-registry is this list).
 
+### `causalPlace`
+
+**Kind:** function · **Import:** `causalPlace` from `'@onderling/core'`
+
+```js
+causalPlace(statements, a, b)
+```
+
+WHERE `b` STANDS AGAINST `a` in the lane's own causal order (the deps-DAG: each statement's `parentHash` chain union its
+`deps`), the same answer on every device that holds both: 'after' when `a` is an ancestor of `b`, 'before' when `b` is an
+ancestor of `a`, 'same' for one statement, 'concurrent' when neither reaches the other, and null when either is not in
+`statements` (it cannot be placed). Never a wall clock, never the fold's depth tiebreak: equal or greater depth does not
+make an act later, only an ancestry path does.
+
+**Parameters**
+
+- `statements` `Array<object>`
+- `a` `string` — a statement hash
+- `b` `string` — a statement hash
+
+**Returns:** `'after'|'before'|'same'|'concurrent'|null`
+
+### `memberStatusFrom`
+
+**Kind:** function · **Import:** `memberStatusFrom` from `'@onderling/core'`
+
+```js
+memberStatusFrom({ folded, statements = [], webid, after = null } = {})
+```
+
+IS THIS MEMBER IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? Decided from a roster fold and the statements it was
+given (the key router's question, pinboard `memberStatus`). 'in' only when the subject is on the FOLDED roster (the fold
+admitted them: its gates, the author's authority, deny-wins at a depth) and no exit of theirs comes after the admission;
+'out' when their last exit comes AFTER it (by ancestry, `causalPlace`); null when it cannot be said:
+  - a named admission that is not a `join` of THIS subject (another statement, another member's join);
+  - a join the fold did not admit (an author who may not admit, a redemption row not arrived yet, a removal that won
+    at the same depth) with no exit after it: not on the roster, so not 'in';
+  - an exit concurrent with the admission, or an admission or exit this device does not hold.
+With no admission named: the subject's last join that took effect; a subject on the roster with NO join at all was
+admitted by the circle's creation or its seed (a founder, a seeded member) and is 'in'. Once such a member is removed
+the answer is null, not 'out' (there is no admission to place the exit after): safe, the change is not made.
+
+**Parameters**
+
+- `a` `{ folded: object, statements: Array<object>, webid: string, after?: (string|null) }`
+
+**Returns:** `{ status: ('in'|'out'|null), reason?: string }`
+
 ### `foldRoster`
 
 **Kind:** function · **Import:** `foldRoster` from `'@onderling/core'`

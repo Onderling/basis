@@ -161,8 +161,10 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // 2026-10-23: -1, `restoreFromMnemonic` retired — the recovery phrase is the owner root's, restored by the host
   // (`restoreOwnerPhrase`); this agent's key is never in the phrase → 92.
   // 2026-10-30: +1, `dismissRemovedCircle` — closing a circle an admin removed you from (this device's copy only) → 84.
-  it('ships the full chat+slash surface (one pinboard manifest, 93 ops)', () => {
-    expect(pinboardManifest.operations.length).toBe(93);
+  // 2026-11-14: +1, `memberStatus` — is a member still in after the admission a key change follows (the key router's
+  // question on every compute; internal, no door) → 94.
+  it('ships the full chat+slash surface (one pinboard manifest, 94 ops)', () => {
+    expect(pinboardManifest.operations.length).toBe(94);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

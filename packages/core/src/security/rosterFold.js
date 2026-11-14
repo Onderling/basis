@@ -122,6 +122,73 @@ function equivocators(stmts) {
 }
 
 /**
+ * WHERE `b` STANDS AGAINST `a` in the lane's own causal order (the deps-DAG: each statement's `parentHash` chain union its
+ * `deps`), the same answer on every device that holds both: 'after' when `a` is an ancestor of `b`, 'before' when `b` is an
+ * ancestor of `a`, 'same' for one statement, 'concurrent' when neither reaches the other, and null when either is not in
+ * `statements` (it cannot be placed). Never a wall clock, never the fold's depth tiebreak: equal or greater depth does not
+ * make an act later, only an ancestry path does.
+ * @param {Array<object>} statements
+ * @param {string} a  a statement hash
+ * @param {string} b  a statement hash
+ * @returns {'after'|'before'|'same'|'concurrent'|null}
+ */
+export function causalPlace(statements, a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return null;
+  const byHash = new Map((Array.isArray(statements) ? statements : []).filter((s) => s && typeof s.hash === 'string').map((s) => [s.hash, s]));
+  if (!byHash.has(a) || !byHash.has(b)) return null;
+  if (a === b) return 'same';
+  const reaches = (from, target) => {   // is `target` an ancestor of `from`?
+    const seen = new Set();
+    const stack = [from];
+    while (stack.length) {
+      const h = stack.pop();
+      if (h === target) return true;
+      if (seen.has(h)) continue;
+      seen.add(h);
+      const s = byHash.get(h);
+      if (s) for (const p of parentsOf(s)) if (!seen.has(p)) stack.push(p);
+    }
+    return false;
+  };
+  if (reaches(b, a)) return 'after';
+  if (reaches(a, b)) return 'before';
+  return 'concurrent';
+}
+
+/**
+ * IS THIS MEMBER IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? Decided from a roster fold and the statements it was
+ * given (the key router's question, pinboard `memberStatus`). 'in' only when the subject is on the FOLDED roster (the fold
+ * admitted them: its gates, the author's authority, deny-wins at a depth) and no exit of theirs comes after the admission;
+ * 'out' when their last exit comes AFTER it (by ancestry, `causalPlace`); null when it cannot be said:
+ *   - a named admission that is not a `join` of THIS subject (another statement, another member's join);
+ *   - a join the fold did not admit (an author who may not admit, a redemption row not arrived yet, a removal that won
+ *     at the same depth) with no exit after it: not on the roster, so not 'in';
+ *   - an exit concurrent with the admission, or an admission or exit this device does not hold.
+ * With no admission named: the subject's last join that took effect; a subject on the roster with NO join at all was
+ * admitted by the circle's creation or its seed (a founder, a seeded member) and is 'in'. Once such a member is removed
+ * the answer is null, not 'out' (there is no admission to place the exit after): safe, the change is not made.
+ * @param {{ folded: object, statements: Array<object>, webid: string, after?: (string|null) }} a
+ * @returns {{ status: ('in'|'out'|null), reason?: string }}
+ */
+export function memberStatusFrom({ folded, statements = [], webid, after = null } = {}) {
+  if (!folded || typeof webid !== 'string' || !webid) return { status: null, reason: 'no-fold' };
+  const onRoster = Array.isArray(folded.members) && folded.members.includes(webid);
+  if (after) {
+    const named = statements.find((s) => s?.hash === after);
+    if (!named) return { status: null, reason: 'admission-not-folded' };
+    if (named.kind !== 'join' || named.subject !== webid) return { status: null, reason: 'not-their-join' };
+  }
+  const admission = after ?? folded.lastJoinBy?.[webid] ?? null;
+  const exit = folded.lastExitBy?.[webid] ?? null;
+  if (!admission) return onRoster && !exit ? { status: 'in' } : { status: null, reason: 'no-admission' };
+  if (!exit) return onRoster ? { status: 'in' } : { status: null, reason: 'not-admitted' };
+  const place = causalPlace(statements, admission, exit);
+  if (place === 'after') return { status: 'out' };
+  if (place === 'before') return onRoster ? { status: 'in' } : { status: null, reason: 'not-admitted' };
+  return { status: null, reason: place === 'concurrent' ? 'concurrent' : 'exit-not-held' };
+}
+
+/**
  * Causal depth of each statement over the deps-DAG: its longest path from a root along ALL its parents — the
  * author's own `parentHash` chain UNION its `deps` (the cross-author frontier). This is the Lamport scalar the
  * DAG induces (max over present parents + 1), so a cross-author causal edge raises depth and a genuinely
@@ -243,6 +310,11 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   // fork's removal). Kept when they are back — membership answers "in or out"; this answers "how did they last go",
   // which a rejoin on an invite they hold is decided by (left → may; removed → needs a new invite).
   const lastExit = Object.create(null);
+  // subject → the HASH of the statement that made their latest exit, in the same fold order (a fork's removal: the
+  // forked sibling it was seeded from). With `causalPlace` a reader can ask "did this exit come AFTER that admission?"
+  const lastExitBy = Object.create(null);
+  // subject → the HASH of their latest join that took effect (the admission a key grant follows when it names none)
+  const lastJoinBy = Object.create(null);
   // subject → { displayName?, avatarRef? } — what a member has said about themselves (`member-props`, 2026-09-21).
   // The handle lives in `handles` (one map for the join's and the later change); these are the rest.
   const props = Object.create(null);
@@ -381,6 +453,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject) && governed(s, adminBefore)) { removed.add(s.subject); removedBy.set(s.subject, s.hash); removedHow.set(s.subject, 'evict'); }
     }
     const joined = new Set();
+    const joinedBy = new Map();   // subject → the hash of the join that admits them at this depth
     for (const s of batch) {
       if (s.kind !== 'join' || !joinPassesGate(s)) continue;
       // A join signed by SOMEONE ELSE — an admin confirming a remote joiner — stands on that author's authority AT
@@ -389,6 +462,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // which the roster read checks where the rows are.
       if (s.author !== s.subject && !canAuthorise(s.author)) continue;
       joined.add(s.subject);
+      joinedBy.set(s.subject, s.hash);
       // The acceptance rides the join's signed payload — record it with the membership it establishes.
       const v = s.payload && typeof s.payload === 'object' ? s.payload.rulesAccepted : undefined;
       if (typeof v === 'string' && v) rulesAccepted[s.subject] = v;
@@ -400,8 +474,8 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     }
 
     // Apply: removals win over same-depth joins/promotes (deny-wins).
-    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; delete props[x]; delete kinds[x]; lastExit[x] = removedHow.get(x) ?? 'evict'; }
-    for (const x of joined)   if (!removed.has(x)) members.add(x);
+    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; delete props[x]; delete kinds[x]; lastExit[x] = removedHow.get(x) ?? 'evict'; if (removedBy.get(x)) lastExitBy[x] = removedBy.get(x); }
+    for (const x of joined)   if (!removed.has(x)) { members.add(x); if (joinedBy.get(x)) lastJoinBy[x] = joinedBy.get(x); }
     for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); adminVia.set(x, 'role'); }
     for (const x of demoted)  { admins.delete(x); adminVia.delete(x); }
 
@@ -540,7 +614,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   const superseded = propStatements
     .filter((st) => !st.setsHandle && st.fields.length > 0 && st.fields.every((f) => propSetters.get(st.subject)?.get(f) !== st.hash))
     .map((st) => st.hash).sort();
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded, lastExit, kinds };
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded, lastExit, lastExitBy, lastJoinBy, kinds };
 }
 
 export default foldRoster;

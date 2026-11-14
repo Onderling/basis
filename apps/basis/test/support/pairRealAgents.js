@@ -50,7 +50,7 @@ import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 // address nobody bound. See `registerCirclePresence` in circleApp.js / agentBundle.js.
 import { registerCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
-import { createCirclePodProducer, createCircleControlAgentRouter } from '../../src/v2/circlePodProducer.js';
+import { createCirclePodProducer, createCircleControlAgentRouter, memberStatusReader } from '../../src/v2/circlePodProducer.js';
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
 import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
@@ -173,7 +173,10 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // circle (`sealCircleViaProducer`) registers a producer here, so the REAL `removeMember` op routes into
   // the producer's control agent, which fans the rotation key-event through the injected sink.
   const circlePods = new Map();
-  const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
+  // as both shells build it: every join's key change re-asks the member's status (the agent is bound before any join)
+  const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
+    memberStatusOf: memberStatusReader((...a) => agent.callSkill(...a)),
+  });
 
   // The peer → kringen index the shells keep (`circleGroupsIndex`): which circles this device shares with a peer —
   // what the DM seal reads a contact's root-revealed key from, and what the pair roster's route needs.

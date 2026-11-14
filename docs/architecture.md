@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-13** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-14** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 

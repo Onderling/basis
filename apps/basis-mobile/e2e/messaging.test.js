@@ -109,7 +109,7 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     await soon(by.id('contact-thread-screen'), 10_000);
   });
 
-  it('switched off later, a member who already wrote stays a conversation: the door is for a FIRST message', async () => {
+  it('switched off later, a member the phone never answered: his next message is a request, shown by his circle name', async () => {
     // the choice is on the persona's card in the person's editor (the header avatar): off = "ask first, like anyone else"
     await backToLauncher();
     await tapSoon(by.id('header-avatar'), 20_000);
@@ -119,12 +119,27 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     await element(off).tap();
     await device.takeScreenshot('msg-05c-members-ask-first');
     await tapSoon(by.id('circle-aboutme-panel-close'));
-    // Bram's FIRST message came in while it was on; his next one is not a first message, so it lands in his thread
-    // (decision 2026-11-12: "off: their first private message is a request"). The request case is walked from a fresh
-    // install with the setting off before anyone writes: e2e/messagingRequest.test.js.
+    // the phone never answered Bram, so turning the switch off is meant to stop exactly this: his next message waits as a
+    // request, held without a card (his card rode only his first message), named as he is in the circle (ruling
+    // 2026-11-14). His first message stays in his thread. Never nowhere.
     peer.send({ do: 'contact-say', text: PEER_DM2 });
     const said = await peer.next('contact-said', () => true, 60_000);
     if (!said.ok) throw new Error(`Bram could not write: ${JSON.stringify(said)}`);
+    let held = false;
+    for (let i = 0; i < 8 && !held; i += 1) {
+      await tapSoon(by.id('circle-tab-circles'));
+      await tapSoon(by.id('circle-tab-contacten'));
+      await soon(by.id('contacts-screen'));
+      held = (await firstOf([by.id('contacts-requests')], 5_000)) === 0;
+    }
+    await device.takeScreenshot('msg-05d-second-is-a-request');
+    if (!held) throw new Error("Bram's message after the switch went off is not a request: lost");
+    await soon(by.text(PEER_DM2).withAncestor(by.id('contacts-requests')), 20_000);
+    if ((await firstOf([by.text('bram').withAncestor(by.id('contacts-requests')), by.text('Bram').withAncestor(by.id('contacts-requests'))], 10_000)) < 0) {
+      throw new Error('the request does not show Bram by his name in the circle');
+    }
+    // accepted without a card: his message moves into his thread
+    await element(by.text('Accept').withAncestor(by.id('contacts-requests'))).tap();
     let row = -1;
     for (let i = 0; i < 8 && row < 0; i += 1) {
       await tapSoon(by.id('circle-tab-circles'));
@@ -132,12 +147,12 @@ describe('messaging on the phone — a circle round trip and a contact round tri
       await soon(by.id('contacts-screen'));
       row = await firstOf([by.text('bram'), by.text('Bram')], 5_000);
     }
-    if (row < 0) throw new Error('Bram is gone from Contacten');
-    if (await isVisible(by.id('contacts-requests'))) throw new Error("a member who already wrote became a request when the setting went off");
+    if (row < 0) throw new Error('Bram is gone from Contacten after the accept');
     await element(row === 0 ? by.text('bram') : by.text('Bram')).atIndex(0).tap();
     await soon(by.id('contact-thread-screen'), 30_000);
-    await soon(by.text(PEER_DM2), 60_000);   // not dropped: it stands in his thread
-    await device.takeScreenshot('msg-05d-second-in-thread');
+    await soon(by.text(PEER_DM2), 60_000);
+    await soon(by.text(PEER_DM), 20_000);   // his first message stayed
+    await device.takeScreenshot('msg-05e-accepted-in-thread');
   });
 
   it("the phone's answer in the thread reaches Bram's stored thread", async () => {

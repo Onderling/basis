@@ -121,4 +121,37 @@ describe('message requests: held beside the book, bounded', () => {
     expect((await store.listByType('message-request')).map((r) => r.createdBy).sort()).toEqual(['me', 'me-work']);
     expect(await perSelf.hold({ ...turn('s', 3), persona: 'unknown' })).toEqual({ held: false, reason: 'no-self' });
   });
+
+  // A CO-MEMBER the person never answered, after "people in my circles may write to me" went off: their card rode only
+  // their first message, so the request is held WITHOUT one and shows them by the name they have in the circle.
+  it('a co-member\'s request needs no card: it shows the name they have in the circle', async () => {
+    const r = await requests.hold({ ...turn('cas', 2), card: null, member: { name: 'Cas' } });
+    expect(r.held).toBe(true);
+    expect(r.request).toMatchObject({ from: 'cas', card: null, name: 'Cas', member: true });
+    expect(await book.listContacts()).toEqual([]);
+    // a later card-less turn from them lands on the same request
+    expect((await requests.hold({ ...turn('cas', 3), card: null })).held).toBe(true);
+    expect((await requests.get('cas')).turns.map((t) => t.messageId)).toEqual(['cas-m2', 'cas-m3']);
+  });
+
+  it('a co-member\'s card, when one does ride, still has to name them', async () => {
+    expect(await requests.hold({ ...turn('cas', 1), card: cardOf('someone-else'), member: { name: 'Cas' } })).toEqual({ held: false, reason: 'card-not-sender' });
+  });
+
+  // NOTHING IS DROPPED SILENTLY: a turn the strict hold refused is held anyway on the door's second call, marked with
+  // the refusal; what made it unholdable is left off (the card, the file) or cut to the bound (the text).
+  it('a refused turn held as the fallback: no card, no file, the text cut to the bound, the refusal named', async () => {
+    const r = await requests.hold({ ...turn('s', 1), card: 'onderling-contact://nonsense', file: { name: 'x.jpg' }, text: 'x'.repeat(MESSAGE_REQUEST_TEXT_MAX_BYTES + 10), refused: 'made-up' });
+    expect(r.held).toBe(true);
+    expect(r.request).toMatchObject({ from: 's', card: null, name: null });
+    expect(r.request.turns).toHaveLength(1);
+    expect(r.request.turns[0]).toMatchObject({ messageId: 's-m1', refused: 'made-up' });
+    expect(new TextEncoder().encode(r.request.turns[0].text).length).toBeLessThanOrEqual(MESSAGE_REQUEST_TEXT_MAX_BYTES);
+  });
+
+  it('the fallback keeps a card already on the request', async () => {
+    await requests.hold(turn('s', 1));
+    await requests.hold({ ...turn('s', 2), card: 'onderling-contact://nonsense', refused: 'malformed-card' });
+    expect((await requests.get('s')).name).toBe('name of s');
+  });
 });

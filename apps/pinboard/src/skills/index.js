@@ -4180,7 +4180,9 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /** holdMessageRequest({from, messageId, ts, text?, card?, file?, persona?}) — the door's write: a turn from someone not known. */
+    /** holdMessageRequest({from, messageId, ts, text?, card?, file?, persona?, memberName?, refused?}) — the door's write: a
+     *  turn from someone not known (`memberName`: a co-member never answered, held without a card; `refused`: the door's
+     *  fallback after a refusal, held anyway). */
     defineSkill('holdMessageRequest', async ({ parts }) => {
       const a = dataArgs(parts);
       if (!bundle?.messageRequests) return { held: false, reason: 'no-contacts' };
@@ -4188,6 +4190,8 @@ export function buildSkills({
         return await bundle.messageRequests.hold({
           from: a.from, messageId: a.messageId, ts: a.ts, text: typeof a.text === 'string' ? a.text : '',
           card: typeof a.card === 'string' ? a.card : null, file: a.file === true, persona: a.persona ?? null,
+          ...(typeof a.memberName === 'string' && a.memberName.trim() ? { member: { name: a.memberName } } : {}),
+          ...(typeof a.refused === 'string' && a.refused ? { refused: a.refused } : {}),
         });
       } catch (err) {
         return { held: false, reason: 'invalid', error: err?.message ?? String(err) };
@@ -4208,7 +4212,10 @@ export function buildSkills({
       const persona = typeof a.persona === 'string' && a.persona.trim() ? a.persona.trim() : null;
       const request = await bundle.messageRequests.get(a.from, { persona });
       if (!request) return { error: 'no-such-request' };
-      const added = await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset });
+      // A REQUEST WITHOUT A CARD (a co-member never answered, or a turn held after a refusal): nothing to put in the book.
+      // Accept moves the held turns onto the thread and takes the request out; the book row comes when the person answers,
+      // as for a member who may write (their answer is the choice).
+      const added = request.card ? await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset }) : { contact: null };
       if (added?.error) return added;
       await bundle.messageRequests.remove(a.from, { persona });
       metrics?.record?.('message-request-accepted');

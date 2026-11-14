@@ -19,8 +19,14 @@
  *   - NOT KNOWN, but the FIRST OPENER of a link the persona shared (L806): the turn carries the link's token and uses it
  *     (`useLink`), or a later turn of theirs while the link's use names them (`letOnByLink`) → 'member', as above.
  *     Anyone after the first opener (the link is used), or a withdrawn or expired link → decided as any stranger's.
- *   - past the budgets, or a turn the request refuses (no card on a new request, a card naming someone else, a file) →
- *     'dropped', with a count line (kind + reason, never who).
+ *   - NOT KNOWN, a member of one of the persona's circles, but the persona does NOT let them write first (the person
+ *     switched it off after they wrote, never having answered them: `coMember`) → HELD as a request WITHOUT a card (their
+ *     card rode only their first message), shown by the name they have in the circle (Fable's ruling, 2026-11-14).
+ *   - past the budgets → 'dropped', with a count line (kind + reason, never who).
+ *   - a turn the hold REFUSES (no card on a new request, a card naming someone else, a file, too large, or the hold
+ *     failing) is NEVER dropped silently: the refusal is written to the refusal log with its reason code (`refusal`), and
+ *     the turn is held anyway on a second call marked `refused` (the hold leaves off what it cannot keep). Only when
+ *     that cannot hold it either (no self to hold it for) → 'dropped', both refusals logged.
  * A blocked sender never reaches this door: the secure agent's block set drops them below every channel.
  *
  * Pure: what is known, what the person wrote, and the hold are injected (the agent's `messageRequests`, the channel's
@@ -39,7 +45,7 @@ import { createInboundAdmission } from './inboundAdmission.js';
  * @returns {(m: {contactId: string, fromAddr: string, text?: string, card?: string|null, messageId?: string, ts?: number, file?: boolean, policy?: 'request'|'open'}) =>
  *   Promise<'known'|'member'|'held'|'dropped'>}
  */
-export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = null, useLink = null, letOnByLink = null, hold, count = null, now = Date.now } = {}) {
+export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = null, coMember = null, useLink = null, letOnByLink = null, hold, refusal = null, count = null, now = Date.now } = {}) {
   if (typeof isKnown !== 'function') throw new TypeError('createMessageRequestDoor: isKnown is required');
   if (typeof hold !== 'function') throw new TypeError('createMessageRequestDoor: hold is required');
   const said = (reason) => { try { count?.({ kind: 'message-request-dropped', reason }); } catch { /* a count never breaks a turn */ } };
@@ -62,12 +68,27 @@ export function createMessageRequestDoor({ isKnown, iWrote = null, isMember = nu
     let member = false;
     try { member = typeof isMember === 'function' && (await isMember({ contactId, fromAddr, to })) === true; } catch { member = false; }
     if (member) return 'member';
-    let held;
-    try {
-      held = await hold({ from: contactId || fromAddr, messageId: messageId || `${fromAddr}:${now()}`, ts: Number.isFinite(ts) ? ts : now(), text: String(text ?? ''), ...(card ? { card } : {}), ...(file ? { file: true } : {}), ...(to ? { to } : {}) });
-    } catch { held = null; }
-    if (held?.held) return 'held';
-    said(held?.reason ?? 'not-held');
+    // a co-member the persona does not let write first: held without a card, named as in the circle
+    let memberName = null;
+    try { if (typeof coMember === 'function') { const n = (await coMember({ contactId, fromAddr, to }))?.name; memberName = typeof n === 'string' && n.trim() ? n.trim() : null; } } catch { memberName = null; }
+    const turn = { from: contactId || fromAddr, messageId: messageId || `${fromAddr}:${now()}`, ts: Number.isFinite(ts) ? ts : now(), text: String(text ?? ''), ...(card ? { card } : {}), ...(file ? { file: true } : {}), ...(to ? { to } : {}), ...(memberName ? { memberName } : {}) };
+    const tryHold = async (t) => {
+      let r;
+      try { r = await hold(t); } catch { return { held: false, reason: 'hold-threw' }; }
+      if (r?.held === true) return r;
+      if (typeof r?.reason === 'string' && r.reason) return r;
+      return { held: false, reason: r == null ? 'no-answer' : (r.error ? 'invalid' : 'not-held') };   // a dispatch error carries no code
+    };
+    const refused = (reason) => { try { refusal?.(reason); } catch { /* the log never breaks a turn */ } };
+    const first = await tryHold(turn);
+    if (first.held) return 'held';
+    const why = typeof first.reason === 'string' && first.reason ? first.reason : 'not-held';
+    refused(why);
+    // NOTHING DROPPED SILENTLY: held anyway, marked with the refusal
+    const again = await tryHold({ ...turn, refused: why });
+    if (again.held) return 'held';
+    refused(typeof again.reason === 'string' && again.reason ? again.reason : 'not-held');
+    said(why);
     return 'dropped';
   };
 }

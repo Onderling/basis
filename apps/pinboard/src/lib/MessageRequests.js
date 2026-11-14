@@ -33,6 +33,13 @@ const REQUEST = 'message-request';
 const CARD_PREFIX = 'onderling-contact://';
 
 const bytesOf = (s) => new TextEncoder().encode(String(s ?? '')).length;
+/** The longest prefix of `s` within `max` bytes, never cutting a character in two. */
+const cutTo = (s, max) => {
+  if (bytesOf(s) <= max) return s;
+  let out = ''; let n = 0;
+  for (const ch of s) { const b = bytesOf(ch); if (n + b > max) break; out += ch; n += b; }
+  return out;
+};
 
 /** The card a request holds, decoded; null when it does not decode or names nobody. */
 function cardOf(payload) {
@@ -47,7 +54,9 @@ function cardOf(payload) {
 function view(row) {
   const turns = [...(row.turns ?? [])].sort((a, b) => (a.ts - b.ts) || String(a.messageId).localeCompare(String(b.messageId)));
   return {
-    id: row.id, self: row.self, from: row.from, card: row.card, name: cardOf(row.card)?.displayName ?? null,
+    id: row.id, self: row.self, from: row.from, card: row.card ?? null,
+    name: cardOf(row.card)?.displayName ?? (typeof row.memberName === 'string' && row.memberName ? row.memberName : null),
+    member: typeof row.memberName === 'string' && !!row.memberName,
     turns, turnsBefore: Number.isFinite(row.turnsBefore) ? row.turnsBefore : null,
     firstAt: row.firstAt ?? null, lastAt: row.lastAt ?? null, state: row.state === 'ignored' ? 'ignored' : 'open',
   };
@@ -82,17 +91,34 @@ export function createMessageRequests({ store, selfFor = null, now = Date.now } 
 
   /**
    * Hold one turn from a sender who is not known to this self.
+   *
+   * `member: {name}`: the sender is a member of one of this self's circles whom the person never answered, after the
+   * person stopped letting circle members write first. Their card rode only their first message, so a new request needs
+   * none; it shows them by the name they have in the circle (Fable's ruling, 2026-11-14).
+   *
+   * `refused: <reason>`: THE FALLBACK. The door's second call after this hold refused a turn: nothing at this door is
+   * dropped silently. What made the turn unholdable is left off (the card, the file) or cut to the bound (the text), and
+   * the turn says it was refused. Not for 'no-self': without a self there is nowhere to hold it.
    * @returns {Promise<{held: true, request: object} | {held: false, reason: string}>}
    */
-  async function hold({ from, card, messageId, text = '', ts, file = null, persona = null } = {}) {
+  async function hold({ from, card, messageId, text = '', ts, file = null, persona = null, member = null, refused = null } = {}) {
     if (typeof from !== 'string' || !from) throw new TypeError('message requests: from required');
     if (typeof messageId !== 'string' || !messageId) throw new TypeError('message requests: messageId required');
     if (!Number.isFinite(ts)) throw new TypeError('message requests: ts must be a time');
     const me = self(persona);
     if (!me) return { held: false, reason: 'no-self' };
+    const fallback = typeof refused === 'string' && refused ? refused : null;
+    const memberName = typeof member?.name === 'string' && member.name.trim() ? member.name.trim() : null;
     return inTurn(me.id, async () => {
-      if (file) return { held: false, reason: 'file-on-request' };
-      if (bytesOf(text) > MESSAGE_REQUEST_TEXT_MAX_BYTES) return { held: false, reason: 'turn-too-large' };
+      if (fallback) {
+        const named = cardOf(card);
+        card = named && (named.webid === from || named.pubKey === from) ? card : null;   // a card that names the sender may stay
+        text = cutTo(String(text ?? ''), MESSAGE_REQUEST_TEXT_MAX_BYTES);
+      }
+      else {
+        if (file) return { held: false, reason: 'file-on-request' };
+        if (bytesOf(text) > MESSAGE_REQUEST_TEXT_MAX_BYTES) return { held: false, reason: 'turn-too-large' };
+      }
       const st = await getStore();
       const mine = await rowsOf(REQUEST, me.id);
       for (const r of mine.filter(expired)) await st.delete(r.id);
@@ -101,7 +127,7 @@ export function createMessageRequests({ store, selfFor = null, now = Date.now } 
       const before = live.find((r) => r.id === id) ?? null;
       // the card: a NEW request needs one (the first message carries it; later turns need not), and any card given must
       // name the sender
-      if (card != null || !before) {
+      if (!fallback && (card != null || (!before && !memberName))) {
         const decoded = cardOf(card);
         if (!decoded) return { held: false, reason: card == null ? 'no-card' : 'malformed-card' };
         if (decoded.webid !== from && decoded.pubKey !== from) return { held: false, reason: 'card-not-sender' };
@@ -109,7 +135,7 @@ export function createMessageRequests({ store, selfFor = null, now = Date.now } 
 
       // the turns: a union by message id, the oldest dropped to keep both bounds (the floor says how far)
       const byId = new Map((before?.turns ?? []).map((t) => [t.messageId, t]));
-      if (!byId.has(messageId) && !(Number.isFinite(before?.turnsBefore) && ts < before.turnsBefore)) byId.set(messageId, { messageId, text: String(text), ts });
+      if (!byId.has(messageId) && !(Number.isFinite(before?.turnsBefore) && ts < before.turnsBefore)) byId.set(messageId, { messageId, text: String(text), ts, ...(fallback ? { refused: fallback } : {}) });
       let turns = [...byId.values()].sort((a, b) => (a.ts - b.ts) || a.messageId.localeCompare(b.messageId));
       let floor = Number.isFinite(before?.turnsBefore) ? before.turnsBefore : null;
       const total = () => turns.reduce((n, t) => n + bytesOf(t.text), 0);
@@ -128,7 +154,8 @@ export function createMessageRequests({ store, selfFor = null, now = Date.now } 
 
       const row = await st.put({
         ...(before ? { createdAt: before.createdAt, createdBy: before.createdBy } : {}),
-        type: REQUEST, id, self: me.id, from, card: before?.card ?? card, turns,
+        type: REQUEST, id, self: me.id, from, ...((before?.card ?? card) ? { card: before?.card ?? card } : {}), turns,
+        ...((before?.memberName ?? memberName) ? { memberName: before?.memberName ?? memberName } : {}),
         ...(floor !== null ? { turnsBefore: floor } : {}),
         firstAt: turns.length ? Math.min(before?.firstAt ?? Infinity, turns[0].ts) : (before?.firstAt ?? ts),
         lastAt: Math.max(before?.lastAt ?? -Infinity, ts),

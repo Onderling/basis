@@ -50,6 +50,15 @@ describe('the two first-contact controls', () => {
     expect(card('werk').firstContact.map((r) => r.value)).toEqual(['request', false]);
   });
 
+  it('the card does not list them a second time as raw property rows (they have their own controls)', () => {
+    const m = buildMijViewModel({ personas: [
+      { id: 'default', name: 'Me', properties: { [CIRCLE_MEMBERS_KEY]: own(false), [FIRST_MESSAGES_KEY]: own('open') } },
+    ], circles: [], releases: {} });
+    const keys = m.personas[0].entries.map((e) => e.key);
+    expect(keys).not.toContain(CIRCLE_MEMBERS_KEY);
+    expect(keys).not.toContain(FIRST_MESSAGES_KEY);
+  });
+
   it('the loader hands each persona its kind (a function profile reads open)', () => {
     expect(read('../../src/v2/mijLoader.js')).toMatch(/kind: +r\.kind \?\? null,/);
   });

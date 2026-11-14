@@ -77,10 +77,18 @@ const until = async (pred, { timeoutMs, what }) => {
  *   `contactReplies` (the contact-thread inbox), `mainBubbles` (calendar lines), `unrouted` (envelopes the router
  *   handed to the default handler), `catchUpOffers` (the consent question; allowed by default, as a tap would).
  */
-export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000, nknLib = liveNknStub() }) {
+export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000, nknLib = liveNknStub(), restoreFrom = null }) {
   if (!name || !relayUrl) throw new Error('bootMobileNode: name and relayUrl are required');
   vi.resetModules();
   const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+  // A RESTART: what the same phone held on its disk, put back before anything boots (`node.snapshot()` before its
+  // dispose). Everything a phone keeps across launches lives in these two stores here.
+  const fsStub = await import('expo-file-system');
+  const { flushPendingSaves } = await import('@onderling/local-store');
+  if (restoreFrom) {
+    await AsyncStorage.multiSet(restoreFrom.asyncStorage ?? []);
+    fsStub.__load?.(restoreFrom.files ?? []);
+  }
   const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
   const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
   const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
@@ -265,6 +273,8 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   return {
     name,
     bundle,
+    /** What this phone holds on its disk now: hand it to `bootMobileNode({ restoreFrom })` after `dispose()` to restart it. */
+    snapshot: async () => ({ _flushed: await flushPendingSaves?.(), asyncStorage: await AsyncStorage.multiGet(await AsyncStorage.getAllKeys()), files: fsStub.__dump?.() ?? [] }),
     /** Sign in to a pod as App.js does once its session holds tokens: the session into the circle pods' ref, the
      *  shared-with-me writer built from it, pinboard's item store attached to the person's pod. */
     signInToPod: async (session) => {

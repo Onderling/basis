@@ -617,6 +617,12 @@ device.
 Concretely: unlinkable to other members, to anyone observing the wire, and to every relay you did not use.
 The relay you do use can correlate your circle addresses and **can read nothing**.
 
+*Corrected 2026-11-14 (Frits; see the entry "A circle link proof names the member"):* "unlinkable to other members"
+holds per PERSONA, not per person. A member is listed in each circle under their persona's key, the same in every
+circle that persona is in, so someone in two of your circles sees it is the same persona. Who wants two circles kept
+apart uses a persona per each. Circles where members know each other only per circle are a later design (after the
+alpha).
+
 Because the relay correlates anyway, the cheap implementation is also the right one: **one socket carrying
 several registered addresses**, not N connections.
 
@@ -1715,3 +1721,32 @@ membership and items on the pod (new carriers), after the alpha, if the posture 
 is none and shared, and the wizard's choice overrides a template's `personal` preference); a circle that already
 holds it, or one made programmatically, can still have it. The two walks pin what crosses and what does not
 (`apps/basis/test/centralPodCircle.relay.test.js`, `centralPodMembership.relay.test.js`). Ledger: L745, L610.
+
+## 2026-11-14 — A circle link proof names the member; one address, one member in a circle (Frits, ledger answer; Fable ruled the shape)
+
+**Status:** decided and built.
+
+**Context:** the proof that a per-circle address belongs in a circle was a signature by the address's key over the
+circle and the address only. Leaving the member out was deliberate (2026-08-02, recorded in
+`circleAddressAnnouncement.js`): naming the member's key in a signature would prove to anyone that address and person
+are one. Two facts reversed it. Every membership statement (join, leave, role, profile) is already signed by the
+per-circle key over a payload that names the member, since the membership lane became circle-scoped, so that link
+already exists inside the circle. And an unbound proof could be COPIED: a member put another member's address and its
+proof on their own roster row, the roster listed it as theirs, and a device bound that address to the copier as a
+person (measured: accepted).
+
+**Decision (Frits):** the key on the roster is the PERSONA's key; recognising one persona across its circles is
+natural, and who does not want that makes a persona per circle. So the proof names the member:
+`onderling-circle-link-v2 | circle | address | member`, the member being the persona's identity in that circle. A
+verifier takes the member from the ROW it writes or reads (the redeem's sender, the announcement's member, the trail
+row's `redeemedBy` / `confirmedBy`), never from a field travelling with the proof. The earlier proof is refused; a
+device that meets one writes `earlier-link-proof` to its device log (no circle id, no address). Circles made before
+this lose their addresses and are made again (pre-launch, no compatibility).
+
+**And one address, one member in a circle:** the key holder could still sign a second proof naming another member.
+An address a member's row already holds stays theirs: an announcement placing it under another member is refused
+(`address-held-by-another-member`), and a joiner presenting it at redeem records none (the join goes on).
+
+**Not decided here:** complete unlinkability between circles (members knowing each other only per circle) is a
+design for after the alpha. Code: `packages/core/src/identity/circleLink.js`, `circleAddressAnnouncement.js`,
+`packages/circles/src/circleAddress.js` (`addressHolderIn`). Ledger: L917, L919, L921.

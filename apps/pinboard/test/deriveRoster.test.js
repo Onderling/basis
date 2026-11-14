@@ -90,13 +90,13 @@ describe('deriveRoster', () => {
   it('the founder\'s per-circle address comes from their creation statement, through the same proof gate as a joiner\'s', () => {
     const seed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('founder');
     const addr = deriveCircleAddress(seed, 'g1');
-    const proof = signCircleLinkFromSeed(seed, 'g1', 'g1', addr);
+    const proof = signCircleLinkFromSeed(seed, 'g1', 'g1', addr, 'A');
     const ok = deriveRoster({ founderWebids: ['A'], founderFacts: { A: { groupId: 'g1', circleAddress: addr, circleAddressProof: proof } } });
     const a = ok.find((m) => m.webid === 'A');
     expect([a.role, a.circleAddress]).toEqual(['admin', addr]);
     expect(a.circleAddresses).toEqual([addr]);
     // a proof for another circle, or none, projects no address
-    const otherProof = signCircleLinkFromSeed(seed, 'g1', 'g2', addr);
+    const otherProof = signCircleLinkFromSeed(seed, 'g1', 'g2', addr, 'A');
     const bad = deriveRoster({ founderWebids: ['A'], founderFacts: { A: { groupId: 'g1', circleAddress: addr, circleAddressProof: otherProof } } });
     expect(bad.find((m) => m.webid === 'A').circleAddress).toBeUndefined();
   });
@@ -137,7 +137,7 @@ describe('deriveRoster', () => {
     // test addresses are genuinely derived and genuinely signed, exactly as a device would.
     const seedOf  = (n) => new Uint8Array(32).fill(n);
     const addrOf  = (n) => deriveCircleAddress(seedOf(n), 'g1');
-    const proofOf = (n) => signCircleLinkFromSeed(seedOf(n), 'g1', 'g1', addrOf(n));
+    const proofOf = (n, m = 'B') => signCircleLinkFromSeed(seedOf(n), 'g1', 'g1', addrOf(n), m);
 
     it('a second PROVEN address (a later trail row) joins the set — and the FIRST survives', () => {
       const roster = deriveRoster({
@@ -215,10 +215,10 @@ describe('deriveRoster', () => {
       const roster = deriveRoster({
         redemptions: [redemption({
           redeemedBy: 'B', confirmedBy: 'A', channel: 'peer',
-          confirmedByCircleAddress: addrOf(5), confirmedByCircleAddressProof: proofOf(5),
+          confirmedByCircleAddress: addrOf(5), confirmedByCircleAddressProof: proofOf(5, 'A'),
           confirmedByCircleAddresses: [
-            { address: addrOf(6), proof: proofOf(6) },
-            { address: addrOf(7), proof: proofOf(3) },   // forged ⇒ refused
+            { address: addrOf(6), proof: proofOf(6, 'A') },
+            { address: addrOf(7), proof: proofOf(3, 'A') },   // forged ⇒ refused
           ],
         })],
       });
@@ -606,14 +606,14 @@ describe('a roster derived again and again checks each member\'s link signature 
     const { vi } = await import('vitest');
     const seed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('founder');
     const addr = deriveCircleAddress(seed, 'g-memo');
-    const proof = signCircleLinkFromSeed(seed, 'g-memo', 'g-memo', addr);
+    const proof = signCircleLinkFromSeed(seed, 'g-memo', 'g-memo', addr, 'A');
     const facts = { founderWebids: ['A'], founderFacts: { A: { groupId: 'g-memo', circleAddress: addr, circleAddressProof: proof } } };
     const spy = vi.spyOn(AgentIdentity, 'verify');
     try {
       for (let i = 0; i < 6; i++) expect(deriveRoster(facts).find((m) => m.webid === 'A').circleAddress).toBe(addr);
       expect(spy.mock.calls.length, 'six derivations, one link: one signature check').toBe(1);
       // a proof for another circle is never remembered as good: refused on every derivation
-      const otherProof = signCircleLinkFromSeed(seed, 'g-memo', 'g-other', addr);
+      const otherProof = signCircleLinkFromSeed(seed, 'g-memo', 'g-other', addr, 'A');
       const bad = { founderWebids: ['A'], founderFacts: { A: { groupId: 'g-memo', circleAddress: addr, circleAddressProof: otherProof } } };
       for (let i = 0; i < 3; i++) expect(deriveRoster(bad).find((m) => m.webid === 'A').circleAddress ?? null).toBe(null);
     } finally { spy.mockRestore(); }
@@ -623,7 +623,7 @@ describe('a roster derived again and again checks each member\'s link signature 
 describe('the link proofs a roster read checks are checked ahead, giving the thread back (fast start, the 100 ms rule)', () => {
   const seedOf = (n) => new Uint8Array(32).fill(100 + n);
   const addrOf = (n) => deriveCircleAddress(seedOf(n), 'g7');
-  const proofOf = (n) => signCircleLinkFromSeed(seedOf(n), 'g7', 'g7', addrOf(n));
+  const proofOf = (n, m = n === 9 ? 'F' : `M${n}`) => signCircleLinkFromSeed(seedOf(n), 'g7', 'g7', addrOf(n), m);
   const args = () => ({
     redemptions: [1, 2, 3, 4, 5, 6].map((n) => redemption({ groupId: 'g7', redeemedBy: `M${n}`, circleAddress: addrOf(n), circleAddressProof: proofOf(n) })),
     founderWebids: ['F'],
@@ -645,7 +645,7 @@ describe('the link proofs a roster read checks are checked ahead, giving the thr
     const real = AgentIdentity.verify.bind(AgentIdentity);
     const spy = vi.spyOn(AgentIdentity, 'verify').mockImplementation((m, s, k) => { const end = Date.now() + 30; while (Date.now() < end) { /* a slow phone */ } return real(m, s, k); });
     const a = args();
-    a.redemptions = a.redemptions.map((r, i) => ({ ...r, source: { ...r.source, circleAddress: deriveCircleAddress(new Uint8Array(32).fill(150 + i), 'g7'), circleAddressProof: signCircleLinkFromSeed(new Uint8Array(32).fill(150 + i), 'g7', 'g7', deriveCircleAddress(new Uint8Array(32).fill(150 + i), 'g7')) } }));
+    a.redemptions = a.redemptions.map((r, i) => ({ ...r, source: { ...r.source, circleAddress: deriveCircleAddress(new Uint8Array(32).fill(150 + i), 'g7'), circleAddressProof: signCircleLinkFromSeed(new Uint8Array(32).fill(150 + i), 'g7', 'g7', deriveCircleAddress(new Uint8Array(32).fill(150 + i), 'g7'), r.redeemedBy ?? r.source?.redeemedBy) } }));
     let last = Date.now(); let worst = 0; let running = true;
     const tick = () => { const t = Date.now(); worst = Math.max(worst, t - last); last = t; if (running) setTimeout(tick, 0); };
     setTimeout(tick, 0);

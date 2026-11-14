@@ -100,6 +100,9 @@ export function makeHandleGroupRedeemRequest({
         // grant only; it is not written into the redemption, the roster or the join statement.
         ...(typeof podWebId === 'string' && podWebId ? { podWebId } : {}),
       });
+      // a device holding no code for this circle is not where the invite lives: silence, so the sibling that holds the
+      // code answers (the joiner takes the first reply; this one would have overtaken it)
+      if (result?.error === 'no-code-here') { logger.info?.(`[group-redeem] no code for ${String(groupId).slice(0, 12)}… on this device: left to the device that holds it`); return; }
       if (result?.error) {
         // a CODE from the closed set crosses the wire, never the substrate's own text (inviteRefusals.js)
         reply = { error: inviteRefusalOf(result.error) };
@@ -373,6 +376,8 @@ export function makeHandleGroupRedeemResponse({
       try { clearTimeout(entry.timer); } catch { /* defensive */ }
     }
     pendingMap.delete(requestId);
-    entry.resolve(payload);
+    // the reply's VERIFIED sender rides along: a reply is matched by its request id alone, so what it says about the
+    // admin (their per-circle address and its proof) is taken only when the admin sent it (joinGroupState)
+    entry.resolve({ ...payload, repliedBy: typeof _fromAddr === 'string' && _fromAddr ? _fromAddr : null });
   };
 }

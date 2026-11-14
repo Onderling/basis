@@ -105,7 +105,7 @@ describe('makeHandleGroupRedeemResponse', () => {
     const pendingMap = new Map([['r-1', { resolve }]]);
     const handle = makeHandleGroupRedeemResponse({ pendingMap });
     handle('peer-A', { requestId: 'r-1', ok: true, codeId: 'c' });
-    expect(resolve).toHaveBeenCalledWith({ requestId: 'r-1', ok: true, codeId: 'c' });
+    expect(resolve).toHaveBeenCalledWith({ requestId: 'r-1', ok: true, codeId: 'c', repliedBy: 'peer-A' });   // the reply's verified sender rides along
     expect(pendingMap.has('r-1')).toBe(false);
   });
 
@@ -178,7 +178,7 @@ describe('makeSendGroupRedeemRequest — Phase 4 (#271)', () => {
     handleResponse('app.alice', { requestId, ok: true, codeId: 'c-1', validUntil: 9999 });
 
     const r = await pending;
-    expect(r).toEqual({ requestId, ok: true, codeId: 'c-1', validUntil: 9999 });
+    expect(r).toEqual({ requestId, ok: true, codeId: 'c-1', validUntil: 9999, repliedBy: 'app.alice' });
     expect(pendingMap.size).toBe(0);
   });
 

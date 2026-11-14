@@ -1,6 +1,8 @@
 import { hasHumanRules } from './circleRulesDoc.js';
+import { addressHolderIn } from './circleAddress.js';
 import { personKeyAnnouncement, MEMBER_PROPS_FIELDS } from '@onderling/core';
 import { releaseUnchanged } from '@onderling/agent-registry';
+
 /**
  * Key-coupled membership WRITERS — pure-body lift out of pinboard's `buildSkills` (the §8c migration, slice-b).
  * These persist a circle's membership STATE transitions as typed `store.addItems([{type}])` items
@@ -27,6 +29,17 @@ import { releaseUnchanged } from '@onderling/agent-registry';
  * `INVITE_LIMIT_REACHED` constant) is passed in. Byte-identical to the pre-lift skill bodies; the caller's
  * test suite is the safety net.
  */
+
+/**
+ * One address, one member in a circle: a proven address another member's row already holds stays theirs, so a joiner
+ * presenting it records none (the join itself goes on). An unreadable trail does not block the join's address.
+ */
+async function addressFreeFor(store, groupId, address, member) {
+  let rows = [];
+  try { rows = (await store.listOpen({ type: 'membership-redemption' })).filter((i) => i?.source?.groupId === groupId); } catch { rows = []; }
+  const holder = addressHolderIn(rows, address);
+  return !holder || holder === member;
+}
 
 /**
  * redeemMembershipCode(deps, {a, from})
@@ -156,7 +169,8 @@ export async function redeemMembershipCode({
   // THIS join (Decision B — the signing proof). Deny-by-default: an unproven or forged
   // address is DROPPED — the join still succeeds, just WITHOUT the cross-circle linkage.
   const verifiedCircleAddress = (a.circleAddress
-    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, memberRef: from, proof: a.circleAddressProof })
+    && await addressFreeFor(store, a.groupId, a.circleAddress, from))
     ? a.circleAddress : null;
   const [item] = await store.addItems([{
     type:       'membership-redemption',
@@ -275,6 +289,10 @@ export async function verifyMembershipCodeForPeer({
 
   const all = await store.listOpen({ type: 'membership-code' });
   const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
+  // NOT WHERE THE INVITE LIVES. A person's devices share one address, so a peer redeem reaches all of them, and the
+  // joiner takes the first reply. A device holding no code for this circle at all (a sibling that never minted one) says
+  // so, and the handler stays silent: its "invalid code" would otherwise overtake the answer of the device that holds it.
+  if (forGroup.length === 0) return { error: 'no-code-here' };
   const now = Date.now();
   const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
   if (!valid) return { error: 'invalid-or-expired-code' };
@@ -303,7 +321,8 @@ export async function verifyMembershipCodeForPeer({
   // (mirrors redeemMembershipCode): a presented per-circle address is recorded ONLY when
   // the joiner proved control of the key behind it. Deny-by-default; unproven ⇒ dropped.
   const verifiedCircleAddress = (a.circleAddress
-    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, memberRef: a.requesterWebid, proof: a.circleAddressProof })
+    && await addressFreeFor(store, a.groupId, a.circleAddress, a.requesterWebid))
     ? a.circleAddress : null;
 
   // The joiner's name rides the redeem as `peerDisplay`. Two people may share a name in a circle (Frits

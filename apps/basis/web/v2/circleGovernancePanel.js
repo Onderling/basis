@@ -8,6 +8,7 @@
  * governance host factory + re-invokes on each action. Unit-testable under happy-dom.
  */
 
+import { reportTargetText } from '../../src/v2/governanceView.js';
 import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../src/v2/circlePolicy.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
@@ -38,9 +39,25 @@ function el(tag, cls, text) {
  * @param {(reportId:string)=>void} [opts.onDismissReport]
  * @param {(reportId:string)=>void} [opts.onActReport]
  */
-export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed, reports = [], onDismissReport, onActReport } = {}) {
+export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed, reports = [], onDismissReport, onActReport, errorKey = null, noticeKey = null, onEnact = null, reportNameOf = null } = {}) {
   const tr = translatorOr(t, 'circleGovernancePanel.js');
   container.innerHTML = '';
+  // a vote that did not go through says so (voteFailedLine): it must not look cast
+  if (errorKey) {
+    const err = document.createElement('p');
+    err.className = 'circle-governance__error';
+    err.setAttribute('role', 'alert');
+    err.textContent = tr(errorKey);
+    container.appendChild(err);
+  }
+  // what an act did (an admin's Enact): one plain line
+  if (noticeKey) {
+    const done = document.createElement('p');
+    done.className = 'circle-governance__notice';
+    done.setAttribute('role', 'status');
+    done.textContent = tr(noticeKey);
+    container.appendChild(done);
+  }
   container.classList.add('circle-governance');
 
   container.appendChild(el('h2', 'circle-governance__title', tr('circle.governance.title')));
@@ -92,8 +109,19 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
         tr('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })) : null),
       'proposal-deadline': () => (row.deadline != null
         ? el('span', 'circle-governance__deadline', deadlineLine(row.deadline, { t: tr, locale: dateLocaleOf(tr) })) : null),
-      'proposal-awaiting': () => (row.approved && row.awaitingEnactment
-        ? el('span', 'circle-governance__awaiting', tr('circle.governance.awaiting_enactment')) : null),
+      'proposal-awaiting': () => {
+        if (!(row.approved && row.awaitingEnactment)) return null;
+        const wait = el('span', 'circle-governance__awaiting', tr('circle.governance.awaiting_enactment'));
+        // the admin's act (L893): one shared decision of who sees it (row.canEnact); everyone else keeps the line
+        if (!row.canEnact || typeof onEnact !== 'function') return wait;
+        const box = el('span', 'circle-governance__awaiting-box');
+        box.appendChild(wait);
+        const go = el('button', 'circle-governance__enact', tr('circle.governance.enact'));
+        go.type = 'button';
+        go.addEventListener('click', () => onEnact(row.proposalId));
+        box.appendChild(go);
+        return box;
+      },
       // affordances — vote (member) / override (admin, past deadline)
       'proposal-vote': () => {
         if (!row.canVote) return null;
@@ -154,9 +182,8 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
     for (const r of reports) {
       const card = el('div', 'circle-governance__report');
       card.dataset.report = r.reportId;
-      const targetLabel = r.targetLabel || r.targetRef || '';
-      card.appendChild(el('span', 'circle-governance__report-what',
-        `${tr(`circle.governance.report_target.${r.targetType}`)}${targetLabel ? `: ${targetLabel}` : ''}`));
+      // named from this admin's own roster, never by the key (reportTargetText, shared)
+      card.appendChild(el('span', 'circle-governance__report-what', reportTargetText(r, { nameOf: reportNameOf, t: tr })));
       if (r.reason) card.appendChild(el('span', 'circle-governance__report-reason', r.reason));
       const acts = el('div', 'circle-governance__report-actions');
       const dismiss = el('button', 'circle-governance__report-dismiss', tr('circle.governance.report_dismiss'));

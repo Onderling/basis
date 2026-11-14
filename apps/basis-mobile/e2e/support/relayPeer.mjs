@@ -47,8 +47,10 @@ import {
 } from '../../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../../basis/src/v2/householdRosterPairing.js';
 import { DEFAULT_CIRCLE_POLICY } from '../../../basis/src/v2/circlePolicy.js';
+import { bindCircleGovernance, makeGovernanceBroadcast } from '../../../basis/src/v2/governanceAppWiring.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from'../../../basis/src/v2/circleInvite.js';
 import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
+import { withCoMemberRoutes, contactSendRoute } from '../../../basis/src/v2/contactsSource.js';
 
 const arg = (name, fallback = null) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -84,8 +86,10 @@ await connectNodesOverRelay([peer], { relayUrl });
 const call = (app, op, args) => peer.agent.callSkill(app, op, args);
 // the circle this peer is in: its own (founded here), or, in `--join` mode, the phone's once the invite arrives
 let groupId = (joinMode || makerMode) ? null : `walk-${Date.now().toString(36)}`;
+// the circle's settings as this peer (its admin) last stated them: what an accepted proposal is applied over
+let settings = { policy: DEFAULT_CIRCLE_POLICY, version: 1 };
 if (!joinMode && !makerMode) {
-await createCircle(peer, { groupId, name: circleName });
+await createCircle(peer, { groupId, name: circleName, handle });   // named, as a founder in a shell is
 await bindCircleAddresses([peer], groupId);
 await bindCircleAddressKeysFor({ agent: peer.agent, circleId: groupId });
 
@@ -95,6 +99,7 @@ const features = (arg('features', '') ?? '').split(',').map((x) => x.trim()).fil
 if (features.length) {
   const policy = { ...DEFAULT_CIRCLE_POLICY, features: { ...DEFAULT_CIRCLE_POLICY.features, ...Object.fromEntries(features.map((f) => [f, true])) } };
   const st = await peer.agent.emitPolicyUpdate?.({ groupId, policy, version: 2 }).catch((e) => ({ error: String(e?.message ?? e) }));
+  if (st && !st.error) settings = { policy, version: 2 };
   say({ step: 'features', on: features, ok: !!st && !st?.error });
 }
 await call('agents', 'setProfileProperty', { id: 'default', key: 'handle', value: handle }).catch(() => null);
@@ -189,6 +194,28 @@ if (talk) {
   };
   setInterval(() => { listen().catch((err) => say({ step: 'listen-error', error: String(err?.message ?? err) })); }, 1000);
 
+  // THE GOVERNANCE BINDING THE SHELLS COMPOSE (bindCircleGovernance + the broadcast), over this peer's log: what its
+  // commands decide, vote and report through. Settings changes it enacts are applied over the settings it holds and
+  // stated on the lane as the next version.
+  const merge = (base, patch) => {
+    const out = { ...base };
+    for (const [k, v] of Object.entries(patch ?? {})) out[k] = (v && typeof v === 'object' && !Array.isArray(v) && base?.[k] && typeof base[k] === 'object') ? merge(base[k], v) : v;
+    return out;
+  };
+  const govBinding = () => bindCircleGovernance({
+    eventLog: peer.chatEventLog, callSkill: call, getPolicy: async () => settings.policy, myRef: () => peer.pubKey,
+    genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: makeGovernanceBroadcast(call),
+    circleIdentityFor: peer.agent.circleIdentityFor, agent: peer.agent,
+    setPolicy: async (_cid, patch) => { settings = { ...settings, policy: merge(settings.policy, patch) }; },
+    statePolicy: async (cid, meta = {}) => {
+      const version = settings.version + 1;
+      const st = await peer.agent.emitPolicyUpdate({ groupId: cid, policy: settings.policy, version, ...(meta?.proposalId ? { proposalId: meta.proposalId } : {}) });
+      if (st?.body?.hash) settings = { ...settings, version };
+      return st;
+    },
+    policyVersionOf: async () => settings.version,
+  });
+
   // SPEAKING: one JSON command per stdin line.
   readline.createInterface({ input: process.stdin }).on('line', async (line) => {
     let cmd = null;
@@ -245,21 +272,87 @@ if (talk) {
         if (open.length !== 1) { say({ step, ok: false, error: `${open.length} open tasks hold "${cmd.text}"` }); return; }
         const r = await call('tasks', cmd.do === 'task-claim' ? 'claimTask' : 'completeTask', { circleId: groupId, id: open[0].id });
         say({ step, ok: !r?.error && r?.result?.ok !== false, id: open[0].id, result: r ?? null });
+      } else if (cmd.do === 'gov-accept') {
+        // THE ADMIN ACCEPTS A MEMBER'S SETTINGS PROPOSAL, as an admin's settings screen does: the governance binding the
+        // shells compose (signed on this peer's log, fanned to the circle), a yes on the open changePolicy proposal, and
+        // the orchestrator enacts it: the patch applied over the settings this peer holds, then stated on the lane
+        try {
+        const gov = govBinding();
+        // bounded by the clock, not by a count (a view can be slow): the walk waits longer than this, so it always hears
+        // which branch it was: no proposal here, or the vote and the tally
+        let open = []; let seen = null;
+        const until = Date.now() + 90_000;
+        while (!open.length && Date.now() < until) {
+          const view = await gov.view(groupId);
+          seen = { open: (view?.open ?? []).map((x) => x?.action ?? null), closed: (view?.closed ?? []).length, events: peer.chatEventLog.query({}).length };
+          open = (view?.open ?? []).filter((x) => x?.action === 'changePolicy');
+          if (!open.length) await new Promise((r) => { setTimeout(r, 2000); });
+        }
+        if (!open.length) { say({ step: 'gov-accepted', ok: false, why: 'no open settings proposal reached the peer', seen }); return; }
+        const v = await gov.vote({ circleId: groupId, proposalId: open[0].proposalId, voter: peer.pubKey, choice: 'yes' });
+        const t = await gov.tally({ circleId: groupId, proposalId: open[0].proposalId });
+        say({ step: 'gov-accepted', ok: t?.status === 'approved' && (t.enacted === true || t.closed === true), vote: v, tally: t, version: settings.version, subject: open[0].subject ?? null });
+        } catch (err) { say({ step: 'gov-accepted', ok: false, error: String(err?.message ?? err) }); }
+      } else if (cmd.do === 'gov-vote') {
+        // A MEMBER VOTES, as the Decisions screen's vote does: a yes on the open proposal of one action
+        // (`cmd.action`, removeMember by default), through the governance binding the shells compose
+        try {
+          const gov = govBinding();
+          const action = cmd.action ?? 'removeMember';
+          let open = []; let seen = null;
+          const until = Date.now() + 90_000;
+          while (!open.length && Date.now() < until) {
+            const view = await gov.view(groupId);
+            seen = (view?.open ?? []).map((x) => x?.action ?? null);
+            open = (view?.open ?? []).filter((x) => x?.action === action);
+            if (!open.length) await new Promise((r) => { setTimeout(r, 2000); });
+          }
+          if (!open.length) { say({ step: 'gov-voted', ok: false, why: `no open ${action} proposal reached the peer`, seen }); return; }
+          const v = await gov.vote({ circleId: groupId, proposalId: open[0].proposalId, voter: peer.pubKey, choice: cmd.choice ?? 'yes' });
+          say({ step: 'gov-voted', ok: v?.ok === true, vote: v, proposalId: open[0].proposalId });
+        } catch (err) { say({ step: 'gov-voted', ok: false, error: String(err?.message ?? err) }); }
+      } else if (cmd.do === 'report-file') {
+        // A MEMBER FILES A REPORT, as the report sheet does: a signed statement on the governance rail, fanned to its
+        // readers only (the circle's admins and the reporter). The target: the circle's other member (the phone).
+        try {
+          const mine = new Set([peer.pubKey, peer.agent.circleSelf?.(groupId)?.webid].filter(Boolean));
+          const other = (await readRoster(peer, groupId)).find((m) => !mine.has(m?.webid ?? m?.pubKey ?? null));
+          const target = other?.webid ?? other?.pubKey ?? null;
+          if (!target) { say({ step: 'report-filed', ok: false, why: 'no other member on the peer\'s roster' }); return; }
+          const r = await govBinding().reports.file({ circleId: groupId, targetType: 'member', targetRef: target, reason: cmd.reason ?? 'walk report' });
+          say({ step: 'report-filed', ok: r?.ok === true, reportId: r?.reportId ?? null, target });
+        } catch (err) { say({ step: 'report-filed', ok: false, error: String(err?.message ?? err) }); }
+      } else if (cmd.do === 'my-circles') {
+        // the circles the peer's own device holds (after a removal, the removed circle is gone from it)
+        const circles = ((await call('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? [])
+          .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+        say({ step: 'my-circles', circles, holds: circles.includes(groupId), circleId: groupId });
       } else if (cmd.do === 'circle-say') {
         const r = await sendCircleChat(peer, { groupId, msgId: `peer-${Date.now().toString(36)}`, text: cmd.text });
         say({ step: 'circle-said', ok: !r?.error, error: r?.error ?? null });
       } else if (cmd.do === 'contact-say') {
-        let to = lastFrom;
-        if (!to) {
+        // who: the person it last heard from, else the first other member of the circle (by their circle id, as a
+        // Contacten row names a co-member)
+        let who = lastFrom;
+        if (!who) {
           const roster = await readRoster(peer, groupId);
           const mine = new Set([peer.pubKey, peer.agent.circleSelf?.(groupId)?.webid].filter(Boolean));
-          const other = (roster ?? []).map((m) => m.webid ?? m.pubKey ?? null).find((id) => id && !mine.has(id));
-          to = other ?? null;
+          who = (roster ?? []).map((m) => m.webid ?? m.pubKey ?? null).find((id) => id && !mine.has(id)) ?? null;
         }
-        if (!to) { say({ step: 'contact-said', ok: false, error: 'nobody to talk to yet' }); return; }
-        const { sent } = peer.contactThreadChannel.sendTurn({ peerAddr: to, threadId: to, text: cmd.text });
+        if (!who) { say({ step: 'contact-said', ok: false, error: 'nobody to talk to yet' }); return; }
+        // where: as a shell's Contacten sends it (contactsSource): a co-member is written to at their circle address in
+        // the circle we share, never at their circle id; someone who wrote first keeps the address they wrote from
+        const [row] = await withCoMemberRoutes([{ contactId: who, source: 'peer', isBot: false }], {
+          circleIds: async () => [groupId], membersOf: (cid) => readRoster(peer, cid),
+        });
+        const route = contactSendRoute(row, who);
+        if (route.blocked) { say({ step: 'contact-said', ok: false, to: null, reason: route.blocked }); return; }
+        const to = route.to;
+        const { sent } = peer.contactThreadChannel.sendTurn({ peerAddr: to, threadId: who, text: cmd.text });
         const r = await sent;
-        say({ step: 'contact-said', ok: r?.delivered !== false, to, result: r ?? null });
+        // the send's answer is `{ sent: { delivered, held, reason }, itemId }`: a held, undelivered turn is not ok, and says why
+        const delivered = r?.sent?.delivered ?? r?.delivered;
+        say({ step: 'contact-said', ok: delivered !== false, to, reason: r?.sent?.reason ?? null, result: r ?? null });
       }
     } catch (err) { say({ step: `${cmd.do}-error`, error: String(err?.message ?? err) }); }
   });

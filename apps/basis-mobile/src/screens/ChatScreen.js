@@ -108,14 +108,12 @@ import MultiFieldFormBubble from '../rn/MultiFieldFormBubble.js';
 import { QrCodeView }     from '@onderling/react-native/qr/view';
 import QrScannerModal     from '../rn/QrScannerModal.js';
 // L125 — a scanned contact card asks first what the contact will see of you (web parity)
-import { useContactLensSheet } from '../../../basis/src/rn/ContactLensSheet.js';
 import { classifyQrPayload } from '@onderling/react-native/qr';
 import { getBasisClassifiers } from '../core/qrClassifiers.js';
 // Extension install (feedback-extension mobile parity) — consent sheet + controller.
 import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../core/mappingsStoreRN.js';
-import { contactPointAdopter } from './v2/RelayQuestionModal.js';
 // ε.6 — multi-offer chooser modal (opt-in via policy.catchUpChooserMode='prompt').
 // ε.6 follow-up — read the same per-circle policy the launcher writes so
 // the chooser mode is honoured on mobile (web reads localStorage
@@ -148,6 +146,8 @@ export default function ChatScreen({
   // reload. Declared here deliberately: the sibling bug fixed the same day was App.js passing
   // `onAcceptFallback` to a screen that never destructured it, which threw on render.
   onCirclesChanged = null,
+  // a contact card opened as a link: handed to the launcher (this shell is mounted hidden; its sheet would not show)
+  onContactLink = null,
   eventLog = null,
   // ε.1 — shared inbox singleton (msgId dedup + ingest mirror + eventLog append).
   // The receiver path here routes through it; rehydrator + future catch-up paths
@@ -220,12 +220,7 @@ export default function ChatScreen({
   }
   const [logsPanelOpen, setLogsPanelOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
-  // a device with no relay of its own adopts the point a scanned card brings (said once)
-  const contactAdopter = useMemo(() => contactPointAdopter(bundle?.agent ?? null), [bundle]);
-  const contactLens = useContactLensSheet({
-    callSkill: bundle?.callSkill ?? null, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor,
-    shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t,
-  });
+  // (no add sheet here: a contact link is handed to the launcher, the screen the person sees)
   // record/mini-page "⤢ Open in full": holds the reply shown in
   // the full-height detail modal, or null when closed.
   const [expandedRecord, setExpandedRecord] = useState(null);
@@ -1524,7 +1519,6 @@ export default function ChatScreen({
           classifies the scanned text and routes by kind:
           - 'contact' → callSkill('pinboard','addContactFromQr',{payload})
           - 'invite'  → setPendingWizard({opId:'joinGroup', args:{invite:payload}}) */}
-      {contactLens.sheet}
       <QrScannerModal
         visible={qrScannerOpen}
         onClose={() => setQrScannerOpen(false)}
@@ -1554,26 +1548,22 @@ export default function ChatScreen({
     onQrScanResult(res);
   }
 
+  // What a link says to the person, from this HIDDEN shell (App.js mounts it out of sight for its peer wiring): a native
+  // alert, which shows whatever view the shell sits in. Its own chat bubble nobody would see (an enrol link was
+  // stashed in silence, an unreadable one said nothing).
+  const sayToPerson = (text) => { try { Alert.alert('', text); } catch { /* no window yet */ } };
+
   async function onQrScanResult(res) {
     setQrScannerOpen(false);
     if (!res || res.kind === 'unknown') {
-      appendBotText(t('chat.scan_unknown'));
+      sayToPerson(t('chat.scan_unknown'));
       return;
     }
     const payload = res.payload;
     if (res.kind === 'contact') {
-      // Call the pinboard substrate skill that decodes the URL + adds the
-      // contact in one round-trip.  Then synthesise a confirmation bubble.
-      try {
-        // …after the sheet (L125): what they will see of you, prefilled; closing it adds nothing. This path recorded
-        // no persona at all before — every add path now records one.
-        const reply = bootState.kind === 'ready' ? await contactLens.addWithSheet(payload) : null;
-        if (reply === null) return;
-        if (reply?.error) appendBotText(t('chat.scan_failed', { error: reply.error }));
-        else              appendBotText(t('chat.scan_contact_added'));
-      } catch (err) {
-        appendBotText(t('chat.scan_failed', { error: err?.message ?? String(err) }));
-      }
+      // the launcher, which the person sees, opens the add sheet for it (this shell's own sheet would not show)
+      if (typeof onContactLink === 'function') onContactLink(payload);
+      else sayToPerson(t('chat.scan_failed', { error: 'no screen to add the contact on' }));
       return;
     }
     if (res.kind === 'enroll') {
@@ -1583,11 +1573,11 @@ export default function ChatScreen({
       // out of its own address bar, and then opens the flow; this shell says where to finish it,
       // because the flow lives on another screen (see docs/conventions/web-mobile-exceptions.md).
       const stashed = await stashEnrollOffer(AsyncStorage, payload).catch(() => ({ ok: false }));
-      appendBotText(stashed.ok ? t('chat.scan_enroll_stashed') : t('chat.scan_enroll_failed'));
+      sayToPerson(stashed.ok ? t('chat.scan_enroll_stashed') : t('chat.scan_enroll_failed'));
       return;
     }
     if (res.kind === 'invite') {
-      appendBotText(t('chat.scan_invite_open'));
+      // the join wizard is a modal: it shows over whatever is on screen, so the invite needs no notice of its own
       // opId MUST match the WIZARD_REGISTRY key ('joinGroupWizard',
       // not 'joinGroup') — wizardModalFor() looks it up by exact key,
       // and a mismatch silently renders nothing (the bug: /scan-qr of
@@ -1596,7 +1586,7 @@ export default function ChatScreen({
       setPendingWizard({ opId: 'joinGroupWizard', args: { invite: payload } });
       return;
     }
-    appendBotText(t('chat.scan_unknown'));
+    sayToPerson(t('chat.scan_unknown'));
   }
 
   function appendBotText(text) {

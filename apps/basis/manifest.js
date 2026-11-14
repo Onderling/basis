@@ -1150,6 +1150,8 @@ export const basisManifest = {
     { id: 'share-contact', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
     // Scan IS the scanQr op — one door with `/scan-qr` (its openQrScanner seam: mobile the camera, web the paste prompt).
     { id: 'scan',          labelKey: 'circle.profile.scan',          target: { kind: 'op',  opId: 'scanQr' } },
+    // the person's ongoing conversation with the assistant: the "+" sheet, opened from Me too (walk row 78)
+    { id: 'assistant',     labelKey: 'circle.profile.assistant',     target: { kind: 'nav', to: 'assistant' } },
   ],
 
   /**
@@ -1210,6 +1212,8 @@ export const basisManifest = {
       ],
     },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
+    // help: the Help circle, where the Onderling bot answers questions about the app (walk row 78: findable from Settings)
+    { id: 'help', kind: 'door', labelKey: 'circle.settings_home.help', target: { kind: 'nav', to: 'help' } },
     // feedback about the app: the feedback op (its thread to Onderling, prefilled), the same act /feedback and the "+" run
     { id: 'feedback', kind: 'door', labelKey: 'circle.feedback.plus', target: { kind: 'op', opId: 'feedback' } },
   ],

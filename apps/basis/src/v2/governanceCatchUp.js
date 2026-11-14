@@ -170,10 +170,5 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
   return { onRequest, onBatch, requestFrom, requestAll, requestCircle, subtypes: { request: REQ, batch: BATCH } };
 }
 
-/** True when a folded proposal list still has open decisions — the caller may nudge (propose-only wakes). */
-export function hasOpenDecisions(fold) {
-  return (fold?.proposals ?? []).some((p) => p && !p.closed && p.action);
-}
-
 export { GOV_EVENT };
 export default makeGovernanceCatchUp;

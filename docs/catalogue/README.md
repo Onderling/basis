@@ -24,7 +24,7 @@ Rule for anyone ruling on absence: before "not built" or "needs design", read th
 | [governance.md](governance.md) | who decides: decision classes, the doors, the receiver gate, the drawn sample, reports, the caretaker | started 2026-11-13 |
 | circles-and-pinboard | circles, membership, posts, requests | owed |
 | calendar | appointments, rsvp, week overview | owed |
-| lists | plain lines, sendable lists | owed |
+| [lists.md](lists.md) | a circle's lists (its Lists tab), entries, boards, the lists block | started 2026-11-14 |
 | household-bot | the bot in a circle: add/done, nudges, digests | owed |
 | nearby | rooms, levels, connection points, LAN/BLE | owed |
 | [contacts-and-personas.md](contacts-and-personas.md) | contacts, trust, personas, disclosure, Mij, message requests, blocking | started 2026-11-12 |

@@ -54,6 +54,11 @@ export const SEAMS = Object.freeze([
   // WHICH SELF A SCREEN IS PAIRED FOR: a persona issues its grants as itself, so on a device holding several selves the
   // pairing form asks (the active self preselected) — the shared decision is `connectionSelfChoice`. The box pairs no
   // screen through a form.
+  // A BANNER FOR WHAT IS NOW ON SCREEN GOES AWAY: the shared banner driver raises a notice on any screen; when the person
+  // then opens that thread or circle another way, the shell asks the driver to recheck, or the banner lies over the
+  // opened screen's header (found walking the phone, 2026-11-14: a tap on the thread's ⋯ landed on it). The box paints no
+  // banner, so the seam is web and mobile only.
+  { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },
   { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
   // A NEW MEMBER IS NAMED AS THEIR FIRST LINE LANDS: a sender the roster cannot place yet (one this device admitted, a
   // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles
@@ -269,6 +274,11 @@ export const SEAMS = Object.freeze([
   // never acted on (`plusLineOutcome`, with each circle's availability from `circleAvailabilityFor`). A shell reading the
   // line any other way is how the sheet would come to act in a circle.
   { id: 'plus-line-outcome', pattern: /plusLineOutcome\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // THE "+" IS ONE KEPT CONVERSATION: each read of its line is one exchange in the person's own thread (`exchange` on
+  // `createPlusThread`: the line heard, the read run, what it answered kept as the bot's own turn entries). A shell that
+  // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already
+  // keeps the same turns through `botThreads` (the Telegram thread), so it is not a shell of this seam.
+  { id: 'plus-kept-thread', pattern: /plusThread(Now\(\))?\.exchange\(/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
   { id: 'ask-matches', pattern: /askMatchChoices\(/, shells: ['web', 'mobile'], why: 'matches under my own ask come from released offerings only, and only the asker sees them' },

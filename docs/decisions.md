@@ -1528,6 +1528,19 @@ one of THAT persona's circles, seen on this device's own roster, gets a thread w
 row; the person's answer is the choice that makes them a contact. Off: their first private message is a request.
 Circles of another persona do not count, so being in a circle with one persona does not open the others.
 
+**Switched off after a member already wrote** (2026-11-14, found walking the phone: the member's next message landed
+nowhere). Answered: the answer made them a contact, and a contact is let on whatever the switch says. Never answered:
+their next message is a request (the person turned the switch off to stop exactly this), held WITHOUT a card (their card
+rode only their first message), shown by the name they have in the circle; their earlier turns stay in the thread.
+Accepting a request without a card puts no row in the book: the held turns move into the thread and the request goes;
+the book row comes when the person answers, as for a member who may write.
+
+**Nothing at the contact door is dropped silently** (same day). A turn the request's hold refuses (no card on a new
+request, a card naming someone else, a file, too large, or the hold failing) is written to the refusal log with its
+reason code from a closed set, then held anyway, marked with that reason: what made it unholdable is left off (the
+card, the file) or cut to the bound (the text). Only a turn there is no self to hold it for is dropped, and both
+refusals are logged. The stranger budgets in front of the door still drop past their bounds, with their own count line.
+
 **Block is about direct contact, never a circle** (Frits, after comparing Signal, WhatsApp and Telegram, which all keep a
 block one-on-one). The block list (`/block`) is kept by the secure agent, alias-aware, but enforced only by the app's
 DIRECT doors: the contact channel (before anything else: no request, no thread, no receipt), files and threaded answers,
@@ -1646,3 +1659,56 @@ written on a device whose copy of its author's membership chain lags names an ol
 between are refused everywhere (a removal among them leaves the member in; L855). Where it lives:
 `apps/basis/src/v2/governanceReceiverGate.js`, the kernel's `foldRoster` (`governedGate`), `docs/catalogue/governance.md`.
 Ledger: L663, L855, L856, L858.
+
+## 2026-11-13 — What the history mirror keeps is declared per kind; the conversation with the assistant and what was heard nearby stay out (Fable's ruling, recorded at Frits's request)
+
+**Status:** decided; the build is its own change, before the alpha. Frits can reverse it here.
+
+**Context:** the "+" now opens on the person's kept conversation with the assistant (`assistant-turn` entries on the
+device log, the chat retention class, with "Forget this conversation"). Measured while reviewing it: a turn is never
+carried to a member or another device and is never in a bug report, but the personal history mirror and the export
+archive follow the whole device log with no filter. So the conversation would sit, sealed, on the person's pod or in
+a file: past the chat retention window, and past Forget (a restore would bring a forgotten conversation back; the
+build's red-first test measures that).
+
+**Decision:** every entry kind declares whether the mirror keeps it (one required field in the entry-kind table,
+`packages/item-store`; a guard is red for a kind without it). The mirror and the export read only that field. Left
+out:
+
+- **the conversation with the assistant** (`assistant-turn`): Forget has to be final, and the sheet says the
+  conversation ages out;
+- **what was heard nearby** (`nearby-line`, `nearby-card`): those are other people's lines with the room's retention;
+  a copy on a pod outlives the room.
+
+Everything else is mirrored as before, the audit kinds included. What a line to the assistant MADE (a list entry, an
+appointment) is a store row and is mirrored as before.
+
+**Alternatives:** filter on the kind's sync policy `none` (rejected: that policy says what is carried between devices
+and members, not what a person's own record keeps; 14 kinds declare it, and the filter would drop the audit trail the
+mirror exists for); filter the one kind by name (rejected: a list of one that the next kind forgets).
+
+**The price:** after a lost device the conversation with the assistant is gone, also for someone who would have
+wanted it kept; and the "earlier, nearby" block in a contact's thread does not come back on a restored device. A
+mirror written before this still holds such entries on the pod; a restore never brings them back. Ledger: L875, L668.
+
+## 2026-11-13 — A posture's name is a promise: no "central pod" circle type until members stop learning each other's addresses (Fable's ruling, recorded at Frits's request)
+
+**Status:** decided for the alpha; what comes after is Frits's call.
+
+**Context:** a circle on one central pod was asked for as "members not exchanging contact data, just a central
+storage place". A walk over the relay and one shared pod measured what the existing pod-only data move does: with
+two repairs (the pod listing and the pod chat read-back each read the wrong shape, so no chat was ever read back from
+a real pod) a chat line crosses on the pod alone. But a join and a removal still travel member to member, a removal
+does not arrive without the relay, and a task does not cross without the relay either (measured; items have no pod
+read-back, so by reading they are fanned as in any circle). So only chat keeps to the pod, and members still learn
+each other's device and relay addresses.
+
+**Decision:** the repairs land; the posture gets no name of its own and is not offered when a circle is made. Naming
+it "central" now would promise the privacy property it does not have. The name and the offer come together with
+membership and items on the pod (new carriers), after the alpha, if the posture is wanted at all.
+
+**Where it stands in the code:** the pod-only data move is reachable only under the policy value `personal`
+(`apps/basis/src/v2/circleDataPolicy.js`). The create wizard does not offer that value (`OFFERED_STORAGE_POSTURES`
+is none and shared, and the wizard's choice overrides a template's `personal` preference); a circle that already
+holds it, or one made programmatically, can still have it. The two walks pin what crosses and what does not
+(`apps/basis/test/centralPodCircle.relay.test.js`, `centralPodMembership.relay.test.js`). Ledger: L745, L610.

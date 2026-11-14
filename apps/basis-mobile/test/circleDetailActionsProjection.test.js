@@ -26,11 +26,12 @@ describe('D / Surface 2 — mobile CircleDetail action roster from the manifest 
     const ids = circleActionsMobile(basisManifest, { policy: DEFAULT_CIRCLE_POLICY }).map((a) => a.id);
     // ONE manifest declaration; order mirrors the live web circle menu (back first
     // for the detail bar — the ⋯ menus filter it out in-shell).
-    // The alpha trims the ⋯ menu to back · invite · settings · beheer (alphaSurface.js
+    // The alpha trims the ⋯ menu to back · invite · settings · beheer · decisions (alphaSurface.js
     // HIDDEN_CIRCLE_ACTIONS); the manifest still declares the rest, hidden not removed. Beheer came back
-    // on 2026-09-13 — it is where an admin removes a member or changes a role. Same list as web, by
-    // construction: both shells read the one declaration.
-    expect(ids).toEqual(['back', 'invite', 'settings', 'admin']);
+    // on 2026-09-13 — it is where an admin removes a member or changes a role; Decisions on 2026-11-14 — it is
+    // the only place a vote is cast and a report is seen. Same list as web, by construction: both shells read the
+    // one declaration.
+    expect(ids).toEqual(['back', 'invite', 'settings', 'admin', 'governance']);
     expect(ids).not.toContain('files');
     expect(ids).toContain('invite');
   });

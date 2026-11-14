@@ -73,10 +73,4 @@ describe('the lists block', () => {
     expect(blockEmptyLine(off, (k) => k)).toBe('circle.screen.lists_off');
   });
 
-  it("the '+' counts a lists block for this circle on any of the person's pages", async () => {
-    const { blockTypesShowingCircle } = await import('../../src/v2/userScreens.js');
-    const book = { screens: [{ id: 'p1', blocks: [{ type: 'lists', config: { circleId: 'thuis' } }, { type: 'notes', config: {} }] }, { id: 'p2', blocks: [] }] };
-    expect(blockTypesShowingCircle(book, 'thuis')).toEqual(['lists']);
-    expect(blockTypesShowingCircle(book, 'werk')).toEqual([]);
-  });
 });

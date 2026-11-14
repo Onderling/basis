@@ -36,6 +36,29 @@ export function buildSubjectLabeler(members) {
   return (ref) => ((typeof ref === 'string' && byId.get(ref)) || null);
 }
 
+/** The subjects that are a PERSON: who is removed, whose role changes, and (the hint 'member') whoever made a change. */
+const PERSON_SUBJECTS = new Set(['removeMember', 'changeRole', 'member']);
+
+/**
+ * THE DECISIONS SCREEN'S ONE LABELER (L897, 2026-11-14): a person subject is named from this device's own roster, or
+ * "a member who has left" when the roster no longer holds them, never by the key; a subject that is not a person keeps
+ * its value. Both shells hand it to the view (`labelForSubject`), so a proposal's subject, a disputed author and whoever
+ * made a change without the vote are named the same way everywhere.
+ * @param {Array<object>} members  the roster rows (`listGroupMembers`)
+ * @param {Function} t
+ * @returns {(subject: unknown, action?: string) => string}
+ */
+export function subjectLabelerFor(members, t) {
+  const nameOf = buildSubjectLabeler(members);
+  return (s, action) => {
+    if (s == null) return '';
+    const name = typeof s === 'string' ? nameOf(s) : null;
+    if (name) return name;
+    if (PERSON_SUBJECTS.has(action)) return t('circle.governance.member_left');
+    return String(s);
+  };
+}
+
 /** This voter's last choice on a proposal ('yes' | 'no' | null). */
 function lastVoteOf(votes, ref) {
   let choice = null; let at = -Infinity;
@@ -87,7 +110,8 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       // admins (admin-quorum, or a member's proposal under any-admin); admins get the override only once the deadline
       // has passed (escape-hatch b).
       // a drawn sample votes only through the members drawn (the admins, where nobody was left to draw)
-      canVote: !p.closed && !!myRef && (cls === 'member-vote'
+      // nothing left to vote on once it is APPROVED (it waits for an admin to enact it): no Yes and No (L897)
+      canVote: !p.closed && p.status !== DECISION_STATUS.APPROVED && !!myRef && (cls === 'member-vote'
         || (cls === 'random-sample' && (Array.isArray(p.decision?.sample) && p.decision.sample.length ? p.decision.sample.includes(myRef) : isAdmin))
         || (isAdmin && (cls === 'admin-quorum' || cls === 'any-admin'))),
       sample: Array.isArray(p.decision?.sample) ? p.decision.sample : null,
@@ -101,6 +125,10 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       // It was dead until 2026-07-26: the flag existed only on `tally()`'s return value, never on a row,
       // so `row.awaitingEnactment` was always undefined and the chip never appeared on either platform.
       awaitingEnactment: p.status === DECISION_STATUS.APPROVED && !p.closed,
+      // WHO SEES "ENACT" (L893, 2026-11-14): the default is that an admin enacts explicitly (Decision B), and only an
+      // admin/caretaker device enacts (Decision A); a caretaker IS an admin in the roster. Everyone else keeps the
+      // waiting line. One decision both shells read.
+      canEnact: p.status === DECISION_STATUS.APPROVED && !p.closed && isAdmin,
     };
   });
 
@@ -119,4 +147,46 @@ export function deadlineLine(deadline, { t, now = new Date(), locale } = {}) {
   const when = momentWords(deadline, { t, now, locale });
   if (!when) return '';
   return when === t('circle.when.closed') ? when : t('circle.governance.deadline', { when });
+}
+
+/**
+ * A VOTE THAT FAILED MUST NOT LOOK CAST (L887, 2026-11-14): the line a shell shows after a vote, from what the vote
+ * answered. Null when it went through (pending, approved, awaiting an admin's enactment); the failure line when it was
+ * refused, threw, or answered nothing. Both shells paint it; neither decides it.
+ * @param {unknown} result  what `governance.vote` resolved to, or the error it threw
+ * @returns {string|null} a locale key
+ */
+export function voteFailedLine(result) {
+  return result && typeof result === 'object' && !(result instanceof Error) && result.ok === true ? null : 'circle.governance.vote_failed';
+}
+
+/**
+ * ENACTING SAYS WHAT IT DID, OR WHY IT COULD NOT (L893, 2026-11-14): the line after an admin's Enact, from what the
+ * handle's `tally` answered. Done when it enacted (or the proposal is closed now); otherwise it could not, and it must
+ * not look done. Both shells paint it; neither decides it.
+ * @param {unknown} result
+ * @returns {{key: string, failed: boolean}}
+ */
+export function enactOutcomeLine(result) {
+  const done = !!result && typeof result === 'object' && !(result instanceof Error) && result.ok !== false && (result.enacted === true || result.closed === true);
+  return done ? { key: 'circle.governance.enacted', failed: false } : { key: 'circle.governance.enact_failed', failed: true };
+}
+
+/**
+ * A REPORT'S TARGET, NAMED BY THE ADMIN'S OWN ROSTER (L897, 2026-11-14): a member is named as the admin's roster names
+ * them (the same labeler a proposal's subject uses), "a member who has left" when the roster no longer holds them, never
+ * by the key and never by the name the reporter chose. A post or a message keeps the reporter's own words about it
+ * (no roster names those), or just its kind. Both shells paint this line; neither decides it.
+ * @param {{targetType: string, targetRef?: string|null, targetLabel?: string|null}} report
+ * @param {{nameOf: (ref: string) => string|null, t: Function}} a
+ * @returns {string}
+ */
+export function reportTargetText(report, { nameOf, t } = {}) {
+  const kind = t(`circle.governance.report_target.${report?.targetType}`);
+  if (report?.targetType === 'member') {
+    const name = (typeof nameOf === 'function' ? nameOf(report.targetRef) : null) ?? t('circle.governance.member_left');
+    return `${kind}: ${name}`;
+  }
+  const label = typeof report?.targetLabel === 'string' && report.targetLabel.trim() ? report.targetLabel.trim() : null;
+  return label ? `${kind}: ${label}` : kind;
 }

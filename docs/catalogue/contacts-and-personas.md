@@ -16,8 +16,16 @@ catalogue's baseline and moves here as it is written up.
 - Choose, per persona, whether people in its circles may write to it first (default on). On: a member of one of THAT
   persona's circles, as this device's own roster shows them, gets a thread but no contact row; answering them makes
   them a contact. Off: their first private message is a request. Circles of another persona do not count.
+  Switched off after a member already wrote: answered, they are a contact and let on; never answered, their next
+  message is a request without a card, shown by their name in the circle, and accepting it moves the messages into the
+  thread without a book row (the row comes when the person answers).
+  Both choices are on each persona's card in Mij (web and phone), each saying what it does.
 - Ignore a request: it stays, marked, later messages still land on it, and it can still be accepted. The sender sees
   nothing different.
+- Never lose a message at the door: a message the request cannot hold as it came (no card, a card naming someone else,
+  a file, too large) is held anyway without what it could not keep, and the refusal is in the device's log with its
+  reason (`apps/basis/src/v2/refusalLog.js`, the door's codes held against their sources by
+  `refusalCodesCoverTheDoor.test.js`).
 - Block someone, on this device: `/block`. Direct contact only: their direct messages, requests, files and answers are
   refused before anything is kept, and a direct message to them is refused with the reason. Circles are untouched (their
   posts still arrive, yours still reach them); the block covers every address the identity link knows for them.
@@ -35,6 +43,10 @@ catalogue's baseline and moves here as it is written up.
   the contact channel on every shell (seam `contact-channel-requests`); the agent's `messageRequests` answers the
   persona's policy for the address a turn arrived on. Accept: `apps/basis/src/v2/messageRequestAccept.js`. The policy:
   the profile property `firstMessages` (`packages/agent-registry/src/firstMessages.js`).
+- The two choices on a persona's card: `apps/basis/src/v2/firstContact.js` (the controls, read through the registry's
+  readers, so the defaults live once), carried on each card by `buildMijViewModel`, painted by web `circleMij.js` and
+  mobile `CircleMijScreen.js`; written through `agents.setProfileProperty` on that persona (the op the agent's own
+  setters use).
 - Shared contact links: `shared-card` rows on the same store, one per link handed out, for the persona shared as:
   `apps/pinboard/src/lib/SharedCards.js` (type `packages/item-types/src/types/sharedCard.js`, own-devices). Each
   "Share my contact" mints a new 128-bit token; its first opener is let on, anyone after is a request. The use is a
@@ -56,6 +68,8 @@ pinboard: mintSharedCard listSharedCards withdrawSharedCard useSharedCard clearC
 
 ## Proof
 
+- `apps/basis/test/v2/firstContactControls.test.js` — the two controls, their words in both languages, the registry's
+  defaults per persona card, and both shells writing them for that persona through the waist.
 - `apps/basis/test/messageRequestDoor.relay.test.js` — a stranger's first turn is a request with no row, no pair circle
   and no thread turn; accept; a chosen contact lands as before; someone the person wrote to first is not a request.
 - `apps/basis/test/messageRequestPersona.relay.test.js` — each persona's own policy decides, and a request is filed

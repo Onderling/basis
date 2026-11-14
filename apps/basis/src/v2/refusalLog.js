@@ -15,6 +15,16 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 const WINDOW_MS = param({ key: 'diagnostics.refusalLogWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });   // how often a repeating refusal is written again
 
 /**
+ * The contact door's codes: what pinboard's message-request hold (and its skill) refuses a turn with, and what the door
+ * itself says when the hold failed without one. Held against those sources by refusalCodesCoverTheDoor.test.js.
+ */
+const DOOR_REFUSAL_CODES_LIST = [
+  'no-card', 'malformed-card', 'card-not-sender', 'file-on-request', 'turn-too-large', 'no-self', 'no-contacts', 'invalid',
+  'no-answer', 'hold-threw', 'not-held',
+];
+export const DOOR_REFUSAL_CODES = Object.freeze([...DOOR_REFUSAL_CODES_LIST]);
+
+/**
  * THE CLOSED SET of reason codes (Opus, reviewing): a reason is often built from the refused statement's own text
  * (`unsupported version: ${body.v}`, an exception's message), so a remote sender could mint unlimited distinct codes:
  * log spam and a growing key table. Only these codes are written; anything else is 'other'.
@@ -29,6 +39,8 @@ export const REFUSAL_CODES = Object.freeze([
   'body-authorref-must-be-a-string-or-null',
   // the binding check and the gates
   'key-not-bound-to-its-member', 'not-allowed-by-the-circle-rule',
+  // the contact door's hold of a message request (held anyway after the refusal: nothing there is dropped silently)
+  ...DOOR_REFUSAL_CODES_LIST,
 ]);
 const KNOWN = new Set(REFUSAL_CODES);
 const DETAIL_MAX = 32;

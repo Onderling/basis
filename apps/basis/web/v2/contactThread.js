@@ -15,6 +15,7 @@ import { sectionsOf } from '../../src/v2/screenSections.js';
 import { buildDeliveryChip } from './circleView.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
+import { heldNoteKey } from '../../src/v2/heldNote.js';
 import { paintFace } from './faceView.js';
 import { buildAttachControl } from './attachControl.js';
 
@@ -71,6 +72,7 @@ export function renderContactThread(container, {
   contactId = null,        // the thread's key, on the root as data-contact-id — what a probe reads to name the open thread
   onOpenLens = null,       // L125: () => void — "what does this contact see of you?"; a person's thread only (with `hidden`)
   onDelete = null,         // L114: () => void — delete this contact (the shell confirms first); a person's thread only
+  self = null,             // who you are in this thread (`contactThreadSelf`: `{id, name}`); its avatar, top right, opens the lens
   deletedAt = null,        // L114: when this contact was deleted — a return after it says "verwijderd", not "verborgen"
 } = {}) {
   if (!container) return container;
@@ -151,9 +153,26 @@ export function renderContactThread(container, {
     }
     header.appendChild(toggle);
   }
-  // HIDE / SHOW (L106, Frits 2026-09-19): the person takes this contact out of their sight, or back. The row
-  // stays — their circles, this thread and the pair roster untouched — and a message from them brings them back;
-  // the note under the control says exactly that, so nobody hides someone expecting silence (that is Blokkeren).
+  // THE HEADER HOLDS ONE ROW (Frits, the UX sitting: "I do like the dot menu"): who you are in this thread, top right
+  // (its tap opens the lens: which persona this contact knows, and how much), and a ⋯ with the two acts on the contact.
+  // A person's thread only: a bot has no pair roster to say a release on, and is removed, not hidden.
+  const acts = document.createElement('div');
+  acts.className = 'cc-cthread__acts';
+  if (typeof hidden === 'boolean' && typeof onOpenLens === 'function') {
+    const me = document.createElement('button');
+    me.type = 'button';
+    me.className = 'cc-cthread__self cc-contacts__icon';
+    const label = tr('circle.contacts.self_here', { name: self?.name ?? tr('circle.switcher.you') });
+    me.setAttribute('aria-label', label);
+    me.title = label;
+    paintFace(me, { face: self?.face ?? null, name: self?.name ?? tr('circle.switcher.you') }, { resolvePicture });
+    me.addEventListener('click', () => onOpenLens());
+    acts.appendChild(me);
+  }
+  const menuItems = [];
+  // HIDE / SHOW (L106, Frits 2026-09-19): the person takes this contact out of their sight, or back. The row stays
+  // (their circles, this thread and the pair roster untouched) and a message from them brings them back; the note
+  // beside the control says exactly that, so nobody hides someone expecting silence (that is Blokkeren).
   if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
     const hide = document.createElement('button');
     hide.type = 'button';
@@ -161,34 +180,37 @@ export function renderContactThread(container, {
     hide.dataset.hidden = String(hidden);
     hide.textContent = tr(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide');
     hide.addEventListener('click', () => onToggleHidden(!hidden));
-    header.appendChild(hide);
+    const note = document.createElement('div');
+    note.className = 'cc-cthread__hide-note';
+    note.textContent = tr('circle.contacts.hide_note');
+    menuItems.push(hide, note);
   }
-  // WHO YOU ARE TO THEM (Frits 2026-09-24; a separate self since 2026-10-12): which persona this contact knows, and how much — changed here,
-  // beside the other per-contact control. A person's thread only: a bot has no pair roster to say a release on.
-  if (typeof hidden === 'boolean' && typeof onOpenLens === 'function') {
-    const lens = document.createElement('button');
-    lens.type = 'button';
-    lens.className = 'cc-btn cc-btn--quiet cc-cthread__lens';
-    lens.textContent = tr('circle.contacts.lens.open');
-    lens.addEventListener('click', () => onOpenLens());
-    header.appendChild(lens);
-  }
-  // DELETE (L114): hide + leave the pair circle — a relationship act. The shell asks first (the confirm is the undo).
+  // DELETE (L114): hide + leave the pair circle, a relationship act. The shell asks first (the confirm is the undo).
   if (typeof hidden === 'boolean' && typeof onDelete === 'function') {
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'cc-btn cc-btn--danger cc-cthread__delete';
     del.textContent = tr('circle.contacts.delete');
     del.addEventListener('click', () => onDelete());
-    header.appendChild(del);
+    menuItems.push(del);
   }
+  if (menuItems.length) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'cc-cthread__more';
+    more.textContent = '⋯';
+    more.setAttribute('aria-label', tr('circle.contacts.more'));
+    more.setAttribute('aria-expanded', 'false');
+    const menu = document.createElement('div');
+    menu.className = 'cc-cthread__menu';
+    menu.hidden = true;
+    for (const item of menuItems) menu.appendChild(item);
+    more.addEventListener('click', () => { menu.hidden = !menu.hidden; more.setAttribute('aria-expanded', String(!menu.hidden)); });
+    acts.appendChild(more);
+    acts.appendChild(menu);
+  }
+  if (acts.childElementCount) header.appendChild(acts);
   container.appendChild(header);
-  if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
-    const note = document.createElement('div');
-    note.className = 'cc-cthread__hide-note';
-    note.textContent = tr('circle.contacts.hide_note');
-    container.appendChild(note);
-  }
   // The pre-send floor, said where the participant reads before typing: personal details are removed on
   // this device before a message leaves it. Only for a contact that declared it.
   if (floor && floor.label) {
@@ -211,6 +233,15 @@ export function renderContactThread(container, {
       sys.className = 'cc-cthread__system';
       sys.textContent = tr(markerKey);
       log.appendChild(sys);
+    }
+    // A turn the door held after a refusal says what it could not keep (the text cut, a file left off): one plain line
+    // on that turn, so the person does not take it for the whole message. web≡mobile with ContactThreadScreen.
+    const heldKey = heldNoteKey(m.held);
+    if (heldKey) {
+      const note = document.createElement('div');
+      note.className = 'cc-cthread__system cc-cthread__held';
+      note.textContent = tr(heldKey);
+      log.appendChild(note);
     }
     const row = document.createElement('div');
     const side = m.origin === 'user' ? 'user' : 'bot';

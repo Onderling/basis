@@ -328,7 +328,7 @@ import { buildStandardRolePolicy } from '@onderling-app/tasks';                 
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
-import { makeIsKnownPeer }                  from '../../v2/knownPeer.js';
+import { makeIsKnownPeer, rosterRowNaming } from '../../v2/knownPeer.js';
 import { parseUntrustedJson } from '@onderling/core';
 import { createTimeSlice } from '@onderling/core';
 import { createInProcessSenderAuthorizer } from '@onderling/core';
@@ -2388,6 +2388,21 @@ export async function createRealHouseholdAgent(opts = {}) {
    * The same, for any address of mine a turn can arrive on: a persona's chat identity, or one of my PER-CIRCLE
    * addresses (a member asking at my circle address, the Ask door), which names the persona that circle belongs to.
    */
+  /** The roster row of a member of one of persona `pid`'s circles that any of `keys` names (the pair circles left out); null. */
+  const coMemberRowOf = async (pid, keys) => {
+    const general = (id) => id === primaryId || id === profileIdOf(null);   // the general persona, as profileIdOf names it
+    const ids = ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])
+      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((cid) => typeof cid === 'string' && cid)
+      .filter((cid) => !isPairCircleId(cid))
+      .filter((cid) => { const owner = profileIdOf(cid); return owner === pid || (general(owner) && general(pid)); });
+    for (const cid of ids) {
+      let rows = [];
+      try { rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: cid }))?.members ?? []; } catch { rows = []; }
+      const row = rosterRowNaming(rows, keys);
+      if (row) return row;
+    }
+    return null;
+  };
   const personaOwningAny = async (addr) => {
     const direct = personaOwning(addr);
     if (direct || typeof addr !== 'string' || !addr) return direct;
@@ -9868,15 +9883,21 @@ export async function createRealHouseholdAgent(opts = {}) {
         const pid = await personaOwningAny(to);
         if (!pid) return false;
         try { if (!circleMembersMayWriteOf(await agentsRegistryRef?.lookup?.(pid))) return false; } catch { return false; }
-        const general = (id) => id === primaryId || id === profileIdOf(null);   // the general persona, as profileIdOf names it
-        const mine = async () => ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])
-          .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((cid) => typeof cid === 'string' && cid)
-          .filter((cid) => !isPairCircleId(cid))
-          .filter((cid) => { const owner = profileIdOf(cid); return owner === pid || (general(owner) && general(pid)); });
-        const inThem = makeIsKnownPeer({ myCircleIds: mine, rosterOf: async (cid) => (await callSkill('pinboard', 'listGroupMembers', { groupId: cid }))?.members ?? [] });
-        for (const k of [fromAddr, contactId]) if (k && (await inThem(k))) return true;
-        return false;
+        return !!(await coMemberRowOf(pid, [fromAddr, contactId]));
       },
+      // THE SAME MEMBER, WHATEVER THE SWITCH SAYS: a member of one of this persona's circles who may NOT write first (the
+      // person switched it off after they wrote, never having answered): the door holds their turn as a request without a
+      // card, showing the name they have in the circle (Fable's ruling, 2026-11-14). Null for anyone else.
+      coMember: async ({ contactId = null, fromAddr = null, to = null } = {}) => {
+        const pid = await personaOwningAny(to);
+        if (!pid) return null;
+        const row = await coMemberRowOf(pid, [fromAddr, contactId]);
+        if (!row) return null;
+        const name = [row.displayName, row.name, row.handle].find((v) => typeof v === 'string' && v.trim()) ?? null;
+        return { name: name ? name.trim() : null };
+      },
+      // a hold the door's first call refused, written through the refusal log (the door then holds it anyway)
+      refusal: (reason) => processRefusalLog().note({ tag: 'door', lane: 'contact', check: 'message-request', reason }),
       // A SHARED LINK'S FIRST OPENER (L806): a turn carrying a link's token, addressed to the persona that minted it, uses
       // the link (a first-wins claim between my devices); a later turn of the same opener is let on while the link's
       // use names them. Fails closed: no persona, no.

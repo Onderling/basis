@@ -59,13 +59,20 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
       li.dataset.from = r.from;
       const name = document.createElement('span');
       name.className = 'cc-requests__name';
-      name.textContent = r.name ? tr('circle.contacts.requests.says', { name: r.name }) : tr('circle.contacts.requests.no_name');
+      name.textContent = r.name ? tr(r.label, { name: r.name }) : tr(r.label);   // the shared row decides which (messageRequestRows)
       li.appendChild(name);
       if (r.firstLine) {
         const line = document.createElement('span');
         line.className = 'cc-requests__line';
         line.textContent = r.firstLine;
         li.appendChild(line);
+      }
+      // what the held messages could not keep (the text cut, a file left off): one plain line each
+      for (const key of r.notes ?? []) {
+        const note = document.createElement('span');
+        note.className = 'cc-requests__note';
+        note.textContent = tr(key);
+        li.appendChild(note);
       }
       const btns = document.createElement('span');
       btns.className = 'cc-requests__acts';

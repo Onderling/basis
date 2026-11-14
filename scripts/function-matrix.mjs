@@ -60,16 +60,24 @@ export const FUNCTIONS = Object.freeze([
     mobile: null,   // circlePods is a unit
     box: NA('the box holds circles by relay and catch-up; its registry mirror is covered under restore and devices'),
   } },
-  // REQUIRED on all three: a normal and a pod-only circle on each; the central pod on web (the CSS-gated test).
-  // Today no person can MAKE a central-pod or pod-only circle on any shell (the wizard sets no storage; a change after
-  // creation is refused) — the scope is Frits's call (L571). ⓘ 'hybrid' is in circleDataPolicy's table but is not one of
-  // the three types Frits named: outside the tested set, no cell.
-  // web: apps/basis/test-browser/walk-circle-types-pod.spec.js walks all three through the wizard; normal is green, the
-  // two pod types are fixme until a web pod sign-in can complete — so the cell stays red until they are green too.
-  { id: 'circle-types', name: 'Circle types (normal, central pod, pod-only)', cells: { web: null, mobile: null, box: null } },
+  // REQUIRED on all three: the circle types a person can MAKE in the alpha, normal and shared pod (storage 'shared': the
+  // pod carries the message, the fan carries a pointer, a member away reads it back from the pod). Pod-only ('personal')
+  // and the name 'central' are out for the alpha (decision 2026-11-13 in docs/decisions.md); its relay walks pin what it does.
+  // ⓘ 'hybrid' is in circleDataPolicy's table but is not a type a person makes: outside the tested set, no cell.
+  { id: 'circle-types', name: 'Circle types (normal, shared pod)', cells: {
+    // made in the wizard, a member's message reaches the other member, and the send took its branch (the pod for the
+    // shared pod, the fan-out for normal; asserted beside the message); pod-only is skipped there with the decision
+    // (the title is per case, `${type}: …`; its 'shared pod' and 'normal' cases carry the cell)
+    web: { file: 'apps/basis/test-browser/walk-circle-types-pod.spec.js', test: "made in the wizard, a member's message reaches the other member, and the send took its branch" },
+    mobile: null,
+    box: null,
+  } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {
     web: { file: 'apps/basis/test-browser/circle-view-bot.spec.js', test: '"@assistant add X" engages the bot' },
-    mobile: null,   // REQUIRED: the assistant on the phone
+    // the assistant since L668 is the "+" kept conversation, read ON THE DEVICE (word rule first, the model when one is
+    // set): the line runs in the circle that holds the list, is kept with its answer, an unknown line is answered
+    // plainly, Forget empties it. (The brief's first story, a bot over the relay, was the design before L668.)
+    mobile: { file: 'apps/basis-mobile/e2e/plusCircleAct.test.js', test: '"zet melk op de boodschappen" in the "+" runs in that circle and says so' },
     box: { file: 'apps/basis/test/botReplyLines.box.test.js', test: 'an add by the word rule is one Telegram line' },
   } },
   // hopping = a member carries for a member (Frits 2026-11-03). Its EVENTUAL half is the catch-up: a member only the
@@ -97,7 +105,10 @@ export const FUNCTIONS = Object.freeze([
   { id: 'governance', name: 'Governance (proposals, votes, roles, removal, signed reports)', cells: {
     // the proposal half; roles, removal and signed reports come with the governance-by-role work
     web: { file: 'apps/basis/test-browser/walk-member-proposes-policy.spec.js', test: 'Save is a proposal; the admin' },
-    mobile: null,   // adminRoleControlGreyed is a unit
+    // the phone as a member: its Save is a proposal, the admin (a real agent on the relay) says yes, the phone holds it
+    // (its admin half: governanceAdmin.test.js, the phone removes a member and that member's device drops the circle; the
+    // REPORT half waits on a surface question: the alpha trims the governance panel, the only place an admin sees a report)
+    mobile: { file: 'apps/basis-mobile/e2e/governanceProposal.test.js', test: "Bram, the admin, says yes: the phone holds the circle's new settings" },
     // the box OBEYING the circle (screen-admin-box is the admin's screen, not the box) — Fable 2026-11-10
     box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the box forgets the circle and its record of it goes' },
   } },
@@ -131,7 +142,8 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'connected-screens', name: 'Connected screens', cells: {
     web: { file: 'apps/basis/test-browser/screen-connect-box.spec.js', test: 'the screen in a browser' },
-    mobile: null,   // REQUIRED: the phone approves a screen's code
+    mobile: null,   // REQUIRED: the phone approves a screen's code. WAITS ON L686 (Frits): the pairing start is being rebuilt
+    // (the app mints a link with a throwaway address, or the screen shows its own key); a walk today would pin the old flow
     box: { file: 'apps/basis/test/screenConnect.relay.test.js', test: '/scherm → a link' },
   } },
 ]);

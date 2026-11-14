@@ -91,7 +91,9 @@ import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
 
 import {
   initialState as createGroupInitialState,
+  chooseKind as createGroupChooseKind,
   finalSubmit as createGroupFinalSubmit,
+  loadFounderHandle,
 } from '../../src/core/wizards/createGroupState.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
 
@@ -777,14 +779,21 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
  * The single-admin creator step, split out so ONE circle can then take MULTIPLE joiners (the sealed-circle
  * three-member case) instead of `pairCircle` minting a fresh circle per pair.
  */
-export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test' } = {}) {
+export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null, kind = 'household' } = {}) {
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
-  const state = createGroupInitialState();
+  // the kind, picked as the wizard's first step asks it (a new circle has none until someone picks one)
+  let state = createGroupChooseKind(createGroupInitialState(), kind, null);
   state.groupId = groupId;
   state.name = name;
   state.purpose = purpose;
-  const { result: created, state: outState } = await createGroupFinalSubmit({ state, callSkill: adminCallSkill });
+  // the founder's handle, as both shells' create wizard asks it when the profile has none (loadFounderHandle): a walk
+  // that names its founder gets a founder the members see by name, not "Unknown"
+  if (typeof handle === 'string' && handle) {
+    state = { ...state, ...(await loadFounderHandle({ callSkill: adminCallSkill })), handle };
+  }
+  const { result: created, state: outState, named } = await createGroupFinalSubmit({ state, callSkill: adminCallSkill });
   if (!created) throw new Error(`createGroupV2 failed: ${outState?.submitError ?? 'unknown'}`);
+  await named;
   // the founder's presence in the new circle, as both shells register it once the launcher reloads after a create
   // (web: the create wizard's onDispatched → registerCirclePresence; mobile: the launcher's load). Without it the
   // founder's per-circle address is not on the bus and its membership fan cannot leave as the circle.

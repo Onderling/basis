@@ -58,6 +58,9 @@ describe('create wizard — which persona founds the circle', () => {
     const name = el.querySelector('input.cc-wizard-input');   // the first field on the identity step is the name
     name.value = 'De straat';
     name.dispatchEvent(new Event('input'));
+    // the kind, asked on this step (never assumed)
+    const kind = el.querySelector('input[type=radio][value=neighbourhood]');
+    kind.checked = true; kind.dispatchEvent(new Event('change', { bubbles: true })); kind.click();
     // Through the five steps to the review: each step's forward button is its primary one.
     for (let i = 0; i < 5; i += 1) el.querySelector('.cc-wizard-btn-primary').click();
     expect(el.textContent).toContain('Buurt');                    // the review names the founding persona

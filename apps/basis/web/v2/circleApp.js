@@ -65,7 +65,7 @@ import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
-import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens } from '../../src/v2/contactLens.js';
+import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens, contactThreadSelfFor } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
 import { deleteContact } from '../../src/v2/contactDelete.js';
 import { restoreFinishOutcome } from '../../src/v2/restoreFinishView.js';
@@ -183,12 +183,14 @@ import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
 import { renderContactsRoster } from './contactsRoster.js';
-import { withHelpContact, contactOpenTarget, tileCircles } from '../../src/v2/helpContact.js';
+import { withHelpContact, contactOpenTarget, tileCircles, helpDoorTarget } from '../../src/v2/helpContact.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
+import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
+import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { replyLine } from '../../src/v2/replyLine.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
@@ -235,6 +237,8 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
+import { GOVERNANCE_OPEN_ACTION } from '../../src/v2/governanceNotices.js';
+import { voteFailedLine, enactOutcomeLine } from '../../src/v2/governanceView.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
@@ -253,7 +257,7 @@ import { contactCardFromLink, loadShareMyContact, sharedLinkState, sharedLinkWor
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
-import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
+import { buildSubjectLabeler, subjectLabelerFor } from '../../src/v2/governanceView.js';
 import { foldGovernance } from '../../src/v2/governanceLog.js';
 import { noticeWants } from '../../src/v2/noticeSettings.js';
 import { makeCircleGovernancePeerHandler } from '../../src/v2/circleLogReceiver.js';
@@ -407,14 +411,14 @@ import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPend
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
 import {
-  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe, blockTypesOnScreen,
+  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe,
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
 } from '../../src/v2/circleRecipe.js';
 import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
 // The person's own pages (Vandaag): read here, edited only through the screen ops (no book function is called from
 // this shell to change the book).
-import { localUserScreenStore, getActiveScreen, blockTypesShowingCircle } from '../../src/v2/userScreens.js';
+import { localUserScreenStore, getActiveScreen } from '../../src/v2/userScreens.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLandingKey } from '../../src/v2/vandaag.js';
 import { createScreenHead } from '../../src/v2/screenHead.js';
 import { watchCircleChanges } from '../../src/v2/headCircleWatch.js';
@@ -3443,6 +3447,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   // to me (a peer-graph row; hiding them puts them in the book, hidden). A bot does not: a bot is removed, not
   // hidden. `null` keeps the header without it.
   let hidden = (row && !row.isBot) ? row.hidden === true : null;
+  // who you are in this thread (the persona this contact knows): the header's avatar, top right; read once, then painted
+  let selfHere = null;
 
   // Phase 2 (C3 / the G18 fix): rehydrate the DURABLE thread on open so a reload
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
@@ -3470,6 +3476,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
           ...(m.returned ? { returned: true } : {}),
+          ...(m.held ? { held: m.held } : {}),   // a turn held after a refusal: what it could not keep (heldNote.js)
         })).concat(notYetDurable);
       }
     } catch { /* best-effort — a rehydrate failure just shows an empty thread */ }
@@ -3559,6 +3566,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
       try { await setContactHidden(contactId, next); } catch { error = true; rerender(); }
     },
     onOpenLens: () => { openContactLens(contactId, thread.name).catch(() => {}); },
+    self: selfHere,
     deletedAt: row?.deletedAt ?? null,
     // DELETE (L114): hide + leave the pair circle, asked first — the confirm is the undo
     onDelete: hidden === null ? null : () => { deleteContactWithConfirm(contactId, thread.name).catch(() => {}); },
@@ -3602,7 +3610,13 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   });
   _activeContactThread?.leave?.();   // the thread this one replaces stops listening to the map
   _activeContactThread = { contactId, rerender, leave: unsubscribeDelivery, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
+  _banner?.recheck();   // a banner for this thread has said its piece (shared driver)
   rerender();
+  // who you are here (a person's thread only): read once, then the header paints it, while this thread is still on screen
+  if (hidden !== null) {
+    contactThreadSelfFor({ callSkill: rawCallSkill, row: row ?? { webid: contactId }, t })
+      .then((s) => { selfHere = s; if (_activeContactThread?.contactId === contactId) rerender(); }).catch(() => {});
+  }
   // Opening the thread is reading it: the seen-mark moves to now, and the row's count is gone next time.
   readMarks.markContact(contactId, _contactUnread[contactId]?.unreadIds ?? []).catch(() => {});   // …read on every device
   contactSeen.mark(contactId, Date.now()).then(() => { if (_contactUnread[contactId]) _contactUnread[contactId].unread = 0; }).catch(() => {});
@@ -4606,6 +4620,8 @@ let _pendingPinOpen = null;
 function runMeAction(id) {
   if (id === 'share-contact') { showShareMyContact(); return; }
   if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
+  // the person's ongoing conversation with the assistant: the "+" sheet
+  if (id === 'assistant') { showVandaagPlus(); }
 }
 
 /** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */
@@ -4621,6 +4637,15 @@ function mountPlusButton() {
   b.textContent = '+';
   b.addEventListener('click', () => showVandaagPlus());
   document.body.appendChild(b);
+}
+
+// the "+" is the person's kept assistant thread: its turns are the bot's own turn entries on THIS shell's log (the
+// chat retention class, never carried), one thread per person; composed once, again when the person changes
+let _plusThread = null;
+function plusThreadNow() {
+  const id = plusThreadId(circleHouseholdAgent?.identity?.chat?.pubKey ?? null);
+  if (!_plusThread || _plusThread.threadId !== id) _plusThread = createPlusThread({ threads: createBotThreads({ eventLog, store: memoryThreadStore() }), threadId: id });
+  return _plusThread;
 }
 
 function showVandaagPlus({ edit = null } = {}) {
@@ -4660,6 +4685,14 @@ function showVandaagPlus({ edit = null } = {}) {
     return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
+  // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
+  const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+    id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
+    lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
+  })));
+  let suggestionPool = [];
+  plusCircles().then((circles) => { suggestionPool = plusSuggestionPool({ circles, lang: currentLang() }); }).catch(() => {});
   // a circle's act the line read: as the person, through the waist with the circle named, so the circle's own doors
   // and governance decide (the "+" has no authority the circle's composer lacks); the reply line says what happened
   const runInCircle = async (command, circleId) => {
@@ -4675,6 +4708,9 @@ function showVandaagPlus({ edit = null } = {}) {
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
+    turns: plusThreadNow().turns(),
+    suggestFor: (typed) => plusSuggest(suggestionPool, typed),
+    onForget: () => { plusThreadNow().forget(); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
@@ -4707,21 +4743,28 @@ function showVandaagPlus({ edit = null } = {}) {
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
       line = text; circleCard = null; done = null;
+      // one exchange in the kept thread (the shared duty): the line heard, the read run, what it answered kept
+      await plusThreadNow().exchange(text, async () => {
       // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
       // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
-      const circles = await Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
-        id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
-        lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
-      })));
+      const circles = await plusCircles();
       const o = plusLineOutcome(text, { circles });
       const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
-      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return; }
+      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return { error, done }; }
       if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }
       else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
+      return { error, card: circleCard, actId: r?.actId ?? null };
+      }, { t });
       paint();
     },
-    onCircleRun: async (circleId) => { const card = circleCard; circleCard = null; if (card) await runInCircle(card.command, circleId); },
+    onCircleRun: async (circleId) => {
+      const card = circleCard; circleCard = null;
+      if (!card) return;
+      // the pick on the card: no new line, the run's answer kept (the same shared exchange)
+      await plusThreadNow().exchange(null, async () => { await runInCircle(card.command, circleId); return { error, done }; }, { t });
+      paint();
+    },
     onCircleCancel: () => { circleCard = null; error = null; paint(); },
     onSave: async (id, filled) => {
       values = filled;
@@ -4805,7 +4848,7 @@ function onScreenAction(action) {
       .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
-  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
+  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openHelpDoor()); }
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
@@ -5420,6 +5463,13 @@ async function showMyData(opts) {
 }
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
+// THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared)
+function openHelpDoor() {
+  const r = helpDoorTarget(circlesCache);
+  if (r.kind === 'circle') { showDetail(r.circleId); return; }
+  globalThis.alert?.(t(r.key));
+}
+
 function showSettingsHome() {
   hideTabBar();
   renderSettingsHome(rootEl, {
@@ -5428,6 +5478,8 @@ function showSettingsHome() {
     onOpenPerCircle: showSettingsCircleChooser,
     // another door at the foot (feedback): its op, through the waist, naming this screen's id (never words)
     onOpenDoor: (d) => {
+      // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same)
+      if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
@@ -5855,7 +5907,12 @@ function openListsPanel(circleId) {
   overlay.appendChild(card);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+  renderListsInto(body, circleId);
+}
 
+// A CIRCLE'S LISTS: make a list, add an entry, tick one off (the lists' own ops, through the waist). One body, painted
+// by the circle's Lists tab and by the panel the circle's menu opens.
+function renderListsInto(body, circleId) {
   let openListId = null;     // null = the container index; an id = that container's card
   let pendingAddTo = null;   // container node id awaiting an inline add-input
   let pendingHint = null;    // the chosen child type for the pending input (from the picker), or null = default
@@ -6955,6 +7012,8 @@ async function openAboutMePanel(personaId) {
         await removeDriver({ callSkill: rawCallSkill, personaId: model.defaultId ?? 'default', key });
         await draw();
       },
+      // a persona's own setting (who may write to it first): through the waist, on THAT persona, then the model again
+      onSetPersonaProperty: async (personaId, key, value) => { try { await rawCallSkill('agents', 'setProfileProperty', { id: personaId, key, value }); } catch { /* the model shows what holds */ } await draw(); },
       onCreatePersona: async (name, answers) => {
         try { await rawCallSkill('agents', 'createProfile', newPersonaArgs(name, answers)); } catch { /* */ }
         await draw();
@@ -7169,8 +7228,9 @@ let helpPendingHelpQuery = null;   // { circleId, query }
 
 // Post the deterministic set-topic chips ("of kies zelf") — each resolves to its kaartje answer with
 // NO language model. `honest` frames them as the ONLY answerable topics (the no-assistant fallback).
-function postHelpTopicChips(id, { honest = false } = {}) {
-  const chips = helpTopicChips({ lang: currentLang() });
+// After a question (`query`): its five likeliest topics, the rest behind "all topics"; without one, every topic.
+function postHelpTopicChips(id, { honest = false, query = null } = {}) {
+  const chips = helpTopicChips({ lang: currentLang(), query, allLabel: t('circle.help.all_topics') });
   const text = honest ? t('circle.help.no_llm_topics') : t('circle.help.pick_topic');
   _circleRender?.botBubble(text, { buttons: chips });
 }
@@ -7200,19 +7260,21 @@ async function answerHelpMessage(id, query) {
     return;
   }
   // no LLM → honest: only the fixed topics can be answered without an assistant.
-  postHelpTopicChips(id, { honest: true });
+  postHelpTopicChips(id, { honest: true, query });
 }
 
 // A tapped help button: a topic chip resolves deterministically; a consent choice forwards to the LLM
 // ("ja, doorsturen") or offers the set topics to pick from ("nee, ik kies zelf").
 async function handleHelpAction(id, help) {
+  // "all topics" after the likeliest few: the whole list
+  if (help.kind === 'all') { postHelpTopicChips(id); return; }
   if (help.kind === 'topic') {
     const ans = resolveHelpTopic(help.id, { lang: currentLang() });
     if (ans) _circleRender?.botBubble(ans.text, { provenance: ans.provenance });
     return;
   }
   if (help.kind === 'consent') {
-    if (help.value === 'no') { postHelpTopicChips(id); return; }
+    if (help.value === 'no') { postHelpTopicChips(id, { query: helpPendingHelpQuery?.circleId === id ? helpPendingHelpQuery.query : null }); return; }
     if (help.value === 'yes') {
       const pending = helpPendingHelpQuery && helpPendingHelpQuery.circleId === id ? helpPendingHelpQuery.query : null;
       helpPendingHelpQuery = null;
@@ -7243,6 +7305,7 @@ async function showDetail(id) {
   await refreshRelayKnown();   // the composer says when a message would wait (no connection point)
   hideTabBar();
   setActiveCircle(id);
+  _banner?.recheck();   // a banner for this circle has said its piece (shared driver)
   // OBJ-2 S1c-shell — (re)feed the household sync roster with THIS circle's members
   // so items added here fan out to them. Member-only + deduped; safe to call often.
   feedHouseholdRosterForCircle?.(id)?.catch?.(() => {});
@@ -7324,20 +7387,15 @@ function showCircle(id, circle, policy) {
   // The menu as it stands NOW: rebuilt when the availability lands and again when the sealed-media path resolves —
   // built once, before media resolved, it left the file entry out of the "+" for good while the composer had the
   // media pipeline all along (no photo could be attached in a circle).
-  // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
-  let circleBlockTypesNow = [];
   const circleAttachEntriesNow = () => attachEntriesFor({
     manifestsByOrigin: circleManifestsByOrigin ?? {},
     availability: circleAvailabilityNow,
     mediaWired: !!circleMedia,
-    blockTypes: circleBlockTypesNow,
   });
   (async () => {
     try {
       const av = await circleOpAvailability(id);
       circleAvailabilityNow = av;
-      // the circle's own screen's blocks, and any of the person's pages' blocks that show this circle (a lists block)
-      try { circleBlockTypesNow = [...blockTypesOnScreen(await recipeStore.get(id), DEFAULT_SCREEN_RECIPE), ...blockTypesShowingCircle(await userScreenStore.get(), id)]; } catch { circleBlockTypesNow = []; }
       // An entry declaring `via: 'media'` is exempt, and that is the same rule read correctly rather
       // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
       // over whether it works. Gating it on the catalogue would hide a working affordance to guard
@@ -7959,6 +8017,8 @@ function showCircle(id, circle, policy) {
       // Taken (tasks) tab — the circle's tasks (stream rows) + the compose affordance.
       // The view only reads these when the taken tab is active.
       tasks: circleTasks,
+      // the Lists tab: the circle's lists body, painted into the tab
+      listsTab: { render: (el) => renderListsInto(el, id) },
       ...(attachEntryForType(circleAttachMenu, 'task') ? { onAddTask: addTaskFromTab } : {}),   // only where a task can be made here
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
@@ -7993,6 +8053,8 @@ function showCircle(id, circle, policy) {
         if (b?.action === 'delivery:allow-fallback') { acceptFallbackOffer(); return; }
         // The caretaker signing for the appointment nobody made (the notice bubble's button).
         if (b?.action === 'caretaker:acknowledge') { acknowledgeCaretakerNotice(); return; }
+        // "A decision opened" leads in: the Decisions screen, the same call the circle menu's entry makes
+        if (b?.action === GOVERNANCE_OPEN_ACTION) { showGovernance(id); return; }
         circleEmbedButtonTap?.(b);
       },
       // tap a "See also" embed chip → open the screen where the item lives (S6.B panel).
@@ -8829,12 +8891,14 @@ async function showGovernance(id) {
   const gov = shellGovernance({ myWebid });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
-  back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
+  back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = t('circle.back');   // the key carries its own arrow
   back.addEventListener('click', () => { _govRerender = null; showDetail(id); });
   rootEl.appendChild(back);
   const host = document.createElement('div');
   rootEl.appendChild(host);
 
+  let govErrorKey = null;   // the line a failed vote leaves on the screen (voteFailedLine), until the next vote
+  let govNoticeKey = null;  // what an admin's Enact did (enactOutcomeLine)
   const rerender = async () => {
     let ctx = { policy: {}, members: [] };
     try { ctx = await gov.getContext(id); } catch { /* empty view on read failure */ }
@@ -8846,18 +8910,30 @@ async function showGovernance(id) {
     let roster = [];
     try { roster = (await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }))?.members ?? []; } catch { /* */ }
     const nameOf = buildSubjectLabeler(roster);
-    const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
+    // a person is named from this roster or 'a member who has left', never the key (subjectLabelerFor, shared)
+    const labelForSubject = subjectLabelerFor(roster, t);
     let view = { open: [], closed: [] };
     try { view = await gov.view(id, { labelForSubject }); } catch { /* */ }
     // §8 — the admin's open reports (member↔admin lane).
     let reports = [];
     if (isAdmin) { try { reports = (await gov.reports.list(id)).open; } catch { /* */ } }
     renderGovernancePanel(host, {
-      view, t, policy: ctx.policy, isAdmin, reports,
+      view, t, policy: ctx.policy, isAdmin, reports, errorKey: govErrorKey, noticeKey: govNoticeKey, reportNameOf: nameOf,
+      // the admin's Enact (L893): the way vote travels, through the circle's governance handle (governance.resolve is
+      // the declared op its statement names); it says what it did, or why it could not
+      onEnact: async (proposalId) => {
+        let r = null;
+        try { r = await gov.tally({ circleId: id, proposalId }); } catch (err) { r = err; }
+        const line = enactOutcomeLine(r);
+        govErrorKey = line.failed ? line.key : null; govNoticeKey = line.failed ? null : line.key;
+        await rerender();
+      },
       onDismissReport: async (reportId) => { try { await gov.reports.dismiss({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
       onActReport:     async (reportId) => { try { await gov.reports.act({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
       onVote: async (proposalId, choice) => {
-        try { await gov.vote({ circleId: id, proposalId, voter: myWebid, choice }); } catch { /* */ }
+        let vr = null;
+        try { vr = await gov.vote({ circleId: id, proposalId, voter: myWebid, choice }); } catch (err) { vr = err; }
+        govErrorKey = voteFailedLine(vr); govNoticeKey = null;   // a vote that did not go through says so on the screen
         await rerender();
       },
       onOverride: async (proposalId) => {

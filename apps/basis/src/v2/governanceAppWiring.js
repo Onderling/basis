@@ -266,7 +266,8 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     let refused = [];
     try { refused = await refusedChanges(circleId); } catch { refused = []; }
     const label = typeof opts?.labelForSubject === 'function' ? opts.labelForSubject : (r) => r;
-    return { ...base, refused: refused.map((r) => ({ ...r, label: label(r.by, r.action) || r.by })) };
+    // whoever made the change is a PERSON: named as the roster names them, or 'a member who has left', never the key
+    return { ...base, refused: refused.map((r) => ({ ...r, label: label(r.by, 'member') })) };
   };
 
   // `appendGovernanceEvent` / `appendReportEvent`: what the POINT runs for a sibling's forwarded act (the same signing,

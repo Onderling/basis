@@ -62,6 +62,7 @@ describe("a stranger's first five minutes on the phone: the help circle, a first
     await element(by.id('create-group-name')).typeText(NAME);
     await device.pressBack();   // the keyboard covers the handle field below
     if (await isVisible(by.id('wizard-handle'))) await element(by.id('wizard-handle')).replaceText('anna');
+    await tapSoon(by.text('Household').withAncestor(by.id('create-group-kind')), 20_000);   // the kind, asked here
     for (let i = 0; i < 6; i += 1) {
       if (await isVisible(by.id('create-group-create'))) break;
       await element(by.id('create-group-next')).tap();
@@ -119,5 +120,28 @@ describe("a stranger's first five minutes on the phone: the help circle, a first
     // the phone's keyboard capitalises a line's first letter, as it does for a person
     await peer.next('circle-heard', (m) => String(m.text).toLowerCase() === FROM_PHONE.toLowerCase(), 90_000);
     await device.takeScreenshot('ffm-07-phone-heard');
+  });
+
+  it('a cold start never says "No circles yet." to an account that has a circle', async () => {
+    // the account has its first circle now: a restart must not paint the empty state on the way to the list (the
+    // launcher once said "No circles yet." for seconds before the circles were read)
+    await launch({ fresh: false });
+    await tapSoon(by.id('circle-tab-circles'), 90_000);
+    const until = Date.now() + 90_000;
+    let tile = false;
+    let lastTap = Date.now();
+    while (Date.now() < until) {
+      if (await isVisible(by.text('No circles yet.'))) throw new Error('"No circles yet." painted for an account that has a circle');
+      if (await isVisible(by.id(`circle-tile-${circleId}`))) { tile = true; break; }
+      // the start screen (Today by default) is applied once the agent is up, after an early tap on Circles: go back to
+      // the list whenever it took over, so the check watches the list for the whole boot
+      if (Date.now() - lastTap > 3000) {
+        try { await element(by.id('circle-tab-circles')).tap(); } catch { /* tab bar not painted yet */ }
+        lastTap = Date.now();
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    await device.takeScreenshot('ffm-08-cold-start');
+    if (!tile) throw new Error("the circle's tile never appeared after the restart");
   });
 });

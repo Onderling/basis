@@ -3,7 +3,7 @@
  * other member, with the BRANCH the send took asserted beside the message.
  *
  *   normal       storage 'none'      the radio left at its default: the plain fan-out, silently — no degrade line
- *   central pod  storage 'shared'    a signed-in founder: the send writes the circle's pod and fans a pointer
+ *   shared pod   storage 'shared'    a signed-in founder: the send writes the circle's pod and fans a pointer
  *   pod-only     storage 'personal'  both members signed in: the send writes the pod, no fan
  *   pod type, no session  'shared' with nobody signed in: today the send degrades to the fan-out and SAYS so. This is
  *                the case that will become a normal circle once a circle without a pod is made as one; then it goes.
@@ -91,6 +91,8 @@ async function createWithStorage(page, name, { storage, podUri = null, handle = 
   await page.locator('.cc-wizard-input:visible').first().waitFor({ timeout: 15_000 });
   await page.locator('.cc-wizard-input:visible').nth(0).fill(name);
   await fillFounderHandle(page, handle);
+  // the kind, asked on the first step (never assumed)
+  await page.locator('input[type="radio"][value="household"]:visible').first().check();
   // the storage choice lives behind the first step's "advanced" fold; opened, the wizard walks every step
   await page.locator('details[data-role="advanced"] > summary').first().click();
   await page.waitForTimeout(500);
@@ -131,14 +133,18 @@ async function createWithStorage(page, name, { storage, podUri = null, handle = 
 
 const CASES = [
   { type: 'normal', storage: 'none', port: null, signA: false, signB: false, branch: 'fan-out' },
-  { type: 'central pod', storage: 'shared', port: 3056, signA: true, signB: true, branch: 'pod', },
-  { type: 'pod-only', storage: 'personal', port: 3057, signA: true, signB: true, branch: 'pod', blocked: 'the pod-circle message does not reach the other member yet: the reader needs a signed-in session the circle grants (central pod) or its own pod and the cross-pod grants (pod-only) — its own investigation' },
+  { type: 'shared pod', storage: 'shared', port: 3056, signA: true, signB: true, branch: 'pod', },
+  // pod-only is OUT FOR THE ALPHA (decision 2026-11-13 in docs/decisions.md: what a person can make is normal and shared pod); its two
+  // relay walks pin what it does. Kept here, skipped with that reason, for the day it comes back.
+  { type: 'pod-only', storage: 'personal', port: 3057, signA: true, signB: true, branch: 'pod', outOfAlpha: 'pod-only is not a circle type a person makes in the alpha (decision 2026-11-13); its relay walks pin it' },
   // without a pod session the wizard offers no pod type: the circle is made a normal one and says nothing about pods
   { type: 'no pod session', storage: 'none', port: null, signA: false, signB: false, branch: 'fan-out', onlyNone: true },
 ];
 
 for (const c of CASES) {
-  // a case that cannot pass yet is named as such, with its reason — it is not a green cell
+  // a case that cannot pass yet is named as such, with its reason — it is not a green cell; a type out of the alpha is
+  // skipped with the decision as its reason
+  if (c.outOfAlpha) { test.skip(`${c.type}: out of the alpha`, () => {}); continue; }
   (c.blocked ? test.fixme : test)(`${c.type}: made in the wizard, a member's message reaches the other member, and the send took its branch`, async ({ browser }) => {
     const base = c.port ? `http://localhost:${c.port}/` : null;
     let css = null;
@@ -190,7 +196,7 @@ for (const c of CASES) {
       await expect.poll(async () => (await readBubbles(B.page)).some((t) => t.includes(text)),
         { timeout: 60_000, intervals: [2500], message: `the other member reads the message in a ${c.type} circle` }).toBe(true);
 
-      if (c.type === 'central pod') expect(refusedRules, 'the member\'s device tried to write the founder\'s access rules').toEqual([]);
+      if (c.type === 'shared pod') expect(refusedRules, 'the member\'s device tried to write the founder\'s access rules').toEqual([]);
       const degraded = sendLog.filter((l) => /degrading to fan-out-full/.test(l));
       if (c.branch === 'fan-out') {
         expect(degraded, `a normal circle must not talk about a pod:\n${sendLog.join('\n')}`).toEqual([]);

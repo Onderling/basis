@@ -223,12 +223,6 @@ export function setActiveRecipe(book, recipeId) {
 }
 
 /** Resolve the active Recipe (or null when the book is empty). */
-/** The block types on a circle's screen: its active recipe's, else the shell's default screen's (what the "+" asks). */
-export function blockTypesOnScreen(book, fallbackRecipe = null) {
-  const r = getActiveRecipe(book) ?? fallbackRecipe;
-  return (Array.isArray(r?.blocks) ? r.blocks : []).map((b) => b?.type).filter((x) => typeof x === 'string');
-}
-
 export function getActiveRecipe(book) {
   const cur = normalizeRecipeBook(book);
   if (!cur.activeId) return null;

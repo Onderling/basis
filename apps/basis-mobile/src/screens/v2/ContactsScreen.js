@@ -141,8 +141,10 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   // THE REQUESTS (web: contactsRoster.js): at the top, only when there is one; the name the card SAYS (unverified)
   const requestRow = (r, ignored) => (
     <View key={`req-${r.from}`} style={styles.reqRow} testID={`request-${r.from}`}>
-      <Text style={styles.reqName}>{r.name ? t('circle.contacts.requests.says', { name: r.name }) : t('circle.contacts.requests.no_name')}</Text>
+      <Text style={styles.reqName}>{r.name ? t(r.label, { name: r.name }) : t(r.label)}</Text>
       {r.firstLine ? <Text style={styles.reqLine} numberOfLines={2}>{r.firstLine}</Text> : null}
+      {/* what the held messages could not keep (the text cut, a file left off): one plain line each (web: contactsRoster) */}
+      {(r.notes ?? []).map((key) => <Text key={key} style={styles.reqLine} testID={`request-note-${r.from}`}>{t(key)}</Text>)}
       <View style={styles.reqActs}>
         <Pressable style={styles.reqAct} onPress={() => onAccept(r.from)} accessibilityRole="button" testID={`request-accept-${r.from}`}>
           <Text style={styles.reqActText}>{t('circle.contacts.requests.accept')}</Text>

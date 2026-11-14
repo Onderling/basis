@@ -798,6 +798,16 @@ because of this reads `"reason":"point-mismatch"` with each candidate as `kind:w
 
 Each one produced an APK that did not carry the code it was built to test.
 
+- **A release build fails at `:app:collectReleaseDependencies` with "Java heap space"** (2026-11-13): on a machine
+  short of memory, the Gradle daemons left by earlier builds (one per worktree) hold gigabytes. `./gradlew --stop`
+  in the worktree's `android/` freed ~7.6 GB and the next build went through.
+- **`mk-worktree.sh` stops part-way with "cp: cannot create hard link … Too many links"** (2026-11-13): every worktree
+  hardlinks the same `node_modules`, and ext4 allows a file about 65,000 links, so with ~45 worktrees the most-shared
+  files reach the cap. The copy stops at the first such file (an old demo app's), the script exits under `set -e`, and
+  the apps after it alphabetically (pinboard, tasks-v0, …) get no `node_modules` and no relink: tests then fail on
+  missing modules, not on code. Fix: remove merged worktrees (`git worktree remove --force <path>`) to free links,
+  and finish a broken one by copying the missing `node_modules` (by value where linking fails) and running
+  `node scripts/relink-workspace.mjs` in it.
 - **A worktree made by `plans/tools/mk-worktree.sh` has no `react-native-libsodium`** (2026-11-13): the phone's
   native signature check (pinned 1.7.0 in `apps/basis-mobile/package.json`) was installed in one probe worktree only,
   and the script copies `node_modules` from the shared checkout, which never got it. The release bundle then fails at

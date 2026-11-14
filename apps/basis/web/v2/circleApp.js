@@ -44,7 +44,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, scopedWriteFailureKey, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture, sealedAnswer, memberStatusReader,
+  scopePinboardCallSkill, scopedWriteFailureKey, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture, sealedAnswer, memberStatusReader, runKeyAudienceCheck,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -1956,6 +1956,8 @@ function recordCircleKeyEvent(circleId, event) {
 // every join's key change re-asks whether the member is still in after the admission it follows (memberStatus)
 const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
   memberStatusOf: memberStatusReader((...a) => (typeof rawCallSkill === 'function' ? rawCallSkill(...a) : Promise.reject(new Error('not booted')))),
+  // after each membership event it handles: one audience round on the key owner's device
+  audienceCheck: (gid, prod) => runKeyAudienceCheck({ circleId: gid, producer: prod, callSkill: rawCallSkill }),
 });
 
 /**
@@ -2218,7 +2220,13 @@ const producerKeyWait = createProducerKeyWait();
 /** Stand up a circle's producer and seed its group-key roster — what opening the circle does, and what the bind re-drives. */
 function ensureCirclePodSeeded(circleId, policy) {
   return ensureCirclePod(circleId, policy)
-    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey }).then(() => prod); return prod; });
+    .then((prod) => {
+      if (!prod?.controlAgent) return prod;
+      return seedCircleRoster({ callSkill: rawCallSkill, circleId, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey })
+        // the producer has started and its roster is seeded: one audience round (the key owner's device only)
+        .then(() => runKeyAudienceCheck({ circleId, producer: prod, callSkill: rawCallSkill }))
+        .then(() => prod);
+    });
 }
 
 /* ─── Connectivity Phase 3 — LIVE shared-pod key custody (MEMBER-SIDE) ─────────────────────────────

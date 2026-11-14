@@ -50,6 +50,7 @@ import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 // address nobody bound. See `registerCirclePresence` in circleApp.js / agentBundle.js.
 import { registerCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
+import { runKeyAudienceCheck } from '../../src/v2/keyAudienceCheck.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, memberStatusReader } from '../../src/v2/circlePodProducer.js';
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
@@ -176,6 +177,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // as both shells build it: every join's key change re-asks the member's status (the agent is bound before any join)
   const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
     memberStatusOf: memberStatusReader((...a) => agent.callSkill(...a)),
+    audienceCheck: (gid, prod) => runKeyAudienceCheck({ circleId: gid, producer: prod, callSkill: (...a) => agent.callSkill(...a) }),
   });
 
   // The peer → kringen index the shells keep (`circleGroupsIndex`): which circles this device shares with a peer —

@@ -221,7 +221,7 @@ export async function createCirclePodProducer({
   }
   if (bootstrap && ownsRoot && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
-  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey };
+  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey, ownsRoot, controllerPublicKey: controllerKey.publicKey };
 }
 
 /**
@@ -235,7 +235,7 @@ export async function createCirclePodProducer({
  * @param {(circleId:string) => (object|Promise<object|null>)} getProducer  resolve a circle's producer.
  * @returns {{ addMember: Function, removeMember: Function }}
  */
-export function createCircleControlAgentRouter(getProducer, { refusals = null, memberStatusOf = null } = {}) {
+export function createCircleControlAgentRouter(getProducer, { refusals = null, memberStatusOf = null, audienceCheck = null } = {}) {
   // Best-effort, and LOUD when it fails. Sealing degrading gracefully is the intended posture — a
   // membership event must not fail because a circle's pod is unreachable. But this catch sat between
   // the caller and every key operation, so a control-agent that threw looked exactly like one that
@@ -247,7 +247,14 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null, m
     const prod = await getProducer(groupId);
     if (!prod?.controlAgent) return null;            // circle not sealed / producer not live → no-op (null: nothing routed)
     // the control agent's own answer — or `{ routed: true }` — so a caller can tell a routed act from no producer
-    try { const out = await fn(prod.controlAgent); await prod.persist?.(); return out ?? { routed: true }; }
+    try {
+      const out = await fn(prod.controlAgent);
+      await prod.persist?.();
+      // after a membership event: one audience round on the key owner's device (its own rotation is not a membership
+      // event, so a revoke there never starts another round)
+      if (typeof audienceCheck === 'function' && prod.ownsRoot === true) { try { await audienceCheck(groupId, prod); } catch { /* said inside */ } }
+      return out ?? { routed: true };
+    }
     catch (err) {
       console.warn(
         `[circlePods] ${what} did not reach circle ${groupId}'s group key → the key audience is unchanged:`,

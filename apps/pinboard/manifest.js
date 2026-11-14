@@ -953,6 +953,16 @@ export const pinboardManifest = {
       surfaces: { internal: true },
     },
     {
+      // The audience check's read (the key owner's device): for each sealing key in a circle's key file, the people it
+      // belongs to by THIS device's verified addresses (redemption rows and proven announcements, current and former
+      // members) and whether the lane holds them in. Internal plumbing, private (who holds what is not a peer's to ask).
+      id:   'keyHoldersStatus', visibility: 'private', group: 'data', verb: 'list',
+      params: [
+        { name: 'keys', kind: 'object', required: true },   // an array of sealing public keys
+      ],
+      surfaces: { internal: true },
+    },
+    {
       id:   'getGroupRules', visibility: 'authenticated', group: 'data', verb: 'list',
       params: [],
       surfaces: {

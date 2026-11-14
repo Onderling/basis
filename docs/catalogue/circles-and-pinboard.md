@@ -27,6 +27,16 @@ catalogue baseline until it is.
 - **Who asks**: the per-circle control-agent router (`apps/basis/src/v2/circlePodProducer.js`), on every compute of a
   join's key change and of a device's enrolment (the device's owner); out drops the change, null writes nothing and
   goes to the refusal log (`member-unknown`). Both shells and the relay harness compose it the same way.
+- **The audience round** (`apps/basis/src/v2/keyAudienceCheck.js`, `runKeyAudienceCheck`): on the KEY OWNER's device only
+  (the producer that holds the circle's root), after the producer's roster seed and after each membership event the
+  router handles. A holder the membership lane places out whose removal never reached the key file (a crash, a device
+  offline, a member another instance admitted) is revoked with a ban, one per round. The controller and the device's
+  own key are kept; every other recipient is asked about through `pinboard` op `keyHoldersStatus {groupId, keys}`, which
+  maps a key to people only by this device's VERIFIED addresses (the redemption rows' proven primary address and the
+  proof-carrying pairs an announcement added, kept after an exit) and asks `memberStatus` for each. In, unmapped and
+  cannot-place are kept and counted; a read that fails revokes nothing that round; a key that maps to several people
+  is kept unless every one of them is out. A recipient-sealed (p3) circle is skipped out loud: its outside grantees
+  have no record. The round's line carries counts only.
 - **Re-driven by**: the roster seed at the next producer start (`seedCircleRoster`), which grants every member on the
   roster by their last join, so a grant that failed after the join stood is made then.
 
@@ -38,6 +48,11 @@ catalogue baseline until it is.
 - `packages/core/test/causalPlace.test.js`: after / before / concurrent / not held, and the fold's last exit and join
   by statement.
 - `apps/basis/test/sharedPodJoinerOpensKey.relay.test.js`: through the app's join, the joiner opens the stored key.
+- `apps/basis/test/keyAudienceCheck.relay.test.js`: a lost removal taken out by the round, a member keeping the key, a
+  key nobody can name kept and counted; a member this instance never knew (removeMember there: removed:false) taken out
+  by the round the router runs after the event. `keyAudienceCheck.test.js`: one rotation per round, counts, a failed
+  read revokes nothing, p3 said once, a non-owner does nothing. `apps/pinboard/test/keyHoldersFromRedemptions.test.js`:
+  devices and former members map, unproven pairs do not.
 
 ## Decided, not built
 
@@ -45,12 +60,13 @@ catalogue baseline until it is.
 
 ## Open rows
 
-- The audience check on the key owner's device (drops a holder the membership no longer has): its own row.
+- Holders nobody can name (unmapped keys): the count is in the device's log only; showing it to an admin is a row for
+  after the alpha. The grant record for recipient-sealed (p3) circles: its own row.
 
 ## Decisions that bind this area
 
 - One sealing key family: a member's key is wrapped to the image of their proven per-circle address (2026-09-04).
 
 <!-- catalogue-ops
-pinboard: memberStatus
+pinboard: memberStatus keyHoldersStatus
 -->

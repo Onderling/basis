@@ -163,8 +163,9 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // 2026-10-30: +1, `dismissRemovedCircle` — closing a circle an admin removed you from (this device's copy only) → 84.
   // 2026-11-14: +1, `memberStatus` — is a member still in after the admission a key change follows (the key router's
   // question on every compute; internal, no door) → 94.
-  it('ships the full chat+slash surface (one pinboard manifest, 94 ops)', () => {
-    expect(pinboardManifest.operations.length).toBe(94);
+  // 2026-11-14: +1, `keyHoldersStatus` — the audience check's read: who holds a circle key's recipients, still in? → 95.
+  it('ships the full chat+slash surface (one pinboard manifest, 95 ops)', () => {
+    expect(pinboardManifest.operations.length).toBe(95);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

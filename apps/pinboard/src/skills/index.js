@@ -706,6 +706,65 @@ async function memberStatusCore(scope, a) {
   return memberStatusFrom({ folded, statements, webid, after: asked });
 }
 
+/**
+ * Sealing key → the people whose VERIFIED addresses it is the image of, from a circle's redemption rows: each row's
+ * primary address with its proof, and the proof-carrying pairs an announcement added; a pair without its proof is not
+ * read. Rows of former members count too (an exit writes no row change). Pure.
+ * @returns {Map<string, Set<string>>}
+ */
+export function keyHoldersFromRedemptions(rows, groupId, deriveKey) {
+  const byKey = new Map();
+  const add = (address, proof, subject) => {
+    if (typeof address !== 'string' || !address || typeof proof !== 'string' || !proof || !subject) return;
+    let k = null;
+    try { k = deriveKey(address); } catch { k = null; }
+    if (!k) return;
+    if (!byKey.has(k)) byKey.set(k, new Set());
+    byKey.get(k).add(subject);
+  };
+  for (const it of Array.isArray(rows) ? rows : []) {
+    const src = it?.source ?? {};
+    if (src.groupId !== groupId) continue;
+    const subject = src.redeemedBy ?? null;
+    add(src.circleAddress, src.circleAddressProof, subject);
+    for (const p of Array.isArray(src.circleAddresses) ? src.circleAddresses : []) add(p?.address, p?.proof, subject);
+  }
+  return byKey;
+}
+
+/**
+ * WHO HOLDS THESE KEYS, AND ARE THEY STILL IN? The audience check's one read (the key owner's device): for each sealing
+ * key asked about, the people it belongs to and whether the membership lane holds them in. Built ONLY from what this
+ * device verified: the circle's `membership-redemption` rows (kept after an exit: exits are statements on the lane), each
+ * holding its member's primary `circleAddress` with the proof checked at redemption and the `circleAddresses` pairs an
+ * announcement added after its proof passed (`recordCircleAddress`); a pair without its proof is not read. A key is the
+ * image of one of those addresses (`deriveSealingKeyFromAddress`, the one sealing key family). Never a self-said field.
+ * Per key: 'unmapped' (no verified address of anyone has this image), 'out' (every person it maps to is out),
+ * 'in' (one of them is in), 'cannot-place' (none in, not all out); `people` is how many it maps to (counts only).
+ */
+async function keyHoldersStatusCore(scope, a) {
+  const groupId = a?.groupId ?? scope.groupId;
+  const keys = Array.isArray(a?.keys) ? a.keys.filter((k) => typeof k === 'string' && k) : [];
+  if (!groupId || !keys.length) return { holders: [] };
+  let rows = [];
+  try { rows = await scope.store.listOpen({ type: 'membership-redemption' }); } catch { return { error: 'no-rows' }; }
+  const byKey = keyHoldersFromRedemptions(rows, groupId, deriveSealingKeyFromAddress);
+  let folded = null; let statements = [];
+  const projected = await projectCircleRoster({
+    store: scope.store, groupId, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
+    selfSigner: scope.selfSigner ?? null, observeFold: (f, s) => { folded = f; statements = Array.isArray(s) ? s : []; },
+  });
+  if (!Array.isArray(projected) || !folded) return { error: 'no-fold' };
+  const holders = keys.map((key) => {
+    const people = [...(byKey.get(key) ?? [])];
+    if (!people.length) return { key, people: 0, status: 'unmapped' };
+    const st = people.map((w) => memberStatusFrom({ folded, statements, webid: w }).status);
+    const status = st.includes('in') ? 'in' : st.every((x) => x === 'out') ? 'out' : 'cannot-place';
+    return { key, people: people.length, status };
+  });
+  return { holders };
+}
+
 async function listGroupMembersCore(scope, a, ctx) {
   // Thin wrapper: the full roster-read logic — the foreign-caller ALLOWLIST gate AND the
   // local-viewer release read — lives in `@onderling/circles` (`listCircleMembers`). Pinboard
@@ -1218,6 +1277,7 @@ export const PINBOARD_CORES = Object.freeze({
   getGroupRules:    getGroupRulesCore,
   listGroupMembers: listGroupMembersCore,
   memberStatus: memberStatusCore,
+  keyHoldersStatus: keyHoldersStatusCore,
   respondToItem:    respondToItemCore,
   signOutOfPod:     signOutOfPodCore,
   addContact:       addContactCore,
@@ -3295,6 +3355,11 @@ export function buildSkills({
      *   — return the members of a group as MemberMap entries.
      *   `groupId` defaults to the bundle's current group.
      */
+    wire('keyHoldersStatus', {
+      description: 'Who holds these sealing keys (from this device\'s verified addresses only) and are they still in? Per key: in / out / cannot-place / unmapped.',
+      visibility:  'private',
+    }),
+
     wire('memberStatus', {
       description: 'Is a member still in, after the admission a key change follows? in / out / null (cannot place), in the membership lane\'s causal order.',
       visibility:  'private',

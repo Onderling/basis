@@ -257,7 +257,7 @@ import { contactCardFromLink, loadShareMyContact, sharedLinkState, sharedLinkWor
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
-import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
+import { buildSubjectLabeler, subjectLabelerFor } from '../../src/v2/governanceView.js';
 import { foldGovernance } from '../../src/v2/governanceLog.js';
 import { noticeWants } from '../../src/v2/noticeSettings.js';
 import { makeCircleGovernancePeerHandler } from '../../src/v2/circleLogReceiver.js';
@@ -8910,7 +8910,8 @@ async function showGovernance(id) {
     let roster = [];
     try { roster = (await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }))?.members ?? []; } catch { /* */ }
     const nameOf = buildSubjectLabeler(roster);
-    const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
+    // a person is named from this roster or 'a member who has left', never the key (subjectLabelerFor, shared)
+    const labelForSubject = subjectLabelerFor(roster, t);
     let view = { open: [], closed: [] };
     try { view = await gov.view(id, { labelForSubject }); } catch { /* */ }
     // §8 — the admin's open reports (member↔admin lane).

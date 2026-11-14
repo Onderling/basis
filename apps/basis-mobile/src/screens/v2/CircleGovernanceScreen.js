@@ -20,7 +20,7 @@ import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
-import { buildSubjectLabeler, deadlineLine, voteFailedLine, enactOutcomeLine, reportTargetText } from '../../../../basis/src/v2/governanceView.js';
+import { buildSubjectLabeler, subjectLabelerFor, deadlineLine, voteFailedLine, enactOutcomeLine, reportTargetText } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
@@ -52,7 +52,8 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
     let roster = [];
     try { roster = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { /* */ }
     const nameOf = buildSubjectLabeler(roster);
-    const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
+    // a person is named from this roster or 'a member who has left', never the key (subjectLabelerFor, shared; web twin)
+    const labelForSubject = subjectLabelerFor(roster, t);
     let view = { open: [], closed: [] };
     try { view = await gov.view(circleId, { labelForSubject }); } catch { /* */ }
     const isAdmin = me?.role === 'admin';

@@ -36,6 +36,29 @@ export function buildSubjectLabeler(members) {
   return (ref) => ((typeof ref === 'string' && byId.get(ref)) || null);
 }
 
+/** The subjects that are a PERSON: who is removed, whose role changes, and (the hint 'member') whoever made a change. */
+const PERSON_SUBJECTS = new Set(['removeMember', 'changeRole', 'member']);
+
+/**
+ * THE DECISIONS SCREEN'S ONE LABELER (L897, 2026-11-14): a person subject is named from this device's own roster, or
+ * "a member who has left" when the roster no longer holds them, never by the key; a subject that is not a person keeps
+ * its value. Both shells hand it to the view (`labelForSubject`), so a proposal's subject, a disputed author and whoever
+ * made a change without the vote are named the same way everywhere.
+ * @param {Array<object>} members  the roster rows (`listGroupMembers`)
+ * @param {Function} t
+ * @returns {(subject: unknown, action?: string) => string}
+ */
+export function subjectLabelerFor(members, t) {
+  const nameOf = buildSubjectLabeler(members);
+  return (s, action) => {
+    if (s == null) return '';
+    const name = typeof s === 'string' ? nameOf(s) : null;
+    if (name) return name;
+    if (PERSON_SUBJECTS.has(action)) return t('circle.governance.member_left');
+    return String(s);
+  };
+}
+
 /** This voter's last choice on a proposal ('yes' | 'no' | null). */
 function lastVoteOf(votes, ref) {
   let choice = null; let at = -Infinity;

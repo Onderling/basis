@@ -29,7 +29,7 @@ export const DOOR_REFUSAL_CODES = Object.freeze([...DOOR_REFUSAL_CODES_LIST]);
  * key (the bounded compare-and-swap ran out) or the roster could not say whether the member is still a member. The
  * next producer start's roster seed re-drives a join. Held against the router by circleKeyChangeNotMadeIsLogged.test.js.
  */
-const KEY_REFUSAL_CODES_LIST = ['key-write-contended', 'member-unknown', 'key-write-unconditioned', 'audience-not-checked', 'pod-key-not-opened'];
+const KEY_REFUSAL_CODES_LIST = ['key-write-contended', 'member-unknown', 'key-write-unconditioned', 'audience-not-checked', 'pod-key-not-opened', 'key-fan-failed'];
 export const KEY_REFUSAL_CODES = Object.freeze([...KEY_REFUSAL_CODES_LIST]);
 
 /**
@@ -112,6 +112,14 @@ export function makeRefusalLog({ now = () => Date.now(), windowMs = Number(WINDO
     },
     get size() { return seen.size; },
   };
+}
+
+/**
+ * A key event's fan through the waist failed (the key-event sink's `onFanFailed`, both shells): the key change stands, the
+ * members it missed take the key by their key pull. Said once per window, no circle id.
+ */
+export function noteKeyFanFailed() {
+  processRefusalLog().note({ tag: 'key', lane: 'key', check: 'fan', reason: 'key-fan-failed' });
 }
 
 /** The process's refusal log: one per process, like the signature memo. */

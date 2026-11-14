@@ -80,6 +80,7 @@ describe('the sink fans a signed statement through the waist', () => {
     });
 
     await sink.append(event);
+    await new Promise((r) => { setTimeout(r, 0); });   // the fan runs on after the append returns
 
     expect(direct).toEqual([]);                                  // nothing went out bare
     expect(fanned).toHaveLength(1);
@@ -96,6 +97,7 @@ describe('the sink fans a signed statement through the waist', () => {
     });
 
     await sink.append(event);
+    await new Promise((r) => { setTimeout(r, 0); });   // the fan runs on after the append returns
 
     expect(direct).toEqual(['addr:ada', 'addr:bo']);
   });
@@ -111,6 +113,7 @@ describe('the sink fans a signed statement through the waist', () => {
     });
 
     await sink.append(event);
+    await new Promise((r) => { setTimeout(r, 0); });   // the fan runs on after the append returns
 
     expect(fanned).toEqual([]);
     expect(direct).toEqual([]);

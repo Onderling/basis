@@ -16,9 +16,18 @@ describe('the requests section', () => {
   it('the projection: the name the card says (or none), the first line, the state', () => {
     const rows = messageRequestRows([req('k-ann', 'Ann', 'open', 'hallo daar'), req('k-x', null, 'ignored')]);
     expect(rows).toEqual([
-      { from: 'k-ann', name: 'Ann', firstLine: 'hallo daar', count: 2, ignored: false },
-      { from: 'k-x', name: null, firstLine: 'hoi', count: 2, ignored: true },
+      { from: 'k-ann', name: 'Ann', member: false, label: 'circle.contacts.requests.says', firstLine: 'hallo daar', count: 2, ignored: false },
+      { from: 'k-x', name: null, member: false, label: 'circle.contacts.requests.no_name', firstLine: 'hoi', count: 2, ignored: true },
     ]);
+  });
+
+  // a member never answered, after the person stopped letting circle members write first: their request holds no card;
+  // the name is the one they have in the circle, from this device's own roster, so it is not painted as a claim
+  it('a member\'s request is named as from your circle, not as what a card says', () => {
+    const [row] = messageRequestRows([{ ...req('k-cas', 'Cas'), member: true }]);
+    expect(row).toMatchObject({ name: 'Cas', member: true, label: 'circle.contacts.requests.member' });
+    const el = renderContactsRoster(document.createElement('div'), { contacts: [], t, requests: [row], onAccept: vi.fn(), onIgnore: vi.fn(), onBlock: vi.fn() });
+    expect(el.querySelector('.cc-requests__name').textContent).toBe('circle.contacts.requests.member:{"name":"Cas"}');
   });
 
   it('is absent when there is no request', () => {

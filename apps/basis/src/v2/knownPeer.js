@@ -18,6 +18,12 @@ const CONTACT_KEYS = ['webid', 'pubKey', 'peerAddr'];
 
 const keysOf = (row, fields) => fields.map((f) => row?.[f]).filter((v) => typeof v === 'string' && v);
 
+/** The roster row any of `keys` names, by the same key fields the known-peer check reads; null when none does. */
+export function rosterRowNaming(rows, keys) {
+  const wanted = (Array.isArray(keys) ? keys : [keys]).filter((k) => typeof k === 'string' && k);
+  return (Array.isArray(rows) ? rows : []).find((m) => keysOf(m, ROSTER_KEYS).some((k) => wanted.includes(k))) ?? null;
+}
+
 /**
  * @param {object} a
  * @param {(key: string) => boolean} [a.isSelf]                      one of this device's own selves
@@ -36,7 +42,7 @@ export function makeIsKnownPeer({ isSelf = null, ownDeviceAddresses = null, myCi
     if (typeof contacts === 'function' && (await safe(contacts, [])).some((c) => keysOf(c, CONTACT_KEYS).includes(key))) return true;
     if (typeof myCircleIds === 'function' && typeof rosterOf === 'function') {
       for (const circleId of await safe(myCircleIds, [])) {
-        if ((await safe(() => rosterOf(circleId), [])).some((m) => keysOf(m, ROSTER_KEYS).includes(key))) return true;
+        if (rosterRowNaming(await safe(() => rosterOf(circleId), []), key)) return true;
       }
     }
     return false;

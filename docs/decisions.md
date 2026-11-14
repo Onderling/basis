@@ -1528,6 +1528,19 @@ one of THAT persona's circles, seen on this device's own roster, gets a thread w
 row; the person's answer is the choice that makes them a contact. Off: their first private message is a request.
 Circles of another persona do not count, so being in a circle with one persona does not open the others.
 
+**Switched off after a member already wrote** (2026-11-14, found walking the phone: the member's next message landed
+nowhere). Answered: the answer made them a contact, and a contact is let on whatever the switch says. Never answered:
+their next message is a request (the person turned the switch off to stop exactly this), held WITHOUT a card (their card
+rode only their first message), shown by the name they have in the circle; their earlier turns stay in the thread.
+Accepting a request without a card puts no row in the book: the held turns move into the thread and the request goes;
+the book row comes when the person answers, as for a member who may write.
+
+**Nothing at the contact door is dropped silently** (same day). A turn the request's hold refuses (no card on a new
+request, a card naming someone else, a file, too large, or the hold failing) is written to the refusal log with its
+reason code from a closed set, then held anyway, marked with that reason: what made it unholdable is left off (the
+card, the file) or cut to the bound (the text). Only a turn there is no self to hold it for is dropped, and both
+refusals are logged. The stranger budgets in front of the door still drop past their bounds, with their own count line.
+
 **Block is about direct contact, never a circle** (Frits, after comparing Signal, WhatsApp and Telegram, which all keep a
 block one-on-one). The block list (`/block`) is kept by the secure agent, alias-aware, but enforced only by the app's
 DIRECT doors: the contact channel (before anything else: no request, no thread, no receipt), files and threaded answers,

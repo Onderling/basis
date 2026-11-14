@@ -6126,6 +6126,10 @@
         "text": "Says they are {{name}}",
         "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {{name}} is that name."
       },
+      "member": {
+        "text": "{{name}}, from your circle",
+        "doc": "A request row from a member of one of your circles whom you never answered (after you stopped letting circle members write first): the name they have in the circle, as your own device's roster shows it, so not marked as a claim."
+      },
       "no_name": {
         "text": "Someone without a name",
         "doc": "A request row whose sender's card gives no name."

@@ -31,15 +31,22 @@ export async function acceptMessageRequest({ callSkill, channel, from, persona =
  * when it names none), the first line they wrote, how many turns are held, and whether the person ignored it. In the
  * order given (newest last turn first, as the list returns them).
  * @param {Array<object>} requests
- * @returns {Array<{from: string, name: string|null, firstLine: string, count: number, ignored: boolean}>}
+ * `label`: the locale key the row's name line is painted with, decided here once for every shell: a member's request
+ * (`member`: their circle name, from this device's own roster) is named as from your circle; a card's name is marked
+ * as the sender's claim; no name is 'someone without a name'. Paint `t(label, { name })`.
+ * @returns {Array<{from: string, name: string|null, label: string, member: boolean, firstLine: string, count: number, ignored: boolean}>}
  */
 export function messageRequestRows(requests = []) {
   return (Array.isArray(requests) ? requests : []).filter((q) => q && typeof q.from === 'string' && q.from).map((q) => {
     const turns = Array.isArray(q.turns) ? q.turns : [];
     const first = turns.find((x) => typeof x?.text === 'string' && x.text.trim()) ?? null;
+    const name = typeof q.name === 'string' && q.name.trim() ? q.name.trim() : null;
+    const member = q.member === true && !!name;
     return {
       from: q.from,
-      name: typeof q.name === 'string' && q.name.trim() ? q.name.trim() : null,
+      name,
+      member,
+      label: member ? 'circle.contacts.requests.member' : (name ? 'circle.contacts.requests.says' : 'circle.contacts.requests.no_name'),
       firstLine: first ? first.text.split('\n')[0].trim() : '',
       count: turns.length,
       ignored: q.state === 'ignored',

@@ -692,6 +692,8 @@ export const pinboardManifest = {
         { name: 'card',      kind: 'string', required: false },
         { name: 'file',      kind: 'boolean', required: false },
         { name: 'persona',   kind: 'string', required: false },
+        { name: 'memberName', kind: 'string', required: false },   // a co-member never answered: held without a card
+        { name: 'refused',   kind: 'string', required: false },    // the door's fallback after a refusal: held anyway
       ],
       surfaces: { internal: true },
     },

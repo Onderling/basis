@@ -174,6 +174,8 @@ export function createContactThreadChannel({
     isKnown: (key) => messageRequests.isKnown(key),
     iWrote: wroteTo,
     isMember: (m) => (typeof messageRequests.isMember === 'function' ? messageRequests.isMember(m) : false),
+    coMember: typeof messageRequests.coMember === 'function' ? (m) => messageRequests.coMember(m) : null,
+    refusal: typeof messageRequests.refusal === 'function' ? (reason) => messageRequests.refusal(reason) : null,
     useLink: typeof messageRequests.useLink === 'function' ? (m) => messageRequests.useLink(m) : null,
     letOnByLink: typeof messageRequests.letOnByLink === 'function' ? (m) => messageRequests.letOnByLink(m) : null,
     hold: (turn) => messageRequests.hold(turn),

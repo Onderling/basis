@@ -24,7 +24,9 @@
  * owns the shape.
  */
 
-import { firstContactRows } from './firstContact.js';
+import { firstContactRows, FIRST_CONTACT_CONTROLS } from './firstContact.js';
+
+const FIRST_CONTACT_KEYS = new Set(FIRST_CONTACT_CONTROLS.map((c) => c.key));
 import { attributeKeys, bucketsFor } from '@onderling/attribute-charter';
 import { isDriverValue, OFFERINGS_INHERIT_KEY, normalizeDriverKind, deriveOfferingCategory, OFFERINGS_TAXONOMY, AVAILABILITY_STATES, availabilityState, locationLabel, isPresentedAttributeKey } from '@onderling/agent-registry';
 
@@ -269,7 +271,8 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
   for (const p of list) {
     // a key with a leading underscore is a marker (no row): the offerings answer, a migration's note; and the handle is an
     // attribute the self's own statements present, never a disclosure choice (no row either)
-    for (const k of Object.keys(p.properties ?? {})) if (!k.startsWith('_') && !isPresentedAttributeKey(k) && !keyOrder.includes(k)) keyOrder.push(k);
+    // the first-contact choices are not rows: the card shows them as their own controls (firstContact.js)
+    for (const k of Object.keys(p.properties ?? {})) if (!k.startsWith('_') && !isPresentedAttributeKey(k) && !FIRST_CONTACT_KEYS.has(k) && !keyOrder.includes(k)) keyOrder.push(k);
   }
   const personaCards = list.map((p) => {
     const isDefault = p.id === defaultId;

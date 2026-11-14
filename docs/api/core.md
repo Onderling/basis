@@ -3954,6 +3954,28 @@ household bot on its own node says so on its row, the circle paints it a bot and
 quiet for its name. Self-said, not an authority: a person who says `function` only silences their own name. The same
 two words a profile record holds (`PROFILE_KINDS` in agent-registry is this list).
 
+### `causalPlace`
+
+**Kind:** function · **Import:** `causalPlace` from `'@onderling/core'`
+
+```js
+causalPlace(statements, a, b)
+```
+
+WHERE `b` STANDS AGAINST `a` in the lane's own causal order (the deps-DAG: each statement's `parentHash` chain union its
+`deps`), the same answer on every device that holds both: 'after' when `a` is an ancestor of `b`, 'before' when `b` is an
+ancestor of `a`, 'same' for one statement, 'concurrent' when neither reaches the other, and null when either is not in
+`statements` (it cannot be placed). Never a wall clock, never the fold's depth tiebreak: equal or greater depth does not
+make an act later, only an ancestry path does.
+
+**Parameters**
+
+- `statements` `Array<object>`
+- `a` `string` — a statement hash
+- `b` `string` — a statement hash
+
+**Returns:** `'after'|'before'|'same'|'concurrent'|null`
+
 ### `foldRoster`
 
 **Kind:** function · **Import:** `foldRoster` from `'@onderling/core'`

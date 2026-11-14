@@ -51,7 +51,7 @@ describe('createBrowserPinboardAgent — control-agent seam (basis circle member
       { rulesAccepted: '1', groupId: GROUP, code: created.code, sealingPublicKey: SEAL_PUB }, BOB);
 
     expect(redeem.redemptionId).toBeTruthy();
-    expect(ca.addMember).toHaveBeenCalledWith({ webId: BOB, publicKey: SEAL_PUB, role: 'member', groupId: GROUP });
+    expect(ca.addMember).toHaveBeenCalledWith({ webId: BOB, publicKey: SEAL_PUB, role: 'member', groupId: GROUP, admittedBy: expect.any(String) });   // the grant names the join it follows
   });
 
   it('forwards the control-agent: leaveGroup → removeMember', async () => {

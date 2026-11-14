@@ -196,7 +196,7 @@ for (const c of CASES) {
       await expect.poll(async () => (await readBubbles(B.page)).some((t) => t.includes(text)),
         { timeout: 60_000, intervals: [2500], message: `the other member reads the message in a ${c.type} circle` }).toBe(true);
 
-      if (c.type === 'central pod') expect(refusedRules, 'the member\'s device tried to write the founder\'s access rules').toEqual([]);
+      if (c.type === 'shared pod') expect(refusedRules, 'the member\'s device tried to write the founder\'s access rules').toEqual([]);
       const degraded = sendLog.filter((l) => /degrading to fan-out-full/.test(l));
       if (c.branch === 'fan-out') {
         expect(degraded, `a normal circle must not talk about a pod:\n${sendLog.join('\n')}`).toEqual([]);

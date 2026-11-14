@@ -62,6 +62,7 @@ describe("a stranger's first five minutes on the phone: the help circle, a first
     await element(by.id('create-group-name')).typeText(NAME);
     await device.pressBack();   // the keyboard covers the handle field below
     if (await isVisible(by.id('wizard-handle'))) await element(by.id('wizard-handle')).replaceText('anna');
+    await tapSoon(by.text('Household').withAncestor(by.id('create-group-kind')), 20_000);   // the kind, asked here
     for (let i = 0; i < 6; i += 1) {
       if (await isVisible(by.id('create-group-create'))) break;
       await element(by.id('create-group-next')).tap();

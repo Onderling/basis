@@ -186,7 +186,7 @@ function openItemAttachmentThumbs(it, opener) {
  * @param {(() => Promise<{mediaGateway:object, localActor:string, t?:Function}|null>)} [getMedia]
  * @returns {(appOrigin:string, opId:string, args?:object)=>Promise<any>}
  */
-export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia) {
+export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia, { sealed = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return callSkill;
   return async (appOrigin, opId, args = {}) => {
     if (appOrigin !== 'pinboard') return callSkill(appOrigin, opId, args);
@@ -198,6 +198,9 @@ export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, get
       if (scoped.groupId == null) scoped.groupId = circleId;   // don't clobber an explicit scope
       // Any scoped write's body is sealed at rest for a sealed circle — a post, an announcement, the next
       // kind — keyed on the ARG, not on the op's name (an announcement used to slip through unsealed).
+      // A SEALED circle with no strategy yet (its key pair is not there: the page asked before its agent was up) is
+      // REFUSED, never written in the clear: "no strategy" is the plaintext answer only for a circle that does not seal.
+      if (!strategy && typeof sealed === 'function' && sealed()) throw new Error('sealed-circle-key-not-ready');
       if (strategy && typeof scoped.text === 'string' && scoped.text) {
         scoped.text = strategy.seal(scoped.text);
       }

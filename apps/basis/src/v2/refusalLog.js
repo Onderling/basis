@@ -39,6 +39,8 @@ export const REFUSAL_CODES = Object.freeze([
   'body-authorref-must-be-a-string-or-null',
   // the binding check and the gates
   'key-not-bound-to-its-member', 'not-allowed-by-the-circle-rule',
+  // a sealed circle's producer asked for on a device whose agent is bound but gives no key pair for it (a fault)
+  'no-sealing-key-pair',
   // the contact door's hold of a message request (held anyway after the refusal: nothing there is dropped silently)
   ...DOOR_REFUSAL_CODES_LIST,
 ]);

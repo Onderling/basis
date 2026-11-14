@@ -20,6 +20,7 @@
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
+import { processRefusalLog } from '../../src/v2/refusalLog.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
 import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -43,7 +44,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait,
+  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait, isSealedPosture,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -574,7 +575,11 @@ async function getCircleShareEnforcement(circleId, policy) {
         if (typeof console !== 'undefined') console.warn('[circleApp] share enforcement unavailable:', err?.message ?? err);
         return null;
       }
-    })());
+    })().then((enf) => {
+      // "none" is not kept: the producer it needs may come with the agent's bind, or a later policy
+      if (!enf) _shareEnforcementByCircle.delete(circleId);
+      return enf;
+    }));
   }
   return _shareEnforcementByCircle.get(circleId);
 }
@@ -1989,7 +1994,9 @@ async function buildCircleSealStrategy(circleId, policy) {
       }
     }
   } catch { strat = null; }
-  circleSealStrategies.set(circleId, strat);
+  // "none" is the plaintext answer, so it is kept only for a circle that does not seal; a sealed circle without a strategy
+  // (no key pair yet, a key not opened yet) asks again next time instead of being written in the clear for good
+  if (strat || !isSealedPosture(policy?.storagePosture)) circleSealStrategies.set(circleId, strat);
   return strat;
 }
 
@@ -2002,7 +2009,11 @@ const devMediaBucket = makeDevMediaBucket();
 const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
 function getCircleMediaComposition(circleId, policy) {
   if (!circleMediaCompositions.has(circleId)) {
-    circleMediaCompositions.set(circleId, resolveCircleMediaComposition(circleId, policy).catch(() => null));
+    circleMediaCompositions.set(circleId, resolveCircleMediaComposition(circleId, policy).catch(() => null).then((c) => {
+      // "none" is not kept (mobile parity): the key pair may come with the agent's bind, or a policy may make it seal
+      if (!c) circleMediaCompositions.delete(circleId);
+      return c;
+    }));
   }
   return circleMediaCompositions.get(circleId);
 }
@@ -2186,7 +2197,11 @@ async function buildCirclePod(circleId, policy) {
   } catch (err) {
     // a sealed circle asked for before this page's agent is up: no producer YET (never a stand-in key) — noted, and
     // built when the agent binds (producerKeyWait.drain below)
-    if (err?.code === 'NO_SEALING_KEY_PAIR') { producerKeyWait.note(circleId, policy); return null; }
+    if (err?.code === 'NO_SEALING_KEY_PAIR') {
+      if (!_peerAgent) { producerKeyWait.note(circleId, policy); return null; }
+      // the agent IS bound and still gives no key pair: a fault, said, not a wait nobody drains again
+      processRefusalLog().note({ tag: 'key', lane: 'key', check: 'producer', reason: 'no-sealing-key-pair' });
+    }
     if (typeof console !== 'undefined') console.warn('[circleApp] ensureCirclePod failed:', err?.message ?? err);
     return null;
   }
@@ -2381,10 +2396,6 @@ function buildCircleBot(agent) {
   circleCoreAgent = agent.sa?.agent ?? null;   // the core chat agent — discoverA2A's hello/native-upgrade target
   if (typeof window !== 'undefined') {
     window.onderlingCirclePods = circlePods;   // S4 debug / e2e seam
-    // e2e: drive a producer for any posture (verifies browser-safe sealing crypto end-to-end).
-    window.onderlingMakeCirclePod = (circleId, storagePosture = 'p2', roster = []) =>
-      createCirclePodProducer({ circleId, storagePosture, vault: circleVault, roster,
-        generateKeypair: podGenerateKeypair, makePodClient: makeCirclePodClient });
     window.onderlingSealingKit = { generateKeypair: podGenerateKeypair, createSealedPodClient, scopePinboardCallSkill };
   }
   circleContactSkills = createContactSkillRegistry({ peerGraph: circlePeerGraph, sendTask: sendContactTask });
@@ -7452,6 +7463,7 @@ function showCircle(id, circle, policy) {
   };
   const pinboardCall = scopePinboardCallSkill(
     rawCallSkill, id, () => getCircleSealStrategy(id, policy), getPinboardMedia,
+    { sealed: () => isSealedPosture(policy?.storagePosture) },
   );
   // Stand up this circle's pod producer (sealing identity + control agent for a sealed
   // posture), then seed its group-key roster with members who joined before it was live.
@@ -9980,7 +9992,11 @@ async function boot() {
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       // the agent is up, so are its per-circle sealing key pairs: build the producers that waited for them
-      producerKeyWait.drain(ensureCirclePodSeeded).catch(() => {});
+      producerKeyWait.drain((id, pol) => {
+        // what was derived while the circle had no producer goes, so the next ask builds it on the producer
+        circleSealStrategies.delete(id); circleMediaCompositions.delete(id); _shareEnforcementByCircle.delete(id);
+        return ensureCirclePodSeeded(id, pol);
+      }).catch(() => {});
       refreshUnreadMyRefs();
       readMarks.refresh().catch(() => {});
       // a sibling's marks landed in the own store: re-read the set

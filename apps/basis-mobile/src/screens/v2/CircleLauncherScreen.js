@@ -218,6 +218,7 @@ import { resolveCircleEmbedder } from '../../../../basis/src/v2/embedPicker.js';
 import { caretakerNotice } from '../../../../basis/src/v2/caretakerNotice.js';
 import { interpretToCommand } from '../../../../basis/src/v2/interpretCommand.js';
 import { scopePinboardCallSkill } from '../../../../basis/src/v2/circlePinboardScope.js';
+import { isSealedPosture } from '../../../../basis/src/v2/circlePodProducer.js';
 // Sealed media (2026-07-11): the per-circle media composition is SHARED src/ (platform-neutral,
 // no DOM). Mobile reuses it verbatim — same seal path as web's pinboard noticeboard — so a noticeboard
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
@@ -3301,6 +3302,7 @@ function CircleDetail({
   const pinboardCall = useMemo(
     () => scopePinboardCallSkill(
       rawCallSkill, circle?.id, () => getCircleSealStrategy(circle?.id, policy), getPinboardMedia,
+      { sealed: () => isSealedPosture(policy?.storagePosture) },
     ),
     [rawCallSkill, circle?.id, policy, getPinboardMedia],
   );

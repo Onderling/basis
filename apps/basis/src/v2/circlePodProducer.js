@@ -25,6 +25,9 @@ import { createCircleControlAgent } from './circleControlAgent.js';
 
 const SEALED_POSTURES = new Set(['p2', 'p3']);
 
+/** Does this storage posture seal content on the device (p2 group key, p3 recipient seal)? */
+export function isSealedPosture(posture) { return SEALED_POSTURES.has(posture); }
+
 /**
  * A sealed circle's producer is built only with the device's per-circle sealing key pair (the address key's image):
  * the key every member's grant wraps to. Without it there is NO producer yet — never a stand-in key. A random

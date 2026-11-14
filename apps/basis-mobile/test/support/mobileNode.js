@@ -84,6 +84,8 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
   const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
   const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
+  const { attachPinboardPodFor, circlePodWriterFor } = await import('../../src/core/phonePodSession.js');
+  const { composePhonePodReadBack } = await import('../../src/core/phonePodReadBack.js');
   // imported in THIS phone's module graph (a later boot resets the registry; a lazy import would get the other phone's)
   const { feedHouseholdRoster } = await import('../../../basis/src/v2/householdRosterPairing.js');
   const { subscribeContactReplies } = await import('../../src/core/contactReplyInbox.js');
@@ -114,6 +116,10 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
 
   // ── what App.js builds before the boot ───────────────────────────────────────────────────────────────────────
   let bundle = null;
+  // App.js's pod session slots (null until `node.signInToPod(session)`): the circle pods read the session ref, the
+  // bundle the shared-with-me writer
+  const podSessionRef = { current: null };
+  const podWriterRef = { current: null };
   const eventLog = new EventLog({ initial: [], muted: [] });
   const deliveryMap = createDeliveryStateMap();
   const groupsIndex = makeCircleGroupsIndex();
@@ -129,6 +135,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const recipePendingStore = makeCircleRecipePendingStoreRN(AsyncStorage);
   const rulesPendingStore = makeCircleRulesPendingStoreRN(AsyncStorage);
   pods.initCirclePods(AsyncStorage);
+  pods.setCirclePodSession(podSessionRef);   // as App.js: the session ref, empty until a sign-in
   const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
   const circlePolicyLane = makeCirclePolicyLane({
     emitter: () => bundle?.agent?.emitPolicyUpdate ?? null,
@@ -155,7 +162,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     asyncStorage: AsyncStorage,
     onSettingsKeyMismatch: () => { flags.settingsKeyMismatch += 1; },
     onSettingsConflicts: () => { flags.settingsConflicts += 1; },
-    getSharedWithMePodWriter: () => null,   // not signed in to a pod
+    getSharedWithMePodWriter: () => podWriterRef.current,   // App.js's getCirclePodWriter: null until a pod sign-in
     pinboardControlAgent: pods.circleControlAgentRouter,
     provisionCircleMedium: pods.provisionCircleMedium,
     deviceLog: eventLog,
@@ -203,7 +210,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   // ── what ChatScreen attaches: the phone's own inbound wiring, paint recorded ───────────────────────────────────
   const landed = { contactReplies: [], mainBubbles: [], unrouted: [], catchUpOffers: [] };
   const unsubscribe = subscribeContactReplies((reply) => { landed.contactReplies.push(reply); });
-  const { handlers } = buildPhoneInboundWiring({
+  const { handlers, lanes } = buildPhoneInboundWiring({
     bundle, agent: bundle.agent, callSkill: bundle.callSkill,
     contactChannel: bundle.contactChannel,
     pendingRedeems: bundle.pendingPeerRedeems,
@@ -221,6 +228,8 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
       },
     },
   });
+  // ChatScreen's pod read-back, composed by the same function (the app's foreground and circle-open entry)
+  const podReadBack = composePhonePodReadBack({ podChatCatchUp: lanes?.catchUps?.podChat ?? null, callSkill: bundle.callSkill });
   bundle.attachPeerWiring({
     // the router hands a default handler (from, payload), not the envelope: recorded as `{ from, payload }` (this read
     // `(env)` and kept only the sender's address, so a story could count unrouted frames but never say what they were)
@@ -256,6 +265,24 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   return {
     name,
     bundle,
+    /** Sign in to a pod as App.js does once its session holds tokens: the session into the circle pods' ref, the
+     *  shared-with-me writer built from it, pinboard's item store attached to the person's pod. */
+    signInToPod: async (session) => {
+      podSessionRef.current = session;
+      podWriterRef.current = await circlePodWriterFor(session);
+      return attachPinboardPodFor({ session, agent: bundle.agent });
+    },
+    /** What the create wizard's `persistPolicy` prop does on the launcher: the new circle's policy into the phone's
+     *  policy store, and the founder's first policy on the lane. */
+    persistPolicy: async (groupId, patch) => {
+      await policyStore.update?.(groupId, patch);
+      circlePolicyLane?.state(groupId).catch(() => {});
+    },
+    /** The circle's policy as this phone's policy store holds it (what the circle pods read). */
+    policyOf: async (circleId) => (await policyStore.get?.(circleId)) ?? null,
+    /** The app's pod read-back (ChatScreen's): `comeToFront()` is what AppState 'active' calls. */
+    podReadBack,
+    comeToFront: () => podReadBack?.onForeground?.() ?? Promise.resolve({ ingested: 0 }),
     agent: bundle.agent,
     callSkill: bundle.callSkill,
     address: bundle.agent?.identity?.chat?.pubKey ?? null,

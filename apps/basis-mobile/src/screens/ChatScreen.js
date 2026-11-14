@@ -75,7 +75,7 @@ import {
 // Circle roster → household no-pod sync peers (+ per-circle address binding). The ONE shared
 // implementation, called by web (circleApp) and the mobile launcher too.
 import { feedHouseholdRoster } from '../../../basis/src/v2/householdRosterPairing.js';
-import { createPodReadBack } from '../../../basis/src/v2/podReadBack.js';
+import { composePhonePodReadBack } from '../core/phonePodReadBack.js';
 import { computeEmbedButtons } from '../../../basis/src/core/embedButtons.js';
 import { embedButtonText } from '../../../basis/src/v2/replyEmbeds.js';
 import { makeCalendarOutboundHook }
@@ -541,10 +541,7 @@ export default function ChatScreen({
     }
     // …and when a circle is opened and when the app comes back to the front (web parity; no timer)
     if (podChatCatchUp && !globalThis.__onderlingPodReadBack) {
-      globalThis.__onderlingPodReadBack = createPodReadBack({
-        catchUp: podChatCatchUp,
-        listCircleIds: async () => ((await bundle.callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean),
-      });
+      globalThis.__onderlingPodReadBack = composePhonePodReadBack({ podChatCatchUp, callSkill: bundle.callSkill });
       AppState.addEventListener?.('change', (st) => { if (st === 'active') globalThis.__onderlingPodReadBack?.onForeground().catch(() => {}); });
     }
     // Background-fetch: when the OS grants a background slot, run the SAME catch-ups the boot kicks

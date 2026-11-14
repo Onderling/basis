@@ -95,6 +95,7 @@ import {
   chooseKind as createGroupChooseKind,
   finalSubmit as createGroupFinalSubmit,
   loadFounderHandle,
+  setStoragePolicy as createGroupSetStorage,
 } from '../../src/core/wizards/createGroupState.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
 
@@ -784,13 +785,17 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
  * The single-admin creator step, split out so ONE circle can then take MULTIPLE joiners (the sealed-circle
  * three-member case) instead of `pairCircle` minting a fresh circle per pair.
  */
-export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null, kind = 'household' } = {}) {
+export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null, kind = 'household', storage = null, groupPodUri = null } = {}) {
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
   // the kind, picked as the wizard's first step asks it (a new circle has none until someone picks one)
   let state = createGroupChooseKind(createGroupInitialState(), kind, null);
   state.groupId = groupId;
   state.name = name;
   state.purpose = purpose;
+  // the storage radio (a pod choice: 'shared' is the one shared circle pod), as the wizard's storage step sets it
+  if (typeof storage === 'string' && storage) state = createGroupSetStorage(state, storage);
+  // …and the pod address the person types beside a shared choice (the wizard's pod field)
+  if (typeof groupPodUri === 'string' && groupPodUri) state.groupPodUri = groupPodUri;
   // the founder's handle, as both shells' create wizard asks it when the profile has none (loadFounderHandle): a walk
   // that names its founder gets a founder the members see by name, not "Unknown"
   if (typeof handle === 'string' && handle) {
@@ -803,7 +808,8 @@ export async function createCircle(admin, { groupId = 'peer-circle', name = 'Pee
   // (web: the create wizard's onDispatched → registerCirclePresence; mobile: the launcher's load). Without it the
   // founder's per-circle address is not on the bus and its membership fan cannot leave as the circle.
   await admin.registerPresence?.(groupId);
-  return { created, groupId };
+  // the wizard's final state too: a phone founder persists its policy from it (the create modal's persistPolicy)
+  return { created, groupId, state: outState };
 }
 
 /**

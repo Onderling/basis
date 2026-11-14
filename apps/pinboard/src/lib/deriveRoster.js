@@ -59,27 +59,28 @@ import { hasHumanRules } from '@onderling/circles';
  * EVERY link proof `deriveRoster` checks, read off the same inputs in the same way: a joiner's address (and the extra
  * proven ones on its row), the admin's as the joiner recorded it, a founder's from its creation statement. One list,
  * so the ahead pass below and the fold cannot disagree (a test pins it: after the pass the fold checks nothing again).
- * @returns {Array<{groupId: string, address: string, proof: string}>}
+ * @returns {Array<{groupId: string, address: string, memberRef: string, proof: string}>}
  */
 export function linkProofsOf({ redemptions = [], founderWebids = [], founderFacts = {} } = {}) {
   const out = [];
-  const add = (groupId, address, proof) => {
-    if (typeof address === 'string' && address && typeof proof === 'string' && proof) out.push({ groupId, address, proof });
+  // the member each proof names is the row's own subject (link proof v2): the redeemer, the confirming admin, the founder
+  const add = (groupId, address, proof, memberRef) => {
+    if (typeof address === 'string' && address && typeof proof === 'string' && proof && typeof memberRef === 'string' && memberRef) out.push({ groupId, address, memberRef, proof });
   };
   for (const it of redemptions ?? []) {
     const src = (it && it.source) ?? {};
     if (src.redeemedBy) {
-      add(src.groupId, src.circleAddress, src.circleAddressProof);
-      for (const p of Array.isArray(src.circleAddresses) ? src.circleAddresses : []) add(src.groupId, p?.address, p?.proof);
+      add(src.groupId, src.circleAddress, src.circleAddressProof, src.redeemedBy);
+      for (const p of Array.isArray(src.circleAddresses) ? src.circleAddresses : []) add(src.groupId, p?.address, p?.proof, src.redeemedBy);
     }
     if (src.confirmedBy && src.channel === 'peer') {
-      add(src.groupId, src.confirmedByCircleAddress, src.confirmedByCircleAddressProof);
-      for (const p of Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : []) add(src.groupId, p?.address, p?.proof);
+      add(src.groupId, src.confirmedByCircleAddress, src.confirmedByCircleAddressProof, src.confirmedBy);
+      for (const p of Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : []) add(src.groupId, p?.address, p?.proof, src.confirmedBy);
     }
   }
   for (const w of founderWebids ?? []) {
     const fa = founderFacts?.[w];
-    if (fa) add(fa.groupId, fa.circleAddress, fa.circleAddressProof);
+    if (fa) add(fa.groupId, fa.circleAddress, fa.circleAddressProof, w);
   }
   return out;
 }
@@ -91,9 +92,9 @@ export function linkProofsOf({ redemptions = [], founderWebids = [], founderFact
  */
 export async function proveLinksAhead(args = {}) {
   const slice = createTimeSlice();
-  for (const { groupId, address, proof } of linkProofsOf(args)) {
+  for (const { groupId, address, memberRef, proof } of linkProofsOf(args)) {
     await slice();
-    verifyCircleLink({ groupId, address, proof });
+    verifyCircleLink({ groupId, address, memberRef, proof });
   }
 }
 
@@ -153,7 +154,8 @@ export function deriveRoster({
   const addProvenAddress = (webid, groupId, address, proof) => {
     if (typeof webid !== 'string' || !webid) return;
     if (typeof address !== 'string' || !address) return;
-    if (!verifyCircleLink({ groupId, address, proof })) return;   // unproven ⇒ refused, never stored
+    // the proof must name THIS member (link proof v2): a copy of another member's proof is refused here
+    if (!verifyCircleLink({ groupId, address, memberRef: webid, proof })) return;   // unproven ⇒ refused, never stored
     let set = provenAddresses.get(webid);
     if (!set) provenAddresses.set(webid, (set = new Set()));
     set.add(address);
@@ -247,7 +249,7 @@ export function deriveRoster({
   for (const w of founderWebids ?? []) {
     // the founder's per-circle address, from their creation statement, through the same proof gate a joiner's passes
     const fa = founderFacts?.[w];
-    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof });
+    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, memberRef: w, proof: fa.circleAddressProof });
     upsert(w, 'admin', {
       ...(proven ? { circleAddress: fa.circleAddress, circleAddressProof: fa.circleAddressProof } : {}),
       ...(typeof fa?.handle === 'string' && fa.handle ? { handle: fa.handle } : {}),

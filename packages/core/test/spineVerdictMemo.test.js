@@ -123,17 +123,17 @@ describe('the verdict memo over the circle-link proof', () => {
   it('ten checks of one proof reach the signature check once; another address or proof is checked again', async () => {
     const a = await AgentIdentity.generate(new VaultMemory());
     // the proof is signed by the circle address's own key, so the address IS the signer's public key
-    const proof = signCircleLink(a, CID, a.pubKey);
+    const proof = signCircleLink(a, CID, a.pubKey, 'webid:a');
     const memo = createVerdictMemo();
     const { calls, verify } = counting();
-    for (let i = 0; i < 10; i++) expect(verifyCircleLink({ groupId: CID, address: a.pubKey, proof, verifySignature: verify, verdictMemo: memo })).toBe(true);
+    for (let i = 0; i < 10; i++) expect(verifyCircleLink({ groupId: CID, address: a.pubKey, memberRef: 'webid:a', proof, verifySignature: verify, verdictMemo: memo })).toBe(true);
     expect(calls.n).toBe(1);
-    expect(verifyCircleLink({ groupId: 'other', address: a.pubKey, proof, verifySignature: verify, verdictMemo: memo })).toBe(false);
+    expect(verifyCircleLink({ groupId: 'other', address: a.pubKey, memberRef: 'webid:a', proof, verifySignature: verify, verdictMemo: memo })).toBe(false);
     expect(calls.n).toBe(2);
     // never coerced: a group id that is not the string asked before is keyed apart, so the memo answers exactly as the
     // full check does (which reads the id through String() in the signed message)
-    const full = verifyCircleLink({ groupId: [CID], address: a.pubKey, proof, verifySignature: verify });
-    expect(verifyCircleLink({ groupId: [CID], address: a.pubKey, proof, verifySignature: verify, verdictMemo: memo })).toBe(full);
+    const full = verifyCircleLink({ groupId: [CID], address: a.pubKey, memberRef: 'webid:a', proof, verifySignature: verify });
+    expect(verifyCircleLink({ groupId: [CID], address: a.pubKey, memberRef: 'webid:a', proof, verifySignature: verify, verdictMemo: memo })).toBe(full);
     expect(memo.size).toBe(full ? 2 : 1);
   });
 });

@@ -35,7 +35,7 @@ export { createCircleFanOut } from './circleFanOut.js';
 // Per-circle ADDRESS announcing — receive half (`recordCircleAddress`) and send
 // half (`fanCircleAddresses`). Pure DI lift out of pinboard; the caller injects the
 // store, the core verify helpers, the announce kind, and the fan.
-export { recordCircleAddress, fanCircleAddresses } from './circleAddress.js';
+export { recordCircleAddress, fanCircleAddresses, addressHolderIn } from './circleAddress.js';
 export { isRosterTrailItem, isLaneCarriedItem } from './rosterTrail.js';
 
 // Roster read, plus the full member

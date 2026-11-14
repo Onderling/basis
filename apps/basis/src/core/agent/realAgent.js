@@ -131,6 +131,9 @@ import { makePolicyUpdateEmitter, denyWinsMerge, POLICY_UPDATE_KIND } from '../.
 import { normalizeCirclePolicy, decisionClassFor } from '../../v2/circlePolicy.js';
 import { chainOfBodies, judgePolicyChain, membershipGateFor, proposalsOn } from '../../v2/governanceReceiverGate.js';   // the governed gate's host half
 import { processRefusalLog } from '../../v2/refusalLog.js';   // every refusal says why
+import { onEarlierCircleLink } from '@onderling/core';
+// a link proof made before the member was named in it says so in the device log (no circle id, no address)
+onEarlierCircleLink(() => processRefusalLog().note({ tag: 'identity', lane: 'circle-link', check: 'link-proof', reason: 'earlier-link-proof' }));
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
@@ -4024,7 +4027,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleId: cid,
         memberWebid: circleSelfRef(cid),   // the circle's self: in a persona's circle, the persona
         circleAddressFor,
-        signCircleAddress: (cid2, address) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address),
+        signCircleAddress: (cid2, address, member) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address, member ?? circleSelfRef(cid2)),
         ceremonyCommitmentFor, signCeremonyCommitment,
       }),
     }),
@@ -4665,7 +4668,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           // the persona's ONE address moves: the new one is where members deliver from now on
           primary: true,
           circleAddressFor: (cid) => deriveCircleAddress(seed, cid),
-          signCircleAddress: (cid, address) => signCircleLinkFromSeed(seed, cid, cid, address),
+          signCircleAddress: (cid, address, member) => signCircleLinkFromSeed(seed, cid, cid, address, member ?? circleSelfRef(cid)),
           ceremonyCommitmentFor,
           signCeremonyCommitment: (cid, address, commitment) =>
             signCeremonyCommitmentFromSeed(deriveCircleSeed(seed, cid), { circleId: cid, circleAddress: address, commitment }),
@@ -5028,7 +5031,7 @@ export async function createRealHouseholdAgent(opts = {}) {
                 const ann = ownCircleAddressAnnouncement({
                   circleId: cid, memberWebid: chatId.pubKey,
                   circleAddressFor: (c) => deriveCircleAddress(selfSeed, c),
-                  signCircleAddress: (c, address) => signCircleLinkFromSeed(selfSeed, c, c, address),
+                  signCircleAddress: (c, address, member) => signCircleLinkFromSeed(selfSeed, c, c, address, member ?? chatId.pubKey),
                   ceremonyCommitmentFor,
                   signCeremonyCommitment: (c, address, commitment) =>
                     signCeremonyCommitmentFromSeed(deriveCircleSeed(selfSeed, c), { circleId: c, circleAddress: address, commitment }),
@@ -5471,7 +5474,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           ownAnnouncement: ownCircleAddressAnnouncement({
             // the circle's OWN self: in a persona's circle the persona — never the default's webid there
             circleId, memberWebid: circleSelfRef(circleId), circleAddressFor,
-            signCircleAddress: (cid2, address) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address),
+            signCircleAddress: (cid2, address, member) => signCircleLinkFromSeed(circleSeedFor(cid2), cid2, cid2, address, member ?? circleSelfRef(cid2)),
             ceremonyCommitmentFor, signCeremonyCommitment,
           }),
         });
@@ -8275,7 +8278,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // A founder proves their address in the creation statement, as a joiner proves theirs on the trail.
       if (realOpId === 'createGroupV2' && typeof realArgs.circleAddress === 'string' && realArgs.circleAddress && !realArgs.circleAddressProof) {
         try {
-          const proof = signCircleLinkFromSeed(circleSeedFor(realArgs.groupId), realArgs.groupId, realArgs.groupId, realArgs.circleAddress);
+          const proof = signCircleLinkFromSeed(circleSeedFor(realArgs.groupId), realArgs.groupId, realArgs.groupId, realArgs.circleAddress, circleSelfRef(realArgs.groupId));
           if (proof) realArgs = { ...realArgs, circleAddressProof: proof };
         } catch { /* unproven: the founder's row shows no address, as before the statement carried it */ }
       }
@@ -10731,7 +10734,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
     // join wizard passes this on the redeem seam; the admin verifies it before recording.
-    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(circleSeedFor(circleId), circleId, groupId, address),
+    // …and it names the member: the circle's own self in the circle being joined or announced (the persona there), so a
+    // copy of this proof cannot be used by anyone else (link proof v2, L917).
+    signCircleLink: (circleId, groupId, address, memberRef = null) => signCircleLinkFromSeed(circleSeedFor(circleId), circleId, groupId, address, memberRef ?? circleSelfRef(groupId)),
     /**
      * Mount an app's LOCAL ops on this agent's waist — today `basis`, whose handlers end in the
      * device's own affordances (a picker, a camera, a panel, a pod login) and so cannot be agent

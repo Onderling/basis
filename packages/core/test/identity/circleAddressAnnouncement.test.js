@@ -21,7 +21,7 @@ const CIRCLE = 'circle-42';
 /** What a host's seams look like — the two functions `realAgent` already exposes. */
 const seamsFor = (seed) => ({
   circleAddressFor:  (cid) => deriveCircleAddress(seed, cid),
-  signCircleAddress: (cid, address) => signCircleLinkFromSeed(seed, cid, cid, address),
+  signCircleAddress: (cid, address, member) => signCircleLinkFromSeed(seed, cid, cid, address, member),
 });
 
 describe('per-circle address announcement', () => {
@@ -67,7 +67,7 @@ describe('per-circle address announcement', () => {
       memberWebid: 'webid:attacker',
       circleAddress: address,
       // signed with the attacker's own key, over the right message
-      circleAddressProof: signCircleLinkFromSeed(seedFor('attacker'), CIRCLE, CIRCLE, address),
+      circleAddressProof: signCircleLinkFromSeed(seedFor('attacker'), CIRCLE, CIRCLE, address, 'webid:attacker'),
     });
     expect(verifyCircleAddressAnnouncement(forged, CIRCLE)).toBeNull();
   });

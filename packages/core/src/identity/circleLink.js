@@ -72,5 +72,21 @@ export function verifyCircleLink({ groupId, address, memberRef, proof, verifySig
   try { good = check(circleLinkMessage(groupId, address, memberRef), proof, address) === true; }
   catch { good = false; }
   if (good && key) memo.remember(key);
+  if (!good && earlierListener) noteIfEarlier(groupId, address, proof, check);
   return good;
+}
+
+/**
+ * THE EARLIER PROOF SAYS SO. A proof signed over the earlier message (circle + address, no member) is refused like any
+ * other; a device whose circles were made before the member was named loses every address in them, and without a word
+ * only the screen would show it. When a listener is set (the app's refusal log), a refused proof is checked once more
+ * against the earlier message, and a match is reported: no circle id, no address, only that it happened.
+ */
+let earlierListener = null;
+/** @param {(() => void)|null} fn  called once per refused proof that the earlier message verifies */
+export function onEarlierCircleLink(fn) { earlierListener = typeof fn === 'function' ? fn : null; }
+function noteIfEarlier(groupId, address, proof, check) {
+  try {
+    if (check(`onderling-circle-link-v1|${String(groupId)}|${String(address)}`, proof, address) === true) earlierListener();
+  } catch { /* a report never breaks a check */ }
 }

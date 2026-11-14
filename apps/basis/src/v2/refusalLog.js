@@ -53,6 +53,9 @@ export const REFUSAL_CODES = Object.freeze([
   ...DOOR_REFUSAL_CODES_LIST,
   // a change to a circle's group key that was NOT made (the key router's codes)
   ...KEY_REFUSAL_CODES_LIST,
+  // a circle link proof signed over the earlier message (circle + address, no member): the circle predates the member
+  // being named in the proof, and its addresses are refused until it is made again
+  'earlier-link-proof',
 ]);
 const KNOWN = new Set(REFUSAL_CODES);
 const DETAIL_MAX = 32;

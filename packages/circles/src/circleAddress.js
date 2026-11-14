@@ -34,6 +34,26 @@ function oneAtATimeFor(store, key, fn) {
 }
 
 /**
+ * Which member a circle's trail rows already give `address` to: the member's own row (`redeemedBy`, its primary and its
+ * set) or the admitting admin's mirror on a peer join (`confirmedBy`). The first row in trail order wins; null when no
+ * row holds it. One address belongs to one member in a circle.
+ * @param {Array<{source?: object}>} rows  the circle's membership-redemption rows
+ * @param {string} address
+ * @returns {string|null}
+ */
+export function addressHolderIn(rows, address) {
+  if (typeof address !== 'string' || !address) return null;
+  const has = (primary, set) => primary === address
+    || (Array.isArray(set) && set.some((p) => (typeof p === 'string' ? p : p?.address) === address));
+  for (const it of rows ?? []) {
+    const src = it?.source ?? {};
+    if (typeof src.redeemedBy === 'string' && src.redeemedBy && has(src.circleAddress, src.circleAddresses)) return src.redeemedBy;
+    if (typeof src.confirmedBy === 'string' && src.confirmedBy && has(src.confirmedByCircleAddress, src.confirmedByCircleAddresses)) return src.confirmedBy;
+  }
+  return null;
+}
+
+/**
  * Record a member's PROVEN per-circle address (the receive half of address
  * announcing).
  *
@@ -109,6 +129,11 @@ export async function recordCircleAddress(
     let all = [];
     try { all = await store.listOpen({ type: 'membership-redemption' }); } catch { all = []; }
     const forGroup = (all ?? []).filter((i) => i?.source?.groupId === a.groupId);
+    // ONE ADDRESS, ONE MEMBER IN A CIRCLE. The proof names the member, so a copied proof no longer verifies for anyone
+    // else; but the key holder could still sign a second proof naming another member. An address another member's row
+    // already holds stays theirs: the earlier holder keeps it, this announcement writes nothing.
+    const holder = addressHolderIn(forGroup, proven.circleAddress);
+    if (holder && holder !== webid) return { ok: false, reason: 'address-held-by-another-member' };
 
     let patched = 0;
     let unchanged = 0;

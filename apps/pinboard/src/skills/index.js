@@ -2619,9 +2619,10 @@ export function buildSkills({
       // Unproven ⇒ dropped, and the joiner keeps reaching the admin the old way.
       const verifiedAdminCircleAddress = (a.confirmedByCircleAddress
         && verifyCircleLink({
-          groupId: a.groupId,
-          address: a.confirmedByCircleAddress,
-          proof:   a.confirmedByCircleAddressProof,
+          groupId:   a.groupId,
+          address:   a.confirmedByCircleAddress,
+          memberRef: a.confirmedBy,   // the proof names the admin who confirmed: the row's own `confirmedBy`
+          proof:     a.confirmedByCircleAddressProof,
         }))
         ? a.confirmedByCircleAddress : null;
       // The joiner's OWN per-circle address (wave 1 batch 5) — the row this skill writes is the row the
@@ -2631,7 +2632,7 @@ export function buildSkills({
       // path — it is the joiner's own device, but an unproven address must not enter a roster row here
       // any more than anywhere else (one rule, many enforcement points).
       const verifiedOwnCircleAddress = (a.circleAddress
-        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, memberRef: from, proof: a.circleAddressProof }))
         ? a.circleAddress : null;
       const [item] = await store.addItems([{
         type:       'membership-redemption',

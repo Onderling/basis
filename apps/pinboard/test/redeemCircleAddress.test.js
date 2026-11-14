@@ -32,9 +32,9 @@ const RULES = { purpose: 'circle', admins: [ADMIN], houseRules: ['wees aardig'] 
 const _bobSeed   = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('bob');
 const _adminSeed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('admin');
 const ADMIN_ADDR = deriveCircleAddress(_adminSeed, GROUP);
-const ADMIN_PROOF = signCircleLinkFromSeed(_adminSeed, GROUP, GROUP, ADMIN_ADDR);
+const ADMIN_PROOF = signCircleLinkFromSeed(_adminSeed, GROUP, GROUP, ADMIN_ADDR, ADMIN);
 const BOB_ADDR   = deriveCircleAddress(_bobSeed, GROUP);
-const BOB_PROOF  = signCircleLinkFromSeed(_bobSeed, GROUP, GROUP, BOB_ADDR);
+const BOB_PROOF  = signCircleLinkFromSeed(_bobSeed, GROUP, GROUP, BOB_ADDR, BOB);
 
 async function callSkill(agent, skillId, args, from = ADMIN) {
   const def = agent.skills.get(skillId);
@@ -115,9 +115,26 @@ describe('redeem → capture joiner per-circle address', () => {
 
     // and a proof for a DIFFERENT joining circle doesn't count either (no cross-circle replay)
     const r2 = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-    const wrongProof = signCircleLinkFromSeed(_bobSeed, GROUP, 'another-circle', BOB_ADDR);
+    const wrongProof = signCircleLinkFromSeed(_bobSeed, GROUP, 'another-circle', BOB_ADDR, BOB);
     await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r2.code, circleAddress: BOB_ADDR, circleAddressProof: wrongProof }, BOB);
     expect((await bundle.members.resolveByWebid(BOB)).circleAddress).toBeNull();
+  });
+
+  it('one address, one member: a second joiner presenting an address another member holds records none', async () => {
+    const bundle = await buildBundle();
+    const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    await callSkill(bundle.agent, 'redeemMembershipCode',
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
+    expect((await bundle.members.resolveByWebid(BOB)).circleAddress).toBe(BOB_ADDR);
+
+    // the key behind Bob's address signs a proof naming CAROL: a good proof, but the address is Bob's in this circle
+    const CAROL = 'https://id.example/carol';
+    const r2 = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    const carolProof = signCircleLinkFromSeed(_bobSeed, GROUP, GROUP, BOB_ADDR, CAROL);
+    await callSkill(bundle.agent, 'redeemMembershipCode',
+      { rulesAccepted: '1', groupId: GROUP, code: r2.code, circleAddress: BOB_ADDR, circleAddressProof: carolProof }, CAROL);
+    expect((await bundle.members.resolveByWebid(CAROL))?.circleAddress ?? null).toBeNull();
+    expect((await bundle.members.resolveByWebid(BOB)).circleAddress, 'the earlier holder keeps it').toBe(BOB_ADDR);
   });
 
   it('back-compat: a redeem WITHOUT a circle address still works + records none', async () => {

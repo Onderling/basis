@@ -278,6 +278,9 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
       await policyStore.update?.(groupId, patch);
       circlePolicyLane?.state(groupId).catch(() => {});
     },
+    /** Whether this phone can seal for the circle now: its circle pods hold a group key for it (the seal strategy the
+     *  send path asks for; null while the key is not on this device). */
+    canSeal: async (circleId) => !!(await pods.getCircleSealStrategy(circleId, (await policyStore.get?.(circleId)) ?? null).catch(() => null)),
     /** The circle's policy as this phone's policy store holds it (what the circle pods read). */
     policyOf: async (circleId) => (await policyStore.get?.(circleId)) ?? null,
     /** The app's pod read-back (ChatScreen's): `comeToFront()` is what AppState 'active' calls. */

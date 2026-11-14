@@ -3976,6 +3976,32 @@ make an act later, only an ancestry path does.
 
 **Returns:** `'after'|'before'|'same'|'concurrent'|null`
 
+### `memberStatusFrom`
+
+**Kind:** function · **Import:** `memberStatusFrom` from `'@onderling/core'`
+
+```js
+memberStatusFrom({ folded, statements = [], webid, after = null } = {})
+```
+
+IS THIS MEMBER IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? Decided from a roster fold and the statements it was
+given (the key router's question, pinboard `memberStatus`). 'in' only when the subject is on the FOLDED roster (the fold
+admitted them: its gates, the author's authority, deny-wins at a depth) and no exit of theirs comes after the admission;
+'out' when their last exit comes AFTER it (by ancestry, `causalPlace`); null when it cannot be said:
+  - a named admission that is not a `join` of THIS subject (another statement, another member's join);
+  - a join the fold did not admit (an author who may not admit, a redemption row not arrived yet, a removal that won
+    at the same depth) with no exit after it: not on the roster, so not 'in';
+  - an exit concurrent with the admission, or an admission or exit this device does not hold.
+With no admission named: the subject's last join that took effect; a subject on the roster with NO join at all was
+admitted by the circle's creation or its seed (a founder, a seeded member) and is 'in'. Once such a member is removed
+the answer is null, not 'out' (there is no admission to place the exit after): safe, the change is not made.
+
+**Parameters**
+
+- `a` `{ folded: object, statements: Array<object>, webid: string, after?: (string|null) }`
+
+**Returns:** `{ status: ('in'|'out'|null), reason?: string }`
+
 ### `foldRoster`
 
 **Kind:** function · **Import:** `foldRoster` from `'@onderling/core'`

@@ -179,6 +179,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `maxExposure` | function | [`core.md`](core.md#maxexposure) |
 | `MEMBER_KINDS` | constant | [`core.md`](core.md#member_kinds) |
 | `MEMBER_PROPS_FIELDS` | constant | [`core.md`](core.md#member_props_fields) |
+| `memberStatusFrom` | function | [`core.md`](core.md#memberstatusfrom) |
 | `MemoryAdapter` | class | [`core.md`](core.md#memoryadapter) |
 | `MemorySource` | class | [`core.md`](core.md#memorysource) |
 | `MemoryStorageBackend` | class | [`core.md`](core.md#memorystoragebackend) |

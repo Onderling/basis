@@ -50,17 +50,20 @@ export function rowMayEstablishKey(row) { return row?.role === 'admin'; }
 
 /**
  * Whether THIS device's self in a circle may establish its first key (`rowMayEstablishKey` over the folded roster).
- * False when the roster cannot be read or the self is not on it: a device that cannot tell does not mint a key.
+ * THREE answers: `true` (may), `false` (the self is on the roster and is not an admin), `null` (CANNOT TELL: the roster
+ * could not be read, or does not hold this self yet). A caller treats `null` as it treats a missing key pair: nothing
+ * built yet, nothing kept, asked again at the next ask. It never falls to 'may' (a member would mint), nor to 'may not'
+ * kept for good (a founder whose first read failed could never mint, and could not post in their own circle).
  * @param {{ callSkill: Function, circleId: string, selfRef: string|null }} a
- * @returns {Promise<boolean>}
+ * @returns {Promise<boolean|null>}
  */
 export async function selfMayEstablishKey({ callSkill, circleId, selfRef }) {
-  if (typeof callSkill !== 'function' || !circleId || typeof selfRef !== 'string' || !selfRef) return false;
+  if (typeof callSkill !== 'function' || !circleId || typeof selfRef !== 'string' || !selfRef) return null;
   try {
     const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     const row = (Array.isArray(r?.members) ? r.members : []).find((m) => m && (m.webid ?? m.addr ?? m.ref) === selfRef);
-    return rowMayEstablishKey(row ?? null);
-  } catch { return false; }
+    return row ? rowMayEstablishKey(row) : null;
+  } catch { return null; }
 }
 
 /**

@@ -219,7 +219,18 @@ export async function createCirclePodProducer({
   // when its key store was empty) and sealed under it, unreadable to the founder (2026-11-14). A member's device takes
   // the key from the key log instead (strategyFromKeyLog).
   let mayMint = true;
-  if (typeof mayEstablish === 'function') { try { mayMint = (await mayEstablish()) === true; } catch { mayMint = false; } }
+  if (typeof mayEstablish === 'function') {
+    let answer = null;
+    try { answer = await mayEstablish(); } catch { answer = null; }
+    // CANNOT TELL (the roster not readable, or not holding this self yet): no producer YET, as a missing key pair —
+    // the shell keeps nothing and asks again at the next ask (never 'may', never 'may not' kept for good)
+    if (answer !== true && answer !== false) {
+      const err = new Error(`createCirclePodProducer: cannot tell yet whether this device may establish circle ${circleId}'s first key`);
+      err.code = 'ESTABLISH_NOT_KNOWN';
+      throw err;
+    }
+    mayMint = answer;
+  }
   const controlAgent = createCircleControlAgent({
     circleId, storagePosture, podClient,
     sharing: sharing ?? memorySharing(),

@@ -43,7 +43,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster,
+  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, createProducerKeyWait,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -2184,9 +2184,19 @@ async function buildCirclePod(circleId, policy) {
     circlePods.set(circleId, producer);
     return producer;
   } catch (err) {
+    // a sealed circle asked for before this page's agent is up: no producer YET (never a stand-in key) — noted, and
+    // built when the agent binds (producerKeyWait.drain below)
+    if (err?.code === 'NO_SEALING_KEY_PAIR') { producerKeyWait.note(circleId, policy); return null; }
     if (typeof console !== 'undefined') console.warn('[circleApp] ensureCirclePod failed:', err?.message ?? err);
     return null;
   }
+}
+/** The sealed circles whose producer waits for this page's agent (their key pairs come with it). */
+const producerKeyWait = createProducerKeyWait();
+/** Stand up a circle's producer and seed its group-key roster — what opening the circle does, and what the bind re-drives. */
+function ensureCirclePodSeeded(circleId, policy) {
+  return ensureCirclePod(circleId, policy)
+    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey }).then(() => prod); return prod; });
 }
 
 /* ─── Connectivity Phase 3 — LIVE shared-pod key custody (MEMBER-SIDE) ─────────────────────────────
@@ -7446,8 +7456,7 @@ function showCircle(id, circle, policy) {
   // Stand up this circle's pod producer (sealing identity + control agent for a sealed
   // posture), then seed its group-key roster with members who joined before it was live.
   // Best-effort + fire-and-forget; never blocks the circle.
-  ensureCirclePod(id, policy)
-    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId: id, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey }); })
+  ensureCirclePodSeeded(id, policy)
     .catch(() => { /* best-effort; plain shared path on failure */ });
   // media — resolve this circle's sealed-media composition (async: the seal strategy
   // rides the pod producer). Until it resolves — and for a p0/p1 circle FOREVER (null) —
@@ -9970,6 +9979,8 @@ async function boot() {
         },
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
+      // the agent is up, so are its per-circle sealing key pairs: build the producers that waited for them
+      producerKeyWait.drain(ensureCirclePodSeeded).catch(() => {});
       refreshUnreadMyRefs();
       readMarks.refresh().catch(() => {});
       // a sibling's marks landed in the own store: re-read the set

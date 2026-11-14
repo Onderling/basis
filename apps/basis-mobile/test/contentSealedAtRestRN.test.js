@@ -24,6 +24,7 @@
 import { describe, it, expect } from 'vitest';
 import { initCirclePods, ensureCirclePod } from '../src/core/circlePods.js';
 import { useTestContentSeal } from './support/contentSeal.js';
+import { bindCircleKeyPairs } from './support/circleKeyPairs.js';
 
 useTestContentSeal();
 
@@ -46,6 +47,7 @@ describe('a phone stores a circle sealed', () => {
   it('every value written to AsyncStorage is an envelope, not content', async () => {
     const storage = inspectableAsyncStorage();
     initCirclePods(storage);
+    bindCircleKeyPairs();   // the agent's per-circle key pairs, as boot binds them before a producer can exist
 
     // Opening a sealed circle is itself a write: the producer puts the group-key resource on this
     // circle's own AsyncStorage-backed store. That is the path the launcher takes on a real phone.

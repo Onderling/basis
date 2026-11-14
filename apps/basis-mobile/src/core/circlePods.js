@@ -33,7 +33,7 @@ const keyFanRoster = async (circleId) => {
 };
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
 import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
-import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
+import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster, createProducerKeyWait } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
 import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
@@ -114,7 +114,16 @@ export function refreshCircleKeyEventsFromLane(rail, groupId) {
 // refs). The sink only fires on a later membership change, so late injection is safe; absent ⇒ the sink
 // records locally and fans to nobody (single-device behaviour, unchanged).
 let _keyEventWiring = null;   // { sendPeer(addr,payload,opts), callSkill(origin,opId,args) }
-export function setCircleKeyEventWiring(wiring) { _keyEventWiring = wiring ?? null; }
+export function setCircleKeyEventWiring(wiring) {
+  _keyEventWiring = wiring ?? null;
+  // the agent is bound, so are its per-circle sealing key pairs: build the producers that waited for them (web parity)
+  if (_keyEventWiring) {
+    producerKeyWait.drain((circleId, policy) => seedCircleRosterFor({ circleId, policy, callSkill: _keyEventWiring?.callSkill })
+      .then(() => circlePods.get(circleId) ?? null)).catch(() => {});
+  }
+}
+/** The sealed circles whose producer waits for the agent's key pairs (built on the bind above, never with a stand-in key). */
+const producerKeyWait = createProducerKeyWait();
 // The history sidecar's per-circle snapshot (the replace ceremony's absorbed group keys — web parity):
 // refreshed from the agent through the wiring's `historyKeyChainFor` whenever a seal strategy is (re)built.
 const circleHistoryKeys = new Map();
@@ -286,6 +295,8 @@ async function buildCirclePod(circleId, policy) {
       keyEventLog: makeCircleKeyEventLog(circleId),
     });
   } catch (err) {
+    // asked for before the agent is bound: no producer YET, and nothing cached — built on the bind (web parity)
+    if (err?.code === 'NO_SEALING_KEY_PAIR') { producerKeyWait.note(circleId, policy); return null; }
     if (typeof console !== 'undefined') console.warn('[circlePods] ensureCirclePod failed:', err?.message ?? err);
   }
   circlePods.set(circleId, producer);

@@ -6,7 +6,7 @@
  * identities, instantiates createControlAgent, or wraps the circle pod-client." This
  * is that producer: for ONE circle it composes the S4 sealing substrate into a
  * per-circle storage producer —
- *   • a per-circle X25519 sealing identity (always, vault-backed), and
+ *   • the device's per-circle X25519 sealing key pair (the address key's image, handed in by the agent), and
  *   • for a SEALED posture (p2/p3): a per-circle control agent over the circle's
  *     pod-client — bootstrapped, holding the recipient-wrapped group key, ready to
  *     grant/seal on join and revoke/rotate on leave (forward secrecy).
@@ -21,10 +21,49 @@
  * storage in the browser, NO OIDC/CSS) — a real Solid pod-client is the env-gated
  * swap later. p0/p1 circles seal nothing → `controlAgent` is null (plain storage).
  */
-import { createCircleSealingIdentity } from './circleSealingIdentity.js';
 import { createCircleControlAgent } from './circleControlAgent.js';
 
 const SEALED_POSTURES = new Set(['p2', 'p3']);
+
+/**
+ * A sealed circle's producer is built only with the device's per-circle sealing key pair (the address key's image):
+ * the key every member's grant wraps to. Without it there is NO producer yet — never a stand-in key. A random
+ * per-circle key kept in the vault used to stand in when the agent was not up yet (a page that opened a circle before
+ * its agent existed): the device then opened the circle's key with a key nobody had wrapped to ("not a recipient"),
+ * and kept doing so, because the producer was cached for the page's life. The shell notes the circle and builds the
+ * producer when the key pair is there (`createProducerKeyWait`).
+ */
+export class SealingKeyPairMissingError extends Error {
+  constructor(circleId) {
+    super(`circle ${String(circleId).slice(0, 12)}… is sealed and this device has no sealing key pair for it yet — no producer until it has`);
+    this.name = 'SealingKeyPairMissingError';
+    this.code = 'NO_SEALING_KEY_PAIR';
+    this.circleId = circleId;
+  }
+}
+
+/**
+ * The circles whose producer waits for this device's key pair, and the one re-drive: when the shell binds its agent
+ * (the moment the key pairs exist), it drains the list through its own `ensureCirclePod`. No timer: the bind is the
+ * event. Both shells compose it (the box builds no circle producer).
+ * @returns {{ note: (circleId:string, policy:object) => void, drain: (ensure:(circleId:string, policy:object)=>Promise<any>) => Promise<number>, size: () => number }}
+ */
+export function createProducerKeyWait() {
+  const waiting = new Map();   // circleId → the policy it was asked with
+  return {
+    note(circleId, policy) { if (circleId) waiting.set(circleId, policy); },
+    async drain(ensure) {
+      const list = [...waiting.entries()];
+      waiting.clear();
+      let n = 0;
+      for (const [circleId, policy] of list) {
+        try { if (await ensure(circleId, policy)) n += 1; } catch { /* the shell's ensure reports its own failure */ }
+      }
+      return n;
+    },
+    size: () => waiting.size,
+  };
+}
 
 /** A no-op ACL sharing: an in-memory pseudo-pod has no ACL layer; real grant/revoke is env-gated. */
 function memorySharing() {
@@ -91,15 +130,14 @@ export async function createCirclePodProducer({
   // ONE sealing key family (2026-09-04): the device's sealing keypair is the ed2curve image of its
   // per-circle ADDRESS key, handed in by the agent (`circleSealingKeyPairFor`). Every grant in the
   // circle already wraps to `sealingPublicKeyFromNetworkKey(address)`; opening with anything else
-  // meant a member's own group key was wrapped to a key it did not hold. The random per-circle vault
-  // identity remains only for a host with no agent (the producer's own tests).
-  const sealingIdentity = (sealingKeyPair?.publicKey && sealingKeyPair?.privateKey)
-    ? {
-      ensure: async () => sealingKeyPair,
-      publicKey: async () => sealingKeyPair.publicKey,
-      rosterEntry: async (webId, role = 'member') => ({ webId: String(webId), publicKey: sealingKeyPair.publicKey, role }),
-    }
-    : createCircleSealingIdentity({ circleId, store: vault });
+  // meant a member's own group key was wrapped to a key it did not hold. No key pair → no producer
+  // (SealingKeyPairMissingError): there is no stand-in key.
+  if (!sealingKeyPair?.publicKey || !sealingKeyPair?.privateKey) throw new SealingKeyPairMissingError(circleId);
+  const sealingIdentity = {
+    ensure: async () => sealingKeyPair,
+    publicKey: async () => sealingKeyPair.publicKey,
+    rosterEntry: async (webId, role = 'member') => ({ webId: String(webId), publicKey: sealingKeyPair.publicKey, role }),
+  };
   const selfKey = await sealingIdentity.ensure();   // {publicKey, privateKey}
   if (typeof generateKeypair !== 'function' || typeof makePodClient !== 'function') {
     throw new Error('createCirclePodProducer: a sealed (p2/p3) circle needs generateKeypair + makePodClient');

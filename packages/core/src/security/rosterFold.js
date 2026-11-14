@@ -156,6 +156,39 @@ export function causalPlace(statements, a, b) {
 }
 
 /**
+ * IS THIS MEMBER IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? Decided from a roster fold and the statements it was
+ * given (the key router's question, pinboard `memberStatus`). 'in' only when the subject is on the FOLDED roster (the fold
+ * admitted them: its gates, the author's authority, deny-wins at a depth) and no exit of theirs comes after the admission;
+ * 'out' when their last exit comes AFTER it (by ancestry, `causalPlace`); null when it cannot be said:
+ *   - a named admission that is not a `join` of THIS subject (another statement, another member's join);
+ *   - a join the fold did not admit (an author who may not admit, a redemption row not arrived yet, a removal that won
+ *     at the same depth) with no exit after it: not on the roster, so not 'in';
+ *   - an exit concurrent with the admission, or an admission or exit this device does not hold.
+ * With no admission named: the subject's last join that took effect; a subject on the roster with NO join at all was
+ * admitted by the circle's creation or its seed (a founder, a seeded member) and is 'in'. Once such a member is removed
+ * the answer is null, not 'out' (there is no admission to place the exit after): safe, the change is not made.
+ * @param {{ folded: object, statements: Array<object>, webid: string, after?: (string|null) }} a
+ * @returns {{ status: ('in'|'out'|null), reason?: string }}
+ */
+export function memberStatusFrom({ folded, statements = [], webid, after = null } = {}) {
+  if (!folded || typeof webid !== 'string' || !webid) return { status: null, reason: 'no-fold' };
+  const onRoster = Array.isArray(folded.members) && folded.members.includes(webid);
+  if (after) {
+    const named = statements.find((s) => s?.hash === after);
+    if (!named) return { status: null, reason: 'admission-not-folded' };
+    if (named.kind !== 'join' || named.subject !== webid) return { status: null, reason: 'not-their-join' };
+  }
+  const admission = after ?? folded.lastJoinBy?.[webid] ?? null;
+  const exit = folded.lastExitBy?.[webid] ?? null;
+  if (!admission) return onRoster && !exit ? { status: 'in' } : { status: null, reason: 'no-admission' };
+  if (!exit) return onRoster ? { status: 'in' } : { status: null, reason: 'not-admitted' };
+  const place = causalPlace(statements, admission, exit);
+  if (place === 'after') return { status: 'out' };
+  if (place === 'before') return onRoster ? { status: 'in' } : { status: null, reason: 'not-admitted' };
+  return { status: null, reason: place === 'concurrent' ? 'concurrent' : 'exit-not-held' };
+}
+
+/**
  * Causal depth of each statement over the deps-DAG: its longest path from a root along ALL its parents — the
  * author's own `parentHash` chain UNION its `deps` (the cross-author frontier). This is the Lamport scalar the
  * DAG induces (max over present parents + 1), so a cross-author causal edge raises depth and a genuinely

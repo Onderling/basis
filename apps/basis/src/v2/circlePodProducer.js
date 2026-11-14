@@ -276,10 +276,16 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null, m
     },
     // Device-grained audience surgery (the custody arc): the member stays; one of their devices'
     // sealing keys joins or leaves the group key's audience.
-    async grantRecipient({ publicKey, groupId, ownerWebId = null }) {
+    async grantRecipient({ publicKey, groupId, ownerWebId = null, ownDevice = false }) {
       if (!publicKey) return;
-      // a member's DEVICE joins the key's audience only while its OWNER is in (their last join, asked on every compute);
-      // no owner named = one of this device's own addresses (the point, a rotation past an old one): no question
+      // a member's DEVICE joins the key's audience only while its OWNER is in (their last join, asked on every compute).
+      // Only THIS device's own address (the point granting itself, a rotation past an old address: realAgent) says so
+      // explicitly and asks nothing; a grant with neither an owner nor that flag is refused, never made unasked.
+      if (!ownerWebId && ownDevice !== true) {
+        console.warn(`[circlePods] enrolling a device in circle ${groupId} refused: no owner named`);
+        (refusals ?? processRefusalLog()).note({ tag: 'key', lane: 'key', check: 'enrolling', reason: 'member-unknown' });
+        return null;
+      }
       const isMember = (typeof memberStatusOf === 'function' && ownerWebId)
         ? async () => { const st = await memberStatusOf(groupId, ownerWebId, null); return st === 'in' ? true : st === 'out' ? false : null; }
         : null;

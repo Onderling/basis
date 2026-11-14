@@ -55,7 +55,7 @@ import {
   defineSkill, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
-  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain, causalPlace,
+  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain, memberStatusFrom,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
@@ -685,6 +685,10 @@ async function getGroupRulesCore(scope, a, ctx) {
  *   'out'  — their last exit (a leave or an eviction) comes AFTER `after`;
  *   'in'   — `after` is folded and no exit of theirs follows it (none at all, or the last one is before it);
  * `after` absent: the member's last folded join (the roster seed, a repeated redeem, a device's owner).
+ * 'in' needs the named statement to be a join of THIS subject AND the subject on the folded roster (memberStatusFrom).
+ * A member with no join at all (a founder, a seeded member) is 'in'; once removed the answer is null, not 'out' (no
+ * admission to place the exit after): safe, the key change is not made. PRIVATE: no peer may ask it ('is X still in'
+ * answered to a peer would be a disclosure about a third person).
  *   null   — it cannot be placed: `after` is not folded on this device yet, the exit is not held, or the exit and the
  *            admission are CONCURRENT (neither saw the other). The caller treats null as "cannot say": nothing written.
  */
@@ -699,20 +703,7 @@ async function memberStatusCore(scope, a) {
     selfSigner: scope.selfSigner ?? null, observeFold: (f, s) => { folded = f; statements = Array.isArray(s) ? s : []; },
   });
   if (!Array.isArray(rows) || !folded) return { status: null, reason: 'no-fold' };
-  // no admission named (the roster seed, a repeated redeem, a device's owner): their LAST folded join; someone on the
-  // folded roster with no join at all was admitted by the circle's CREATION (a founder) or its seed, and is in
-  const after = asked ?? folded.lastJoinBy?.[webid] ?? null;
-  if (!asked && !after) {
-    const onRoster = Array.isArray(folded.members) && folded.members.includes(webid);
-    return onRoster ? { status: 'in' } : { status: null, reason: 'no-admission' };
-  }
-  if (!statements.some((s) => s?.hash === after)) return { status: null, reason: 'admission-not-folded' };
-  const exit = folded.lastExitBy?.[webid] ?? null;
-  if (!exit) return { status: 'in' };
-  const place = causalPlace(statements, after, exit);
-  if (place === 'after') return { status: 'out' };
-  if (place === 'before') return { status: 'in' };
-  return { status: null, reason: place === 'concurrent' ? 'concurrent' : 'exit-not-held' };
+  return memberStatusFrom({ folded, statements, webid, after: asked });
 }
 
 async function listGroupMembersCore(scope, a, ctx) {

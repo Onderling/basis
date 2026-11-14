@@ -57,7 +57,10 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'pod-sync', name: 'Syncing through a pod', cells: {
     web: null,      // walk-pod only LOGS its findings and passes regardless — no proof (and no person can make a pod circle yet, L571)
-    mobile: null,   // circlePods is a unit
+    // the phone in Node on a real Solid server (CI's live-pod job): Bram's phone, away while Anna's posted in their
+    // shared-pod circle, comes back to the front with no relay and reads the post from the pod (the app's own read-back
+    // entry, his own per-circle key)
+    mobile: { file: 'apps/basis-mobile/test/podSyncPhone.mobile.css.test.js', test: 'Bram, away while Anna posted, comes back to the front with no relay and reads the post from the pod' },
     box: NA('the box holds circles by relay and catch-up; its registry mirror is covered under restore and devices'),
   } },
   // REQUIRED on all three: the circle types a person can MAKE in the alpha, normal and shared pod (storage 'shared': the

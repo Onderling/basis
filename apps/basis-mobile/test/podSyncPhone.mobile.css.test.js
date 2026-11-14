@@ -68,7 +68,7 @@ SUITE('syncing through a pod, on the phone', () => {
     // the join wizard's seams as the launcher hands them: the phone's own peer redeem and post-join step
     bram.sendPeerRedeem = bram.bundle.sendPeerRedeem;
     bram.onJoined = bram.bundle.onCircleJoined;
-    const annaSession = await signedIn(anna, 'A');
+    await signedIn(anna, 'A');
     await signedIn(bram, 'B');
 
     const { created, state: made } = await createCircle(anna, { groupId: CIRCLE, name: 'Pod samen', storage: 'shared', groupPodUri: `${process.env.CSS_A_WEBID.replace(/profile\/card#me$/, '')}circles/${CIRCLE}/`, handle: 'anna' });
@@ -76,53 +76,40 @@ SUITE('syncing through a pod, on the phone', () => {
     await anna.persistPolicy(CIRCLE, policyPatchFromState(made));
     // the launcher shows the new circle: its view builds the circle's pod producer before anyone is invited
     await anna.openCircle(CIRCLE);
-    console.info('[pod-sync-phone] created', JSON.stringify({ podBacked: created?.podBacked, podUrl: created?.podUrl, storage: created?.storage }));
     const joined = await joinExistingCircle(anna, bram, { groupId: CIRCLE, handle: 'bram', podUrl: created?.storage?.groupPodUri ?? null });
-    console.info('[pod-sync-phone] PROBE anna sends', anna.copyLog().split('\n').filter((l) => /send\.|deliver|hold|give/i.test(l)).slice(-25).join(' | '));
-    expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);
+    expect(joined.joined?.ok, `Bram's phone joined: ${JSON.stringify(joined.joined)}`).toBe(true);
     await anna.bundle.registerCirclePresence?.([CIRCLE]);
-    await bram.bundle.registerCirclePresence?.([CIRCLE]);
-    const bramShared = await until(async () => (await bram.policyOf(CIRCLE))?.pod === 'shared', { timeout: 30_000, step: 500 });
-    console.info('[pod-sync-phone] PROBE bram learned shared:', bramShared);
-    const kinds = (n) => n.eventLog.query({}).filter((e) => JSON.stringify(e).includes(CIRCLE)).map((e) => `${e.type}:${e.payload?.body?.kind ?? e.payload?.kind ?? ''}`);
-    console.info('[pod-sync-phone] PROBE log kinds', JSON.stringify({ anna: kinds(anna), bram: kinds(bram) }).slice(0, 1500));
-    console.info('[pod-sync-phone] PROBE bram all', bram.copyLog().split('\n').slice(-40).join(' | ').slice(0, 4000));
-    console.info('[pod-sync-phone] PROBE anna gov', anna.copyLog().split('\n').filter((l) => /gov|polic|lane|pull|rail|statement/i.test(l)).slice(-12).join(' | '));
-    console.info('[pod-sync-phone] PROBE bram gov', bram.copyLog().split('\n').filter((l) => /gov|polic|lane|pull|rail|statement|join/i.test(l)).slice(-15).join(' | '));
-    console.info('[pod-sync-phone] PROBE policy', JSON.stringify({ anna: (await anna.policyOf(CIRCLE))?.pod ?? null, bram: (await bram.policyOf(CIRCLE))?.pod ?? null, bramFull: await bram.policyOf(CIRCLE) }).slice(0, 600));
+    // the circle's pod policy reaches the joiner by its post-join governance pull
+    expect(await until(async () => (await bram.policyOf(CIRCLE))?.pod === 'shared', { timeout: 30_000, step: 500 }), 'Bram\'s phone holds the circle as a shared-pod circle').toBe(true);
+    // …and the newcomer holds the others' per-circle addresses (the presence signal after the join clears the early sends)
+    const annaRow = async () => ((await bram.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [])
+      .find((m) => m?.webid && m.webid !== bram.agent.circleSelf?.(CIRCLE)?.webid && m.webid !== bram.pubKey && m.circleAddress);
+    expect(await until(annaRow, { timeout: 30_000, step: 500 }), 'Bram\'s phone holds Anna\'s per-circle address').toBeTruthy();
 
     // Bram away: his phone off the relay (its socket removed, as when the app is closed)
     await bram.agent.relays.remove(relay.url);
     expect((bram.agent.relays.list() ?? []).some((x) => x.url === relay.url && x.connected), 'Bram is off the relay').toBe(false);
     // Anna posts as the circle screen does (CircleLauncherScreen: appendCircleMessage + broadcastFanOut): the line on
     // her event log, then the shared fan-out over the phone's waist, the chat rail signing the entry
+    const podWrites = () => anna.copyLog().split('\n').filter((l) => /pod\/pod\.write/.test(l)).length;
+    const writesBefore = podWrites();
     const msgId = `circle-${CIRCLE}-${Date.now()}-pod`;
     const ts = Date.now();
     anna.eventLog.append(circleChatMessageEvent({ msgId, ts, circleId: CIRCLE, actor: 'me', text: TEXT }));
-    const sent = await broadcastCircleFanOut({
+    broadcastCircleFanOut({
       rawCallSkill: anna.bundle.callSkill, circleId: CIRCLE, msgId, text: TEXT, ts,
       deliveryStateMap: anna.deliveryMap, onChange: () => {},
       signStatement: (cid, mid) => anna.bundle.agent?.chatRail?.signEntry?.(cid, mid) ?? null,
     });
-    console.info('[pod-sync-phone] sent', String(JSON.stringify(sent ?? null)).slice(0, 400), JSON.stringify(anna.deliveryMap?.get?.(msgId) ?? null));
-    await new Promise((res) => { setTimeout(res, 3000); });
-    // PROBE: what the pod holds under the circle (Anna's own session), and the log lines of both phones
-    try {
-      const root = created?.storage?.groupPodUri;
-      const listing = await annaSession.getAuthenticatedFetch()(root, { headers: { accept: 'text/turtle' } });
-      console.info('[pod-sync-phone] PROBE pod listing', listing.status, (await listing.text()).match(/<[^>]+>/g)?.slice(0, 20)?.join(' '));
-    } catch (e) { console.info('[pod-sync-phone] PROBE pod listing failed', e?.message); }
-    console.info('[pod-sync-phone] PROBE anna log', anna.copyLog().split('\n').filter((l) => /pod|refus|seal|key/i.test(l)).slice(-15).join(' | '));
+    expect(await until(() => podWrites() > writesBefore, { timeout: 20_000, step: 250 }), 'Anna\'s post was written to the circle\'s pod').toBe(true);
+    // Anna stops, and the relay is gone: nothing Bram reads now can come from either
     await anna.dispose();
     anna = null;
-    // …and the relay is gone: nothing Bram reads now can come from it
     await relay.close();
 
-    console.info('[pod-sync-phone] PROBE bram circles', JSON.stringify(await bram.callSkill('pinboard', 'listMyCircles', {})).slice(0, 400), typeof bram.podReadBack?.onForeground);
+    // Bram comes back to the front: the app's own entry (ChatScreen's pod read-back, AppState 'active')
     const r = await bram.comeToFront();
-    console.info('[pod-sync-phone] came to front', JSON.stringify(r));
-    console.info('[pod-sync-phone] PROBE bram log', bram.copyLog().split('\n').filter((l) => /pod|refus|seal|key/i.test(l)).slice(-15).join(' | '));
-    const seen = await until(() => chatIn(bram).includes(TEXT), { timeout: 20_000, step: 250 });
-    expect(seen, `Bram's phone holds the post after coming to the front: ${JSON.stringify(chatIn(bram))}`).toBe(true);
+    expect(r?.ingested, `the read-back read the post from the pod: ${JSON.stringify(r)}`).toBeGreaterThan(0);
+    expect(chatIn(bram), 'Bram\'s phone holds Anna\'s post').toContain(TEXT);
   }, 240_000);
 });

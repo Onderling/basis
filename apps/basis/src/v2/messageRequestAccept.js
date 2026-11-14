@@ -14,6 +14,10 @@
  * @param {'handle'|'profile'|'full'} [a.revealPreset] what the new contact sees of you
  * @returns {Promise<{ accepted: true, contact: object, turns: number } | { accepted: false, reason: string }>}
  */
+import { heldNoteOf, heldNoteKey } from './heldNote.js';
+
+export { heldNoteOf, heldNoteKey };
+
 export async function acceptMessageRequest({ callSkill, channel, from, persona = null, revealPreset = null } = {}) {
   if (typeof callSkill !== 'function' || typeof channel?.persistInbound !== 'function') return { accepted: false, reason: 'not-composed' };
   if (typeof from !== 'string' || !from) return { accepted: false, reason: 'no-sender' };
@@ -21,7 +25,9 @@ export async function acceptMessageRequest({ callSkill, channel, from, persona =
   if (!r || r.error) return { accepted: false, reason: r?.error ?? 'no-answer' };
   const turns = Array.isArray(r.turns) ? [...r.turns].sort((x, y) => (x.ts - y.ts) || String(x.messageId).localeCompare(String(y.messageId))) : [];
   for (const t of turns) {
-    try { await channel.persistInbound({ contactId: from, fromAddr: from, text: t.text ?? '', messageId: t.messageId, ts: t.ts }); } catch { /* the next turn still lands; a lost held turn is the cost */ }
+    // a turn held after a refusal keeps its note on the thread (what was not kept: the text cut, a file left off)
+    const held = heldNoteOf(t.refused);
+    try { await channel.persistInbound({ contactId: from, fromAddr: from, text: t.text ?? '', messageId: t.messageId, ts: t.ts, ...(held ? { held } : {}) }); } catch { /* the next turn still lands; a lost held turn is the cost */ }
   }
   return { accepted: true, contact: r.contact ?? null, turns: turns.length };
 }
@@ -34,7 +40,8 @@ export async function acceptMessageRequest({ callSkill, channel, from, persona =
  * `label`: the locale key the row's name line is painted with, decided here once for every shell: a member's request
  * (`member`: their circle name, from this device's own roster) is named as from your circle; a card's name is marked
  * as the sender's claim; no name is 'someone without a name'. Paint `t(label, { name })`.
- * @returns {Array<{from: string, name: string|null, label: string, member: boolean, firstLine: string, count: number, ignored: boolean}>}
+ * `notes`: the locale keys of what the held turns could not keep (`heldNote.js`), one plain line each under the row.
+ * @returns {Array<{from: string, name: string|null, label: string, member: boolean, notes: string[], firstLine: string, count: number, ignored: boolean}>}
  */
 export function messageRequestRows(requests = []) {
   return (Array.isArray(requests) ? requests : []).filter((q) => q && typeof q.from === 'string' && q.from).map((q) => {
@@ -42,11 +49,14 @@ export function messageRequestRows(requests = []) {
     const first = turns.find((x) => typeof x?.text === 'string' && x.text.trim()) ?? null;
     const name = typeof q.name === 'string' && q.name.trim() ? q.name.trim() : null;
     const member = q.member === true && !!name;
+    // the notes of turns held after a refusal (what was not kept), once each, in the order they first appear
+    const notes = [...new Set(turns.map((x) => heldNoteKey(heldNoteOf(x?.refused))).filter(Boolean))];
     return {
       from: q.from,
       name,
       member,
       label: member ? 'circle.contacts.requests.member' : (name ? 'circle.contacts.requests.says' : 'circle.contacts.requests.no_name'),
+      notes,
       firstLine: first ? first.text.split('\n')[0].trim() : '',
       count: turns.length,
       ignored: q.state === 'ignored',

@@ -64,6 +64,10 @@ walk spawns it, waits for its `{"step":"ready","invite":…,"circleId":…}` lin
 `askMatches.test.js`. The shared moves (launch, poll, tap through modal focus, first boot, emulator-only) are in
 `support/ui.js`.
 
+The peer takes commands on stdin (`peer.send({ do: … })`: `contact-say`, `circle-say`, `gov-accept`, `roster`, `dump`, …)
+**only when started with `--talk`**. Without it a command is read by nobody and the walk times out waiting for an answer
+that cannot come (2026-11-14, the governance walk: two runs lost to it).
+
 ## What's NOT covered (D-2+, tracked in #224 Phase B)
 
 - Cross-device JM scenarios (paired emulators)

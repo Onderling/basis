@@ -26,6 +26,7 @@
  */
 
 import { createMessageRequestDoor } from './messageRequestDoor.js';
+import { heldNoteValid } from './heldNote.js';
 import { createAddressedDeliver, chatTurnsFromItems } from '@onderling/item-store';
 import { cardNamesSender } from './contactCardLink.js';
 import { applyPresendFloor } from './presendFloor.js';
@@ -487,7 +488,9 @@ export function createContactThreadChannel({
    *   forth: each hand-off looks like a fresh arrival to the other.
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
-  async function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice = false, returned: carriedReturned = false } = {}) {
+  async function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice = false, returned: carriedReturned = false, held: heldIn = null } = {}) {
+    // a turn the door held after a refusal says what it could not keep (`heldNote.js`), stored and carried with the turn
+    const held = heldNoteValid(heldIn);
     // THE TURN THAT BRINGS A HIDDEN CONTACT BACK IS MARKED AS SUCH (L106). Decided where the turn first lands
     // (the contact is hidden here as it arrives), and then carried with the turn — stored, fanned, rehydrated —
     // so every device paints the one-line marker above THIS bubble, whether the row there was unhidden by the
@@ -514,6 +517,7 @@ export function createContactThreadChannel({
         // device keeps them (full, or the description only — the file's own choice on Mij / My data).
         ...(file && typeof file === 'object' ? { file: fileToKeep(file) } : {}),
         ...(isReturn ? { returned: true } : {}),
+        ...(held ? { held } : {}),
       },
     };
     // Hold nothing, still carry: a device that does not keep contact turns fans the turn (bytes included) to
@@ -532,7 +536,7 @@ export function createContactThreadChannel({
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
-        await fanOwn({ direction: 'in', contactId: who, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}) });
+        await fanOwn({ direction: 'in', contactId: who, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}), ...(held ? { held } : {}) });
         // …and the sender hears that it landed, the way a circle member does: the SAME receipt, the same per-person
         // setting (the hook is `makeReceiptSender`'s `onStored`; it decides whether anything goes). Only a turn that
         // came straight from them and carries their id — a carried copy or a duplicate confirms nothing new.
@@ -610,7 +614,7 @@ export function createContactThreadChannel({
     const outbound = direction === 'out';
     const res = outbound
       ? await persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, file, viaOwnDevice: true })
-      : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true, returned: wire.returned === true });
+      : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true, returned: wire.returned === true, held: outbound ? null : heldNoteValid(wire.held) });
     return {
       contactId,
       origin:  outbound ? 'user' : 'bot',
@@ -618,6 +622,7 @@ export function createContactThreadChannel({
       itemId:  res?.itemId ?? null,
       text, messageId, replyTo, ts, buttons, file, fromAddr, peerAddr,
       ...(res?.returned === true ? { returned: true } : {}),
+      ...(!outbound && heldNoteValid(wire.held) ? { held: heldNoteValid(wire.held) } : {}),
       ...(!outbound && wire.message === true ? { message: true } : {}),
       ...(!outbound && wire.message === true && typeof wire.admission === 'string' ? { admission: wire.admission } : {}),
       ...(!outbound && wire.message === true && wire.auth && typeof wire.auth === 'object' ? { auth: wire.auth } : {}),

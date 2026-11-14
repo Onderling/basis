@@ -16,9 +16,15 @@ describe('the requests section', () => {
   it('the projection: the name the card says (or none), the first line, the state', () => {
     const rows = messageRequestRows([req('k-ann', 'Ann', 'open', 'hallo daar'), req('k-x', null, 'ignored')]);
     expect(rows).toEqual([
-      { from: 'k-ann', name: 'Ann', member: false, label: 'circle.contacts.requests.says', firstLine: 'hallo daar', count: 2, ignored: false },
-      { from: 'k-x', name: null, member: false, label: 'circle.contacts.requests.no_name', firstLine: 'hoi', count: 2, ignored: true },
+      { from: 'k-ann', name: 'Ann', member: false, label: 'circle.contacts.requests.says', notes: [], firstLine: 'hallo daar', count: 2, ignored: false },
+      { from: 'k-x', name: null, member: false, label: 'circle.contacts.requests.no_name', notes: [], firstLine: 'hoi', count: 2, ignored: true },
     ]);
+  });
+
+  it('a request whose held messages lost something says so, one plain line per note', () => {
+    const [row] = messageRequestRows([{ ...req('k-ann', 'Ann'), turns: [{ messageId: 'a', text: 'lang', ts: 1, refused: 'turn-too-large' }] }]);
+    const el = renderContactsRoster(document.createElement('div'), { contacts: [], t, requests: [row], onAccept: vi.fn(), onIgnore: vi.fn(), onBlock: vi.fn() });
+    expect([...el.querySelectorAll('.cc-requests__note')].map((n) => n.textContent)).toEqual(['circle.contacts.held.cut']);
   });
 
   // a member never answered, after the person stopped letting circle members write first: their request holds no card;

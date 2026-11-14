@@ -119,6 +119,8 @@ export function createAddressedDeliver({
         ...(ex.file && typeof ex.file === 'object' ? { file: stripBytes(ex.file) } : {}),
         // The turn that brought a hidden contact back: the thread's one-line marker is painted from this.
         ...(ex.returned === true ? { returned: true } : {}),
+        // A turn the app's door held after a refusal: what it could not keep (the app's closed set, carried as given).
+        ...(typeof ex.held === 'string' && ex.held ? { held: ex.held } : {}),
         sentAt:       typeof envelope?.ts === 'number' ? envelope.ts : Date.now(),
         // an inbound turn: when it ARRIVED on this device (the sender's time stays in sentAt). What "new since I
         // looked" compares, so a message the relay held for hours still counts once it lands.
@@ -284,6 +286,7 @@ export function chatTurnsFromItems(items, { threadKey } = {}) {
       ...(Array.isArray(s.buttons) ? { buttons: s.buttons } : {}),
       ...(s.file && typeof s.file === 'object' ? { file: s.file } : {}),
       ...(s.returned === true ? { returned: true } : {}),
+      ...(typeof s.held === 'string' && s.held ? { held: s.held } : {}),
     });
   }
   out.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));

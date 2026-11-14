@@ -25,6 +25,7 @@ import FaceView from './FaceView.js';
 // L125 — "what does this contact see of you?", beside Verbergen (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 // L114 — delete as a relationship act (hide + leave the pair circle), and the words above a returning turn (web parity)
+import { heldNoteKey } from '../../../../basis/src/v2/heldNote.js';
 import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/contactDelete.js';
 import { contactThreadSelfFor } from '../../../../basis/src/v2/contactLens.js';
 import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
@@ -109,6 +110,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
           ...(m.returned ? { returned: true } : {}),
+          ...(m.held ? { held: m.held } : {}),   // a turn held after a refusal: what it could not keep (heldNote.js)
         }))));
       } catch { /* best-effort — an empty thread is the honest fallback */ }
     })();
@@ -330,6 +332,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
               "Je had dit contact verborgen." — neither side's bubble. web≡mobile with contactThread.js. */}
           {returnedMarkerKey(m, contact?.deletedAt ?? null) ? (
             <Text style={styles.system} testID={`contact-returned-${m.id}`}>{t(returnedMarkerKey(m, contact?.deletedAt ?? null))}</Text>
+          ) : null}
+          {/* A turn the door held after a refusal says what it could not keep (the text cut, a file left off): one plain
+              line on that turn, so the person does not take it for the whole message. web≡mobile with contactThread.js. */}
+          {heldNoteKey(m.held) ? (
+            <Text style={styles.system} testID={`contact-held-${m.id}`}>{t(heldNoteKey(m.held))}</Text>
           ) : null}
           <View style={[styles.msg, m.origin === 'user' ? styles.msgUser : styles.msgBot]}>
             <View style={[styles.bubble, m.origin === 'user' ? styles.bubbleUser : styles.bubbleBot]}>

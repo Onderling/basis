@@ -6122,6 +6122,14 @@
       "text": "Geblokkeerd op dit apparaat",
       "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
     },
+    "held": {
+      "cut": {
+        "text": "Dit bericht was te lang en is ingekort."
+      },
+      "file": {
+        "text": "Bij dit bericht zat een bestand; dat is niet bewaard."
+      }
+    },
     "requests": {
       "title": {
         "text": "Verzoeken",

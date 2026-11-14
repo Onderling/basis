@@ -3474,6 +3474,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
           ...(m.returned ? { returned: true } : {}),
+          ...(m.held ? { held: m.held } : {}),   // a turn held after a refusal: what it could not keep (heldNote.js)
         })).concat(notYetDurable);
       }
     } catch { /* best-effort — a rehydrate failure just shows an empty thread */ }

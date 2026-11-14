@@ -301,7 +301,7 @@ export default function CircleSettingsScreen({
           pageLabel → t(). Falls back to t('circle.settings.title') when no page. */}
       <Text style={styles.title}>{pageLabel(SETTINGS_PAGE, t, t('circle.settings.title'))}</Text>
 
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body} testID="circle-settings-scroll">
         {/* Theme B — walk the basics in chat, then pre-fill the form below (the GUI hand-off). */}
         <Pressable
           style={styles.guided}

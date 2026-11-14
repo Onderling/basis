@@ -99,7 +99,13 @@ describe('a list entry created on one device reaches another device (the circle 
   it('the containment edge survives the crossing — B can read the list back as a list', async () => {
     // A ref plus a back-ref is how containment travels (`item-store/containment.js`); if only the rows
     // crossed and not the edges, B would hold two loose items rather than a list with something on it.
-    const rows = await listItemsOn(B);
+    // The edge is the list's SECOND write (adding the entry updates the list), so it fans a moment after the entry the
+    // first test waited for: under a loaded full suite it reached B 63 ms after that (measured 2026-11-14). Wait for it.
+    const withEdge = (rs) => {
+      const l = rs.find((r) => r.type === 'list'); const e = rs.find((r) => r.type === 'list-item');
+      return l && e && l.embeds?.some((x) => x?.ref === e.id && x?.rel === 'contains') ? rs : null;
+    };
+    const rows = (await until(async () => withEdge(await listItemsOn(B)), { timeout: 8000, step: 50 })) ?? await listItemsOn(B);
     const list = rows.find((r) => r.type === 'list');
     const entry = rows.find((r) => r.type === 'list-item');
     expect(list?.embeds?.some((e) => e?.ref === entry.id && e?.rel === 'contains'),

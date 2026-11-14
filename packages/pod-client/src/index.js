@@ -80,7 +80,8 @@ export {
   buildGroupKeyResource, unwrapGroupKey, grantMember, rotateGroupKeyResource,
   createSealedIndex, upsertEntry, removeEntry, getEntry, decodePseudonym,
   queryIndex, semanticQuery, serializeIndex, parseIndex, shardKeyFor,
-  createControlAgent, createCanonicalShare, createPodKeyStore, readGroupKey, createMemberSealingIdentity,
+  createControlAgent, MemberUnknownError, changeKeyResource, KeyWriteContendedError,
+  createCanonicalShare, createPodKeyStore, readGroupKey, createMemberSealingIdentity,
   KEY_EVENT_KIND, buildKeyEvent, establishKeyEvent, rotateKeyEvent,   // key-events in the log — self-distributing group key + rotation (no pod)
   keyIdOf, collapseKeyEvents, MAX_KEYS_PER_VERSION,                   // …and the ONE rule for two admins rotating at once (the store and the fold share it)
   foldKeyEvents, readKeyChain, currentGroupKey, openAcrossKeyChain,

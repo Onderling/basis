@@ -25,6 +25,14 @@ const DOOR_REFUSAL_CODES_LIST = [
 export const DOOR_REFUSAL_CODES = Object.freeze([...DOOR_REFUSAL_CODES_LIST]);
 
 /**
+ * The key router's codes: a change to a circle's group key that was NOT made, because another device kept changing the
+ * key (the bounded compare-and-swap ran out) or the roster could not say whether the member is still a member. The
+ * next producer start's roster seed re-drives a join. Held against the router by circleKeyChangeNotMadeIsLogged.test.js.
+ */
+const KEY_REFUSAL_CODES_LIST = ['key-write-contended', 'member-unknown', 'key-write-unconditioned'];
+export const KEY_REFUSAL_CODES = Object.freeze([...KEY_REFUSAL_CODES_LIST]);
+
+/**
  * THE CLOSED SET of reason codes (Opus, reviewing): a reason is often built from the refused statement's own text
  * (`unsupported version: ${body.v}`, an exception's message), so a remote sender could mint unlimited distinct codes:
  * log spam and a growing key table. Only these codes are written; anything else is 'other'.
@@ -43,6 +51,8 @@ export const REFUSAL_CODES = Object.freeze([
   'no-sealing-key-pair',
   // the contact door's hold of a message request (held anyway after the refusal: nothing there is dropped silently)
   ...DOOR_REFUSAL_CODES_LIST,
+  // a change to a circle's group key that was NOT made (the key router's codes)
+  ...KEY_REFUSAL_CODES_LIST,
 ]);
 const KNOWN = new Set(REFUSAL_CODES);
 const DETAIL_MAX = 32;

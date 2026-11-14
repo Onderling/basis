@@ -685,6 +685,17 @@ exactly as `createControlAgent` injects it:
 
 ## `src/sealing/controlAgent.js`
 
+### `MemberUnknownError`
+
+**Kind:** class · **Import:** `MemberUnknownError` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+class MemberUnknownError extends Error
+new MemberUnknownError()
+```
+
+The roster could not say whether the member is still a member: the join's key change is NOT made (never a yes).
+
 ### `createControlAgent`
 
 **Kind:** function · **Import:** `createControlAgent` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
@@ -1162,6 +1173,38 @@ removal (that version's key never entered their chain).
 
 **Returns:** `string` — plaintext
 
+## `src/sealing/keyResourceWrite.js`
+
+### `KeyWriteContendedError`
+
+**Kind:** class · **Import:** `KeyWriteContendedError` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+class KeyWriteContendedError extends Error
+new KeyWriteContendedError(attempts)
+```
+
+Thrown when every attempt lost a race: the change was NOT written. The caller reports it; nothing is dropped quietly.
+
+### `changeKeyResource`
+
+**Kind:** function · **Import:** `changeKeyResource` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+changeKeyResource(keyStore, compute, { attempts = MAX_KEY_WRITE_ATTEMPTS } = {})
+```
+
+Apply one change to a key resource: `compute(cur)` returns the next resource built on `cur` (the stored one),
+or `null` when there is nothing to change on that base. Serialised in-process; compare-and-swap across devices.
+
+**Parameters**
+
+- `keyStore` `{ read: Function, write: Function, writeIfUnchanged?: Function }`
+- `compute` `(cur: object|null) => (object|null|Promise<object|null>)`
+- `[opts]` `{ attempts?: number }`
+
+**Returns:** `Promise<{ written: object|null, base: object|null }>` — `written` null = nothing to change.
+
 ## `src/sealing/memberIdentity.js`
 
 ### `createMemberSealingIdentity`
@@ -1200,7 +1243,7 @@ Stored as plain JSON — the group key inside is already a recipient-wrapped env
 - `podClient` `{ read: Function, write: Function }` — a PodClient-shaped client
 - `uri` `string` — the key-resource URI (e.g. <pod>/.keys/group.json)
 
-**Returns:** `{ read: () => Promise<object|null>, write: (resource:object) => Promise<void> }`
+**Returns:** `{ read: () => Promise<object|null>, write: (resource:object) => Promise<void>, writeIfUnchanged: (resource:object, cur:object|null) => Promise<boolean> }`
 
 ### `readGroupKey`
 

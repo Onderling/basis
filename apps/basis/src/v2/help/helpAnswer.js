@@ -125,12 +125,21 @@ function localSource(deck, lang, cardId) {
  * Returns null when nothing matches (the honest no-answer): the caller decides
  * whether to offer a consent-gated model fallback there.
  */
+/** The languages the help deck carries (its cards' `nl` / `en`): a question is read in each. */
+export const HELP_LANGS = Object.freeze(['nl', 'en']);
+
 export function answerHelp(query, { lang } = {}) {
   const l = lang === 'en' ? 'en' : 'nl';
   const deck = helpDeck;
   if (typeof query !== 'string' || !query.trim()) return null;
 
-  const m = createMatcher(deck, l).match(query);
+  // A person writes in either language the deck has, whatever the app's is (walk: Dutch questions in an English app
+  // all missed): the app's language is read first, then the others; the card is always answered in the app's.
+  let m = { type: 'fallback' };
+  for (const ml of [l, ...HELP_LANGS.filter((x) => x !== l)]) {
+    m = createMatcher(deck, ml).match(query);
+    if (m.type !== 'fallback') break;
+  }
 
   if (m.type === 'opening') {
     return { text: deck.opening[l], layer: 0, source: localSource(deck, l, null) };
@@ -195,4 +204,26 @@ export function rankHelpCards(query, { lang, limit = 4, deck = helpDeck } = {}) 
   return scored
     .slice(0, Math.max(0, limit))
     .map(({ card, score }) => ({ id: card.id, kop: card.kop[l], text: card[l], score }));
+}
+
+/**
+ * likelyHelpTopics(query, { lang, limit }) → [{ id, kop }]
+ *
+ * The topics a question that matched no card most likely means, best first: every card scored on the SAME tag/heading
+ * overlap the matcher uses, in every language the deck has (a card keeps its best score), at most `limit`, headed in
+ * the app's language. `[]` when the question shares nothing with any card. Never calls a network or a model.
+ */
+export function likelyHelpTopics(query, { lang, limit = 5, deck = helpDeck } = {}) {
+  const l = lang === 'en' ? 'en' : 'nl';
+  if (typeof query !== 'string' || !query.trim()) return [];
+  const best = new Map();
+  for (const ml of HELP_LANGS) {
+    for (const { card, score } of createMatcher(deck, ml).scoreCards(query)) {
+      if (score > (best.get(card.id)?.score ?? 0)) best.set(card.id, { card, score });
+    }
+  }
+  return [...best.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(0, limit))
+    .map(({ card }) => ({ id: card.id, kop: card.kop[l] }));
 }

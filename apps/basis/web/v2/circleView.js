@@ -156,6 +156,8 @@ export function renderCircleView(container, {
   // renders its empty state (a friendly line, not the tab-coming placeholder).
   //   `onAddTask()` — the tab's compose affordance (host adds a task, then refreshes).
   tasks = null,
+  // the Lists tab's painter (`render(el)`): the host's lists body for this circle
+  listsTab = null,
   onAddTask = null,
   // G16 — the real MEMBERS (members) tab. When the active tab is `members`, the body
   // lists the circle's trail-roster (the canonical Member via `normalizeCircleMembers`),
@@ -377,6 +379,8 @@ export function renderCircleView(container, {
       tasks: Array.isArray(tasks) ? tasks : [],
       tr, onAction, onAddTask, viewerWebid, viewerIsAdmin, availability,
     });
+  } else if (effectiveTab === 'lists') {
+    listsTab?.render?.(body);
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
     renderLedenTab(body, { members, unreachable, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture,

@@ -24,6 +24,7 @@
  * owns the shape.
  */
 
+import { firstContactRows } from './firstContact.js';
 import { attributeKeys, bucketsFor } from '@onderling/attribute-charter';
 import { isDriverValue, OFFERINGS_INHERIT_KEY, normalizeDriverKind, deriveOfferingCategory, OFFERINGS_TAXONOMY, AVAILABILITY_STATES, availabilityState, locationLabel, isPresentedAttributeKey } from '@onderling/agent-registry';
 
@@ -280,7 +281,8 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
       // localised state token, not a raw `away`/`open`.
       return { key, state, value: displayValue(value), l10n: valueL10nFor(key) };
     });
-    return { id: p.id, name: (typeof p.name === 'string' && p.name) ? p.name : p.id, isDefault, entries };
+    // who may write to this persona first: its two first-contact controls (firstContact.js), with the values in force
+    return { id: p.id, name: (typeof p.name === 'string' && p.name) ? p.name : p.id, isDefault, entries, firstContact: firstContactRows(p) };
   });
 
   // ── 3 · per circle: who sees what ────────────────────────────────────────

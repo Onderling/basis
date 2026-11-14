@@ -958,6 +958,10 @@
       "text": "Prima. Kies dan zelf een onderwerp:",
       "doc": "Task #13 Phase 2 — heading above the set-topic chips after the user declines forwarding (or types /help)."
     },
+    "all_topics": {
+      "text": "Alle onderwerpen",
+      "doc": "Help: the chip after the five likeliest topics of an unanswered question; it posts every topic."
+    },
     "no_llm_topics": {
       "text": "Zonder assistent kan ik alleen deze vaste onderwerpen beantwoorden. Kies er een:",
       "doc": "Task #13 Phase 2 — honest fallback on a MISS when NO assistant is connected: only the fixed topics can be answered."
@@ -1563,8 +1567,16 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
-      "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
+      "text": "Dat kon ik niet lezen.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_forget": {
+      "text": "Vergeet dit gesprek",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Je gesprek met de assistent",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
     },
     "act_done": {
       "text": "Klaar",
@@ -5904,6 +5916,14 @@
       "text": "Tonen",
       "doc": "The thread header's control when the contact is hidden: show them in Contacten again (the person's own act; a message from them does the same)."
     },
+    "more": {
+      "text": "Meer",
+      "doc": "A contact thread: the ⋯ button that holds Hide and Delete."
+    },
+    "self_here": {
+      "text": "Hier ben je {{name}}; wat ziet dit contact van je?",
+      "doc": "A contact thread: the avatar top right, the persona you are in this thread; its tap shows what the contact sees of you."
+    },
     "hide_note": {
       "text": "Alleen uit je lijst. Hun kringen en dit gesprek blijven; een bericht van hen brengt ze terug.",
       "doc": "What hiding IS and is not, said under the control (amendment 3: Contacten only — their circles, roster row and member card are untouched). Never a notification."
@@ -6435,6 +6455,10 @@
     "scan": {
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "assistant": {
+      "text": "Assistent",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
     },
     "share_contact": {
       "text": "Deel mijn kaart",
@@ -7766,6 +7790,30 @@
     "personas_tagline": {
       "text": "filters + uitzonderingen op de algemene",
       "doc": "mij#personas — sectie 2 tagline: persona's zijn filters/uitzonderingen op de waarheidslaag."
+    },
+    "first_messages": {
+      "text": "Wie mag deze persona als eerste schrijven",
+      "doc": "mij#personas — persona-kaart: kop van de keuze wie een eerste privébericht mag sturen (eigenschap firstMessages)."
+    },
+    "first_messages_request": {
+      "text": "Alleen wie ik koos: een eerste bericht van een ander wacht als verzoek",
+      "doc": "mij#personas — keuze verzoek: een eerste bericht van iemand buiten het adresboek wacht tot de persoon het aanneemt."
+    },
+    "first_messages_open": {
+      "text": "Iedereen: een eerste bericht komt meteen binnen",
+      "doc": "mij#personas — keuze open: ieders eerste bericht wordt een gesprek."
+    },
+    "circle_members": {
+      "text": "Mensen in de kringen van deze persona",
+      "doc": "mij#personas — persona-kaart: kop van de keuze of kringleden privé mogen schrijven (circleMembersMayWrite)."
+    },
+    "circle_members_on": {
+      "text": "Mogen mij schrijven: hun bericht opent een gesprek",
+      "doc": "mij#personas — aan (standaard): het eerste privébericht van een kringlid is een gesprek, geen verzoek."
+    },
+    "circle_members_off": {
+      "text": "Eerst vragen, zoals ieder ander: hun bericht wacht als verzoek",
+      "doc": "mij#personas — uit: het eerste privébericht van een kringlid is een verzoek, zoals van een vreemde."
     },
     "truth_tag": {
       "text": "waarheidslaag",
@@ -10412,6 +10460,11 @@
   },
   "settings_home": {
     "title": "Instellingen",
+    "help": "Hulp",
+    "help_missing": {
+      "text": "Het Hulp-gesprek staat (nog) niet op dit apparaat.",
+      "doc": "Gezegd als de persoon Hulp opent (Instellingen, de intro's meer) en dit apparaat geen Hulp-kring heeft."
+    },
     "appearance": "Weergave",
     "per_circle": "Per kring",
     "no_circles": "Je zit nog in geen enkele kring.",

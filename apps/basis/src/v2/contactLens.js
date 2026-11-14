@@ -170,3 +170,24 @@ export async function changeContactLens({
   }
   return { contact: row?.contact ?? null, releaseShared };
 }
+
+/**
+ * Who you are in a contact's thread: the persona this contact knows (the row records it; none recorded is the
+ * default), named as the header's avatar shows it (the default persona is "you"). Tapping that avatar opens the lens.
+ * @param {object|null} row  the contact's book row
+ * @param {Array<{id: string, name: string}>} personas
+ * @param {{t?: Function}} [o]
+ * @returns {{id: string, name: string}}
+ */
+export function contactThreadSelf(row, personas = [], { t = (k) => k } = {}) {
+  const id = personaOfContact(row) ?? DEFAULT_PERSONA;
+  const p = (Array.isArray(personas) ? personas : []).find((x) => x?.id === id);
+  return { id, name: id === DEFAULT_PERSONA ? t('circle.switcher.you') : (p?.name || id) };
+}
+
+/** The same, reading the personas through the waist (both shells' header). */
+export async function contactThreadSelfFor({ callSkill, row, t } = {}) {
+  const personas = await loadPersonas({ callSkill }).catch(() => []);
+  return contactThreadSelf(row, personas, { t });
+}
+

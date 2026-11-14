@@ -15,7 +15,8 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';
 
 const typeLabel = (type) => t(`circle.container.type.${type}`);
 
-export default function CircleListsScreen({ circleId, storeFor, callSkill, onBack }) {
+// `embedded`: painted inside the circle's Lists tab — no back row on its index (the tab bar is the way out)
+export default function CircleListsScreen({ circleId, storeFor, callSkill, onBack, embedded = false }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const svcRef = useRef(null);
@@ -112,9 +113,11 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
 
   return (
     <View style={styles.wrap} testID="circle-lists">
-      <View style={styles.header}>
-        <Pressable onPress={openList ? backToIndex : onBack} testID="lists-back"><Text style={styles.back}>‹ {t('circle.lists.title')}</Text></Pressable>
-      </View>
+      {(!embedded || openList) ? (
+        <View style={styles.header}>
+          <Pressable onPress={openList ? backToIndex : onBack} testID="lists-back"><Text style={styles.back}>‹ {t('circle.lists.title')}</Text></Pressable>
+        </View>
+      ) : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         {!openList ? (
           <>

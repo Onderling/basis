@@ -923,7 +923,7 @@
 }
 
 .cc-cthread { display: flex; flex-direction: column; height: 100%; padding-bottom: 12px; }
-.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; padding-right: 44px; }   /* clear the fixed header avatar (top-right), so the ⋯ is never under it */
 .cc-cthread__lang { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
 .cc-cthread__lang-btn { cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; padding: 3px 9px; background: transparent; border: none; color: var(--ink-soft); }
 .cc-cthread__lang-btn.is-active { background: var(--accent); color: var(--accent-contrast); }
@@ -960,6 +960,12 @@
   background: transparent; border: none; padding: 4px 0; text-decoration: underline; flex: 0 0 auto;
 }
 .cc-cthread__hide-note { font-size: 12px; color: var(--ink-soft); padding: 0 12px 4px; }
+/* the header's one row: who you are here (the avatar, top right) and the ⋯ that holds Hide and Delete */
+.cc-cthread__acts { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
+.cc-cthread__self { cursor: pointer; border: none; padding: 0; background: transparent; }
+.cc-cthread__more { cursor: pointer; font: inherit; font-size: 20px; line-height: 1; color: var(--ink); background: transparent; border: none; padding: 4px 8px; }
+.cc-cthread__menu { position: absolute; top: 100%; right: 0; z-index: 5; min-width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.cc-cthread__menu[hidden] { display: none; }
 .cc-cthread__system { align-self: center; font-size: 12px; font-style: italic; color: var(--ink-soft); padding: 2px 8px; }
 .cc-cthread__sending { font-size: 12px; color: var(--ink-soft); font-style: italic; padding: 2px 4px; }
 /* my own bubble's delivery chip (the circle bubble's chip, same classes) sits on a meta line under the words */
@@ -1300,6 +1306,9 @@
 .cc-mij__card-head { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
 .cc-mij__card-name { margin: 0; font-size: 14px; font-weight: 800; color: var(--ink); }
 .cc-mij__card-tag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--card); background: var(--accent-ink); padding: 2px 6px; }
+.cc-mij__first-contact { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.cc-mij__choice { font: inherit; font-size: 12.5px; text-align: left; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; }
+.cc-mij__choice--on { border-color: var(--ink); font-weight: 600; cursor: default; }
 .cc-mij__entry { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid var(--line); }
 .cc-mij__entry:last-child { border-bottom: none; }
 .cc-mij__entry-key { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); flex: 0 0 38%; }

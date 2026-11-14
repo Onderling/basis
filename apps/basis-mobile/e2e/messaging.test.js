@@ -14,10 +14,11 @@ const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, backToLauncher, em
 const { startPeer, joinByInvite } = require('./support/peer');
 
 const stamp = Date.now().toString(36);
-const PHONE_LINE = `hallo kring ${stamp}`;
-const PEER_LINE = `hoi anna ${stamp}`;
-const PEER_DM = `even apart ${stamp}`;
-const PHONE_DM = `prima ${stamp}`;
+// each line starts with a capital: the composer capitalises a sent line's first letter, and these are compared exactly
+const PHONE_LINE = `Hallo kring ${stamp}`;
+const PEER_LINE = `Hoi anna ${stamp}`;
+const PEER_DM = `Even apart ${stamp}`;
+const PHONE_DM = `Prima ${stamp}`;
 let peer = null;
 let ready = null;
 
@@ -69,13 +70,15 @@ describe('messaging on the phone — a circle round trip and a contact round tri
     await device.takeScreenshot('msg-03-circle-answer');
   });
 
-  it("Bram writes to the phone directly; it shows in the phone's thread with him", async () => {
+  it("Bram writes to the phone directly: a member of its circle gets a thread, not a request", async () => {
     peer.send({ do: 'contact-say', text: PEER_DM });
     const said = await peer.next('contact-said', () => true, 60_000);
     if (!said.ok) throw new Error(`Bram could not write: ${JSON.stringify(said)}`);
     // the thread lives under Contacten; the list does not refresh in place (gotchas), so re-open it until Bram is there
     // the circle's chat hides the tab bar: step back out of it first
     await backToLauncher();
+    // "People in my circles may write to me" is on by default: a member's first private message is a THREAD (no request,
+    // and no contact row until the phone answers; the book side is pinned by circleMembersMayWrite.relay.test.js)
     let row = -1;
     for (let i = 0; i < 8 && row < 0; i += 1) {
       await tapSoon(by.id('circle-tab-circles'));
@@ -84,11 +87,25 @@ describe('messaging on the phone — a circle round trip and a contact round tri
       row = await firstOf([by.text('bram'), by.text('Bram')], 5_000);
     }
     await device.takeScreenshot('msg-04-contacts');
-    if (row < 0) throw new Error('Bram never showed in Contacten after his direct message');
+    if (row < 0) throw new Error('Bram never showed in Contacten after his first message');
+    if (await isVisible(by.id('contacts-requests'))) throw new Error("a circle member's first message was held as a request");
     await element(row === 0 ? by.text('bram') : by.text('Bram')).atIndex(0).tap();
     await soon(by.id('contact-thread-screen'), 30_000);
     await soon(by.text(PEER_DM), 60_000);
     await device.takeScreenshot('msg-05-thread');
+  });
+
+  it("the thread's header: who you are here (the lens) and the ⋯ that holds Hide and Delete", async () => {
+    await soon(by.id('contact-thread-self'), 20_000);
+    await soon(by.id('contact-thread-more'), 20_000);
+    await element(by.id('contact-thread-more')).tap();
+    await soon(by.text('Delete'), 10_000);
+    await soon(by.text('Hide'), 10_000);
+    await device.takeScreenshot('msg-05b-thread-more');
+    // the ⋯ opens the platform's own dialog (Hide, Delete, Cancel): Cancel closes it, the thread stays (Android's back
+    // key went past the dialog and left the thread)
+    await element(by.text('Cancel')).tap();
+    await soon(by.id('contact-thread-screen'), 10_000);
   });
 
   it("the phone's answer in the thread reaches Bram's stored thread", async () => {

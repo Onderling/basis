@@ -12,6 +12,7 @@ import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSendRoute } from '../../../../basis/src/v2/contactsSource.js';
+import { HEADER_AVATAR_SIDE_CLEARANCE } from './fab.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { earlierRoomMessages } from '../../../../basis/src/v2/nearbyKept.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
@@ -25,6 +26,7 @@ import FaceView from './FaceView.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 // L114 — delete as a relationship act (hide + leave the pair circle), and the words above a returning turn (web parity)
 import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/contactDelete.js';
+import { contactThreadSelfFor } from '../../../../basis/src/v2/contactLens.js';
 import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 import { basisManifest } from '../../../../basis/src/index.js';
@@ -155,6 +157,15 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   // does not: a bot is removed, not hidden. `null` keeps the header without it. The mark is the book's — the ONE
   // pinboard op changes it, on every device of the person; a message from the contact does the same as Tonen.
   const hideable = !!contact && !contact.isBot;
+  // who you are in this thread (the persona this contact knows): the header's avatar, top right (web parity)
+  const [selfHere, setSelfHere] = useState(null);
+  useEffect(() => {
+    if (!hideable || typeof bundle?.callSkill !== 'function') return undefined;
+    let alive = true;
+    contactThreadSelfFor({ callSkill: bundle.callSkill, row: contact, t }).then((s) => { if (alive) setSelfHere(s); }).catch(() => {});
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hideable, contactId]);
   const [hidden, setHidden] = useState(() => (hideable ? contact.hidden === true : null));
   const toggleHidden = useCallback(async () => {
     if (hidden === null || typeof bundle?.callSkill !== 'function') return;
@@ -191,6 +202,15 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
       } },
     ]);
   }, [bundle, contact, contactId, onBack]);
+  // THE ⋯ (Frits, the UX sitting: "I do like the dot menu"): Hide / Show with what hiding is and is not, and Delete; the
+  // platform's own sheet (web: a small menu under the ⋯)
+  const openMore = useCallback(() => {
+    Alert.alert(name, t('circle.contacts.hide_note'), [
+      { text: t(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide'), onPress: () => { toggleHidden(); } },
+      { text: t('circle.contacts.delete'), style: 'destructive', onPress: () => confirmDelete() },
+      { text: t('circle.contacts.lens.cancel'), style: 'cancel' },
+    ]);
+  }, [name, hidden, toggleHidden, confirmDelete]);
   const scrollRef = useRef(null);
 
   // Route inbound replies for THIS thread (by threadId echo, else sender addr).
@@ -270,6 +290,19 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
             opened is visibly the person you tapped in Contacten. */}
         <FaceView row={contact ?? { name }} size={26} resolvePicture={resolvePicture} />
         <Text style={styles.title} numberOfLines={1}>{t('circle.contacts.thread_title', { name })}</Text>
+        {/* who you are here, top right: its tap opens the lens (which persona they know, and how much); then the ⋯ with
+            the acts on the contact. One row that the title gives way to (web parity: contactThread's header). */}
+        {hidden !== null ? (
+          <Pressable onPress={openLens} accessibilityRole="button" testID="contact-thread-self"
+            accessibilityLabel={t('circle.contacts.self_here', { name: selfHere?.name ?? t('circle.switcher.you') })}>
+            <FaceView row={{ name: selfHere?.name ?? t('circle.switcher.you') }} size={26} />
+          </Pressable>
+        ) : null}
+        {hidden !== null ? (
+          <Pressable onPress={openMore} accessibilityRole="button" testID="contact-thread-more" accessibilityLabel={t('circle.contacts.more')} style={styles.more}>
+            <Text style={styles.moreText}>⋯</Text>
+          </Pressable>
+        ) : null}
       </View>
       {/* The mark and the contact's actions get a row of their own that WRAPS: in one row with the title they ran
           past a phone's edge and could not be tapped — hiding, inspecting and deleting a contact did not exist. */}
@@ -279,26 +312,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
             {`${sealedMark.level === 'person' ? '🔐' : '🔒'} ${t(sealedMark.key)}`}
           </Text>
         ) : null}
-        {hidden !== null ? (
-          <Pressable onPress={toggleHidden} accessibilityRole="button" testID="contact-thread-hide" style={styles.hide}>
-            <Text style={styles.hideText}>{t(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide')}</Text>
-          </Pressable>
-        ) : null}
-        {hidden !== null ? (
-          <Pressable onPress={openLens} accessibilityRole="button" testID="contact-thread-lens" style={styles.hide}>
-            <Text style={styles.hideText}>{t('circle.contacts.lens.open')}</Text>
-          </Pressable>
-        ) : null}
-        {hidden !== null ? (
-          <Pressable onPress={confirmDelete} accessibilityRole="button" testID="contact-thread-delete" style={styles.hide}>
-            <Text style={styles.hideText}>{t('circle.contacts.delete')}</Text>
-          </Pressable>
-        ) : null}
       </View>
       {lens.sheet}
-      {hidden !== null ? (
-        <Text style={styles.hideNote} testID="contact-thread-hide-note">{t('circle.contacts.hide_note')}</Text>
-      ) : null}
       {floor ? (
         <Text style={styles.floor} testID="contact-thread-floor">{`🛡 ${t('circle.contacts.presend_floor')}`}</Text>
       ) : null}
@@ -476,14 +491,14 @@ function replyTextFromResult(res) {
 
 const makeStyles = (theme, insets) => StyleSheet.create({
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  // the frame's avatar sits top-right on every tab: the header row keeps its room, so the ⋯ is never under it
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4, paddingRight: HEADER_AVATAR_SIDE_CLEARANCE },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4, rowGap: 2, marginBottom: 8 },
   floor: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingVertical: 4 },
   sealed: { fontSize: 12, color: theme.color.inkSoft },
   sealedPerson: { color: theme.color.green },   // STATUS colour: sealed to the person
-  hide: { paddingHorizontal: 8, paddingVertical: 4 },
-  hideText: { fontSize: 13, color: theme.color.inkSoft, textDecorationLine: 'underline' },
-  hideNote: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingBottom: 4 },
+  more: { paddingHorizontal: 8, paddingVertical: 2 },
+  moreText: { fontSize: 22, lineHeight: 24, color: theme.color.ink },
   system: { fontSize: 12, color: theme.color.inkSoft, textAlign: 'center', paddingVertical: 4, fontStyle: 'italic' },
   back: { fontSize: 13, color: theme.color.inkSoft },
   title: { flexShrink: 1, fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },

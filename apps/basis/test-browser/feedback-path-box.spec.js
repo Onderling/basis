@@ -219,6 +219,7 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     const hide = visitor.page.locator('.cc-cthread__hide');
     expect(await hide.count(), 'the thread header offers Verbergen for a person').toBe(1);
     expect(await hide.getAttribute('data-hidden')).toBe('false');
+    await visitor.page.locator('.cc-cthread__more').click();   // Verbergen lives in the ⋯
     await hide.click();
     await expect(hide, 'the control flips to Tonen once the book has the mark').toHaveAttribute('data-hidden', 'true');
     await visitor.page.locator('.cc-cthread__back').first().click();

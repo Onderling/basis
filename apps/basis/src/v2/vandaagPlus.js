@@ -11,6 +11,8 @@ import { attachEntriesFor } from './attachEntries.js';
 import { catalogueManifests } from './manifestSources.js';
 import { renderGate } from '@onderling/app-manifest';
 import { listsGateRules } from './circleGate.js';
+import { GATE_WORDS } from './gateWords.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * The acts the "+" offers: the composed manifests' attach entries declared for the OWN scope (`surfaces.attach.scopes`,
@@ -385,4 +387,52 @@ export function plusFollowUp(book, actId) {
 export function plusCircleOp(command, circleId) {
   if (!command?.appOrigin || !command?.opId || typeof circleId !== 'string' || !circleId) return null;
   return { app: command.appOrigin, opId: command.opId, args: { ...(command.args ?? {}), circleId } };
+}
+
+/** How many suggestions the "+" shows under its line at once. */
+export const PLUS_SUGGESTIONS_SHOWN = param({ key: 'assistant.plusSuggestionsShown', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
+
+/**
+ * What the person can type in the "+" HERE: the gate rules' own examples (every language the gate speaks; each is
+ * proven by the gate-words guard to give its rule's op), kept only where the "+" reads it with this person's circles
+ * (`plusLineOutcome`: the circle filter, so a line that would do nothing is never offered). Computed once per sheet
+ * open from the same circles the read uses.
+ * @param {{circles?: object[], acts?: object[], manifestsByOrigin?: object, words?: object, lang?: string|null}} [o]  lang: the person's language, whose examples come first
+ * @returns {string[]}
+ */
+export function plusSuggestionPool({ circles = [], acts = PLUS_ACTS, manifestsByOrigin, words = GATE_WORDS, lang = null } = {}) {
+  const seen = new Set();
+  const out = [];
+  // the person's own language first; the others after it, since the "+" reads every language's lines
+  const langs = Object.keys(words ?? {}).sort((a, b) => (b === lang) - (a === lang));
+  for (const entries of langs.map((l) => words[l])) {
+    for (const [id, entry] of Object.entries(entries ?? {})) {
+      if (id.startsWith('_')) continue;   // a word list, not a rule
+      for (const ex of entry?.examples ?? []) {
+        if (typeof ex !== 'string' || seen.has(ex)) continue;
+        seen.add(ex);
+        let read = null;
+        try { read = plusLineOutcome(ex, { circles, acts, manifestsByOrigin }); } catch { read = null; }
+        if (read) out.push(ex);
+      }
+    }
+  }
+  return out;
+}
+
+const suggestWords = (v) => String(v ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/**
+ * The suggestions for what is typed so far: the pool's lines in which every typed word starts a word of the line,
+ * at most `limit`; none under two letters, and none once the line is typed in full.
+ * @param {string[]} pool @param {string} typed @param {{limit?: number}} [o]
+ */
+export function plusSuggest(pool, typed, { limit = PLUS_SUGGESTIONS_SHOWN } = {}) {
+  const t = String(typed ?? '').trim().toLowerCase();
+  if (t.length < 2) return [];
+  const want = suggestWords(t);
+  return (Array.isArray(pool) ? pool : [])
+    .filter((line) => line.toLowerCase() !== t)
+    .filter((line) => { const have = suggestWords(line); return want.every((w) => have.some((h) => h.startsWith(w))); })
+    .slice(0, limit);
 }

@@ -65,4 +65,28 @@ describe('createBannerDriver', () => {
     timers.at(-1)();
     expect(hidden).toBe(1);
   });
+
+  it('a banner whose thing is now on screen goes away at the recheck (it was raised before the thread opened)', async () => {
+    let rows = [];
+    let open = null;
+    let hidden = 0;
+    const d = createBannerDriver({
+      readRows: () => rows, t, show: () => {}, hide: () => { hidden += 1; },
+      onSource: (o) => o?.kind === 'thread' && o.id === open,
+      setTimer: () => 1, clearTimer: () => {}, now: () => 0,
+    });
+    await d.poke();
+    rows = [dm('d1')];
+    await d.poke();             // raised while the person is elsewhere
+    d.recheck();                // nothing opened yet: it stays
+    expect(hidden).toBe(0);
+    open = 'someone-else';
+    d.recheck();
+    expect(hidden).toBe(0);
+    open = 'bea';               // the person opens Bea's thread (from Contacten, not from the banner)
+    d.recheck();
+    expect(hidden).toBe(1);
+    d.recheck();                // gone: nothing more to hide
+    expect(hidden).toBe(1);
+  });
 });

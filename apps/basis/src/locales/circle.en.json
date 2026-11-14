@@ -958,6 +958,10 @@
       "text": "Fine. Then pick a topic yourself:",
       "doc": "Task #13 Phase 2 — heading above the set-topic chips after the user declines forwarding (or types /help)."
     },
+    "all_topics": {
+      "text": "All topics",
+      "doc": "Help: the chip after the five likeliest topics of an unanswered question; it posts every topic."
+    },
     "no_llm_topics": {
       "text": "Without an assistant I can only answer these set topics. Pick one:",
       "doc": "Task #13 Phase 2 — honest fallback on a MISS when NO assistant is connected: only the fixed topics can be answered."
@@ -1560,8 +1564,16 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
-      "text": "I could not read that — fill in the fields below.",
+      "text": "I could not read that.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_forget": {
+      "text": "Forget this conversation",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Your conversation with the assistant",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
     },
     "act_done": {
       "text": "Done",
@@ -5899,6 +5911,14 @@
       "text": "Show",
       "doc": "The thread header's control when the contact is hidden: show them in Contacts again (the person's own act; a message from them does the same)."
     },
+    "more": {
+      "text": "More",
+      "doc": "A contact thread: the ⋯ button that holds Hide and Delete."
+    },
+    "self_here": {
+      "text": "You are {{name}} here; what does this contact see of you?",
+      "doc": "A contact thread: the avatar top right, the persona you are in this thread; its tap shows what the contact sees of you."
+    },
     "hide_note": {
       "text": "Only from your list. Their circles and this conversation stay; a message from them brings them back.",
       "doc": "What hiding IS and is not, said under the control (amendment 3: Contacts only — their circles, roster row and member card are untouched). Never a notification."
@@ -6430,6 +6450,10 @@
     "scan": {
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "assistant": {
+      "text": "Assistant",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
     },
     "share_contact": {
       "text": "Share my card",
@@ -7760,6 +7784,30 @@
     "personas_tagline": {
       "text": "filters + exceptions on the general one",
       "doc": "mij#personas — section 2 tagline: personas are filters/exceptions on the truth layer."
+    },
+    "first_messages": {
+      "text": "Who may write to this persona first",
+      "doc": "mij#personas — a persona card: heading of the choice who may send it a first private message (the firstMessages property)."
+    },
+    "first_messages_request": {
+      "text": "Only people I chose: anyone else's first message waits as a request",
+      "doc": "mij#personas — the request choice: a first message from someone not in the book is held until the person accepts it."
+    },
+    "first_messages_open": {
+      "text": "Anyone: a first message comes straight in",
+      "doc": "mij#personas — the open choice: anyone's first message lands as a conversation."
+    },
+    "circle_members": {
+      "text": "People in this persona's circles",
+      "doc": "mij#personas — a persona card: heading of the choice whether circle members may write privately (circleMembersMayWrite)."
+    },
+    "circle_members_on": {
+      "text": "May write to me: their message opens a conversation",
+      "doc": "mij#personas — on (the default): a co-member's first private message is a thread, not a request."
+    },
+    "circle_members_off": {
+      "text": "Ask first, like anyone else: their message waits as a request",
+      "doc": "mij#personas — off: a co-member's first private message is a request like a stranger's."
     },
     "truth_tag": {
       "text": "truth layer",
@@ -10406,6 +10454,11 @@
   },
   "settings_home": {
     "title": "Settings",
+    "help": "Help",
+    "help_missing": {
+      "text": "The Help conversation is not on this device (yet).",
+      "doc": "Said when the person opens Help (Settings, the intro's more) and this device holds no Help circle."
+    },
     "appearance": "Appearance",
     "per_circle": "Per circle",
     "no_circles": "You are not in any circle yet.",

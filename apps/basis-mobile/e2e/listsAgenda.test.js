@@ -112,4 +112,17 @@ describe("a circle's lists on the phone's Vandaag — a real second person over 
     await device.takeScreenshot('lists-07-zeep-added');
     if (!seen) throw new Error("the phone's own line never showed in its lists block");
   });
+
+  it("the circle's Lists tab (after Tasks) shows its lists, and a list made there reaches Bram", async () => {
+    await tapSoon(by.id('circle-tab-circles'));
+    await tapSoon(by.id(`circle-tile-${ready.circleId}`), 60_000);
+    await tapSoon(by.id('circle-detail-tab-lists'), 30_000);
+    await soon(by.text(LIST).withAncestor(by.id('circle-detail-lists')), 30_000);
+    await device.takeScreenshot('lists-08-tab');
+    await element(by.id('lists-new-input')).replaceText('Klusjes');
+    await tapSoon(by.id('lists-create-list'));
+    await soon(by.text('Klusjes').withAncestor(by.id('circle-detail-lists')), 30_000);
+    await bramHolds((ls) => ls.some((l) => l.list === 'Klusjes'));
+    await device.takeScreenshot('lists-09-made-in-tab');
+  });
 });

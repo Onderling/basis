@@ -7627,6 +7627,10 @@
       "text": "Why are you reporting this member?",
       "doc": "Governance §8 — prompt for the report reason."
     },
+    "member_left": {
+      "text": "a member who has left",
+      "doc": "How the Decisions screen names a reported member the admin’s roster no longer holds: never their key."
+    },
     "enact": {
       "text": "Enact",
       "doc": "An admin's button on an approved decision that waits: carries it out (the default is that an admin does this explicitly)."

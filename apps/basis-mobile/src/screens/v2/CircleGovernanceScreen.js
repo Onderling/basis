@@ -20,7 +20,7 @@ import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
-import { buildSubjectLabeler, deadlineLine, voteFailedLine, enactOutcomeLine } from '../../../../basis/src/v2/governanceView.js';
+import { buildSubjectLabeler, deadlineLine, voteFailedLine, enactOutcomeLine, reportTargetText } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
@@ -58,7 +58,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
     const isAdmin = me?.role === 'admin';
     let reports = [];
     if (isAdmin) { try { reports = (await gov.reports.list(circleId)).open; } catch { /* */ } }
-    setModel({ view, isAdmin, policy: ctx.policy, reports });
+    setModel({ view, isAdmin, policy: ctx.policy, reports, nameOf });
   }, [callSkill, governance, circleId]);
 
   useEffect(() => { load(); }, [load]);
@@ -115,7 +115,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
   return (
     <ScrollView contentContainerStyle={styles.root} testID="circle-governance">
       <Pressable onPress={onBack} accessibilityRole="button" style={styles.back} testID="circle-governance-back">
-        <Text style={styles.backText}>{`← ${t('circle.back')}`}</Text>
+        <Text style={styles.backText}>{t('circle.back')}</Text>
       </Pressable>
       {errorKey ? <Text style={{ color: theme.color.danger, marginBottom: 8 }} accessibilityRole="alert" testID="circle-governance-error">{t(errorKey)}</Text> : null}
       {noticeKey ? <Text style={{ marginBottom: 8 }} accessibilityRole="text" testID="circle-governance-notice">{t(noticeKey)}</Text> : null}
@@ -229,7 +229,8 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
           {model.reports.map((r) => (
             <View key={r.reportId} style={styles.card} testID={`gov-report-${r.reportId}`}>
               <Text style={styles.action}>
-                {t(`circle.governance.report_target.${r.targetType}`)}{(r.targetLabel || r.targetRef) ? `: ${r.targetLabel || r.targetRef}` : ''}
+                {/* named from this admin's own roster, never by the key (reportTargetText, shared; web twin) */}
+                {reportTargetText(r, { nameOf: model.nameOf, t })}
               </Text>
               {r.reason ? <Text style={styles.tally}>{r.reason}</Text> : null}
               <View style={styles.actions}>

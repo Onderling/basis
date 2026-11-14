@@ -87,7 +87,8 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       // admins (admin-quorum, or a member's proposal under any-admin); admins get the override only once the deadline
       // has passed (escape-hatch b).
       // a drawn sample votes only through the members drawn (the admins, where nobody was left to draw)
-      canVote: !p.closed && !!myRef && (cls === 'member-vote'
+      // nothing left to vote on once it is APPROVED (it waits for an admin to enact it): no Yes and No (L897)
+      canVote: !p.closed && p.status !== DECISION_STATUS.APPROVED && !!myRef && (cls === 'member-vote'
         || (cls === 'random-sample' && (Array.isArray(p.decision?.sample) && p.decision.sample.length ? p.decision.sample.includes(myRef) : isAdmin))
         || (isAdmin && (cls === 'admin-quorum' || cls === 'any-admin'))),
       sample: Array.isArray(p.decision?.sample) ? p.decision.sample : null,
@@ -146,4 +147,23 @@ export function voteFailedLine(result) {
 export function enactOutcomeLine(result) {
   const done = !!result && typeof result === 'object' && !(result instanceof Error) && result.ok !== false && (result.enacted === true || result.closed === true);
   return done ? { key: 'circle.governance.enacted', failed: false } : { key: 'circle.governance.enact_failed', failed: true };
+}
+
+/**
+ * A REPORT'S TARGET, NAMED BY THE ADMIN'S OWN ROSTER (L897, 2026-11-14): a member is named as the admin's roster names
+ * them (the same labeler a proposal's subject uses), "a member who has left" when the roster no longer holds them, never
+ * by the key and never by the name the reporter chose. A post or a message keeps the reporter's own words about it
+ * (no roster names those), or just its kind. Both shells paint this line; neither decides it.
+ * @param {{targetType: string, targetRef?: string|null, targetLabel?: string|null}} report
+ * @param {{nameOf: (ref: string) => string|null, t: Function}} a
+ * @returns {string}
+ */
+export function reportTargetText(report, { nameOf, t } = {}) {
+  const kind = t(`circle.governance.report_target.${report?.targetType}`);
+  if (report?.targetType === 'member') {
+    const name = (typeof nameOf === 'function' ? nameOf(report.targetRef) : null) ?? t('circle.governance.member_left');
+    return `${kind}: ${name}`;
+  }
+  const label = typeof report?.targetLabel === 'string' && report.targetLabel.trim() ? report.targetLabel.trim() : null;
+  return label ? `${kind}: ${label}` : kind;
 }

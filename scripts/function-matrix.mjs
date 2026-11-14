@@ -74,7 +74,10 @@ export const FUNCTIONS = Object.freeze([
     // shared pod, the fan-out for normal; asserted beside the message); pod-only is skipped there with the decision
     // (the title is per case, `${type}: …`; its 'shared pod' and 'normal' cases carry the cell)
     web: { file: 'apps/basis/test-browser/walk-circle-types-pod.spec.js', test: "made in the wizard, a member's message reaches the other member, and the send took its branch" },
-    mobile: null,
+    // two phones in Node (the mobile composition) on a real ACP CSS: the same two types through the create wizard's steps,
+    // the post reaches the member's phone, the branch read from the founder phone's own log (what the phone's screens
+    // show is the phone session's)
+    mobile: { file: 'apps/basis-mobile/test/circleTypesPhone.mobile.css.test.js', test: "made in the wizard, a member's message reaches the other member, and the send took its branch" },
     box: null,
   } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {

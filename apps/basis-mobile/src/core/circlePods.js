@@ -307,6 +307,9 @@ async function buildCirclePod(circleId, policy) {
     });
   } catch (err) {
     // asked for before the agent is bound: no producer YET, and nothing cached — built on the bind (web parity)
+    // cannot tell yet whether this device may establish the circle's first key (its roster not readable, or not holding
+    // this self yet): nothing built, NOTHING KEPT, asked again at the next ask (web parity)
+    if (err?.code === 'ESTABLISH_NOT_KNOWN') return null;
     if (err?.code === 'NO_SEALING_KEY_PAIR') {
       if (!_keyEventWiring) { producerKeyWait.note(circleId, policy); return null; }
       // the agent IS bound and still gives no key pair: a fault, said, not a wait nobody drains again (web parity)

@@ -113,6 +113,25 @@ describe('mobile circlePods', () => {
 // wiring feeds the EMIT sink, and a key-event recorded on RECEIVE feeds the seal strategy's fold.
 describe('mobile circlePods — G11 no-pod rotation wiring', () => {
   beforeEach(() => bindKeyPairs());
+  it('a founder whose roster cannot be read at the first build keeps NO producer; the next ask builds it and mints', async () => {
+    initCirclePods(mockAsyncStorage());
+    let failOnce = true;
+    bindKeyPairs({
+      circleSelfRef: () => 'did:anna',
+      callSkill: async (_o, opId) => {
+        if (opId !== 'listGroupMembers') return {};
+        if (failOnce) { failOnce = false; throw new Error('roster not readable yet'); }
+        return { members: [{ webid: 'did:anna', role: 'admin' }] };
+      },
+    });
+    // the first ask cannot tell whether this self may establish the key: no producer, nothing kept
+    expect(await ensureCirclePod('cannot-tell', { storagePosture: 'p2' }), 'no producer while it cannot tell').toBeNull();
+    // the next ask can: the producer is built and the founder's first key minted
+    const prod = await ensureCirclePod('cannot-tell', { storagePosture: 'p2' });
+    expect(prod?.controlAgent, 'the producer is built on the next ask').toBeTruthy();
+    expect(await getCircleSealStrategy('cannot-tell', { storagePosture: 'p2' }), 'and the founder can seal').toBeTruthy();
+  });
+
   it('removing a member fans the rotation key-event to the REMAINING members only', async () => {
     initCirclePods(mockAsyncStorage());
     const sent = [];

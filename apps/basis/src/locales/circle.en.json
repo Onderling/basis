@@ -3735,6 +3735,10 @@
       "text": "Nobody nearby right now.",
       "doc": "Shown when no peers are visible on the local network."
     },
+    "header_cannot_discover": {
+      "text": "This device cannot find people nearby: a browser has no Wi-Fi discovery or Bluetooth. Open Onderling on your phone to meet people here.",
+      "doc": "Nearby's top line on a device that cannot discover anyone (a browser has no Wi-Fi discovery or Bluetooth): the room stays empty here; the phone is where people meet nearby."
+    },
     "anon_peer": {
       "text": "someone",
       "doc": "Fallback row label when a peer has no derivable pseudonym."

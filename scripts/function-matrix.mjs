@@ -56,7 +56,9 @@ export const FUNCTIONS = Object.freeze([
     box: { file: 'apps/basis/test/personaOnTheBox.relay.test.js', test: 'on its first start it rejoins Y AS W' },
   } },
   { id: 'pod-sync', name: 'Syncing through a pod', cells: {
-    web: null,      // walk-pod only LOGS its findings and passes regardless — no proof (and no person can make a pod circle yet, L571)
+    // two members of a shared-pod circle: B away while A posts, A stops, B comes back with every WebSocket closed and
+    // reads the post from the pod (the page is seen reading it)
+    web: { file: 'apps/basis/test-browser/walk-pod-sync.spec.js', test: 'a member who was away reads the post from the pod, with the relay out of reach' },
     mobile: null,   // circlePods is a unit
     box: NA('the box holds circles by relay and catch-up; its registry mirror is covered under restore and devices'),
   } },

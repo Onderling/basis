@@ -4,8 +4,8 @@
 // the emulator reaches) joins from the phone's invite. The phone REMOVES Bram from its admin panel (the confirm the
 // op declares), and Bram's own
 // device drops the circle: read from Bram's own store, never from what the phone sent.
-// (The REPORT half of this cell waits on a surface question: in the alpha the governance panel, the only place an
-// admin sees a report, is trimmed from the circle's menu. Asked 2026-11-14.)
+// Before the removal, Bram files a REPORT (a signed statement on the governance rail) and the phone sees it on its
+// Decisions screen, reached from the circle's menu (the alpha had trimmed that entry: L887 brought it back).
 // Runs against the RELEASE APK; deletes the app, so emulator only. The member's half: governanceProposal.test.js.
 
 const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, backToLauncher, emulatorOnly } = require('./support/ui');
@@ -25,7 +25,7 @@ async function openFromMenu(token, screenId) {
   await soon(by.id(screenId), 20_000);
 }
 
-describe('governance on the phone — the admin removes a member', () => {
+describe('governance on the phone — the admin sees a signed report and removes a member', () => {
   beforeAll(async () => {
     emulatorOnly('governanceAdmin');
     peer = await startPeer(['--join', '--talk', '--handle', 'bram']);
@@ -73,6 +73,22 @@ describe('governance on the phone — the admin removes a member', () => {
     await soon(by.id('invite-joined'), 60_000).catch(() => {});
     await device.takeScreenshot('gova-01-joined');
     await tapSoon(by.id('invite-close'));
+  });
+
+  it("Bram files a report; the phone, the circle's admin, sees it on the Decisions screen", async () => {
+    // a signed statement on the governance rail, fanned to its readers (the circle's admins and the reporter); the
+    // Decisions screen is the one place an admin sees it, reached from the circle's menu (back in the alpha: L887)
+    peer.send({ do: 'report-file', reason: 'walk: een melding' });
+    const filed = await peer.next('report-filed', () => true, 60_000);
+    if (!filed.ok) throw new Error(`Bram could not file a report: ${JSON.stringify(filed)}`);
+    let seen = false;
+    for (let i = 0; i < 10 && !seen; i += 1) {
+      await openFromMenu('governance', 'circle-governance');
+      seen = (await firstOf([by.id(`gov-report-${filed.reportId}`)], 6_000)) === 0;
+      if (!seen) await new Promise((r) => setTimeout(r, 3000));
+    }
+    await device.takeScreenshot('gova-02-report');
+    if (!seen) throw new Error(`the phone never showed Bram's report ${filed.reportId} on its Decisions screen`);
   });
 
   it("the phone removes Bram from its admin panel; Bram's own device drops the circle", async () => {

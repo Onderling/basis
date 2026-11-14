@@ -9,7 +9,11 @@ kernel's roster fold; every shell composes the same binding).
 ## What a person can do
 
 - See the circle's open decisions, their tally and deadline, and vote where the class lets them (the Decisions
-  screen, web and phone); see the settled ones as history.
+  screen, web and phone); see the settled ones as history. **The door:** the circle's ⋯ menu, "Decisions" /
+  "Besluiten", for every member (back in the alpha's menu since 2026-11-14: the screen is the only place a vote on a
+  removal, a role or the rules is cast, the only place an admin sees a report, and the only place the changes made
+  without the vote are listed). A member hears of an open decision as a line in the circle's conversation ("A decision
+  opened: … your vote may be needed"), rendered from the proposal statement; the line itself is not a way in yet.
 - As an admin, set WHO DECIDES each governed action: one admin (`any-admin`), the admins together (`admin-quorum`, a
   majority of the admins; a single admin is the quorum), the whole circle (`member-vote`, a majority of all members),
   or, after the alpha, a few drawn members (`random-sample`, built and held back, see below). Who decides is itself a
@@ -89,7 +93,9 @@ pinboard: removeMember setMemberRole editGroupRules recordGroupRulesUpdate getGr
   `membershipGate.walk.test.js` (a lone removal under "admins decide together" holds on every device; under any-admin
   it removes; a removal made under any-admin stays after the circle tightens), and over a real relay in
   `membershipGate.relay.test.js`: a lone removal and a lone promotion hold on the other admin's device; the same
-  removal and promotion, proposed and voted yes by both admins, take effect on both devices (red with the gate off).
+  removal and promotion, proposed and voted yes by both admins, take effect on both devices (red with the gate off);
+  where the members decide, a plain member's yes completes the vote and the removal lands on both devices.
+- The door on both shells' menus: `alphaSurface.test.js` and the phone's `circleDetailActionsProjection.test.js`.
 - The caretaker over a real relay: `test/v2/caretakerHandover.relay.test.js`; a removed member refused on every
   member's device: `removedMemberRefusedEverywhere.relay.test.js`; the classes and tallies:
   `governanceDecision.test.js`, `governanceHost.test.js`, `governanceOrchestrator.test.js`.

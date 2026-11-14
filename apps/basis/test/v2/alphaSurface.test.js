@@ -36,10 +36,12 @@ describe('alphaSurface', () => {
     expect(alphaViewMode(undefined)).toBe('chat');
   });
 
-  it('the ⋯ menu is back · invite · settings · beheer on both shells; the manifest still declares the rest', () => {
+  it('the ⋯ menu is back · invite · settings · beheer · decisions on both shells; the manifest still declares the rest', () => {
     const web = circleActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
     const mobile = circleActionsMobile(basisManifest, { policy: DEFAULT_CIRCLE_POLICY }).map((a) => a.id);
-    expect(web).toEqual(['back', 'invite', 'settings', 'admin']);   // beheer painted again since 2026-09-13
+    // beheer painted again since 2026-09-13; decisions since 2026-11-14 (the only door to a vote, a report and the
+    // changes made without the vote: hidden, a circle that votes could never finish a removal)
+    expect(web).toEqual(['back', 'invite', 'settings', 'admin', 'governance']);
     expect(mobile).toEqual(web);
     const declared = circleActionRoster(basisManifest).map((a) => a.id);
     for (const id of HIDDEN_CIRCLE_ACTIONS) expect(declared).toContain(id);
@@ -49,6 +51,7 @@ describe('alphaSurface', () => {
     // role, and hiding it left those reachable only through the assistant. `lists` stands in as the
     // hidden example now.
     expect(alphaActions([{ id: 'lists' }, { id: 'admin' }, { id: 'invite' }]).map((a) => a.id)).toEqual(['admin', 'invite']);
+    expect(HIDDEN_CIRCLE_ACTIONS).not.toContain('governance');
   });
 
   it('five settings stay in view; every other policy axis is behind the fold', () => {

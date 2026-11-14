@@ -52,7 +52,7 @@ describe('the membership gate, over the relay', () => {
     expect(st?.body?.hash, `settings version ${version} stated`).toBeTruthy();
   };
 
-  async function circleOf3(circleId, governance) {
+  async function circleOf3(circleId, governance, { promote = true } = {}) {
     await createCircle(founder, { groupId: circleId, name: circleId });
     for (const [who, handle] of [[bram, 'bram'], [cato, 'cato']]) {
       expect((await joinExistingCircle(founder, who, { groupId: circleId, handle })).joined?.ok).toBe(true);
@@ -60,6 +60,7 @@ describe('the membership gate, over the relay', () => {
     await bindCircleAddresses([founder, bram, cato], circleId);
     await Promise.all([founder, bram, cato].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId })));
     await state(circleId, normalizeCirclePolicy({ governance }), 1);
+    if (!promote) return;
     // a second admin while any admin decides settings (role changes follow the settings rule): this one stands
     const promoted = await founder.agent.callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: bram.pubKey, role: 'admin' });
     expect(promoted?.ok, JSON.stringify(promoted)).toBe(true);
@@ -106,6 +107,28 @@ describe('the membership gate, over the relay', () => {
     await voted(C, 'removeMember', cato.pubKey);
     expect(await soon(async () => !(await inRoster(bram, C, cato.pubKey))), 'bram\'s device removes cato once both admins said yes').toBe(true);
     expect(await soon(async () => !(await inRoster(founder, C, cato.pubKey))), 'the founder\'s device too').toBe(true);
+  }, 180_000);
+
+  // THE MEMBER'S VOTE (L887: the Decisions screen is the door a member votes through; this is what that vote does): where
+  // the MEMBERS decide removals, the founder's proposal alone does not remove; a plain member's yes completes the count,
+  // the founder's device (an admin's) enacts it with its proposal, and the removal lands on the member's own device.
+  it('members decide removals: a plain member\'s yes completes the vote and the removal lands on both devices', async () => {
+    const C = 'gate-relay-member-vote';
+    await circleOf3(C, { removeMember: 'member-vote', changePolicy: 'any-admin' }, { promote: false });
+    expect(await roleOn(bram, C, bram.pubKey), 'bram is a plain member here').toBe('member');
+    const gF = govOf(founder); const gB = govOf(bram);
+    const p = await gF.propose({ circleId: C, action: 'removeMember', subject: cato.pubKey, actor: { ref: founder.pubKey } });
+    expect(p?.proposalId, `proposed: ${JSON.stringify(p)}`).toBeTruthy();
+    expect(p.enacted ?? false, 'the proposer alone does not carry a members\' vote').toBe(false);
+    await settle(2000);
+    expect(await inRoster(bram, C, cato.pubKey), 'nothing removed before the vote').toBe(true);
+    expect(await soon(async () => ((await gB.view(C))?.open ?? []).some((x) => x.proposalId === p.proposalId)), 'the open removal reached the member').toBe(true);
+    const v = await gB.vote({ circleId: C, proposalId: p.proposalId, voter: bram.pubKey, choice: 'yes' });
+    expect(v?.ok, JSON.stringify(v)).toBe(true);
+    let t = null;
+    expect(await soon(async () => { t = await gF.tally({ circleId: C, proposalId: p.proposalId }); return t?.status === 'approved' && (t.enacted === true || t.closed === true); }), `approved and enacted: vote ${JSON.stringify(v)}, tally ${JSON.stringify(t)}`).toBe(true);
+    expect(await soon(async () => !(await inRoster(bram, C, cato.pubKey))), "the member's own device removes cato").toBe(true);
+    expect(await soon(async () => !(await inRoster(founder, C, cato.pubKey))), "the founder's device too").toBe(true);
   }, 180_000);
 
   it('admins decide settings together: a lone promotion holds on bram\'s device; with both admins\' yes it takes effect', async () => {

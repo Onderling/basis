@@ -3,7 +3,9 @@
  * 2026-11-14: the member's next message landed nowhere; Fable's ruling the same day):
  *   - NEVER ANSWERED: the person turned the switch off to stop exactly this, so the member's next message is a REQUEST,
  *     held without a card (the card rode only the first message), shown by their name in the circle. Accept needs no
- *     card: the held turns go onto the thread, the request goes. Their earlier turns stay in the thread.
+ *     card: the held turns go onto the thread, the request goes, and Accept is the choice (Frits 2026-11-14): the member
+ *     is a contact from then on, named as in the circle, and their next message lands in the thread. Their earlier turns
+ *     stay in the thread.
  *   - ANSWERED: the person's answer made them a contact, and a contact is let on whatever the switch says.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -56,14 +58,13 @@ describe('switched off after a member already wrote', () => {
     expect(has(await threadOf(me, cas.pubKey), 'tweede')).toBe(true);
     expect((await requestsOf(me)).some((x) => x.from === cas.pubKey)).toBe(false);
 
-    // the person answers: chosen now, so the member's next message is in the thread, not a new request
-    await me.contactThreadChannel.sendTurn({ peerAddr: cas.agent.circleAddressFor(CIRCLE), threadId: cas.pubKey, text: 'welkom', messageId: 'me-cas-1' });
-    expect(await wait(async () => has(await threadOf(cas, me.pubKey), 'welkom'))).toBe(true);
-    await cas.contactThreadChannel.sendTurn({ peerAddr: me.agent.circleAddressFor(CIRCLE), threadId: me.pubKey, text: 'derde', messageId: 'cas-3' });
-    expect(await wait(async () => has(await threadOf(me, cas.pubKey), 'derde')), 'answered after accept: in the thread').toBe(true);
-    expect((await requestsOf(me)).some((x) => x.from === cas.pubKey)).toBe(false);
+    // Accept IS the choice (Frits 2026-11-14): the member is a contact now, with no answer needed, so their next message
+    // lands in the thread and never asks again
     const book = (await me.agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? [];
-    expect(book.some((c) => c.webid === cas.pubKey || c.pubKey === cas.pubKey), 'the answer made the book row').toBe(true);
+    expect(book.some((c) => c.webid === cas.pubKey || c.pubKey === cas.pubKey), 'Accept made the book row').toBe(true);
+    await cas.contactThreadChannel.sendTurn({ peerAddr: me.agent.circleAddressFor(CIRCLE), threadId: me.pubKey, text: 'derde', messageId: 'cas-3' });
+    expect(await wait(async () => has(await threadOf(me, cas.pubKey), 'derde')), 'accepted, not answered: in the thread').toBe(true);
+    expect((await requestsOf(me)).some((x) => x.from === cas.pubKey), 'no new request').toBe(false);
   }, 60_000);
 
   it('answered: the person\'s answer made them a contact, let on whatever the switch says', async () => {

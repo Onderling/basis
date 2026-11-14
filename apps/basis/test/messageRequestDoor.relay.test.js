@@ -64,6 +64,16 @@ describe('a stranger\'s first message is a request, not a contact', () => {
     expect(await requestsOf(bob)).toEqual([]);
   }, 40_000);
 
+  it('a stranger\'s request WITHOUT a card (a turn held after a refusal): Accept puts the turn on the thread and no one in the book', async () => {
+    const eve = 'eve-has-no-card-key';
+    const held = await bob.agent.callSkill('pinboard', 'holdMessageRequest', { from: eve, messageId: 'eve-1', ts: Date.now(), text: 'hallo', refused: 'file-on-request' });
+    expect(held?.held, JSON.stringify(held)).toBe(true);
+    const r = await acceptMessageRequest({ callSkill: (a, o, x) => bob.agent.callSkill(a, o, x), channel: bob.contactThreadChannel, from: eve });
+    expect(r).toMatchObject({ accepted: true, turns: 1 });
+    expect((await contactsOf(bob)).map((c) => c.webid), 'a stranger without a card is not made a contact').not.toContain(eve);
+    expect((await requestsOf(bob)).some((q) => q.from === eve)).toBe(false);
+  }, 40_000);
+
   it('Carol, whom Bob chose (her card in his book), lands in the thread as before', async () => {
     const card = (await carol.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
     expect((await bob.agent.callSkill('pinboard', 'addContactFromQr', { payload: card }))?.error ?? null).toBe(null);

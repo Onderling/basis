@@ -4212,10 +4212,22 @@ export function buildSkills({
       const persona = typeof a.persona === 'string' && a.persona.trim() ? a.persona.trim() : null;
       const request = await bundle.messageRequests.get(a.from, { persona });
       if (!request) return { error: 'no-such-request' };
-      // A REQUEST WITHOUT A CARD (a co-member never answered, or a turn held after a refusal): nothing to put in the book.
-      // Accept moves the held turns onto the thread and takes the request out; the book row comes when the person answers,
-      // as for a member who may write (their answer is the choice).
-      const added = request.card ? await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset }) : { contact: null };
+      // A REQUEST WITHOUT A CARD. From a member of one of this self's circles (named as in the circle): Accept IS the
+      // choice (Frits 2026-11-14), so they go into the book now, by their identity and their circle name, as an answer
+      // would have put them there; their next message lands in the thread. From a stranger (a turn held after a
+      // refusal, no card): nothing to put in the book, as before; the held turns go onto the thread.
+      const asMember = !request.card && request.member === true;
+      const added = request.card
+        ? await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset })
+        : asMember
+          ? { contact: await bundle.contacts.addContact({
+            webid: a.from,
+            ...(request.name ? { displayName: request.name } : {}),
+            ...(persona ? { persona } : {}),
+            ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
+            trustLevel: 'bekend',
+          }) }
+          : { contact: null };
       if (added?.error) return added;
       await bundle.messageRequests.remove(a.from, { persona });
       metrics?.record?.('message-request-accepted');

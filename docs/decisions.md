@@ -1533,7 +1533,10 @@ nowhere). Answered: the answer made them a contact, and a contact is let on what
 their next message is a request (the person turned the switch off to stop exactly this), held WITHOUT a card (their card
 rode only their first message), shown by the name they have in the circle; their earlier turns stay in the thread.
 Accepting a request without a card puts no row in the book: the held turns move into the thread and the request goes;
-the book row comes when the person answers, as for a member who may write.
+the book row comes when the person answers, as for a member who may write. **Reversed for a member by Frits, 2026-11-14:**
+Accept on a circle MEMBER's request counts as the choice: it makes the contact (their identity, named as in the circle),
+as an answer would, so their next message lands in the thread and does not ask again. A stranger's request without a
+card (a turn held after a refusal) is unchanged: Accept puts the turns in the thread and no one in the book.
 
 **Nothing at the contact door is dropped silently** (same day). A turn the request's hold refuses (no card on a new
 request, a card naming someone else, a file, too large, or the hold failing) is written to the refusal log with its

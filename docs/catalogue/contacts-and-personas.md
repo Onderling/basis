@@ -10,7 +10,8 @@ catalogue's baseline and moves here as it is written up.
   name shown as unverified) and the turns they sent. Known senders are let on as before: own devices, members of a
   circle the person is in, contacts in the book, and anyone the person wrote to first.
 - Accept a request: the held card becomes a contact (as a scanned card does) and the held messages move into the
-  thread, in order. (The Contacten section that offers it is still being built.)
+  thread, in order. A circle member's request has no card: Accept makes them a contact by the name they have in the
+  circle (Accept is the choice). A stranger's request without a card adds no one to the book. (The Contacten section that offers it is still being built.)
 - Choose, per persona, who may write first: `request` (the default for a person) or `open` (anyone, within the
   stranger budgets; the default for a bot, and the feedback persona's).
 - Choose, per persona, whether people in its circles may write to it first (default on). On: a member of one of THAT

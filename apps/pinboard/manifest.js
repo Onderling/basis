@@ -927,6 +927,16 @@ export const pinboardManifest = {
       },
     },
     {
+      // Asked again on every recompute of a join's key grant: is the member still in, after the admission the grant follows
+      // (`after`: the join statement's hash)? 'in' / 'out' / null when it cannot be placed in the lane's causal order.
+      id:   'memberStatus', visibility: 'private', group: 'data', verb: 'list',
+      appliesTo: { type: 'member' },
+      params: [
+        { name: 'webid', kind: 'string', required: true },
+        { name: 'after', kind: 'string', required: false },   // absent: the member's last folded join
+      ],
+    },
+    {
       id:   'listGroupMembers', visibility: 'authenticated', group: 'data', verb: 'list',
       appliesTo: { type: 'member' },
       params: [

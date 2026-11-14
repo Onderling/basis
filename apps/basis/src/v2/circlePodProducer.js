@@ -185,7 +185,7 @@ export async function createCirclePodProducer({
  * @param {(circleId:string) => (object|Promise<object|null>)} getProducer  resolve a circle's producer.
  * @returns {{ addMember: Function, removeMember: Function }}
  */
-export function createCircleControlAgentRouter(getProducer, { refusals = null } = {}) {
+export function createCircleControlAgentRouter(getProducer, { refusals = null, memberStatusOf = null } = {}) {
   // Best-effort, and LOUD when it fails. Sealing degrading gracefully is the intended posture — a
   // membership event must not fail because a circle's pod is unreachable. But this catch sat between
   // the caller and every key operation, so a control-agent that threw looked exactly like one that
@@ -210,9 +210,15 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null } 
     }
   };
   return {
-    async addMember({ webId, publicKey, role, groupId, podAgent = null }) {
+    async addMember({ webId, publicKey, role, groupId, podAgent = null, admittedBy = null }) {
       if (!webId || !publicKey) return;
-      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role, podAgent }), `granting ${webId}`);
+      // asked again on EVERY compute of the key change: is the member still in after the admission this grant follows
+      // (`admittedBy`: the join's hash; none: their last folded join)? in → go on, out → the change is dropped (the
+      // removal stands), cannot place → MemberUnknownError: nothing written, refusal-logged
+      const isMember = typeof memberStatusOf === 'function'
+        ? async () => { const st = await memberStatusOf(groupId, webId, admittedBy); return st === 'in' ? true : st === 'out' ? false : null; }
+        : null;
+      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role, podAgent, isMember }), `granting ${webId}`);
     },
     async removeMember({ webId, force, policy, groupId }) {
       if (!webId) return;
@@ -220,14 +226,35 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null } 
     },
     // Device-grained audience surgery (the custody arc): the member stays; one of their devices'
     // sealing keys joins or leaves the group key's audience.
-    async grantRecipient({ publicKey, groupId }) {
+    async grantRecipient({ publicKey, groupId, ownerWebId = null }) {
       if (!publicKey) return;
-      return route(groupId, (ca) => ca.grantRecipient?.({ publicKey }), 'enrolling a device');
+      // a member's DEVICE joins the key's audience only while its OWNER is in (their last join, asked on every compute);
+      // no owner named = one of this device's own addresses (the point, a rotation past an old one): no question
+      const isMember = (typeof memberStatusOf === 'function' && ownerWebId)
+        ? async () => { const st = await memberStatusOf(groupId, ownerWebId, null); return st === 'in' ? true : st === 'out' ? false : null; }
+        : null;
+      return route(groupId, (ca) => ca.grantRecipient?.({ publicKey, isMember }), 'enrolling a device');
     },
     async revokeRecipient({ publicKey, policy, groupId }) {
       if (!publicKey) return;
       return route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }), 'revoking a device');
     },
+  };
+}
+
+/**
+ * The router's `memberStatusOf`, over the waist: pinboard's memberStatus (in / out / null). A read that fails answers
+ * null (cannot say), never a yes.
+ * @param {(app:string, op:string, args:object) => Promise<any>} callSkill
+ * @returns {(groupId:string, webid:string, after:(string|null)) => Promise<'in'|'out'|null>}
+ */
+export function memberStatusReader(callSkill) {
+  return async (groupId, webid, after = null) => {
+    if (typeof callSkill !== 'function') return null;
+    try {
+      const r = await callSkill('pinboard', 'memberStatus', { groupId, webid, ...(after ? { after } : {}) });
+      return r?.status === 'in' || r?.status === 'out' ? r.status : null;
+    } catch { return null; }
   };
 }
 

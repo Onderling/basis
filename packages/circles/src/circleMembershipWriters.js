@@ -58,6 +58,12 @@ function boundElsewhere(codeItem, redeemer) {
  * The pod WebID a joiner said their pod session signs in as, for the read grant on a pod-backed circle. It goes to the
  * grant ONLY: never into the redemption item, the roster or the spine — those reach every member, the WebID does not.
  */
+/** The hash of a membership statement as the spine appender returned it (null when nothing was appended). */
+function statementHashOf(st) {
+  const h = st?.body?.hash ?? st?.hash ?? null;
+  return typeof h === 'string' && h ? h : null;
+}
+
 function podAgentOf(a) {
   const w = a?.podWebId;
   return (typeof w === 'string' && /^https?:\/\/\S+$/.test(w.trim())) ? w.trim() : null;
@@ -212,7 +218,6 @@ export async function redeemMembershipCode({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: from, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a) });
   // ALSO record this JOIN on the circle's membership spine — the durable, per-author SIGNED log the roster
   // folds deterministically (identical on every device, no wall-clock). This is a same-device redeem, so the
   // acting device IS the joiner: the injected emitter signs `join` with the joiner's own identity (author =
@@ -221,7 +226,7 @@ export async function redeemMembershipCode({
   // The join's authorization rides the SIGNED payload: the redemption row it stands on. The fold admits a
   // self-authored join only when that row exists (deny-favouring: a not-yet-arrived row defers, never forges).
   const ownKey = personKeyAnnouncement(typeof currentPersonKey === 'function' ? currentPersonKey() : null);
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
+  const ownJoin = await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
     redemptionRef: item.id,
     // The handle the joiner presented, so every device that folds this join can name them — the redemption
     // row above carries it too, but only the admitting device ever holds that row. Self-asserted, like the
@@ -234,6 +239,10 @@ export async function redeemMembershipCode({
     // join; every later version is announced root-revealed (the person-key statement).
     ...(ownKey ? { personKey: ownKey } : {}),
   } });
+  // MEMBERSHIP FIRST, THE KEY FOLLOWS: the grant comes after the join stands on the lane, and names it as the admission
+  // it follows, so a recompute after a lost race can ask whether an exit came AFTER it (memberStatus). A grant that fails
+  // here is re-driven by the roster seed at the next producer start (the join is there, the key is not yet).
+  await grantKey({ webId: from, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a), admittedBy: statementHashOf(ownJoin) });
   return {
     redemptionId: item.id,
     groupId:      a.groupId,
@@ -403,7 +412,6 @@ export async function verifyMembershipCodeForPeer({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a) });
   // ALSO record this JOIN on the circle's membership spine (as `redeemMembershipCode` does). This is the
   // ADMIN's device confirming a REMOTE joiner, who is not here to sign — so the ADMIN signs `join` with their
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority
@@ -425,6 +433,8 @@ export async function verifyMembershipCodeForPeer({
     // The joiner's FIRST person key, forwarded from the redeem request the same way — recorded verbatim.
     ...(joinerKey ? { personKey: joinerKey } : {}),
   } });
+  // MEMBERSHIP FIRST, THE KEY FOLLOWS (as in the self redeem): the grant names the join it follows.
+  await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a), admittedBy: statementHashOf(joinStatement) });
   return {
     redemptionId: item.id,
     codeId:       valid.id,

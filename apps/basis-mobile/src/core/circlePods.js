@@ -33,7 +33,7 @@ const keyFanRoster = async (circleId) => {
 };
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
 import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
-import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
+import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
 import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
@@ -295,7 +295,10 @@ async function buildCirclePod(circleId, policy) {
 // S4 — routes pinboard membership events (redeem/leave) to the joined circle's producer for
 // multi-member sealing (the joiner's sealing key is wrapped into the group key). Pass to
 // bootAgentBundle as `pinboardControlAgent`. V0: routes to a live (opened) circle's producer.
-export const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
+// every join's key change re-asks whether the member is still in after the admission it follows (web parity)
+export const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
+  memberStatusOf: memberStatusReader((...a) => (typeof _keyEventWiring?.callSkill === 'function' ? _keyEventWiring.callSkill(...a) : Promise.reject(new Error('not bound')))),
+});
 
 /** Ensure a circle's producer, then seed its group-key roster with prior members (web parity). */
 export async function seedCircleRosterFor({ circleId, policy, callSkill }) {

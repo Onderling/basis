@@ -1111,6 +1111,11 @@ and bad actors, weakest concern to strongest:
   the circle's governance layer below decides what happens next.
   *Scope: the hash-chain covers only the governance/membership/key event types — chat stays on the mergeable
   concurrent-edit path (forking chat isn't an attack).*
+  **Membership first, the key follows.** A join is written in this order: the redemption row, the roster entry, the
+  signed `join` on the membership lane, then the sealed circle's key grant, which names that join as the admission it
+  follows. Every change to the key that adds someone (a join's grant, a device's enrolment by its owner) asks again,
+  on each compute, whether they are still in after that admission (`memberStatus`, placed in the lane's causal order by
+  ancestry, never a clock); a removal that came after it stands, and an answer that cannot be placed writes nothing.
 - **L4 · governance** — each governed action maps to a **decision-class** in the circle policy
   (`governance: { removeMember, rotateKey, changeRule, changePolicy } → any-admin | admin-quorum | member-vote`).
   A `member-vote` tallies `governance` events over the **full proof-derived membership** (not the reachable

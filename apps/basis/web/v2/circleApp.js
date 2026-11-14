@@ -43,7 +43,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster,
+  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot, seedCircleRoster, memberStatusReader,
   circleStoreMode,
   isNoticeboardPost,
   NOTICEBOARD_REFRESH_EVENTS,
@@ -1948,7 +1948,10 @@ function recordCircleKeyEvent(circleId, event) {
 // a new member's sealing key is wrapped into that circle's group key (multi-member sealing).
 // V0: routes to a LIVE producer (circle opened on this device); seeding from prior redemptions
 // is a follow-up. Passed to the single pinboard agent as its `controlAgent`.
-const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
+// every join's key change re-asks whether the member is still in after the admission it follows (memberStatus)
+const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
+  memberStatusOf: memberStatusReader((...a) => (typeof rawCallSkill === 'function' ? rawCallSkill(...a) : Promise.reject(new Error('not booted')))),
+});
 
 /**
  * resolve (and cache) a circle's CONTENT seal/open strategy. For a sealed (p2/p3)
@@ -9945,8 +9948,8 @@ async function boot() {
             agent,
             // Sealed-circle audience (the custody arc): a proven device address joins the group
             // key's readers when THIS device holds the circle's producer; no-ops otherwise.
-            grantSealedAudience: (circleId, address) => circleControlAgentRouter.grantRecipient({
-              groupId: circleId, publicKey: podSealingPublicKeyFromNetworkKey(address),
+            grantSealedAudience: (circleId, address, ownerWebId = null) => circleControlAgentRouter.grantRecipient({
+              groupId: circleId, publicKey: podSealingPublicKeyFromNetworkKey(address), ownerWebId,
             }),
           }),
           // personas#2 — post-join persona-property push: admin records the member's disclosure onto

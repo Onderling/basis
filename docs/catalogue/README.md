@@ -22,7 +22,7 @@ Rule for anyone ruling on absence: before "not built" or "needs design", read th
 | [tasks-and-dispatch.md](tasks-and-dispatch.md) | tasks, chores, claims, subtasks, approval, mandates, skill dispatch | first draft 2026-10-23 |
 | [news-and-read-state.md](news-and-read-state.md) | what is new for the person (circle tiles, Today's news, contact badges), read state across their devices | started 2026-11-09 |
 | [governance.md](governance.md) | who decides: decision classes, the doors, the receiver gate, the drawn sample, reports, the caretaker | started 2026-11-13 |
-| circles-and-pinboard | circles, membership, posts, requests | owed |
+| [circles-and-pinboard.md](circles-and-pinboard.md) | circles, membership, posts, requests | started 2026-11-14 (membership and its key) |
 | calendar | appointments, rsvp, week overview | owed |
 | [lists.md](lists.md) | a circle's lists (its Lists tab), entries, boards, the lists block | started 2026-11-14 |
 | household-bot | the bot in a circle: add/done, nudges, digests | owed |

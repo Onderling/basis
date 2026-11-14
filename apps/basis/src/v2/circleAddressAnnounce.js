@@ -470,7 +470,7 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
       // unsealed circle (or a producer living elsewhere) no-ops.
       if (typeof grantSealedAudience === 'function') {
         for (const one of proven) {
-          try { await grantSealedAudience(circleId, one.circleAddress); }
+          try { await grantSealedAudience(circleId, one.circleAddress, one.memberWebid ?? null); }
           catch (err) { logger?.warn?.('[circle-address] sealed-audience grant failed', err?.message ?? err); }
         }
       }

@@ -165,8 +165,8 @@ export function buildPhoneInboundWiring({
     onAdmitted: (a) => { onCirclesChanged?.(); return bundle?.pairRoster?.onAdmitted?.(a); },
     // Sealed-circle audience (the custody arc): a proven device address joins the group key's readers when THIS
     // device holds the circle's producer; no-ops otherwise.
-    grantSealedAudience: (circleId, address) => circleControlAgentRouter.grantRecipient({
-      groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address),
+    grantSealedAudience: (circleId, address, ownerWebId = null) => circleControlAgentRouter.grantRecipient({
+      groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), ownerWebId,
     }),
     applyIncomingReceipt: (payload, from) => applyIncomingReceipt?.(payload, from),
     nearbyRoom: bundle?.nearbyRoom ?? null,

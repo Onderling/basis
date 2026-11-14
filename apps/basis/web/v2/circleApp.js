@@ -9710,13 +9710,9 @@ async function boot() {
       // the request to the invite's address may leave on the person key for this redeem (the send gate's invite exchange)
       inviteExchange: agent.inviteExchange ?? null,
     });
-    // when signed in, route pinboard's items to the user's REAL pod (parity with
-    // folio/calendar; reuses pinboard's already-built pod-routing write-through). Best-effort.
-    if (podSession?.isLoggedIn && circleRealPodRouting?.podRoot && typeof agent.attachPinboardPod === 'function') {
-      agent.attachPinboardPod({ podRoot: circleRealPodRouting.podRoot, webid: podSession.webid, fetch: podSession.fetch })
-        .then((r) => { if (!r?.ok && r?.error) console.warn('[circleApp] attachPinboardPod:', r.error); })
-        .catch(() => { /* best-effort; stays local-first */ });
-    }
+    // pinboard's own store is NOT attached to the person's pod: the write-through never reached a pod in this app
+    // (no pod routing on the bundle, so the first flush refused a mem:// key and the store's cache went offline), and
+    // what it would write is not sealed. It comes back only with a sealed design (scripts/lint-no-pinboard-pod-attach.mjs).
     // Refresh the on-screen noticeboard when a post changed under it (requested attachment bytes landed, an answer
     // to my request was recorded). Subscribed once; the hook points at the active circle's loader.
     for (const ev of NOTICEBOARD_REFRESH_EVENTS) {

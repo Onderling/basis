@@ -66,7 +66,7 @@ import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { sealedLocalBackend, sealedKeyValue } from '../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { backendSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
-import { attachPinboardPodFor, circlePodWriterFor } from './src/core/phonePodSession.js';
+import { circlePodWriterFor } from './src/core/phonePodSession.js';
 // γ-next.recipe — per-circle pending-recipe cache (AsyncStorage-backed).
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
@@ -321,19 +321,13 @@ export default function App() {
   // falls through to the local AsyncStorage side.  Refreshed on mount and
   // every time the SecureStore restore completes.
   const circlePodWriterRef = useRef(null);
-  // S4 — when signed in, route pinboard's items to the user's REAL pod (web parity with
-  // circleApp). Same attachPod seam; the RN authenticated fetch is the OidcSessionRN bearer.
-  // Best-effort; fires on session restore + once the bundle is up (whichever lands later).
-  // the sign-in's steps live in src/core/phonePodSession.js (the phone in Node runs the same ones)
-  const maybeAttachPinboardPod = useCallback(async () => {
-    await attachPinboardPodFor({ session: sessionRef.current, agent: bundleRef.current?.agent });
-  }, []);
+  // the sign-in's steps live in src/core/phonePodSession.js (the phone in Node runs the same ones). Pinboard's own
+  // store is not attached to the pod (web parity; scripts/lint-no-pinboard-pod-attach.mjs).
   const refreshCirclePodWriter = useCallback(async () => {
     const w = await circlePodWriterFor(sessionRef.current);
     circlePodWriterRef.current = w;
     if (w) dlog.boot('circle pod writer ready @', w.podRoot);
-    maybeAttachPinboardPod();   // restore completed → attach pinboard's item store too
-  }, [maybeAttachPinboardPod]);
+  }, []);
   const getCirclePodWriter = useCallback(() => circlePodWriterRef.current, []);
 
   useEffect(() => {
@@ -625,7 +619,6 @@ export default function App() {
             else b.agent.dismissRestorePending?.().catch?.(() => {});
           });
         }
-        maybeAttachPinboardPod();   // S4 — bundle up → attach pinboard's item store if already signed in
         // Mark the first-boot seed as done so the next launch skips it.
         // Fire-and-forget; failures are non-fatal (next launch re-seeds,
         // which is harmless because realAgent's listOpen probe is the

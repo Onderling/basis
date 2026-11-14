@@ -141,12 +141,29 @@ export function setAdvanced(state, on) {
   return { ...state, advanced: on === true };
 }
 
-/** The purpose a circle gets when nobody typed one: its kind's own sentence, never an empty value. */
-export function purposeOrDefault(state, t) {
-  const typed = String(state?.purpose ?? '').trim();
-  if (typed) return typed;
-  const kind = CIRCLE_KINDS.includes(state?.kind) ? state.kind : 'other';
-  return typeof t === 'function' ? t(`circle.wizard.create.default_purpose_${kind}`) : '';
+/** The kinds the first step asks: the templates that exist, then "other" (no template: the neutral defaults). */
+export const CREATE_KIND_CHOICES = Object.freeze([...CIRCLE_KINDS, 'other']);
+
+/** The purpose a kind suggests: its own sentence, shown in the field where the person can change it; none for "other". */
+export function suggestedPurpose(kind, t) {
+  return CIRCLE_KINDS.includes(kind) && typeof t === 'function' ? t(`circle.wizard.create.default_purpose_${kind}`) : '';
+}
+
+/**
+ * THE KIND, PICKED ON THE FIRST STEP: its template fills what the circle can do (`setKind`), and its sentence goes into
+ * the purpose field as a suggestion the person sees. Another pick replaces a suggestion they did not touch; what they
+ * typed stays. Nothing is chosen for them: a new circle has no kind until this is called.
+ */
+export function chooseKind(state, kind, t) {
+  const before = String(state?.purpose ?? '');
+  const untouched = !before.trim() || before === suggestedPurpose(state?.kind, t);
+  const next = setKind(state, kind);
+  return { ...next, kind, purpose: untouched ? suggestedPurpose(kind, t) : before };
+}
+
+/** The purpose a circle is made with: what the field holds. Nothing is filled in that the person did not see. */
+export function purposeOrDefault(state) {
+  return String(state?.purpose ?? '').trim();
 }
 /** The state as it is created: the defaults the short path did not ask for filled in (`t` for the purpose's words). */
 export function withCreateDefaults(state, t) {
@@ -369,11 +386,11 @@ export function policyPatchFromState(state) {
 /* ─── Initial state ─────────────────────────────────────────── */
 
 export function initialState() {
-  // a household by default (the short path asks no kind): its template fills what the circle can DO, as a pick would —
-  // but not who sees whose name. A create that never asked must not widen that: members see each other's names per
-  // pair until someone chooses "everyone" under Geavanceerd (`setRevealPolicy`) or in settings afterwards. Held as a
-  // touched axis, so no kind picked in the fold moves it either — only the reveal choice itself does.
-  return markAxisTouched({ ...setKind(blankState(), 'household'), revealPolicy: 'pairwise' }, 'revealPolicy');
+  // NO KIND until the person picks one on the first step (`chooseKind`): the neutral template fills the axes meanwhile,
+  // and the step cannot be left without a kind (`identityComplete`). Who sees whose name stays per pair until someone
+  // chooses "everyone" under Geavanceerd (`setRevealPolicy`) or in settings afterwards; held as a touched axis, so no
+  // kind picked moves it — only the reveal choice itself does.
+  return markAxisTouched({ ...setKind(blankState(), null), kind: null, revealPolicy: 'pairwise' }, 'revealPolicy');
 }
 
 /** Who sees whose name in the circle — the choice under Geavanceerd, worded for both shells and the review. */
@@ -543,9 +560,10 @@ export function founderHandleSuggestionsFor(state) {
   return founderHandleSuggestions({ personaName, profileName: state?.profileName ?? null, prior: state?.priorHandles ?? [] });
 }
 
-/** Can the identity step be left? A name, a valid id, and — when the founder needs one — a valid handle. */
+/** Can the identity step be left? A name, a valid id, a kind, and — when the founder needs one — a valid handle. */
 export function identityComplete(state) {
   if (!state?.name?.trim() || !isValidSlug(state.groupId)) return false;
+  if (!CREATE_KIND_CHOICES.includes(state.kind)) return false;   // the kind is asked, never assumed
   return !state.needsHandle || isValidName(String(state.handle ?? '').trim());
 }
 

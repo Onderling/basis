@@ -41,7 +41,7 @@ describe("the founder's handle", () => {
     expect((await loadFounderHandle({ callSkill: profile({ handle: 'bea' }) })).needsHandle).toBe(false);
   });
   it('the identity step cannot be left without a valid handle when one is needed', () => {
-    const s = { ...initialState(), name: 'Buurt', groupId: 'abc123', needsHandle: true, handle: '' };
+    const s = { ...initialState(), kind: 'neighbourhood', name: 'Buurt', groupId: 'abc123', needsHandle: true, handle: '' };
     expect(identityComplete(s)).toBe(false);
     expect(identityComplete({ ...s, handle: '   ' })).toBe(false);
     expect(identityComplete({ ...s, handle: 'bea' })).toBe(true);

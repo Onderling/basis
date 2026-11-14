@@ -91,6 +91,7 @@ import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
 
 import {
   initialState as createGroupInitialState,
+  chooseKind as createGroupChooseKind,
   finalSubmit as createGroupFinalSubmit,
   loadFounderHandle,
 } from '../../src/core/wizards/createGroupState.js';
@@ -778,9 +779,10 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
  * The single-admin creator step, split out so ONE circle can then take MULTIPLE joiners (the sealed-circle
  * three-member case) instead of `pairCircle` minting a fresh circle per pair.
  */
-export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null } = {}) {
+export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null, kind = 'household' } = {}) {
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
-  let state = createGroupInitialState();
+  // the kind, picked as the wizard's first step asks it (a new circle has none until someone picks one)
+  let state = createGroupChooseKind(createGroupInitialState(), kind, null);
   state.groupId = groupId;
   state.name = name;
   state.purpose = purpose;

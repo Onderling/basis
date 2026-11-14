@@ -78,6 +78,7 @@ SUITE('syncing through a pod, on the phone', () => {
     await anna.openCircle(CIRCLE);
     console.info('[pod-sync-phone] created', JSON.stringify({ podBacked: created?.podBacked, podUrl: created?.podUrl, storage: created?.storage }));
     const joined = await joinExistingCircle(anna, bram, { groupId: CIRCLE, handle: 'bram', podUrl: created?.storage?.groupPodUri ?? null });
+    console.info('[pod-sync-phone] PROBE anna sends', anna.copyLog().split('\n').filter((l) => /send\.|deliver|hold|give/i.test(l)).slice(-25).join(' | '));
     expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);
     await anna.bundle.registerCirclePresence?.([CIRCLE]);
     await bram.bundle.registerCirclePresence?.([CIRCLE]);

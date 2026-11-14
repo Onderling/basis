@@ -14,8 +14,9 @@
  *                        box's tile shows the circle's id. The membership-lane address statement is the cure; the change
  *                        that lands it turns this into a plain test, and is not done while it is red.
  *   two joiners          A founds a circle with B, then C joins it. B and C never met: each holds the other's row at a
- *                        proven per-circle address that is not the person's global key, and a line each way lands. A
- *                        fresh profile has the address fallback OFF, so a line that lands came by the per-circle route.
+ *                        proven per-circle address that is not the person's global key, and a NOTICEBOARD post each
+ *                        way is read on the other side (sealed under the circle's key: a chat line would not prove the
+ *                        key). A fresh profile has the address fallback OFF, so what lands came by the per-circle route.
  *                        Its red leg: skip the admin's hand-over after a join (`propagateCircleAddressesAfterJoin`) and
  *                        B and C cannot reach each other — the hole that hand-over closed.
  *
@@ -208,18 +209,22 @@ test('two joiners who never met reach each other at per-circle addresses', async
     }
 
     // the circle is SEALED (the wizard makes every circle p2) and has no pod: its key reaches a joiner only as key
-    // statements, and the key-establish to C was refused while C's address was not answering yet (the red after train
-    // ae). So a line landing at C below, with no reload, is C holding the circle key.
+    // statements. A CHAT line does not prove the joiner holds that key (chat between members rides the peer channel, not
+    // the circle's group key: found 2026-11-14); a NOTICEBOARD post does: it goes through the circle's scope and is
+    // sealed under the circle's key, so a post each way read on the other side, with no reload, is both joiners holding
+    // the same key (and neither sealing under a key of its own making).
     const posture = await A.page.evaluate(async (cid) => (await window.onderlingCirclePolicy?.get(cid))?.storagePosture ?? null, circle);
     expect(posture, 'the circle is sealed (p2)').toBe('p2');
-    // and a line each way lands (the address fallback is off on a fresh profile: no global-key route to take)
-    for (const peer of [B, C]) await intoChat(peer.page, circle);
+    const boardTab = (page) => page.locator('.circle-view__tab[data-tab="noticeboard"]');
+    const toBoard = async (page) => { await intoChat(page, circle); await boardTab(page).first().click(); await page.waitForTimeout(1000); };
     for (const [from, to] of [[B, C], [C, B]]) {
-      const line = `van ${from.label} aan ${to.label} ${Date.now().toString(36).slice(-5)}`;
-      await sendChat(from.page, line, 1000);
-      const landed = await waitForBubble(to.page, line, { tries: Math.ceil(CATCH_UP_MS / 2500), every: 2500 });
-      expect(landed, `${from.label}'s line reached ${to.label}`).toBe(true);
-      log(`STEP2 ${from.label} → ${to.label}`, 'PASS', line);
+      const line = `prikbord van ${from.label} aan ${to.label} ${Date.now().toString(36).slice(-5)}`;
+      await toBoard(from.page);
+      await from.page.locator('.cc-noticeboard__input').fill(line);
+      await from.page.locator('.cc-noticeboard__post').click();
+      await expect.poll(async () => { await toBoard(to.page); return (await to.page.locator('body').innerText()).includes(line); },
+        { timeout: CATCH_UP_MS, intervals: [2500], message: `${from.label}'s noticeboard post is read on ${to.label}` }).toBe(true);
+      log(`STEP2 ${from.label} → ${to.label} (noticeboard, sealed)`, 'PASS', line);
     }
   } finally {
     if (stats) log('TOGGLE skip the join hand-over', 'OBSERVED', `served ${stats.served} · rewritten ${stats.rewritten}`);

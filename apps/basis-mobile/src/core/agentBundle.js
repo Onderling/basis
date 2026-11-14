@@ -925,6 +925,8 @@ export async function bootAgentBundle(opts = {}) {
     keyEmit: (gid, event) => agent.keyEmit?.(gid, event) ?? null,
     // ONE sealing key family: the producer opens with the device's per-circle address key's image.
     circleSealingKeyPairFor: (gid) => agent.circleSealingKeyPairFor?.(gid) ?? null,
+    // this device's self in a circle: who asks whether it may establish the circle's first key (the key rail's rule)
+    circleSelfRef: (gid) => agent.circleSelf?.(gid)?.webid ?? agent.identity?.chat?.pubKey ?? null,
     // The history sidecar (the replace ceremony's absorbed keys), read by the open path.
     historyKeyChainFor: (gid) => agent.historyKeyChainFor?.(gid) ?? null,
   });

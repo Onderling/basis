@@ -64,7 +64,7 @@ const aclAgentOf = (m) => m.podAgent ?? m.webId;
  *   (local to this device, never on the roster). A member re-added without one (a reload's roster seed) gets
  *   the saved one back, so a later removal revokes the identity the grant actually named.
  */
-export function createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {} }) {
+export function createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {}, mayEstablish = true }) {
   if (!sharing || typeof sharing.grant !== 'function' || typeof sharing.revoke !== 'function') {
     throw new Error('createControlAgent: sharing with grant/revoke required');
   }
@@ -101,6 +101,8 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
     return bootstrapping;
   }
   async function bootstrapOnce() {
+    // a device that may not establish the circle's first key never mints one, by any path (its key comes by the key log)
+    if (mayEstablish !== true) return null;
     const { written } = await changeKeyResource(keyStore, (cur) => (cur ? null : buildGroupKeyResource({
       version: 1, groupKey: generateGroupKey(), recipients: recipientsWithController(members.map((m) => m.publicKey)),
     })));
@@ -148,6 +150,8 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
           dropped = false;
         }
         if (!cur) {   // no key yet: the first one, sealed to this agent's roster + the joiner
+          // …only on a device that may establish it; elsewhere nothing is written (the key arrives by the key log)
+          if (mayEstablish !== true) return null;
           return buildGroupKeyResource({ version: 1, groupKey: generateGroupKey(), recipients: [...recipientsWithController(members.map((x) => x.publicKey)), m.publicKey] });
         }
         if ((cur.recipients ?? []).includes(m.publicKey)) return null;   // already holds this version

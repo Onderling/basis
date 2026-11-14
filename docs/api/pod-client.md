@@ -701,7 +701,7 @@ The roster could not say whether the member is still a member: the join's key ch
 **Kind:** function · **Import:** `createControlAgent` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
 
 ```js
-createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {} })
+createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {}, mayEstablish = true })
 ```
 
 Create the household control-agent: applies pod ACL grant/revoke AND group-key rotation together

@@ -40,6 +40,33 @@ export const KEY_CATCHUP_SUBTYPES = Object.freeze({
 });
 
 /**
+ * WHO MAY ESTABLISH A CIRCLE'S FIRST KEY: a self that holds the ADMIN role on the circle's folded roster (the founder,
+ * a co-admin). One rule for both ends: the receivers' key rail refuses a `key-establish` from anyone else, and a device
+ * builds its producer's first key only when its own self passes it (a member's device minted its own first key and
+ * sealed under it, unreadable to the founder: found 2026-11-14).
+ * @param {object|null} row  the self's row on the circle's folded roster (`listGroupMembers`)
+ */
+export function rowMayEstablishKey(row) { return row?.role === 'admin'; }
+
+/**
+ * Whether THIS device's self in a circle may establish its first key (`rowMayEstablishKey` over the folded roster).
+ * THREE answers: `true` (may), `false` (the self is on the roster and is not an admin), `null` (CANNOT TELL: the roster
+ * could not be read, or does not hold this self yet). A caller treats `null` as it treats a missing key pair: nothing
+ * built yet, nothing kept, asked again at the next ask. It never falls to 'may' (a member would mint), nor to 'may not'
+ * kept for good (a founder whose first read failed could never mint, and could not post in their own circle).
+ * @param {{ callSkill: Function, circleId: string, selfRef: string|null }} a
+ * @returns {Promise<boolean|null>}
+ */
+export async function selfMayEstablishKey({ callSkill, circleId, selfRef }) {
+  if (typeof callSkill !== 'function' || !circleId || typeof selfRef !== 'string' || !selfRef) return null;
+  try {
+    const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
+    const row = (Array.isArray(r?.members) ? r.members : []).find((m) => m && (m.webid ?? m.addr ?? m.ref) === selfRef);
+    return row ? rowMayEstablishKey(row) : null;
+  } catch { return null; }
+}
+
+/**
  * The key lane's binding — the base roster rule (author key ∈ the ref's proven address set) PLUS
  * the authority rule above. Spineless roster reads, like every binding verifier (no recursion).
  *
@@ -72,7 +99,7 @@ export function keyBindingVerifier(callSkill, { rotateClassFor = null } = {}) {
       // The authority rule — receiver-enforced, so a sender cannot pick a weaker one.
       if (kind === 'key-establish') {
         if (payload?.event?.version !== 1) return false;   // an establish IS version 1, by definition
-        return row.role === 'admin';
+        return rowMayEstablishKey(row);   // the same rule a device asks before it mints a first key
       }
       if (kind === 'key-rotate') {
         let cls = 'any-admin';

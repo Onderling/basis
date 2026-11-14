@@ -306,6 +306,13 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
         { sealed: () => sealedAnswer(policy) },
       );
     },
+    /** Open a sealed text with this phone's own strategy for the circle (what its open path uses): the plaintext, or
+     *  null when this device holds no key that opens it. */
+    openSealed: async (circleId, sealed) => {
+      const strat = await pods.getCircleSealStrategy(circleId, (await policyStore.get?.(circleId)) ?? null).catch(() => null);
+      if (!strat?.open) return null;
+      try { const out = await strat.open(sealed); return typeof out === 'string' ? out : (out?.text ?? out ?? null); } catch { return null; }
+    },
     /** The circle's policy as this phone's policy store holds it (what the circle pods read). */
     policyOf: async (circleId) => (await policyStore.get?.(circleId)) ?? null,
     /** The app's pod read-back (ChatScreen's): `comeToFront()` is what AppState 'active' calls. */

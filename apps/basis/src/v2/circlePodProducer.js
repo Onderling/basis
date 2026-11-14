@@ -248,7 +248,9 @@ export async function createCirclePodProducer({
   }
   if (bootstrap && ownsRoot && controlAgent && mayMint) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
-  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey, ownsRoot, controllerPublicKey: controllerKey.publicKey, keyHolders };
+  // `keyFromLog`: a member's device of a circle whose root it holds locally (no pod) but whose first key it may not
+  // establish: its key is the KEY LOG's (strategyFromKeyLog), never a copy in its own store that would not move on
+  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey, ownsRoot, keyFromLog: ownsRoot && !mayMint, controllerPublicKey: controllerKey.publicKey, keyHolders };
 }
 
 /**

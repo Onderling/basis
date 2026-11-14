@@ -361,12 +361,12 @@ async function buildCircleSealStrategy(circleId, policy) {
     const prod = await ensureCirclePod(circleId, policy);
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
-      strat = await prod.controlAgent.sealingStrategy(idKey.privateKey);
-      // a MEMBER's device holds no key resource of its own (it may not establish one): its strategy is the key log's,
-      // the founder's key events folded and opened with this device's key pair (null until one reached it)
-      if (!strat && idKey?.privateKey) {
-        strat = strategyFromKeyLog({ events: circleKeyEventStore.list(circleId), groupId: circleId, posture: policy?.storagePosture, privateKey: idKey.privateKey });
-      }
+      // a MEMBER's device of a circle without a pod may not establish its key: its strategy is the KEY LOG's (the
+      // founder's key events folded, opened with this device's key pair; null until one reached it), so a rotation's
+      // new version is what its next write seals under. Everyone else: the key resource, as before.
+      strat = (prod.keyFromLog === true)
+        ? (idKey?.privateKey ? strategyFromKeyLog({ events: circleKeyEventStore.list(circleId), groupId: circleId, posture: policy?.storagePosture, privateKey: idKey.privateKey }) : null)
+        : await prod.controlAgent.sealingStrategy(idKey.privateKey);
       // G11 — no-pod defence-in-depth: content sealed under a version carried only in the key-event LOG
       // (a rotation fanned to this device) still opens. Shared wrapper; lazy read at open time (web parity).
       if (strat && idKey?.privateKey) {

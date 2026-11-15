@@ -1322,7 +1322,7 @@ export async function createSecureAgent(opts = {}) {
     const once = { ...opts, hold: false, guarantee: 'best-effort' };
     const owner = (typeof opts?.personaOwner === 'string' && opts.personaOwner)
       || (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
-    if (!owner) return _sendWithFailover(addr, payload, once);
+    if (!owner) return notDeliveredThrows(await _sendWithFailover(addr, payload, once));
     const r = await sendAsPersona(addr, payload, once, owner);
     if (r?.delivered === false) {
       const err = new Error(`secure-agent: a persona's held message did not go out (${r.reason})`);
@@ -1330,6 +1330,16 @@ export async function createSecureAgent(opts = {}) {
       throw err;
     }
     return r;
+  }
+  /**
+   * A route that ANSWERED `{delivered: false}` (the relay sweep's last answer when none acked) did not deliver: for a send
+   * that holds, that is a failure of the address, thrown, so it is held and never counted as sent or as a sign of life.
+   */
+  function notDeliveredThrows(r) {
+    if (r?.delivered !== false) return r;
+    const err = new Error(`secure-agent: not delivered (${r?.reason ?? 'no ack'})`);
+    err.notDelivered = true;
+    throw err;
   }
   /** A persona's connection came up, or took a circle address: re-send what is held AS that persona (nothing counted —
    *  it is our connection that changed, not the peer's silence). */
@@ -2562,7 +2572,7 @@ export async function createSecureAgent(opts = {}) {
       // not yet seen alive and attempted within the interval: join the hold, no wire attempt (`notYetWaits`)
       if (notYetWaits(addr)) return enqueueHold(addr, payload, opts);
       try {
-        const result = await _sendWithHandshakeRetry(addr, payload, opts);
+        const result = notDeliveredThrows(await _sendWithHandshakeRetry(addr, payload, opts));
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
         clearDeliveryFailures(addr);          // it answered — not a dead address
         return { held: false, delivered: true, msgId, result };

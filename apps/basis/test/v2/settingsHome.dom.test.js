@@ -39,7 +39,7 @@ const allSettingsProps = () => ({
   devices: [{ deviceId: 'dev-1', label: 'telefoon', revoked: false }], onRevokeDevice: vi.fn(),
   companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }], onOpenCompanionGrant: vi.fn(), onGrantCompanion: vi.fn(),
   connections: [{ viewPubKey: 'v1', short: 'v1…', label: 'scherm', sees: null, opCount: 1 }], onUnpairConnection: vi.fn(),
-  connectionChoices: { ops: [], sections: [] }, onPairConnection: vi.fn(), parseConnectionOffer: () => null,
+  connectionChoices: { ops: [], sections: [] }, screenPairing: { offer: async () => ({ ok: false, reason: 'unreadable' }), pick: async () => ({ ok: false }), grant: async () => ({ ok: false }), cancel: () => {}, picked: false }, onPaired: vi.fn(),
 });
 
 describe('settings behind the gear (web)', () => {

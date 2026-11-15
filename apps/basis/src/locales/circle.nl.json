@@ -7101,6 +7101,54 @@
       "text": "Deze koppelcode is onvolledig.",
       "doc": "Refusal: sleutel of nonce ontbreekt."
     },
+    "connection_pick_code": {
+      "text": "Welke code staat op het andere scherm? Kies die.",
+      "doc": "The screen door: three codes, the person picks the one their screen shows (before any tick)."
+    },
+    "connection_none_of_these": {
+      "text": "Geen van deze",
+      "doc": "The screen door: the code on my screen is not among the three (nothing is connected)."
+    },
+    "connection_scan": {
+      "text": "Scan de code op het scherm",
+      "doc": "Phone: opens the camera to read the pairing code the other screen shows."
+    },
+    "connection_offer_pairing-not-an-offer": {
+      "text": "Deze koppelcode is onvolledig.",
+      "doc": "Refusal (screen door): no key or nonce in the offer."
+    },
+    "connection_offer_pairing-other-relay": {
+      "text": "Dat scherm wacht op een andere relay dan dit apparaat, dus het kan hier niet gekoppeld worden.",
+      "doc": "Refusal (screen door): the offer's relay is not one this device is on (the grant could never reach it)."
+    },
+    "connection_offer_pairing-nonce-replayed": {
+      "text": "Deze koppelcode is al gebruikt. Maak een nieuwe op het scherm.",
+      "doc": "Refusal (screen door): an offer whose nonce was already granted here."
+    },
+    "connection_offer_pairing-nothing-pending": {
+      "text": "Plak de koppelcode opnieuw.",
+      "doc": "Refusal (screen door): a pick with no offer waiting."
+    },
+    "connection_offer_pairing-expired": {
+      "text": "Te laat. Maak een nieuwe koppelcode op het scherm.",
+      "doc": "Refusal (screen door): the pick came after the offer's lifetime."
+    },
+    "connection_offer_pairing-wrong-code": {
+      "text": "Dat is niet de code op je scherm, dus er is niets gekoppeld. Maak een nieuwe koppelcode op het scherm.",
+      "doc": "Refusal (screen door): the picked code is not the screen's (or 'none of these'); the offer is gone."
+    },
+    "connection_offer_pairing-no-pick": {
+      "text": "Kies eerst de code die je scherm toont.",
+      "doc": "Refusal: a grant asked for before the right pick."
+    },
+    "connection_offer_nothing-picked": {
+      "text": "Vink minstens één ding aan dat het mag zien of doen.",
+      "doc": "Refusal: the ticks grant nothing."
+    },
+    "connection_offer_grant-failed": {
+      "text": "Koppelen is niet gelukt. Probeer het opnieuw.",
+      "doc": "Refusal: the grant op failed."
+    },
     "mnemonic_written": {
       "text": "Opgeschreven",
       "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."

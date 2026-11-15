@@ -829,6 +829,7 @@ import { mergeAvailability } from '../../src/v2/memberAvailability.js';
 import { createAvailabilityStore, localStorageAvailabilityIo, podAvailabilityIo, tieredAvailabilityIo } from '../../src/v2/memberAvailability.js';
 import { renderCircleAvailability } from './circleAvailability.js';
 import {
+  onPolicyPostureChange,
   createCirclePolicyStore, localStoragePolicyIo, localCirclePolicyStore,
   createMemberOverrideStore, localStorageOverrideIo,
 } from '../../src/v2/circlePolicyStore.js';
@@ -2034,6 +2035,9 @@ async function buildCircleSealStrategy(circleId, policy) {
 // circle re-opens.
 const devMediaBucket = makeDevMediaBucket();
 const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
+// a policy write that changes the circle's pod or posture: the producer, the strategy, the media composition and the share
+// enforcement built from the old one go (mobile parity); the next use builds them from the policy in force
+onPolicyPostureChange((circleId) => { circlePods.delete(circleId); circleSealStrategies.delete(circleId); circleMediaCompositions.delete(circleId); _shareEnforcementByCircle.delete(circleId); });
 function getCircleMediaComposition(circleId, policy) {
   if (!circleMediaCompositions.has(circleId)) {
     circleMediaCompositions.set(circleId, resolveCircleMediaComposition(circleId, policy).catch(() => null).then((c) => {

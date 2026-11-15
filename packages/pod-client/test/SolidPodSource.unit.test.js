@@ -97,6 +97,23 @@ describe('SolidPodSource — read', () => {
     expect(result.lastModified).toBe('Wed, 28 Apr 2026 10:00:00 GMT');
   });
 
+  it('the ETag belongs to the body it came with: a write landing just after the read cannot pair the old body with the new ETag', async () => {
+    // Measured on a real pod (2026-11-15): the body was taken from a GET and the ETag from a HEAD sent after it; another
+    // writer's PUT in between gave the old body under the new ETag, a write conditioned on that ETag passed, and that
+    // writer's change was lost (13 of 40 runs of the key-file race). This pod changes the resource right after every GET.
+    let server = { body: 'v1', etag: '"1"' };
+    const fetchFn = async (url, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const res = makeRes({ body: method === 'HEAD' ? '' : server.body, headers: { etag: server.etag }, url: String(url) });
+      if (method === 'GET') server = { body: 'v2', etag: '"2"' };   // another writer's PUT lands now
+      return res;
+    };
+    const source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+    const got = await source.read('/foo.txt');
+    expect(new TextDecoder().decode(got.content)).toBe('v1');
+    expect(got.etag).toBe('"1"');
+  });
+
   it('404 → NOT_FOUND', async () => {
     const fetchFn = makeFetch({
       [`GET ${POD}missing.txt`]: makeRes({ status: 404, statusText: 'Not Found' }),

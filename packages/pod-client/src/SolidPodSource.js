@@ -31,12 +31,10 @@
  * `PodClientError` subclasses.
  */
 import {
-  getFile,
   overwriteFile,
   deleteFile,
   getSolidDataset,
   getContainedResourceUrlAll,
-  getContentType,
   getSourceUrl,
   createContainerAt,
 } from '@inrupt/solid-client';
@@ -153,22 +151,6 @@ function toBlob(data, contentType) {
   throw podError('Unsupported write payload', { code: 'INVALID_ARGUMENT' });
 }
 
-/**
- * Read a couple of conventional headers off whatever `solid-client` returned.
- * We piggy-back on the underlying Blob plus the `internal_resourceInfo`
- * metadata; we cannot get `lastModified` / `etag` from the Inrupt API
- * directly so we re-fetch the headers via HEAD when callers need them.
- *
- * Returns `{ contentType, size }` — the rest is filled in by callers that
- * also issued a HEAD.
- */
-function infoFromInruptFile(file) {
-  const contentType = getContentType(file) ?? DEFAULT_CONTENT_TYPE;
-  // Blob exposes `.size`; if not present (defensive), fall back to 0.
-  const size = typeof file?.size === 'number' ? file.size : 0;
-  return { contentType, size };
-}
-
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 /**
@@ -224,36 +206,35 @@ export class SolidPodSource extends DataSource {
   async read(uri, _opts = {}) {   // eslint-disable-line no-unused-vars
     const fullUri = this.#resolve(uri);
     const t0 = Date.now();
-    let blob;
+    // ONE GET gives the body AND its ETag. The body must never be paired with an ETag from a second request: another
+    // writer's PUT landing between the two gives the old body under the new ETag, a write conditioned on that ETag then
+    // passes and writes that writer's change away (measured on a real pod, 2026-11-15: 13 of 40 runs of the key-file
+    // race when the ETag came from a HEAD sent after the GET; 0 of 40 from the GET's own response).
+    if (typeof this.#fetch !== 'function') {
+      throw podError('SolidPodSource: no fetch implementation available', { code: 'NETWORK_ERROR', uri: fullUri });
+    }
+    let res;
     try {
-      blob = await getFile(fullUri, { fetch: this.#fetch });
+      res = await this.#fetch(fullUri, { method: 'GET' });
     } catch (err) {
       rethrow(err, fullUri, 'read');
     }
-
-    const { contentType, size: blobSize } = infoFromInruptFile(blob);
-    const buf  = await blob.arrayBuffer();
-    const content = new Uint8Array(buf);
-    const size = content.byteLength || blobSize;
+    if (!res.ok) {
+      // PII-SAFE: op label + code + numeric status only.
+      log.error('pod', 'pod.error', { op: 'read', code: codeForStatus(res.status), status: res.status });
+      throw podError(`GET ${fullUri} failed: ${res.status} ${res.statusText}`, {
+        code:   codeForStatus(res.status),
+        status: res.status,
+        uri:    fullUri,
+      });
+    }
+    const content = new Uint8Array(await res.arrayBuffer());
+    const size = content.byteLength;
+    const contentType = (res.headers.get('content-type') || '').split(';')[0].trim() || DEFAULT_CONTENT_TYPE;
     // PII-SAFE: byte COUNT + duration only — never the resource path or content.
     log.info('pod', 'pod.read', { bytes: size, ms: Date.now() - t0 });
 
-    // The Inrupt API hides response headers from us; re-fetch with HEAD to
-    // get etag/lastModified for conflict detection.  Best-effort — failure
-    // here doesn't fail the read.
-    let etag = null;
-    let lastModified = null;
-    try {
-      const headRes = await this.#headFetch(fullUri);
-      if (headRes && headRes.ok) {
-        etag         = headRes.headers.get('etag');
-        lastModified = headRes.headers.get('last-modified');
-      }
-    } catch {
-      // ignore — etag/lastModified stay null
-    }
-
-    return { content, contentType, lastModified, etag, size };
+    return { content, contentType, lastModified: res.headers.get('last-modified'), etag: res.headers.get('etag'), size };
   }
 
   /**

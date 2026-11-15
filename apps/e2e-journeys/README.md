@@ -48,7 +48,7 @@ reuses the real tasks-v0 claim + substrate-mirror conflict machinery.
 client-credentials, runs a real on-device Solid-OIDC (DPoP) session, and proxies every
 pod fetch back to the device. Boot a CSS and point the harness at it:
 ```bash
-npx -y @solid/community-server@^7 -c @css:config/file.json -p 3001 -b http://localhost:3001/ -f /tmp/pod &
+npx -y @solid/community-server@7.2.0 -c @css:config/file.json -p 3001 -b http://localhost:3001/ -f /tmp/pod &
 CSS_URL=http://localhost:3001/ node run.mjs      # now j-companion runs instead of skipping
 ```
 

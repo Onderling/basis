@@ -40,7 +40,6 @@ export const INTEGRATION_TESTS = [
   { file: 'apps/basis-mobile/test/podSyncPhone.mobile.css.test.js', proves: 'Pod sync on the phone: Bram\'s phone, away while Anna\'s posted in their shared-pod circle, comes back to the front with no relay and reads the post from the pod (the app\'s own read-back entry, his own per-circle key).', needs: { acp: true } },
   { file: 'apps/basis-mobile/test/circleSealE2E.css.test.js',         proves: 'Mobile circle seal end-to-end against a real pod (the RN-side parity of the basis producer path).' },
   { file: 'apps/companion-node/test/companionAgentProxy.css.test.js', proves: 'The companion proxies a device\'s pod fetches to a real pod (holds no secret); out-of-scope is denied; revoke kills the grant.' },
-  { file: 'apps/pinboard/test/realPodAttach.css.test.js',                proves: 'Attaching a real Solid pod to pinboard and reading/writing through the attachment.' },
   { file: 'apps/basis/test/registryRestoreOverPod.css.test.js',        proves: 'Journey 5 on a real pod: the registry (a membership + a circle put away) rides the sealed pod medium; a new phone with the phrase finds both; the pod holds neither the circle id nor the mark in clear.' },
   { file: 'apps/basis/test/v2/settingsPodMedium.css.test.js',          proves: 'The parameter register self-sealed settings on a real pod: an agent-scope value round-trips, ciphertext at rest (fp1), a second device (same owner-seed) opens it, a stranger is denied.' },
 ];

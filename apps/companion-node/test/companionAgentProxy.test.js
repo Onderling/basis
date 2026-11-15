@@ -497,8 +497,11 @@ describe('companion-node R3.1 — agent-proxy WRITE/DELETE: the full method set 
     const podClient = host.store.getPodSource().podClient;
     const target    = `${POD_ROOT}notes/race.md`;
 
-    // First write creates the file; the host learns its etag (into its etag map).
+    // First write creates the file; then the host READS it (a read-modify-write caller), so its
+    // condition is that read's ETag. (After a plain write PodClient holds no ETag at all, L936:
+    // its next write would first read; the read is what puts an If-Match on the wire.)
     await podClient.write(target, 'v1', { contentType: 'text/markdown' });
+    expect((await podClient.read(target)).content).toBe('v1');
 
     // Someone else mutates the resource out-of-band: its DEVICE-side etag advances,
     // while the host still holds the OLD etag → its next If-Match is stale.
@@ -518,6 +521,34 @@ describe('companion-node R3.1 — agent-proxy WRITE/DELETE: the full method set 
     expect(devicePod.calls.slice(callsBefore).some((c) => c.method === 'PUT')).toBe(true);
     // The stale write did NOT land — v1 is intact on the device.
     expect(decodeBytes(devicePod.store.get('/notes/race.md').body)).toBe('v1');
+  }, 20_000);
+
+  it('ANOTHER WRITER AFTER OUR WRITE: the host\'s next default write reads through the proxy, sees it is no longer ours, refuses with a ConflictError and sends no PUT (L936)', async () => {
+    const owner = await AgentIdentity.generate(new VaultMemory());
+    const devicePod = makeDevicePod({ secret: 'oidc-access-SECRET-l936', files: [] });
+    const host   = await bootProxyHost({ owner, container: 'notes/' });
+    const device = await makeOwnerDevice(host, owner, devicePod);
+
+    const token = await authorizePod(owner, host.agent.address, {
+      scopes: ['pod.read:/notes/', 'pod.write:/notes/'], pod: POD_ROOT,
+    });
+    expect((await deliverPodDelegation(device, host.agent.address, token)).ok).toBe(true);
+
+    const podClient = host.store.getPodSource().podClient;
+    const target    = `${POD_ROOT}notes/race2.md`;
+    await podClient.write(target, 'v1', { contentType: 'text/markdown' });
+
+    // another writer replaces the body on the device; the host never read it
+    const cur = devicePod.store.get('/notes/race2.md');
+    devicePod.store.set('/notes/race2.md', { ...cur, body: new TextEncoder().encode('THEIRS'), etag: '"etag-THEIRS"' });
+
+    const callsBefore = devicePod.calls.length;
+    const caught = await podClient.write(target, 'v2', { contentType: 'text/markdown' }).catch((e) => e);
+    expect(caught?.code).toBe('CONFLICT');
+    const after = devicePod.calls.slice(callsBefore);
+    expect(after.some((c) => c.method === 'GET')).toBe(true);   // the lazy check crossed the proxy
+    expect(after.some((c) => c.method === 'PUT')).toBe(false);  // and nothing was sent over their change
+    expect(decodeBytes(devicePod.store.get('/notes/race2.md').body)).toBe('THEIRS');
   }, 20_000);
 
   it('OUT-OF-SCOPE WRITE/DELETE DENIED BY THE DEVICE: a read-only token cannot PUT or DELETE — opaque, no device fetch, nothing changed', async () => {

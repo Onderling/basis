@@ -99,4 +99,26 @@ SUITE('PodClient — CSS integration', () => {
     await a.delete(uri, { force: true });
     await a.close(); await b.close();
   });
+
+  // L936 (a), the question: does the pod hand back an RDF body RE-SERIALISED? Then the digest of what we sent never
+  // matches what we read, and every second write of a turtle / JSON-LD resource is a ConflictError with no other writer.
+  // Odd spacing, a prefix, a comment: the forms a serialiser would change first. Measured, one body per type.
+  it('an RDF resource written twice by one client: the pod gives back the bytes we sent, so the second write goes through (skips without CSS_CLIENT_ID)', async () => {
+    if (!process.env.CSS_CLIENT_ID || !process.env.CSS_CLIENT_SECRET) return;
+    const sv = new SolidVault({ webid: process.env.CSS_WEBID || `${CSS_URL}profile/card#me`, vault: new VaultMemory() });
+    await sv.login({ clientId: process.env.CSS_CLIENT_ID, clientSecret: process.env.CSS_CLIENT_SECRET, oidcIssuer: process.env.CSS_OIDC_ISSUER || CSS_URL });
+    const a = new PodClient({ podRoot: CSS_URL, auth: new SolidOidcAuth({ vault: sv }) });
+    const bodies = [
+      ['text/turtle', 'ttl', '@prefix ex:   <https://example.org/ns#> .\n# a comment\n<#me>   ex:peerAddr "x1" ;   ex:n 1 .\n'],
+      ['application/ld+json', 'jsonld', '{ "@context": {"ex": "https://example.org/ns#"},  "@id": "#me", "ex:peerAddr": "x1" }'],
+    ];
+    for (const [contentType, ext, body] of bodies) {
+      const uri = `${CSS_URL}${scratch}rdf-twice-${Date.now()}.${ext}`;
+      await a.write(uri, body, { contentType });
+      await a.write(uri, body.replace('x1', 'x2'), { contentType });
+      await a.write(uri, body.replace('x1', 'x3'), { contentType });
+      await a.delete(uri, { force: true });
+    }
+    await a.close();
+  });
 });

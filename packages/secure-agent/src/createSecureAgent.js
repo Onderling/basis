@@ -229,6 +229,11 @@ const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', s
  *  so a never-answering roster address costs at most one such wait a minute however often the device sends, while a
  *  newcomer is unaffected (the join signals them present, which drains the hold at once). */
 const NOT_YET_ATTEMPT_INTERVAL_MS = param({ key: 'secureAgent.notYetAttemptIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+/** How many held-for ADDRESSES a flush attempts side by side (each address's own messages still go one after another,
+ *  oldest first). A flush on (re)connect used to walk the addresses one by one, so K unreachable addresses cost K handshake
+ *  waits in a row (~15 s each on a phone). 4: one wait per four addresses, while the handshakes on one relay socket and
+ *  their key work on a phone stay few at once. */
+const FLUSH_PARALLEL_ADDRESSES = param({ key: 'secureAgent.flushParallelAddresses', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 const STALE_PARK_MAX = param({ key: 'secureAgent.staleParkMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
 /** How long a parked stale envelope waits for a refreshed sender check before its bucket is judged once more. */
 const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
@@ -988,6 +993,9 @@ export async function createSecureAgent(opts = {}) {
   /** address never seen alive → when its last wire attempt was made (`notYetWaits`). In memory: a restart may try once. */
   const notYetAttemptAt = new Map();
   const notYetAttemptIntervalMs = Number.isFinite(opts.notYetAttemptIntervalMs) ? opts.notYetAttemptIntervalMs : NOT_YET_ATTEMPT_INTERVAL_MS;
+  const flushParallelAddresses = Number.isFinite(opts.flushParallelAddresses) ? opts.flushParallelAddresses : FLUSH_PARALLEL_ADDRESSES;
+  /** addresses a flush is sending right now (`flushPending`). */
+  const flushingNow = new Set();
 
   // G12 — identity pubKey → the alias addresses bound to it (`registerPeerAddress`). The hold queue is
   // keyed by the address you SENT to, but presence arrives on the address the peer SPEAKS from: a peer
@@ -1246,17 +1254,36 @@ export async function createSecureAgent(opts = {}) {
    * `rescope` (the hold snapshots the scope it was sent under) and re-send them all.
    */
   async function flushHeld(rescope = null) {
-    let flushed = 0;
+    const addrs = [];
     for (const [addr, q] of [...pendingHold]) {
       if (typeof rescope === 'function') {
         for (const entry of q.values()) {
           try { entry.opts = rescope(entry.opts) ?? entry.opts; } catch { /* keep the terms it was held under */ }
         }
       }
-      flushed += (await flushPending(addr)).flushed;
+      addrs.push(addr);
     }
+    return flushAddresses(addrs, (addr) => flushPending(addr));
+  }
+
+  /**
+   * Flush several addresses SIDE BY SIDE, at most `flushParallelAddresses` at once; each address's own messages go one
+   * after another inside `flushPending`. One address timing out holds only its own slot.
+   */
+  async function flushAddresses(addrs, flushOne) {
+    let flushed = 0;
+    let next = 0;
+    const width = Math.max(1, Math.min(flushParallelAddresses, addrs.length));
+    const lane = async () => {
+      while (next < addrs.length) {
+        const addr = addrs[next++];
+        try { flushed += (await flushOne(addr))?.flushed ?? 0; } catch { /* re-held inside */ }
+      }
+    };
+    await Promise.all(Array.from({ length: width }, lane));
     return { flushed };
   }
+
   /**
    * Re-send a held message once, best-effort. A message sent AS a persona goes out on that persona's own
    * sockets only — never through the general router, whose sockets would show the relay the two are one device — and a
@@ -1278,21 +1305,25 @@ export async function createSecureAgent(opts = {}) {
   /** A persona's connection came up, or took a circle address: re-send what is held AS that persona (nothing counted —
    *  it is our connection that changed, not the peer's silence). */
   async function flushHeldOf(owner) {
-    let flushed = 0;
-    for (const [addr, q] of [...pendingHold]) {
-      if (![...q.values()].some((e) => e?.opts?.personaOwner === owner)) continue;
-      flushed += (await flushPending(addr, { countFailures: false })).flushed;
-    }
-    return { flushed };
+    const addrs = [...pendingHold].filter(([, q]) => [...q.values()].some((e) => e?.opts?.personaOwner === owner)).map(([addr]) => addr);
+    return flushAddresses(addrs, (addr) => flushPending(addr, { countFailures: false }));
   }
   async function flushPending(addr, { countFailures = true } = {}) {
     sweepExpiredHolds();
+    // an address already being flushed is not taken up by a second flush meanwhile (a reconnect during a flush): its
+    // queue was taken out whole by the first, which sends it in order; what is re-held lands back for the next one
+    if (flushingNow.has(addr)) return { flushed: 0 };
     const q = pendingHold.get(addr);
     if (!q || q.size === 0) return { flushed: 0 };
+    flushingNow.add(addr);
+    try { return await flushPendingNow(addr, q, { countFailures }); } finally { flushingNow.delete(addr); }
+  }
+  async function flushPendingNow(addr, q, { countFailures }) {
     const entries = [...q.values()];
     pendingHold.delete(addr);
     let flushed = 0;
-    for (const entry of entries) {
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
       const { payload, opts } = entry;
       try {
         await resendHeld(addr, payload, opts);
@@ -1306,8 +1337,12 @@ export async function createSecureAgent(opts = {}) {
         // is just paying for it again later. Giving up is REPORTED, like every other drop.
         // A young-address re-flush is a guess at WHEN, not evidence the address is dead: it never counts.
         // …nor is a persona that has no socket of its own yet: that is ours to fix, not the peer's silence.
-        if (countFailures && !err?.personaNoConnection && recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
-        else enqueueHold(addr, payload, opts);
+        // ONE failure per address per flush: its later messages share its fate, so they are re-held (in order) without
+        // each paying another handshake wait (or, written off, all reported) — one attempt per address per flush
+        const rest = entries.slice(i);
+        if (countFailures && !err?.personaNoConnection && recordDeliveryFailure(addr)) for (const e of rest) dropHeld(addr, e, 'peer-unreachable');
+        else for (const e of rest) enqueueHold(addr, e.payload, e.opts);
+        break;
       }
     }
     if (flushed && typeof console !== 'undefined') {

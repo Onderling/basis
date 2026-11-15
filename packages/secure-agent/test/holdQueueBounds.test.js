@@ -218,22 +218,25 @@ describe('hold queue — an address never seen alive is "not yet", not dead', ()
     await a.shutdown();
   }, 15_000);
 
-  it('a presence signal drains everything held for it: each held message goes on the wire', async () => {
-    const a = await agent({ holdMaxDeliveryFailures: 10, notYetAttemptIntervalMs: 60_000 });
-    const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
-    await a.addSecureTransport('relay', relay);
-    const probe = 'probe-address-measuring-one-attempt-111111111';
-    await a.peer.sendTo(probe, { msgId: 'probe' }, HOLD);
-    const perAttempt = relay.puts;
-    const NEW = 'newcomer-circle-address-333333333333333333333';
-    for (const id of ['p1', 'p2', 'p3', 'p4']) await a.peer.sendTo(NEW, { msgId: id }, HOLD);
-    expect(a.heldFor(NEW)).toBe(4);
-    const before = relay.puts;
-    await a.presenceSignal(NEW);
-    // nobody is really there (a black hole); the point: presence attempted ALL four, none stayed parked behind the interval
-    expect(relay.puts - before, 'four resends on the wire').toBe(4 * perAttempt);
-    await a.shutdown();
-  }, 30_000);
+  it('a presence signal drains everything held for it: a receiver who was never seen alive gets all four, in order', async () => {
+    const { startRelay } = await import('@onderling/relay');
+    const R = await startRelay({ port: 0, log: false });
+    const url = `ws://127.0.0.1:${R.port}`;
+    const got = [];
+    const anna = await agent({ holdMaxDeliveryFailures: 3, notYetAttemptIntervalMs: 60_000, relayReadyTimeoutMs: 3000 });
+    const bram = await agent({ relayReadyTimeoutMs: 3000, onPeerMessage: (m) => got.push(m?.payload?.msgId ?? m?.msgId) });
+    try {
+      await anna.relay.connect({ relayUrl: url, awaitReady: true }); anna.setTransportMode('relay');
+      const SEND = { firstSendTimeoutMs: 400, retryDelays: [], guarantee: 'hold-forward' };
+      for (const id of ['p1', 'p2', 'p3', 'p4']) expect((await anna.peer.sendTo(bram.identity.pubKey, { subtype: 'note', msgId: id }, SEND)).held).toBe(true);
+      expect(anna.heldFor(bram.identity.pubKey)).toBe(4);
+      await bram.relay.connect({ relayUrl: url, awaitReady: true }); bram.setTransportMode('relay');
+      await anna.presenceSignal(bram.identity.pubKey);      // they are here: none stays parked behind the interval
+      const t = Date.now(); while (Date.now() - t < 8000 && got.filter((x) => String(x).startsWith('p')).length < 4) await new Promise((r) => { setTimeout(r, 25); });
+      expect(got.filter((x) => String(x).startsWith('p'))).toEqual(['p1', 'p2', 'p3', 'p4']);
+      expect(anna.heldFor(bram.identity.pubKey)).toBe(0);
+    } finally { await anna.shutdown(); await bram.shutdown(); await R.close?.(); }
+  }, 60_000);
 
   it('a restored device with a roster of K never-seen addresses: its first boot\'s sends cost K wire attempts, not one per send', async () => {
     const K = 6, SENDS = 4;

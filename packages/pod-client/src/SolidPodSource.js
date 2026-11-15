@@ -313,16 +313,11 @@ export class SolidPodSource extends DataSource {
       rethrow(err, fullUri, 'write');
     }
 
-    // Best-effort HEAD for fresh etag/lastModified.
-    let etag = null;
-    let lastModified = null;
-    try {
-      const headRes = await this.#headFetch(fullUri);
-      if (headRes && headRes.ok) {
-        etag         = headRes.headers.get('etag');
-        lastModified = headRes.headers.get('last-modified');
-      }
-    } catch { /* ignore */ }
+    // NO version is named for a plain write: a pod answers a PUT with no ETag and no Last-Modified (measured on CSS 7.2.0),
+    // and a version asked for by a LATER request (the HEAD this once sent) may already be another writer's, which a caller
+    // would then build on as ours. PodClient remembers what it WROTE instead and checks it at its next write.
+    const etag = null;
+    const lastModified = null;
 
     const savedUrl =
       (saved && getSourceUrl?.(saved)) ||

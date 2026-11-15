@@ -97,6 +97,40 @@ describe('SolidPodSource — read', () => {
     expect(result.lastModified).toBe('Wed, 28 Apr 2026 10:00:00 GMT');
   });
 
+  it('a read after the resource changed sees the change, never a cached copy (every read revalidates with the pod)', async () => {
+    // A browser's fetch keeps an HTTP cache: a GET or HEAD without a cache mode may be answered from it, with the OLD body
+    // and the OLD ETag, after this same page wrote a new version. Measured in the shared-pod walks (2026-11-15): the key
+    // file's writer read back its own grant as missing for ~25 s, every retry's If-Match then failed, and the member never
+    // got the key. This fetch behaves like that cache: it answers from the cache unless the request asks to revalidate.
+    let server = { body: 'v1', etag: '"1"' };
+    const cache = new Map();
+    const fetchFn = async (url, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const key = `${method} ${url}`;
+      const revalidates = init.cache === 'no-cache' || init.cache === 'no-store' || init.cache === 'reload';
+      if (!revalidates && cache.has(key)) return cache.get(key).clone();
+      const res = makeRes({ body: method === 'HEAD' ? '' : server.body, headers: { etag: server.etag }, url: String(url) });
+      cache.set(key, res.clone());
+      return res;
+    };
+    source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+
+    const first = await source.read('/foo.txt');
+    expect(new TextDecoder().decode(first.content)).toBe('v1');
+    server = { body: 'v2', etag: '"2"' };            // this page's own write landed on the pod
+    const second = await source.read('/foo.txt');
+    expect(new TextDecoder().decode(second.content)).toBe('v2');
+    expect(second.etag).toBe('"2"');
+  });
+
+  it('an existence check revalidates too', async () => {
+    const fetchFn = makeFetch({ [`HEAD ${POD}foo.txt`]: makeRes({ status: 200 }) });
+    source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+    await source.exists('/foo.txt');
+    expect(fetchFn.calls.length).toBeGreaterThan(0);
+    expect(fetchFn.calls.every((c) => c.init.cache === 'no-cache')).toBe(true);
+  });
+
   it('404 → NOT_FOUND', async () => {
     const fetchFn = makeFetch({
       [`GET ${POD}missing.txt`]: makeRes({ status: 404, statusText: 'Not Found' }),

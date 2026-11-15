@@ -198,7 +198,13 @@ export class SolidPodSource extends DataSource {
   constructor({ podUrl, fetch: fetchFn, credential } = {}) {
     super();
     this.#podUrl = podUrl ?? null;
-    this.#fetch  = fetchFn ?? (typeof globalThis !== 'undefined' ? globalThis.fetch : undefined);
+    // Every request REVALIDATES with the pod (`cache: 'no-cache'`: the browser may keep a copy, but asks the pod whether it
+    // is current; an unchanged resource costs a 304). Without it a browser's HTTP cache can answer a GET or HEAD with the
+    // old body and the old ETag after this same page wrote a new version: a compare-and-swap then builds on a version the
+    // pod no longer has, and a read-back never sees its own write (the circle key file's grants were given up that way).
+    // A caller that names its own cache mode keeps it. Node's fetch has no HTTP cache; the option changes nothing there.
+    const baseFetch = fetchFn ?? (typeof globalThis !== 'undefined' ? globalThis.fetch : undefined);
+    this.#fetch  = typeof baseFetch === 'function' ? (input, init = {}) => baseFetch(input, { cache: 'no-cache', ...init }) : baseFetch;
     // `credential` is accepted but ignored.  See class JSDoc.
     void credential;
   }

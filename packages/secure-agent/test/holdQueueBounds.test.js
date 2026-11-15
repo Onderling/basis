@@ -304,3 +304,18 @@ describe('hold queue — receipt-keyed removal (removeHeld)', () => {
     await a.shutdown();
   });
 });
+
+describe("the record of addresses seen alive is bounded", () => {
+  it('keeps the most recent signs of life; the oldest goes past the cap (persisted with the holds)', async () => {
+    const bytes = new Map();
+    const holdStore = { async read(uri) { return bytes.get(uri) ?? null; }, async write(uri, body) { bytes.set(uri, String(body)); } };
+    const a = await agent({ seenAliveMax: 2, holdStore });
+    for (const addr of ['alive-a', 'alive-b', 'alive-c']) await a.presenceSignal(addr);
+    await a.presenceSignal('alive-b');                     // a newer sign of life moves it to the young end
+    await a.presenceSignal('alive-d');
+    await a.outboxFlushed();
+    const alive = JSON.parse([...bytes.values()].pop()).alive;
+    expect(alive).toEqual(['alive-b', 'alive-d']);
+    await a.shutdown();
+  });
+});

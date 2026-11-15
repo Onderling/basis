@@ -70,9 +70,9 @@ describe('a flush attempts held-for addresses side by side, bounded', () => {
 
   it('a reconnect during a flush: no extra wire attempt for an address being flushed, and all its messages stay held', async () => {
     // the first flush took X's queue (x1, x2) and is waiting on x1; x3 is held for X meanwhile; a second flush (a
-    // reconnect during the flush) skips X while it is being flushed (`flushingNow`). NOTE: this test is green without that
-    // guard too (measured): the per-peer handshake coalescing absorbs a second attempt's HI, so the black hole cannot see
-    // it; the guard is there for ORDER (x3 must not go beside x2), which needs a live receiver and timing to show
+    // reconnect during the flush) skips X while it is being flushed (`flushingNow`). This one is green without that guard
+    // too (the per-peer handshake coalescing absorbs a second attempt's HI, so the black hole cannot see it); the guard is
+    // for ORDER, and its red is in flushStopsOnlyForTheAddress.test.js (a live receiver, a transport held back by hand)
     const one = await perAttempt();
     const { a, tx } = await onBlackHole({ flushParallelAddresses: 4, notYetAttemptIntervalMs: 60_000 });
     const X = 'flushing-address-000000000000000000000000';

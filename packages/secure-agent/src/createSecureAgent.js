@@ -233,6 +233,12 @@ const NOT_YET_ATTEMPT_INTERVAL_MS = param({ key: 'secureAgent.notYetAttemptInter
  *  oldest first). A flush on (re)connect used to walk the addresses one by one, so K unreachable addresses cost K handshake
  *  waits in a row (~15 s each on a phone). 4: one wait per four addresses, while the handshakes on one relay socket and
  *  their key work on a phone stay few at once. */
+/** How many addresses the record of 'seen alive at least once' keeps (persisted with the holds); the one longest without a
+ *  sign of life goes first. Without a bound it only grows: a removed member's addresses would stay in it for ever. A time
+ *  bound would be wrong: an address that answered a day ago and is dead now must still be judged dead (that is what the
+ *  dead record saves a phone from: a handshake wait per dead roster address at every boot). 1024: a few hundred contacts'
+ *  circle addresses, while the persisted outbox stays small. Dropped = 'not yet' again: one attempt per interval. */
+const SEEN_ALIVE_MAX = param({ key: 'secureAgent.seenAliveMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1024 });
 const FLUSH_PARALLEL_ADDRESSES = param({ key: 'secureAgent.flushParallelAddresses', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 const STALE_PARK_MAX = param({ key: 'secureAgent.staleParkMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
 /** How long a parked stale envelope waits for a refreshed sender check before its bucket is judged once more. */
@@ -901,7 +907,7 @@ export async function createSecureAgent(opts = {}) {
     if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.peers)) return 0;
     let restored = 0;
     const now = Date.now();
-    if (Array.isArray(parsed.alive)) for (const addr of parsed.alive) if (typeof addr === 'string') seenAlive.add(addr);
+    if (Array.isArray(parsed.alive)) for (const addr of parsed.alive) if (typeof addr === 'string') markSeenAlive(addr);
     if (Array.isArray(parsed.dead)) {
       for (const [addr, f] of parsed.dead) {
         if (typeof addr !== 'string' || !f || typeof f.n !== 'number') continue;
@@ -990,6 +996,13 @@ export async function createSecureAgent(opts = {}) {
    *  these can be judged DEAD: a failure against an address never seen alive (a newcomer's fresh per-circle address,
    *  not registered yet) says 'not yet', so it holds and is not counted. Kept across a restart with the holds. */
   const seenAlive = new Set();
+  const seenAliveMax = Number.isFinite(opts.seenAliveMax) ? opts.seenAliveMax : SEEN_ALIVE_MAX;
+  /** A sign of life: the address moves to the young end of `seenAlive`; past `seenAliveMax` the oldest goes. */
+  function markSeenAlive(addr) {
+    seenAlive.delete(addr);
+    seenAlive.add(addr);
+    while (seenAliveMax > 0 && seenAlive.size > seenAliveMax) seenAlive.delete(seenAlive.values().next().value);
+  }
   /** address never seen alive → when its last wire attempt was made (`notYetWaits`). In memory: a restart may try once. */
   const notYetAttemptAt = new Map();
   const notYetAttemptIntervalMs = Number.isFinite(opts.notYetAttemptIntervalMs) ? opts.notYetAttemptIntervalMs : NOT_YET_ATTEMPT_INTERVAL_MS;
@@ -1116,6 +1129,16 @@ export async function createSecureAgent(opts = {}) {
   }
 
   /**
+   * Did a send fail because the ADDRESS did not answer (unreachable, the handshake timed out), or because of the ENTRY
+   * itself: a persona of ours with no socket of its own yet, a scope that allows no route to a peer reachable otherwise,
+   * a refusal? Only the first is evidence about the address (it counts towards writing it off, and the entries held
+   * behind it share its fate); the second is ours or the entry's to fix. The one test for that question.
+   */
+  function failureOfTheAddress(err) {
+    return !isApplicationError(err) && !err?.personaNoConnection && !err?.scopedOut;
+  }
+
+  /**
    * Record a failed delivery attempt to an address, and say whether we should stop attempting.
    *
    * "Stop attempting" is the point: an address that no longer answers still passes `canReach` on the
@@ -1156,7 +1179,7 @@ export async function createSecureAgent(opts = {}) {
   /** This address answered (or announced itself) — it is not a dead address after all. */
   function clearDeliveryFailures(addr) {
     const firstSign = !seenAlive.has(addr);
-    seenAlive.add(addr);
+    markSeenAlive(addr);
     notYetAttemptAt.delete(addr);
     if (deliveryFailures.delete(addr) || firstSign) persistHolds();
   }
@@ -1316,18 +1339,40 @@ export async function createSecureAgent(opts = {}) {
   }
   async function flushPending(addr, { countFailures = true } = {}) {
     sweepExpiredHolds();
-    // an address already being flushed is not taken up by a second flush meanwhile (a reconnect during a flush): its
-    // queue was taken out whole by the first, which sends it in order; what is re-held lands back for the next one
+    // an address already being flushed is not taken up by a second flush meanwhile (a reconnect during a flush): the first
+    // sends its queue in order and drains what joins meanwhile (below); what is re-held lands back for the next flush
     if (flushingNow.has(addr)) return { flushed: 0 };
-    const q = pendingHold.get(addr);
-    if (!q || q.size === 0) return { flushed: 0 };
+    if (!pendingHold.get(addr)?.size) return { flushed: 0 };
     flushingNow.add(addr);
-    try { return await flushPendingNow(addr, q, { countFailures }); } finally { flushingNow.delete(addr); }
-  }
-  async function flushPendingNow(addr, q, { countFailures }) {
-    const entries = [...q.values()];
-    pendingHold.delete(addr);
+    const taken = new Set();   // the payloads this flush has tried: a re-held one is not tried twice in one flush
     let flushed = 0;
+    try {
+      for (;;) {
+        const q = pendingHold.get(addr);
+        const batch = q ? [...q].filter(([, e]) => !taken.has(e.payload)) : [];
+        if (!batch.length) break;
+        for (const [k, e] of batch) { taken.add(e.payload); q.delete(k); }
+        if (q.size === 0) pendingHold.delete(addr);
+        const r = await flushPendingNow(addr, batch.map(([, e]) => e), { countFailures });
+        flushed += r.flushed;
+        // the address answered: what joined its hold while this flush was in flight (a not-yet address's sends join the
+        // hold without a wire attempt) goes now, after what this flush held, rather than waiting for the next presence
+        if (!r.answered) break;
+      }
+    } finally { flushingNow.delete(addr); }
+    if (flushed && typeof console !== 'undefined') {
+      console.info(`[secure-agent] presence-flush delivered ${flushed} held message(s) to ${String(addr).slice(0, 16)}…`);
+    }
+    return { flushed };
+  }
+  /** Re-hold a flushed entry, unless a NEWER entry already holds its slot (a `key:` slot: the newest supersedes). */
+  function reholdEntry(addr, e) {
+    if (pendingHold.get(addr)?.has(holdKeyFor(e.payload, e.opts)) && holdKeyFor(e.payload, e.opts).startsWith('key:')) return;
+    enqueueHold(addr, e.payload, e.opts);
+  }
+  async function flushPendingNow(addr, entries, { countFailures }) {
+    let flushed = 0;
+    let answered = false;
     // this flush's attempt is the not-yet address's one attempt for the interval (`notYetWaits`): a send right after it
     // joins the hold instead of paying the wait again
     if (!seenAlive.has(addr)) notYetAttemptAt.set(addr, Date.now());
@@ -1338,33 +1383,41 @@ export async function createSecureAgent(opts = {}) {
         await resendHeld(addr, payload, opts);
         clearDeliveryFailures(addr);
         flushed++;
+        answered = true;
         const sentId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
         try { onHeldSent?.({ addr, msgId: sentId }); } catch { /* a report never breaks the flush */ }
       } catch (err) {
         if (isApplicationError(err)) continue;   // unfixable by resend → drop
-        // Still unreachable → re-hold, unless this address has now failed often enough that re-holding
-        // is just paying for it again later. Giving up is REPORTED, like every other drop.
+        // A failure that belongs to THIS ENTRY (its persona has no socket yet, its scope allows no route) says nothing
+        // about the address: re-hold the entry and try the next one.
+        if (!failureOfTheAddress(err)) { reholdEntry(addr, entry); continue; }
+        // The ADDRESS did not answer → re-hold, unless it has now failed often enough that re-holding is just paying
+        // for it again later. Giving up is REPORTED, like every other drop.
         // A young-address re-flush is a guess at WHEN, not evidence the address is dead: it never counts.
-        // …nor is a persona that has no socket of its own yet: that is ours to fix, not the peer's silence.
         // ONE failure per address per flush: its later messages share its fate, so they are re-held (in order) without
         // each paying another handshake wait (or, written off, all reported) — one attempt per address per flush
         const rest = entries.slice(i);
-        if (countFailures && !err?.personaNoConnection && recordDeliveryFailure(addr)) for (const e of rest) dropHeld(addr, e, 'peer-unreachable');
-        else for (const e of rest) enqueueHold(addr, e.payload, e.opts);
+        if (countFailures && recordDeliveryFailure(addr)) for (const e of rest) dropHeld(addr, e, 'peer-unreachable');
+        else for (const e of rest) reholdEntry(addr, e);
         break;
       }
     }
-    if (flushed && typeof console !== 'undefined') {
-      console.info(`[secure-agent] presence-flush delivered ${flushed} held message(s) to ${String(addr).slice(0, 16)}…`);
-    }
     persistHolds();     // what got through is now GONE from the durable copy, not just from memory
-    return { flushed };
+    return { flushed, answered };
   }
 
   // Read back the previous run's queue. Kicked here rather than at declaration so every constant it
   // reads (the TTL, the drop reporter) is initialised; nothing sends before boot completes anyway,
   // and `outboxRestored()` is the await for a caller that wants to be certain.
   outboxRestored = restoreHolds().catch(() => 0);
+
+  /** Could a send with NO scope reach `addr` now, on a transport whose socket is open? (Whether a circle's own narrowing,
+   *  not the peer's absence, is what stops a send.) The unscoped route under a pinned transport mode names that transport
+   *  whether or not its socket is open, so `canReach` is asked too. */
+  async function reachableUnscoped(addr) {
+    const unscoped = await route(addr).catch(() => null);
+    return !!unscoped && (typeof unscoped.transport?.canReach !== 'function' || unscoped.transport.canReach(addr) === true);
+  }
 
   /** Is there a live route to `addr` right now? (route() returns null when no
    *  connected transport reports it can reach the peer.) */
@@ -2153,6 +2206,8 @@ export async function createSecureAgent(opts = {}) {
     makeReceiveHandler(tx);                 // inbound for the persona lands in this one agent
     // what the persona could not send while it had no socket goes out now, on this socket (`resendHeld` keeps a
     // persona's held message on that persona's sockets) — as the primary socket's connect does for the default's
+    // a persona socket's connect clears ALL not-yet clocks, not only those of this persona's sends: the clocks are per
+    // address, not per sender, and this device having a connection again says nothing about any peer (`connectivityRestored`)
     tx.on?.('connect', () => { notYetAttemptAt.clear(); flushHeldOf(socketIdentity.pubKey).catch(() => { /* re-hold handled inside */ }); });
     await tx.connect();
     personaTransports.set(key, { url, identity: socketIdentity, tx });
@@ -2501,9 +2556,7 @@ export async function createSecureAgent(opts = {}) {
         // route under a pinned transport mode names that transport whether or not its socket is open,
         // so a send in the first second after boot — socket still opening — used to be labelled as
         // scoped out (an offer to accept the address fallback, which cannot help) instead of offline.
-        const unscoped = await route(addr).catch(() => null);
-        const reachableNow = !!unscoped && (typeof unscoped.transport?.canReach !== 'function' || unscoped.transport.canReach(addr) === true);
-        const scopedOut = !!opts?.scope && reachableNow;
+        const scopedOut = !!opts?.scope && await reachableUnscoped(addr);
         return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
       }
       // not yet seen alive and attempted within the interval: join the hold, no wire attempt (`notYetWaits`)
@@ -2515,6 +2568,8 @@ export async function createSecureAgent(opts = {}) {
         return { held: false, delivered: true, msgId, result };
       } catch (err) {
         if (isApplicationError(err)) throw err;
+        // A failure of the send's own terms (`failureOfTheAddress`) is held without counting against the address.
+        if (!failureOfTheAddress(err)) return enqueueHold(addr, payload, opts);
         // A transport-class failure AFTER the route said yes — the only evidence we get that an address
         // is dead rather than briefly offline, so it is what the give-up counter counts.
         if (recordDeliveryFailure(addr)) {
@@ -2701,10 +2756,13 @@ export async function createSecureAgent(opts = {}) {
     for (let attempt = 0; attempt < budget; attempt++) {
       const sel = await route(addr, opts?.scope ?? null);
       if (!sel) {
-        throw new Error(
+        const err = new Error(
           `Peer transport not connected (mode=${transportMode}).  ` +
           `Call sa.peer.connect() and/or sa.relay.connect() first.`,
         );
+        // the entry's own scope is what stopped it when the peer is reachable unscoped (`failureOfTheAddress`)
+        err.scopedOut = !!opts?.scope && await reachableUnscoped(addr);
+        throw err;
       }
       // The router keeps returning a transport we've already exhausted
       // (single-transport mode, or every alternative degraded) → no fresh

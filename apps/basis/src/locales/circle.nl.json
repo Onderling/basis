@@ -7658,6 +7658,14 @@
       "text": "sluit {{when}}",
       "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
     },
+    "joined_since_one": {
+      "text": "1 lid is erbij gekomen sinds dit voorstel is gedaan",
+      "doc": "Decisions screen, an open proposal: one member on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
+    },
+    "joined_since_n": {
+      "text": "{{count}} leden zijn erbij gekomen sinds dit voorstel is gedaan",
+      "doc": "Decisions screen, an open proposal: {{count}} members on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
+    },
     "awaiting_enactment": {
       "text": "wacht op een beheerder",
       "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."

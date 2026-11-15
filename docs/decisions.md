@@ -1750,3 +1750,26 @@ An address a member's row already holds stays theirs: an announcement placing it
 **Not decided here:** complete unlinkability between circles (members knowing each other only per circle) is a
 design for after the alpha. Code: `packages/core/src/identity/circleLink.js`, `circleAddressAnnouncement.js`,
 `packages/circles/src/circleAddress.js` (`addressHolderIn`). Ledger: L917, L919, L921.
+
+## 2026-11-15 — No vote freeze for the alpha: a vote counts the members as they are now, and the screen says who joined since (Frits; reverses his choice of 2026-11-14)
+
+Admissions are not governed, so an admin who may admit alone can admit accounts and win a members' vote with them. On
+2026-11-14 Frits chose to freeze a vote on the members of the moment it was proposed (the proposal naming the
+membership statements it was made under). It was built and reviewed, and is NOT adopted, because the log cannot prove
+the order of a join and a proposal: each lane is its own hash chain, and the statements a proposal would name are a
+floor its author chooses. So a proposer could name an old snapshot in which they and their allies were the majority,
+and every device would agree (a new power for every member); and the freeze never stopped an admin who admits first and
+proposes after. Any rule that lets the left-out members count lets packed accounts block or win; any rule that does not
+lets an old snapshot leave real members out. The order can only come from governing admissions.
+
+So, for the alpha:
+
+- **A vote counts the roster as it is now**, and only the votes of members on it (a vote by someone who has left or was
+  removed since counts for nothing).
+- **The limit is said and shown.** An open decision on the Decisions screen says how many of today's members joined
+  since it was made ("3 members joined since this proposal was made"), counted from the joins whose signed time is after
+  the proposal's. A join's time is set by the device that wrote it, so this informs and decides nothing.
+- **Governed admissions** (who may admit is decided like who may remove) are designed after the alpha.
+
+Where it lives: `apps/basis/src/v2/governanceDecision.js` (the tally), `governanceView.js` (`joinsSince`,
+`joinedSinceLine`), `packages/circles/src/circleMembershipWriters.js` (the join's `at`). Ledger: L856, L945.

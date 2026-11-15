@@ -42,6 +42,8 @@ export const SCREEN_SECTIONS = Object.freeze({
     Object.freeze({ id: 'proposal-status',   titleKey: null }),
     Object.freeze({ id: 'proposal-tally',    titleKey: null }),
     Object.freeze({ id: 'proposal-deadline', titleKey: null }),
+    // how many of today's members joined since the proposal was made (a shown hint: the vote counts the roster as it is now)
+    Object.freeze({ id: 'proposal-joined-since', titleKey: null }),
     Object.freeze({ id: 'proposal-awaiting', titleKey: 'circle.governance.awaiting_enactment' }),
     Object.freeze({ id: 'proposal-vote',     titleKey: null }),
     Object.freeze({ id: 'proposal-override', titleKey: 'circle.governance.override' }),

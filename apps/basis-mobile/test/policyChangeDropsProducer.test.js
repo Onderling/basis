@@ -7,6 +7,8 @@
  * strategy; the next use builds them from the policy in force. A change of anything else keeps them.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { initCirclePods, ensureCirclePod } from '../src/core/circlePods.js';
 import { createCirclePolicyStore } from '../../basis/src/v2/circlePolicyStore.js';
 import { bindCircleKeyPairs } from './support/circleKeyPairs.js';
@@ -42,5 +44,16 @@ describe('a policy write that changes the pod or the posture', () => {
     const first = await ensureCirclePod('c-keep', await store.get('c-keep'));
     await store.update('c-keep', { features: { calendar: true } });
     expect(await ensureCirclePod('c-keep', await store.get('c-keep'))).toBe(first);
+  });
+  // The share enforcement is built from the producer and kept per circle, but only when signed in to a real pod (ACP
+  // sharing and a key); its getter is async, so a unit test can observe neither the object nor the drop without a pod.
+  // What is pinned instead: each shell's ONE subscription drops it beside the producer.
+  it('both shells drop the kept share enforcement in the same subscription as the producer', () => {
+    for (const f of ['../src/core/circlePods.js', '../../basis/web/v2/circleApp.js']) {
+      const src = readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8');
+      const sub = /onPolicyPostureChange\(\(circleId\) => \{([^}]*)\}\)/.exec(src)?.[1] ?? '';
+      expect(sub, f).toContain('circlePods.delete(circleId)');
+      expect(sub, f).toContain('_shareEnforcementByCircle.delete(circleId)');
+    }
   });
 });

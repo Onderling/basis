@@ -145,9 +145,9 @@ export function forgetCircleSealStrategies() { circleSealStrategies.clear(); }
 /** One circle's cached strategy — a policy that arrived may have changed its storage posture (a cached "none" included). */
 export function forgetCircleSealStrategyFor(circleId) { circleSealStrategies.delete(circleId); }
 
-// a policy write that changes the circle's pod or posture: the producer and the strategy built from the old one go (web
-// parity); the next use builds them from the policy in force
-onPolicyPostureChange((circleId) => { circlePods.delete(circleId); circleSealStrategies.delete(circleId); });
+// a policy write that changes the circle's pod or posture: the producer, the strategy and the share enforcement built
+// from the old one go (web parity); the next use builds them from the policy in force
+onPolicyPostureChange((circleId) => { circlePods.delete(circleId); circleSealStrategies.delete(circleId); _shareEnforcementByCircle.delete(circleId); });
 
 /** The no-pod distribution sink for ONE circle — a membership change (notably a REMOVE → rotation) fans the
  * new versioned key AS a log key-event to the circle's REMAINING members over the SAME peer channel content

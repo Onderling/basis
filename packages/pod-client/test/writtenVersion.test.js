@@ -17,14 +17,14 @@ const dec = (b) => new TextDecoder().decode(b);
 /** A pod that behaves like CSS: a write answers with NO ETag; If-Match is checked; every request is counted. `afterOwnWrite`
  *  lets another writer land right after this client's PUT (before anything this client sends next). */
 function fakePod() {
-  const pod = { body: null, version: 0, calls: { read: 0, write: 0, delete: 0 }, afterOwnWrite: null };
+  const pod = { body: null, version: 0, calls: { read: 0, write: 0, delete: 0 }, afterOwnWrite: null, noVersion: false };
   const etag = () => `"v${pod.version}"`;
   pod.other = (body) => { pod.body = enc(body); pod.version += 1; };
   pod.source = {
     async read() {
       pod.calls.read += 1;
       if (pod.body == null) throw Object.assign(new Error('nf'), { code: 'NOT_FOUND' });
-      return { content: pod.body, contentType: 'text/plain', etag: etag(), lastModified: null, size: pod.body.length };
+      return { content: pod.body, contentType: 'text/plain', etag: pod.noVersion ? null : etag(), lastModified: null, size: pod.body.length };
     },
     async write(uri, payload, opts = {}) {
       pod.calls.write += 1;
@@ -108,5 +108,30 @@ describe('after a write, the client remembers what it wrote, never a version it 
     pod.other('theirs');
     await expect(c.delete('/f.txt')).rejects.toBeInstanceOf(ConflictError);
     expect(dec(pod.body)).toBe('theirs');
+  });
+
+  // A READ ALWAYS REPLACES what the client remembers for the resource: a caller that does the right thing (read, then
+  // write) must never stay refused.
+  it('another device DELETED it after my write; I read (not found) and create it again: the create goes through', async () => {
+    const pod = fakePod();
+    const c = client(pod);
+    await c.write('/f.txt', 'mine-1');
+    pod.body = null; pod.version += 1;                    // another device deletes it
+    await expect(c.write('/f.txt', 'mine-2')).rejects.toBeInstanceOf(ConflictError);
+    await expect(c.read('/f.txt')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await c.write('/f.txt', 'again');
+    expect(dec(pod.body)).toBe('again');
+  });
+
+  it('a pod whose GET names no version: after I read the newer body, my merged write goes through', async () => {
+    const pod = fakePod();
+    pod.noVersion = true;
+    const c = client(pod);
+    await c.write('/f.txt', 'mine-1');
+    pod.other('theirs');
+    await expect(c.write('/f.txt', 'mine-2')).rejects.toBeInstanceOf(ConflictError);
+    expect((await c.read('/f.txt', { decode: 'string' })).content).toBe('theirs');
+    await c.write('/f.txt', 'theirs+mine');
+    expect(dec(pod.body)).toBe('theirs+mine');
   });
 });

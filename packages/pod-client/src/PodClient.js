@@ -348,13 +348,12 @@ export class PodClient extends Emitter {
       // redundant (the resource was deleted by another device).  Best-effort:
       // swallow tombstone-store errors so we never mask the real read failure.
       if (err?.code === 'NOT_FOUND') {
+        this.#rememberRead(uri, null);
         try { await this.#tombstoneStore.remove(uri); } catch { /* swallow */ }
       }
       this.#wrapAndThrow(err, uri);
     }
-    if (res.etag || res.lastModified) {
-      this.#etagMap.set(uri, { etag: res.etag, lastModified: res.lastModified });
-    }
+    this.#rememberRead(uri, res);
     const content = this.#decode(res.content, res.contentType, opts.decode || 'auto');
     return { ...res, content };
   }
@@ -578,18 +577,29 @@ export class PodClient extends Emitter {
   async #fetchRemoteForConflict(uri) {
     try {
       const res = await this.#podSource.read(uri);
-      if (res?.etag || res?.lastModified) {
-        this.#etagMap.set(uri, { etag: res.etag, lastModified: res.lastModified });
-      }
+      this.#rememberRead(uri, res);
       const isText = TEXT_CONTENT_TYPE_RE.test(res?.contentType || '');
       const tooBig = typeof res?.size === 'number' && res.size > REMOTE_CONTENT_FETCH_LIMIT;
       const content = (!tooBig && isText && res?.content !== undefined && res?.content !== null)
         ? this.#decode(res.content, res.contentType, 'auto')
         : undefined;
       return { ...res, content };
-    } catch {
+    } catch (err) {
+      if (err?.code === 'NOT_FOUND') this.#rememberRead(uri, null);
       return null;
     }
+  }
+
+  /**
+   * A READ ALWAYS REPLACES what this client remembers for the resource (L936): the version that read saw, even when the
+   * response named none (then the next default write is unconditional, as a first write is), and nothing at all after a
+   * not-found. Otherwise a caller that does the right thing, read and then write, stays refused on 'I wrote this'.
+   * @param {string} uri
+   * @param {{etag?: string|null, lastModified?: string|null}|null} res  null = the read found nothing
+   */
+  #rememberRead(uri, res) {
+    if (!res) { this.#etagMap.delete(uri); return; }
+    this.#etagMap.set(uri, { etag: res.etag ?? null, lastModified: res.lastModified ?? null });
   }
 
   /**

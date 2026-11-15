@@ -13,7 +13,7 @@ import en from '../../src/locales/circle.en.json' with { type: 'json' };
 const t = (k, vars = {}) => {
   const node = k.split('.').slice(1).reduce((o, p) => o?.[p], en);
   const text = typeof node === 'string' ? node : node?.text ?? k;
-  return text.replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
+  return text.replace(/\{\{(\w+)\}\}/g, (_, v) => String(vars[v] ?? ''));
 };
 
 describe('help inside the "+" thread', () => {

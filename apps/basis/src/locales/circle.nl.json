@@ -1567,8 +1567,8 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_help": {
-      "text": "Dit kan ik voor je doen: {acts}. Of vraag hoe iets werkt.",
-      "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({acts}: its own acts by name, comma-separated), and that it answers how things work."
+      "text": "Dit kan ik voor je doen: {{acts}}. Of vraag hoe iets werkt.",
+      "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
       "text": "Dat kon ik niet lezen.",

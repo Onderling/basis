@@ -7,6 +7,7 @@
 // sealed blob}`. A plain PodClient suffices; no SealedPodClient is needed for the key resource itself.
 // (The circle's CONTENT, by contrast, is sealed under the group key via a SealedPodClient.)
 
+import { KeyReadTornError, KEY_READ_AGREE_ATTEMPTS } from './keyResourceWrite.js';
 import { unwrapGroupKey } from './groupKeyResource.js';
 
 /**
@@ -18,14 +19,49 @@ import { unwrapGroupKey } from './groupKeyResource.js';
  * @param {string} uri                                      the key-resource URI (e.g. <pod>/.keys/group.json)
  * @returns {{ read: () => Promise<object|null>, write: (resource:object) => Promise<void>, writeIfUnchanged: (resource:object, cur:object|null) => Promise<boolean> }}
  */
-export function createPodKeyStore({ podClient, uri } = {}) {
+export function createPodKeyStore({ podClient, uri, agreeAttempts = KEY_READ_AGREE_ATTEMPTS } = {}) {
   if (!podClient || typeof podClient.read !== 'function' || typeof podClient.write !== 'function') {
     throw new Error('createPodKeyStore: a PodClient with read/write is required');
   }
   if (!uri) throw new Error('createPodKeyStore: a key-resource uri is required');
   // the ETag each parsed resource was read with, so a later conditional write can name the version it built on
   const readEtags = new WeakMap();
+  // one GET: the parsed resource (null: none stored), the text it was read as and the ETag it came with
+  const readOnce = async () => {
+    let res;
+    try {
+      res = await podClient.read(uri, { decode: 'text' });
+    } catch (err) {
+      if (err && (err.code === 'NOT_FOUND' || err.status === 404)) return { parsed: null, text: null, etag: null };   // not bootstrapped yet
+      throw err;
+    }
+    const body = typeof res === 'string' ? res : res?.content;
+    if (body == null) return { parsed: null, text: null, etag: null };
+    const etag = (res && typeof res === 'object' && typeof res.etag === 'string') ? res.etag : null;
+    let parsed = null;
+    if (typeof body === 'object') parsed = body;
+    else { try { parsed = JSON.parse(body); } catch { parsed = null; } }
+    return { parsed: parsed && typeof parsed === 'object' ? parsed : null, text: typeof body === 'string' ? body : JSON.stringify(body), etag };
+  };
   return {
+    /**
+     * THE READ A CHANGE BUILDS ON (`changeKeyResource`, the canonical share's loops): trusted only when two consecutive
+     * GETs agree on the ETag AND the body. A pod can serve a torn read (the old body under the new ETag, when the GET
+     * overlaps another writer's PUT); a change built on it would pass its If-Match and write that writer's change away.
+     * A disagreement reads again (bounded); one that never settles throws KEY_READ_TORN and nothing is written.
+     */
+    async readForWrite() {
+      for (let i = 0; i < agreeAttempts; i += 1) {
+        const a = await readOnce();
+        const b = await readOnce();
+        if (a.etag === b.etag && a.text === b.text) {
+          if (b.parsed) readEtags.set(b.parsed, b.etag);
+          return b.parsed;
+        }
+      }
+      throw new KeyReadTornError(agreeAttempts);
+    },
+    /** A read that only OPENS the key (a strategy, a reseal): one GET. Never the base of a write. */
     async read() {
       let res;
       try {

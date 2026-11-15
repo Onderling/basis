@@ -289,7 +289,7 @@ import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { replyLine } from '../../../../basis/src/v2/replyLine.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
@@ -2247,7 +2247,9 @@ export default function CircleLauncherScreen({
         suggestFor={(typed) => plusSuggest(plusPool, typed)}
         onRead={(line) => plusRecorded(line, async () => {
           const list = await plusCircles();
-          const o = plusLineOutcome(line, { circles: list });
+          const o = plusLineOutcome(line, { circles: list, lang: lang() });
+          // help ("help", "?", a how-to question a help card knows): answered in the thread (web twin)
+          if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
           if (o?.kind === 'circle' && o.atOnce) return plusRunInCircle(o.command, o.circleId);
           if (o?.kind === 'circle') return { card: { line, to: o.to, command: o.command } };
           return (o?.kind === 'own' ? o : null) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') };

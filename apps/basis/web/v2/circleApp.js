@@ -204,8 +204,8 @@ import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
 import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsHome.js';
-import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant, connectionSelfChoice } from '../../src/v2/connections.js';
-import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
+import { connectionRows, connectionOpChoices, connectionSectionChoices, connectionSelfChoice } from '../../src/v2/connections.js';
+import { createAppScreenPairing } from '../../src/v2/appScreenPairing.js';
 import {
   createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, contactReceiptAddresses, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
@@ -1905,6 +1905,13 @@ const circleSurfacePref = createSurfacePrefStore(registerSurfacePrefIo(() => cir
 let circleContactSkills = null;  // live contact/bot exposed-skill registry (subscribed to agent.peers)
 let circlePeerGraph = null;      // app-owned PeerGraph (contacts roster registry source)
 let circleCoreAgent = null;      // the core chat agent (agent.sa.agent), for discoverA2A
+// the app's screen pairing (offer → pick one of three codes → grant), one for the session: the form is redrawn often,
+// the pending offer and the pick live here, and it is the only way from a pasted offer to the grant
+let _screenPairing = null;
+const screenPairing = () => (_screenPairing ??= createAppScreenPairing({
+  callSkill: (app, op, args) => circleHouseholdAgent.callSkill(app, op, args),
+  relays: () => { try { return (circleHouseholdAgent?.relays?.list?.() ?? []).map((r) => r?.url).filter(Boolean); } catch { return []; } },
+}));
 let circleHouseholdAgent = null; // OBJ-2 — the real household agent (createRealHouseholdAgent); module-level
                                  // so showSettings (a sibling fn, NOT nested in buildCircleBot) can read its
                                  // no-pod sync hooks (householdSelfAddr / addCirclePeer). Was referenced
@@ -5391,15 +5398,9 @@ async function showMyData(opts) {
       // which self the screen is for (a persona issues its grants as itself): the switcher's set
       self: connectionSelfChoice({ held: _selfSet.held, on: _selfSet.on }),
     },
-    parseConnectionOffer: parsePairingOffer,
-    onPairConnection: async ({ viewPubKey, nonce, label, ops, sections, persona }) => {
-      const args = compileConnectionGrant({ viewPubKey, ops, sections, label, persona });
-      if (!args) return;                      // a pick that grants nothing creates nothing
-      try { await circleHouseholdAgent.callSkill('household', 'grantSurface', { ...args, ...(nonce ? { nonce } : {}) }); }
-      catch { /* the list re-reads; a failure leaves no half-connection */ }
-      await refreshConnections();
-      rerender();
-    },
+    // the shared pairing: offer → the code picked from three → the grant (the shell never calls the op)
+    screenPairing: circleHouseholdAgent ? screenPairing() : null,
+    onPaired: async () => { await refreshConnections(); rerender(); },
     delivery: deliverySettingsCache,
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
@@ -9708,13 +9709,9 @@ async function boot() {
       // the request to the invite's address may leave on the person key for this redeem (the send gate's invite exchange)
       inviteExchange: agent.inviteExchange ?? null,
     });
-    // when signed in, route pinboard's items to the user's REAL pod (parity with
-    // folio/calendar; reuses pinboard's already-built pod-routing write-through). Best-effort.
-    if (podSession?.isLoggedIn && circleRealPodRouting?.podRoot && typeof agent.attachPinboardPod === 'function') {
-      agent.attachPinboardPod({ podRoot: circleRealPodRouting.podRoot, webid: podSession.webid, fetch: podSession.fetch })
-        .then((r) => { if (!r?.ok && r?.error) console.warn('[circleApp] attachPinboardPod:', r.error); })
-        .catch(() => { /* best-effort; stays local-first */ });
-    }
+    // pinboard's own store is NOT attached to the person's pod: the write-through never reached a pod in this app
+    // (no pod routing on the bundle, so the first flush refused a mem:// key and the store's cache went offline), and
+    // what it would write is not sealed. It comes back only with a sealed design (scripts/lint-no-pinboard-pod-attach.mjs).
     // Refresh the on-screen noticeboard when a post changed under it (requested attachment bytes landed, an answer
     // to my request was recorded). Subscribed once; the hook points at the active circle's loader.
     for (const ev of NOTICEBOARD_REFRESH_EVENTS) {

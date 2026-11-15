@@ -29,7 +29,7 @@ export const DOOR_REFUSAL_CODES = Object.freeze([...DOOR_REFUSAL_CODES_LIST]);
  * key (the bounded compare-and-swap ran out) or the roster could not say whether the member is still a member. The
  * next producer start's roster seed re-drives a join. Held against the router by circleKeyChangeNotMadeIsLogged.test.js.
  */
-const KEY_REFUSAL_CODES_LIST = ['key-write-contended', 'member-unknown', 'key-write-unconditioned', 'audience-not-checked', 'pod-key-not-opened', 'key-fan-failed'];
+const KEY_REFUSAL_CODES_LIST = ['key-write-contended', 'member-unknown', 'key-write-unconditioned', 'audience-not-checked', 'pod-key-not-opened', 'key-fan-failed', 'key-read-torn'];
 export const KEY_REFUSAL_CODES = Object.freeze([...KEY_REFUSAL_CODES_LIST]);
 
 /**
@@ -42,6 +42,10 @@ const LINK_REFUSAL_CODES_LIST = ['earlier-link-proof'];
 /** The circle policy's code: a joined circle's 'policy pending' mark could not be written (it is held in memory for the run). */
 const POLICY_REFUSAL_CODES_LIST = ['policy-mark-not-written'];
 export const POLICY_REFUSAL_CODES = Object.freeze([...POLICY_REFUSAL_CODES_LIST]);
+
+/** The screen door's codes (`screenDoor.js` re-exports them): a screen's pairing offer refused, or a pick that did not grant. */
+const SCREEN_PAIRING_REFUSAL_CODES_LIST = ['pairing-not-an-offer', 'pairing-other-relay', 'pairing-nonce-replayed', 'pairing-nothing-pending', 'pairing-expired', 'pairing-wrong-code'];
+export const SCREEN_PAIRING_REFUSAL_CODES = Object.freeze(SCREEN_PAIRING_REFUSAL_CODES_LIST.slice());
 export const LINK_REFUSAL_CODES = Object.freeze([...LINK_REFUSAL_CODES_LIST]);
 
 /**
@@ -69,6 +73,8 @@ export const REFUSAL_CODES = Object.freeze([
   ...LINK_REFUSAL_CODES_LIST,
   // a joined circle's policy-pending mark not written (held in memory for the run)
   ...POLICY_REFUSAL_CODES_LIST,
+  // a screen's pairing offer refused, or a pick that did not grant (the screen door)
+  ...SCREEN_PAIRING_REFUSAL_CODES_LIST,
 ]);
 const KNOWN = new Set(REFUSAL_CODES);
 const DETAIL_MAX = 32;

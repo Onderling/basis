@@ -6,7 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
-import { createBotScreens, screenCode } from '../src/v2/botScreens.js';
+import { createBotScreens } from '../src/v2/botScreens.js';
+import { screenCode } from '../src/v2/screenDoor.js';
 import { encodePairingOffer } from '../src/v2/connectionPairing.js';
 import { EventLog } from '../src/eventLog.js';
 

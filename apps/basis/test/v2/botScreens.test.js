@@ -4,7 +4,8 @@
  * lists and drops them; revoking the person drops them all.
  */
 import { describe, it, expect } from 'vitest';
-import { createBotScreens, parseScreenLink, screenCode, codeChoices, screenLabel, SCREEN_LINK_TTL_MS } from '../../src/v2/botScreens.js';
+import { createBotScreens, parseScreenLink } from '../../src/v2/botScreens.js';
+import { screenCode, codeChoices, screenLabel, SCREEN_PAIRING_TTL_MS } from '../../src/v2/screenDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
@@ -156,7 +157,7 @@ describe('a person connects a screen to the bot', () => {
   it('refused: too late, from another key than it names, a nonce nobody asked for; a new link ends the old one', async () => {
     const ctx = setup(); const { screens, grants, tick } = ctx;
     const late = nonceOf(await start(ctx));
-    tick(SCREEN_LINK_TTL_MS + 1);
+    tick(SCREEN_PAIRING_TTL_MS + 1);
     expect(await screens.offer({ from: 'V', viewPubKey: 'V', nonce: late })).toMatchObject({ ok: false, reason: 'expired' });
     const n = nonceOf(await start(ctx));
     expect(await screens.offer({ from: 'OTHER', viewPubKey: 'V', nonce: n })).toMatchObject({ ok: false, reason: 'wrong-sender' });
@@ -201,7 +202,7 @@ describe('a person connects a screen to the bot', () => {
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['B']);
     // too late
     const codeD = await offerFor('D');
-    ctx.tick(SCREEN_LINK_TTL_MS + 1);
+    ctx.tick(SCREEN_PAIRING_TTL_MS + 1);
     expect(await ctx.screens.confirm('telegram:1', codeD, { isPrivate: true })).toMatchObject({ ok: false, reason: 'expired' });
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['B']);
   });

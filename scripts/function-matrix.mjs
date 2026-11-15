@@ -35,7 +35,11 @@ export const FUNCTIONS = Object.freeze([
     box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the circle door: a member who names it is answered' },
   } },
   { id: 'nearby', name: 'Nearby', cells: {
-    web: null,      // nearby-level proves only that the level survives a reload; nobody meets anyone (Fable 2026-11-10)
+    // not applicable for the alpha (Fable's ruling 2026-11-15, Frits may reverse it): the room's people come only from
+    // discovering transports (Wi-Fi discovery, Bluetooth) and a browser has neither, so on web nobody can be met. The web
+    // screen says so in words (`header_cannot_discover`) and shows what others would see of you; a room carried by the
+    // relay would tell the relay who is near whom, and is a question for after the alpha.
+    web: NA('a browser can do neither Wi-Fi discovery nor Bluetooth, so nobody can be met nearby on web; the screen says so'),
     mobile: null,   // circlesNearbyParity is a parity test
     box: NA('the box joins no Nearby room in alpha one (a venue room is later)'),
   } },
@@ -74,7 +78,10 @@ export const FUNCTIONS = Object.freeze([
     // shared pod, the fan-out for normal; asserted beside the message); pod-only is skipped there with the decision
     // (the title is per case, `${type}: …`; its 'shared pod' and 'normal' cases carry the cell)
     web: { file: 'apps/basis/test-browser/walk-circle-types-pod.spec.js', test: "made in the wizard, a member's message reaches the other member, and the send took its branch" },
-    mobile: null,
+    // two phones in Node (the mobile composition) on a real ACP CSS: the same two types through the create wizard's steps,
+    // the post reaches the member's phone, the branch read from the founder phone's own log (what the phone's screens
+    // show is the phone session's)
+    mobile: { file: 'apps/basis-mobile/test/circleTypesPhone.mobile.css.test.js', test: "made in the wizard, a member's message reaches the other member, and the send took its branch" },
     box: null,
   } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {

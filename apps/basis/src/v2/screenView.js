@@ -21,7 +21,8 @@
  */
 import { DataPart, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
-import { parseScreenLink, parseScreenStartLink, parseScreenLaunchLink, screenCode, SCREEN_LINK_TTL_MS, screenAddressFor } from './botScreens.js';
+import { parseScreenLink, parseScreenStartLink, parseScreenLaunchLink, screenAddressFor } from './botScreens.js';
+import { screenCode, SCREEN_PAIRING_TTL_MS } from './screenDoor.js';
 import { launchDataFrom } from './telegramLaunch.js';
 import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERED } from './screenStepUp.js';
 import { SCREEN_NUDGE_SUBTYPE } from './screenNudge.js';
@@ -203,7 +204,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
      * Resolves with the grant once the bot sent it (the person picked the right code); rejects with `refused` (the bot
      * said it was not taken) or `timed-out` (nothing within the link's ten minutes) — never waits for ever.
      */
-    granted: ({ timeoutMs = SCREEN_LINK_TTL_MS } = {}) => Promise.race([
+    granted: ({ timeoutMs = SCREEN_PAIRING_TTL_MS } = {}) => Promise.race([
       grantArrived,
       new Promise((_, reject) => { const h = setTimeout(() => reject(new Error('timed-out')), timeoutMs); h?.unref?.(); }),
     ]),

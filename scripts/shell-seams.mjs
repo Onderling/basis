@@ -59,6 +59,10 @@ export const SEAMS = Object.freeze([
   // opened screen's header (found walking the phone, 2026-11-14: a tap on the thread's ⋯ landed on it). The box paints no
   // banner, so the seam is web and mobile only.
   { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },
+  // THE SCREEN DOOR in the app: a pasted or scanned screen offer reaches the grant only through the shared pairing (three
+  // codes, one pick). The box has no pairing UI: its door is the household bot's (`botScreens`), which composes the same
+  // screen door (`screenDoor.js`).
+  { id: 'screen-pairing-door', pattern: /createAppScreenPairing\(/, shells: ['web', 'mobile'], why: 'without it a pasted screen offer could be granted without the person picking the code their screen shows' },
   { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
   // A NEW MEMBER IS NAMED AS THEIR FIRST LINE LANDS: a sender the roster cannot place yet (one this device admitted, a
   // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles

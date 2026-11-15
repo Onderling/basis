@@ -31,7 +31,7 @@ describe('a circle whose policy was seen here is not marked pending again', () =
     const a = storeOver(policy, marks);
     await a.markPending('c');
     await a.update('c', { storagePosture: 'p2' }, { seen: true });
-    const b = storeOver(policy, marks);   // a new run over the same storage
+    const b = storeOver(policy, { load: marks.load, save: marks.save });   // a new run over the same storage (fresh memory)
     await b.markPending('c');
     expect((await b.get('c')).policyPending ?? false).toBe(false);
   });

@@ -5,7 +5,7 @@
  * for this run, so the circle stays not-known until its policy arrives.
  */
 import { describe, it, expect } from 'vitest';
-import { createCirclePolicyStore } from '../../src/v2/circlePolicyStore.js';
+import { createCirclePolicyStore, localPolicyPendingMarks } from '../../src/v2/circlePolicyStore.js';
 import { sealedAnswer } from '../../src/v2/circlePodProducer.js';
 
 const memIo = () => { const m = new Map(); return { load: async (id) => m.get(id) ?? null, save: async (id, v) => { m.set(id, v); } }; };
@@ -38,5 +38,15 @@ describe('the policy-pending mark fails closed', () => {
   it('a circle never marked (created here) reads as before', async () => {
     const store = createCirclePolicyStore({ ...memIo(), marks: memIo() });
     expect((await store.get('mine')).policyPending ?? false).toBe(false);
+  });
+  it('the hold binds EVERY store over the same storage (the phone builds several): an unwritten mark still refuses', async () => {
+    const storage = { getItem: async () => null, setItem: async () => { throw new Error('quota'); } };
+    const policy = memIo();
+    const marker = createCirclePolicyStore({ ...policy, marks: localPolicyPendingMarks(storage), onMarkNotWritten: () => {} });
+    const reader = createCirclePolicyStore({ ...policy, marks: localPolicyPendingMarks(storage) });   // the lane's, the launcher's
+    await marker.markPending('c1');
+    const p = await reader.get('c1');
+    expect(p.policyPending, 'the other store sees the held mark').toBe(true);
+    expect(sealedAnswer(p)).toBeNull();
   });
 });

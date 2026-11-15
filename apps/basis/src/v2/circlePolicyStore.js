@@ -27,6 +27,8 @@ import {
 import { withDerivedChatFeature } from './conversationKinds.js';
 import { processRefusalLog } from './refusalLog.js';
 
+const inMemoryByMarks = new WeakMap();   // marks backend → its in-memory marks (one per device storage)
+
 export function createCirclePolicyStore({ load, save, versions, marks = null, onMarkNotWritten = null } = {}) {
   // THE POLICY OF A JOINED CIRCLE IS NOT KNOWN UNTIL IT ARRIVED. A read with no record answers the defaults (p0, a
   // plaintext circle), which is right for a circle this device created and wrong for one it JOINED: until the founder's
@@ -35,7 +37,10 @@ export function createCirclePolicyStore({ load, save, versions, marks = null, on
   // while it stands `get` says so (`policyPending: true`), and every posture reader treats that as not known.
   // FAILS CLOSED: a mark that cannot be READ counts as pending (a storage error never makes a joined circle plaintext),
   // and what this run marked or cleared is held in memory as well, so a mark that could not be WRITTEN still holds.
-  const inMemory = new Map();   // circleId → pending (true/false), this run
+  // circleId → pending (true/false), this run; SHARED by every store over the same marks backend: the phone builds
+  // several policy stores (the lane's, the mark's, the launcher's), and a mark held only by the store that set it was
+  // missed by the others when its write failed
+  const inMemory = marks ? (inMemoryByMarks.get(marks) ?? inMemoryByMarks.set(marks, new Map()).get(marks)) : new Map();
   const pendingOf = async (circleId) => {
     if (!marks) return false;
     if (inMemory.has(circleId)) return inMemory.get(circleId);
@@ -148,12 +153,17 @@ export function localCirclePolicyStore(storage = globalThis.localStorage) {
  * swallowed here: the store fails closed on them (an unreadable mark is pending; an unwritten one is said and held).
  * @param {{getItem: Function, setItem: Function}} storage  localStorage, AsyncStorage or the box's file store
  */
+// one marks backend per storage, so every policy store over the same storage shares the in-memory hold above
+const marksByStorage = new WeakMap();
 export function localPolicyPendingMarks(storage = globalThis.localStorage) {
+  if (storage && typeof storage === 'object' && marksByStorage.has(storage)) return marksByStorage.get(storage);
   const key = (id) => `cc.circlePolicyPending.${id}`;
-  return {
+  const marks = {
     load: async (id) => { if (!storage) throw new Error('no storage'); const s = await storage.getItem(key(id)); return s ? JSON.parse(s) : null; },
     save: async (id, value) => { if (!storage) throw new Error('no storage'); await storage.setItem(key(id), JSON.stringify(value)); },
   };
+  if (storage && typeof storage === 'object') marksByStorage.set(storage, marks);
+  return marks;
 }
 
 /** localStorage-backed load/save (web). Key: `cc.circlePolicy.<circleId>`. */

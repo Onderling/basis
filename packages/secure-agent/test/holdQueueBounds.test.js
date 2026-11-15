@@ -187,17 +187,69 @@ describe('hold queue — an address never seen alive is "not yet", not dead', ()
   // A newcomer's fresh per-circle address collected three timeouts (the join's broadcast, the create statement
   // re-told, a key event) before it was even registered, was written off, and a later send was refused
   // 'peer-unreachable', not even held. An address with no sign of life yet has given no evidence that it is DEAD.
-  it('failures to an address that never answered are not counted: every send is held, none refused', async () => {
-    const a = await agent({ holdMaxDeliveryFailures: 2 });
-    await a.addSecureTransport('relay', new BlackHoleTransport(new InternalBus(), a.identity.pubKey));
+  it('sends to an address that never answered inside the interval: ONE wire attempt, every send held, none refused', async () => {
+    const a = await agent({ holdMaxDeliveryFailures: 2, notYetAttemptIntervalMs: 60_000 });
+    const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
+    await a.addSecureTransport('relay', relay);
     const NEW = 'newcomer-circle-address-000000000000000000000';
-    for (const id of ['n1', 'n2', 'n3']) {
+    await a.peer.sendTo(NEW, { msgId: 'n1' }, HOLD);
+    const oneAttempt = relay.puts;
+    expect(oneAttempt).toBeGreaterThan(0);
+    for (const id of ['n2', 'n3', 'n4', 'n5']) {
       const r = await a.peer.sendTo(NEW, { msgId: id }, HOLD);
       expect(r.held, `${id} held, not refused`).toBe(true);
     }
+    expect(relay.puts, 'no wire attempt between attempts').toBe(oneAttempt);
     expect(a.holdStats().givenUpOn).toBe(0);
     await a.shutdown();
   }, 15_000);
+
+  it('after the interval, one more attempt', async () => {
+    const a = await agent({ holdMaxDeliveryFailures: 2, notYetAttemptIntervalMs: 50 });
+    const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
+    await a.addSecureTransport('relay', relay);
+    const NEW = 'newcomer-circle-address-222222222222222222222';
+    await a.peer.sendTo(NEW, { msgId: 'i1' }, HOLD);
+    const oneAttempt = relay.puts;
+    await new Promise((r) => { setTimeout(r, 80); });
+    const r = await a.peer.sendTo(NEW, { msgId: 'i2' }, HOLD);
+    expect(r.held).toBe(true);
+    expect(relay.puts, 'the interval passed: attempted again').toBeGreaterThan(oneAttempt);
+    await a.shutdown();
+  }, 15_000);
+
+  it('a presence signal drains everything held for it: each held message goes on the wire', async () => {
+    const a = await agent({ holdMaxDeliveryFailures: 10, notYetAttemptIntervalMs: 60_000 });
+    const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
+    await a.addSecureTransport('relay', relay);
+    const probe = 'probe-address-measuring-one-attempt-111111111';
+    await a.peer.sendTo(probe, { msgId: 'probe' }, HOLD);
+    const perAttempt = relay.puts;
+    const NEW = 'newcomer-circle-address-333333333333333333333';
+    for (const id of ['p1', 'p2', 'p3', 'p4']) await a.peer.sendTo(NEW, { msgId: id }, HOLD);
+    expect(a.heldFor(NEW)).toBe(4);
+    const before = relay.puts;
+    await a.presenceSignal(NEW);
+    // nobody is really there (a black hole); the point: presence attempted ALL four, none stayed parked behind the interval
+    expect(relay.puts - before, 'four resends on the wire').toBe(4 * perAttempt);
+    await a.shutdown();
+  }, 30_000);
+
+  it('a restored device with a roster of K never-seen addresses: its first boot\'s sends cost K wire attempts, not one per send', async () => {
+    const K = 6, SENDS = 4;
+    const a = await agent({ holdMaxDeliveryFailures: 3, notYetAttemptIntervalMs: 60_000 });
+    const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
+    await a.addSecureTransport('relay', relay);
+    const probe = 'probe-address-measuring-one-attempt-000000000';
+    await a.peer.sendTo(probe, { msgId: 'probe' }, HOLD);
+    const perAttempt = relay.puts;
+    relay.puts = 0;
+    const roster = Array.from({ length: K }, (_, i) => `roster-address-never-seen-${String(i).padStart(20, '0')}`);
+    for (let n = 0; n < SENDS; n++) for (const addr of roster) await a.peer.sendTo(addr, { msgId: `${addr}-${n}` }, HOLD);
+    expect(relay.puts, `K=${K} addresses x ${SENDS} sends`).toBe(K * perAttempt);
+    expect(a.holdStats().givenUpOn).toBe(0);
+    await a.shutdown();
+  }, 30_000);
 
   it('once it has answered, its failures count again', async () => {
     const a = await agent({ holdMaxDeliveryFailures: 2 });

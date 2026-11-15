@@ -224,6 +224,11 @@ function isApplicationError(err) {
 const YOUNG_ADDRESS_WINDOW_MS = param({ key: 'secureAgent.youngAddressWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: Object.freeze([2_000, 5_000, 10_000]) });
 /** How many stale envelopes one bucket (a circle) may hold while its sender check is refreshed; the oldest goes first. */
+/** An address never seen alive gets at most ONE wire attempt per this interval; a send in between joins its hold with
+ *  no wire attempt and no wait. 60 s: a send to a dead address costs a full handshake wait (seconds, ~15 s on a phone),
+ *  so a never-answering roster address costs at most one such wait a minute however often the device sends, while a
+ *  newcomer is unaffected (the join signals them present, which drains the hold at once). */
+const NOT_YET_ATTEMPT_INTERVAL_MS = param({ key: 'secureAgent.notYetAttemptIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 const STALE_PARK_MAX = param({ key: 'secureAgent.staleParkMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
 /** How long a parked stale envelope waits for a refreshed sender check before its bucket is judged once more. */
 const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
@@ -980,6 +985,9 @@ export async function createSecureAgent(opts = {}) {
    *  these can be judged DEAD: a failure against an address never seen alive (a newcomer's fresh per-circle address,
    *  not registered yet) says 'not yet', so it holds and is not counted. Kept across a restart with the holds. */
   const seenAlive = new Set();
+  /** address never seen alive → when its last wire attempt was made (`notYetWaits`). In memory: a restart may try once. */
+  const notYetAttemptAt = new Map();
+  const notYetAttemptIntervalMs = Number.isFinite(opts.notYetAttemptIntervalMs) ? opts.notYetAttemptIntervalMs : NOT_YET_ATTEMPT_INTERVAL_MS;
 
   // G12 — identity pubKey → the alias addresses bound to it (`registerPeerAddress`). The hold queue is
   // keyed by the address you SENT to, but presence arrives on the address the peer SPEAKS from: a peer
@@ -1123,10 +1131,25 @@ export async function createSecureAgent(opts = {}) {
     return writtenOff;
   }
 
+  /**
+   * Should a send to `addr` join its hold WITHOUT a wire attempt? Only for an address never seen alive whose last attempt
+   * is younger than `notYetAttemptIntervalMs`: at most one attempt per interval (a fresh install or a restore holds a
+   * whole roster of not-yet addresses; one handshake wait per send to each would undo the cold start). Marks the attempt.
+   */
+  function notYetWaits(addr) {
+    if (seenAlive.has(addr) || !(notYetAttemptIntervalMs > 0)) return false;
+    const now = Date.now();
+    const last = notYetAttemptAt.get(addr);
+    if (last != null && now - last < notYetAttemptIntervalMs) return true;
+    notYetAttemptAt.set(addr, now);
+    return false;
+  }
+
   /** This address answered (or announced itself) — it is not a dead address after all. */
   function clearDeliveryFailures(addr) {
     const firstSign = !seenAlive.has(addr);
     seenAlive.add(addr);
+    notYetAttemptAt.delete(addr);
     if (deliveryFailures.delete(addr) || firstSign) persistHolds();
   }
 
@@ -2439,6 +2462,8 @@ export async function createSecureAgent(opts = {}) {
         const scopedOut = !!opts?.scope && reachableNow;
         return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
       }
+      // not yet seen alive and attempted within the interval: join the hold, no wire attempt (`notYetWaits`)
+      if (notYetWaits(addr)) return enqueueHold(addr, payload, opts);
       try {
         const result = await _sendWithHandshakeRetry(addr, payload, opts);
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;

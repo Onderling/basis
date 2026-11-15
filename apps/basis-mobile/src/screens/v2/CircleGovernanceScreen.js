@@ -20,7 +20,7 @@ import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
-import { buildSubjectLabeler, subjectLabelerFor, deadlineLine, voteFailedLine, enactOutcomeLine, reportTargetText } from '../../../../basis/src/v2/governanceView.js';
+import { buildSubjectLabeler, subjectLabelerFor, deadlineLine, joinedSinceLine, voteFailedLine, enactOutcomeLine, reportTargetText } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
@@ -163,6 +163,10 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
               'proposal-deadline': () => (row.deadline != null ? (
                 <Text style={styles.tally} testID={`governance-deadline-${row.id ?? ''}`}>{deadlineLine(row.deadline, { t, locale: dateLocaleOf(t) })}</Text>
               ) : null),
+              'proposal-joined-since': () => {
+                const line = joinedSinceLine(row.joinedSince, { t });
+                return line ? <Text style={styles.tally} testID={`governance-joined-since-${row.proposalId}`}>{line}</Text> : null;
+              },
               'proposal-awaiting': () => (row.approved && row.awaitingEnactment ? (
                 <View>
                   <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
@@ -193,7 +197,7 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
                 </Pressable>
               ) : null),
             };
-            const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-awaiting']);
+            const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-joined-since', 'proposal-awaiting']);
             const declared = sectionsOf('governanceProposal');
             const metaRow = declared.filter((d) => META.has(d.id)).map((d) => <React.Fragment key={d.id}>{PAINT[d.id]?.()}</React.Fragment>);
             let metaPlaced = false;

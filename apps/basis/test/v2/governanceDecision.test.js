@@ -78,6 +78,15 @@ describe('member-vote — full-membership threshold + escape hatch', () => {
   const p = POL({ removeMember: 'member-vote' });
   const members = roster(5, 1);       // 5 members → need 3
 
+  it('only the votes of members on the roster count: a vote by someone who has left (or never was a member) does not', () => {
+    // two members say yes, and two people no longer on the roster (left or removed after voting) said yes too: 4 yes
+    // counted against a base of 5 would pass it; only the 2 members' yes count, so it is still waiting
+    const votes = [{ voter: 'admin0', choice: 'yes' }, { voter: 'm0', choice: 'yes' }, { voter: 'gone1', choice: 'yes' }, { voter: 'gone2', choice: 'yes' }];
+    const d = resolveGovernance({ action: 'removeMember', policy: p, members, votes });
+    expect(d.status).toBe(DECISION_STATUS.PENDING);
+    expect(d.tally).toMatchObject({ yes: 2, need: 3, of: 5 });
+  });
+
   it('approves on a strict majority of the FULL membership', () => {
     const votes = [{ voter: 'admin0', choice: 'yes' }, { voter: 'm0', choice: 'yes' }, { voter: 'm1', choice: 'yes' }];
     const r = resolveGovernance({ action: 'removeMember', policy: p, members, votes });

@@ -12,7 +12,7 @@ import { reportTargetText } from '../../src/v2/governanceView.js';
 import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../src/v2/circlePolicy.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
-import { deadlineLine } from '../../src/v2/governanceView.js';
+import { deadlineLine, joinedSinceLine } from '../../src/v2/governanceView.js';
 import { dateLocaleOf } from '../../src/v2/whenWords.js';
 
 /** decision-class / action / status → a locale key (values carry hyphens; keys don't). */
@@ -109,6 +109,10 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
         tr('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })) : null),
       'proposal-deadline': () => (row.deadline != null
         ? el('span', 'circle-governance__deadline', deadlineLine(row.deadline, { t: tr, locale: dateLocaleOf(tr) })) : null),
+      'proposal-joined-since': () => {
+        const line = joinedSinceLine(row.joinedSince, { t: tr });
+        return line ? el('span', 'circle-governance__joined-since', line) : null;
+      },
       'proposal-awaiting': () => {
         if (!(row.approved && row.awaitingEnactment)) return null;
         const wait = el('span', 'circle-governance__awaiting', tr('circle.governance.awaiting_enactment'));
@@ -144,7 +148,7 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
         return ob;
       },
     };
-    const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-awaiting']);
+    const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-joined-since', 'proposal-awaiting']);
     let meta = null;
     for (const d of sectionsOf('governanceProposal')) {
       const node = PAINT[d.id]?.();

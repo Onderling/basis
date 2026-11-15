@@ -30,6 +30,7 @@
  *
  * Pure: bodies, the policy chain, members and the folded proposals in; verdicts out.
  */
+import { admissionWithin } from './voteFreeze.js';
 import { changeNeedsVote, normalizeCirclePolicy } from './circlePolicy.js';
 import { DECISION_STATUS, resolveGovernance } from './governanceDecision.js';
 import { foldGovernance } from './governanceLog.js';
@@ -120,8 +121,10 @@ export function writeSkippedTheVote({ action, body, policy, members = [], propos
   if (!p || p.action !== action) return true;
   // NO DEVICE CLOCK (Opus): an open proposal is judged by its votes alone; a closed one at its resolve's own signed
   // time (the override's deadline test), so every device judges the same statement the same way
+  // the proposal's OWN roster (the vote freeze): a proposal this device cannot count yet is not a decision here
+  if (p.waitingForMembers === true) return true;
   const d = resolveGovernance({
-    action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0,
+    action, policy, members: Array.isArray(p.members) ? p.members : members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0,
     seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by,
   });
   const approved = d.status === DECISION_STATUS.APPROVED
@@ -210,11 +213,18 @@ export function judgeRulesWrites({ bodies = [], chain, currentPolicy = {}, membe
   return { kept, skipped, waiting };
 }
 
-/** The governance fold this device holds for a circle (the proposals the gate tallies). */
-export async function proposalsOn({ rail, circleId, policy = {}, members = [], now = Date.now() } = {}) {
+/**
+ * The governance fold this device holds for a circle (the proposals the gate tallies). With the circle's membership
+ * statements (`readMembershipBodies`), each proposal carries the roster it is counted on (the vote freeze): the gate
+ * judges a decision on the same members the deciding device counted, never on the roster as it is now.
+ */
+export async function proposalsOn({ rail, circleId, policy = {}, members = [], now = Date.now(), readMembershipBodies = null } = {}) {
   let events = []; let disputed = new Set();
   try { ({ events = [], disputed = new Set() } = (await rail?.readVerified?.(circleId)) ?? {}); } catch { events = []; }
-  return foldGovernance(events, { policy, members, now, disputed }).proposals;
+  let bodies = null;
+  try { bodies = typeof readMembershipBodies === 'function' ? await readMembershipBodies(circleId) : null; } catch { bodies = null; }
+  const admissionFor = Array.isArray(bodies) ? (heads) => admissionWithin(bodies, heads) : null;
+  return foldGovernance(events, { policy, members, now, disputed, admissionFor }).proposals;
 }
 
 /**
@@ -306,7 +316,8 @@ export function membershipGateFor({ chain, currentPolicy = {}, members = [], pro
       ? p.subject === s.subject
       : p.subject?.member === s.subject && p.subject?.role === payload.role;
     if (!about) return false;
-    const d = resolveGovernance({ action, policy, members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0, seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by });
+    if (p.waitingForMembers === true) return false;   // not countable here yet: not a decision (the vote freeze)
+    const d = resolveGovernance({ action, policy, members: Array.isArray(p.members) ? p.members : members, votes: p.votes ?? [], deadline: p.deadline ?? null, now: p.closed ? (p.closedAt ?? 0) : 0, seed: p.seed ?? p.proposalId, subject: p.subject, by: p.by });
     return d.status === DECISION_STATUS.APPROVED
       || (p.closed === true && p.status === DECISION_STATUS.APPROVED && d.overrideAvailable === true);
   };

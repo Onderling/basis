@@ -110,6 +110,8 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
       'proposal-deadline': () => (row.deadline != null
         ? el('span', 'circle-governance__deadline', deadlineLine(row.deadline, { t: tr, locale: dateLocaleOf(tr) })) : null),
       'proposal-awaiting': () => {
+        // the vote freeze: the member list this proposal is counted on has not reached this device yet
+        if (row.waitingForMembers) return el('span', 'circle-governance__awaiting circle-governance__awaiting--members', tr('circle.governance.waiting_member_list'));
         if (!(row.approved && row.awaitingEnactment)) return null;
         const wait = el('span', 'circle-governance__awaiting', tr('circle.governance.awaiting_enactment'));
         // the admin's act (L893): one shared decision of who sees it (row.canEnact); everyone else keeps the line

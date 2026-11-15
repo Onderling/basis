@@ -12,6 +12,7 @@
  * newly-appointed caretaker IS an admin in that roster, the same rule makes it the enactor
  * with no special case.
  */
+import { membershipFrontier, admissionWithin, authorTip } from './voteFreeze.js';
 import { selfRefIn } from './selfRef.js';
 import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
 import { autoEnacts } from './circlePolicy.js';
@@ -36,6 +37,8 @@ export function makeCircleGovernance({
   callSkill, appendGovernanceEvent, getPolicy, getMembers,
   localActorRef, setPolicy = null, rotateKey = null, newProposalId, now = () => 0,
   readGovernanceState,
+  // the circle's verified membership statement bodies (the vote freeze reads the circle as it stood); absent → no freeze
+  readMembershipBodies = null,
   // the WHOLE removal (`removeCircleMember`: the substrate op, then unbind the member's circle address and re-record the
   // authorize snapshot), when the wiring has this device's agent; else the bare pinboard op
   removeMember = null,
@@ -70,14 +73,24 @@ export function makeCircleGovernance({
   async function getContext(circleId) {
     // The fold's input is the rail's VERIFIED state: signature-verified, binding-resolved events + the
     // disputed set from real fork-proofs. (The unsigned event path was deleted with the governance cutover.)
-    const [policy, members, state] = await Promise.all([
+    const [policy, members, state, bodies] = await Promise.all([
       getPolicy(circleId), getMembers(circleId), readGovernanceState(circleId),
+      typeof readMembershipBodies === 'function' ? Promise.resolve(readMembershipBodies(circleId)).catch(() => null) : null,
     ]);
+    // THE VOTE FREEZE: the frontier a new proposal is made under, and the reader of the circle as it stood at a
+    // proposal's heads; without the membership statements there is nothing to freeze on (counted as before)
+    const membershipBody = Array.isArray(bodies) ? bodies : (Array.isArray(bodies?.bodies) ? bodies.bodies : null);
     return {
       circleId,
       policy, members: Array.isArray(members) ? members : [],
       events: Array.isArray(state?.events) ? state.events : [],
       disputed: state?.disputed instanceof Set ? state.disputed : new Set(),
+      ...(membershipBody ? {
+        membershipHeads: membershipFrontier(membershipBody),
+        admissionFor: (heads) => admissionWithin(membershipBody, heads),
+        // the tip of an author's own chain on the membership lane (the last statement of theirs nothing of theirs builds on)
+        membershipUpToOf: (ref) => authorTip(membershipBody, ref),
+      } : {}),
     };
   }
 
@@ -102,7 +115,7 @@ export function makeCircleGovernance({
       try { await settle(circleId); ctx = await getContext(circleId); } catch { /* view must still render */ }
     }
     const me = (ctx.members || []).find((m) => m && m.ref === actorIn(circleId)) || null;
-    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed, admissionFor: ctx.admissionFor });
     const base = buildGovernanceView({ fold, viewer: me, labelForSubject });
     // L3: surface the disputed authors (equivocators) so the shell can prompt "review & remove".
     const disputed = [...ctx.disputed].map((ref) => ({ ref, label: labelForSubject ? labelForSubject(ref, 'removeMember') : ref }));
@@ -128,7 +141,7 @@ export function makeCircleGovernance({
    */
   async function settle(circleId) {
     const ctx = await getContext(circleId);
-    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed, admissionFor: ctx.admissionFor });
     const open = (fold.proposals ?? []).filter((p) => p && !p.closed);
     const results = [];
     for (const p of open) {

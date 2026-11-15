@@ -125,13 +125,18 @@ export function resolveGovernance({ action, policy, actor = null, members = [], 
     return resolveSample({ policy, roster, admins, isAdmin, final, actor, deadline, now, override, seed, subject, by });
   }
 
-  // member-vote — strict majority of the FULL membership.
+  // member-vote — strict majority of the FULL membership. Only the votes of members ON THIS ROSTER count (the roster of
+  // the proposal, `voteFreeze.js`: the members from before it, minus anyone who left since): a vote by anyone else, an
+  // account admitted after the proposal included, is not one of the base's and counts for nothing.
+  const onRoster = new Set(roster.map((m) => m.ref));
+  const yesM = yes.filter((v) => onRoster.has(v.voter));
+  const noM = no.filter((v) => onRoster.has(v.voter));
   const need = majorityOf(roster.length);
-  const tally = { yes: yes.length, no: no.length, need, of: roster.length };
+  const tally = { yes: yesM.length, no: noM.length, need, of: roster.length };
   const expired = deadline != null && now >= deadline;
-  if (yes.length >= need) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'majority', tally, deadline };
+  if (roster.length > 0 && yesM.length >= need) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'majority', tally, deadline };
   // A no-majority makes the yes-threshold unreachable → reject (no deadlock, and it's a clear NO).
-  if (no.length > roster.length - need) return { status: DECISION_STATUS.REJECTED, decisionClass, reason: 'rejected-by-majority', tally, deadline };
+  if (roster.length > 0 && noM.length > roster.length - need) return { status: DECISION_STATUS.REJECTED, decisionClass, reason: 'rejected-by-majority', tally, deadline };
   // Threshold not (yet) reached. Escape-hatch (b): once past the deadline an admin may force it.
   if (expired && override && actor && isAdmin(actor.ref)) {
     return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'admin-override', tally, deadline };

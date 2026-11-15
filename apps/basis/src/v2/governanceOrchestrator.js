@@ -6,8 +6,10 @@
  *   - appendEvent(circleId, event)      — write a governance event to the one log stream.
  *   - enact(circleId, action, subject)  — the REAL op (removeMember / setCirclePolicy / …),
  *                                         mapped by the host; called only once APPROVED.
- *   - getContext(circleId) → { policy, members, events }  — current policy + full roster +
- *                                         the folded governance events, read back off the log.
+ *   - getContext(circleId) → { policy, members, events, membershipHeads?, admissionFor? }  — current policy + full
+ *                                         roster + the folded governance events; the membership frontier a new
+ *                                         proposal is made under and the reader of the circle as it stood at a
+ *                                         proposal's heads (the vote freeze, `voteFreeze.js`).
  *   - newProposalId()                   — a fresh proposal id.
  *   - now()                             — current ms (deadline evaluation).
  *
@@ -20,6 +22,7 @@
 import { resolveGovernance, DECISION_STATUS } from './governanceDecision.js';
 import { proposeEvent, voteEvent, resolveEvent, foldGovernance } from './governanceLog.js';
 import { decisionDeadlineDays } from './circlePolicy.js';
+import { proposalRoster } from './voteFreeze.js';
 
 export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, newProposalId, now = () => 0, canEnact = () => true } = {}) {
   async function enactAndClose(circleId, proposal, by) {
@@ -38,7 +41,7 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
   async function tally({ circleId, proposalId, enactor = null }) {
     const ctx = await getContext(circleId);
     // L3: discount any equivocating author's votes (ctx.disputed from the host's foldDisputes).
-    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed, admissionFor: ctx.admissionFor });
     const p = (fold.proposals ?? []).find((x) => x.proposalId === proposalId);
     if (!p) return { ok: false, reason: 'no-proposal' };
     if (p.closed) return { ok: true, status: p.status, proposalId, closed: true };
@@ -69,7 +72,7 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     if (immediate.decisionClass === 'any-admin' && immediate.status !== DECISION_STATUS.PENDING) {
       if (immediate.status !== DECISION_STATUS.APPROVED) return { ok: false, status: immediate.status, reason: immediate.reason };
       const proposalId = newProposalId();
-      await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: null, at: t }));
+      await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: null, at: t, membershipHeads: ctx.membershipHeads, membershipUpTo: ctx.membershipUpToOf?.(actor?.ref) ?? null }));
       const { ok, result } = await enactAndClose(circleId, { proposalId, action, subject }, actor?.ref);
       return { ok, status: ok ? DECISION_STATUS.APPROVED : DECISION_STATUS.REJECTED, proposalId, enacted: ok, result };
     }
@@ -84,7 +87,8 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     const days = decisionDeadlineDays(ctx.policy);
     const defaultDeadline = days > 0 ? t + (days * 86_400_000) : null;
     const effectiveDeadline = deadline ?? defaultDeadline;
-    await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: effectiveDeadline, at: t }));
+    // the circle as it stands NOW rides the proposal, signed: its vote is counted on these members (the vote freeze)
+    await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: effectiveDeadline, at: t, membershipHeads: ctx.membershipHeads, membershipUpTo: ctx.membershipUpToOf?.(actor?.ref) ?? null }));
     if (actor?.ref) await appendEvent(circleId, voteEvent({ proposalId, voter: actor.ref, choice: 'yes', at: t }));
     return tally({ circleId, proposalId, enactor: actor?.ref });
   }
@@ -98,11 +102,14 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
   // The admin past-deadline valve (escape-hatch b): force a still-pending member-vote.
   async function override({ circleId, proposalId, actor = null }) {
     const ctx = await getContext(circleId);
-    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, actor, now: now(), disputed: ctx.disputed });
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, actor, now: now(), disputed: ctx.disputed, admissionFor: ctx.admissionFor });
     const p = (fold.proposals ?? []).find((x) => x.proposalId === proposalId);
     if (!p || p.closed) return { ok: false, reason: 'no-open-proposal' };
+    // the override is judged on the proposal's own roster too (never the roster as it is now)
+    const own = proposalRoster(p, { members: ctx.members, admissionFor: ctx.admissionFor });
+    if (own.waiting) return { ok: false, status: DECISION_STATUS.PENDING, reason: 'waiting-for-members' };
     const d = resolveGovernance({
-      action: p.action, policy: ctx.policy, actor, members: ctx.members, votes: p.votes,
+      action: p.action, policy: ctx.policy, actor, members: own.members, votes: p.votes,
       deadline: p.deadline, now: now(), override: true, seed: p.seed, subject: p.subject, by: p.by,
     });
     if (d.status !== DECISION_STATUS.APPROVED) return { ok: false, status: d.status, reason: d.reason };

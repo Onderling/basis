@@ -612,12 +612,14 @@ if (relayUrl) {
     readPolicy: (cid) => circlePolicyStore.get(cid),
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
     membersOf: membersOfViaSkill(callSkill),   // the roster the receiver gate counts
+    // the circle's verified membership statements: a decision is judged on the members from before its proposal (the vote freeze)
+    readMembershipBodies: (cid) => agent.membershipBodies?.(cid) ?? null,
   });
   // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
   // same reaction for a catch-up batch and a live statement.
   const govChanged = (cid) => {
     if (!govRail) return;
-    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy }).catch(() => {});
+    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy, readMembershipBodies: (c) => agent.membershipBodies?.(c) ?? null }).catch(() => {});
     circlePolicyLane.apply(cid, govRail)
       .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
       .catch(() => {});

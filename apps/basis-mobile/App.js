@@ -285,6 +285,8 @@ export default function App() {
     const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
     circlePolicyLaneRef.current = makeCirclePolicyLane({
       emitter: () => bundleRef.current?.agent?.emitPolicyUpdate ?? null,
+      // the circle's verified membership statements: a decision is judged on the members from before its proposal (the vote freeze)
+      readMembershipBodies: (cid) => bundleRef.current?.agent?.membershipBodies?.(cid) ?? null,
       headStore: makePolicyHeadStore(AsyncStorage),
       readPolicy: (cid) => policyStore.get(cid),
       // a policy that arrives may change the circle's storage posture — drop the strategy composed from the old one

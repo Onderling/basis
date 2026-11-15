@@ -41,6 +41,10 @@ const LINK_REFUSAL_CODES_LIST = ['earlier-link-proof'];
 
 /** The circle policy's code: a joined circle's 'policy pending' mark could not be written (it is held in memory for the run). */
 const POLICY_REFUSAL_CODES_LIST = ['policy-mark-not-written'];
+
+/** The vote freeze's codes (`voteFreeze.js`): a proposal not countable here yet, or one whose heads leave out its proposer's line. */
+const VOTE_FREEZE_REFUSAL_CODES_LIST = ['membership-head-unknown', 'membership-heads-behind-proposer'];
+export const VOTE_FREEZE_REFUSAL_CODES = Object.freeze(VOTE_FREEZE_REFUSAL_CODES_LIST.slice());
 export const POLICY_REFUSAL_CODES = Object.freeze([...POLICY_REFUSAL_CODES_LIST]);
 export const LINK_REFUSAL_CODES = Object.freeze([...LINK_REFUSAL_CODES_LIST]);
 
@@ -69,6 +73,8 @@ export const REFUSAL_CODES = Object.freeze([
   ...LINK_REFUSAL_CODES_LIST,
   // a joined circle's policy-pending mark not written (held in memory for the run)
   ...POLICY_REFUSAL_CODES_LIST,
+  // a proposal this device cannot count (the vote freeze)
+  ...VOTE_FREEZE_REFUSAL_CODES_LIST,
 ]);
 const KNOWN = new Set(REFUSAL_CODES);
 const DETAIL_MAX = 32;

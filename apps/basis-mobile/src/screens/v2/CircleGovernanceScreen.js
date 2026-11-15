@@ -163,7 +163,10 @@ export default function CircleGovernanceScreen({ callSkill, governance, circleId
               'proposal-deadline': () => (row.deadline != null ? (
                 <Text style={styles.tally} testID={`governance-deadline-${row.id ?? ''}`}>{deadlineLine(row.deadline, { t, locale: dateLocaleOf(t) })}</Text>
               ) : null),
-              'proposal-awaiting': () => (row.approved && row.awaitingEnactment ? (
+              // the vote freeze: the member list this proposal is counted on has not reached this phone yet
+              'proposal-awaiting': () => (row.waitingForMembers ? (
+                <Text style={styles.awaiting} testID={`governance-waiting-members-${row.proposalId}`}>{t('circle.governance.waiting_member_list')}</Text>
+              ) : row.approved && row.awaitingEnactment ? (
                 <View>
                   <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
                   {/* the admin's act (L893): who sees it is one shared decision (row.canEnact) */}

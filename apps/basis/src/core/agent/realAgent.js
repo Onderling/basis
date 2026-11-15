@@ -6424,7 +6424,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         });
         let bodies = [];
         try { ({ bodies = [] } = await bound.readVerifiedBodies(circleId)); } catch { bodies = []; }
-        const proposals = await proposalsOn({ rail: bound, circleId, policy: normalizeCirclePolicy({}), members });
+        const proposals = await proposalsOn({ rail: bound, circleId, policy: normalizeCirclePolicy({}), members,
+          readMembershipBodies: async (cid) => { try { return (await membershipRail?.readVerifiedBodies?.(cid))?.bodies ?? []; } catch { return null; } } });
         const chain = judgePolicyChain({ bodies: bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author)), members, proposals, merge: denyWinsMerge });
         // the membership lane's own bodies (raw author keys): an author's earlier removals sit in their chain before the
         // tip their later settings change named
@@ -9753,6 +9754,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     surfaceTokenEntry: async (tokenId) => { await surfaceGrantsReady; return surfaceGrants.activeEntryOf(tokenId); },
     /** Resolves once the durable surface registry has loaded (grants are refused until then). */
     surfaceGrantsReady: () => surfaceGrantsReady,
+    /** The circle's VERIFIED membership statement bodies: the vote freeze reads the circle as it stood from them. */
+    membershipBodies: async (circleId) => { try { return (await membershipRail?.readVerifiedBodies?.(circleId))?.bodies ?? []; } catch { return []; } },
     llmProviders,
     // host-injected claim router; called after every successful
     // claimTask.  Hosts wire `makeAfterClaimHook` here once the agent +

@@ -150,6 +150,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
   const circlePolicyLane = makeCirclePolicyLane({
     emitter: () => bundle?.agent?.emitPolicyUpdate ?? null,
+    readMembershipBodies: (cid) => bundle?.agent?.membershipBodies?.(cid) ?? null,   // App.js's (the vote freeze)
     headStore: makePolicyHeadStore(AsyncStorage),
     readPolicy: (cid) => policyStore.get(cid),
     writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); pods.forgetCircleSealStrategyFor(cid); return r; },

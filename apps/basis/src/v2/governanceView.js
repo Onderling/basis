@@ -125,6 +125,9 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       // It was dead until 2026-07-26: the flag existed only on `tally()`'s return value, never on a row,
       // so `row.awaitingEnactment` was always undefined and the chip never appeared on either platform.
       awaitingEnactment: p.status === DECISION_STATUS.APPROVED && !p.closed,
+      // THE VOTE FREEZE: this device does not hold the circle's member list the proposal names yet, so it cannot say who
+      // may vote; the screen says so (never a silent pending)
+      waitingForMembers: p.waitingForMembers === true && !p.closed,
       // WHO SEES "ENACT" (L893, 2026-11-14): the default is that an admin enacts explicitly (Decision B), and only an
       // admin/caretaker device enacts (Decision A); a caretaker IS an admin in the roster. Everyone else keeps the
       // waiting line. One decision both shells read.

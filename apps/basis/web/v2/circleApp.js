@@ -1156,6 +1156,8 @@ const policyStore = localCirclePolicyStore();
 // copy of circle state, no longer a per-device setting that only a settings save ever broadcast.
 const circlePolicyLane = makeCirclePolicyLane({
   emitter: () => _peerAgent?.emitPolicyUpdate ?? null,
+  // the circle's verified membership statements: a decision is judged on the members from before its proposal (the vote freeze)
+  readMembershipBodies: (cid) => circleHouseholdAgent?.membershipBodies?.(cid) ?? null,
   headStore: makePolicyHeadStore({
     getItem: async (k) => { try { return globalThis.localStorage?.getItem(k) ?? null; } catch { return null; } },
     setItem: async (k, v) => { try { globalThis.localStorage?.setItem(k, v); } catch { /* quota / disabled */ } },
@@ -9770,7 +9772,7 @@ async function boot() {
       // statement — fold it into the local rules head, then re-render. Fire-and-forget: the apply
       // pre-scans the lane cheaply and no-ops when nothing rules-shaped landed.
       const govChanged = (cid) => {
-        applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy }).catch(() => {});
+        applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy, readMembershipBodies: (c) => circleHouseholdAgent?.membershipBodies?.(c) ?? null }).catch(() => {});
         circlePolicyLane.apply(cid, govShellRail).catch(() => {});
         if (getActiveCircle() === cid) _govRerender?.();
       };
@@ -9929,7 +9931,7 @@ async function boot() {
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.
-            applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy }).catch(() => {});
+            applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy, readMembershipBodies: (c) => circleHouseholdAgent?.membershipBodies?.(c) ?? null }).catch(() => {});
             circlePolicyLane.apply(cid, govShellRail).catch(() => {});
             if (getActiveCircle() === cid) _govRerender?.();
           } }),

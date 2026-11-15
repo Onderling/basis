@@ -203,6 +203,8 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     ...(agent ? { removeMember: (circleId, memberWebid, decided = {}) => removeCircleMember({ agent, callSkill, circleId, memberWebid, ...decided }) } : {}),
     // The fold's input: VERIFIED events + the disputed (equivocator) ref set, from the rail's read.
     readGovernanceState: (circleId) => rail.readVerified(circleId),
+    // the vote freeze: the circle's verified membership statements (what a proposal's roster is read from)
+    ...(typeof agent?.membershipBodies === 'function' ? { readMembershipBodies: (circleId) => agent.membershipBodies(circleId) } : {}),
   });
 
   // §8 reporting — SIGNED on this rail (`report-file` · `report-resolve`, `reportLane.js`): who filed a report and who
@@ -255,10 +257,11 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     let bodies = [];
     try { ({ bodies = [] } = await rail.readVerifiedBodies(circleId)); } catch { return []; }
     if (!bodies.some((b) => b?.kind === 'rules-update' || b?.kind === 'policy-update')) return [];
-    let policy = {}; let members = []; let state = { events: [], disputed: new Set() };
-    try { [policy, members, state] = await Promise.all([getPolicy(circleId), getMembers(circleId), rail.readVerified(circleId)]); } catch { return []; }
-    const { proposals } = foldGovernance(state?.events ?? [], { policy: policy ?? {}, members, now: now(), disputed: state?.disputed ?? new Set() });
-    return refusedCarriedChanges({ bodies, policy: policy ?? {}, members, proposals, merge: denyWinsMerge });
+    // the same context the decisions are made in (the vote freeze included): judged on each proposal's own roster
+    let ctx = null;
+    try { ctx = await governance.getContext(circleId); } catch { return []; }
+    const { proposals } = foldGovernance(ctx.events, { policy: ctx.policy ?? {}, members: ctx.members, now: now(), disputed: ctx.disputed, admissionFor: ctx.admissionFor });
+    return refusedCarriedChanges({ bodies, policy: ctx.policy ?? {}, members: ctx.members, proposals, merge: denyWinsMerge });
   };
   // the view, with the refused changes beside the proposals: who made each (named like a subject), never applied
   const view = async (circleId, opts = {}) => {
@@ -284,7 +287,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
 export async function openPolicyProposals(gov, circleId, { now = Date.now() } = {}) {
   const ctx = await gov.getContext(circleId);
   const fold = foldGovernance(ctx.events, {
-    policy: ctx.policy, members: ctx.members, now, disputed: ctx.disputed,
+    policy: ctx.policy, members: ctx.members, now, disputed: ctx.disputed, admissionFor: ctx.admissionFor,
   });
   return {
     proposals: (fold.proposals ?? []).filter((p) => !p.closed && p.action === 'changePolicy'),

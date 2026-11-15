@@ -7610,6 +7610,10 @@
       "text": "wacht op een beheerder",
       "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."
     },
+    "waiting_member_list": {
+      "text": "Wacht op de ledenlijst van de kring voordat dit geteld kan worden.",
+      "doc": "Decisions screen: a proposal this device cannot count yet, because the circle's member list it was made under (the vote freeze) has not reached it."
+    },
     "disputed_line": {
       "text": "tegenstrijdige historie van {{who}} — bewijs bijgevoegd",
       "doc": "Governance L3 — equivocation (fork-proof) alert."

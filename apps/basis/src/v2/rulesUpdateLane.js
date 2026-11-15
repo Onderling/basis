@@ -106,7 +106,7 @@ export async function preservedRulesStatementsFor({ callSkill, circleId } = {}) 
  *   gate judges each change by the circle's rule for changing the rules (governanceReceiverGate.js)
  * @returns {Promise<{applied: boolean, version?: number, skipped?: number}>}
  */
-export async function applyRulesUpdates({ rail, callSkill, circleId, readPolicy = null } = {}) {
+export async function applyRulesUpdates({ rail, callSkill, circleId, readPolicy = null, readMembershipBodies = null } = {}) {
   if (!rail || typeof callSkill !== 'function' || typeof circleId !== 'string' || !circleId) {
     return { applied: false };
   }
@@ -148,7 +148,7 @@ export async function applyRulesUpdates({ rail, callSkill, circleId, readPolicy 
       const chain = judgePolicyChain({ bodies: policyChanges, members, proposals, merge: denyWinsMerge, need });
       return judgeRulesWrites({ bodies: byAdmins, chain, currentPolicy: policy, members, proposals, need, chainOf: chainOfBodies(bodies) });
     },
-    () => proposalsOn({ rail, circleId, policy, members }),
+    () => proposalsOn({ rail, circleId, policy, members, readMembershipBodies }),
   );
   // every refusal says why (L857): a rules change the circle's rule did not allow, one record per kind of refusal
   for (let i = 0; i < skipped.length; i += 1) processRefusalLog().note({ tag: 'gate', lane: 'governance', check: 'rules', reason: 'not allowed by the circle rule' });

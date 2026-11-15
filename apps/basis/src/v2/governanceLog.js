@@ -14,13 +14,33 @@
  * See docs/decisions.md (2026-07-25).
  */
 import { resolveGovernance, DECISION_STATUS } from './governanceDecision.js';
+import { proposalRoster } from './voteFreeze.js';
+import { processRefusalLog } from './refusalLog.js';
+
+// each proposal's freeze outcome said ONCE per process (the fold runs on every view)
+const saidFreeze = new Set();
+function noteOnce(key, reason) {
+  if (saidFreeze.has(key)) return;
+  saidFreeze.add(key);
+  if (reason) { try { processRefusalLog().note({ tag: 'gate', lane: 'governance', check: 'vote', reason }); } catch { /* said best-effort */ } }
+  else if (typeof console !== 'undefined') console.info('[governance] a proposal made before the vote freeze: counted on the roster as it is now');
+}
 
 export const GOVERNANCE_KIND = 'governance';
 export const GOV_EVENT = { PROPOSE: 'propose', VOTE: 'vote', RESOLVE: 'resolve' };
 
-/** Open a proposal. `subject` is the target (a member ref for removeMember, a patch key for a rule/policy change). */
-export function proposeEvent({ proposalId, action, subject = null, by, deadline = null, at = 0 }) {
-  return { kind: GOVERNANCE_KIND, event: GOV_EVENT.PROPOSE, proposalId, action, subject, by, deadline, at };
+/**
+ * Open a proposal. `subject` is the target (a member ref for removeMember, a patch key for a rule/policy change).
+ * `membershipHeads`: the frontier of the circle's membership statements on the proposer's device (signed with the
+ * proposal): the circle as it stood, the base its vote is counted on (`voteFreeze.js`).
+ */
+export function proposeEvent({ proposalId, action, subject = null, by, deadline = null, at = 0, membershipHeads = null, membershipUpTo = null }) {
+  return {
+    kind: GOVERNANCE_KIND, event: GOV_EVENT.PROPOSE, proposalId, action, subject, by, deadline, at,
+    ...(Array.isArray(membershipHeads) && membershipHeads.length ? { membershipHeads } : {}),
+    // the proposer's own membership chain tip: the heads must reach it (a proposal cannot leave out its own admissions)
+    ...(typeof membershipUpTo === 'string' && membershipUpTo ? { membershipUpTo } : {}),
+  };
 }
 /** Cast a vote on a proposal. */
 export function voteEvent({ proposalId, voter, choice, at = 0 }) {
@@ -40,10 +60,12 @@ export function resolveEvent({ proposalId, status, by = null, at = 0 }) {
  * @param {Array<{ref:string, role?:string}>} deps.members  the FULL roster
  * @param {object} [deps.actor]    the viewer/actor (for any-admin authority in the live status)
  * @param {number} [deps.now]      current time (ms) — for deadline evaluation
+ * @param {(heads: string[]) => object} [deps.admissionFor]  the circle as it stood at a proposal's heads (`voteFreeze.js`
+ *   `admissionWithin` over this device's membership statements): each proposal is counted on ITS roster
  * @returns {{proposals: Array<{proposalId, action, subject, by, deadline, votes, closed,
  *            status, decision}>}}
  */
-export function foldGovernance(events, { policy, members = [], actor = null, now = 0, disputed = null } = {}) {
+export function foldGovernance(events, { policy, members = [], actor = null, now = 0, disputed = null, admissionFor = null } = {}) {
   // L3: a disputed author (caught equivocating) has their votes discounted — an equivocator
   // must not be able to sway a decision. `disputed` is a Set of author refs (foldDisputes).
   const isDisputed = disputed instanceof Set ? (ref) => disputed.has(ref) : () => false;
@@ -64,6 +86,8 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
       if (better) {
         p.action = e.action; p.subject = e.subject ?? null; p.by = e.by ?? null;
         p.deadline = e.deadline ?? null; p._proposedAt = e.at ?? 0; p._proposeHash = e.hash ?? null;
+        p.membershipHeads = Array.isArray(e.membershipHeads) ? e.membershipHeads.filter((h) => typeof h === 'string') : null;
+        p.membershipUpTo = typeof e.membershipUpTo === 'string' && e.membershipUpTo ? e.membershipUpTo : null;
       }
     } else if (e.event === GOV_EVENT.VOTE) {
       if (typeof e.voter === 'string' && (e.choice === 'yes' || e.choice === 'no') && !isDisputed(e.voter)) {
@@ -81,12 +105,24 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
   const proposals = [];
   for (const p of byId.values()) {
     if (p.action === null) continue;   // votes/resolves with no matching propose — drop
-    const decision = resolveGovernance({ action: p.action, policy, actor, members, votes: p.votes, deadline: p.deadline, now, seed: p._proposeHash ?? p.proposalId, subject: p.subject, by: p.by });
+    // THE ROSTER OF THIS PROPOSAL (the vote freeze): the members from before it, minus anyone who left since; a device that
+    // does not hold every named head yet keeps it waiting, never counted on a partial roster
+    const own = proposalRoster(p, { members, admissionFor });
+    // said, never silent: a proposal this device cannot count yet, and one whose heads leave out its proposer's own line
+    if (own.waiting) noteOnce(`wait:${p.proposalId}`, 'membership-head-unknown');
+    if (own.behindProposer) noteOnce(`behind:${p.proposalId}`, 'membership-heads-behind-proposer');
+    if (!own.frozen && admissionFor) noteOnce(`old:${p.proposalId}`, null);   // made before the freeze: counted as today
+    const decision = own.waiting
+      ? { status: DECISION_STATUS.PENDING, reason: 'waiting-for-members', tally: null }
+      : resolveGovernance({ action: p.action, policy, actor, members: own.members, votes: p.votes, deadline: p.deadline, now, seed: p._proposeHash ?? p.proposalId, subject: p.subject, by: p.by });
     proposals.push({
       proposalId: p.proposalId, action: p.action, subject: p.subject, by: p.by, deadline: p.deadline,
       proposedAt: p._proposedAt, votes: p.votes, closed: p.closed,
       closedAt: p.closed ? (p.closedAt ?? 0) : null,   // the resolve's own signed time (a receiver judges an override by it, never its clock)
       seed: p._proposeHash ?? p.proposalId,   // what a drawn sample (`random-sample`) is drawn from
+      membershipHeads: p.membershipHeads ?? null,   // the circle as it stood (the vote freeze); null: made before it
+      members: own.members,                         // the roster this proposal is counted on
+      waitingForMembers: own.waiting === true,      // this device does not hold the circle's member list it names yet
       // a closed proposal keeps its recorded outcome; an open one shows the live decision.
       status: p.closed ? (p.closedStatus ?? DECISION_STATUS.REJECTED) : decision.status,
       decision,

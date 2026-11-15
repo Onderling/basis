@@ -189,7 +189,7 @@ export async function nextPolicyVersion(headStore, circleId) {
  * @param {(circleId: string, policy: object) => Promise<*>} a.writePolicy  replaces the device's policy for the circle
  * @returns {Promise<{applied: boolean, version?: number, skipped?: number}>}
  */
-export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adminsOf = null, readPolicy = null, headStore, writePolicy } = {}) {
+export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adminsOf = null, readPolicy = null, headStore, writePolicy, readMembershipBodies = null } = {}) {
   if (!rail || typeof circleId !== 'string' || !circleId || typeof writePolicy !== 'function' || !headStore) {
     return { applied: false };
   }
@@ -213,7 +213,7 @@ export async function applyPolicyUpdates({ rail, circleId, membersOf = null, adm
   const changes = bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author));
   const { kept, skipped } = await judgeWithProposals(
     (proposals, need) => judgePolicyChain({ bodies: changes, members, proposals, merge: denyWinsMerge, need }),
-    () => proposalsOn({ rail, circleId, policy, members }),
+    () => proposalsOn({ rail, circleId, policy, members, readMembershipBodies }),
   );
   const won = foldPolicyUpdates(kept, { admins });
   // every refusal says why (L857): a settings change the circle's rule did not allow
@@ -248,13 +248,13 @@ export async function preservedPolicyStatementsFor({ headStore, circleId } = {})
  * @param {(circleId: string, policy: object) => Promise<*>} a.writePolicy
  * @param {(circleId: string) => Promise<Set<string>>} a.adminsOf
  */
-export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePolicy, membersOf = null, adminsOf = null } = {}) {
+export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePolicy, membersOf = null, adminsOf = null, readMembershipBodies = null } = {}) {
   // The receive rail this device folds the lane with — handed over by the shell when it builds it, and remembered from
   // every apply, so a SAVE can bring the head up to date before it counts one past it.
   let knownRail = null;
   const apply = (circleId, rail) => {
     if (rail) knownRail = rail;
-    return applyPolicyUpdates({ rail: rail ?? knownRail, circleId, membersOf, adminsOf, readPolicy, headStore, writePolicy });
+    return applyPolicyUpdates({ rail: rail ?? knownRail, circleId, membersOf, adminsOf, readPolicy, headStore, writePolicy, readMembershipBodies });
   };
   return {
     /**

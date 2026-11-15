@@ -7607,6 +7607,10 @@
       "text": "awaiting an admin",
       "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."
     },
+    "waiting_member_list": {
+      "text": "Waiting for the circle's member list before this can be counted.",
+      "doc": "Decisions screen: a proposal this device cannot count yet, because the circle's member list it was made under (the vote freeze) has not reached it."
+    },
     "disputed_line": {
       "text": "conflicting history from {{who}} — evidence attached",
       "doc": "Governance L3 — equivocation (fork-proof) alert."

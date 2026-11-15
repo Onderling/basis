@@ -1750,3 +1750,106 @@ An address a member's row already holds stays theirs: an announcement placing it
 **Not decided here:** complete unlinkability between circles (members knowing each other only per circle) is a
 design for after the alpha. Code: `packages/core/src/identity/circleLink.js`, `circleAddressAnnouncement.js`,
 `packages/circles/src/circleAddress.js` (`addressHolderIn`). Ledger: L917, L919, L921.
+
+## 2026-11-14 — The circle key: who makes the first one, when it is granted, who may hold it, and never plain text (Fable's rulings, recorded; Frits told the same day)
+
+**Status:** decided and built.
+
+**Context:** the first walks of a shared-pod circle and of two phones in a circle without a pod found four faults in
+how a circle's key is made and handed out. A joiner's device made its own first key on opening the circle and sealed a
+post under it, so the founder saw ciphertext. A join rebuilt the key's audience from one device's memory and dropped
+holders it did not know. Nothing removed a holder whose removal was lost. And a sealed circle with no key yet stored
+its posts unsealed.
+
+**Decision:**
+
+- **Only a device that may admit makes a circle's first key.** The same authority check as the receivers' key rail
+  decides who may establish it. A member's device takes the key from the key log and never makes its own; until it
+  holds one, its posts are refused with the existing sentence.
+- **The key is granted after the join is recorded, never before.** A failed join used to leave a key holder who was no
+  member; now the worst case is a member without the key, which the next start repairs. Every key change that adds
+  someone asks again whether they are still in after the admission it acts on (pinboard's internal `memberStatus`).
+- **The key's audience follows the membership.** On the key owner's device the stored audience is compared with who
+  should hold it, and a holder the membership places out is revoked with the existing revoke. It never adds. If any of
+  the lists it compares against cannot be read, nothing is revoked that round. It runs for group-key circles only.
+- **A sealed circle never falls back to plain text.** With no seal strategy a scoped write is refused, not stored in
+  the clear. A joined circle's posture is NOT KNOWN until its policy arrived (the join's reply carries it, a mark holds
+  it meanwhile), and not known refuses the write.
+
+**The price:** a member cannot post in a circle until the founder's or an admin's device has been reachable once after
+their join; a joiner whose grant failed once waits for the next start.
+
+Code: `apps/basis/src/v2/keyRail.js`, `circleControlAgent.js`, `circlePodProducer.js`, `keyAudienceCheck.js`,
+`circlePolicyStore.js` (`markPending`). Ledger: L934, L899, L907, L909.
+
+## 2026-11-14 — An approved decision is enacted by an admin, and now there is a button for it (Fable; keeps the choice of 2026-07-26)
+
+**Status:** decided and built.
+
+**Context:** a browser walk showed a removal approved by a member's yes (2 of 3) that never landed. The choice of
+2026-07-26 stands that a received message never removes someone by itself: an admin's device enacts. But that step had
+no control anywhere; it only ever ran when the completing vote was an admin's own.
+
+**Decision:** keep the explicit step, and give it a control: an approved, open decision shows an Enact button to an
+admin on both shells, and a waiting line ("awaiting an admin") to everyone else. The Decisions entry is back in the
+circle's menu, and the "A decision opened" line in the conversation leads to the Decisions screen.
+
+**The price:** a voted removal needs one more tap by an admin, and with no admin around it waits (the absent admin is
+a design for after the alpha). Enacting automatically on an admin's device would reverse the July decision; that is
+Frits's to choose, and it is one value in `circlePolicy.js`.
+
+Code: `apps/basis/src/v2/governanceView.js` (`canEnact`), `governanceHost.js`. Ledger: L893, L887.
+
+## 2026-11-15 — Pinboard's own store is not written through to the person's pod (Fable; privacy, before the alpha)
+
+**Status:** decided and built; the sealed design is for after the alpha.
+
+**Context:** signing in to a pod attached pinboard's own store to it, and that store writes through unsealed, so the
+pod's host could read what landed there.
+
+**Decision:** neither shell attaches pinboard's own store to the person's pod. That store gets pod routing again only
+together with a seal (sealed, per field), as a design after the alpha.
+
+Code: the attach is gone from both shells' sign-in; `scripts/lint-no-pinboard-pod-attach.mjs` (in `npm run guards`)
+fails if it comes back. Ledger: L935.
+
+## 2026-11-15 — How the app reads and writes a pod: ask the pod, one response for body and version, remember what you wrote (Fable ruled the shapes; Opus measured)
+
+**Status:** decided and built.
+
+**Context:** two members' changes to one pod resource were sometimes lost although every write was conditional. It was
+first read as the pod server returning an old body under a new ETag, and a double read was built around that. Measured
+the next day, the fault was ours, three times over:
+
+1. A browser's HTTP cache (and the phone's networking cache) answered a read with an old copy for seconds after the
+   same page wrote a new version.
+2. Our read took the body from one request and the ETag from a second one sent after it. A write landing between the
+   two gave the old body under the new ETag. Counted on a real pod: 13 lost of 40 with the second request, 0 of 40 with
+   the ETag from the body's own response.
+3. A pod answers a write with no version at all (measured on the Community Solid Server 7.2.0), so our client took
+   "its" version from a later request, which could be another writer's, and its next write then passed over their
+   change.
+
+**Decision:**
+
+- **Every pod request asks the pod.** Reads and existence checks are sent to revalidate; a cached copy is never the
+  answer.
+- **A read's version comes from the response that carried the body.** Never from a second request.
+- **After a write the client remembers what it WROTE** (a digest of the bytes), never a version. At its next default
+  write or delete of that resource it reads once: still what it wrote, it writes on that response's version; changed,
+  it refuses with a conflict and the caller reads and merges. A write-once resource costs no extra request. A read
+  always replaces what is remembered; a not-found read clears it.
+- **A plain write names no version** and sends no request after it.
+- **The pod server version is pinned** (7.2.0) in our own pod image and every test harness: a new release does not
+  change what our pods do without a test run on it.
+
+The double read and the read-back of 2026-11-14 are removed: they worked around our own fault. No report went to the
+pod server's maintainers; there was nothing of theirs to report.
+
+**What this says about method:** the first diagnosis blamed the server on a probe that saw the symptom and not its
+cause. The count that settled it ran both variants in one loop.
+
+Code: `packages/pod-client/src/SolidPodSource.js`, `PodClient.js` (`#conditionFor`, `#rememberRead`),
+`apps/basis/src/web/podStorage.js`, `deploy/css-pod/Dockerfile`, `scripts/css-harness.mjs`;
+`docs/agent-notes-known-gotchas.md` (React Native turns a revalidating read into a query on the URL).
+Ledger: L899, L936, L941, L942.

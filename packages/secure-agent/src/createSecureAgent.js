@@ -1284,6 +1284,12 @@ export async function createSecureAgent(opts = {}) {
     return { flushed };
   }
 
+  /** THIS device is connected again: a failure while it had no connection says nothing about a peer, so every not-yet
+   *  address gets its one attempt again (`notYetWaits`), and what was held goes out (side by side, `flushHeld`). */
+  async function connectivityRestored() {
+    notYetAttemptAt.clear();
+    return flushHeld();
+  }
   /**
    * Re-send a held message once, best-effort. A message sent AS a persona goes out on that persona's own
    * sockets only — never through the general router, whose sockets would show the relay the two are one device — and a
@@ -1322,6 +1328,9 @@ export async function createSecureAgent(opts = {}) {
     const entries = [...q.values()];
     pendingHold.delete(addr);
     let flushed = 0;
+    // this flush's attempt is the not-yet address's one attempt for the interval (`notYetWaits`): a send right after it
+    // joins the hold instead of paying the wait again
+    if (!seenAlive.has(addr)) notYetAttemptAt.set(addr, Date.now());
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       const { payload, opts } = entry;
@@ -1906,7 +1915,7 @@ export async function createSecureAgent(opts = {}) {
       // event that makes those holds sendable, so it flushes them; whatever still cannot route re-holds.
       // Same on every reconnect. Found 2026-09-13: a fresh install that wrote to its seeded contact in
       // its first second parked the message until the contact happened to speak first.
-      tx.on('connect', () => { flushHeld().catch(() => { /* re-hold handled inside */ }); });
+      tx.on('connect', () => { connectivityRestored().catch(() => { /* re-hold handled inside */ }); });
       await tx.connect();
       // `connect()` only REQUESTS the socket — it deliberately does not await it, so that
       // `agent.start()` never blocks on a relay that may be unreachable. That is right for boot and
@@ -2144,7 +2153,7 @@ export async function createSecureAgent(opts = {}) {
     makeReceiveHandler(tx);                 // inbound for the persona lands in this one agent
     // what the persona could not send while it had no socket goes out now, on this socket (`resendHeld` keeps a
     // persona's held message on that persona's sockets) — as the primary socket's connect does for the default's
-    tx.on?.('connect', () => { flushHeldOf(socketIdentity.pubKey).catch(() => { /* re-hold handled inside */ }); });
+    tx.on?.('connect', () => { notYetAttemptAt.clear(); flushHeldOf(socketIdentity.pubKey).catch(() => { /* re-hold handled inside */ }); });
     await tx.connect();
     personaTransports.set(key, { url, identity: socketIdentity, tx });
     if (auditAutoLog) audit('relay.add.persona', url);
@@ -3271,6 +3280,8 @@ export async function createSecureAgent(opts = {}) {
     /** Our own terms changed (the address-fallback setting): re-stamp every held entry through `rescope`
      *  and re-send it — see `flushHeld`. Resolves `{ flushed }` across all peers. */
     flushHeld: ({ rescope = null } = {}) => flushHeld(rescope),
+    /** This device is connected again (what the relay socket's 'connect' runs): the not-yet clocks clear, the holds flush. */
+    connectivityRestored: () => connectivityRestored(),
     /** Receipt-keyed removal: the peer's app confirmed `msgId` arrived, so every copy still held for
      *  them (any of their addresses) is obsolete. Per-peer, never global; not a drop, so not reported. */
     removeHeld: (a) => removeHeld(a),

@@ -88,6 +88,29 @@ describe('a flush attempts held-for addresses side by side, bounded', () => {
     await a.shutdown();
   }, 30_000);
 
+  it('a flapping network: three reconnects inside one interval cost at most 3 x K attempts; none refused, nothing lost', async () => {
+    const K = 4;
+    const one = await perAttempt();
+    const { a, tx } = await onBlackHole({ flushParallelAddresses: 4, notYetAttemptIntervalMs: 60_000 });
+    const roster = addrs(K, 'flap');
+    for (const r of roster) await a.peer.sendTo(r, { msgId: `${r}-0` }, HOLD);
+    const p0 = tx.puts;
+    for (let n = 1; n <= 3; n++) {
+      await a.connectivityRestored();
+      for (const r of roster) {
+        const s = await a.peer.sendTo(r, { msgId: `${r}-${n}` }, HOLD);
+        expect(s.held, `${r}-${n} held, not refused`).toBe(true);
+      }
+    }
+    // each reconnect: ONE attempt per address (the flush stops an address at its first failure and re-holds the rest; that
+    // attempt is also the address's not-yet attempt, so the sends after it join the hold): bounded by the reconnects
+    const attempts = (tx.puts - p0) / one;
+    expect(attempts, `${attempts} attempts`).toBe(3 * K);
+    let held = 0; for (const r of roster) held += a.heldFor(r);
+    expect(held, 'every message is still held (nothing lost)').toBe(K * 4);
+    expect(a.holdStats().givenUpOn).toBe(0);
+    await a.shutdown();
+  }, 60_000);
 });
 
 describe('order within one address is kept', () => {

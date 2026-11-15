@@ -10,8 +10,9 @@ import { nounWord } from './nounNames.js';
 import { attachEntriesFor } from './attachEntries.js';
 import { catalogueManifests } from './manifestSources.js';
 import { renderGate } from '@onderling/app-manifest';
-import { listsGateRules } from './circleGate.js';
+import { listsGateRules, circleListsFor } from './circleGate.js';
 import { GATE_WORDS } from './gateWords.js';
+import { replyLine } from './replyLine.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
@@ -248,12 +249,16 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
  *     from (`circleId` null). The shell runs `command` as the person through `callSkill`, so the circle's own doors
  *     and governance apply: the "+" has no authority the circle's own composer lacks;
  *   - null — no reading.
+ * THE PERSON'S OWN LISTS (`own`: the lists of the self ticked in the "+", and the word the card calls them by) are read
+ * FIRST, with the same phrase table: a line naming one of them runs there at once (the own scope, `OWN_DEVICES_SCOPE`,
+ * as `circleId`), unless a circle holds a list of that name too: then the card asks, 'mine' first. A line that MAKES a
+ * list ("nieuwe lijst Vakantie") makes an own one, unless it names a circle ("Thuis: maak een lijst Vakantie").
  * @param {string} line
- * @param {{ circles?: Array<{id: string, name?: string, lists?: object[], manifestsByOrigin: object, availability?: {of: Function}|null}>, acts?: object[], manifestsByOrigin?: object, now?: number }} [o]
+ * @param {{ circles?: Array<{id: string, name?: string, lists?: object[], manifestsByOrigin: object, availability?: {of: Function}|null}>, own?: {lists?: object[], name?: string}|null, acts?: object[], manifestsByOrigin?: object, now?: number }} [o]
  */
-export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
-  const own = plusRead(line, { acts, manifestsByOrigin, now });
-  if (own) return { kind: 'own', ...own };
+export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
+  const ownAct = plusRead(line, { acts, manifestsByOrigin, now });
+  if (ownAct) return { kind: 'own', ...ownAct };
   const text = word(line);
   if (!text) return null;
   const all = Array.isArray(circles) ? circles : [];
@@ -261,10 +266,19 @@ export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifest
   const m = /^([^:]{1,60}):\s*(.+)$/u.exec(text);
   const named = m ? all.filter((c) => c?.name && String(c.name).trim().toLowerCase() === m[1].trim().toLowerCase()) : [];
   const [scope, rest] = named.length === 1 ? [named, m[2]] : [all, text];
+  const mine = own && named.length !== 1 ? ownListsReading(text, own) : null;
+  const ownTo = { circleId: OWN_DEVICES_SCOPE, name: own?.name ?? '', own: true };
+  const atOwn = (command) => ({ kind: 'circle', atOnce: true, circleId: OWN_DEVICES_SCOPE, to: [ownTo], command: { ...command, args: { ...command.args, circleId: OWN_DEVICES_SCOPE } } });
+  if (mine?.makes) return atOwn(mine.command);
   // a line that names a list some circle HOLDS is about that list: those circles read it, and a manifest's looser
   // phrasing elsewhere does not count (the tasks gate reads "zet melk op …" as a new task anywhere)
   const read = scope.map((c) => ({ circle: c, ...circleReading(rest, c) })).filter((x) => x.command);
   const byList = read.filter((x) => x.fromLists);
+  if (mine) {
+    // an own list of that name: there at once, unless a circle holds one too (then the card, 'mine' first)
+    if (!byList.length) return atOwn(mine.command);
+    return { kind: 'circle', atOnce: false, circleId: null, to: [ownTo, ...byList.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }))], command: mine.command };
+  }
   const readers = byList.length ? byList : read;
   if (!readers.length) return null;
   const to = readers.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }));
@@ -274,6 +288,57 @@ export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifest
     kind: 'circle', atOnce: !!pick, circleId: pick ? pick.circle.id : null, to,
     command: pick ? { ...command, args: { ...command.args, circleId: pick.circle.id } } : command,
   };
+}
+
+/** The list ops a person's own lists answer in the "+" (what the phrase table reads to; a chore or a person is a circle's). */
+/** Stands in for the list words while a person has no own list (a control character: never typed). */
+const NO_OWN_LIST = '\u0000';
+const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeFromList', 'markListItemDone']);
+
+/**
+ * The person's own lists' reading of a line (`plusLineOutcome`): the box's phrase table over THEIR lists, accepted only
+ * when it names one of them, or makes a list (`makes`). Their agenda is the calendar's, not a list here.
+ * @returns {{command: {appOrigin: string, opId: string, args: object}, makes: boolean}|null}
+ */
+function ownListsReading(text, own) {
+  const lists = (Array.isArray(own?.lists) ? own.lists : []).filter((l) => l?.name && l.defaultChild !== 'calendar-event');
+  const names = new Set(lists.map((l) => l.name));
+  // the table needs list words to compile; with no own list yet, a word nobody types stands in (only a make can read)
+  for (const rule of listsGateRules(null, lists.length ? lists : [{ name: NO_OWN_LIST }], { greeting: false })) {
+    let cmd = null;
+    try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+    if (!cmd?.opId || !OWN_LIST_OPS.has(cmd.opId) || (cmd.appOrigin && cmd.appOrigin !== 'lists')) continue;
+    const command = { appOrigin: 'lists', opId: cmd.opId, args: { ...(cmd.args ?? {}) } };
+    if (cmd.opId === 'createList') return { command, makes: true };
+    if (names.has(command.args.list)) return { command, makes: false };
+  }
+  return null;
+}
+
+/**
+ * The person's OWN lists, as `plusLineOutcome`'s `own` reads them: the lists' own read with the own scope named. `call`
+ * runs an op AS the self ticked in the "+" (`(app, opId, args) => …`), so another self's lists are never read.
+ */
+export function plusOwnLists(call) {
+  return circleListsFor((app, opId, args = {}) => call(app, opId, { ...args, circleId: OWN_DEVICES_SCOPE })).catch(() => []);
+}
+
+/** The "+" card's button for one place the line may run: a circle by its name, the person's own lists as theirs. */
+export function plusCardLabel(t, to) {
+  return to?.own ? t('circle.vandaag.plus_card_mine') : t('circle.vandaag.plus_circle_in', { name: to?.name || t('circle.screens.untitled') });
+}
+
+/**
+ * What the "+" thread answers after a circle or own act ran: the reply line every door words an act with
+ * (`replyLine`); for a read of one list (`listEntries`), its entries, the done ones marked, or that it is empty.
+ * @param {object} result @param {{opId: string, args?: object, t: Function}} o
+ */
+export function plusDoneLine(result, { opId, args = {}, t } = {}) {
+  const said = replyLine(result, { opId, args, t });
+  if (said || opId !== 'listEntries' || !result || result.ok === false || result.error) return said;
+  const name = result.title ?? args?.list ?? '';
+  const items = (Array.isArray(result.items) ? result.items : []).map((i) => i?.label ?? i?.text ?? '').filter(Boolean);
+  return items.length ? t('circle.vandaag.plus_list_items', { name, items: items.join(', ') }) : t('circle.vandaag.plus_list_empty', { name });
 }
 
 /**
@@ -386,7 +451,8 @@ export function plusFollowUp(book, actId) {
  */
 export function plusCircleOp(command, circleId) {
   if (!command?.appOrigin || !command?.opId || typeof circleId !== 'string' || !circleId) return null;
-  return { app: command.appOrigin, opId: command.opId, args: { ...(command.args ?? {}), circleId } };
+  // the person's own lists run AS the self ticked in the "+" (`own`: the shell's call with that self); a circle's as the person
+  return { app: command.appOrigin, opId: command.opId, args: { ...(command.args ?? {}), circleId }, ...(circleId === OWN_DEVICES_SCOPE ? { own: true } : {}) };
 }
 
 /** How many suggestions the "+" shows under its line at once. */

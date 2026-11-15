@@ -286,11 +286,14 @@
     "doc": "Make a new list (anyone in the household).",
     "patterns": [
       "maak (een)? (nieuwe)? lijst (voor|genaamd)? {name}",
-      "maak (een)? (nieuwe)? lijst met (de)? naam {name}"
+      "maak (een)? (nieuwe)? lijst met (de)? naam {name}",
+      "(nieuwe|nieuw) lijst {name}",
+      "(nieuwe|nieuw) lijst: {name}"
     ],
     "examples": [
       "maak een lijst werk",
-      "maak een nieuwe lijst Vakantie"
+      "maak een nieuwe lijst Vakantie",
+      "nieuwe lijst Vakantie"
     ],
     "not": [
       "maak het eten"

@@ -269,11 +269,14 @@
   "lists.createList": {
     "doc": "Make a new list (anyone in the household).",
     "patterns": [
-      "(make|create) (a)? (new)? list (called|named)? {name}"
+      "(make|create) (a)? (new)? list (called|named)? {name}",
+      "new list {name}",
+      "new list: {name}"
     ],
     "examples": [
       "make a list work",
-      "create a new list called Holiday"
+      "create a new list called Holiday",
+      "new list Holiday"
     ],
     "not": [
       "make dinner"

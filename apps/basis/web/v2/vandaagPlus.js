@@ -4,7 +4,7 @@
  * own row, Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
  * Pure render.
  */
-import { PLUS_ACTS, plusLabel } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, plusCardLabel } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
@@ -249,7 +249,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       b.type = 'button';
       b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__card-in';
       b.dataset.circleId = r.circleId;
-      b.textContent = tr('circle.vandaag.plus_circle_in', { name: r.name || tr('circle.screens.untitled') });
+      b.textContent = plusCardLabel(tr, r);
       b.addEventListener('click', () => onCircleRun?.(r.circleId));
       box.appendChild(b);
     }

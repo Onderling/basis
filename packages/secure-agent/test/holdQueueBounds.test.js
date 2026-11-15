@@ -109,6 +109,7 @@ describe('hold queue — giving up on a dead address', () => {
     // relay/NKN shape, and the only case that actually costs anything.
     await a.addSecureTransport('relay', new BlackHoleTransport(new InternalBus(), a.identity.pubKey));
 
+    await a.presenceSignal(DEAD);                                  // it answered once, then went silent
     const first = await a.peer.sendTo(DEAD, { msgId: 'g1' }, HOLD);
     expect(first.held, 'the first failure must still hold — a peer may simply be offline').toBe(true);
 
@@ -129,6 +130,7 @@ describe('hold queue — giving up on a dead address', () => {
     const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
     await a.addSecureTransport('relay', relay);
 
+    await a.presenceSignal(DEAD);                                  // it answered once, then went silent
     await a.peer.sendTo(DEAD, { msgId: 'w1' }, HOLD);              // attempted, fails → given up
     const attemptedPuts = relay.puts;
     expect(attemptedPuts).toBeGreaterThan(0);
@@ -151,6 +153,7 @@ describe('hold queue — giving up on a dead address', () => {
     const ALIAS = 'their-circle-address-00000000000000000000000';
     a.registerPeerAddress(ALIAS, CANONICAL);
 
+    await a.presenceSignal(CANONICAL);                             // it answered once, then went silent
     await a.peer.sendTo(CANONICAL, { msgId: 'c1' }, HOLD);         // fails once → written off
     expect(a.holdStats().givenUpOn).toBe(1);
 
@@ -164,6 +167,7 @@ describe('hold queue — giving up on a dead address', () => {
     const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
     await a.addSecureTransport('relay', relay);
 
+    await a.presenceSignal(DEAD);                                  // it answered once, then went silent
     await a.peer.sendTo(DEAD, { msgId: 'r1' }, HOLD);              // fails once → given up
     expect(a.holdStats().givenUpOn).toBe(1);
     const before = relay.puts;
@@ -175,6 +179,34 @@ describe('hold queue — giving up on a dead address', () => {
     // is the property: giving up is a suspension on current evidence, never a permanent verdict.
     await a.peer.sendTo(DEAD, { msgId: 'r2' }, HOLD);
     expect(relay.puts).toBeGreaterThan(before);
+    await a.shutdown();
+  }, 15_000);
+});
+
+describe('hold queue — an address never seen alive is "not yet", not dead', () => {
+  // A newcomer's fresh per-circle address collected three timeouts (the join's broadcast, the create statement
+  // re-told, a key event) before it was even registered, was written off, and a later send was refused
+  // 'peer-unreachable', not even held. An address with no sign of life yet has given no evidence that it is DEAD.
+  it('failures to an address that never answered are not counted: every send is held, none refused', async () => {
+    const a = await agent({ holdMaxDeliveryFailures: 2 });
+    await a.addSecureTransport('relay', new BlackHoleTransport(new InternalBus(), a.identity.pubKey));
+    const NEW = 'newcomer-circle-address-000000000000000000000';
+    for (const id of ['n1', 'n2', 'n3']) {
+      const r = await a.peer.sendTo(NEW, { msgId: id }, HOLD);
+      expect(r.held, `${id} held, not refused`).toBe(true);
+    }
+    expect(a.holdStats().givenUpOn).toBe(0);
+    await a.shutdown();
+  }, 15_000);
+
+  it('once it has answered, its failures count again', async () => {
+    const a = await agent({ holdMaxDeliveryFailures: 2 });
+    await a.addSecureTransport('relay', new BlackHoleTransport(new InternalBus(), a.identity.pubKey));
+    const NEW = 'newcomer-circle-address-111111111111111111111';
+    await a.peer.sendTo(NEW, { msgId: 'm1' }, HOLD);              // not yet: held, not counted
+    await a.presenceSignal(NEW);                                   // it answers (the held m1 is retried, fails: count 1)
+    const r = await a.peer.sendTo(NEW, { msgId: 'm2' }, HOLD);     // count 2: written off
+    expect(r).toMatchObject({ held: false, delivered: false, reason: 'peer-unreachable' });
     await a.shutdown();
   }, 15_000);
 });

@@ -866,6 +866,7 @@ export async function createSecureAgent(opts = {}) {
         // across a restart (for `holdDeadTtlMs`), so every launch does not re-pay a full HI budget per dead
         // roster address (seen on the phone: three dead addresses × a 15 s wait, every boot).
         dead: [...deliveryFailures].map(([addr, f]) => [addr, { n: f.n, at: f.at }]),
+        alive: [...seenAlive],
       });
     } catch { return holdPersist; }          // a queue we cannot serialise stays in memory
     holdPersist = holdPersist.then(async () => {
@@ -890,6 +891,7 @@ export async function createSecureAgent(opts = {}) {
     if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.peers)) return 0;
     let restored = 0;
     const now = Date.now();
+    if (Array.isArray(parsed.alive)) for (const addr of parsed.alive) if (typeof addr === 'string') seenAlive.add(addr);
     if (Array.isArray(parsed.dead)) {
       for (const [addr, f] of parsed.dead) {
         if (typeof addr !== 'string' || !f || typeof f.n !== 'number') continue;
@@ -974,6 +976,10 @@ export async function createSecureAgent(opts = {}) {
   let primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
   /** address → consecutive failed delivery attempts. Cleared by a success or a presence signal. */
   const deliveryFailures = new Map();
+  /** Addresses that have shown a sign of life at least once (an answer, a presence signal, an inbound envelope). Only
+   *  these can be judged DEAD: a failure against an address never seen alive (a newcomer's fresh per-circle address,
+   *  not registered yet) says 'not yet', so it holds and is not counted. Kept across a restart with the holds. */
+  const seenAlive = new Set();
 
   // G12 — identity pubKey → the alias addresses bound to it (`registerPeerAddress`). The hold queue is
   // keyed by the address you SENT to, but presence arrives on the address the peer SPEAKS from: a peer
@@ -1102,6 +1108,11 @@ export async function createSecureAgent(opts = {}) {
    * prove otherwise — any presence signal or successful send clears the count (`clearDeliveryFailures`).
    */
   function recordDeliveryFailure(addr) {
+    if (!seenAlive.has(addr)) {
+      // Not yet seen alive: no evidence it is dead. Hold, do not count (a newcomer's address before it answers).
+      if (typeof console !== 'undefined') console.info(`[secure-agent] delivery failure for ${String(addr).slice(0, 16)}… not counted: never seen alive yet`);
+      return false;
+    }
     const n = (deliveryFailures.get(addr)?.n ?? 0) + 1;
     deliveryFailures.set(addr, { n, at: Date.now() });
     const writtenOff = holdMaxDeliveryFailures > 0 && n >= holdMaxDeliveryFailures;
@@ -1114,7 +1125,9 @@ export async function createSecureAgent(opts = {}) {
 
   /** This address answered (or announced itself) — it is not a dead address after all. */
   function clearDeliveryFailures(addr) {
-    if (deliveryFailures.delete(addr)) persistHolds();
+    const firstSign = !seenAlive.has(addr);
+    seenAlive.add(addr);
+    if (deliveryFailures.delete(addr) || firstSign) persistHolds();
   }
 
   /** Have we given up on attempting delivery to this address until it shows a sign of life? */

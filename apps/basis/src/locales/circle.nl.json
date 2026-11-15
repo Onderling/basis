@@ -3740,6 +3740,10 @@
       "text": "Op dit moment niemand in de buurt.",
       "doc": "Empty state."
     },
+    "header_cannot_discover": {
+      "text": "Dit apparaat kan geen mensen in de buurt vinden: een browser heeft geen wifi-zoeken of Bluetooth. Open Onderling op je telefoon om hier mensen te ontmoeten.",
+      "doc": "Nearby's top line on a device that cannot discover anyone (a browser has no Wi-Fi discovery or Bluetooth): the room stays empty here; the phone is where people meet nearby."
+    },
     "anon_peer": {
       "text": "iemand",
       "doc": "Fallback row label."

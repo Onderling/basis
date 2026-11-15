@@ -35,7 +35,11 @@ export const FUNCTIONS = Object.freeze([
     box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the circle door: a member who names it is answered' },
   } },
   { id: 'nearby', name: 'Nearby', cells: {
-    web: null,      // nearby-level proves only that the level survives a reload; nobody meets anyone (Fable 2026-11-10)
+    // not applicable for the alpha (Fable's ruling 2026-11-15, Frits may reverse it): the room's people come only from
+    // discovering transports (Wi-Fi discovery, Bluetooth) and a browser has neither, so on web nobody can be met. The web
+    // screen says so in words (`header_cannot_discover`) and shows what others would see of you; a room carried by the
+    // relay would tell the relay who is near whom, and is a question for after the alpha.
+    web: NA('a browser can do neither Wi-Fi discovery nor Bluetooth, so nobody can be met nearby on web; the screen says so'),
     mobile: null,   // circlesNearbyParity is a parity test
     box: NA('the box joins no Nearby room in alpha one (a venue room is later)'),
   } },

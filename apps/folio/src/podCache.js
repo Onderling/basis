@@ -65,11 +65,13 @@ export function wrapWithPseudoPod({ realPodClient, backend, deviceId = 'folio' }
       // force:true — in cache mode the local store is canonical and the
       // write-through unconditionally overwrites the pod copy (mirrors
       // SyncEngine's own force-push intent; sidesteps an If-Match 412).
-      const r = await realPodClient.write(uri, bytes, {
+      await realPodClient.write(uri, bytes, {
         contentType: guessContentType(uri),
         force: true,
       });
-      return r && r.etag != null ? { etag: r.etag } : undefined;
+      // No pod version back: a pod's PUT names none, and one read by a later request may be another writer's. The local
+      // copy keeps its own version; the next fresh read takes the pod's ETag from the read's own response.
+      return undefined;
     },
   });
 

@@ -190,6 +190,23 @@ describe('SolidPodSource — write', () => {
     expect(put).toBeTruthy();
   });
 
+  // A pod answers a PUT with no ETag (measured on CSS 7.2.0), and a version asked for by a LATER request may already be
+  // another writer's. So a plain write sends no HEAD afterwards and names no version: here another writer's PUT lands
+  // between ours and anything we could send next, and the result must not hand us their version as ours.
+  it('a plain write sends no HEAD afterwards and returns no version (one that could be another writer\'s)', async () => {
+    let version = 0;
+    const fetchFn = makeFetch({
+      [`PUT ${POD}note.txt`]: () => { version += 2; return makeRes({ status: 205, statusText: 'Reset Content' }); }, // ours, then another writer's
+      [`HEAD ${POD}note.txt`]: () => makeRes({ headers: { etag: `"v${version}"`, 'last-modified': 'later' } }),
+    });
+    const source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+
+    const result = await source.write('/note.txt', 'hello', { contentType: 'text/plain' });
+    expect(fetchFn.calls.filter((c) => c.method === 'HEAD')).toHaveLength(0);
+    expect(result.etag ?? null).toBeNull();
+    expect(result.lastModified ?? null).toBeNull();
+  });
+
   it('honours If-Match — happy path 200', async () => {
     const fetchFn = makeFetch({
       [`PUT ${POD}note.txt`]: ({ init }) => {

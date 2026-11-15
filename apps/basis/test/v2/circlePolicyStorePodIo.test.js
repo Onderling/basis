@@ -13,6 +13,7 @@ import {
   podPolicyIo,
   tieredPolicyIo,
 } from '../../src/v2/circlePolicyStore.js';
+import { createPodWriter } from '../../src/web/podStorage.js';
 
 /** In-memory podWriter (read/write JSON keyed by `${app}::${resource}`). */
 function makeMockPodWriter() {
@@ -44,6 +45,29 @@ function makeMemIo() {
 }
 
 describe('podPolicyIo', () => {
+  it('the policy\'s pod tier never reads a cached copy: another member\'s newer policy on the pod is what it loads', async () => {
+    // A browser's fetch keeps an HTTP cache (and the phone's OkHttp a disk one): a GET without a cache mode can be answered
+    // with an OLD body after the pod changed. The pod writer's reads ask the pod (`cache: 'no-cache'`), as pod-client's
+    // own requests do. This fetch answers from its cache unless a request asks to revalidate.
+    let onPod = JSON.stringify({ pod: 'shared', version: 1 });
+    const cache = new Map();
+    const fetch = async (url, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      if (method === 'PUT') { onPod = String(init.body); return new Response(null, { status: 201 }); }
+      const key = `${method} ${url}`;
+      const revalidates = init.cache === 'no-cache' || init.cache === 'no-store' || init.cache === 'reload';
+      if (!revalidates && cache.has(key)) return cache.get(key).clone();
+      const res = new Response(method === 'HEAD' ? null : onPod, { status: 200, headers: { 'content-type': 'application/json' } });
+      cache.set(key, res.clone());
+      return res;
+    };
+    const writer = createPodWriter({ webid: 'https://pod.example/me/profile/card#me', fetch }, { podRoot: 'https://pod.example/me/' });
+    const io = podPolicyIo({ getWriter: () => writer });
+    expect((await io.load('c1'))?.version).toBe(1);
+    onPod = JSON.stringify({ pod: 'shared', version: 2 });   // another member's device changed the policy on the pod
+    expect((await io.load('c1'))?.version).toBe(2);
+  });
+
   it('is a no-op when getWriter returns null', async () => {
     const io = podPolicyIo({ getWriter: () => null });
     expect(await io.load('c1')).toBeNull();

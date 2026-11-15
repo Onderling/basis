@@ -1750,3 +1750,21 @@ An address a member's row already holds stays theirs: an announcement placing it
 **Not decided here:** complete unlinkability between circles (members knowing each other only per circle) is a
 design for after the alpha. Code: `packages/core/src/identity/circleLink.js`, `circleAddressAnnouncement.js`,
 `packages/circles/src/circleAddress.js` (`addressHolderIn`). Ledger: L917, L919, L921.
+
+## 2026-11-14 — A vote is counted on the members of the moment it was proposed (Frits; Fable ruled the shape)
+
+Admissions are not governed, so an admin could admit accounts while a vote is open and win it with them. Instead of
+gating admissions, the vote is frozen: a proposal names, signed, the circle's membership statements it was made under
+(`membershipHeads`, and the proposer's own line), and every device counts it on the roster folded from those.
+
+- **One roster per proposal** (`voteFreeze.proposalRoster`), used by the tally, the drawn sample, the override and the
+  receiver gate; no call site folds its own.
+- **The base can only shrink during a vote.** A member admitted after the proposal never counts; a member who left or
+  was removed since does not count either and leaves the base.
+- **Never a partial roster.** A device that lacks a named head keeps the proposal waiting, and the Decisions screen
+  says so ("waiting for the circle's member list"); heads that leave out the proposer's own line count for nothing.
+- **Earlier proposals** (no heads) are counted on the roster as it is now, as before.
+
+Known limit, accepted for now: where removals are not themselves governed, an admin who removes a voter mid-vote
+shrinks the base. Where it lives: `apps/basis/src/v2/voteFreeze.js`, `governanceLog.js`, `governanceReceiverGate.js`,
+`docs/catalogue/governance.md`. Ledger: L856.

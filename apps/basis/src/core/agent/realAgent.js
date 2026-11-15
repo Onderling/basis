@@ -6424,8 +6424,15 @@ export async function createRealHouseholdAgent(opts = {}) {
         });
         let bodies = [];
         try { ({ bodies = [] } = await bound.readVerifiedBodies(circleId)); } catch { bodies = []; }
+        // the vote freeze's membership statements, bound against the same first-pass rows: the device's own membership
+        // rail checks a binding THROUGH the roster, and the roster is what is asking here (it waited on itself forever)
+        const boundMembership = makeMembershipRail({
+          eventLog: opts.deviceLog, circleIdentityFor, ownCeremonyCommitmentFor: ceremonyCommitmentFor, myRef: circleSelfRef,
+          callSkill: (...a) => callSkill(...a),
+          verifyBinding: async ({ author, ref, atSeq = null }) => rows.some((m) => m.webid === ref && addressBindsOnRow(m, author, atSeq)),
+        });
         const proposals = await proposalsOn({ rail: bound, circleId, policy: normalizeCirclePolicy({}), members,
-          readMembershipBodies: async (cid) => { try { return (await membershipRail?.readVerifiedBodies?.(cid))?.bodies ?? []; } catch { return null; } } });
+          readMembershipBodies: async (cid) => { try { return (await boundMembership.readVerifiedBodies(cid))?.bodies ?? []; } catch { return null; } } });
         const chain = judgePolicyChain({ bodies: bodies.filter((b) => b?.kind === POLICY_UPDATE_KIND && admins.has(b.author)), members, proposals, merge: denyWinsMerge });
         // the membership lane's own bodies (raw author keys): an author's earlier removals sit in their chain before the
         // tip their later settings change named

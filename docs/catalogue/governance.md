@@ -60,7 +60,15 @@ kernel's roster fold; every shell composes the same binding).
   `membershipEmit` and the rules emitter, whichever path wrote it); an author's own later settings change draws its
   line through their own hash chain (`membershipUpTo`, `authorChainCut.js`), so what they signed before it keeps its
   stamp. Never asked for a person's own acts (leaving, stepping down, the caretaker's acknowledgement). Admissions
-  (`join`) are not gated: the policy has no admission class yet.
+  (`join`) are not gated: the policy has no admission class yet. What stops an admin admitting accounts to win an open
+  vote is THE VOTE FREEZE (`voteFreeze.js`): a proposal names the circle's membership statements it was made under
+  (`membershipHeads`, signed), and every device counts it on the roster folded from those (`proposalRoster`, the one
+  function the tally, the drawn sample, the override and the receiver gate use): members admitted after the proposal
+  never count, and anyone who left or was removed since does not count either, so the base can only shrink during a
+  vote. A device missing a named head keeps the proposal waiting and says so on the Decisions screen ("waiting for the
+  circle's member list"); heads that leave out the proposer's own line count for nothing; a proposal made before the
+  freeze counts on the roster as it is now. Known limit: where removals are not governed, an admin's removal mid-vote
+  shrinks the base (pinned in `voteFreeze.test.js`).
   An author's stamps bind only that author: an admin who never stamps above an older settings version keeps being
   judged by it after ANOTHER admin tightened (no device can tell them from an honest admin who was offline); it is
   signed, attributable and shown. Two admins' settings at one version merge "who decides" strictest-first per act

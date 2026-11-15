@@ -224,10 +224,12 @@ describe('PodClient.write', () => {
     expect(ps.write).toHaveBeenCalledWith('/x.json', JSON.stringify({ a: 1 }), expect.objectContaining({ contentType: 'application/json' }));
   });
 
-  it('updates etag map on success', async () => {
+  it('after a write remembers WHAT it wrote (a digest), never the response\'s ETag (L936: a pod sends none on a PUT, and a later read of it may be another writer\'s)', async () => {
     ps.write.mockResolvedValue({ uri: '/n.md', contentType: 'text/plain', lastModified: 'WED', etag: '"NEW"', size: 1 });
     await client.write('/n.md', 'X', { contentType: 'text/plain' });
-    expect(client._etagMap.get('/n.md')).toEqual({ etag: '"NEW"', lastModified: 'WED' });
+    const known = client._etagMap.get('/n.md');
+    expect(known?.etag).toBeUndefined();
+    expect(typeof known?.written).toBe('string');
   });
 
   it('maps CONFLICT → ConflictError', async () => {

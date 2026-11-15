@@ -47,6 +47,7 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { SolidPodSource } from './SolidPodSource.js';
 
 import { ConflictError, mapSourceCode } from './Errors.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { ConflictResolver }             from './ConflictResolver.js';
 import { MemoryTombstones }             from './tombstones/MemoryTombstones.js';
 import { createClientSharing }          from './sharing/index.js';
@@ -73,6 +74,21 @@ const DEFAULT_CONFLICT_LISTENER_TIMEOUT_MS = param({ key: 'podClient.conflictLis
 // Parameter register (#36) — soft cap for remoteContent fetch (scope:device, kind:internal).
 const REMOTE_CONTENT_FETCH_LIMIT     = param({ key: 'podClient.remoteContentFetchLimit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000_000 });
 const TEXT_CONTENT_TYPE_RE           = /^(text\/|application\/json\b|application\/.*\+json\b)/i;
+
+/**
+ * WHAT THIS CLIENT WROTE, as a digest of the exact bytes it sent. A pod answers a PUT with no ETag (measured on CSS 7.2.0:
+ * 201/205, no ETag, no Last-Modified), so a write never tells which version it made; a version read by a SECOND request
+ * may already be another writer's. So after a write the client remembers this digest, never an ETag, and checks it at
+ * the next default write or delete of that resource (`#conditionFor`).
+ */
+function writtenDigest(payload) {
+  const bytes = typeof payload === 'string' ? new TextEncoder().encode(payload)
+    : payload instanceof ArrayBuffer ? new Uint8Array(payload)
+      : payload instanceof Uint8Array ? payload : new TextEncoder().encode(String(payload));
+  let hex = '';
+  for (const b of sha256(bytes)) hex += b.toString(16).padStart(2, '0');
+  return hex;
+}
 
 /**
  * High-level pod client: read/write/list/append/patch/delete on top of `SolidPodSource` plus an
@@ -502,11 +518,7 @@ export class PodClient extends Emitter {
     const writeOpts = { ...opts };
     delete writeOpts.conflictPolicy; // not for the source layer
     delete writeOpts._suppressConflictEvent;
-    if (!opts.force && !opts.ifMatch && !opts.ifNoneMatch) {
-      const known = this.#etagMap.get(uri);
-      if (known?.etag)              writeOpts.ifMatch         = known.etag;
-      else if (known?.lastModified) writeOpts.ifUnmodifiedSince = known.lastModified;
-    }
+    if (!opts.force && !opts.ifMatch && !opts.ifNoneMatch) Object.assign(writeOpts, await this.#conditionFor(uri, 'write'));
     delete writeOpts.force;
 
     const payload =
@@ -523,10 +535,32 @@ export class PodClient extends Emitter {
     } catch (err) {
       this.#wrapAndThrow(err, uri);
     }
-    if (res?.etag || res?.lastModified) {
-      this.#etagMap.set(uri, { etag: res.etag, lastModified: res.lastModified });
-    }
+    // never the response's ETag: a pod sends none on a PUT, and one read by a later request may be another writer's
+    this.#etagMap.set(uri, { written: writtenDigest(payload) });
     return res;
+  }
+
+  /**
+   * THE CONDITION A DEFAULT WRITE OR DELETE IS SENT UNDER (L936). After a READ: that read's own ETag (or Last-Modified).
+   * After this client's own WRITE: one GET now, lazily (a write-once resource never pays it): the body is still what we
+   * wrote → that response's ETag is the version we build on; it is not (or it is gone) → another writer changed it since:
+   * a ConflictError, exactly as a 412 would be, so the caller reads and merges instead of overwriting their change.
+   * @returns {Promise<{ifMatch?: string, ifUnmodifiedSince?: string}>}
+   */
+  async #conditionFor(uri, what) {
+    const known = this.#etagMap.get(uri);
+    if (known?.written) {
+      let cur = null;
+      try { cur = await this.#podSource.read(uri); }
+      catch (err) { if (err?.code !== 'NOT_FOUND') this.#wrapAndThrow(err, uri); cur = null; }
+      if (!cur || writtenDigest(cur.content) !== known.written) {
+        throw new ConflictError(`PodClient.${what}: ${uri} changed since this client wrote it`, { uri });
+      }
+      return cur.etag ? { ifMatch: cur.etag } : (cur.lastModified ? { ifUnmodifiedSince: cur.lastModified } : {});
+    }
+    if (known?.etag) return { ifMatch: known.etag };
+    if (known?.lastModified) return { ifUnmodifiedSince: known.lastModified };
+    return {};
   }
 
   /**
@@ -755,8 +789,8 @@ export class PodClient extends Emitter {
     }
     const delOpts = { ...opts };
     if (!opts.force && !opts.ifMatch) {
-      const known = this.#etagMap.get(uri);
-      if (known?.etag) delOpts.ifMatch = known.etag;
+      const cond = await this.#conditionFor(uri, 'delete');
+      if (cond.ifMatch) delOpts.ifMatch = cond.ifMatch;
     }
     delete delOpts.force;
     try {

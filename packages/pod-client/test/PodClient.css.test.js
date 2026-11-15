@@ -73,4 +73,30 @@ SUITE('PodClient — CSS integration', () => {
     await client.delete(uri);
     await client.close();
   });
+
+  // L936 (a): a real pod answers a PUT with no ETag, so a client remembers what it WROTE and checks it at its next default
+  // write. Two clients with their own memory (two devices): A's own second write goes through; after B writes, A's next
+  // default write is a ConflictError and B's change stays.
+  it('after a write, the next default write builds on what this client wrote, or refuses (skips without CSS_CLIENT_ID)', async () => {
+    if (!process.env.CSS_CLIENT_ID || !process.env.CSS_CLIENT_SECRET) return;
+    const login = async () => {
+      const sv = new SolidVault({ webid: process.env.CSS_WEBID || `${CSS_URL}profile/card#me`, vault: new VaultMemory() });
+      await sv.login({ clientId: process.env.CSS_CLIENT_ID, clientSecret: process.env.CSS_CLIENT_SECRET, oidcIssuer: process.env.CSS_OIDC_ISSUER || CSS_URL });
+      return new PodClient({ podRoot: CSS_URL, auth: new SolidOidcAuth({ vault: sv }) });
+    };
+    const [a, b] = [await login(), await login()];
+    const uri = `${CSS_URL}${scratch}written-${Date.now()}.txt`;
+    await a.write(uri, 'a-1', { contentType: 'text/plain' });
+    await a.write(uri, 'a-2', { contentType: 'text/plain' });
+    await a.write(uri, 'a-3', { contentType: 'text/plain' });          // its own third write: no 412 on its own change (the old client sent the ETag from before its second write)
+    expect((await b.read(uri, { decode: 'string' })).content).toBe('a-3');
+    await b.write(uri, 'b-1', { contentType: 'text/plain' });          // another device writes (it read first)
+    await expect(a.write(uri, 'a-5', { contentType: 'text/plain' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect((await b.read(uri, { decode: 'string' })).content, 'B\'s change stays').toBe('b-1');
+    await a.read(uri);                                                  // A reads, then its write builds on that read
+    await a.write(uri, 'a-4', { contentType: 'text/plain' });
+    expect((await b.read(uri, { decode: 'string' })).content).toBe('a-4');
+    await a.delete(uri, { force: true });
+    await a.close(); await b.close();
+  });
 });

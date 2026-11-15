@@ -15,7 +15,11 @@
  */
 import { parsePairingOffer, CONNECT_SCHEME } from './connectionPairing.js';
 import { compileConnectionGrant } from './connections.js';
-import { createScreenDoor, memoryUsedNonces } from './screenDoor.js';
+import { createScreenDoor, memoryUsedNonces, SCREEN_PAIRING_REFUSAL_CODES } from './screenDoor.js';
+
+/** The reasons a shell words as `circle.mydata.connection_offer_<reason>`: anything else is said as 'grant-failed'. */
+const WORDED = new Set([...SCREEN_PAIRING_REFUSAL_CODES, 'pairing-no-pick', 'nothing-picked', 'grant-failed', 'not-a-connect-uri', 'unreadable', 'wrong-version', 'incomplete']);
+const worded = (reason) => (WORDED.has(reason) ? reason : 'grant-failed');
 
 /** What the phone's scanner reads on 'Apparaten & sleutels' → connect a screen: a screen's offer only (Me → Scan does not
  *  route it: a screen is connected from here, where the code pick follows). */
@@ -65,7 +69,8 @@ export function createAppScreenPairing({ callSkill, relays = null, door = null, 
       picked = null;   // one grant per pick
       let r = null;
       try { r = await callSkill('household', 'grantSurface', { ...args, nonce: offer.nonce }); } catch { return { ok: false, reason: 'grant-failed' }; }
-      return r?.ok === false ? { ok: false, reason: r.error ?? 'grant-failed' } : { ok: true };
+      // the op's own error text is not a sentence: the person reads 'could not connect', the detail stays here
+      return r?.ok === false ? { ok: false, reason: worded(r.error), ...(r.error ? { detail: String(r.error) } : {}) } : { ok: true };
     },
     cancel() { picked = null; theDoor.drop(OWNER); },
   };

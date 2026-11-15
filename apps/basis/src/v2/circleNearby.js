@@ -55,6 +55,9 @@ export function buildNearbyModel({
   myPseudonym = null,
   t,
   maxSharedSkillsPerRow = SHARED_SKILLS_DEFAULT_MAX,
+  // false on a device with no discovering transport (a browser: no Wi-Fi discovery, no Bluetooth): the room is empty
+  // by construction there, and the header says so instead of 'nobody nearby'
+  canDiscover = true,
 } = {}) {
   const tr = translatorOr(t, 'circleNearby.js');
   const myKeyed = new Set(asArray(mySkills).map(pickSkillKey).filter(Boolean));
@@ -105,7 +108,7 @@ export function buildNearbyModel({
     },
     // Who here shows what they offer: by name when one does, plainly when nobody does, a count past one.
     headerLabel: total === 0
-      ? tr('circle.nearbyScreen.header_empty')
+      ? tr(canDiscover ? 'circle.nearbyScreen.header_empty' : 'circle.nearbyScreen.header_cannot_discover')
       : sharingAny === 0
         ? tr('circle.nearbyScreen.header_none')
         : sharingAny === 1

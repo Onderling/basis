@@ -9804,11 +9804,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `/zoek` to lexical-only. Rebuilds the note index on the next `/zoek`
     // when the embedder identity changes.
     setFolioNoteEmbedder: (e) => folioAgent.setNoteEmbedder?.(e) ?? null,
-    // S4 — route pinboard's items to the user's REAL pod on sign-in (parity with folio/
-    // calendar). Delegates to the pinboard agent's attachPod (builds a SolidPodSource +
-    // activates the already-built pod-routing write-through). Pass {podRoot, webid, fetch}.
-    attachPinboardPod: (opts) => (typeof pinboardAgent?.attachPod === 'function' ? pinboardAgent.attachPod(opts) : Promise.resolve({ ok: false })),
-    detachPinboardPod: () => pinboardAgent?.detachPod?.(),
     // S6.4 — subscribe to events the inner pinboard agent emits (e.g.
     // 'pinboard:attachment-fetched' when a recipient's requested attachment bytes
     // arrive over the 1:1 channel). The pinboard agent extends core.Emitter

@@ -26,13 +26,14 @@ import { classifyQrPayload } from '@onderling/react-native/qr';
 import { getBasisClassifiers } from '../core/qrClassifiers.js';
 import { theme } from '../screens/v2/theme.js';
 
-export default function QrScannerModal({ visible, onClose, onResult, t }) {
+// `classifiers`: what this scanner reads (default the shared router's list; 'Apparaten & sleutels' passes a screen offer's)
+export default function QrScannerModal({ visible, onClose, onResult, t, classifiers = null }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanLock, setScanLock]   = useState(false);
   const [hint, setHint]           = useState(null);
   const [pasted, setPasted]       = useState('');
   const [showPaste, setShowPaste] = useState(false);
-  const CLASSIFIERS = getBasisClassifiers();
+  const CLASSIFIERS = classifiers ?? getBasisClassifiers();
 
   const dispatch = useCallback((res) => {
     if (res.kind === 'unknown') {

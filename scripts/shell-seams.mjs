@@ -62,6 +62,10 @@ export const SEAMS = Object.freeze([
   // THE VOTE FREEZE at the receiver: a shell's policy and rules lanes judge a decision on the members from before its
   // proposal, read from the circle's membership statements; without them a packed vote would be accepted.
   { id: 'vote-freeze-membership', pattern: /readMembershipBodies:/, why: 'a receiver counting a decision on the roster as it is now accepts a vote packed with accounts admitted after the proposal' },
+  // THE SCREEN DOOR in the app: a pasted or scanned screen offer reaches the grant only through the shared pairing (three
+  // codes, one pick). The box has no pairing UI: its door is the household bot's (`botScreens`), which composes the same
+  // screen door (`screenDoor.js`).
+  { id: 'screen-pairing-door', pattern: /createAppScreenPairing\(/, shells: ['web', 'mobile'], why: 'without it a pasted screen offer could be granted without the person picking the code their screen shows' },
   { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
   // A NEW MEMBER IS NAMED AS THEIR FIRST LINE LANDS: a sender the roster cannot place yet (one this device admitted, a
   // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles

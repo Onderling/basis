@@ -353,6 +353,8 @@ export function createNearbyScreen({
       mySkills: safeCall(mySkills, []),
       myPseudonym,
       t,
+      // no peer source handed in: this device has no discovering transport (a browser), so it can meet nobody here
+      canDiscover: typeof subscribeToPeers === 'function',
     });
     // Actions are attached per row rather than computed in the renderer, so web and mobile cannot drift on
     // what proximity entitles someone to.

@@ -92,7 +92,7 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
   const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
   const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
   const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
-  const { attachPinboardPodFor, circlePodWriterFor } = await import('../../src/core/phonePodSession.js');
+  const { circlePodWriterFor } = await import('../../src/core/phonePodSession.js');
   const { composePhonePodReadBack } = await import('../../src/core/phonePodReadBack.js');
   const { scopePinboardCallSkill } = await import('../../../basis/src/v2/circlePinboardScope.js');
   const { sealedAnswer } = await import('../../../basis/src/v2/circlePodProducer.js');
@@ -280,12 +280,12 @@ export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000
     bundle,
     /** What this phone holds on its disk now: hand it to `bootMobileNode({ restoreFrom })` after `dispose()` to restart it. */
     snapshot: async () => ({ _flushed: await flushPendingSaves?.(), asyncStorage: await AsyncStorage.multiGet(await AsyncStorage.getAllKeys()), files: fsStub.__dump?.() ?? [] }),
-    /** Sign in to a pod as App.js does once its session holds tokens: the session into the circle pods' ref, the
-     *  shared-with-me writer built from it, pinboard's item store attached to the person's pod. */
+    /** Sign in to a pod as App.js does once its session holds tokens: the session into the circle pods' ref and the
+     *  shared-with-me writer built from it (pinboard's own store is not attached to the pod, as in App.js). */
     signInToPod: async (session) => {
       podSessionRef.current = session;
       podWriterRef.current = await circlePodWriterFor(session);
-      return attachPinboardPodFor({ session, agent: bundle.agent });
+      return !!session;
     },
     /** What the create wizard's `persistPolicy` prop does on the launcher: the new circle's policy into the phone's
      *  policy store, and the founder's first policy on the lane. */

@@ -16,7 +16,7 @@
  * here by the root's own tombstone (`revoked`, any party may deliver it), kept per linked root on disk.
  */
 import { createNonceWindow, verifyDeviceRevocation, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
-import { codeChoices } from './botScreens.js';
+import { codeChoices } from './screenDoor.js';
 import { parseLinkOffer, linkCode, encodeLinkStartLink, verifyLinkStatement, IDENTITY_LINK_SUBTYPE, LINK_OPS } from './identityLink.js';
 
 /** How long a pasted offer waits for its code (the screen's ten minutes). */

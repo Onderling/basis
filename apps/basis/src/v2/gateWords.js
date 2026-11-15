@@ -33,8 +33,8 @@ export function compileGateWords(words = GATE_WORDS, slots = {}) {
   return out;
 }
 
-/** The whole lines that ask for help ("help", "?"), every language together, lower-cased: the "+" thread answers them with
- *  what it can do. */
+/** How a line OPENS when it asks how something works ("hoe …", "what is …"; the gate files' `_help.questions`), every
+ *  language together, lower-cased: only a line that opens so is looked up in the help cards. */
 export function helpQuestionOpeners(words = GATE_WORDS) {
   const out = [];
   for (const entries of Object.values(words)) for (const w of entries?._help?.questions ?? []) out.push(String(w).toLowerCase());

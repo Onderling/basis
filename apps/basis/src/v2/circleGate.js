@@ -69,6 +69,8 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
  * `listEntries` on the list the words name — and "wat moet ik nog doen" at `listMine`. The lists and the words people
  * use for them come from the bot's TEMPLATE (`templateLists`), so another template's lists get the same rules.
  * @param {string} [_locale]
+ * The table needs at least one list word to compile (a `{list}` slot with no words is refused): a reader with no list
+ * yet (a person's own lists before the first, `ownListsReading` in vandaagPlus.js) hands a word nobody types instead.
  * @param {Array<{name: string, aliases?: string[], defaultChild?: string|null}>} lists  the template's lists
  */
 export function listsGateRules(_locale, lists = [], { greeting = true } = {}) {
@@ -212,7 +214,9 @@ const GATE_RULES = [
   } },
   { id: 'lists.removeFromList', name: 'lists:removeFromList(take-off)', build: (m, _t, { listFor }) => {
     if (m.list && !listFor(m.list)) return null;
-    return { opId: 'removeFromList', args: { item: m.item }, fallback: 'model' };
+    // the list the line names goes with it (the op's optional `list`): taken off THAT list, and a reader of several
+    // places (the "+": the person's own lists first) can tell which one the line meant
+    return { opId: 'removeFromList', args: { item: m.item, ...(m.list ? { list: listFor(m.list) } : {}) }, fallback: 'model' };
   } },
   { id: 'lists.createList', name: 'lists:createList(make)', build: (m) => (m.name ? { opId: 'createList', args: { text: m.name } } : null) },
   // a chore that says who (and a day the bounded reader reads): "nieuwe taak voor mij: ramen lappen, morgen"

@@ -314,6 +314,7 @@ import { pairCircleIdFor, isPairCircleId } from '../../v2/pairCircleId.js';
 import { isDirectPayload } from '../../v2/directDoors.js';   // a block refuses direct contact, never a circle's   // an own appointment shared with a contact
 import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
+import { ownStoreAsSelf, OwnViewRefused } from '../../v2/ownStoreAsSelf.js';   // a person's own lists as one self: default-deny
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
 import { linkOfferMessage, encodeLinkOffer, linkedBotsOf, LINK_OPS, LINKED_COMPANION_OP, IDENTITY_LINK_REVOKE_SUBTYPE } from '../../v2/identityLink.js';   // the identity link's offer, turns and revokes
@@ -7363,6 +7364,37 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
+  /**
+   * A person's OWN lists: the lists ops over their own store, as ONE self. Whose a list is: the self it was made AS (the
+   * waist's `actAs`, checked; none = the general self), the same rule as an own appointment or note, so it rides that
+   * self's own lane to that self's devices only. And only that self's lists are read: the store is seen through the
+   * self the call is made as (`ownStoreAsSelf`), so a list made as one persona is never read or shown with another ticked.
+   * The own Agenda is the calendar's, not a list here. What is done stays shown, marked, until the person takes it off.
+   */
+  async function ownListsCall(opId, args, ctx) {
+    if (!listsManifest.operations.some((o) => o.id === opId)) return { ok: false, error: 'unknown-op', app: 'lists', op: opId };
+    const asSelf = actorOf(ctx);
+    // the own store as that self: its rows only, the own Agenda left out (the calendar's); default-deny (`ownStoreAsSelf`)
+    const self = selfOfOwnItem({ createdBy: asSelf });
+    const view = ownStoreAsSelf(await getOwnStore(), (row) => selfOfOwnItem(row) === self && row.defaultChild !== 'calendar-event');
+    const ops = makeListsOps({
+      storeFor: () => view,
+      t: translatorFor(callLang(ctx?.lang) || null),
+      activeCircle: () => OWN_DEVICES_SCOPE,
+      localActor: asSelf ?? 'me',
+      // a read shows what is done too, marked (the thread answers with done and not done); taking it off is the person's
+      passed: () => ({ mode: 'keep', days: 0 }),
+    });
+    const handler = ops[opId];
+    if (typeof handler !== 'function') return { ok: false, error: 'not-mounted', app: 'lists', op: opId };
+    const { person: _unvouched, personRole: _unvouchedRole, ...ctxClean } = ctx ?? {};
+    let res;
+    try { res = await handler(args ?? {}, ctxClean); }
+    catch (err) { if (err instanceof OwnViewRefused) return { ok: false, code: err.code, error: err.message }; throw err; }
+    // saved on this device, as an own appointment's reply says: the own store reaches the person's other devices only
+    const reads = ['listLists', 'listEntries', 'listDone'];
+    return res?.ok && !reads.includes(opId) && !res._sync ? { ...res, _sync: { style: 'decentralized', peers: [], pending: [], unreachable: [] } } : res;
+  }
   const circleCalendarByLang = new Map();   // the calendar over a circle's store, one per call language, made on first use
   // A person's OWN appointments (of no circle): the same ops over their own-devices store, under an own Agenda — made
   // on first use (the shell hands the store; on web and mobile it is durable, so they come back after a restart).
@@ -8633,6 +8665,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: false, error: 'not-mounted', app: 'basis', op: opId };
       }
       return handler(args ?? {});
+    }
+    // A PERSON'S OWN LISTS (the "+" thread): the own scope named as the circle is their own store, beside their own agenda,
+    // never a household store named after the scope; a persona's own LANE is a carry, not a place, and a door never
+    // reaches it (the own scope is the person's on THIS device only).
+    if (appOrigin === 'lists' && typeof args?.circleId === 'string' && (args.circleId === OWN_DEVICES_SCOPE || args.circleId.startsWith(`${OWN_DEVICES_SCOPE}:`))) {
+      if (args.circleId !== OWN_DEVICES_SCOPE) return { ok: false, code: 'own-lane-not-a-circle', error: 'own-lane-not-a-circle' };
+      if (typeof ctx?.caller === 'string' && ctx.caller) return { ok: false, code: 'own-scope-not-at-a-door', error: 'own-scope-not-at-a-door' };
+      return ownListsCall(opId, args, ctx);
     }
     // A local app a shell mounted (see `mountAppOps`), else its default table (lists). Same contract as the `basis` branch above: the
     // app's own manifest gates which ops exist, an absent handler is a structured refusal, never a throw.

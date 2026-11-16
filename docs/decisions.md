@@ -1876,3 +1876,25 @@ Code: `packages/pod-client/src/SolidPodSource.js`, `PodClient.js` (`#conditionFo
 `apps/basis/src/web/podStorage.js`, `deploy/css-pod/Dockerfile`, `scripts/css-harness.mjs`;
 `docs/agent-notes-known-gotchas.md` (React Native turns a revalidating read into a query on the URL).
 Ledger: L899, L936, L941, L942.
+
+## 2026-11-16 — A person's own lists live in their own store, are the self's that made them, and are reached from the "+" thread (Frits named the place; Fable ruled the shape)
+
+**Status:** decided and built.
+
+**Context:** Frits, round 2 of the walk: lists are not on Today; a circle's lists get a tab, and the person's OWN lists
+are reached in the assistant thread (the "+"). Nothing was recorded on own lists before (grepped "own list", "eigen
+lijst").
+
+**Decision:** a person's own lists are the lists ops over their own store, beside their own agenda: no new store. The
+own scope named as the circle reaches them; a door never does, and a persona's own lane is not a place. A list is the
+self's it was made AS (the self ticked in the "+", the waist's `actAs`), as an own appointment or note is: it rides that
+self's own lane to that self's devices only, and only that self's lists are read (personas are only loosely
+connected, so a list made as one persona is never shown with another ticked). The "+" reads a line against the ticked
+self's own lists FIRST, with the same phrase table the box reads; a list name held both as own and in a circle gets the
+which-circle card with 'mine' first; "nieuwe lijst <naam>" makes an own list unless the line names a circle. A read of a
+list answers in the thread with its entries, the done ones marked; an own list keeps a done entry until it is taken off.
+An own list adds no entry kind: its rows are store items on the own lane, which the history mirror keeps.
+
+**Not built (open ideas for Frits):** own lists in a block on Me; sharing or moving an own list into a circle. Code:
+`apps/basis/src/v2/vandaagPlus.js` (`plusLineOutcome`'s `own`, `plusOwnLists`, `plusDoneLine`),
+`apps/basis/src/core/agent/realAgent.js` (`ownListsCall`, `ownStoreAsSelf`). Ledger: L670.

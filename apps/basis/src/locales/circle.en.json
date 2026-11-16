@@ -1758,6 +1758,18 @@
     "control_within": {
       "text": "Period",
       "doc": "Customise sheet: heading over the relative-date chips of a tasks or notes block."
+    },
+    "plus_card_mine": {
+      "text": "On my own list",
+      "doc": "The \"+\" card's button for the person's OWN list of that name (beside a circle that holds one too): run it there, as the self ticked in the \"+\"."
+    },
+    "plus_list_items": {
+      "text": "{{name}}: {{items}}",
+      "doc": "The \"+\" thread's answer to a read of one list (\"what is on my shopping\"): the list's name and its entries, the done ones marked."
+    },
+    "plus_list_empty": {
+      "text": "Nothing on {{name}}.",
+      "doc": "The \"+\" thread's answer to a read of a list that has no entries."
     }
   },
   "screens": {

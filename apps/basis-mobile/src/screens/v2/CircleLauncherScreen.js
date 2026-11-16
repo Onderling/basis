@@ -289,9 +289,8 @@ import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
-import { replyLine } from '../../../../basis/src/v2/replyLine.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
 import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
@@ -2174,14 +2173,22 @@ export default function CircleLauncherScreen({
 
   // a circle's act the "+" line read: as the person, through the waist with the circle named, so the circle's own doors
   // and governance decide (the "+" has no authority the circle's composer lacks); answers what it did, or why not
-  const plusRunInCircle = async (command, circleId) => {
+  const plusRunInCircle = async (command, circleId, asSelf = null) => {
     const op = plusCircleOp(command, circleId);
     if (!op) return { error: t('circle.vandaag.plus_line_unread') };
-    const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    // an own list's op runs as the ticked self (`plusAsSelf`); a circle's as the person
+    const r = await Promise.resolve(op.own ? plusAsSelf(asSelf)(op.app, op.opId, op.args) : bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     if (r?.ok === false || r?.error) return { error: t('circle.vandaag.plus_failed', { error: r.error ?? '' }) };
     refreshScreensBook();
-    return { done: replyLine(r, { opId: op.opId, args: op.args, t }) };
+    return { done: plusDoneLine(r, { opId: op.opId, args: op.args, t }) };
   };
+  // a call AS the self ticked in the "+" (the waist's actAs): it rides that self's own lane; the default needs no saying
+  const plusAsSelf = (asSelf) => {
+    const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
+    return (app, opId, args) => (actAs ? bundle?.agent?.callSkill?.(app, opId, args, { actAs }) : bundle?.callSkill?.(app, opId, args));
+  };
+  // the person's OWN lists, of the ticked self (read as that self, so another self's are never read) — web twin: ownLists
+  const plusOwnListsOf = (asSelf) => plusOwnLists(plusAsSelf(asSelf));
 
   // the "+" is the person's KEPT assistant thread: its turns are the bot's own turn entries on this device's log (the
   // chat retention class, never carried), one thread per person — web twin: circleApp.js `plusThreadNow`
@@ -2245,16 +2252,16 @@ export default function CircleLauncherScreen({
         turns={plusTurns}
         onForget={plusThread ? () => { plusThread.forget(); setPlusTurnsTick((n) => n + 1); } : null}
         suggestFor={(typed) => plusSuggest(plusPool, typed)}
-        onRead={(line) => plusRecorded(line, async () => {
+        onRead={(line, asSelf) => plusRecorded(line, async () => {
           const list = await plusCircles();
-          const o = plusLineOutcome(line, { circles: list, lang: lang() });
+          const o = plusLineOutcome(line, { circles: list, own: { lists: await plusOwnListsOf(asSelf) }, lang: lang() });
           // help ("help", "?", a how-to question a help card knows): answered in the thread (web twin)
           if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
-          if (o?.kind === 'circle' && o.atOnce) return plusRunInCircle(o.command, o.circleId);
+          if (o?.kind === 'circle' && o.atOnce) return plusRunInCircle(o.command, o.circleId, asSelf);
           if (o?.kind === 'circle') return { card: { line, to: o.to, command: o.command } };
           return (o?.kind === 'own' ? o : null) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') };
         })}
-        onCircleRun={(card, circleId) => plusRecorded(null, () => plusRunInCircle(card?.command, circleId))}
+        onCircleRun={(card, circleId, asSelf) => plusRecorded(null, () => plusRunInCircle(card?.command, circleId, asSelf))}
         shareTargets={plusShareList}
         onShare={plusEdit ? async (actId, contact) => {
           const op = plusShareOp(actId, { id: plusEdit.id, with: contact });

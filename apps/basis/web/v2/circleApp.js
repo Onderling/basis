@@ -192,9 +192,8 @@ import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
-import { replyLine } from '../../src/v2/replyLine.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -4755,6 +4754,8 @@ function showVandaagPlus({ edit = null } = {}) {
     id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
     lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
   })));
+  // the person's OWN lists, of the self ticked in the header (read as that self, so another self's are never read)
+  const ownLists = () => plusOwnLists((app, opId, args) => call({ app, opId, args }));
   let suggestionPool = [];
   plusCircles().then((circles) => { suggestionPool = plusSuggestionPool({ circles, lang: currentLang() }); }).catch(() => {});
   // a circle's act the line read: as the person, through the waist with the circle named, so the circle's own doors
@@ -4762,9 +4763,10 @@ function showVandaagPlus({ edit = null } = {}) {
   const runInCircle = async (command, circleId) => {
     const op = plusCircleOp(command, circleId);
     if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return; }
-    const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    // an own list's op runs as the ticked self (`call`); a circle's as the person
+    const r = op.own ? await call(op) : await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     if (r?.ok === false || r?.error) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); done = null; }
-    else { error = null; done = replyLine(r, { opId: op.opId, args: op.args, t }); }
+    else { error = null; done = plusDoneLine(r, { opId: op.opId, args: op.args, t }); }
     paint();
   };
   // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
@@ -4812,7 +4814,7 @@ function showVandaagPlus({ edit = null } = {}) {
       // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
       // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
       const circles = await plusCircles();
-      const o = plusLineOutcome(text, { circles, lang: currentLang() });
+      const o = plusLineOutcome(text, { circles, own: { lists: await ownLists() }, lang: currentLang() });
       // help ("help", "?", a how-to question a help card knows): answered in the thread, the same line on the phone
       if (o?.kind === 'help') { done = plusHelpAnswer(o, { t }); error = null; return { error, done }; }
       const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));

@@ -114,9 +114,14 @@ describe('the "+" on the phone acts in the one circle that holds the list', () =
   it('a line the word rule does not know, with no model set, gets a plain answer, never silence', async () => {
     await typeLine('flubber quaxel');
     await tapSoon(by.id('vandaag-plus-read'));
-    // the answer shows under the line (and is kept as the assistant's turn above it: the same words twice)
-    await soon(by.id('vandaag-plus-error'), 20_000);
-    await expect(element(by.id('vandaag-plus-error'))).toHaveText('I could not read that.');
+    // the answer shows under the line (and is kept as the assistant's turn above it): no model is set, and where to
+    // set one, in the screens' own labels
+    await soon(by.id('vandaag-plus-done'), 20_000);
+    // the exact answer, from the same locale file and the same labels the app joins (English on the test phone)
+    const en = require('../../basis/src/locales/circle.en.json');
+    const txt = (v) => (typeof v === 'string' ? v : v.text);
+    const path = [en.tab.mij, en.settings_home.title, en.settings_home.appearance, en.userLlm.title].map(txt).join(' \u2192 ');
+    await expect(element(by.id('vandaag-plus-done'))).toHaveText(txt(en.vandaag.plus_no_model).replace('{{path}}', path));
     await device.takeScreenshot('plus-04-unread');
   });
 

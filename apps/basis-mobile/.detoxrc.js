@@ -2,7 +2,7 @@
 // 2026-05-26).  Targets the Android emulator (Medium_Phone_API_36)
 // by default; the `attached` device can be selected via
 // `--configuration android.attached.debug` for tests against a
-// physical phone (Frits's c53828f5).
+// physical phone named by DETOX_ADB_NAME (its adb serial).
 //
 // Local-only — no CI yet.  See Project Files/basis/
 // post-2026-05-24-priority.md → Bundle D for the rationale.
@@ -44,10 +44,9 @@ module.exports = {
     },
     attached: {
       type:   'android.attached',
-      // Pin to Frits's specific phone (avoids picking the emulator
-      // when both are connected).  Override with adbName: '.*' if a
-      // different phone gets connected.
-      device: { adbName: 'c53828f5' },
+      // The phone is named by the run (DETOX_ADB_NAME=<adb serial>), never written here: no personal device in a
+      // public file, and no default that could pick whichever phone is plugged in.
+      device: { adbName: process.env.DETOX_ADB_NAME || 'set-DETOX_ADB_NAME-to-the-phone-serial' },
     },
   },
 

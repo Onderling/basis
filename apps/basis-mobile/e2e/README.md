@@ -23,10 +23,10 @@ pnpm exec detox test --configuration android.emu.debug
 # or: npm run detox:test
 ```
 
-Target the physical phone (`c53828f5`) instead:
+Target an attached phone instead, named by its adb serial:
 
 ```sh
-npm run detox:test:attached
+DETOX_ADB_NAME=<serial> npm run detox:test:attached
 ```
 
 ## What's covered

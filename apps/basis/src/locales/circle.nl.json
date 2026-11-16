@@ -4382,6 +4382,10 @@
     }
   },
   "lists": {
+    "no_self": {
+      "text": "Niet bewaard: dit apparaat heeft geen eigen ik in deze kring.",
+      "doc": "A lists write in a circle this device holds no self for: refused, nothing written (a row names its maker by the circle's self, never the local 'me')."
+    },
     "title": {
       "text": "Lijsten",
       "doc": "K2 lists panel title + more-menu entry."

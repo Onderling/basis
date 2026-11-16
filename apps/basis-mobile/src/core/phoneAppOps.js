@@ -26,6 +26,7 @@
  */
 import { listsManifest } from '../../../lists/manifest.js';
 import { makeListsOps } from '../../../basis/src/v2/listsOps.js';
+import { rowAuthorFor } from '../../../basis/src/v2/rowAuthor.js';
 import { buildMobileLocalBuiltins } from './hostOps.js';
 
 export function mountPhoneAppOps({ agent, catalogue, callSkill, t, eventLog, podAuth = null, sessionRef = null, activeCircle, platform }) {
@@ -37,7 +38,8 @@ export function mountPhoneAppOps({ agent, catalogue, callSkill, t, eventLog, pod
       storeFor: (circleId) => agent.circleStoreFor?.(circleId),
       t,
       activeCircle,
-      localActor: 'me',
+      // a row names its maker by the circle's self, never the local 'me' (rowAuthor.js; the web's twin in circleApp)
+      localActor: rowAuthorFor({ circleSelf: (circleId) => agent.circleSelf?.(circleId) ?? null }),
     }), listsManifest);
   } catch { /* older composition */ }
   agent.mountAppOps('basis', buildMobileLocalBuiltins({

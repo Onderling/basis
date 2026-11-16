@@ -4377,6 +4377,10 @@
     }
   },
   "lists": {
+    "no_self": {
+      "text": "Not saved: this device holds no self in this circle.",
+      "doc": "A lists write in a circle this device holds no self for: refused, nothing written (a row names its maker by the circle's self, never the local 'me')."
+    },
     "title": {
       "text": "Lists",
       "doc": "K2 lists panel title + more-menu entry."

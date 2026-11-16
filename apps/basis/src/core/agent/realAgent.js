@@ -311,6 +311,7 @@ import { mergeManifests }                  from '../../manifestMerge.js';
 import { sharedCopyIdFor, sharedFieldsOf, withSharedMark } from '../../v2/sharedAppointment.js';
 import { personaOfContact, DEFAULT_PERSONA } from '../../v2/contactPersona.js';
 import { pairCircleIdFor, isPairCircleId } from '../../v2/pairCircleId.js';
+import { rowAuthorFor } from '../../v2/rowAuthor.js';
 import { isDirectPayload } from '../../v2/directDoors.js';   // a block refuses direct contact, never a circle's   // an own appointment shared with a contact
 import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
@@ -5290,6 +5291,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     const pk = p.personKey ? { version: p.personKey.version, pubKey: p.personKeyPubOf(p.personKey) } : null;
     return { webid: (isDefault ? chatId : p.chatId)?.pubKey ?? null, sendAs: isDefault ? null : (p.chatId?.pubKey ?? null), personKey: pk };
   };
+  // who a row this device writes names as its maker, per circle (rowAuthor.js): the circle's self, never the local 'me'
+  const rowAuthor = rowAuthorFor({ circleSelf });
   hostAgent.register('bindCirclePersona', async ({ parts }) => {
     const d = parts?.[0]?.data ?? {};
     return [DataPart(await bindCirclePersona({ circleId: d.circleId, personaId: d.personaId ?? null, relayUrl: d.relayUrl ?? null }))];
@@ -6483,7 +6486,8 @@ export async function createRealHouseholdAgent(opts = {}) {
             // a task given to me by someone else is its own news (an edit that is); a new task that arrives already
             // given to me is that, not a second plain landing
             const assigned = assignedEntryFor({ circleId, item, previous: landing?.previous ?? null, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
-            const entry = assigned ?? landingEntryFor({ circleId, item, fresh: landing?.fresh !== false, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
+            // the row's own maker decides (never who served the snapshot: a server's catch-up, a sibling device)
+            const entry = assigned ?? landingEntryFor({ circleId, item, fresh: landing?.fresh !== false, self: circleSelfRef(circleId) });
             // once per row (per assignment): a re-application (a rebuild from the log) is not a second arrival
             if (entry && !opts.deviceLog.query().some((e) => e.id === entry.id)) opts.deviceLog.append(entry);
           } catch { /* a news mark never fails the merge */ }
@@ -7317,7 +7321,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         // No localisation on a bare agent: a key IS the message (the basis default table's rule); a call's language wins.
         t: tLang,
         activeCircle: () => resolveCircleId({}),
-        localActor: 'me',
+        // the row's maker per circle (rowAuthor.js): the door person or the circle's self, never the local 'me'
+        localActor: rowAuthor,
         // a household bot: a chore ticked by its words is the chore's own `completeTask`, as the person (the gate)
         ...(opts.tasksCircleId ? { completeChore: ({ circleId, entry, ctx }) => callSkill('tasks', 'completeTask', { id: entry.id, circleId }, ctx) } : {}),
         // a household bot: what is done or has passed follows the household's setting
@@ -7554,7 +7559,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * `mayGive: false` — an op whose own door gate already decided who may give a chore (reassigning is the admin's, or
    * every member's under the flat roles): the add's rule of who may name whom is not asked again.
    */
-  async function choreHolderFor(assignee, ctx, { mayGive = true } = {}) {
+  async function choreHolderFor(assignee, ctx, { mayGive = true, circleId = null } = {}) {
     const tr = translatorFor(ctx?.lang);
     const caller = actorOf(ctx);
     // in a circle: its roster is who may be named, and assigning follows the standard role table (no household setting)
@@ -7566,7 +7571,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const p = personIn(book, assignee, caller);
     if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
     if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: String(assignee).trim() }) };
-    const who = p.self ? (caller ?? 'me') : p.id;
+    // "mij": the asker, else this device's self in that circle (rowAuthor.js) — never the local 'me' on a row in a circle
+    const who = p.self ? (caller ?? rowAuthor(inCircle ?? resolveCircleId({ circleId }))) : p.id;
+    if (!who) return { ok: false, code: 'no-self', error: tr('circle.lists.no_self') };
     const whoName = p.self ? null : p.name;
     const allowed = !mayGive || assignAllowed({
       policy: inCircle ? 'roles' : paramsService.register.valueOf(ASSIGN_POLICY_KEY),
@@ -7577,10 +7584,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       const byRole = inCircle || assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
       return { ok: false, error: tr('circle.tasks.assign_refused'), refusal: byRole ? refuse('op-rule', 'cannot-reassign') : refuse('door-settings', 'setting:assign') };
     }
-    if (who !== 'me' && roles[who] !== undefined && !policy.canClaim(who)) {
+    if (!p.self && roles[who] !== undefined && !policy.canClaim(who)) {
       return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? String(assignee).trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
     }
-    return { ok: true, who, whoName };
+    return { ok: true, who, whoName, self: !!p.self };
   }
 
   /**
@@ -7593,10 +7600,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     const caller = actorOf(ctx);
     let who = null;
     let whoName = null;
+    let whoSelf = false;
     if (typeof assignee === 'string' && assignee.trim()) {
-      const given = await choreHolderFor(assignee, ctx);
+      const given = await choreHolderFor(assignee, ctx, { circleId: rest.circleId ?? null });
       if (!given.ok) return given;
       ({ who, whoName } = given);
+      whoSelf = given.self;
     }
     let made = await callSkill('lists', opId, rest, ctx);
     if (!made?.ok || !made.itemId) return made;
@@ -7614,7 +7623,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (iso) {
         const store = householdService.stores.getStore(circleId);
         const item = await store.get(made.itemId);
-        if (item) await store.put({ ...item, dueAt: iso }, { by: caller ?? 'me' });
+        if (item) await store.put({ ...item, dueAt: iso }, { by: caller ?? rowAuthor(circleId) ?? undefined });
       }
     }
     if (who) {
@@ -7625,7 +7634,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The chore, who holds it and its day — the reply names the one who got it only where names may be seen; to
     // someone else it says it was given. One line, worded where every reply is (`replyLine`).
     const dueAt = typeof due === 'string' && due.trim() ? (parseCalendarDate(due.trim()) ?? null) : null;
-    const holder = !who ? null : (who === caller || who === 'me') ? 'self' : (whoName ? 'named' : 'given');
+    const holder = !who ? null : (whoSelf || who === caller) ? 'self' : (whoName ? 'named' : 'given');
     const chore = { title: made.entry ?? rest.text ?? null, holder, ...(holder === 'named' ? { name: whoName } : {}), ...(dueAt ? { dueAt } : {}) };
     if (!chore.title) return made;
     const done = { ...made, chore };
@@ -7732,11 +7741,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // reply says who got it as the asker may see them (`readerNamer`: themself, a name, or only that it was given).
     let givenTo = null;
     if (appOrigin === 'tasks' && opId === 'reassignTask' && opts.tasksCircleId && typeof args?.newAssignee === 'string' && args.newAssignee.trim()) {
-      const given = await choreHolderFor(args.newAssignee, ctx, { mayGive: false });
+      const given = await choreHolderFor(args.newAssignee, ctx, { mayGive: false, circleId: args?.circleId ?? null });
       if (!given.ok) return given;
       args = { ...args, newAssignee: given.who };
       const caller = actorOf(ctx);
-      const seen = (given.who === 'me' || (caller && given.who === caller)) ? { you: true } : (await readerNamer(caller, doorCircleOf(ctx)))(given.who);
+      const seen = (given.self || (caller && given.who === caller)) ? { you: true } : (await readerNamer(caller, doorCircleOf(ctx)))(given.who);
       givenTo = seen.you ? { holder: 'self' } : seen.name ? { holder: 'named', name: seen.name } : { holder: 'given' };
     }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
@@ -7748,12 +7757,17 @@ export async function createRealHouseholdAgent(opts = {}) {
       // household is the only app with a capability entry today; `by`/`circleId` are sourced
       // exactly like the bespoke household path below (chatId.pubKey actor · resolved circle).
       if (g?.app === 'household' && householdService) {
+        const capCircle = resolveCircleId(args);
+        const capInCircle = !!capCircle && capCircle !== OWN_DEVICES_SCOPE;
         const capCtx = {
-          circleId: resolveCircleId(args),
+          circleId: capCircle,
           // made by the PERSON at the door (as chores and appointments are, `actorOf`), never by the device: a note on a
-          // household bot was "made by the bot" for everyone, and whose it was could not be judged
-          by:       actorOf(ctx) ?? chatId?.pubKey,
+          // household bot was "made by the bot" for everyone, and whose it was could not be judged.
+          // With no door person: in a circle, that circle's self (rowAuthor.js), and no self there is a refusal below,
+          // never the general key; the general key only in the person's own scope.
+          by:       actorOf(ctx) ?? (capInCircle ? rowAuthor(capCircle) : chatId?.pubKey),
         };
+        if (capInCircle && !capCtx.by) return { ok: false, code: 'no-self', error: translatorFor(ctx?.lang)('circle.lists.no_self') };
         // A person's OWN item (no circle): the own scope named as the circle reaches their own store — carried to their
         // other devices, never to a circle's members — through the same generic atoms; never a household circle store
         // named after the scope.
@@ -8463,17 +8477,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       storeFor: (circleId) => householdService.stores.getStore(circleId),
       activeCircle: () => resolveCircleId({}),
       t: tLang,
-      // a PAIR circle is written as its self (the lens the contact knows, as `writeSharedCopy` writes the copy): a row
-      // authored by the general 'me' is one no pair roster names, and the rail may drop it (L350's rsvp that vanished)
-      // — and only that self: a pair circle whose self this device does not run is not ours to write (null → `no-self`);
-      // falling back to the general key would be the same defect in another coat. 'me' is for ordinary circles only.
-      // A name the call passes must BE that self in a pair circle (`writeSharedCopy` passes it); any other — 'me' included —
-      // is refused too. An ordinary circle keeps the caller's actor, else 'me'.
-      localActor: (circleId, named) => {
-        if (!isPairCircleId(circleId)) return named ?? 'me';
-        const self = circleSelf(circleId)?.webid ?? null;
-        return self && (!named || named === self) ? self : null;
-      },
+      // the row's maker, per circle (rowAuthor.js): a PAIR circle is written as its self only (the lens the contact
+      // knows, as `writeSharedCopy` writes the copy; a name the call passes must BE that self); an ORDINARY circle as the
+      // actor the call names (a door person), else the circle's self. Never the local 'me' in a circle's store: a
+      // receiver reads that as nobody. No self here → null → `no-self`, never the general key.
+      localActor: rowAuthor,
       // AN ANSWER is signed by the answering self's circle identity, and in an ordinary circle it is from that self's
       // roster id (never the 'me' placeholder no roster names) — or from the door person the call names (a function
       // profile's `telegram:…`). Which answers stand is the roster's rule (rsvpItems.js `rosterAnswerRule`): this

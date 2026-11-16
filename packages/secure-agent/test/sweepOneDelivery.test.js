@@ -96,4 +96,33 @@ describe('the relay sweep delivers once', () => {
       await anna.shutdown(); await bram.shutdown(); await A.R.stop(); await B.R.stop();
     }
   }, 30_000);
+
+  it('a relay socket replaced after the peer was heard on it: the record names the old socket, so the peer reads as not heard and the sweep tries every relay (it arrives)', async () => {
+    const A = await countingRelay();
+    const B = await countingRelay();
+    const received = [];
+    const anna = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false, relayReadyTimeoutMs: 3000 });
+    const bram = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false, relayReadyTimeoutMs: 3000, onPeerMessage: (m) => received.push(m) });
+    try {
+      await anna.relay.connect({ relayUrl: A.url, awaitReady: true });
+      await anna.relays.add(B.url, { awaitReady: true });
+      anna.setTransportMode('relay');
+      await bram.relay.connect({ relayUrl: B.url, awaitReady: true });
+      bram.setTransportMode('relay');
+      const to = bram.identity.pubKey;
+      await anna.peer.sendTo(to, { subtype: 'note', msgId: 'r-1' }, FAST);
+      await until(() => received.some((m) => m.payload?.msgId === 'r-1'));          // heard on B's socket now
+      // B's socket replaced (removed and added again: a new transport object)
+      await anna.relays.remove(B.url);
+      await anna.relays.add(B.url, { awaitReady: true });
+      const before = { A: A.owTo(to), B: B.owTo(to) };
+      await anna.peer.sendTo(to, { subtype: 'note', msgId: 'r-2' }, FAST);
+      expect(await until(() => received.some((m) => m.payload?.msgId === 'r-2')), 'it arrived').toBeTruthy();
+      await new Promise((res) => { setTimeout(res, 300); });
+      // not heard on the new socket: every relay tried, each once (the safe side), never the primary twice
+      expect({ A: A.owTo(to) - before.A, B: B.owTo(to) - before.B }).toEqual({ A: 1, B: 1 });
+    } finally {
+      await anna.shutdown(); await bram.shutdown(); await A.R.stop(); await B.R.stop();
+    }
+  }, 30_000);
 });

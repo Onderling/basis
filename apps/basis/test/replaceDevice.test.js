@@ -12,9 +12,11 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import {
-  bootRealAgentNode, connectNodesOverBus, pairCircle, bindCircleAddresses, sealCircleViaProducer, postSealed, readSealed, until, teardown,
+  bootRealAgentNode, connectNodesOverRelay, bindCircleAddresses, pairCircle, sealCircleViaProducer, postSealed, readSealed, until, teardown,
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
+import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
+import { startJourneyRelay } from './support/testRelay.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
 import { makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore, keyEventsFromRail } from '../src/v2/keyRail.js';
 import { EventLog } from '../src/eventLog.js';
@@ -32,16 +34,19 @@ const rowFor = async (node, webid) => {
 const logOpts = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
 
 describe('the replace ceremony — her phone is gone, the new one carries on', () => {
-  let A; let B; let A2;
-  afterAll(async () => { await teardown(A, B, A2); });
+  let A; let B; let A2; let relay;
+  afterAll(async () => { await teardown(A, B, A2); await relay?.close?.(); });
 
   it('retires the old phone everywhere, brings the sealed history along, and rotates the key past the old phone', async () => {
     [A, B] = await Promise.all([
       bootRealAgentNode('A', { agentOpts: { ...logOpts(), ...OPT_IN_FALLBACK } }),
       bootRealAgentNode('B', { agentOpts: { ...logOpts(), ...OPT_IN_FALLBACK } }),
     ]);
-    await connectNodesOverBus([A, B]);
+    // over a real relay, where per-circle addresses route (the in-memory bus hid the address fallback the ceremony leaned on)
+    relay = await startJourneyRelay();
+    await connectNodesOverRelay([A, B], { relayUrl: relay.url });
     await pairCircle(A, B, { groupId: GROUP, name: 'Replace walk', handle: 'bram' });
+    await bindCircleAddresses([A, B], GROUP);
     // B ingests membership statements through the production peer handler — the harness registers it
     // for every node that has the rail (since 2026-09-14); the hand-wiring that lived here is gone.
 
@@ -71,8 +76,10 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const enrolled = await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'nieuwe telefoon' });
     expect(enrolled.ok).toBe(true);
     await teardown(pre);
-    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, ...logOpts(), ...OPT_IN_FALLBACK } });
-    await connectNodesOverBus([A, B, A2]);
+    // the person's address-fallback setting is OFF on the new phone, as it is by default: the ceremony must not lean on it
+    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, ...logOpts(), allowAddressFallback: false } });
+    await connectNodesOverRelay([A2], { relayUrl: relay.url });
+    await bindCircleAddresses([A2], GROUP);
     expect(A2.pubKey, 'one person: the same webid').toBe(A.pubKey);
     const addrA = A.agent.circleAddressFor(GROUP);
     const addrA2 = A2.agent.circleAddressFor(GROUP);
@@ -85,7 +92,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
       await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...mine });
     }
     // The new phone knows its circle (the registry came back from the pod or the recovery file — modelled by the membership record).
-    await A2.agent.callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId: GROUP, handle: 'anna', address: addrA2 });
+    await A2.agent.callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId: GROUP, handle: 'anna', address: addrA2, relays: [relay.url] });
     // …and holds the circle's key chain STATEMENTS (the key lane's catch-up brings them on re-open; the
     // harness performs that act explicitly by ingesting A's statements at A2's rail — it cannot OPEN them:
     // they are sealed to A's key, which is the point).
@@ -93,6 +100,11 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     // catch-up on re-open) — the old phone's proven address, then the statements it signed — so the key
     // lane can bind the admin's establish. Same explicit act as above, at A2's production rails.
     await recordOwn(A2);
+    // the members' proven addresses, as the recovery file's roster snapshot hands a restored phone
+    const bram = ownAnnouncementFor({ agent: B.agent, circleId: GROUP });
+    await A2.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: B.pubKey, ...bram });
+    // …and binds every member's circle address to its key, as the shells do once a roster loads (feedHouseholdRoster)
+    await bindCircleAddressKeysFor({ agent: A2.agent, circleId: GROUP });
     const onMembershipA2 = makeMembershipPeerHandler({ rail: A2.agent.membershipRail });
     for (const stmt of A.agent.membershipRail.storedStatements(GROUP)) {
       await onMembershipA2('A', { subtype: MEMBERSHIP_BROADCAST, circleId: GROUP, event: stmt });
@@ -119,7 +131,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
 
     // The member stays on Bram's roster — at the persona's NEW address; the old one is gone
     expect(await until(async () => { const row = await rowFor(B, A.pubKey); const set = [row?.circleAddress, ...(row?.circleAddresses ?? [])].filter(Boolean); return set.includes(addrNext) && !set.includes(addrA) ? true : null; }, { timeout: 15000, step: 100 }),
-      `Bram's row did not move: ${JSON.stringify(await rowFor(B, A.pubKey))}`).toBe(true);
+      `Bram's row did not move: old …${String(addrA).slice(-6)} new …${String(addrNext).slice(-6)} — Bram's row for Anna: ${JSON.stringify([(await rowFor(B, A.pubKey))?.circleAddress, ...((await rowFor(B, A.pubKey))?.circleAddresses ?? [])].filter(Boolean).map((a) => String(a).slice(-6)))}`).toBe(true);
 
     // THE WINDOW CLOSES (the stable point §7): what comes next is sealed past the old address, so the lost phone — which
     // holds only the old root — does not read it, and Bram does

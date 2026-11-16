@@ -12,10 +12,11 @@
  * `onRowOpen` the label stays plain text, exactly as before.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { buildScreenModel } from '../../../../basis/src/v2/screenModel.js';
 import { t } from '../../core/localisation.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function CircleListScreen({
   items = [], categoryField, searchFields, labelField, defaultAudience, manifestsByOrigin, appOrigin, capabilityMatrix = [],
@@ -61,7 +62,7 @@ export default function CircleListScreen({
       {/* a list scoped to an audience says so, non-dismissible (a visibility scope, not a filter) — as web's caption */}
       {model.audienceScope != null ? <Text style={styles.muted} testID="list-screen-scope-caption">{t('circle.screen.audience_scope')}</Text> : null}
 
-      <TextInput
+      <ThemedTextInput
         style={styles.search}
         placeholder={t('circle.screen.filter_placeholder')}
         placeholderTextColor={theme.color.inkSoft}

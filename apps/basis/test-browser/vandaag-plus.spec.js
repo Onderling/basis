@@ -65,6 +65,16 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   const row = page.locator('.circle-screen__agenda-row').filter({ hasText: 'kapper' });
   await expect(row, 'the appointment from the line shows').toBeVisible({ timeout: 20_000 });
 
+  // a day said without a time: the form asks for the time on that day and the time stays empty (never 09:00); Save waits
+  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag-plus__line').fill('afspraak morgen tandarts');
+  await page.locator('.circle-vandaag-plus__line').press('Enter');
+  await expect(page.locator('.circle-vandaag-plus__ask-time'), 'the form asks for the time').toBeVisible();
+  await expect(page.locator('.circle-vandaag-plus__when')).toHaveValue('');
+  await page.locator('.circle-vandaag-plus__save').click();
+  await expect(page.locator('.circle-screen__agenda-row').filter({ hasText: 'tandarts' }), 'nothing saved without a time').toHaveCount(0);
+  await page.locator('.circle-vandaag-plus__close').click();
+
   // a line it cannot read says so and fills nothing
   await page.locator('.circle-vandaag__plus').click();
   await page.locator('.circle-vandaag-plus__line').fill('ooit eens iets');

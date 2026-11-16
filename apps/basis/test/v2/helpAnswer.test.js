@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { answerHelp, answerHelpTopic, helpTopics } from '../../src/v2/help/helpAnswer.js';
-import { helpDeck } from '../../src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../src/v2/help/helpCards.js';   // every reader's deck: the site's cards + the app's
 
 // The card text answerHelp returns for a given query+lang, or null on a miss.
 function cardText(id, lang) {

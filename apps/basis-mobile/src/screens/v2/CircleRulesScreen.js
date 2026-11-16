@@ -15,7 +15,7 @@
  * recipe editor with a rules-namespaced heading via its `title` prop.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import {
   RULES_QUESTIONS, normalizeRulesDoc, isRulesComplete,
@@ -23,6 +23,7 @@ import {
 } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function CircleRulesScreen({
   doc, onSave, onBack, onPreview,
@@ -122,7 +123,7 @@ export default function CircleRulesScreen({
           {RULES_QUESTIONS.map((q) => (
             <View key={q.key} style={styles.field}>
               <Text style={styles.q}>{t(`circle.rules.q.${q.key}`)}{q.required ? ' *' : ''}</Text>
-              <TextInput
+              <ThemedTextInput
                 style={styles.input}
                 value={working[q.key]}
                 onChangeText={(v) => setField(q.key, v)}

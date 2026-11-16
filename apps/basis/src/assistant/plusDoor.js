@@ -27,6 +27,7 @@ import { ownPlacePolicy } from '../v2/circlePolicy.js';
 import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce } from '../v2/vandaagPlus.js';
 import { plusAnswerLine } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
+import { loadOwnItems } from './ownItems.js';
 
 /**
  * The apps the own "+" composes: every app that declares something for the own place (an op's or a noun's `scopes`).
@@ -102,10 +103,14 @@ export function availableOnly(catalogue, manifestsByOrigin = {}, policy = null) 
  * @param {object} [a.householdManifest]          the household manifest the person's agent carries (`agent.manifest`)
  * @param {string[]} [a.apps]                       the apps to compose (default: those that declare an own act)
  * @param {Array} [a.acts]                         the own acts (default: the catalogue's own-scope attach entries)
+ * @param {(asSelf: string|null) => Function} [a.readAs]  the shell's call AS a self (the waist's `actAs`): what the
+ *        assistant reads for a line (own notes, appointments, list entries) is read through it, as the ticked self
+ * @param {(asSelf: string|null) => {key: string|null, isDefault: boolean}} [a.selfOf]  that self's key
  */
 export function createPlusDoor({
   llm = null, threads = null, threadId = null, t, lang = 'nl', circles = async () => [], ownListsOf = async () => [],
   runInCircle = null, interpret = interpretToCommand, householdManifest, apps, acts = PLUS_ACTS,
+  readAs = null, selfOf = () => ({ key: null, isDefault: true }),
 } = {}) {
   if (typeof t !== 'function') throw new TypeError('createPlusDoor: t required');
   const memory = threads?.memory ?? null;
@@ -130,6 +135,10 @@ export function createPlusDoor({
   let outcome = null;
   const engine = createAssistantEngine({
     catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false,
+    // what the model may read for a line: the ticked self's own things only (D1: own things only; D8: that self's)
+    ...(typeof readAs === 'function'
+      ? { loadItems: (ctx) => loadOwnItems({ call: readAs(ctx?.asSelf ?? null), self: selfOf(ctx?.asSelf ?? null) })() }
+      : {}),
     ...(memory ? { memory } : {}),
     // The yes of an own act is its form: a proposal opens the act's form filled, and nothing is stored here.
     dispatch: async (input) => {
@@ -164,7 +173,7 @@ export function createPlusDoor({
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere)
     if (!llm) return unread();
     outcome = null;
-    await engine.ask(threadId, text);
+    await engine.ask(threadId, text, { asSelf });
     return outcome ?? unread();
   }
 

@@ -172,3 +172,33 @@ describe('a noun people write is PROPOSED in the own place, never written by the
     expect(callSkill).not.toHaveBeenCalled();
   });
 });
+
+describe('the assistant reads the person\'s own things, as the ticked self (journey 3)', () => {
+  // the own routes, as the agent answers them (one note of the general self, one of a persona)
+  const ownRoutes = (asSelf) => async (app, opId) => {
+    if (app === 'household') return { items: [
+      { id: 'n1', type: 'note', body: 'de sleutel ligt bij de buren', createdBy: 'me-key' },
+      { id: 'n2', type: 'note', body: 'het wachtwoord van de printer', createdBy: 'werk-key' },
+    ] };
+    if (app === 'calendar' && opId === 'listEvents') return { items: asSelf === 'werk' ? [] : [{ id: 'e1', title: 'tandarts', when: '2026-11-17T10:00' }] };
+    return { items: [] };
+  };
+  const selfOf = (asSelf) => (asSelf === 'werk' ? { key: 'werk-key', isDefault: false } : { key: 'me-key', isDefault: true });
+
+  it('"waar ligt de sleutel?" reaches the model with the note\'s words; nothing changes', async () => {
+    let context = null;
+    const interpret = async (_text, o) => { context = JSON.stringify(o.context ?? []); return { reply: 'Bij de buren.' }; };
+    const { d, callSkill } = door({ interpret, readAs: ownRoutes, selfOf });
+    const r = await d.read('waar ligt de sleutel?');
+    expect(r.done).toBe('Bij de buren.');
+    expect(context).toContain('sleutel ligt bij de buren');
+    expect(callSkill).not.toHaveBeenCalled();
+  });
+  it('another self ticked: the general self\'s note never reaches the model (D8)', async () => {
+    let context = null;
+    const interpret = async (_text, o) => { context = JSON.stringify(o.context ?? []); return { reply: 'Weet ik niet.' }; };
+    const { d } = door({ interpret, readAs: ownRoutes, selfOf });
+    await d.read('waar ligt de sleutel?', { asSelf: 'werk' });
+    expect(context).not.toContain('sleutel');
+  });
+});

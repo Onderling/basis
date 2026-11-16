@@ -12,7 +12,7 @@ import path from 'node:path';
 import { VaultNodeFs } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../../src/core/agent/realAgent.js';
 import { botOpLevel, botRoleAllows } from '../../src/v2/botOpMap.js';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { withAssistantOps } from '../../src/v2/assistantOps.js';
 import { createBotUsers, contactBookStore } from '../../src/v2/botUsers.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';

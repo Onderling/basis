@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { buildToolDescriptors } from '../src/v2/interpretCommand.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { BOT_OP_MAP, botOpLevel, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { HOUSEHOLD_TEMPLATE, templateLists } from '../src/v2/householdTemplate.js';

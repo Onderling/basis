@@ -15,7 +15,7 @@ import { bootAnnouncingBox } from './support/announcingBox.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { templateLists, HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { testModelProviders } from '../src/v2/testModel.js';

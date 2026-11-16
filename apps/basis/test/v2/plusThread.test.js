@@ -121,13 +121,10 @@ describe('one exchange in the "+" thread (the duty both shells run)', () => {
     expect(plus.turns().map((x) => x.who)).toEqual(['you', 'assistant', 'you', 'you']);
   });
 
-  it('both shells hand it that shape: web\'s read returns card and actId, never circleCard or ownActId', () => {
+  it('web reads the line through the one shared door, which keeps the exchange; no model call is composed in the shell', () => {
     const web = readFileSync(fileURLToPath(new URL('../../web/v2/circleApp.js', import.meta.url)), 'utf8');
-    const at = web.indexOf('await plusThreadNow().exchange(text,');
-    expect(at).toBeGreaterThan(-1);
-    const body = web.slice(at, web.indexOf('}, { t });', at));
-    expect(body).toMatch(/return \{ error, card: circleCard, actId: /);
-    expect(body).not.toMatch(/ownActId/);
+    expect(web).toMatch(/await plusDoorNow\(\)\.read\(text, \{ asSelf \}\)/);
+    expect(web).not.toMatch(/plusReadWithModel|plusModelAsk/);
   });
 });
 

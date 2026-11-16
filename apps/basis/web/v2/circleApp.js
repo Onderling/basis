@@ -191,8 +191,9 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
+import { createPlusDoor } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
@@ -4745,12 +4746,16 @@ function showVandaagPlus({ edit = null } = {}) {
   // an own row is changed as the self that made it (the row says which); something new as the ticked self
   let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
-  const call = async (op) => {
-    // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-    const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
-    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+  // a self's key: the general self's chat key, a persona's webid (what its rows are made by)
+  const selfKeyOf = (id) => (!id || id === 'default' ? (circleHouseholdAgent?.identity?.chat?.pubKey ?? null) : (_selfSet.held.find((p) => p.id === id)?.webid ?? null));
+  // a call AS one self (the waist's actAs): it rides that self's own lane; the default needs no saying
+  const callAs = (id) => (app, opId, args) => {
+    const actAs = id && id !== 'default' ? (_selfSet.held.find((p) => p.id === id)?.webid ?? null) : null;
+    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(app, opId, args, { actAs }) : rawCallSkill(app, opId, args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // made AS the ticked self
+  const call = async (op) => callAs(asSelf)(op.app, op.opId, op.args);
   // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
   // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
   const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
@@ -4765,12 +4770,25 @@ function showVandaagPlus({ edit = null } = {}) {
   // and governance decide (the "+" has no authority the circle's composer lacks); the reply line says what happened
   const runInCircle = async (command, circleId) => {
     const op = plusCircleOp(command, circleId);
-    if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return; }
+    if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return { error }; }
     // an own list's op runs as the ticked self (`call`); a circle's as the person
     const r = op.own ? await call(op) : await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     if (r?.ok === false || r?.error) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); done = null; }
     else { error = null; done = plusDoneLine(r, { opId: op.opId, args: op.args, t }); }
     paint();
+    return { error, done };
+  };
+  // the person's own "+" door, composed for this open: their own model as it is set now, this thread, these circles
+  let _door = null;
+  const plusDoorNow = () => {
+    const th = plusThreadNow();
+    if (!_door || _door.threadId !== th.threadId) {
+      _door = createPlusDoor({ llm: th.threadId ? circleOwnModel() : null, threads: th.threads, threadId: th.threadId,
+        householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(), readAs: callAs,
+        circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId) => runInCircle(command, circleId) });
+      _door.threadId = th.threadId;
+    }
+    return _door;
   };
   // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
   let shareTargets = null;
@@ -4779,7 +4797,8 @@ function showVandaagPlus({ edit = null } = {}) {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
     turns: plusThreadNow().turns(),
     suggestFor: (typed) => plusSuggest(suggestionPool, typed),
-    onForget: () => { plusThreadNow().forget(); paint(); },
+    // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
+    onForget: async () => { await plusDoorNow().forget(); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
@@ -4812,21 +4831,13 @@ function showVandaagPlus({ edit = null } = {}) {
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
       line = text; circleCard = null; done = null;
-      // one exchange in the kept thread (the shared duty): the line heard, the read run, what it answered kept
-      await plusThreadNow().exchange(text, async () => {
-      // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
-      // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
-      const circles = await plusCircles();
-      const o = plusLineOutcome(text, { circles, own: { lists: await ownLists() }, lang: currentLang() });
-      // help ("help", "?", a how-to question a help card knows): answered in the thread, the same line on the phone
-      if (o?.kind === 'help') { done = plusHelpAnswer(o, { t }); error = null; return { error, done }; }
-      const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
-      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return { error, done }; }
-      if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }
-      else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
-      else error = t('circle.vandaag.plus_line_unread');
-      return { error, card: circleCard, actId: r?.actId ?? null };
-      }, { t });
+      // the ONE "+" door (shared with the phone): help, then the plain reading, then the person's own model through the
+      // assistant engine; the line and what it answered are kept in the thread
+      const r = await plusDoorNow().read(text, { asSelf });
+      if (r?.card) { circleCard = r.card; error = null; }
+      else if (r?.actId) { actId = r.actId; values = { ...values, ...(r.values ?? {}) }; error = null; }
+      else if (r?.done) { done = r.done; error = null; }
+      else error = r?.error ?? t('circle.vandaag.plus_line_unread');
       paint();
     },
     onCircleRun: async (circleId) => {

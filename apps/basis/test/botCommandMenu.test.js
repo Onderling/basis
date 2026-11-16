@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { botCommandList, createCommandMenus } from '../src/v2/botCommandMenu.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { scopeCatalogueToRole } from '../src/v2/botOpMap.js';
 import { createBotUsers } from '../src/v2/botUsers.js';
 import nl from '../src/locales/circle.nl.json' with { type: 'json' };

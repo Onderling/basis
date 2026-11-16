@@ -5,7 +5,7 @@
  * may lose that op's tool.
  */
 import { describe, it, expect } from 'vitest';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { scopeCatalogueToRole } from '../../src/v2/botOpMap.js';
 import { HOUSEHOLD_TEMPLATE } from '../../src/v2/householdTemplate.js';
 import { FIXTURES } from '../../scripts/assistant-eval.fixtures.mjs';

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { screenPanels, screenPanelsForGrant, screenPickerFetcher, screenActionForm } from '../../src/v2/screenPaint.js';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { botOpLevel } from '../../src/v2/botOpMap.js';
 import nl from '../../src/locales/circle.nl.json' with { type: 'json' };
 

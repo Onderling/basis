@@ -49,7 +49,7 @@ export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxIt
  * @param {(key:string, params?:object) => string} a.t
  * @param {(opId:string, caller:string, visibility:string) => Promise<object|null>} [a.refusal]  the host gate: a
  *        refusal `{layer, code}`, or null. Absent → no caller is checked (a door without admitted people).
- * @param {{catalogue?: ReturnType<import('../telegram/assistantCatalogue.js').createDoorCatalogue>,
+ * @param {{catalogue?: ReturnType<import('../assistant/assistantCatalogue.js').createDoorCatalogue>,
  *          status?: () => object|Promise<object>, users?: () => Promise<object[]>,
  *          admission?: ReturnType<import('./botAdmission.js').createBotAdmission>,
  *          revoke?: (who: string) => Promise<object|null>,

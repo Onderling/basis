@@ -17,7 +17,7 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole } from '../src/v2/botOpMap.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, p) => NAMES[k] ?? (p ? `${k} ${JSON.stringify(p)}` : k);

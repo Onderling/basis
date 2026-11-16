@@ -10,7 +10,7 @@
  *
  * Pure composition over `call`: the shell paints what this returns, and reads again after an action or a nudge.
  */
-import { composeAssistantCatalogue } from '../telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../assistant/assistantCatalogue.js';
 
 let catalogue = null;
 const catalogueForScreen = () => (catalogue ??= composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true }).catalogue);

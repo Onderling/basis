@@ -98,6 +98,8 @@ export const calendarManifest = {
      */
     {
       id:    'listEvents', visibility: 'authenticated', group: 'data',
+      // the person's own agenda serves it too (the agent's own-calendar route): offered in a circle and in their own "+"
+      scopes: ['circle', 'own'],
       verb:  'list',
       appliesTo: { type: 'calendar-event' },
       params: [
@@ -183,6 +185,7 @@ export const calendarManifest = {
     },
     {
       id:    'cancelEvent', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'remove',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -206,6 +209,7 @@ export const calendarManifest = {
     },
     {
       id:    'updateEvent', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'edit',
       writes: { scope: 'circle' },
       // a person's words and moment, like an entry's edited text: the newer change wins
@@ -226,6 +230,7 @@ export const calendarManifest = {
     // or a cancel. A person's own act: a button, no chat tool — the model never decides what crosses to a contact.
     {
       id:    'shareEvent', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'share',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -244,6 +249,7 @@ export const calendarManifest = {
     // pick, never a row a person taps. `internal` takes it out of coverage and the Other shelf.
     {
       id:    'shareTargets', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'list',
       params: [],
       surfaces: { internal: true },
@@ -255,6 +261,7 @@ export const calendarManifest = {
      */
     {
       id:    'getEventSnapshot', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'list',
       appliesTo: { type: 'calendar-event' },
       params: [
@@ -274,6 +281,7 @@ export const calendarManifest = {
      */
     {
       id:    'briefSummary', visibility: 'authenticated', group: 'data',
+      scopes: ['circle', 'own'],
       verb:  'list',
       params: [],
       surfaces: {
@@ -287,6 +295,7 @@ export const calendarManifest = {
      */
     {
       id:    'searchEvents', visibility: 'authenticated', group: 'data',
+      scopes: ['circle', 'own'],
       verb:  'list',
       params: [
         { name: 'query', kind: 'string', required: true },

@@ -21,7 +21,7 @@
  * This file renders + re-loads after each edit (persisted state, not the tap).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, Image } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Image } from 'react-native';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import ProfileBasics from './ProfileBasics.js';
@@ -33,6 +33,7 @@ import {
   toggleDisclosure, shareDisclosureToCircle,
   setProfilePicture, loadCurrentPicture, resolveSealedThumbUri,
 } from '../../core/mijHost.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 /* Mobile t() falls back to the FULL key on a miss (no defaultValue param like
  * web's t) — resolve with an explicit fallback so raw driver keys render as
@@ -213,7 +214,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
                 <View style={styles.editorRow}>
                   {p.free ? (
                     <>
-                      <TextInput
+                      <ThemedTextInput
                         style={styles.input}
                         defaultValue={p.value ?? ''}
                         placeholder={t('circle.aboutme.place_placeholder')}
@@ -246,7 +247,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
                       })}
                       {p.whenField ? (
                         <>
-                          <TextInput
+                          <ThemedTextInput
                             style={styles.input}
                             defaultValue={p.when ?? ''}
                             placeholder={t('circle.mij.availability_when_ph')}
@@ -307,17 +308,17 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
               </View>
               {ds.id === 'interests' ? (
                 <View style={styles.form}>
-                  <TextInput style={styles.input} value={interestDraft} placeholder={t('circle.mij.interest_add_ph')}
+                  <ThemedTextInput style={styles.input} value={interestDraft} placeholder={t('circle.mij.interest_add_ph')}
                     placeholderTextColor={theme.color.inkSoft} onChangeText={setInterestDraft} testID="mij-interest-input" />
                   <Btn variant="primary" label={t('circle.mij.offering_save')} testID="mij-interest-add"
                     onPress={() => { if (interestDraft.trim()) onSaveDriver('interests', { tags: interestTagsAfter(ds.tags, { add: interestDraft }) }); }} />
                 </View>
               ) : driverForm?.section === ds.id ? (
                 <View style={styles.form}>
-                  <TextInput style={styles.input} value={driverForm.text}
+                  <ThemedTextInput style={styles.input} value={driverForm.text}
                     placeholder={t(ds.id === 'goals' ? 'circle.mij.goal_text_ph' : 'circle.mij.offering_text_ph')}
                     placeholderTextColor={theme.color.inkSoft} onChangeText={(v) => setDriverForm((f) => ({ ...f, text: v }))} />
-                  <TextInput style={styles.input} value={driverForm.tags} placeholder={t('circle.mij.offering_tags_ph')}
+                  <ThemedTextInput style={styles.input} value={driverForm.tags} placeholder={t('circle.mij.offering_tags_ph')}
                     placeholderTextColor={theme.color.inkSoft} onChangeText={(v) => setDriverForm((f) => ({ ...f, tags: v }))} />
                   <View style={styles.formActions}>
                     <Pressable style={styles.btnPrimary} accessibilityRole="button"
@@ -391,7 +392,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
         {/* dashed potential-action card: a new persona (createProfile) */}
         {personaForm ? (
           <View style={[styles.card, styles.form]}>
-            <TextInput
+            <ThemedTextInput
               style={styles.input}
               value={personaForm.name}
               placeholder={t('circle.mij.new_persona_ph')}

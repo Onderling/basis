@@ -7,7 +7,7 @@
  * form per pause. Every branch ends on a screen that says what happened.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
@@ -17,6 +17,7 @@ import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { restoreFinishOutcome } from '../../../../basis/src/v2/restoreFinishView.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'restore-finish');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
@@ -96,7 +97,7 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
     body = (
       <View>
         <Text style={styles.body}>{t('circle.restore_finish.phrase_body')}</Text>
-        <TextInput
+        <ThemedTextInput
           style={styles.input} placeholder={t('circle.enroll.mnemonic_placeholder')} placeholderTextColor={theme.color.inkSoft}
           multiline autoCapitalize="none" autoCorrect={false} autoComplete="off" value={phrase} onChangeText={setPhrase}
           testID="restore-finish-mnemonic"

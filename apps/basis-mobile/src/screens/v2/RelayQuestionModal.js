@@ -7,13 +7,14 @@
  * it. One question per app session: "Later" on any screen holds for all of them.
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createRelayQuestion, knownRelayUrl, createConnectionPoints, asyncStorageConnectionPointsIo, adoptInheritedPoint } from '../../../../basis/src/v2/connectionPoints.js';
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 import { asyncStorageRelayIo, normalizeRelayUrl } from '../../../../basis/src/v2/relayPref.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // What this device knows about relays right now: the saved setting, the build argument, the circles' points.
 const readKnown = async () => ({
@@ -83,7 +84,7 @@ export default function RelayQuestionModal({ onResolve }) {
         <View style={styles.card} testID="relay-question">
           <Text style={styles.title}>{t('circle.settings.relayAsk_title')}</Text>
           <Text style={styles.body}>{t('circle.settings.relayAsk_body')}</Text>
-          <TextInput
+          <ThemedTextInput
             style={styles.input}
             value={value}
             onChangeText={(v) => { setValue(v); setInvalid(false); }}

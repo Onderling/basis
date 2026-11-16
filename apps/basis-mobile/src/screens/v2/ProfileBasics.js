@@ -5,10 +5,11 @@
  * getMyProfile and dispatches the pinboard mutations through the injected `callSkill`.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { fieldAfterLoad } from '@onderling-app/basis';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function ProfileBasics({ callSkill }) {
   const theme = useTheme();
@@ -76,7 +77,7 @@ export default function ProfileBasics({ callSkill }) {
         <Text style={styles.sectionTitle}>{t('circle.profile.location')}</Text>
         <Text style={styles.locCurrent}>{profile.location?.label ? t('circle.profile.loc_current', { label: profile.location.label }) : t('circle.profile.loc_none')}</Text>
         <View style={styles.row}>
-          <TextInput style={styles.input} value={geoQuery} onChangeText={setGeoQuery} placeholder={t('circle.profile.geo_placeholder')} placeholderTextColor={theme.color.inkSoft} testID="profile-geo" />
+          <ThemedTextInput style={styles.input} value={geoQuery} onChangeText={setGeoQuery} placeholder={t('circle.profile.geo_placeholder')} placeholderTextColor={theme.color.inkSoft} testID="profile-geo" />
           <Pressable style={styles.primary} onPress={geocode}><Text style={styles.primaryText}>{t('circle.profile.geo_search')}</Text></Pressable>
         </View>
         {geoResult?.label && (
@@ -98,7 +99,7 @@ function Field({ styles, label, value, onChangeText, editable = true, testID }) 
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={[styles.input, !editable && styles.inputWaiting]} value={value} onChangeText={onChangeText} editable={editable} autoCapitalize="none" testID={testID} />
+      <ThemedTextInput style={[styles.input, !editable && styles.inputWaiting]} value={value} onChangeText={onChangeText} editable={editable} autoCapitalize="none" testID={testID} />
     </View>
   );
 }

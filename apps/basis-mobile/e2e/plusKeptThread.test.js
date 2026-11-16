@@ -24,6 +24,10 @@ describe('the "+" on the phone is one kept conversation', () => {
     await openPlus();
     if (await isVisible(by.id('vandaag-plus-thread'))) throw new Error('a fresh install already has a conversation');
     await element(by.id('vandaag-plus-line')).replaceText(LINE);
+    // the sheet has TAKEN the line before Read is tapped: a tap that comes first goes nowhere, and the walk would blame
+    // the read (measured 2026-11-16: the same build passed with a pause here and failed without one)
+    await expect(element(by.id('vandaag-plus-line'))).toHaveText(LINE);
+    await new Promise((r) => setTimeout(r, 1500));
     await tapSoon(by.id('vandaag-plus-read'));
     await soon(by.text(LINE).withAncestor(by.id('vandaag-plus-thread')), 15_000);
     await soon(by.id('vandaag-plus-turn-assistant'), 10_000);

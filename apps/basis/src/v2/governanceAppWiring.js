@@ -203,6 +203,8 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     ...(agent ? { removeMember: (circleId, memberWebid, decided = {}) => removeCircleMember({ agent, callSkill, circleId, memberWebid, ...decided }) } : {}),
     // The fold's input: VERIFIED events + the disputed (equivocator) ref set, from the rail's read.
     readGovernanceState: (circleId) => rail.readVerified(circleId),
+    // the circle's verified membership statements: the Decisions view says how many members joined since a proposal
+    ...(typeof agent?.membershipBodies === 'function' ? { readMembershipBodies: (circleId) => agent.membershipBodies(circleId) } : {}),
   });
 
   // §8 reporting — SIGNED on this rail (`report-file` · `report-resolve`, `reportLane.js`): who filed a report and who

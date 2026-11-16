@@ -79,13 +79,37 @@ function subjectLabelOf(p, labelForSubject) {
 }
 
 /**
+ * HOW MANY MEMBERS JOINED SINCE A PROPOSAL WAS MADE — a SHOWN hint on an open decision, never a gate (Frits 2026-11-15:
+ * no vote freeze for the alpha; a vote counts the roster as it is now). Counted from the join statements this device holds
+ * whose signed time (`payload.at`) is after the proposal's own signed time, once per member, and only members who are
+ * still on the roster. A join's time is set by the device that wrote it, so a changed client can put any time there:
+ * that is why this informs and decides nothing. A join without a time (written before joins carried one) is not counted.
+ * @param {Array<{kind:string, subject:string, payload?:{at?:number}}>|null} bodies  the circle's verified membership bodies
+ * @param {number} since  the proposal's signed time
+ * @param {Array<{ref:string}>} [members]  the roster as it is now
+ */
+export function joinsSince(bodies, since, members = null) {
+  if (!Array.isArray(bodies) || typeof since !== 'number' || !(since > 0)) return 0;
+  const current = Array.isArray(members) ? new Set(members.map((m) => m?.ref).filter((r) => typeof r === 'string')) : null;
+  const who = new Set();
+  for (const b of bodies) {
+    if (b?.kind !== 'join' || typeof b.subject !== 'string') continue;
+    const at = b.payload?.at;
+    if (typeof at !== 'number' || !(at > since)) continue;
+    if (current && !current.has(b.subject)) continue;
+    who.add(b.subject);
+  }
+  return who.size;
+}
+
+/**
  * @param {object} a
  * @param {{proposals: Array}} a.fold           the governanceLog fold
  * @param {{ref?:string, role?:string}} [a.viewer]  the current member (drives can-vote/override)
  * @param {(subject:any, action:string)=>string} [a.labelForSubject]  humanise the subject (e.g. member ref → name)
  * @returns {{open: Array<object>, closed: Array<object>, hasOpen: boolean}}
  */
-export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s) => (s == null ? '' : String(s)) } = {}) {
+export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s) => (s == null ? '' : String(s)), joinedSinceOf = null } = {}) {
   const proposals = (fold && Array.isArray(fold.proposals)) ? fold.proposals : [];
   const myRef = viewer && typeof viewer.ref === 'string' ? viewer.ref : null;
   const isAdmin = viewer?.role === 'admin';
@@ -129,11 +153,21 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       // admin/caretaker device enacts (Decision A); a caretaker IS an admin in the roster. Everyone else keeps the
       // waiting line. One decision both shells read.
       canEnact: p.status === DECISION_STATUS.APPROVED && !p.closed && isAdmin,
+      // HOW MANY OF TODAY'S MEMBERS JOINED SINCE THIS PROPOSAL WAS MADE (a shown hint, never a gate: the vote counts the
+      // roster as it is now, and a join's time is self-declared): the screen says it on an open decision when it is not 0
+      joinedSince: !p.closed && typeof joinedSinceOf === 'function' ? (Number(joinedSinceOf(p)) || 0) : 0,
     };
   });
 
   const open = rows.filter((r) => !r.closed);
   return { open, closed: rows.filter((r) => r.closed), hasOpen: open.length > 0 };
+}
+
+/** The line an open decision shows when members joined since it was made (null at 0): one wording both shells paint. */
+export function joinedSinceLine(count, { t } = {}) {
+  const n = Number(count) || 0;
+  if (n <= 0 || typeof t !== 'function') return null;
+  return n === 1 ? t('circle.governance.joined_since_one') : t('circle.governance.joined_since_n', { count: n });
 }
 
 /**

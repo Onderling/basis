@@ -48,7 +48,7 @@
 // CURRENT version only (grant carries history forward untouched) — never retroactive access to pre-grant
 // history. Expanding that (grant historic versions) is a deliberate POLICY choice, not the default.
 
-import { keyStoreSerializer, MAX_KEY_WRITE_ATTEMPTS, readKeyForWrite } from './keyResourceWrite.js';
+import { keyStoreSerializer, MAX_KEY_WRITE_ATTEMPTS } from './keyResourceWrite.js';
 import {
   grantMember, rotateGroupKeyResource, buildGroupKeyResource, unwrapGroupKey,
   openSealedAcrossVersions,
@@ -150,7 +150,7 @@ export function createCanonicalShare({ sharing, keyStore, controllerKey, resourc
       // `compute` still limits the damage (each write carries forward whoever it can see).
       const next = await _serialize(async () => {
         for (let attempt = 0; attempt < MAX_GRANT_ATTEMPTS; attempt += 1) {
-          const cur = await readKeyForWrite(keyStore);
+          const cur = await keyStore.read();
           const candidate = compute(cur);
           if (typeof keyStore.writeIfUnchanged === 'function') {
             const wrote = await keyStore.writeIfUnchanged(candidate, cur);
@@ -267,7 +267,7 @@ export function createCanonicalShare({ sharing, keyStore, controllerKey, resourc
       //    recipient is out; a concurrent grant losing to a revoke is a liveness cost, not a safety hole.
       const next = await _serialize(async () => {
         for (let attempt = 0; attempt < MAX_GRANT_ATTEMPTS; attempt += 1) {
-          const cur = await readKeyForWrite(keyStore);
+          const cur = await keyStore.read();
           const candidate = rotateGroupKeyResource({
             previous: cur,
             recipients: rotateRecipients(cur),
@@ -280,7 +280,7 @@ export function createCanonicalShare({ sharing, keyStore, controllerKey, resourc
           await keyStore.write(candidate);
           return candidate;
         }
-        const cur = await readKeyForWrite(keyStore);
+        const cur = await keyStore.read();
         const latest = rotateGroupKeyResource({
           previous: cur,
           recipients: rotateRecipients(cur),

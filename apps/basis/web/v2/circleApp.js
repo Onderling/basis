@@ -192,7 +192,7 @@ import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
@@ -828,6 +828,7 @@ import { mergeAvailability } from '../../src/v2/memberAvailability.js';
 import { createAvailabilityStore, localStorageAvailabilityIo, podAvailabilityIo, tieredAvailabilityIo } from '../../src/v2/memberAvailability.js';
 import { renderCircleAvailability } from './circleAvailability.js';
 import {
+  onPolicyPostureChange,
   createCirclePolicyStore, localStoragePolicyIo, localCirclePolicyStore,
   createMemberOverrideStore, localStorageOverrideIo,
 } from '../../src/v2/circlePolicyStore.js';
@@ -2033,6 +2034,9 @@ async function buildCircleSealStrategy(circleId, policy) {
 // circle re-opens.
 const devMediaBucket = makeDevMediaBucket();
 const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
+// a policy write that changes the circle's pod or posture: the producer, the strategy, the media composition and the share
+// enforcement built from the old one go (mobile parity); the next use builds them from the policy in force
+onPolicyPostureChange((circleId) => { circlePods.delete(circleId); circleSealStrategies.delete(circleId); circleMediaCompositions.delete(circleId); _shareEnforcementByCircle.delete(circleId); });
 function getCircleMediaComposition(circleId, policy) {
   if (!circleMediaCompositions.has(circleId)) {
     circleMediaCompositions.set(circleId, resolveCircleMediaComposition(circleId, policy).catch(() => null).then((c) => {
@@ -4810,7 +4814,9 @@ function showVandaagPlus({ edit = null } = {}) {
       // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
       // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
       const circles = await plusCircles();
-      const o = plusLineOutcome(text, { circles, own: { lists: await ownLists() } });
+      const o = plusLineOutcome(text, { circles, own: { lists: await ownLists() }, lang: currentLang() });
+      // help ("help", "?", a how-to question a help card knows): answered in the thread, the same line on the phone
+      if (o?.kind === 'help') { done = plusHelpAnswer(o, { t }); error = null; return { error, done }; }
       const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
       if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return { error, done }; }
       if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }

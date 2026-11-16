@@ -1563,6 +1563,10 @@
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
+    "plus_help": {
+      "text": "I can do this for you: {{acts}}. Or ask me how something works.",
+      "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
+    },
     "plus_line_unread": {
       "text": "I could not read that.",
       "doc": "The free line could not be read: the person fills the fields."
@@ -7666,6 +7670,14 @@
     "deadline": {
       "text": "closes {{when}}",
       "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
+    },
+    "joined_since_one": {
+      "text": "1 member joined since this proposal was made",
+      "doc": "Decisions screen, an open proposal: one member on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
+    },
+    "joined_since_n": {
+      "text": "{{count}} members joined since this proposal was made",
+      "doc": "Decisions screen, an open proposal: {{count}} members on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
     },
     "awaiting_enactment": {
       "text": "awaiting an admin",

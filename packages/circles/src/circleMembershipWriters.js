@@ -242,6 +242,9 @@ export async function redeemMembershipCode({
   const ownKey = personKeyAnnouncement(typeof currentPersonKey === 'function' ? currentPersonKey() : null);
   const ownJoin = await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
     redemptionRef: item.id,
+    // WHEN, by this device's clock (self-declared, signed): the Decisions screen counts the joins since a proposal from it,
+    // as a shown hint only; nothing decides on it
+    at: now,
     // The handle the joiner presented, so every device that folds this join can name them — the redemption
     // row above carries it too, but only the admitting device ever holds that row. Self-asserted, like the
     // circle address; uniqueness within the circle is enforced at redemption, before this is emitted.
@@ -438,6 +441,9 @@ export async function verifyMembershipCodeForPeer({
   const joinerKey = personKeyAnnouncement(a.personKey);
   const joinStatement = await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
     redemptionRef: item.id,
+    // WHEN, by this device's clock (self-declared, signed): the Decisions screen counts the joins since a proposal from it,
+    // as a shown hint only; nothing decides on it
+    at: now,
     // A FUNCTION PROFILE, stated by THIS admin: only for a code the admin minted for a bot, and only when the
     // redeemer says it runs one. The fold reads it from this admin-signed join; a claim on an ordinary code says nothing.
     ...(valid?.source?.forFunction === true && a.profileKind === 'function' ? { kind: 'function' } : {}),

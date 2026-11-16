@@ -318,9 +318,8 @@ export function createCircleControlAgentRouter(getProducer, { refusals = null, m
         err?.message ?? err,
       );
       // a key change that was NOT made says so in the device's log, with its reason (never an id): another device kept
-      // changing the key, the roster could not say whether the member is still a member, or the pod never served the
-      // key file the same twice (a torn read: nothing is built on it)
-      const reason = { KEY_WRITE_CONTENDED: 'key-write-contended', MEMBER_UNKNOWN: 'member-unknown', KEY_WRITE_UNCONDITIONED: 'key-write-unconditioned', KEY_READ_TORN: 'key-read-torn' }[err?.code] ?? null;
+      // changing the key, or the roster could not say whether the member is still a member
+      const reason = { KEY_WRITE_CONTENDED: 'key-write-contended', MEMBER_UNKNOWN: 'member-unknown', KEY_WRITE_UNCONDITIONED: 'key-write-unconditioned' }[err?.code] ?? null;
       if (reason) (refusals ?? processRefusalLog()).note({ tag: 'key', lane: 'key', check: String(what).split(' ')[0], reason });
     }
   };

@@ -899,3 +899,13 @@ moved here so every agent reads them in one place.
   limit and took the live bot's model down, because the test key and the live key were one organisation. Before any
   batch: estimate tokens (calls × prompt and tool-list size), check the remaining quota, and ask (see also the
   `LIVE_LLM=1` rule in CLAUDE.md).
+
+## React Native's fetch turns `cache: 'no-cache'` into a query on the URL (2026-11-15)
+
+Every pod request asks the pod whether its copy is current (`cache: 'no-cache'` in `SolidPodSource` and the pod writer),
+because a browser's HTTP cache, and the phone's OkHttp disk cache (React Native's networking module builds its client
+with a 10 MB `http-cache`), can answer a GET or HEAD with an old body after a write. React Native's `fetch` is
+whatwg-fetch, which does not send a cache mode: on a GET or HEAD with `no-cache` or `no-store` it appends `_=<ms>` to the
+URL instead (a new URL each time, so the cache misses). The Community Solid Server ignores an unknown query (measured on
+7.2.0: `/` and `/?_=<ms>` give the same answer), so this works there. A pod server that does NOT ignore an unknown query
+would break on the phone only. Not yet proven on a phone: the DPoP proof with that query on the URL.

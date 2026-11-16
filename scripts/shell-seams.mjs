@@ -63,6 +63,9 @@ export const SEAMS = Object.freeze([
   // codes, one pick). The box has no pairing UI: its door is the household bot's (`botScreens`), which composes the same
   // screen door (`screenDoor.js`).
   { id: 'screen-pairing-door', pattern: /createAppScreenPairing\(/, shells: ['web', 'mobile'], why: 'without it a pasted screen offer could be granted without the person picking the code their screen shows' },
+  // WHAT WAS BUILT FROM A CIRCLE'S POLICY GOES WHEN ITS POD OR POSTURE CHANGES: a shell that keeps a producer, a seal
+  // strategy or a media composition per circle subscribes to the policy store's change. The box builds none of them.
+  { id: 'policy-change-drops-producer', pattern: /onPolicyPostureChange\(/, shells: ['web', 'mobile'], why: 'a producer built on half a policy (a pod still at its default) outlives the real one, and a shared-pod member never finds the circle\'s pod' },
   { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
   // A NEW MEMBER IS NAMED AS THEIR FIRST LINE LANDS: a sender the roster cannot place yet (one this device admitted, a
   // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles

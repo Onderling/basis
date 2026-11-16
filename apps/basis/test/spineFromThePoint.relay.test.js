@@ -409,9 +409,11 @@ describe('spine statements only from the point', () => {
       await new Promise((res) => setTimeout(res, 17_000));   // past the time-out: members exist, so it must not release
       expect(A.agent.spineClosedCircles(), 'the time-out released a circle that has members to fork against').toContain(GROUP);
       expect(ownRoleStatements(A).length, 'the phone signed blind').toBe(before);
-      // someone answers
+      // someone answers: as on a reconnect, what the relay's 'connect' runs (the not-yet clocks clear, the holds flush),
+      // then the real agent's own step on connect (catch up again in every circle still closed)
       A._routerRef.fn = prior;
       released = true;
+      await A.agent.sa.connectivityRestored();
       await A.agent.spineCatchUpAgain();
       const s = await until(() => ownRoleStatements(A).find((x) => x.body.payload?.role === want) ?? null, { timeout: 20000, step: 200 });
       expect(s, 'the waiting act never landed').toBeTruthy();

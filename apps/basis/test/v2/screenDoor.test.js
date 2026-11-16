@@ -39,9 +39,10 @@ describe('the screen door', () => {
     const a = await door.ask('o', { viewPubKey: 'K', nonce: 'n1' });
     expect(a.codes).toHaveLength(3);
     expect(a.codes).toContain(await screenCode('K', 'n1'));
-    const wrong = a.codes.find((c) => c !== a.code);
+    const real1 = await screenCode('K', 'n1');
+    const wrong = a.codes.find((c) => c !== real1);
     expect((await door.answer('o', wrong)).reason).toBe('pairing-wrong-code');
-    expect((await door.answer('o', a.code)).reason, 'gone after one try').toBe('pairing-nothing-pending');
+    expect((await door.answer('o', real1)).reason, 'gone after one try').toBe('pairing-nothing-pending');
     await door.ask('o', { viewPubKey: 'K', nonce: 'n2' });
     t += SCREEN_PAIRING_TTL_MS + 1;
     expect((await door.answer('o', await screenCode('K', 'n2'))).reason).toBe('pairing-expired');
@@ -102,5 +103,18 @@ describe('the offer holds nothing long-lived of the person', () => {
     expect(Object.values(body)).not.toContain(PERSON);
     expect(Object.values(body), 'no address of the bot or the person rides the offer').not.toContain(BOT);
     view.stop?.();
+  });
+  it('the door\'s answer never carries the real code', async () => {
+    const door = createScreenDoor({ pending: slot(), note: () => {} });
+    const a = await door.ask('o', { viewPubKey: 'K', nonce: 'n9' });
+    expect(Object.keys(a).sort()).toEqual(['codes', 'ok', 'previous']);
+  });
+
+  it('a grant the op refuses is said as one sentence, not the op\'s error text', async () => {
+    const p = createAppScreenPairing({ callSkill: async () => ({ ok: false, error: 'self-required' }), rand: () => 0.42 });
+    await p.offer(offerOf('K2', 'n10'));
+    await p.pick(await screenCode('K2', 'n10'));
+    const r = await p.grant({ ops: ['household.listOpenTasks'] });
+    expect(r.reason).toBe('grant-failed');
   });
 });

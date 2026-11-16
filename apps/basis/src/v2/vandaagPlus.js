@@ -11,7 +11,8 @@ import { attachEntriesFor } from './attachEntries.js';
 import { catalogueManifests } from './manifestSources.js';
 import { renderGate } from '@onderling/app-manifest';
 import { listsGateRules, circleListsFor } from './circleGate.js';
-import { GATE_WORDS } from './gateWords.js';
+import { GATE_WORDS, helpWords, helpQuestionOpeners } from './gateWords.js';
+import { answerHelp } from './help/helpAnswer.js';
 import { replyLine } from './replyLine.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
@@ -254,9 +255,12 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
  * as `circleId`), unless a circle holds a list of that name too: then the card asks, 'mine' first. A line that MAKES a
  * list ("nieuwe lijst Vakantie") makes an own one, unless it names a circle ("Thuis: maak een lijst Vakantie").
  * @param {string} line
- * @param {{ circles?: Array<{id: string, name?: string, lists?: object[], manifestsByOrigin: object, availability?: {of: Function}|null}>, own?: {lists?: object[], name?: string}|null, acts?: object[], manifestsByOrigin?: object, now?: number }} [o]
+ * @param {{ circles?: Array<{id: string, name?: string, lists?: object[], manifestsByOrigin: object, availability?: {of: Function}|null}>, own?: {lists?: object[], name?: string}|null, acts?: object[], manifestsByOrigin?: object, now?: number, lang?: string|null }} [o]
  */
-export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
+export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_ACTS, manifestsByOrigin, now, lang = null } = {}) {
+  // "help", "?": what the "+" can do (read first: the help cards' matcher alone answers "help" with the wrong card)
+  const asked = word(line).toLowerCase();
+  if (helpWords().has(asked.replace(/[!.?]+$/u, '') || asked)) return { kind: 'help', acts: acts.map((a) => a.id) };
   const ownAct = plusRead(line, { acts, manifestsByOrigin, now });
   if (ownAct) return { kind: 'own', ...ownAct };
   const text = word(line);
@@ -280,7 +284,13 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
     return { kind: 'circle', atOnce: false, circleId: null, to: [ownTo, ...byList.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }))], command: mine.command };
   }
   const readers = byList.length ? byList : read;
-  if (!readers.length) return null;
+  if (!readers.length) {
+    // nothing to do here: a line that ASKS how something works ("hoe …", gate words `_help.questions`) is looked up in the
+    // help cards (before any model reads it); only such a line: the cards' matcher alone hits ordinary lines on a keyword
+    const asks = helpQuestionOpeners().some((o) => text.toLowerCase().startsWith(o));
+    const card = asks ? answerHelp(text, { lang: lang ?? undefined }) : null;
+    return card ? { kind: 'help', card: { cardId: card.source?.cardId ?? null, text: card.text } } : null;
+  }
   const to = readers.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }));
   const pick = readers.length === 1 ? readers[0] : null;
   const command = (pick ?? readers[0]).command;
@@ -339,6 +349,18 @@ export function plusDoneLine(result, { opId, args = {}, t } = {}) {
   const name = result.title ?? args?.list ?? '';
   const items = (Array.isArray(result.items) ? result.items : []).map((i) => i?.label ?? i?.text ?? '').filter(Boolean);
   return items.length ? t('circle.vandaag.plus_list_items', { name, items: items.join(', ') }) : t('circle.vandaag.plus_list_empty', { name });
+}
+
+/**
+ * What the "+" answers in its thread to a help reading (`plusLineOutcome` kind 'help'): a card's own text, or what the "+"
+ * can do: its own acts by name, and that it answers how things work. Both shells say this one line.
+ * @param {{acts?: string[], card?: {text: string}|null}} o
+ * @param {{t: Function, acts?: object[]}} a
+ */
+export function plusHelpAnswer(o, { t, acts = PLUS_ACTS } = {}) {
+  if (o?.card?.text) return o.card.text;
+  const names = (o?.acts ?? acts.map((a) => a.id)).map((id) => acts.find((a) => a.id === id)).filter(Boolean).map((a) => plusLabel(t, a));
+  return t('circle.vandaag.plus_help', { acts: names.join(', ') });
 }
 
 /**

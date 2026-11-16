@@ -152,9 +152,9 @@ describe('two projector families are named as data', () => {
 describe('a NOUN may declare its attach entry (declare a noun → its "add" in the "+" too)', () => {
   const m = {
     app: 'household', name: 'Household',
-    nouns: { note: { atoms: ['add', 'list', 'update', 'remove'],
-      attach: { label: 'circle.attach.own_note', scopes: ['own'], fields: [{ name: 'body', kind: 'text', labelKey: 'circle.vandaag.plus_note_ph' }] } } },
-    operations: [{ id: 'addEvent', surfaces: { attach: { label: 'x', scopes: ['own', 'circle'] } }, params: [{ name: 'title', kind: 'string', required: true }] }],
+    nouns: { note: { atoms: ['add', 'list', 'update', 'remove'], scopes: ['own'],
+      attach: { label: 'circle.attach.own_note', fields: [{ name: 'body', kind: 'text', labelKey: 'circle.vandaag.plus_note_ph' }] } } },
+    operations: [{ id: 'addEvent', scopes: ['own', 'circle'], surfaces: { attach: { label: 'x' } }, params: [{ name: 'title', kind: 'string', required: true }] }],
   };
   it('projects to the generic add op of the noun, with its scopes and fields', () => {
     const { attachMenu } = renderAttachments(m);
@@ -163,7 +163,7 @@ describe('a NOUN may declare its attach entry (declare a noun → its "add" in t
     expect(note.scopes).toEqual(['own']);
     expect(note.fields.map((f) => f.name)).toEqual(['body']);
   });
-  it('an op entry carries its scopes; an entry that names none is a circle entry', () => {
+  it('an op entry carries the op\'s places; an op that names none is a circle entry', () => {
     const { attachMenu } = renderAttachments(m);
     expect(attachMenu.find((e) => e.opId === 'addEvent').scopes).toEqual(['own', 'circle']);
     const plain = renderAttachments({ app: 'x', operations: [{ id: 'a', surfaces: { attach: { label: 'y' } } }] }).attachMenu[0];
@@ -172,12 +172,13 @@ describe('a NOUN may declare its attach entry (declare a noun → its "add" in t
 });
 
 describe('a noun attach declaration is validated', () => {
-  it('an attach on a noun without `add`, or a scope that is no scope, is refused', async () => {
+  it('an attach on a noun without `add`, or a place that is no place, or a place on the attach itself, is refused', async () => {
     const { validateManifest } = await import('../src/index.js');
-    const base = (attach, atoms = ['add']) => ({ app: 'x', name: 'X', version: '1', itemTypes: ['note'], nouns: { note: { atoms, attach } }, operations: [] });
+    const base = (attach, atoms = ['add'], scopes) => ({ app: 'x', name: 'X', version: '1', itemTypes: ['note'], nouns: { note: { atoms, attach, ...(scopes ? { scopes } : {}) } }, operations: [] });
     const codes = (m) => (validateManifest(m).errors ?? []).map((e) => e.code);
-    expect(codes(base({ label: 'k', scopes: ['own'] }))).not.toContain('bad-attach');
+    expect(codes(base({ label: 'k', buttonIn: ['own'] }, ['add'], ['own']))).toEqual([]);
     expect(codes(base({ label: 'k' }, ['list']))).toContain('bad-attach');
-    expect(codes(base({ scopes: ['everywhere'] }))).toContain('bad-attach');
+    expect(codes(base({ label: 'k' }, ['add'], ['everywhere']))).toContain('bad-scopes');
+    expect(codes(base({ label: 'k', scopes: ['own'] }))).toContain('scope-on-surface');
   });
 });

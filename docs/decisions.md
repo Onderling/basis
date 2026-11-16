@@ -1898,3 +1898,22 @@ An own list adds no entry kind: its rows are store items on the own lane, which 
 **Not built (open ideas for Frits):** own lists in a block on Me; sharing or moving an own list into a circle. Code:
 `apps/basis/src/v2/vandaagPlus.js` (`plusLineOutcome`'s `own`, `plusOwnLists`, `plusDoneLine`),
 `apps/basis/src/core/agent/realAgent.js` (`ownListsCall`, `ownStoreAsSelf`). Ledger: L670.
+
+## 2026-11-16 — Where an act is offered is declared once, on the op; a button may only narrow it (Fable ruled; Frits agreed the plan)
+
+An op (or a noun, for its generic atoms) says WHERE it is offered in one field, `scopes`: `own` (the person's own "+"
+and, later, their own assistant thread), `circle` (a circle's composer and bot; the default), `contact` (a contact
+thread). The model's tools (`renderChat`), the "/" list and the plain phrases (`renderSlash`, `renderGate`) and the
+buttons (`renderAttachments`) all read it, through `@onderling/app-manifest`'s `scopes.js`. A button that shows in fewer
+places than its act says so with `surfaces.attach.buttonIn`, which must be a subset of the op's places; no surface may
+name a place of its own. The validator refuses both (`scope-on-surface`, `button-wider-than-op`), so a place is decided
+in one spot and an app that declares an own-scope op appears in the "+" without code in Basis.
+
+**Why not one place per surface:** the place lived only on `surfaces.attach`, so the chat and "/" surfaces had none, and
+the "+" got a hand-written model prompt instead of the manifests' tools. **Why not one place for button and act alike:**
+an appointment is a circle act AND an own act, but its button is only in the "+"; one shared field would either drop
+circle appointments from chat or add an appointment button to every circle composer. **Why not split ops:** two ops for
+one act is the duplication the manifest exists to prevent.
+
+A projection asked without a scope offers every op, as before; the "+" asks for `own`. Code:
+`packages/app-manifest/src/scopes.js`, `validate.js` (`checkPlaces`). Ledger: L668.

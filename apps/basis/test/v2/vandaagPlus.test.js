@@ -23,7 +23,7 @@ describe('Vandaag — the "+"', () => {
   it('an entry not declared for the own scope never appears on Vandaag (a circle composer entry stays a circle\'s)', () => {
     const acts = plusActs({ manifestsByOrigin: {
       lists: { app: 'lists', operations: [{ id: 'createList', surfaces: { attach: { label: 'x' } } }] },
-      calendar: { app: 'calendar', operations: [{ id: 'addEvent', appliesTo: { type: 'calendar-event' }, surfaces: { attach: { label: 'y', scopes: ['own'] } }, params: [] }] },
+      calendar: { app: 'calendar', operations: [{ id: 'addEvent', appliesTo: { type: 'calendar-event' }, scopes: ['own', 'circle'], surfaces: { attach: { label: 'y', buttonIn: ['own'] } }, params: [] }] },
     } });
     expect(acts.map((a) => a.opId)).toEqual(['addEvent']);
   });

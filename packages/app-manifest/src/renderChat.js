@@ -24,6 +24,7 @@
 
 import { paramsToJsonSchema } from './paramsToJsonSchema.js';
 import { buildPrompt }         from './internal/prompt.js';
+import { inScope }             from './scopes.js';
 
 /**
  * Render the chat-surface projection of a manifest: `toolCatalogue` + `toolHandlers` + `systemPrompt`
@@ -59,7 +60,8 @@ export function renderChat(manifest, args, opts = {}) {
     throw new Error('renderChat: toSkillCtx required');
   }
 
-  const ops = Array.isArray(manifest.operations) ? manifest.operations : [];
+  // only the ops offered where this surface asks (`opts.scope`: own, circle, contact; see scopes.js); none asked: all
+  const ops = (Array.isArray(manifest.operations) ? manifest.operations : []).filter((op) => inScope(op, opts.scope));
 
   // (a) free-text channel — exactly what ChatAgent expects.
   const toolCatalogue = ops.map((op) => ({

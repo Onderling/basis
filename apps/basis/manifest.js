@@ -282,10 +282,12 @@ export const basisManifest = {
       params: [
         { name: 'screen', kind: 'string' },
       ],
+      // offered in a circle and in the person's own "+"; its BUTTON only in the "+" (attach.buttonIn narrows)
+      scopes: ['circle', 'own'],
       surfaces: {
         slash:  { command: '/feedback' },
         chat:   { reply: 'text', hint: 'open the thread to Onderling to give feedback about the app; never sends anything itself' },
-        attach: { label: 'circle.feedback.plus', scopes: ['own'] },
+        attach: { label: 'circle.feedback.plus', buttonIn: ['own'] },
       },
     },
 
@@ -440,6 +442,8 @@ export const basisManifest = {
      */
     {
       id:    'send-file', visibility: 'authenticated',
+      // sent in a circle and in a contact thread; its BUTTON only in a contact thread (attach.buttonIn narrows)
+      scopes: ['circle', 'contact'],
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
@@ -453,7 +457,7 @@ export const basisManifest = {
         actState: 'bubble',
         // the "+" in a CONTACT thread (Frits: one attach affordance everywhere; a walk found no way to send a file to a
         // contact but the slash): the same projector the circle composer reads, offered only where a contact is
-        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', scopes: ['contact'] },
+        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', buttonIn: ['contact'] },
       },
     },
 

@@ -13,6 +13,7 @@
 
 import { list as listCanonicalTypes, metadata as registryTypeMetadata } from '@onderling/item-types';
 import { isAtom, canonicalAtom, DOMAIN_VERB_KINDS, NOUN_WRITERS } from './atoms.js';
+import { SCOPE_PLACES, opScopes } from './scopes.js';
 
 /**
  * L4 ≡ B — registry recognition. True when the shared `@onderling/item-types`
@@ -223,6 +224,7 @@ export function validateManifest(manifest, opts = {}) {
     const ids = new Set();
     manifest.operations.forEach((op, i) => {
       validateOperation(op, `/operations/${i}`, manifest, errors, ids, opts);
+      checkPlaces(op, op?.surfaces ?? {}, `/operations/${i}`, errors);
     });
   }
 
@@ -304,6 +306,8 @@ export function validateManifest(manifest, opts = {}) {
           }
         }
         // A noun's ATTACH entry (its generic `add` in a "+"): a label key, where it is offered, what the person fills in.
+        // where the noun's generic atoms are offered: declared once on the noun (scopes.js), a button only narrows it
+        checkPlaces(decl, { attach: decl.attach }, np, errors);
         if (decl.attach !== undefined) {
           const at = decl.attach;
           const bad = (msg) => errors.push({ path: `${np}/attach`, message: msg, code: 'bad-attach' });
@@ -311,7 +315,6 @@ export function validateManifest(manifest, opts = {}) {
           else {
             if (!decl.atoms.includes('add')) bad('attach needs the noun to declare the `add` atom');
             if (at.label !== undefined && typeof at.label !== 'string') bad('attach.label must be a locale key');
-            if (at.scopes !== undefined && !(Array.isArray(at.scopes) && at.scopes.length && at.scopes.every((x) => x === 'own' || x === 'circle'))) bad("attach.scopes must be a non-empty list of 'own' | 'circle'");
             if (at.fields !== undefined && !(Array.isArray(at.fields) && at.fields.every((f) => f && typeof f.name === 'string' && typeof f.kind === 'string'))) bad('attach.fields must be a list of { name, kind, labelKey? }');
           }
         }
@@ -1441,4 +1444,28 @@ export function classifyItemTypes(manifest) {
     (canonicalSet.has(t) ? canonical : appLocal).push(t);
   }
   return { canonical, appLocal };
+}
+
+/**
+ * WHERE an op or noun is offered is declared once, on it (`scopes`: own, circle, contact; scopes.js). No surface names
+ * a place of its own (`scope-on-surface`), and a button may only narrow the declaration (`attach.buttonIn`, a subset:
+ * `button-wider-than-op`). This is the guard that keeps the chat, "/", gate and buttons offering one thing in one place.
+ */
+function checkPlaces(holder, surfaces, path, errors) {
+  if (!holder || typeof holder !== 'object') return;
+  if (holder.scopes !== undefined && !(Array.isArray(holder.scopes) && holder.scopes.length && holder.scopes.every((x) => SCOPE_PLACES.includes(x)))) {
+    errors.push({ path: `${path}/scopes`, message: `scopes must be a non-empty list of ${SCOPE_PLACES.join(', ')}`, code: 'bad-scopes' });
+  }
+  for (const [name, surface] of Object.entries(surfaces ?? {})) {
+    if (surface && typeof surface === 'object' && !Array.isArray(surface) && surface.scopes !== undefined) {
+      errors.push({ path: `${path}/surfaces/${name}/scopes`, message: `a place is declared on the op (scopes), not on the ${name} surface`, code: 'scope-on-surface' });
+    }
+  }
+  const b = surfaces?.attach?.buttonIn;
+  if (b !== undefined) {
+    const all = opScopes(holder);
+    if (!(Array.isArray(b) && b.length && b.every((x) => all.includes(x)))) {
+      errors.push({ path: `${path}/surfaces/attach/buttonIn`, message: `attach.buttonIn may only narrow the op's places (${all.join(', ')})`, code: 'button-wider-than-op' });
+    }
+  }
 }

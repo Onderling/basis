@@ -18,6 +18,14 @@ describe('the own "+" catalogue comes from the declarations', () => {
       expect(tools).toContain(id);
     }
   });
+  it('holds the own calendar the agent serves (read, search, change, cancel, share), and no answer to an invitation', () => {
+    const tools = ownTools();
+    for (const id of ['listEvents', 'searchEvents', 'getEventSnapshot', 'briefSummary', 'updateEvent', 'cancelEvent', 'shareEvent', 'shareTargets']) {
+      expect(tools).toContain(`calendar.${id}`);
+    }
+    // the own appointments have nobody who invited the person: the own route serves no answer (unknown-op there)
+    for (const id of ['rsvpAccept', 'rsvpDecline', 'rsvpTentative']) expect(tools).not.toContain(`calendar.${id}`);
+  });
   it('the own note is a noun offered there', () => {
     expect(nouns('own')).toContain('household.note');
   });

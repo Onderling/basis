@@ -145,6 +145,8 @@ describe('the "+" free line read by the person\'s OWN model', () => {
     const local = { invoke: async () => ({}) };
     expect(ownModelClient({ userCfg: { preset: 'off' }, providers: { local } })).toBe(null);
     expect(ownModelClient({ userCfg: null, providers: { local } }), 'the deployment\'s env route is not the person\'s').toBe(null);
+    const cloud = { invoke: async () => ({}) };
+    expect(ownModelClient({ userCfg: null, providers: { local, cloud } }), 'a circle\'s route present, no own route: the "+" stays without a model (gate only)').toBe(null);
     expect(ownModelClient({ userCfg: { preset: 'local-ollama' }, providers: { local } }), 'a preset without its address is no route').toBe(null);
     expect(ownModelClient({ userCfg: { preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434' }, providers: { local } })).toBe(local);
     const { ownModelOf } = await import('../../src/v2/userLlmRuntime.js');

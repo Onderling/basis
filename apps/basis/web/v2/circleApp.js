@@ -191,7 +191,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
-import { createPlusDoor, conversationSelf } from '../../src/assistant/plusDoor.js';
+import { createPlusDoor, conversationSelf, plusRouteLine } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
@@ -330,7 +330,7 @@ import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
 import { createSingleFlight } from '../../src/v2/singleFlight.js';
 import { askMatchChoices, askMatchThreadId, createAskMatchSkips, localStorageAskMatchSkipsIo } from '../../src/v2/askMatches.js';
-import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient } from '../../src/v2/userLlmRuntime.js';
+import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient, ownRouteOf } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
 // basis's own ops, mounted on the agent's waist at boot. Until this, the v2 web shell was the only
@@ -1904,6 +1904,8 @@ let circleResolveRagEmbedder = null;
 // The person's OWN model (their settings' route, never the deployment's fallback), or null — the "+" free line reads
 // with it when the plain reading misses. Published from the same block, same pattern.
 let circleOwnModel = () => null;
+// the person's own route, said plainly at the top of the "+" conversation (set with the model, below)
+let circleOwnRoute = () => ownRouteOf(null);
 // S6.C — per-user surface preference (inline / screen / minimal); hydrated at boot.
 // Register-backed (the device-params consolidation): the thunk resolves once the agent boots;
 // hydrate() runs post-boot, and set() rides the one kind-gated write.
@@ -2623,6 +2625,7 @@ function buildCircleBot(agent) {
   };
   circleResolveRagEmbedder = resolveCircleRagEmbedder;   // reachable from the agent boot (see declaration)
   circleOwnModel = () => ownModelClient({ userCfg: userDefault, providers: llmProviders });
+  circleOwnRoute = () => ownRouteOf(userDefault);
   const policyIo = localStoragePolicyIo(sealedKeyValue(globalThis.localStorage, { name: 'the circle policy' }));
   async function policyFor() {
     const cid = getActiveCircle();
@@ -4795,6 +4798,7 @@ function showVandaagPlus({ edit = null } = {}) {
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
+    routeLine: plusRouteLine(circleOwnRoute(), { t }),
     turns: conversationSelf(asSelf, selves.length) ? plusDoorNow().turns({ asSelf: conversationSelf(asSelf, selves.length) }) : [],
     suggestFor: (typed) => plusSuggest(suggestionPool, typed),
     // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat

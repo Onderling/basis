@@ -1951,8 +1951,6 @@ export default function CircleLauncherScreen({
   // the one scanner above — one door with `/scan-qr`.
   const onMeAction = (id) => {
     if (id === 'share-contact') { setView('shareContact'); return; }
-    // the person's ongoing conversation with the assistant: the "+" sheet (web parity)
-    if (id === 'assistant') { setPlusEdit(null); setPlusOpen(true); return; }
     if (id === 'scan') {
       // ONE door: the op opens the scanner through its seam. If it refuses, say so — opening the scanner anyway would be
       // a second door to the same act.

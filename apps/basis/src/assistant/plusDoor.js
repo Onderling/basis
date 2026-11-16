@@ -21,10 +21,11 @@ import { composeAssistantCatalogue } from './assistantCatalogue.js';
 import { catalogueManifests } from '../v2/manifestSources.js';
 import { withAssistantOps } from '../v2/assistantOps.js';
 import { assistantManifest } from '../v2/assistantManifest.js';
-import { opScopes } from '@onderling/app-manifest';
+import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
+import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
-import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce } from '../v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
 import { loadOwnItems } from './ownItems.js';
@@ -62,7 +63,7 @@ export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
   const { catalogue: placed, manifestsByOrigin } = composeAssistantCatalogue({
     apps: apps ?? ownPlaceApps(catalogueManifests({ householdManifest })), householdManifest, place: 'own',
   });
-  return { catalogue: proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin)))), manifestsByOrigin };
+  return { catalogue: proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin), manifestsByOrigin };
 }
 
 /**
@@ -70,13 +71,13 @@ export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
  * chat surface (`genericOpSynth`). In the own place the model may PROPOSE one: the door's dispatch only opens the act's
  * form filled, never a store, and Save is the person's own write. So here, and only here, a people-written noun's `add`
  * offered in the own place gets a tool, from its declaration (no list of nouns): a bot and a circle stay without one.
- * @param {object} catalogue
+ * @param {object} catalogue @param {object} manifestsByOrigin  `{app → manifest}`, whose nouns say who writes them
  */
-function proposable(catalogue) {
+export function proposable(catalogue, manifestsByOrigin = {}) {
   if (!catalogue?.opsById) return catalogue;
   const opsById = new Map([...catalogue.opsById].map(([k, e]) => {
     const g = e?.op?.__generic;
-    if (!g || g.atom !== 'add' || e.op.surfaces?.chat) return [k, e];
+    if (!g || g.atom !== 'add' || e.op.surfaces?.chat || !isPeopleWritten(manifestsByOrigin?.[e.appOrigin] ?? null, g.noun)) return [k, e];
     // LLM-facing (never shown to the person)
     const hint = `propose an own ${g.noun} of the person's; they see it filled in and save it themselves`;
     return [k, { ...e, op: { ...e.op, surfaces: { ...e.op.surfaces, chat: { hint } } } }];
@@ -114,7 +115,8 @@ export function availableOnly(catalogue, manifestsByOrigin = {}, policy = null) 
  * @param {string[]} [a.apps]                       the apps to compose (default: those that declare an own act)
  * @param {Array} [a.acts]                         the own acts (default: the catalogue's own-scope attach entries)
  * @param {(asSelf: string|null) => Function} [a.readAs]  the shell's call AS a self (the waist's `actAs`): what the
- *        assistant reads for a line (own notes, appointments, list entries) is read through it, as the ticked self
+ *        assistant reads for a line (own notes, appointments, list entries), and a read the model picks, run through
+ *        it as the self the "+" writes as
  * @param {(asSelf: string|null) => {key: string|null, isDefault: boolean}} [a.selfOf]  that self's key
  */
 export function createPlusDoor({
@@ -139,7 +141,13 @@ export function createPlusDoor({
     if (!keys.length) return null;
     return keys.length === 1 ? plusThreadId(keys[0]) : `own-combined:${keys.join('+')}`;
   };
-  const { catalogue: cat } = ownPlaceCatalogue({ householdManifest, apps });
+  const { catalogue: cat, manifestsByOrigin } = ownPlaceCatalogue({ householdManifest, apps });
+  /** The catalogue entry of a model's pick (by op id: a key may carry its app's prefix). */
+  const entryOf = (opId) => cat.opsById.get(opId) ?? [...cat.opsById.values()].find((e) => e?.op?.id === opId) ?? null;
+  /** A pick that only READS (the atom catalogue, or the manifest's `domainVerbs`); one nothing classifies is a write. */
+  const reads = (e) => verbKind(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op?.verb ?? e?.op?.__generic?.atom) === 'read';
+  /** A read as the self the "+" writes as, on the own scope. */
+  const readOwn = (asSelf, e, args) => readAs(asSelf)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE });
   // The door's own ops (`assistantManifest`: memory mode, forget, language), answered by the one door-op handler the
   // box's door uses (`withAssistantOps`). The person's own app IS their private door: one row, this thread, never a
   // screen or a group, so forgetting is theirs to do here as in their own Telegram chat.
@@ -157,6 +165,7 @@ export function createPlusDoor({
 
   // What this turn came to: set by the engine's sinks while the turn runs (the lane runs one turn at a time).
   let outcome = null;
+  let currentLine = '';
   const engine = createAssistantEngine({
     catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false,
     // what the model may read for a line: the person's own things only, and only the ticked self's (or the set's)
@@ -170,7 +179,13 @@ export function createPlusDoor({
       } }
       : {}),
     ...(memory ? { memory } : {}),
-    // The yes of an own act is its form: a proposal opens the act's form filled, and nothing is stored here.
+    // a read the model picks for a line that asks for an act is looked at as the self and handed back to it once
+    ...(typeof readAs === 'function'
+      ? { peek: async (cmd, ctx) => { const e = entryOf(cmd?.opId); return e && reads(e) ? readOwn(ctx?.asSelf ?? null, e, cmd.args) : null; } }
+      : {}),
+    // EVERY op offered to the model has an outcome here, and none reaches a store from the model: a door op runs (it
+    // sets this conversation), an own act opens its form filled (Save is the yes), a read runs as the self and is
+    // answered, any other own write is a card naming the act and its list, run only on the person's pick as the self.
     dispatch: async (input, ctx) => {
       const cmd = typeof input === 'object' && input ? input : null;
       // the conversation's own settings (memory mode, language): the door's ops, run at once (they change no thing of
@@ -178,6 +193,17 @@ export function createPlusDoor({
       if (cmd && DOOR_OP_IDS.has(cmd.opId)) { outcome = await runDoorOp(cmd.opId, cmd.args ?? {}, ctx?.id ?? threadId); return; }
       // only the acts that MAKE something: a line is never read as "open a door" (feedback runs from its button)
       const act = cmd && acts.find((a) => a.opId === cmd.opId && !actRunsAtOnce(a));
+      const e = cmd && !act ? entryOf(cmd.opId) : null;
+      if (e && reads(e) && typeof readAs === 'function') {
+        const r = await Promise.resolve(readOwn(ctx?.asSelf ?? null, e, cmd.args)).catch((err) => ({ ok: false, error: err?.message ?? String(err) }));
+        outcome = r?.ok === false ? { error: t('circle.vandaag.plus_failed', { error: r.error ?? '' }) } : { done: plusDoneLine(r, { opId: e.op.id, args: cmd.args ?? {}, t }) || t('circle.vandaag.plus_line_unread') };
+        return;
+      }
+      if (e && !reads(e) && !actRunsAtOnce(acts.find((a) => a.opId === cmd.opId))) {
+        const { circleId: _c, ...args } = cmd.args ?? {};
+        outcome = { card: { line: currentLine, to: [{ circleId: OWN_DEVICES_SCOPE, name: '', own: true }], command: { appOrigin: e.appOrigin, opId: e.op.id, args } } };
+        return;
+      }
       if (!act) { outcome = unread(); return; }
       const values = {};
       for (const f of act.fields) {
@@ -215,6 +241,7 @@ export function createPlusDoor({
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere)
     if (!llm) return unread();
     outcome = null;
+    currentLine = text;
     await engine.ask(threadIdFor(set), text, { asSelf, selves: set });
     return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
   }

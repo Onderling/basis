@@ -45,5 +45,8 @@ describe('the place an op is offered is declared once, on the op', () => {
     const wider = { ...manifest, operations: [{ id: 'y', scopes: ['own'], params: [], surfaces: { attach: { label: 'y', buttonIn: ['circle'] } } }] };
     expect(validateManifest(wider).errors.some((e) => e.code === 'button-wider-than-op')).toBe(true);
     expect(validateManifest(manifest).errors.filter((e) => /scope|button/.test(e.code ?? ''))).toEqual([]);
+    // a noun's error names the noun's own attach, not a surfaces path the noun does not have
+    const noun = { ...manifest, itemTypes: ['note'], nouns: { note: { atoms: ['add'], attach: { label: 'n', scopes: ['own'] } } } };
+    expect(validateManifest(noun).errors.find((e) => e.code === 'scope-on-surface').path).toMatch(/\/nouns\/note\/attach\/scopes$/);
   });
 });

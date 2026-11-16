@@ -2218,7 +2218,7 @@ export default function CircleLauncherScreen({
   // circles; composed per read (the conversation lives in the thread, so nothing is lost between reads)
   const plusDoorNow = () => createPlusDoor({
     llm: plusThread?.threadId ? ownModelOf(userLlmCfg) : null, threads: plusThread?.threads ?? null, threadId: plusThread?.threadId ?? null,
-    householdManifest: bundle?.agent?.manifest, t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
+    householdManifest: bundle?.agent?.manifest, t, lang: lang(), readAs: plusAsSelf, circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
   });
   // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
   const plusRecorded = async (line, run) => {

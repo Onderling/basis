@@ -62,3 +62,34 @@ describe('the own items the "+" assistant may read', () => {
     expect(asWerk, 'the general self\'s list entry').not.toContain('melk');
   });
 });
+
+describe('a read the MODEL picks is cut to the ticked self too (the same rule as the reader)', () => {
+  it('with Werk ticked, the agenda and the note list the model reads never hold the general self\'s rows', async () => {
+    const { VaultMemory } = await import('@onderling/vault');
+    const { createPlusDoor } = await import('../../src/assistant/plusDoor.js');
+    const { EventLog } = await import('../../src/eventLog.js');
+    const { createBotThreads, memoryThreadStore } = await import('../../src/v2/botThreads.js');
+    const a = await boot(memoryDataSource(), { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() });
+    const p = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
+    const werk = a.persona(p.id).chatId.pubKey;
+    const me = a.identity?.chat?.pubKey ?? null;
+    await a.callSkill('calendar', 'addEvent', { circleId: OWN, title: 'tandarts', when: `${tomorrow()}T10:00:00.000Z` });
+    await a.callSkill('household', NOTE_ADD, { circleId: OWN, body: 'de sleutel ligt bij de buren' });
+    await a.callSkill('calendar', 'addEvent', { circleId: OWN, title: 'klantoverleg', when: `${tomorrow()}T09:00:00.000Z` }, { actAs: werk });
+    const selfKeyOf = (id) => (id === p.id ? werk : me);
+    const readAs = (id) => as(a, id === p.id ? werk : null);
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    for (const opId of ['listEvents', encodeGenericOpId('household', 'list', 'note')]) {
+      // everything the model is handed (its context on every call: the retrieval and the read handed back) and what
+      // the "+" answers
+      const handed = [];
+      const d = createPlusDoor({ llm: { invoke: async () => null }, threads, selfKeyOf, readAs, t: (k) => k, lang: 'nl',
+        interpret: async (_text, o) => { handed.push(JSON.stringify(o.context ?? [])); return { opId, args: {} }; } });
+      const r = await d.read('wat staat er morgen, en wat weet je nog?', { asSelf: p.id });
+      expect(handed.length, `${opId}: the read was handed back to the model`).toBeGreaterThan(1);
+      const said = JSON.stringify(r) + handed.join(' ');
+      expect(said, `${opId}: the general self's appointment`).not.toContain('tandarts');
+      expect(said, `${opId}: the general self's note`).not.toContain('sleutel');
+    }
+  });
+});

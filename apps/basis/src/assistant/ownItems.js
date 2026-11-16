@@ -19,9 +19,33 @@ const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : Array.isArray(r?.not
  * @param {{key: string|null, isDefault: boolean}} a.self   the ticked self: its key, and whether it is the general self
  * @returns {() => Promise<Array<{id: string, type: string, text: string}>>}
  */
+/**
+ * The routes that answer EVERY self's rows on the own scope (until the agent reads them per self, as it does lists): the
+ * own agenda and the own notes. Their rows are cut to the ticked self here, by the one rule below, on every path that
+ * reads them for the assistant (this reader, and a read the model picks). The own lists' route reads as the self.
+ */
+export const EVERY_SELF_ROUTES = Object.freeze(new Set(['calendar', 'household']));
+
+/**
+ * Is this row the ticked self's? The general self's when it names no persona's key (as the Vandaag blocks decide a
+ * maker), else the persona's own key.
+ * @param {{key: string|null, isDefault: boolean}} self
+ */
+export const rowIsSelfs = (self) => (n) => (self?.isDefault
+  ? n?.createdBy == null || n.createdBy === 'me' || n.createdBy === self.key
+  : n?.createdBy === self?.key);
+
+/**
+ * A route's answer cut to the ticked self, when the route answers every self (`EVERY_SELF_ROUTES`); else as it came.
+ * @param {string} app @param {any} result  the op's result (`{items}`) @param {{key, isDefault}} self
+ */
+export function cutToSelf(app, result, self) {
+  if (!EVERY_SELF_ROUTES.has(app) || !Array.isArray(result?.items)) return result;
+  return { ...result, items: result.items.filter(rowIsSelfs(self)) };
+}
+
 export function loadOwnItems({ call, self = { key: null, isDefault: true } } = {}) {
-  // whose row it is, as the screen's blocks read it: the general self's when it names no persona's key
-  const mine = (n) => (self.isDefault ? n.createdBy == null || n.createdBy === 'me' || n.createdBy === self.key : n.createdBy === self.key);
+  const mine = rowIsSelfs(self);
   const read = async (app, opId, args) => { try { return itemsOf(await call(app, opId, { circleId: OWN, ...args })); } catch { return []; } };
   return async () => {
     if (typeof call !== 'function') return [];

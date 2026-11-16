@@ -28,7 +28,7 @@ import { ownPlacePolicy } from '../v2/circlePolicy.js';
 import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
-import { loadOwnItems } from './ownItems.js';
+import { loadOwnItems, cutToSelf } from './ownItems.js';
 
 /**
  * Whose conversation the sheet shows: the self it is written as; with one self or none ticked, the general self's (as the
@@ -158,7 +158,8 @@ export function createPlusDoor({
   /** A pick that only READS (the atom catalogue, or the manifest's `domainVerbs`); one nothing classifies is a write. */
   const reads = (e) => verbKind(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op?.verb ?? e?.op?.__generic?.atom) === 'read';
   /** A read as the self the "+" writes as, on the own scope. */
-  const readOwn = (asSelf, e, args) => readAs(asSelf)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE });
+  // a read as one self, cut to that self's rows where the route answers every self (the reader's own rule, `cutToSelf`)
+  const readOwn = async (asSelf, e, args) => cutToSelf(e.appOrigin, await readAs(asSelf)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE }), selfOf(asSelf));
   /**
    * A read for this conversation: as its one self, or, for a SET read together, as EACH self of the set (the same union
    * retrieval reads), every row tagged with the self it is (`self`); one self's refusal leaves the others' rows.

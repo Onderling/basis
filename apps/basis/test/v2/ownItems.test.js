@@ -33,7 +33,7 @@ describe('the own items the "+" assistant may read', () => {
     for (const i of items) expect(typeof i.id).toBe('string');
   });
 
-  it('read as the ticked self: a persona\'s note and list never reach the general self, and the other way round', async () => {
+  it('read as the ticked self: a persona\'s note, appointment and list entry never reach the general self, and the other way round', async () => {
     const { VaultMemory } = await import('@onderling/vault');
     const a = await boot(memoryDataSource(), { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() });
     const p = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
@@ -41,14 +41,24 @@ describe('the own items the "+" assistant may read', () => {
     await a.callSkill('household', NOTE_ADD, { circleId: OWN, body: 'het wachtwoord van de printer' }, { actAs: werk });
     await a.callSkill('lists', 'createList', { circleId: OWN, text: 'Projecten' }, { actAs: werk });
     await a.callSkill('lists', 'addToList', { circleId: OWN, list: 'Projecten', text: 'offerte' }, { actAs: werk });
+    await a.callSkill('calendar', 'addEvent', { circleId: OWN, title: 'klantoverleg', when: `${tomorrow()}T09:00:00.000Z` }, { actAs: werk });
     await a.callSkill('household', NOTE_ADD, { circleId: OWN, body: 'de sleutel ligt bij de buren' });
+    await a.callSkill('calendar', 'addEvent', { circleId: OWN, title: 'tandarts', when: `${tomorrow()}T10:00:00.000Z` });
+    await a.callSkill('lists', 'createList', { circleId: OWN, text: 'Boodschappen' });
+    await a.callSkill('lists', 'addToList', { circleId: OWN, list: 'Boodschappen', text: 'melk' });
     const general = (await loadOwnItems({ call: as(a), self: { key: a.identity?.chat?.pubKey ?? null, isDefault: true } })()).map((i) => i.text).join('\n');
     expect(general).toContain('sleutel');
     expect(general, 'Werk\'s note').not.toContain('printer');
     expect(general, 'Werk\'s list').not.toContain('offerte');
+    expect(general, 'Werk\'s appointment').not.toContain('klantoverleg');
+    expect(general).toContain('tandarts');
+    expect(general).toContain('melk');
     const asWerk = (await loadOwnItems({ call: as(a, werk), self: { key: werk, isDefault: false } })()).map((i) => i.text).join('\n');
     expect(asWerk).toContain('printer');
     expect(asWerk).toContain('offerte');
     expect(asWerk, 'the general self\'s note').not.toContain('sleutel');
+    expect(asWerk).toContain('klantoverleg');
+    expect(asWerk, 'the general self\'s appointment').not.toContain('tandarts');
+    expect(asWerk, 'the general self\'s list entry').not.toContain('melk');
   });
 });

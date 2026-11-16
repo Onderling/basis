@@ -314,3 +314,22 @@ it('only a noun PEOPLE write is proposed: a generic add without a chat surface f
   expect(out.opsById.get('a').op.surfaces.chat).toBeTruthy();
   expect(out.opsById.get('b').op.surfaces.chat).toBeUndefined();
 });
+
+describe('a combined conversation reads across its set', () => {
+  it('a read the model picks runs as EACH self of the set, and the answer holds the rows of both', async () => {
+    const asked = [];
+    const readAs = (asSelf) => async (app, opId) => { asked.push(asSelf); return { ok: true, items: [{ id: `${asSelf}-1`, label: asSelf === 'werk' ? 'offerte' : 'melk' }] }; };
+    const selfKeyOf = (id) => ({ default: 'me-key', werk: 'werk-key' })[id];
+    const { d } = door({ readAs, selfKeyOf, threadId: undefined, interpret: async () => ({ opId: 'listEntries', args: { list: 'Boodschappen' } }) });
+    const r = await d.read('wat staat er op mijn lijsten, kun je dat zeggen?', { selves: ['default', 'werk'], asSelf: 'default' });
+    expect(new Set(asked)).toEqual(new Set(['default', 'werk']));
+    expect(r.done).toMatch(/melk/);
+    expect(r.done).toMatch(/offerte/);
+  });
+  it('idle can be asked for one conversation (not red-first: the door had one thread before)', async () => {
+    const selfKeyOf = (id) => ({ default: 'me-key', werk: 'werk-key' })[id];
+    const { d } = door({ selfKeyOf, threadId: undefined, interpret: async () => ({ reply: 'ok' }) });
+    await d.read('een', { asSelf: 'werk' });
+    await expect(d.idle({ asSelf: 'werk' })).resolves.not.toThrow?.();
+  });
+});

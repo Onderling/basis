@@ -1,10 +1,10 @@
 /**
  * What the person's own assistant may READ for a line: their OWN notes, appointments and own lists' entries, each with
  * its words, shaped for the retriever (`{id, type, text}`). Every read goes through `call`, the shell's call AS the self
- * ticked in the "+" (the waist's `actAs`): the own lists and the own agenda are read as that self by the agent. The own
- * notes' route answers every self's notes at once (the Vandaag notes block shows all ticked selves and marks each row's
- * maker), so the notes are cut here to the ticked self's, by the row's maker, as the block decides a maker: a persona's
- * notes never reach another self's model. A source that fails contributes nothing.
+ * ticked in the "+" (the waist's `actAs`): the own lists are read as that self by the agent. The own notes' and the own
+ * agenda's routes answer every self's rows at once (the Vandaag blocks show all ticked selves and mark each row's maker),
+ * so those rows are cut here to the ticked self's, by the row's maker, as the blocks decide a maker: a persona's note or
+ * appointment never reaches another self's model. A source that fails contributes nothing.
  */
 import { encodeGenericOpId } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
@@ -20,8 +20,8 @@ const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : Array.isArray(r?.not
  * @returns {() => Promise<Array<{id: string, type: string, text: string}>>}
  */
 export function loadOwnItems({ call, self = { key: null, isDefault: true } } = {}) {
-  // whose note a row is, as the screen's block reads it: the general self's when it names no persona's key
-  const ownNote = (n) => (self.isDefault ? n.createdBy == null || n.createdBy === 'me' || n.createdBy === self.key : n.createdBy === self.key);
+  // whose row it is, as the screen's blocks read it: the general self's when it names no persona's key
+  const mine = (n) => (self.isDefault ? n.createdBy == null || n.createdBy === 'me' || n.createdBy === self.key : n.createdBy === self.key);
   const read = async (app, opId, args) => { try { return itemsOf(await call(app, opId, { circleId: OWN, ...args })); } catch { return []; } };
   return async () => {
     if (typeof call !== 'function') return [];
@@ -36,8 +36,8 @@ export function loadOwnItems({ call, self = { key: null, isDefault: true } } = {
       return (await read('lists', 'listEntries', { list: name })).map((e) => ({ e, name }));
     }))).flat();
     return [
-      ...notes.filter(ownNote).map((n) => ({ id: String(n.id ?? ''), type: 'note', text: words(n.body ?? n.text ?? n.label) })),
-      ...events.map((ev) => ({ id: String(ev.id ?? ''), type: 'calendar-event', text: [words(ev.title ?? ev.text ?? ev.label), words(ev.when ?? ev.startsAt ?? '')].filter(Boolean).join(' · ') })),
+      ...notes.filter(mine).map((n) => ({ id: String(n.id ?? ''), type: 'note', text: words(n.body ?? n.text ?? n.label) })),
+      ...events.filter(mine).map((ev) => ({ id: String(ev.id ?? ''), type: 'calendar-event', text: [words(ev.title ?? ev.text ?? ev.label), words(ev.when ?? ev.startsAt ?? '')].filter(Boolean).join(' · ') })),
       ...entries.map(({ e, name }) => ({ id: String(e.id ?? ''), type: 'list-item', text: `${name}: ${words(e.text ?? e.label)}${e.done === true ? ' (done)' : ''}` })),
     ].filter((i) => i.text);
   };

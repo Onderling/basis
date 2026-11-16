@@ -148,6 +148,17 @@ export function createPlusDoor({
   const reads = (e) => verbKind(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op?.verb ?? e?.op?.__generic?.atom) === 'read';
   /** A read as the self the "+" writes as, on the own scope. */
   const readOwn = (asSelf, e, args) => readAs(asSelf)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE });
+  /**
+   * A read for this conversation: as its one self, or, for a SET read together, as EACH self of the set (the same union
+   * retrieval reads), every row tagged with the self it is (`self`); one self's refusal leaves the others' rows.
+   */
+  const readForTurn = async (ctx, e, args) => {
+    const set = Array.isArray(ctx?.selves) && ctx.selves.length > 1 ? ctx.selves : null;
+    if (!set) return readOwn(ctx?.asSelf ?? null, e, args);
+    const parts = await Promise.all(set.map(async (id) => ({ id, r: await Promise.resolve(readOwn(id, e, args)).catch(() => null) })));
+    const items = parts.flatMap(({ id, r }) => (Array.isArray(r?.items) ? r.items.map((it) => ({ ...it, self: id })) : []));
+    return parts.every(({ r }) => r?.ok === false) ? parts[0].r : { ok: true, items };
+  };
   // The door's own ops (`assistantManifest`: memory mode, forget, language), answered by the one door-op handler the
   // box's door uses (`withAssistantOps`). The person's own app IS their private door: one row, this thread, never a
   // screen or a group, so forgetting is theirs to do here as in their own Telegram chat.
@@ -181,7 +192,7 @@ export function createPlusDoor({
     ...(memory ? { memory } : {}),
     // a read the model picks for a line that asks for an act is looked at as the self and handed back to it once
     ...(typeof readAs === 'function'
-      ? { peek: async (cmd, ctx) => { const e = entryOf(cmd?.opId); return e && reads(e) ? readOwn(ctx?.asSelf ?? null, e, cmd.args) : null; } }
+      ? { peek: async (cmd, ctx) => { const e = entryOf(cmd?.opId); return e && reads(e) ? readForTurn(ctx, e, cmd.args) : null; } }
       : {}),
     // EVERY op offered to the model has an outcome here, and none reaches a store from the model: a door op runs (it
     // sets this conversation), an own act opens its form filled (Save is the yes), a read runs as the self and is
@@ -195,7 +206,7 @@ export function createPlusDoor({
       const act = cmd && acts.find((a) => a.opId === cmd.opId && !actRunsAtOnce(a));
       const e = cmd && !act ? entryOf(cmd.opId) : null;
       if (e && reads(e) && typeof readAs === 'function') {
-        const r = await Promise.resolve(readOwn(ctx?.asSelf ?? null, e, cmd.args)).catch((err) => ({ ok: false, error: err?.message ?? String(err) }));
+        const r = await Promise.resolve(readForTurn(ctx, e, cmd.args)).catch((err) => ({ ok: false, error: err?.message ?? String(err) }));
         outcome = r?.ok === false ? { error: t('circle.vandaag.plus_failed', { error: r.error ?? '' }) } : { done: plusDoneLine(r, { opId: e.op.id, args: cmd.args ?? {}, t }) || t('circle.vandaag.plus_line_unread') };
         return;
       }
@@ -276,6 +287,7 @@ export function createPlusDoor({
     /** "Forget this conversation": the door's own op (`assistant-forget`), for THIS conversation only. */
     forget: (opts = {}) => runDoorOp('assistant-forget', {}, threadIdFor(setOf(opts).set)),
     /** Resolves when no turn is running. */
-    idle: () => engine.idle(threadId ?? undefined),
+    /** Resolves when THIS conversation has no turn running (no conversation named: every one). */
+    idle: (opts) => engine.idle(opts ? (threadIdFor(setOf(opts).set) ?? undefined) : undefined),
   };
 }

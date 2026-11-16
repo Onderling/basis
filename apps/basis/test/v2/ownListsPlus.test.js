@@ -78,6 +78,13 @@ describe('an own list is the self it was made as', () => {
     expect(asWerk.items.map((l) => l.label), 'Werk sees only its own').toEqual(['Projecten']);
     const added = await a.callSkill('lists', 'addToList', { circleId: OWN, list: 'Projecten', text: 'offerte' });
     expect(added?.ok, 'the general self cannot add to Werk\'s list').toBe(false);
+    // an entry added as Werk names Werk too; one added as nobody in particular names the local 'me' (that lane ends at
+    // the person's own devices): the one rule every writer reads (rowAuthor.js)
+    expect((await a.callSkill('lists', 'addToList', { circleId: OWN, list: 'Projecten', text: 'offerte' }, { actAs: werk }))?.ok).toBe(true);
+    expect((await a.callSkill('lists', 'addToList', { circleId: OWN, list: 'Boodschappen', text: 'melk' }))?.ok).toBe(true);
+    const items = await createOwnDevicesStore({ dataSource: ds }).listByType('list-item');
+    expect(items.find((i) => i.text === 'offerte')?.createdBy).toBe(werk);
+    expect(items.find((i) => i.text === 'melk')?.createdBy).toBe('me');
   });
 });
 

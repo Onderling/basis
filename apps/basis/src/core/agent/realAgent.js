@@ -7386,7 +7386,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       storeFor: () => view,
       t: translatorFor(callLang(ctx?.lang) || null),
       activeCircle: () => OWN_DEVICES_SCOPE,
-      localActor: asSelf ?? 'me',
+      // the maker is the self the call is made as, else 'me': the one rule every writer reads (rowAuthor.js, own scope)
+      localActor: rowAuthor,
       // a read shows what is done too, marked (the thread answers with done and not done); taking it off is the person's
       passed: () => ({ mode: 'keep', days: 0 }),
     });

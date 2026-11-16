@@ -192,9 +192,8 @@ import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
-import { replyLine } from '../../src/v2/replyLine.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -312,7 +311,7 @@ import { routeHelpMessage, helpTopicChips, resolveHelpTopic, parseHelpAction, he
 // #38 — the DEDICATED help-answer LLM path: a freeform layer-2 ask is ANSWERED (grounded in the kaartjes),
 // not routed through the tool-selection prompt (which maps a help question to no op → null → fallback).
 import { answerHelpViaLlm } from '../../src/v2/help/helpLlm.js';
-import { helpDeck } from '../../src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../src/v2/help/helpCards.js';   // the site's cards + the app's how-to cards
 import { resolveCircleLlm } from '../../src/v2/llmPicker.js';
 // Task #13 Phase 2 — the onboarding "Ja, help me" handoff opens the RICH 5-step create wizard.
 import { renderCreateGroupWizard } from '../../src/web/wizards/createGroupWizard.js';
@@ -345,6 +344,7 @@ import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
 import { makeListsOps } from '../../src/v2/listsOps.js';
+import { rowAuthorFor } from '../../src/v2/rowAuthor.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -625,7 +625,7 @@ async function shareItemIntoCircle({ itemId, fromCircleId, toCircleId, by, recip
     policyOf: _circlePolicy,
     // recipient re-seal: the resolved keys + the injected copy-mode re-sealer (pod-client crypto).
     recipientKeys, sealCopy: sealCopyToRecipients,
-    itemId, fromCircleId, toCircleId, by: by ?? LOCAL_ACTOR,
+    itemId, fromCircleId, toCircleId, by: by ?? rowAuthorWeb(fromCircleId) ?? undefined,
     recipient, recipients: who,
   });
 }
@@ -683,7 +683,7 @@ async function shareItemToContact({ itemId, fromCircleId, toCircleId, by, recipi
       (typeof _peerAgent?.sendPeerMessage === 'function'
         ? _peerAgent.sendPeerMessage(to, envelope)
         : Promise.resolve()),
-    itemId, fromCircleId, toCircleId, by: by ?? LOCAL_ACTOR,
+    itemId, fromCircleId, toCircleId, by: by ?? rowAuthorWeb(fromCircleId) ?? undefined,
     recipient, recipientNetworkKey, verify, includeHistory,
   });
 }
@@ -867,6 +867,9 @@ import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circ
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
 const LOCAL_ACTOR = 'me';
+// who a row this shell writes INTO A CIRCLE names as its maker: the circle's self, never the local 'me' (rowAuthor.js;
+// the phone's twin in phoneAppOps). 'me' stays for this device's own stores (a contact thread, its own media).
+const rowAuthorWeb = rowAuthorFor({ circleSelf: (circleId) => circleHouseholdAgent?.circleSelf?.(circleId) ?? null });
 
 /* ─────────── basis's own ops → the waist ─────────── */
 // The seams only a browser has, handed to the SAME handler table mobile builds in `hostOps.js`. What
@@ -904,7 +907,8 @@ function listsOpsForShell() {
     storeFor: (circleId) => circleHouseholdAgent?.circleStoreFor?.(circleId),
     t,
     activeCircle: () => getActiveCircle(),
-    localActor: LOCAL_ACTOR,
+    // a row names its maker by the circle's self, never the local 'me' (rowAuthor.js; the phone's twin in phoneAppOps)
+    localActor: rowAuthorWeb,
   });
 }
 
@@ -4684,8 +4688,6 @@ let _pendingPinOpen = null;
 function runMeAction(id) {
   if (id === 'share-contact') { showShareMyContact(); return; }
   if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
-  // the person's ongoing conversation with the assistant: the "+" sheet
-  if (id === 'assistant') { showVandaagPlus(); }
 }
 
 /** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */
@@ -4755,6 +4757,8 @@ function showVandaagPlus({ edit = null } = {}) {
     id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
     lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
   })));
+  // the person's OWN lists, of the self ticked in the header (read as that self, so another self's are never read)
+  const ownLists = () => plusOwnLists((app, opId, args) => call({ app, opId, args }));
   let suggestionPool = [];
   plusCircles().then((circles) => { suggestionPool = plusSuggestionPool({ circles, lang: currentLang() }); }).catch(() => {});
   // a circle's act the line read: as the person, through the waist with the circle named, so the circle's own doors
@@ -4762,9 +4766,10 @@ function showVandaagPlus({ edit = null } = {}) {
   const runInCircle = async (command, circleId) => {
     const op = plusCircleOp(command, circleId);
     if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return; }
-    const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    // an own list's op runs as the ticked self (`call`); a circle's as the person
+    const r = op.own ? await call(op) : await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     if (r?.ok === false || r?.error) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); done = null; }
-    else { error = null; done = replyLine(r, { opId: op.opId, args: op.args, t }); }
+    else { error = null; done = plusDoneLine(r, { opId: op.opId, args: op.args, t }); }
     paint();
   };
   // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
@@ -4812,7 +4817,7 @@ function showVandaagPlus({ edit = null } = {}) {
       // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
       // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
       const circles = await plusCircles();
-      const o = plusLineOutcome(text, { circles, lang: currentLang() });
+      const o = plusLineOutcome(text, { circles, own: { lists: await ownLists() }, lang: currentLang() });
       // help ("help", "?", a how-to question a help card knows): answered in the thread, the same line on the phone
       if (o?.kind === 'help') { done = plusHelpAnswer(o, { t }); error = null; return { error, done }; }
       const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));

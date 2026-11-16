@@ -18,9 +18,7 @@
  * input pattern — Alert.prompt is iOS-only).
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View, Text, Pressable, ScrollView, TextInput, Switch, StyleSheet, Alert, Platform,
-} from 'react-native';
+import { View, Text, Pressable, ScrollView, Switch, StyleSheet, Alert, Platform } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import {
@@ -28,6 +26,7 @@ import {
   detectRecipeConflicts, applyResolution,
 } from '@onderling-app/basis';
 import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // α.5c — list-shaped block types that expose the Compact toggle in
 // the per-block config drawer (mirrors web's COMPACTABLE_TYPES).
@@ -217,7 +216,7 @@ function BookMode({ book, onBack, onOpenRecipe, onAddRecipe, onRenameRecipe, onR
       </ScrollView>
 
       <View style={styles.addRecipeRow}>
-        <TextInput
+        <ThemedTextInput
           style={styles.addRecipeInput}
           value={newName}
           onChangeText={setNewName}
@@ -433,7 +432,7 @@ function renderTypeBody(block, emit, styles) {
     case 'announcement':
     case 'text':
       return (
-        <TextInput
+        <ThemedTextInput
           style={styles.blockTextarea}
           value={block.config?.text ?? ''}
           onChangeText={(v) => emit({ text: v })}
@@ -445,14 +444,14 @@ function renderTypeBody(block, emit, styles) {
     case 'photo':
       return (
         <View>
-          <TextInput
+          <ThemedTextInput
             style={styles.blockInput}
             value={block.config?.src ?? ''}
             onChangeText={(v) => emit({ src: v })}
             placeholder={t('circle.recipe.editor.photo_src_placeholder')}
             testID={`block-config-${block.id}-src`}
           />
-          <TextInput
+          <ThemedTextInput
             style={styles.blockInput}
             value={block.config?.caption ?? ''}
             onChangeText={(v) => emit({ caption: v })}
@@ -506,7 +505,7 @@ function LimitField({ block, configKey, labelKeySuffix, emit }) {
   return (
     <View style={styles.limitRow}>
       <Text style={styles.limitLabel}>{t(`circle.recipe.editor.${labelKeySuffix}`)}</Text>
-      <TextInput
+      <ThemedTextInput
         style={styles.limitInput}
         value={String(block.config?.[configKey] ?? '')}
         onChangeText={(v) => {

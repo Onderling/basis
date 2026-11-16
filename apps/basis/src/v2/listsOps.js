@@ -17,13 +17,17 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
 import { childIdsOf, deleteContainer, contain, RETAIN, retentionWindowFor } from '@onderling/item-store';
+import { LOCAL_ME } from './rowAuthor.js';
 
 /**
  * @param {object} a
  * @param {(circleId: string) => object} a.storeFor   the circle's own CircleItemStore
  * @param {(k: string, vars?: object) => string} a.t  locale resolver
  * @param {() => string|null} a.activeCircle  the circle a call means when it does not name one
- * @param {string} [a.localActor]
+ * @param {string|((circleId: string|null, name: string|null, o?: {actAs?: string|null}) => string|null)} [a.localActor]
+ *        who a row names as its maker, per circle (`rowAuthorFor` in rowAuthor.js: a circle's self, never the local
+ *        'me'); null = no writer here, the write is refused with `no-self`. A plain string is that maker everywhere
+ *        (a store no one else reads).
  * @param {() => {mode: 'keep'|'hide'|'delete', days: number}} [a.passed]  a household bot's setting for what is done or
  *        has passed (shown marked · shown marked for N days · deleted); absent → a done entry leaves the read at once
  * @param {(a: {circleId: string, entry: object, ctx?: object}) => Promise<object>} [a.completeChore]  how a chore on a
@@ -51,10 +55,20 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
   // A call names its circle, or means the one the person is looking at. Named wins: an agent or a
   // journey acts on a circle it is not "in", and must be able to say which.
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
-  // the person a write records: the door's (`ctx.person`, set by the host from who is asking), else this device's own
-  const personOf = (ctx) => (typeof ctx?.person === 'string' && ctx.person ? ctx.person : localActor);
   // the door's person, or nobody (this device's own call)
   const doorPersonOf = (ctx) => (typeof ctx?.person === 'string' && ctx.person ? ctx.person : null);
+  // WHO A WRITE RECORDS: the door's person (`ctx.person`, set by the host from who is asking) or the caller, else this
+  // device's own maker in that circle (`localActor`, per circle: rowAuthor.js). No maker here: the op is refused with
+  // `no-self` before anything is written (every op asks before its first write).
+  const NO_SELF = Symbol('no-self');
+  const writer = (circleId, ctx) => {
+    const name = doorPersonOf(ctx) ?? (typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null);
+    const by = typeof localActor === 'function' ? localActor(circleId, name, { actAs: ctx?.actAs ?? null }) : (name ?? localActor);
+    if (!by) throw NO_SELF;
+    return by;
+  };
+  // this device's own maker in a circle: a tick by it is not "done by someone else"
+  const selfIn = (circleId) => { try { return writer(circleId, null); } catch { return null; } };
   // may this caller see and restore every entry in the trash: an admin, or this device's own call (no door person)
   const seesAllTrash = async (ctx) => !doorPersonOf(ctx) || (typeof ctx?.personRole === 'function' && (await ctx.personRole()) === 'admin');
   // the lists removed in this circle that can still come back, and dropping those past the keep window
@@ -133,14 +147,14 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
   };
 
   const ops = {
-    createList: async (args) => {
+    createList: async (args, ctx) => {
       const circleId = circleOf(args);
       const text = String(args?.text ?? '').trim();
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       if (!text) return { ok: false, error: t('circle.lists.need_name') };
       // What a bare add to it makes (a chores list: `task`) — one of the kinds a list accepts, else ignored.
       const defaultChild = typeof args?.defaultChild === 'string' && args.defaultChild.trim() ? args.defaultChild.trim() : undefined;
-      const made = await svc.createList(circleId, text, localActor, defaultChild ? { defaultChild } : undefined);
+      const made = await svc.createList(circleId, text, writer(circleId, ctx), defaultChild ? { defaultChild } : undefined);
       return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.made', { name: text }) };
     },
 
@@ -162,7 +176,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const same = (await entriesOf(circleId, target.id)).find((c) => String(c.text ?? '').trim().toLowerCase() === text.toLowerCase());
       if (same) return { ok: true, itemId: same.id, duplicate: true, message: t('circle.lists.already_there', { item: same.text ?? text, list: target.text ?? ref }) };
       // who added it: the door's person (the id the tasks record — the bot's own key is nobody), else this device's own
-      const made = await svc.addItem(circleId, target.id, text, personOf(ctx), kind ? { hint: kind } : undefined);
+      const made = await svc.addItem(circleId, target.id, text, writer(circleId, ctx), kind ? { hint: kind } : undefined);
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {
         ok: true, itemId: made.id ?? null, kind: made.type ?? null,
@@ -194,7 +208,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const store = svc.storeFor(circleId);
       const stored = await store.get(entry.id);
       if (!stored) return { ok: false, error: t('circle.lists.not_there', { item: entry.text ?? '' }), code: 'not-found' };
-      await store.put({ ...stored, type: 'task' }, { by: ctx?.caller ?? localActor });
+      await store.put({ ...stored, type: 'task' }, { by: writer(circleId, ctx) });
       return { ok: true, itemId: entry.id, kind: 'task', entry: entry.text ?? '', message: t('circle.lists.chore_made', { text: entry.text ?? '' }) };
     },
 
@@ -229,7 +243,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // underneath — as the person asking.
       if (at.entry.type === 'task' && typeof completeChore === 'function') return completeChore({ circleId: at.circleId, entry: at.entry, ctx });
       // who ticked it: the door's person, as who added it (the history read says it, through the door's ceiling only)
-      await svc.markDone(at.circleId, at.entry.id, personOf(ctx));
+      await svc.markDone(at.circleId, at.entry.id, writer(at.circleId, ctx));
       // the reply names what was ticked — the entry found, not the words it was asked by
       return { ok: true, entry: at.entry.text ?? '', list: at.target?.text ?? null, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
     },
@@ -245,6 +259,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       const days = Math.min(31, Math.max(1, Math.round(Number(args?.days) || 7)));
       const since = now() - days * 86_400_000;
+      // this device's own ticks name no doer (as before: they were stamped 'me'; now the circle's self)
+      const mine = selfIn(circleId);
       const ref = String(args?.list ?? '').trim();
       const containers = await svc.listContainers(circleId);
       const lists = ref ? containers.filter((c) => c.id === ref || String(c.text ?? '').toLowerCase() === ref.toLowerCase()) : containers;
@@ -256,7 +272,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
           if (!c?.completedAt || c.state === 'cancelled') continue;
           const at = new Date(c.completedAt).getTime();
           if (!Number.isFinite(at) || at < since) continue;
-          const by = typeof c.completedBy === 'string' && c.completedBy && c.completedBy !== localActor ? c.completedBy : null;
+          const by = typeof c.completedBy === 'string' && c.completedBy && c.completedBy !== LOCAL_ME && c.completedBy !== mine ? c.completedBy : null;
           items.push({ id: c.id, label: c.text ?? c.id, type: c.type, list: list.text ?? null, doneAt: new Date(at).toISOString(), ...(by ? { doneBy: by } : {}) });
         }
       }
@@ -334,7 +350,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       await store.put({
         id: `removed-list-${target.id}`, type: 'removed-list', listId: target.id, name: String(target.text ?? ref),
         removedAt: now(), removedBy: doorPersonOf(ctx), items: whole, keptIds: [...kept],
-      }, { by: ctx?.caller ?? localActor });
+      }, { by: writer(circleId, ctx) });
       for (const id of removing) await deleteContainer(store, id);
       await dropExpired(circleId);
       return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref, days: KEEP_ASIDE_DAYS }), vars };
@@ -363,7 +379,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (!rec) return { ok: false, error: t('circle.lists.restore_not_found', { name: ref }), code: 'not-found' };
       if (await findList(circleId, rec.name)) return { ok: false, error: t('circle.lists.restore_name_taken', { name: rec.name }) };
       const store = svc.storeFor(circleId);
-      for (const item of rec.items) await store.put(item, { by: ctx?.caller ?? localActor });
+      for (const item of rec.items) await store.put(item, { by: writer(circleId, ctx) });
       for (const id of rec.keptIds ?? []) if (await store.get(id)) await contain(store, rec.listId, id);
       await store.delete(rec.id);
       return { ok: true, message: t('circle.lists.list_restored', { name: rec.name, count: rec.items.length - 1 }) };
@@ -419,7 +435,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (!rec) return { ok: false, error: t('circle.lists.trash_not_found', { item: ref }), code: 'not-found' };
       const store = svc.storeFor(circleId);
       if (!(await store.get(rec.listId))) return { ok: false, error: t('circle.lists.trash_list_gone', { item: rec.name, list: rec.listName }) };
-      for (const item of rec.items) await store.put(item, { by: personOf(ctx) });
+      for (const item of rec.items) await store.put(item, { by: writer(circleId, ctx) });
       await contain(store, rec.listId, rec.entryId);
       await store.delete(rec.id);
       return { ok: true, entry: rec.name, list: rec.listName, message: t('circle.lists.trash_restored', { item: rec.name, list: rec.listName }) };
@@ -444,7 +460,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         Object.assign(timed, { dueAt: when });
       }
       const words = text || at.entry.text || at.entry.title || '';
-      await svc.storeFor(at.circleId).put({ ...at.entry, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: ctx?.caller ?? localActor });
+      await svc.storeFor(at.circleId).put({ ...at.entry, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: writer(at.circleId, ctx) });
       return { ok: true, message: t('circle.lists.edited', { text: words, name: at.target.text ?? '' }) };
     },
 
@@ -460,7 +476,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       const { reminders: _old, ...entry } = at.entry;
-      await svc.storeFor(at.circleId).put(reminders ? { ...entry, reminders } : entry, { by: ctx?.caller ?? localActor });
+      await svc.storeFor(at.circleId).put(reminders ? { ...entry, reminders } : entry, { by: writer(at.circleId, ctx) });
       const name = at.entry.text ?? at.entry.title ?? '';
       return { ok: true, message: reminders ? t('circle.lists.reminders_set', { text: name, rules: describeRules(reminders.rules, t) + (reminders.mode === 'add' ? ` (${t('circle.lists.reminders_on_top')})` : '') }) : t('circle.lists.reminders_usual', { text: name }) };
     },
@@ -468,6 +484,15 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
     /** The service itself, for a screen that projects containers (a read, not a second write path). */
     _service: svc,
   };
+  // no maker here (`writer` threw before the first write): said, never written
+  for (const [id, handler] of Object.entries(ops)) {
+    ops[id] = async (args, ctx) => {
+      try { return await handler(args, ctx); } catch (err) {
+        if (err === NO_SELF) return { ok: false, code: 'no-self', error: t('circle.lists.no_self') };
+        throw err;
+      }
+    };
+  }
   return ops;
 }
 

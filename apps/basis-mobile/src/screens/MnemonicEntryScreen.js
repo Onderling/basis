@@ -10,15 +10,14 @@
  * `restoreFromMnemonic.js` to localized strings.
  */
 import React, { useState, useCallback } from 'react';
-import {
-  View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator,
-} from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { theme } from './v2/theme.js';
 import { t } from '../core/localisation.js';
 import {
   countMnemonicWords, MNEMONIC_WORD_COUNT,
 } from '../core/restoreFromMnemonic.js';
+import ThemedTextInput from './v2/ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function MnemonicEntryScreen({ onSubmit, onCancel } = {}) {
   const [phrase, setPhrase]   = useState('');
@@ -49,7 +48,7 @@ export default function MnemonicEntryScreen({ onSubmit, onCancel } = {}) {
       <Text style={styles.title}>{t('mnemonic.entry.title')}</Text>
       <Text style={styles.lede}>{t('mnemonic.entry.lede')}</Text>
 
-      <TextInput
+      <ThemedTextInput
         style={styles.input}
         value={phrase}
         onChangeText={(v) => { setPhrase(v); setError(null); }}

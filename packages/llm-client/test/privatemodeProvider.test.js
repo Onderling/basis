@@ -3,7 +3,7 @@
  * transport. Unit tests drive a fake SDK client; the live test runs only when a key is present.
  */
 import { describe, it, expect } from 'vitest';
-import { privatemodeProvider, privatemodeFetch, readPrivatemodeKey, reasoningBodyFor, PRIVATEMODE_DEFAULT_MODEL } from '../src/providers/privatemode.js';
+import { privatemodeProvider, privatemodeFetch, readPrivatemodeKey, reasoningBodyFor, cacheSaltFor, PRIVATEMODE_DEFAULT_MODEL } from '../src/providers/privatemode.js';
 
 function fakeClient(reply) {
   const calls = [];
@@ -96,10 +96,28 @@ describe('prompt caching: one secret per box, a salt per person', () => {
     expect(salts[3]).toBeTruthy();
     for (const s of salts) {
       expect(s).not.toContain(SECRET);
-      expect(Buffer.from(s, 'base64').length).toBeGreaterThanOrEqual(32);   // ≥256 bits, as Privatemode asks
+      expect(Buffer.from(s, 'base64url').length).toBeGreaterThanOrEqual(32);   // ≥256 bits, as Privatemode asks
     }
     // the key never travels as the salt (the salt reveals neither the secret nor whose it is)
     expect(salts[0]).not.toContain('telegram');
+  });
+
+  // Privatemode refuses a salt it cannot take: "Parameter 'cache_salt' must be at most 128 characters and must not
+  // contain '@', '/', '\\', or NUL" (HTTP 400, seen on a household's box: its key check and every turn of a person
+  // whose salt held a '/' were refused, so the bot answered without a model). Plain base64 carries '/' for most inputs.
+  it('a salt is one the provider accepts, for any secret and any person: at most 128 characters, none of @ / \\ NUL', () => {
+    const secrets = [SECRET, 'x', 'q83vEjRWeJASNFZ4kKvN7xI0VniQq83vEjRWeJASNFY='];
+    let seen = 0;
+    for (const secret of secrets) {
+      for (let i = 0; i < 400; i += 1) {
+        const salt = cacheSaltFor(secret, i === 0 ? null : `telegram:${i}`);
+        expect(salt.length, salt).toBeLessThanOrEqual(128);
+        expect(salt, 'a character Privatemode refuses').not.toMatch(/[@/\\\0]/);
+        expect(Buffer.from(salt, 'base64url').length).toBe(32);   // still the whole 256 bits
+        seen += 1;
+      }
+    }
+    expect(seen).toBe(1200);
   });
 
   it('without a secret: no cache_salt — caching stays off', async () => {

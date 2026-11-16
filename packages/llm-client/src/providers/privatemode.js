@@ -113,13 +113,16 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
  * Privatemode's prompt cache is off unless a request carries a `cache_salt` (≥256 bits, kept private); requests with the
  * same salt share a cache. One cache per PERSON, not per box: a cache shared by the household would let one person learn,
  * by how fast an answer comes, whether another sent the same words. So the salt is derived from the box's secret and the
- * request's `cacheKey` (the person's thread) — HMAC-SHA256, base64: neither the secret nor whose it is can be read off it.
+ * request's `cacheKey` (the person's thread) — HMAC-SHA256: neither the secret nor whose it is can be read off it.
  * A request without a key gets the box's own salt.
+ * Written as base64url (43 characters of A-Z a-z 0-9 - _): the provider refuses a salt longer than 128 characters or
+ * holding '@', '/', '\\' or NUL (HTTP 400), and plain base64 carries '/' for most inputs — a box's key check and the
+ * turns of every person whose salt held one were refused, and the bot answered without a model.
  * @param {string} secret
  * @param {string|null} [cacheKey]
  */
 export function cacheSaltFor(secret, cacheKey = null) {
-  return createHmac('sha256', String(secret)).update(`prompt-cache:${cacheKey ?? ''}`).digest('base64');
+  return createHmac('sha256', String(secret)).update(`prompt-cache:${cacheKey ?? ''}`).digest('base64url');
 }
 
 /**

@@ -1150,8 +1150,8 @@ export const basisManifest = {
     { id: 'share-contact', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
     // Scan IS the scanQr op — one door with `/scan-qr` (its openQrScanner seam: mobile the camera, web the paste prompt).
     { id: 'scan',          labelKey: 'circle.profile.scan',          target: { kind: 'op',  opId: 'scanQr' } },
-    // the person's ongoing conversation with the assistant: the "+" sheet, opened from Me too (walk row 78)
-    { id: 'assistant',     labelKey: 'circle.profile.assistant',     target: { kind: 'nav', to: 'assistant' } },
+    // NOT the assistant: the "+" button is the one way into the person's conversation (Frits 2026-11-16: a second door
+    // from Me confused more than it helped)
   ],
 
   /**

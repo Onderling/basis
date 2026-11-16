@@ -2,16 +2,17 @@
  * Vandaag's "+" (RN; web twin: web/v2/vandaagPlus.js): the person's own acts (the own-scope attach entries), a free
  * line at the top that fills them ("notitie: melk", "afspraak morgen 14:00 tandarts"), the fields, Save — and, opened on
  * an own row (`edit`), Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the
- * host's (`onSave(actId, values, asSelf)` / `onRead(line)` / `onRemove(actId)` → null, or the line to show). A moment
+ * host's (`onSave(actId, values, asSelf)` / `onRead(line, asSelf)` / `onRemove(actId)` → null, or the line to show). A moment
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t } from '../../core/localisation.js';
-import { PLUS_ACTS, plusLabel, actRunsAtOnce } from '../../../../basis/src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel } from '../../../../basis/src/v2/vandaagPlus.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does → null, or the line
@@ -73,7 +74,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // once (`done`) or asks which circle (`card`)
   const read = async () => {
     setDone(null);
-    const r = await onRead?.(line);
+    // the ticked self goes with the line: the person's own lists are read and written as that self
+    const r = await onRead?.(line, asSelf);
     setCard(r?.card && Array.isArray(r.card.to) && r.card.to.length ? r.card : null);
     if (r?.card) setError(null);
     else if (r && 'done' in r) { setDone(r.done ?? null); setError(null); }
@@ -84,7 +86,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     const c = card;
     setCard(null);
     setBusy(true);
-    const r = await onCircleRun?.(c, circleId);
+    const r = await onCircleRun?.(c, circleId, asSelf);
     setBusy(false);
     if (r?.error) setError(r.error); else { setDone(r?.done ?? null); setError(null); }
   };
@@ -108,7 +110,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
-              <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
+              <ThemedTextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
                 placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
@@ -141,7 +143,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {act.fields.map((f) => (
                 <View key={f.name} style={styles.field}>
                   <Text style={styles.label}>{f.labelKey ? t(f.labelKey) : f.name}</Text>
-                  <TextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
+                  <ThemedTextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
                     onChangeText={(v) => setValues((cur) => ({ ...cur, [f.name]: v }))} />
                 </View>
               ))}
@@ -189,7 +191,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             <View testID="vandaag-plus-card">
               <Text style={styles.label}>{t('circle.vandaag.plus_circle_ask', { line: card.line ?? '' })}</Text>
               {card.to.map((r) => (
-                <Btn key={r.circleId} label={t('circle.vandaag.plus_circle_in', { name: r.name || t('circle.screens.untitled') })}
+                <Btn key={r.circleId} label={plusCardLabel(t, r)}
                   onPress={() => runIn(r.circleId)} disabled={busy} testID={`vandaag-plus-card-in-${r.circleId}`} style={styles.btnAt} />
               ))}
               <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => setCard(null)} testID="vandaag-plus-card-no" style={styles.btnAt} />

@@ -12,7 +12,7 @@
  * is no incoming copy to reconcile by hand here — the γ.4 conflict resolver that did so had no source and is gone.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, Switch, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import {
@@ -48,6 +48,7 @@ import { isAdvancedSetting } from '../../../../basis/src/v2/alphaSurface.js';
 import { settingsSaveNeedsProposal } from '../../../../basis/src/v2/circlePolicy.js';
 import { policySaveControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
 import { policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../../../basis/src/v2/governanceAppWiring.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // Phase 4 §9 — the Connection & transport controls, read once from the static basisManifest.
 const SETTINGS_CONTROLS = settingsControlsFromManifest(basisManifest);
@@ -430,7 +431,7 @@ export default function CircleSettingsScreen({
                 return (
                   <View key={ctl.id} style={styles.controlRow} testID={`control-${ctl.id}`}>
                     <Text style={styles.rowLabel}>{t(ctl.labelKey)}</Text>
-                    <TextInput style={styles.input} value={relayInput} editable={cs.enabled}
+                    <ThemedTextInput style={styles.input} value={relayInput} editable={cs.enabled}
                       placeholder={t('circle.settings.relayEndpoint_placeholder')} autoCapitalize="none"
                       onChangeText={setRelayInput} testID={`control-${ctl.id}-input`} />
                     <View style={styles.chipRow}>
@@ -577,7 +578,7 @@ export default function CircleSettingsScreen({
         </>) : null}
         {advancedOpen ? (<>
         <Text style={styles.section}>{t('circle.recipeApply.heading')}</Text>
-        <TextInput
+        <ThemedTextInput
           style={styles.recipeInput}
           value={recipeSource}
           onChangeText={setRecipeSource}
@@ -625,7 +626,7 @@ export default function CircleSettingsScreen({
                           ))}
                         </View>
                       ) : (
-                        <TextInput style={styles.input} value={f.value == null ? '' : String(f.value)}
+                        <ThemedTextInput style={styles.input} value={f.value == null ? '' : String(f.value)}
                           keyboardType={f.control === 'number' ? 'numeric' : 'default'}
                           onChangeText={(txt) => patch({ settings: { [key]: f.control === 'number' ? (txt === '' ? undefined : Number(txt)) : txt } })}
                           testID={`setting-${key}`} />

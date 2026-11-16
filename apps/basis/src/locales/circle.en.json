@@ -1758,6 +1758,18 @@
     "control_within": {
       "text": "Period",
       "doc": "Customise sheet: heading over the relative-date chips of a tasks or notes block."
+    },
+    "plus_card_mine": {
+      "text": "On my own list",
+      "doc": "The \"+\" card's button for the person's OWN list of that name (beside a circle that holds one too): run it there, as the self ticked in the \"+\"."
+    },
+    "plus_list_items": {
+      "text": "{{name}}: {{items}}",
+      "doc": "The \"+\" thread's answer to a read of one list (\"what is on my shopping\"): the list's name and its entries, the done ones marked."
+    },
+    "plus_list_empty": {
+      "text": "Nothing on {{name}}.",
+      "doc": "The \"+\" thread's answer to a read of a list that has no entries."
     }
   },
   "screens": {
@@ -4365,6 +4377,10 @@
     }
   },
   "lists": {
+    "no_self": {
+      "text": "Not saved: this device holds no self in this circle.",
+      "doc": "A lists write in a circle this device holds no self for: refused, nothing written (a row names its maker by the circle's self, never the local 'me')."
+    },
     "title": {
       "text": "Lists",
       "doc": "K2 lists panel title + more-menu entry."
@@ -6480,10 +6496,6 @@
     "scan": {
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
-    },
-    "assistant": {
-      "text": "Assistant",
-      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
     },
     "share_contact": {
       "text": "Share my card",

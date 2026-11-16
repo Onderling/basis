@@ -1761,6 +1761,18 @@
     "control_within": {
       "text": "Periode",
       "doc": "Customise sheet: heading over the relative-date chips of a tasks or notes block."
+    },
+    "plus_card_mine": {
+      "text": "Op mijn eigen lijst",
+      "doc": "The \"+\" card's button for the person's OWN list of that name (beside a circle that holds one too): run it there, as the self ticked in the \"+\"."
+    },
+    "plus_list_items": {
+      "text": "{{name}}: {{items}}",
+      "doc": "The \"+\" thread's answer to a read of one list (\"what is on my shopping\"): the list's name and its entries, the done ones marked."
+    },
+    "plus_list_empty": {
+      "text": "Er staat niets op {{name}}.",
+      "doc": "The \"+\" thread's answer to a read of a list that has no entries."
     }
   },
   "screens": {
@@ -4370,6 +4382,10 @@
     }
   },
   "lists": {
+    "no_self": {
+      "text": "Niet bewaard: dit apparaat heeft geen eigen ik in deze kring.",
+      "doc": "A lists write in a circle this device holds no self for: refused, nothing written (a row names its maker by the circle's self, never the local 'me')."
+    },
     "title": {
       "text": "Lijsten",
       "doc": "K2 lists panel title + more-menu entry."
@@ -6482,10 +6498,6 @@
     "scan": {
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
-    },
-    "assistant": {
-      "text": "Assistent",
-      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
     },
     "share_contact": {
       "text": "Deel mijn kaart",

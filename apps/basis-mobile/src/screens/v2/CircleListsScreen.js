@@ -8,10 +8,11 @@
  * complete/remove. PERSISTENT via an AsyncStorage-backed DataSource (in-memory fallback).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, TextInput, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const typeLabel = (type) => t(`circle.container.type.${type}`);
 
@@ -129,7 +130,7 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
               </Pressable>
             ))}
             <View style={styles.newRow}>
-              <TextInput
+              <ThemedTextInput
                 style={styles.newInput} value={newName} onChangeText={setNewName}
                 placeholder={t('circle.lists.new')} placeholderTextColor={theme.color.inkSoft}
                 onSubmitEditing={() => createContainer('list')} testID="lists-new-input"
@@ -154,7 +155,7 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
             ) : null}
             {pendingAdd ? (
               <View style={styles.newRow}>
-                <TextInput
+                <ThemedTextInput
                   style={styles.newInput} value={addText} onChangeText={setAddText} autoFocus
                   placeholder={pendingHint ? typeLabel(pendingHint) : t('circle.lists.add_prompt')} placeholderTextColor={theme.color.inkSoft}
                   onSubmitEditing={submitAdd} testID="lists-add-input"

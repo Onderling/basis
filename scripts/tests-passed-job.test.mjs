@@ -32,3 +32,16 @@ describe('the summary check stands for every gate job', () => {
     for (const j of gate) expect(script, `the verdict reads ${j}`).toContain(`needs.${j}.result`);
   });
 });
+
+// `development` merges through the merge queue: without the `merge_group` trigger no check ever reports on a queued
+// commit and nothing lands; with the tail in the queue every merge waits ~45 minutes for shards the push runs anyway.
+describe('the merge queue runs the gate, not the tail', () => {
+  const on = wf.on ?? wf[true] ?? {};   // YAML 1.1 reads a bare `on:` key as the boolean true
+  it('the workflow starts for a queued commit', () => {
+    expect(Object.keys(on)).toContain('merge_group');
+  });
+  it('no gate job leaves the queue out; the browser tail does', () => {
+    for (const j of [...gate, 'same-bytes', 'tests-passed']) expect(String(jobs[j]?.if ?? ''), j).not.toMatch(/merge_group/);
+    expect(String(jobs.browser?.if)).toContain("github.event_name != 'merge_group'");
+  });
+});

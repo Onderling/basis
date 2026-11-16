@@ -52,12 +52,19 @@
 #
 # Feature branches run nothing until a PR is opened — a branch per feature ends in a PR here anyway, and
 # the push + pull_request pair used to run everything twice per push.
+#
+# THE MERGE QUEUE (2026-11-16). `development` merges through GitHub's merge queue: a queued PR is tested
+# as the merge commit it will become, on top of what is queued ahead of it (`merge_group`), and lands only
+# when `tests passed` is green there. That is "branches must be up to date" without bringing each branch
+# up to date by hand. A queue run is the GATE, never the tail: the browser shards still run on the push the
+# landing makes, and `release:check` reads only push and by-hand runs.
 # =============================================================================
 
 name: tests
 
 on:
   pull_request:
+  merge_group:
   push:
     branches: [development, live]
   workflow_dispatch:
@@ -343,9 +350,10 @@ jobs:
   # SHARDS — each shard is a full environment running its slice serially. Traces on failure only.
   browser:
     name: browser (shard ${{ matrix.shard }}/8)
-    # THE TAIL: after a merge (a push to development or live) and by hand — never on a pull request.
+    # THE TAIL: after a merge (a push to development or live) and by hand — never on a pull request, never in the
+    # merge queue (the push that lands the queued commit runs it).
     needs: same-bytes
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.same-bytes.outputs.same != 'true' }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.event_name != 'merge_group' && needs.same-bytes.outputs.same != 'true' }}
     # Pinned, not ubuntu-latest: on 2026-11-12 ubuntu-latest became 26.04, and Playwright refuses it
     # ("Playwright does not support chromium on ubuntu26.04-x64"), so every shard failed before a test ran.
     # Move to latest when the Playwright in package.json lists 26.04.

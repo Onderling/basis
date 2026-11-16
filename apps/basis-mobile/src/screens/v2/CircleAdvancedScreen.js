@@ -7,13 +7,14 @@
  * projections (`advancedOpRows` / `settingsProjection`); this component only paints.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, Switch, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, Switch, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { advancedOpRows, settingsProjection } from '@onderling-app/basis';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 import { t } from '../../core/localisation.js';
 import OpPageModal from './OpPageModal.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill, onBack = null }) {
   const theme = useTheme();
@@ -93,7 +94,7 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
                   </View>
                 ) : (
                   <>
-                    <TextInput
+                    <ThemedTextInput
                       style={styles.input}
                       defaultValue={String(row.shown ?? '')}
                       keyboardType={row.control.kind === 'number' || row.control.kind === 'duration' ? 'numeric' : 'default'}

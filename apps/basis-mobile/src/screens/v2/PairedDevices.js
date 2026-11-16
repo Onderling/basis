@@ -7,12 +7,13 @@
  * Uses the SHARED circle.pairedDevices.* locale keys (one source for web + mobile).
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { useTheme } from './themeContext.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
 import { makePairUri, parsePairUri } from '../../../../basis/src/core/qrSchemes.js';
 import { translatorOr } from '../../../../basis/src/locales/translatorOr.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const short = (a) => (a && a.length > 16 ? `${a.slice(0, 8)}…${a.slice(-6)}` : a);
 
@@ -74,7 +75,7 @@ export default function PairedDevices({ selfAddr = '', peers: initialPeers = [],
       <QrScannerModal visible={scanOpen} onClose={() => setScanOpen(false)} onResult={onScanResult} t={tr} />
 
       <View style={styles.addRow}>
-        <TextInput
+        <ThemedTextInput
           style={styles.input}
           value={draft}
           onChangeText={setDraft}

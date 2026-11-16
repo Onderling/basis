@@ -187,7 +187,22 @@ function wordsFor(act, manifestsByOrigin) {
   return Object.values(names).flatMap((n) => [n?.one, n?.other]).filter((w) => typeof w === 'string' && w).map((w) => w.toLowerCase());
 }
 const catalogueByOrigin = () => Object.fromEntries(catalogueManifests().filter((m) => m?.app).map((m) => [m.app, m]));
-const pickerMoment = (day, time) => `${day}T${time ?? '09:00'}`;
+// the moment a reading fills in: the day and the time that were SAID; no time said, the day alone (the form then asks
+// for the time, `plusMomentNeedsTime`): a time nobody said is never filled in
+const pickerMoment = (day, time) => (time ? `${day}T${time}` : day);
+const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Does this act's moment still need its time? The day a reading kept (a day was said, no time), or null. Both shells ask
+ * for the time on that day and hold Save until it is there.
+ * @param {{fields: Array<{name: string, kind?: string}>}} act @param {object} values
+ * @returns {string|null}
+ */
+export function plusMomentNeedsTime(act, values = {}) {
+  const f = (act?.fields ?? []).find((x) => x.kind === 'datetime');
+  const v = f ? String(values?.[f.name] ?? '') : '';
+  return DAY_ONLY.test(v) ? v : null;
+}
 
 /**
  * THE FREE LINE at the top of the "+" sheet: what was typed, read by the same bounded readers the circle chat uses —
@@ -228,7 +243,10 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
   }
   const timed = (a) => a.fields.some((f) => f.kind === 'datetime');
   const moment = readDayAndTime(rest, now ? { now } : {});
-  if (!act && moment?.day) act = acts.find(timed) ?? null;
+  // a day alone makes a line an appointment, unless the line ASKS something ("wat is het weer morgen", "…?"): a question
+  // is not an act. The question openers are the gate's own (`_help.questions`); an act word above still names its act.
+  const asks = /\?\s*$/u.test(text) || helpQuestionOpeners().some((o) => lower.startsWith(o));
+  if (!act && moment?.day && !asks) act = acts.find(timed) ?? null;
   if (!act) return null;
   const values = {};
   let words = rest;

@@ -9,7 +9,7 @@
  */
 import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share, Switch } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal, Alert, Share, Switch } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
@@ -62,6 +62,7 @@ import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
 import Constants from 'expo-constants';
 import { deviceListWords } from '../../../../basis/src/v2/mijWords.js';   // never the d-… id on screen
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
@@ -647,7 +648,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
 
           {/* In-app relay setting — no-server cross-device sync, configurable without a rebuild. */}
           <View style={styles.relayEdit}>
-            <TextInput
+            <ThemedTextInput
               style={styles.relayInput}
               value={relayInput}
               onChangeText={setRelayInput}
@@ -957,7 +958,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
             not consent. Refusals name their own reason; a newer version is told to update, never guessed. The shared
             pairing is the only way from the offer to the grant (this screen never calls the op). */}
         <Section title={t('circle.mydata.connection_add')}>
-          <TextInput
+          <ThemedTextInput
             testID="mydata-connection-offer"
             value={offerText}
             onChangeText={onOfferText}
@@ -1089,7 +1090,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
               {!botLink.view?.bot?.ok ? (
                 <View>
                   <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
-                  <TextInput
+                  <ThemedTextInput
                     style={styles.relayInput}
                     value={botLink.text}
                     onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
@@ -1153,7 +1154,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
           {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
           {podCapable && !podSignedIn && (
             <View style={styles.signin}>
-              <TextInput
+              <ThemedTextInput
                 style={styles.signinInput}
                 value={issuer}
                 onChangeText={setIssuer}

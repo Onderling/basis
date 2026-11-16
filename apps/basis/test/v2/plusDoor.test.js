@@ -89,11 +89,14 @@ it('a circle act the plain reading runs at once answers with what the run said, 
 });
 
 describe('a model\'s proposal never widens the "+"', () => {
-  it('a field the act does not declare (a circle named) is dropped; a circle\'s op is no reading', async () => {
+  it('a field the act does not declare (a circle named) is dropped; a circle named for a list write is dropped too', async () => {
     const { d, callSkill } = door({ interpret: async () => ({ opId: 'addEvent', args: { title: 'kapper', when: '2026-11-17T10:00', circleId: 'kring' } }) });
     expect((await d.read('kun je de kapper voor me regelen?')).values).toEqual({ title: 'kapper', when: '2026-11-17T10:00' });
     const c = door({ interpret: async () => ({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk', circleId: 'c1' } }) });
-    expect((await c.d.read('melk halen voor thuis, regel jij dat?')).error).toBeTruthy();
+    // a circle the model names is dropped: the write becomes a card for the person's OWN list only, run on their pick
+    const card = (await c.d.read('melk halen voor thuis, regel jij dat?')).card;
+    expect(card.to.every((x) => x.own === true)).toBe(true);
+    expect(card.command.args.circleId).toBeUndefined();
     expect(callSkill).not.toHaveBeenCalled();
     expect(c.callSkill).not.toHaveBeenCalled();
   });
@@ -171,4 +174,47 @@ describe('a noun people write is PROPOSED in the own place, never written by the
     expect(r).toEqual({ actId: 'household.note', values: { body: 'de sleutel ligt bij de buren' } });
     expect(callSkill).not.toHaveBeenCalled();
   });
+});
+
+describe('every op the door offers the model has an outcome (or is not offered)', () => {
+  it('each tool, picked by the model, ends in a form, a card, an answer or the run\'s own word: never "could not read"', async () => {
+    const { buildToolDescriptors } = await import('../../src/v2/interpretCommand.js');
+    const probe = door();
+    const tools = [...probe.d.catalogue.opsById.values()].filter((e) => e.op.surfaces?.chat).map((e) => e.op.id);
+    expect(tools.length).toBe(buildToolDescriptors(probe.d.catalogue).length);
+    const unread = t('circle.vandaag.plus_line_unread');
+    const misses = [];
+    for (const opId of tools) {
+      const readAs = () => async () => ({ ok: true, items: [{ id: 'x1', label: 'melk' }] });
+      const { d, callSkill } = door({ readAs, interpret: async () => ({ opId, args: { list: 'Boodschappen', text: 'melk', title: 't', when: '2026-11-17T10:00' } }) });
+      const r = await d.read('regel dit voor me alsjeblieft');
+      if (r?.error === unread) misses.push(opId);
+      expect(callSkill, `${opId}: nothing reaches a store from the model`).not.toHaveBeenCalled();
+    }
+    expect(misses).toEqual([]);
+  });
+  it('an own-list write the model proposes is a card naming the act and the list; it runs only on the pick, as the self', async () => {
+    const { d } = door({ interpret: async () => ({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk' } }) });
+    const r = await d.read('kun je melk op mijn boodschappen zetten, graag');
+    expect(r.card?.command).toMatchObject({ appOrigin: 'lists', opId: 'addToList', args: { list: 'Boodschappen', text: 'melk' } });
+    expect(r.card.to).toEqual([expect.objectContaining({ own: true })]);
+  });
+  it('a read the model picks is run as the self and answered in words', async () => {
+    const seen = [];
+    const readAs = (asSelf) => async (app, opId, args) => { seen.push({ asSelf, app, opId, args }); return { ok: true, items: [{ id: 'e1', label: 'melk' }] }; };
+    const { d } = door({ readAs, interpret: async () => ({ opId: 'listEntries', args: { list: 'Boodschappen' } }) });
+    const r = await d.read('wat staat er op mijn boodschappen, weet je dat?');
+    expect(r.done).toMatch(/melk/);
+    expect(seen.some((s) => s.opId === 'listEntries' && s.args.circleId)).toBe(true);
+  });
+});
+
+it('only a noun PEOPLE write is proposed: a generic add without a chat surface for any other reason gets no tool', async () => {
+  const { proposable } = await import('../../src/assistant/plusDoor.js');
+  const op = (noun) => ({ id: `__generic__:x:add:${noun}`, __generic: { app: 'x', atom: 'add', noun }, surfaces: { slash: { command: `/add-${noun}` } } });
+  const catalogue = { opsById: new Map([['a', { op: op('note'), appOrigin: 'x' }], ['b', { op: op('thing'), appOrigin: 'x' }]]) };
+  const manifests = { x: { app: 'x', nouns: { note: { atoms: ['add'], writtenBy: 'people' }, thing: { atoms: ['add'] } } } };
+  const out = proposable(catalogue, manifests);
+  expect(out.opsById.get('a').op.surfaces.chat).toBeTruthy();
+  expect(out.opsById.get('b').op.surfaces.chat).toBeUndefined();
 });

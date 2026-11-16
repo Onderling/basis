@@ -59,6 +59,10 @@ describe('the foreground timer', () => {
 
 describe('the person\'s clock', () => {
   it('runs the person\'s own due row while the app is in front, as the person', async () => {
+    // midday, by the clock: an `at` row may run the rest of ITS local day, so a row due a minute ago is skipped in the
+    // first minute after midnight (a CI run at 00:00 Amsterdam once got nothing). Only Date is faked; timers stay real.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-17T11:00:00Z'));
     const store = createOwnDevicesStore({ dataSource: memoryDataSource() });
     await store.put({ type: 'intention', trigger: { at: new Date(Date.now() - 60_000).toISOString() }, op: 'weekCard', appOrigin: 'basis', args: {}, actsAs: 'me-person', state: 'open', createdAt: new Date(Date.now() - 3_600_000).toISOString() }, { by: 'me-person' });
     const calls = [];

@@ -34,7 +34,11 @@ describe('Vandaag "+" — the sheet makes things (web twin: test/vandaagPlusShee
   const sheet = code(read('../src/screens/v2/VandaagPlusModal.js'));
   it('a button beside the free line reads it; Klaar is the ghost way out; no Me actions in the sheet', () => {
     expect(sheet).toMatch(/testID="vandaag-plus-read"/);
-    expect(sheet).toMatch(/variant="ghost" onPress=\{onClose\}/);
+    // every way out (Klaar, the system back) hands the host the self and the open form: a form the "+" opened, closed
+    // unsaved, is said in the conversation (the shared door's `settled`; web twin: circleApp.js onClose)
+    expect(sheet).toMatch(/variant="ghost" onPress=\{closeSheet\}/);
+    expect(sheet).toMatch(/onRequestClose=\{closeSheet\}/);
+    expect(sheet).toMatch(/const closeSheet = \(\) => onClose\?\.\(\{ asSelf, actId, editing: /);
     expect(sheet).not.toMatch(/meActions|onMeAction|'plus-me'/);
     expect(code(read('../src/screens/v2/CircleLauncherScreen.js'))).not.toMatch(/meActions=\{/);
   });

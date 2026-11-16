@@ -2247,7 +2247,12 @@ export default function CircleLauncherScreen({
           setPlusOpen(false); setPlusEdit(null); setPendingPinOpen(r); if (c) openCircle(c);
           return null;
         }}
-        visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
+        visible={plusOpen} edit={plusEdit}
+        // closing with a form the "+" opened from a line still unsaved: refused, nothing stored, the conversation says so
+        onClose={(o) => {
+          if (o?.actId && !o.editing) plusDoorNow().settled({ asSelf: o.asSelf }, { saved: false }).then(() => setPlusTurnsTick((n) => n + 1)).catch(() => null);
+          setPlusOpen(false); setPlusEdit(null);
+        }}
         selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
         // the free line: an own act; or, for something that lives in a circle, that circle's act: run at once where the
         // circle is clear, else the card asks which (plusLineOutcome); the own model reads only what the plain reading
@@ -2297,6 +2302,8 @@ export default function CircleLauncherScreen({
           if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
           // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
           if (!plusEdit) actionFrequency.bump(OWN_USAGE_SCOPE, actId);
+          // a form the "+" opened from a line: the conversation says it was saved (web twin: circleApp.js)
+          if (!plusEdit) await plusDoorNow().settled({ asSelf }, { saved: true, actId }).catch(() => null);
           const follow = plusEdit ? null : plusFollowUp(screensBook, actId);
           if (follow) await runScreenOp(follow.opId, follow.args);
           setPlusOpen(false); setPlusEdit(null); refreshScreensBook();

@@ -11,7 +11,7 @@ import { attachEntriesFor } from './attachEntries.js';
 import { catalogueManifests } from './manifestSources.js';
 import { renderGate } from '@onderling/app-manifest';
 import { listsGateRules, circleListsFor } from './circleGate.js';
-import { GATE_WORDS, helpWords, helpQuestionOpeners } from './gateWords.js';
+import { GATE_WORDS, helpWords, helpQuestionOpeners, referringWords, referringAround } from './gateWords.js';
 import { answerHelp } from './help/helpAnswer.js';
 import { HELP_CIRCLE_ID } from './helpCircle.js';
 import { replyLine } from './replyLine.js';
@@ -262,7 +262,15 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
   // a day alone makes a line an appointment, unless the line ASKS something ("wat is het weer morgen", "…?"): a question
   // is not an act. The question openers are the gate's own (`_help.questions`); an act word above still names its act.
   const asks = /\?\s*$/u.test(text) || helpQuestionOpeners().some((o) => lower.startsWith(o));
-  if (!act && moment?.day && !asks) act = acts.find(timed) ?? null;
+  // …and unless what is left only POINTS back ("zet dat morgen om 10 in mijn agenda"): the fixed phrases cannot know
+  // what "dat" is; the person's own model, which has the previous turns, reads it (none set: the "+" says so)
+  // (a pointing word, and nothing else but the words around one: "onthoud dat de vuilnis dinsdag buiten gaat" says what)
+  const points = () => {
+    const ws = (moment?.rest ?? rest).toLowerCase().split(/[^\p{L}]+/u).filter(Boolean);
+    const refers = referringWords(); const around = referringAround();
+    return ws.some((w) => refers.has(w)) && ws.every((w) => refers.has(w) || around.has(w));
+  };
+  if (!act && moment?.day && !asks && !points()) act = acts.find(timed) ?? null;
   if (!act) return null;
   const values = {};
   let words = rest;

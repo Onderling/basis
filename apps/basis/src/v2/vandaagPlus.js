@@ -422,54 +422,6 @@ function offered(c, app, opId, ms, av) {
   return offers.has(`${app}.${opId}`) || ms.some((m) => m.app === app && (m.operations ?? []).some((o) => o.id === opId));
 }
 
-/**
- * The free line read by a MODEL, when one is configured: asked with the sheet's acts (and their fields) and the own
- * scope only. Its answer is held to those bounds — an act outside them is no reading, a field it does not declare is
- * dropped — so a model can improve the reading, never widen it.
- * @param {string} line
- * @param {{ask: (line: string, bounds: {scope: string, acts: Array<{actId: string, fields: string[]}>}) => Promise<{actId: string, values: object}|null>}} a
- */
-export async function plusReadWithModel(line, { ask, acts = PLUS_ACTS } = {}) {
-  if (typeof ask !== 'function' || !word(line)) return null;
-  let r = null;
-  // only the acts that MAKE something: a line is never read as "open a door" (feedback runs at once, from its button)
-  const makers = acts.filter((a) => !actRunsAtOnce(a));
-  try { r = await ask(word(line), { scope: OWN_DEVICES_SCOPE, acts: makers.map((a) => ({ actId: a.id, fields: a.fields.map((f) => f.name) })) }); } catch { r = null; }
-  const act = r && makers.find((a) => a.id === r.actId);
-  if (!act) return null;
-  const values = {};
-  for (const f of act.fields) if (r.values?.[f.name] != null && word(String(r.values[f.name]))) values[f.name] = word(String(r.values[f.name]));
-  return Object.keys(values).length ? { actId: act.id, values } : null;
-}
-
-/**
- * The model's side of the free line (LLM-facing, not a user string): pick one of the acts and fill its fields from the
- * line, or say none — nothing else, no circle, no other act.
- */
-const PLUS_MODEL_SYSTEM = 'You read one short line a person typed to make something of their own. Choose at most ONE of the acts below '
-  + 'and fill only its listed fields from the line; a moment field as local "YYYY-MM-DDTHH:mm". Answer with JSON only: '
-  + '{"actId": "...", "values": {...}}, or {"actId": null} when no act fits. Never invent an act, a field, or a place to put it.';
-
-/**
- * `ask` for `plusReadWithModel` over one model client: the line is the only thing sent (the acts and the own scope are
- * the bounds, in the instruction); the answer's JSON is read back, anything else is no reading.
- * @param {{invoke: Function}|null} client   the person's own model (`ownModelClient`), or null
- * @returns {Function|null}
- */
-export function plusModelAsk(client) {
-  if (!client || typeof client.invoke !== 'function') return null;
-  return async (line, bounds) => {
-    const acts = (bounds?.acts ?? []).map((a) => `- ${a.actId}: ${a.fields.join(', ')}`).join('\n');
-    const now = new Date();
-    const system = `${PLUS_MODEL_SYSTEM}\nScope: ${bounds?.scope}\nNow: ${now.toString()}\nActs:\n${acts}`;
-    const res = await client.invoke({ system, messages: [{ role: 'user', content: line }] });
-    const text = typeof res?.replyText === 'string' ? res.replyText : '';
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return null;
-    try { const j = JSON.parse(m[0]); return j && typeof j.actId === 'string' ? { actId: j.actId, values: j.values ?? {} } : null; } catch { return null; }
-  };
-}
-
 /** The block that shows what each noun makes. */
 const SHOWN_BY = Object.freeze({ note: 'notes', 'calendar-event': 'calendar' });
 

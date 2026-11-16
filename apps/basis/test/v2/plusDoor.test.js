@@ -218,3 +218,12 @@ it('only a noun PEOPLE write is proposed: a generic add without a chat surface f
   expect(out.opsById.get('a').op.surfaces.chat).toBeTruthy();
   expect(out.opsById.get('b').op.surfaces.chat).toBeUndefined();
 });
+
+it('the door\'s catalogue is composed once per household manifest and app list, not per door', async () => {
+  const { ownPlaceCatalogue } = await import('../../src/assistant/plusDoor.js');
+  const a = ownPlaceCatalogue({});
+  const b = ownPlaceCatalogue({});
+  expect(b.catalogue).toBe(a.catalogue);
+  const other = ownPlaceCatalogue({ apps: ['household'] });
+  expect(other.catalogue).not.toBe(a.catalogue);
+});

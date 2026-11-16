@@ -4746,12 +4746,16 @@ function showVandaagPlus({ edit = null } = {}) {
   // an own row is changed as the self that made it (the row says which); something new as the ticked self
   let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
-  const call = async (op) => {
-    // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-    const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
-    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+  // a self's key: the general self's chat key, a persona's webid (what its rows are made by)
+  const selfKeyOf = (id) => (!id || id === 'default' ? (circleHouseholdAgent?.identity?.chat?.pubKey ?? null) : (_selfSet.held.find((p) => p.id === id)?.webid ?? null));
+  // a call AS one self (the waist's actAs): it rides that self's own lane; the default needs no saying
+  const callAs = (id) => (app, opId, args) => {
+    const actAs = id && id !== 'default' ? (_selfSet.held.find((p) => p.id === id)?.webid ?? null) : null;
+    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(app, opId, args, { actAs }) : rawCallSkill(app, opId, args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // made AS the ticked self
+  const call = async (op) => callAs(asSelf)(op.app, op.opId, op.args);
   // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
   // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
   const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
@@ -4780,7 +4784,7 @@ function showVandaagPlus({ edit = null } = {}) {
     const th = plusThreadNow();
     if (!_door || _door.threadId !== th.threadId) {
       _door = createPlusDoor({ llm: th.threadId ? circleOwnModel() : null, threads: th.threads, threadId: th.threadId,
-        householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
+        householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(), readAs: callAs,
         circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId) => runInCircle(command, circleId) });
       _door.threadId = th.threadId;
     }

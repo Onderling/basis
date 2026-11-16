@@ -85,3 +85,18 @@ it('a circle act the plain reading runs at once answers with what the run said, 
   expect(r).toEqual({ done: 'melk staat op Boodschappen' });
   expect(memory.recent('own:me').at(-1)).toContain('melk staat op Boodschappen');
 });
+
+describe('a model\'s proposal never widens the "+"', () => {
+  it('a field the act does not declare (a circle named) is dropped; a circle\'s op is no reading', async () => {
+    const { d, callSkill } = door({ interpret: async () => ({ opId: 'addEvent', args: { title: 'kapper', when: '2026-11-17T10:00', circleId: 'kring' } }) });
+    expect((await d.read('kun je de kapper voor me regelen?')).values).toEqual({ title: 'kapper', when: '2026-11-17T10:00' });
+    const c = door({ interpret: async () => ({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk', circleId: 'c1' } }) });
+    expect((await c.d.read('melk halen voor thuis, regel jij dat?')).error).toBeTruthy();
+    expect(callSkill).not.toHaveBeenCalled();
+    expect(c.callSkill).not.toHaveBeenCalled();
+  });
+  it('an act that opens a thread (feedback) is never read from a line', async () => {
+    const { d } = door({ interpret: async () => ({ opId: 'feedback', args: {} }) });
+    expect((await d.read('ik wil iets over de app kwijt, kun je helpen?')).actId).toBeUndefined();
+  });
+});

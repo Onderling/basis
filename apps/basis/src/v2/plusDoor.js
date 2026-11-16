@@ -20,7 +20,7 @@ import { createAssistantEngine } from './assistantEngine.js';
 import { scopeCatalogueToPlace } from './circleCatalogueScope.js';
 import { mergeManifests } from '../manifestMerge.js';
 import { catalogueManifests } from './manifestSources.js';
-import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer } from './vandaagPlus.js';
+import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce } from './vandaagPlus.js';
 import { plusAnswerLine } from './plusThread.js';
 import { interpretToCommand } from './interpretCommand.js';
 
@@ -62,7 +62,8 @@ export function createPlusDoor({
     // The yes of an own act is its form: a proposal opens the act's form filled, and nothing is stored here.
     dispatch: (input) => {
       const cmd = typeof input === 'object' && input ? input : null;
-      const act = cmd && acts.find((a) => a.opId === cmd.opId);
+      // only the acts that MAKE something: a line is never read as "open a door" (feedback runs from its button)
+      const act = cmd && acts.find((a) => a.opId === cmd.opId && !actRunsAtOnce(a));
       if (!act) { outcome = unread(); return; }
       const values = {};
       for (const f of act.fields) {

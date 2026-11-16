@@ -77,6 +77,8 @@ export function synthesizeGenericOps(manifest) {
       params,
       // Decode-free marker for the dispatch waist (equivalent to decodeGenericOpId(id)).
       __generic: { app, atom, noun },
+      // where the noun is offered (declared once on the noun; app-manifest scopes.js), so its ops are offered there too
+      ...(Array.isArray(manifest?.nouns?.[noun]?.scopes) ? { scopes: [...manifest.nouns[noun].scopes] } : {}),
       surfaces: {
         slash: { command: `/${atom}-${noun}`, match },
         // LLM-facing tool description (like DEFAULT_INTERPRET_SYSTEM — internal, not shown to the member). A noun PEOPLE

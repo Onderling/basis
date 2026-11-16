@@ -43,6 +43,8 @@ export const listsManifest = {
   operations: [
     {
       id:        'createList', visibility: 'authenticated',
+      // offered in a circle and in the person's own "+" (their own lists): where, declared once (app-manifest scopes)
+      scopes: ['circle', 'own'],
       verb:      'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list' },
@@ -60,11 +62,12 @@ export const listsManifest = {
         slash: { command: '/new-list', body: 'argline' },
         chat:  { reply: 'text', hint: 'Start a new list in this circle.' },
         // In the "+": making a list is a thing you do while talking about it.
-        attach: { label: 'circle.attach.new_list', group: 'create' },
+        attach: { label: 'circle.attach.new_list', group: 'create', buttonIn: ['circle'] },
       },
     },
     {
       id:        'addToList', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:      'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -101,11 +104,12 @@ export const listsManifest = {
       surfaces: {
         slash: { command: '/add-to-list', body: 'flags' },
         chat:  { reply: 'text', hint: 'ONE call per thing to add — several things are several calls; a sentence (even one with a comma, like \"the dishes, but the pans first\") is ONE thing. Add something to a list — a plain entry, or any kind that list accepts.' },
-        attach: { label: 'circle.attach.list_item', group: 'create' },
+        attach: { label: 'circle.attach.list_item', group: 'create', buttonIn: ['circle'] },
       },
     },
     {
       id:       'listLists', visibility: 'authenticated', group: 'data',
+      scopes: ['circle', 'own'],
       verb:     'list',
       requires: ['lists'],
       params:   [],
@@ -116,6 +120,7 @@ export const listsManifest = {
     },
     {
       id:        'markListItemDone', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:      'complete',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -191,6 +196,7 @@ export const listsManifest = {
     },
     {
       id:        'listEntries', visibility: 'authenticated', group: 'data',
+      scopes: ['circle', 'own'],
       verb:      'list',
       requires:  ['lists'],
       params: [
@@ -205,6 +211,7 @@ export const listsManifest = {
       // what was done in the last days ("wat is er deze week gedaan"): the ticked and completed entries, on one list or
       // all — what, which list, when; who did it as the household's names setting lets the reader see (the door says)
       id:        'listDone', visibility: 'authenticated', group: 'data',
+      scopes: ['circle', 'own'],
       verb:      'list-done',
       requires:  ['lists'],
       params: [
@@ -218,6 +225,7 @@ export const listsManifest = {
     },
     {
       id:        'removeFromList', visibility: 'authenticated', group: 'compose',
+      scopes: ['circle', 'own'],
       verb:      'remove',
       writes:    { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -236,6 +244,7 @@ export const listsManifest = {
       // The confirm below is the SURFACE's (a chat asks first; a screen paints it): the waist does not ask. A connected
       // screen that calls this op directly removes the list — on a household bot that is the admin's own screen only.
       id:        'removeList', visibility: 'authenticated', group: 'compose',
+      scopes: ['circle', 'own'],
       verb:      'remove',
       writes:    { scope: 'circle' },
       requires:  ['lists'],
@@ -255,6 +264,7 @@ export const listsManifest = {
       // A removed list comes back (within the keep window: 30 days on a household bot) with everything that went with
       // it. Without a name: the lists that can come back, a button each.
       id:        'restoreList', visibility: 'authenticated', group: 'compose',
+      scopes: ['circle', 'own'],
       verb:      'unarchive',
       writes:    { scope: 'circle' },
       requires:  ['lists'],
@@ -270,6 +280,7 @@ export const listsManifest = {
       // The trash: an entry someone took off ANOTHER person's list comes back (within the keep window: 30 days on a
       // household bot) — put back by its maker or an admin. Without words: what this person may put back, a button each.
       id:        'restoreEntry', visibility: 'authenticated', group: 'compose',
+      scopes: ['circle', 'own'],
       verb:      'unarchive',
       writes:    { scope: 'circle' },
       requires:  ['lists'],
@@ -283,6 +294,7 @@ export const listsManifest = {
     },
     {
       id:        'editEntry', visibility: 'authenticated', group: 'compose',
+      scopes: ['circle', 'own'],
       verb:      'edit',
       writes:    { scope: 'circle' },
       appliesTo: { type: 'list-item' },

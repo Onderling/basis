@@ -9,6 +9,7 @@ import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 // the contact is already in the book (added by the person's yes earlier): the door opens the thread at once
 const inBook = async (app, op) => (op === 'listContacts' ? { contacts: [{ webid: 'https://id.example/onderling' }] } : {});
 import { basisManifest } from '../../manifest.js';
+import { buttonScopes } from '@onderling/app-manifest';
 import { encodeContactCard } from '../../../pinboard/src/lib/contactCard.js';
 
 const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
@@ -19,7 +20,7 @@ describe('the feedback op', () => {
     const op = basisManifest.operations.find((o) => o.id === 'feedback');
     expect(op).toMatchObject({ visibility: 'authenticated' });
     expect(op.surfaces.slash.command).toBe('/feedback');
-    expect(op.surfaces.attach).toMatchObject({ scopes: ['own'] });
+    expect(buttonScopes(op, op.surfaces.attach)).toEqual(['own']);
     expect((op.params ?? []).filter((p) => p.required)).toEqual([]);
   });
 

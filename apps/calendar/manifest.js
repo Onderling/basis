@@ -61,6 +61,8 @@ export const calendarManifest = {
       // `/addappt --when='tomorrow 3pm'` now matches the param name.
       // CalendarStore accepts both internally for back-compat.
       // Aliased: 'startsAt' still works for any existing callers.
+      // a circle's appointment and the person's own (their own agenda); its BUTTON only in the "+" (attach.buttonIn)
+      scopes: ['circle', 'own'],
       params: [
         { name: 'title',         kind: 'string', required: true  },
         { name: 'when',          kind: 'date',   required: true  },
@@ -77,7 +79,7 @@ export const calendarManifest = {
       ],
       surfaces: {
         // the person's own "+" (Vandaag): an own appointment — with no circle named it lands in the own agenda
-        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent', share: 'shareEvent',
+        attach: { label: 'circle.vandaag.plus_own', buttonIn: ['own'], edit: 'updateEvent', remove: 'cancelEvent', share: 'shareEvent',
           fields: [
             { name: 'title', kind: 'text', labelKey: 'circle.vandaag.plus_title_ph' },
             { name: 'when', kind: 'datetime', labelKey: 'circle.vandaag.plus_when' },

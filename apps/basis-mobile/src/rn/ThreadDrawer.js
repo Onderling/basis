@@ -15,13 +15,11 @@
  * via `t()`.
  */
 import React, { useState, useCallback } from 'react';
-import {
-  Modal, Pressable, View, Text, FlatList, TouchableOpacity,
-  TextInput, StyleSheet, Platform,
-} from 'react-native';
+import { Modal, Pressable, View, Text, FlatList, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
 import { t } from '../core/localisation.js';
 import { theme } from '../screens/v2/theme.js';
+import ThemedTextInput from '../screens/v2/ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function ThreadDrawer({
   threads,
@@ -95,7 +93,7 @@ export default function ThreadDrawer({
           />
 
           <View style={styles.createRow}>
-            <TextInput
+            <ThemedTextInput
               style={styles.createInput}
               value={newName}
               onChangeText={setNewName}

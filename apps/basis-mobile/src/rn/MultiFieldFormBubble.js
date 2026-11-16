@@ -17,11 +17,12 @@
  */
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
 } from 'react-native';
 
 import { t } from '../core/localisation.js';
 import { theme } from '../screens/v2/theme.js';
+import ThemedTextInput from '../screens/v2/ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function MultiFieldFormBubble({ pending, onSubmit }) {
   const initial = useMemo(() => {
@@ -54,7 +55,7 @@ export default function MultiFieldFormBubble({ pending, onSubmit }) {
       {(pending.fields ?? []).map((f) => (
         <View key={f.name} style={styles.fieldRow}>
           <Text style={styles.fieldLabel}>{f.label}</Text>
-          <TextInput
+          <ThemedTextInput
             style={styles.fieldInput}
             value={values[f.name] ?? ''}
             onChangeText={(v) => setField(f.name, v)}

@@ -23,7 +23,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { wireBackgroundSync } from '../core/backgroundSync.js';
 import {
   Alert, AppState, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View,
+  Text, TouchableOpacity, View,
 } from 'react-native';
 
 import {
@@ -116,6 +116,7 @@ import { getBasisClassifiers } from '../core/qrClassifiers.js';
 import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../core/mappingsStoreRN.js';
+import ThemedTextInput from './v2/ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 // ε.6 — multi-offer chooser modal (opt-in via policy.catchUpChooserMode='prompt').
 // ε.6 follow-up — read the same per-circle policy the launcher writes so
 // the chooser mode is honoured on mobile (web reads localStorage
@@ -1348,7 +1349,7 @@ export default function ChatScreen({
       </ScrollView>
 
       <View style={styles.inputBar}>
-        <TextInput
+        <ThemedTextInput
           style={styles.input}
           value={input}
           onChangeText={setInput}

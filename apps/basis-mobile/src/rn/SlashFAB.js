@@ -17,7 +17,7 @@
  */
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, Modal, TextInput, FlatList,
+  View, Text, TouchableOpacity, Modal, FlatList,
   StyleSheet, Pressable,
 } from 'react-native';
 
@@ -25,6 +25,7 @@ import { filterSlashSuggestions } from '../core/slashFilter.js';
 import { t }                       from '../core/localisation.js';
 import { theme }                   from '../screens/v2/theme.js';
 import { useSheetCap, SHEET_SCROLL } from '../screens/v2/sheetCap.js';
+import ThemedTextInput from '../screens/v2/ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 /**
  * @param {object}   props
@@ -92,7 +93,7 @@ export default function SlashFAB({ catalogue, onDispatch, visible = true }) {
       >
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable style={[styles.sheet, sheetCap]} onPress={(e) => e.stopPropagation()}>
-            <TextInput
+            <ThemedTextInput
               autoFocus
               value={input}
               onChangeText={setInput}

@@ -6,9 +6,10 @@
  * (`validate`) runs before save, so a "confidential" preset can't reach a host that could read raw text.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const PRESETS = ['off', 'local-ollama', 'confidential-proxy', 'openai-compatible'];
 
@@ -40,7 +41,7 @@ export default function UserLlmSettings({ current = {}, onSave, validate }) {
   const field = (key, labelKey, { placeholder = '', secure = false } = {}) => (
     <View style={styles.field} key={key}>
       <Text style={styles.cap}>{t(labelKey)}</Text>
-      <TextInput
+      <ThemedTextInput
         style={styles.input}
         value={cfg[key]}
         onChangeText={(v) => patch({ [key]: v })}

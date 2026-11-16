@@ -17,14 +17,13 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import {
-  View, Text, Pressable, TextInput, Modal, StyleSheet, ScrollView,
-} from 'react-native';
+import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { classifyQrPayload } from '@onderling/react-native/qr';
 import { getBasisClassifiers } from '../core/qrClassifiers.js';
 import { theme } from '../screens/v2/theme.js';
+import ThemedTextInput from '../screens/v2/ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // `classifiers`: what this scanner reads (default the shared router's list; 'Apparaten & sleutels' passes a screen offer's)
 export default function QrScannerModal({ visible, onClose, onResult, t, classifiers = null }) {
@@ -126,7 +125,7 @@ function PasteToggle({ visible, value, onChange, onShow, onSubmit, t }) {
   }
   return (
     <View style={styles.pasteBlock}>
-      <TextInput
+      <ThemedTextInput
         value={value} onChangeText={onChange}
         multiline placeholder={t('circle.scan.paste_placeholder')}
         style={styles.pasteInput}

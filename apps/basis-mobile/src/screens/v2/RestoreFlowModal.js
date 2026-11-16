@@ -7,12 +7,13 @@
  * re-probes through declared ops, so it can open any time after boot.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, ScrollView, Alert, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, Alert, StyleSheet } from 'react-native';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '@onderling-app/basis';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const FLOW = paramsManifest.flows.find((f) => f.id === 'restore-settings');
 const OPS = new Map(paramsManifest.operations.map((o) => [o.id, o]));
@@ -134,7 +135,7 @@ export default function RestoreFlowModal({ visible, callSkill, onClose, onPhrase
               <View>
                 {/* generic fallback: one text input per declared param (no bespoke form registered) */}
                 {view.form.params.map((param) => (
-                  <TextInput
+                  <ThemedTextInput
                     key={param.name}
                     style={styles.input}
                     placeholder={t(param.labelKey, { defaultValue: param.name })}

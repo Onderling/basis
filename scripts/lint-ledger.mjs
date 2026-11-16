@@ -133,7 +133,13 @@ for (const f of archiveFiles) {
     if (n === undefined) continue;
     if (archivedIds.has(n)) errors.push(`L${n} is archived twice (found again in ${f}).`);
     archivedIds.add(n);
-    if (!/✅|✔|\bCLOSED\b/.test(line)) errors.push(`Archived row L${n} (${f}) is not closed: only a closed (✅ CLOSED) row leaves the ledger.`);
+    // closed is said at the row's HEAD, right after its id ("N. **[Ln] ✅ CLOSED …"): an open row may carry a ✅ further
+    // in (a matrix of done cells), and that must not let it leave
+    if (!/^\s*(?:\d+\.|[-*])\s+\**\s*\[L\d+\]\s*\**\s*(?:✅|✔|CLOSED\b)/.test(line)) {
+      errors.push(`Archived row L${n} (${f}) is not closed: only a row that says ✅ CLOSED right after its id leaves the ledger.`);
+    }
+    // a question to Frits still on the row: the open-questions table reads the ledger only, so it would vanish from it
+    if (/\?\s*Needs Frits/.test(line)) errors.push(`Archived row L${n} (${f}) still asks Frits ("? Needs Frits"): an open question stays on the ledger.`);
   }
 }
 for (const n of openIds) {

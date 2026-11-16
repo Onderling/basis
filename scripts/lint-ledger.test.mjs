@@ -216,6 +216,24 @@ describe('the archive of closed rows', () => {
     expect(out).toMatch(/Archived row L1.*not closed/s);
   });
 
+  it('fails when an open row carrying a ✅ further in is archived (closed is said at the row\'s head)', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L2] Open one.**'));
+    archive('2026-10', '1. **[L1] The function matrix: lists ✅, calendar ✅, nearby still red.**\n');
+    baseline();
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/Archived row L1.*not closed/s);
+  });
+
+  it('fails when an archived row still asks Frits (the open-questions table reads the ledger only)', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L2] Open one.**'));
+    archive('2026-10', '1. **[L1] ✅ CLOSED (merged #10) — but which colour? ? Needs Frits**\n');
+    baseline();
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/Archived row L1.*still asks Frits/s);
+  });
+
   it('fails when one id is archived twice', () => {
     write('REMAINING-WORK.md', ledger('1. **[L3] Open one.**'));
     archive('2026-10', '1. **[L1] ✅ CLOSED — first.**\n');

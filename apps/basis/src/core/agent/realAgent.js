@@ -7725,13 +7725,17 @@ export async function createRealHouseholdAgent(opts = {}) {
       // household is the only app with a capability entry today; `by`/`circleId` are sourced
       // exactly like the bespoke household path below (chatId.pubKey actor · resolved circle).
       if (g?.app === 'household' && householdService) {
+        const capCircle = resolveCircleId(args);
+        const capInCircle = !!capCircle && capCircle !== OWN_DEVICES_SCOPE;
         const capCtx = {
-          circleId: resolveCircleId(args),
+          circleId: capCircle,
           // made by the PERSON at the door (as chores and appointments are, `actorOf`), never by the device: a note on a
-          // household bot was "made by the bot" for everyone, and whose it was could not be judged
-          // with no door person: in a circle, that circle's self (rowAuthor.js: a persona's circle never gets the general key)
-          by:       actorOf(ctx) ?? (resolveCircleId(args) && resolveCircleId(args) !== OWN_DEVICES_SCOPE ? rowAuthor(resolveCircleId(args)) : null) ?? chatId?.pubKey,
+          // household bot was "made by the bot" for everyone, and whose it was could not be judged.
+          // With no door person: in a circle, that circle's self (rowAuthor.js), and no self there is a refusal below,
+          // never the general key; the general key only in the person's own scope.
+          by:       actorOf(ctx) ?? (capInCircle ? rowAuthor(capCircle) : chatId?.pubKey),
         };
+        if (capInCircle && !capCtx.by) return { ok: false, code: 'no-self', error: translatorFor(ctx?.lang)('circle.lists.no_self') };
         // A person's OWN item (no circle): the own scope named as the circle reaches their own store — carried to their
         // other devices, never to a circle's members — through the same generic atoms; never a household circle store
         // named after the scope.

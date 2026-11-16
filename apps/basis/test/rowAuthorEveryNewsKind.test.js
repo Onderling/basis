@@ -17,6 +17,7 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 import { HOUSEHOLD_BOT_STORE_OPTS, householdCircleIdFor } from '../src/v2/householdBotStore.js';
 import { landingKindOf, itemAuthor } from '../src/v2/itemLanding.js';
+import { pairCircleIdFor } from '../src/v2/pairCircleId.js';
 
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k) => NAMES[k] ?? k;
@@ -58,5 +59,11 @@ describe('every news kind in a circle names its maker', () => {
       for (const a of [r.assignee, ...(Array.isArray(r.assignees) ? r.assignees : [])].filter(Boolean)) expect(a, `${r.type} holder`).not.toBe('me');
     }
     for (const r of news) expect(itemAuthor(r), `${landingKindOf(r)} has an author`).toBeTruthy();
+
+    // in a circle a note never falls back to the GENERAL key: its maker is that circle's self (here the default persona's,
+    // which is what `circleSelf` answers for a circle no persona is filed under); with no self it is refused (rowAuthor.test)
+    const foreign = pairCircleIdFor('webid:x', 'webid:y');
+    const note = await call('household', encodeGenericOpId('household', 'add', 'note'), { body: 'een briefje', circleId: foreign });
+    expect(note?.result?.item?.createdBy ?? null).toBe(agent.circleSelf(foreign)?.webid ?? 'no-self');
   }, 90_000);
 });

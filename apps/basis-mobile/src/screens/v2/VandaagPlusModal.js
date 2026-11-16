@@ -10,8 +10,8 @@ import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
-import { t } from '../../core/localisation.js';
-import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel, plusMomentNeedsTime } from '../../../../basis/src/v2/vandaagPlus.js';
+import { t, lang } from '../../core/localisation.js';
+import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel, plusMomentNeedsTime, plusAskTime } from '../../../../basis/src/v2/vandaagPlus.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
@@ -145,7 +145,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                   <Text style={styles.label}>{f.labelKey ? t(f.labelKey) : f.name}</Text>
                   {/* a day was said but no time: ask for it (web twin); Save waits until the time is there */}
                   {f.kind === 'datetime' && plusMomentNeedsTime(act, values) ? (
-                    <Text style={styles.label} testID="vandaag-plus-ask-time">{t('circle.vandaag.plus_which_time', { day: plusMomentNeedsTime(act, values) })}</Text>
+                    <Text style={styles.label} testID="vandaag-plus-ask-time">{plusAskTime(act, values, { t, lang: lang() })}</Text>
                   ) : null}
                   <ThemedTextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
                     onChangeText={(v) => setValues((cur) => ({ ...cur, [f.name]: v }))} />

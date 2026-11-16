@@ -1561,6 +1561,8 @@
 /* the "+" sheet's fields: the theme's paper and ink, so they follow dark mode (the browser default is a light box) */
 .circle-vandaag-plus input, .circle-vandaag-plus textarea, .circle-vandaag-plus select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
 .circle-vandaag-plus__line { width: 100%; box-sizing: border-box; }
+/* which route answers the "+" conversation, and whether it is confidential: a quiet line above it */
+.circle-vandaag-plus__route { margin: 0 0 6px; font-size: 0.9em; color: var(--ink-soft, inherit); }
 /* each section is a wrapping row of pills with room between them (they sat flush against each other and against the
    line above at laptop width); a section's title, the free line and an act's form take a whole row */
 .circle-vandaag-plus__section { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }

@@ -75,11 +75,11 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   await expect(page.locator('.circle-screen__agenda-row').filter({ hasText: 'tandarts' }), 'nothing saved without a time').toHaveCount(0);
   await page.locator('.circle-vandaag-plus__close').click();
 
-  // a line it cannot read says so and fills nothing
+  // a line nothing reads, with no model set: it says no model is set and where to set one, and fills nothing
   await page.locator('.circle-vandaag__plus').click();
   await page.locator('.circle-vandaag-plus__line').fill('ooit eens iets');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
-  await expect(page.locator('.circle-vandaag-plus__error')).toBeVisible();
+  await expect(page.locator('.circle-vandaag-plus__done')).toHaveText(/(Assistent-endpoint|Assistant endpoint)/);
   await page.locator('.circle-vandaag-plus__close').click();
 
   // the own row opens the sheet on itself: change the title, Save; then open again and Remove

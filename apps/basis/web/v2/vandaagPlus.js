@@ -8,7 +8,7 @@ import { PLUS_ACTS, plusLabel, plusCardLabel, plusMomentNeedsTime, plusAskTime }
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
-export function renderVandaagPlus(container, { t, lang = 'nl', actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
+export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does
   shareTargets = null, onShare,
   // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
@@ -58,6 +58,13 @@ export function renderVandaagPlus(container, { t, lang = 'nl', actId = null, val
       container.appendChild(b);
     }
   } else {
+    // which route answers this conversation, and whether it is confidential (the shared line, `plusRouteLine`)
+    if (!editing && routeLine) {
+      const route = document.createElement('p');
+      route.className = 'circle-vandaag-plus__route';
+      route.textContent = routeLine;
+      container.appendChild(route);
+    }
     // the conversation so far: what the person said and what the "+" answered, kept across opens
     if (!editing && Array.isArray(turns) && turns.length) {
       const list = document.createElement('ol');

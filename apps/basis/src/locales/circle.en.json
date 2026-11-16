@@ -1575,6 +1575,34 @@
       "text": "I could not read that.",
       "doc": "The free line could not be read: the person fills the fields."
     },
+    "plus_no_model": {
+      "text": "No model of your own is set. Without one, the fixed phrases work (like \"put milk on Groceries\" or \"note: ...\"), the buttons below, and \"help\". To set a model: {{path}}.",
+      "doc": "The \"+\" with NO own model set, for a line the plain reading did not take: no model is set, what works without one, and the way to the setting ({{path}}: the screens' own labels joined by arrows)."
+    },
+    "plus_model_unreachable": {
+      "text": "Your own model cannot be reached right now. Try again later; the fixed phrases and the buttons still work.",
+      "doc": "The \"+\": the person's own model is set but could not be reached for this line."
+    },
+    "plus_route_none": {
+      "text": "No model of your own is set: the fixed phrases and the buttons work.",
+      "doc": "The line at the top of the \"+\" conversation when no own model is set."
+    },
+    "plus_route_confidential": {
+      "text": "Your own model answers, confidentially.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is confidential (a confidential preset the route guard accepts)."
+    },
+    "plus_route_local": {
+      "text": "Your own model answers, on {{host}}: a model you run yourself.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is a LOCAL model the person runs themselves (the Local preset); {{host}} is where it runs."
+    },
+    "plus_route_confidential_asserted": {
+      "text": "Your own model answers via {{host}}. You marked that route as attested; this app has not checked it.",
+      "doc": "The line at the top of the \"+\" conversation: a REMOTE confidential route accepted only because the person set its attestation flag; the app has not checked the enclave, so it never claims confidentiality as checked. {{host}} is where it goes."
+    },
+    "plus_route_plain": {
+      "text": "Your own model answers via {{host}}. That is not confidential.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is NOT confidential; {{host}} is where it goes."
+    },
     "plus_forget": {
       "text": "Forget this conversation",
       "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."

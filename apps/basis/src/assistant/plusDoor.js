@@ -31,6 +31,30 @@ import { interpretToCommand } from '../v2/interpretCommand.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
 
 /**
+ * The answer when no own model is set and the plain reading did not take the line: no model is set, what works without
+ * one, and the way to the setting, in the screens' own labels (so it stays true when a screen is renamed).
+ * @param {{t: Function}} o
+ */
+export function plusNoModelAnswer({ t }) {
+  const path = ['circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title'].map((k) => t(k)).join(' → ');
+  return t('circle.vandaag.plus_no_model', { path });
+}
+
+/**
+ * The line at the top of the conversation: which route answers, and whether it is confidential (`ownRouteOf`).
+ * @param {{set: boolean, kind: string, confidential: boolean, host: string|null}} route  @param {{t: Function}} o
+ */
+export function plusRouteLine(route, { t }) {
+  if (!route?.set) return t('circle.vandaag.plus_route_none');
+  if (route.kind === 'confidential') return t('circle.vandaag.plus_route_confidential');
+  // confidential only by the person's own word (a remote route, its attestation the setting's flag): never claimed as checked
+  if (route.kind === 'confidential-asserted') return t('circle.vandaag.plus_route_confidential_asserted', { host: route.host ?? '' });
+  // a model the person runs themselves: the most private route, never called "not confidential"
+  if (route.kind === 'local') return t('circle.vandaag.plus_route_local', { host: route.host ?? '' });
+  return t('circle.vandaag.plus_route_plain', { host: route.host ?? '' });
+}
+
+/**
  * Whose conversation the sheet shows: the self it is written as; with one self or none ticked, the general self's (as the
  * door reads a line then); with several ticked and none picked, nobody's until the sheet's question is answered.
  * @param {string|null} asSelf  @param {number} tickedCount  how many selves are ticked in the header
@@ -236,7 +260,8 @@ export function createPlusDoor({
       outcome = { actId: act.id, values };
     },
     onNoMatch: (_text, _ctx, opts) => { outcome = typeof opts?.reply === 'string' && opts.reply ? { done: opts.reply } : unread(); },
-    onLlmUnavailable: () => { outcome = unread(); },
+    // the own model is set but could not be reached: say that, never "I could not read that"
+    onLlmUnavailable: () => { outcome = { error: t('circle.vandaag.plus_model_unreachable') }; },
     onUnhandled: () => { outcome = unread(); },
   });
 
@@ -261,8 +286,9 @@ export function createPlusDoor({
     if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command } };
     // an own act's form, filled as the primary self (the form may change it)
     if (o?.kind === 'own') return o.actId ? { actId: o.actId, values: o.values ?? {}, asSelf } : o;
-    // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere)
-    if (!llm) return unread();
+    // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere, and the
+    // "+" says what works without one and where to set one)
+    if (!llm) return { done: plusNoModelAnswer({ t }) };
     outcome = null;
     currentLine = text;
     await engine.ask(threadIdFor(set), text, { asSelf, selves: set });

@@ -60,12 +60,12 @@ describe('the "+" door: the line goes to the person\'s own model after the plain
     expect(r.actId).toBe('household.note');
   });
 
-  it('no own model: the line is not sent anywhere, and the "+" says it could not read it', async () => {
+  it('no own model: the line is not sent anywhere, and the "+" says no model is set (and where to set one)', async () => {
     const interpret = vi.fn(async () => ({ reply: 'x' }));
     const { d } = door({ llm: null, interpret });
     const r = await d.read('wat kan je allemaal?');
     expect(interpret).not.toHaveBeenCalled();
-    expect(r.error).toBeTruthy();
+    expect(r.done).toContain('circle.vandaag.plus_no_model');
   });
 
   it('the conversation is kept: the next turn reaches the model with the previous one', async () => {

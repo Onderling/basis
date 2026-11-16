@@ -15,7 +15,7 @@ test('the "+" opens on the conversation so far, also after a reload; Forget empt
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
-  // a line the "+" cannot read: the person's turn and its answer ("I could not read that") are both kept
+  // a line nothing reads (no model set): the person's turn and its answer (no model is set, and where) are both kept
   await page.locator('.circle-vandaag__plus').click();
   await expect(page.locator('.circle-vandaag-plus__thread'), 'a fresh person has no conversation yet').toHaveCount(0);
   await page.locator('.circle-vandaag-plus__line').fill('blauwe olifanten dansen');

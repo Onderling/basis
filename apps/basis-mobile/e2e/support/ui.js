@@ -64,7 +64,7 @@ async function backToLauncher(tries = 4) {
 }
 
 /** A walk that deletes the app must never run on a person's phone: an emulator, or an agreed test device the run names
- *  in E2E_WIPE_OK (wipeOk.js: two locks; the Fairphone is refused whatever a run says). */
+ *  in E2E_WIPE_OK (wipeOk.js: two locks; a phone not on the agreed list is refused whatever a run says). */
 function emulatorOnly(name) {
   if (!mayWipe(device.id)) {
     throw new Error(`${name} refuses to run on ${device.id}: it deletes the app — an emulator, or an agreed test device named in E2E_WIPE_OK`);

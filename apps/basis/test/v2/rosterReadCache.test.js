@@ -69,3 +69,44 @@ describe('rosterReadCache — one answer per (op, circle) per window', () => {
     expect(ROSTER_READ_OPS).toEqual(['listGroupMembers', 'listGroupRoster', 'listMyCircles']);
   });
 });
+
+describe('a read in flight across an invalidation never keeps its answer', () => {
+  const deferred = () => { let resolve; const p = new Promise((r) => { resolve = r; }); return { p, resolve }; };
+  it('(a) a join lands while a read is in flight → the next read shows the new member', async () => {
+    const cache = createRosterReadCache({ ttlMs: 30_000 });
+    let members = ['ann'];
+    const slow = deferred();
+    const first = cache.read('listGroupMembers', { groupId: 'g' }, async () => { const snap = [...members]; await slow.p; return { members: snap }; });
+    members = ['ann', 'bot'];          // the join lands…
+    cache.invalidate('g');             // …and clears the circle's window
+    slow.resolve();
+    await first;
+    const next = await cache.read('listGroupMembers', { groupId: 'g' }, async () => ({ members: [...members] }));
+    expect(next.members, 'the next read served the pre-join answer').toEqual(['ann', 'bot']);
+  });
+  it('(b) an evict lands while a read is in flight → the next read does not show the removed member', async () => {
+    const cache = createRosterReadCache({ ttlMs: 30_000 });
+    let members = ['ann', 'bob'];
+    const slow = deferred();
+    const first = cache.read('listGroupMembers', { groupId: 'g' }, async () => { const snap = [...members]; await slow.p; return { members: snap }; });
+    members = ['ann'];
+    cache.invalidate('g');
+    slow.resolve();
+    await first;
+    const next = await cache.read('listGroupMembers', { groupId: 'g' }, async () => ({ members: [...members] }));
+    expect(next.members, 'a removed member is still on the next read').toEqual(['ann']);
+  });
+  it('(c) …and when the invalidation comes BEFORE the slow read settles but a SECOND read joins it first', async () => {
+    const cache = createRosterReadCache({ ttlMs: 30_000 });
+    let members = ['ann', 'bob'];
+    const slow = deferred();
+    const first = cache.read('listGroupMembers', { groupId: 'g' }, async () => { const snap = [...members]; await slow.p; return { members: snap }; });
+    const joined = cache.read('listGroupMembers', { groupId: 'g' }, async () => ({ members: ['never-run'] }));
+    members = ['ann'];
+    cache.invalidate('g');
+    slow.resolve();
+    await Promise.all([first, joined]);
+    const next = await cache.read('listGroupMembers', { groupId: 'g' }, async () => ({ members: [...members] }));
+    expect(next.members).toEqual(['ann']);
+  });
+});

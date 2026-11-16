@@ -105,6 +105,17 @@ describe('the "+" reads the ticked self\'s own lists first', () => {
     expect(r.to).toEqual([{ circleId: OWN, name: 'mine', own: true }, { circleId: 'c1', name: 'Thuis' }]);
   });
 
+  it('a line naming a circle that has NO list yet still makes the list there (the newcomer\'s first list)', () => {
+    for (const line of ['Thuis: maak een lijst Boodschappen', 'Thuis: nieuwe lijst Klusjes']) {
+      expect(plusLineOutcome(line, { circles: [circle('c1', 'Thuis', []), circle('c-help', 'Help', [])], own: own([]) }), line)
+        .toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c1', command: { opId: 'createList', args: { circleId: 'c1' } } });
+    }
+    // only a MAKE is read without lists: a line about a list the circle does not hold is not guessed
+    expect(plusLineOutcome('Thuis: zet melk op Boodschappen', { circles: [circle('c1', 'Thuis', [])], own: own([]) })?.command?.opId).not.toBe('addToList');
+    // and only where the line NAMES the circle: unnamed, no list-less circle is guessed (here no own lists either)
+    expect(plusLineOutcome('maak een lijst Boodschappen', { circles: [circle('c1', 'Thuis', []), circle('c-help', 'Help', [])] })?.kind).not.toBe('circle');
+  });
+
   it('no own list of that name: the circles read it as before', () => {
     const r = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', [SHOP])], own: own([]) });
     expect(r).toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c1' });

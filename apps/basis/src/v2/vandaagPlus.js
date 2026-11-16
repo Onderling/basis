@@ -13,6 +13,7 @@ import { renderGate } from '@onderling/app-manifest';
 import { listsGateRules, circleListsFor } from './circleGate.js';
 import { GATE_WORDS, helpWords, helpQuestionOpeners } from './gateWords.js';
 import { answerHelp } from './help/helpAnswer.js';
+import { HELP_CIRCLE_ID } from './helpCircle.js';
 import { replyLine } from './replyLine.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
@@ -265,7 +266,8 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
   if (ownAct) return { kind: 'own', ...ownAct };
   const text = word(line);
   if (!text) return null;
-  const all = Array.isArray(circles) ? circles : [];
+  // the Help circle is where the Onderling bot answers, never a place for a person's things: the "+" never offers it
+  const all = (Array.isArray(circles) ? circles : []).filter((c) => c?.id !== HELP_CIRCLE_ID);
   // "<circle>: …" names the circle: the rest is read there only
   const m = /^([^:]{1,60}):\s*(.+)$/u.exec(text);
   const named = m ? all.filter((c) => c?.name && String(c.name).trim().toLowerCase() === m[1].trim().toLowerCase()) : [];
@@ -276,7 +278,7 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
   if (mine?.makes) return atOwn(mine.command);
   // a line that names a list some circle HOLDS is about that list: those circles read it, and a manifest's looser
   // phrasing elsewhere does not count (the tasks gate reads "zet melk op …" as a new task anywhere)
-  const read = scope.map((c) => ({ circle: c, ...circleReading(rest, c) })).filter((x) => x.command);
+  const read = scope.map((c) => ({ circle: c, ...circleReading(rest, c, { named: named.length === 1 }) })).filter((x) => x.command);
   const byList = read.filter((x) => x.fromLists);
   if (mine) {
     // an own list of that name: there at once, unless a circle holds one too (then the card, 'mine' first)
@@ -367,7 +369,7 @@ export function plusHelpAnswer(o, { t, acts = PLUS_ACTS } = {}) {
  * One circle's reading of a line: the box's lists table first (`fromLists`: the circle holds the list it names), then the
  * circle's manifests' gate; only an op it offers. `{command: null}` when it reads nothing.
  */
-function circleReading(text, c) {
+function circleReading(text, c, { named = false } = {}) {
   const ms = Object.values(c?.manifestsByOrigin ?? {}).filter(Boolean);
   const av = c?.availability ?? null;
   const shown = (opId) => !av || av.of(opId).state !== 'hidden';
@@ -386,7 +388,12 @@ function circleReading(text, c) {
     return null;
   };
   const lists = Array.isArray(c?.lists) ? c.lists : [];
-  const fromLists = lists.length ? tryRules(listsGateRules(null, lists, { greeting: false }), false) : null;
+  // the lists table needs list words to compile; a circle with no list yet, NAMED in the line, gets the word nobody types
+  // (as the own lists do), so only a MAKE reads there: "Thuis: maak een lijst Boodschappen" is a newcomer's first list.
+  // Unnamed, a make stays the person's own (plusLineOutcome reads the own lists first); no circle is guessed.
+  const fromLists = lists.length
+    ? tryRules(listsGateRules(null, lists, { greeting: false }), false)
+    : !named ? null : (() => { const cmd = tryRules(listsGateRules(null, [{ name: NO_OWN_LIST }], { greeting: false }), false); return cmd?.opId === 'createList' ? cmd : null; })();
   if (fromLists) return { command: fromLists, fromLists: true };
   return { command: tryRules(renderGate(ms), true), fromLists: false };
 }

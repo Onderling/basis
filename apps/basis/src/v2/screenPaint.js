@@ -6,7 +6,7 @@
  */
 
 import { pickerChoices } from '../forms/pickerChoices.js';
-import { composeAssistantCatalogue } from '../telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../assistant/assistantCatalogue.js';
 import { isAdminOp } from './botHelp.js';
 import { parseInput } from '../parser.js';
 import { resolveDispatch } from '../router.js';

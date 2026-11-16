@@ -45,7 +45,7 @@ describe('the door carries the thread\'s language on its calls', () => {
     threads.setLang('telegram:31', 'en');
     const seen = [];
     const callSkill = async (app, op, args, ctx) => { seen.push({ op, lang: ctx?.lang ?? null }); return { ok: true, message: 'x' }; };
-    const { createDoorCatalogue } = await import('../src/telegram/assistantCatalogue.js');
+    const { createDoorCatalogue } = await import('../src/assistant/assistantCatalogue.js');
     const { mockHouseholdManifest } = await import('../src/core/agent/mockAgent.js');
     const door = createDoorCatalogue({ getApps: () => ['lists'], householdManifest: mockHouseholdManifest });
     // any op the door offers as a slash command with no argument (a read)

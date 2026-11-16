@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
 import { createTelegramRunner } from '../src/telegram/runner.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { mergeManifests } from '../src/index.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';

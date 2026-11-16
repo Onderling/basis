@@ -5,7 +5,7 @@
  * their screens.
  */
 import { describe, it, expect } from 'vitest';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { screenColumnFor, BOT_SCREEN_NEVER, SCREEN_ADMIN_OPS } from '../src/v2/screenActing.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';

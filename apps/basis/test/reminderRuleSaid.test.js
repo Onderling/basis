@@ -10,7 +10,7 @@ import { initLocalisation, t } from '../src/localisation.js';
 import { welcomeLines } from '../src/v2/botWelcome.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { templateLists } from '../src/v2/householdTemplate.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { scopeCatalogueToRole } from '../src/v2/botOpMap.js';
 import { REMINDER_MOMENTS, EVENING_BEFORE_UNTIL } from '../src/v2/botReminders.js';
 import { HOUSEHOLD_RULES_DEFAULT } from '../src/v2/botSettings.js';

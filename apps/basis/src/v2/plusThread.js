@@ -25,6 +25,8 @@ export function createPlusThread({ threads, threadId } = {}) {
   if (!threads?.memory) throw new TypeError('createPlusThread: bot threads are required');
   return {
     threadId,
+    /** The thread's memory, the shape the assistant engine reads back (`remember`, `recent`): the door's. */
+    memory: threads.memory,
     /** The person's line, as they typed it. */
     heard(text) { if (threadId) threads.memory.remember(threadId, 'you', text); },
     /** What the "+" answered: what it did, what it asks, or that it could not read the line. */

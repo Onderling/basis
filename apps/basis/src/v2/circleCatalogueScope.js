@@ -13,6 +13,7 @@
 // filtered by `appOrigin`.
 
 import { DEFAULT_CIRCLE_ORIGINS } from './circleSources.js';
+import { inScope } from '@onderling/app-manifest';
 
 /**
  * @param {{opsById?:Map<string,{op:object,appOrigin:string}>, commandMenu?:Array}} catalogue
@@ -26,6 +27,24 @@ export function scopeCatalogueToApps(catalogue, apps) {
   for (const [k, entry] of catalogue.opsById) if (allow.has(entry && entry.appOrigin)) opsById.set(k, entry);
   const commandMenu = Array.isArray(catalogue.commandMenu)
     ? catalogue.commandMenu.filter((e) => allow.has(e && e.appOrigin))
+    : catalogue.commandMenu;
+  return { ...catalogue, opsById, commandMenu };
+}
+
+/**
+ * A catalogue narrowed to one PLACE (`own`, `circle`, `contact`): only the ops declared to be offered there (the op's
+ * `scopes`, read through `@onderling/app-manifest`'s `inScope`). The person's own "+" asks for `own`, so its model
+ * sees, and its "/" list offers, only the acts that live in their own things.
+ * @param {{opsById?:Map<string,{op:object,appOrigin:string}>, commandMenu?:Array}} catalogue
+ * @param {'own'|'circle'|'contact'} place
+ */
+export function scopeCatalogueToPlace(catalogue, place) {
+  if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function' || !place) return catalogue;
+  const opsById = new Map();
+  for (const [k, entry] of catalogue.opsById) if (inScope(entry?.op, place)) opsById.set(k, entry);
+  const kept = new Set([...opsById.values()].map((e) => `${e?.appOrigin}:${e?.op?.id}`));
+  const commandMenu = Array.isArray(catalogue.commandMenu)
+    ? catalogue.commandMenu.filter((e) => kept.has(`${e?.appOrigin}:${e?.opId}`))
     : catalogue.commandMenu;
   return { ...catalogue, opsById, commandMenu };
 }

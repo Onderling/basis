@@ -8,11 +8,12 @@
  * /slash" — and a device with no circle has no chat, so such an op could not be run at all.
  */
 import React, { useMemo, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { buildFormSpec, validateAndCoerce } from '../../../../basis/src/forms/buildFormSpec.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose, onDispatched,
   // a form already decided by the shared `opFormOrRun` (what is known filled in), and the choices its pickers offer
@@ -71,7 +72,7 @@ export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose
             ) : (
               <View key={f.name} style={styles.field}>
                 <Text style={styles.label}>{f.name}{f.required ? ' *' : ''}{f.choices ? ` (${f.choices.join(' | ')})` : ''}</Text>
-                <TextInput
+                <ThemedTextInput
                   style={styles.input}
                   value={values[f.name] ?? ''}
                   placeholder={f.placeholder ?? (f.kind === 'boolean' ? 'true / false' : f.kind)}

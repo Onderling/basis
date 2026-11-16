@@ -23,7 +23,7 @@
 // consent-gated route the shell already owns.
 
 import { rankHelpCards } from './helpAnswer.js';
-import { helpDeck as defaultDeck } from './kaartjes.js';
+import { helpCardsDeck as defaultDeck } from './helpCards.js';   // the site's cards + the app's how-to cards
 
 /** How many related cards to ground on before falling back to a full-deck digest. */
 export const HELP_LLM_TOP_N = 4;

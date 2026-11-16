@@ -80,6 +80,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `switch-names-its-setting` | — | EVERY SWITCH NAMES WHAT IT SETS. A switch a person can flip that changes nothing is a promise unkept |
 | `telegram-imports` | — | the Telegram folder is the BOX's Telegram door, nothing more |
 | `theme-tokens` | — | the web design system's drift guards (theme.css regenerates clean; circle.css uses only defined tokens; no … |
+| `themed-inputs` | — | every text input takes its colours from the theme, never from the platform |
 | `typed-commands-reachable` | — | a command a person can TYPE must have a door, in both shells |
 | `ui-copy-dashes` | — | UI COPY IS PLAIN SENTENCES: NO DASH CONSTRUCTIONS |
 | `unbound-names` | — | a Node entry point uses no name that nothing defines |

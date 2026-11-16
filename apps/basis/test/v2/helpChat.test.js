@@ -3,7 +3,7 @@ import {
   routeHelpMessage, helpTopicChips, resolveHelpTopic,
   parseHelpAction, helpTopicAction, helpConsentAction, helpLlmLabelKeys,
 } from '../../src/v2/helpChat.js';
-import { helpDeck } from '../../src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../src/v2/help/helpCards.js';   // every reader's deck: the site's cards + the app's
 import nl from '../../src/locales/circle.nl.json';
 import en from '../../src/locales/circle.en.json';
 

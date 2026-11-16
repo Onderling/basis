@@ -12,7 +12,7 @@
  * which supersedes the old read-only `listReports` view this screen used to carry.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t, lang } from '../../core/localisation.js';
 import { removeMemberDoor, changeRoleDoor } from '../../../../basis/src/v2/governanceDoors.js';
@@ -33,6 +33,7 @@ import { blockedRowWords } from '../../../../basis/src/v2/blockedWords.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import FaceView from './FaceView.js';
 import { rosterRowShown } from '../../../../basis/src/v2/circleViewAs.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function CircleAdminPanelScreen({ callSkill, agent = null, governance = null, groupId, onBack, onLeave = null, resolvePicture = null, revealPolicyOf = null,
   // what this circle shared out, and taking it back (the host binds them to this device's resolvers — `circlePods.js`):
@@ -221,7 +222,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, govern
           const ann = loaded ? announceControlFor({ members, myRef: myWebid }) : { disabled: true };
           return (
             <>
-              <TextInput style={styles.area} value={announce} onChangeText={setAnnounce} editable={!ann.disabled}
+              <ThemedTextInput style={styles.area} value={announce} onChangeText={setAnnounce} editable={!ann.disabled}
                 placeholder={t(ann.reasonKey ?? 'circle.admin.announce_placeholder')} placeholderTextColor={theme.color.inkSoft} multiline testID="admin-announce" />
               <Pressable style={[styles.primary, ann.disabled ? { opacity: 0.45 } : null]} disabled={ann.disabled} onPress={postAnnounce} testID="admin-announce-post">
                 <Text style={styles.primaryText}>{t('circle.admin.announce_post')}</Text>

@@ -8,7 +8,7 @@
  * platform glue (React state); the channel contract is shared web≡mobile.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { Image, View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSendRoute } from '../../../../basis/src/v2/contactsSource.js';
@@ -35,6 +35,7 @@ import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
 import { settleContactAttach } from '../../../../basis/src/v2/contactAttachOutcome.js';
 import { trackContactTurn } from '../../../../basis/src/v2/contactTurnDelivery.js';
 import DeliveryChip from '../../rn/DeliveryChip.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
 // `deliveryStateMap` — the SHARED per-message map (App.js owns it; receipts land there): my own bubbles read it.
@@ -463,7 +464,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
             <Text style={styles.suggestHint}>+</Text>
           </Pressable>
         ) : null}
-        <TextInput
+        <ThemedTextInput
           style={styles.input}
           value={input}
           onChangeText={setInput}

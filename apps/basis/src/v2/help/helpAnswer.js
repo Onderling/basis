@@ -16,7 +16,7 @@
 // Pure: no DOM, no network, no storage. answerHelp(query, { lang }) is the
 // whole surface; helpTopics({ lang }) lists the answerable headings.
 
-import { helpDeck } from './kaartjes.js';
+import { helpCardsDeck as helpDeck } from './helpCards.js';   // the site's cards + the app's how-to cards
 
 // Layer-0 word rules, per language. A rule maps a query pattern to a card id,
 // or to '@opening' for the bare greeting. Ported verbatim from the site matcher.

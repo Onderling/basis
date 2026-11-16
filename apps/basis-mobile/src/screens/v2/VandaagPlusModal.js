@@ -6,13 +6,14 @@
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t } from '../../core/localisation.js';
-import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel } from '../../../../basis/src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel, plusMomentNeedsTime } from '../../../../basis/src/v2/vandaagPlus.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does → null, or the line
@@ -114,7 +115,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
-              <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
+              <ThemedTextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
                 placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
@@ -147,11 +148,15 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {act.fields.map((f) => (
                 <View key={f.name} style={styles.field}>
                   <Text style={styles.label}>{f.labelKey ? t(f.labelKey) : f.name}</Text>
-                  <TextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
+                  {/* a day was said but no time: ask for it (web twin); Save waits until the time is there */}
+                  {f.kind === 'datetime' && plusMomentNeedsTime(act, values) ? (
+                    <Text style={styles.label} testID="vandaag-plus-ask-time">{t('circle.vandaag.plus_which_time', { day: plusMomentNeedsTime(act, values) })}</Text>
+                  ) : null}
+                  <ThemedTextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
                     onChangeText={(v) => setValues((cur) => ({ ...cur, [f.name]: v }))} />
                 </View>
               ))}
-              <Btn disabled={busy} onPress={save} testID="vandaag-plus-save" label={t('circle.vandaag.plus_save')} style={styles.btnAt} />
+              <Btn disabled={busy || !!plusMomentNeedsTime(act, values)} onPress={save} testID="vandaag-plus-save" label={t('circle.vandaag.plus_save')} style={styles.btnAt} />
               {edit && onRemove ? (
                 <Btn disabled={busy} onPress={remove} testID="vandaag-plus-remove" label={t('circle.vandaag.plus_remove')} style={styles.btnAt} />
               ) : null}

@@ -20,7 +20,9 @@ const DEAD = 'dead-peer-address-0000000000000000000000000';
 const SEND = { firstSendTimeoutMs: 300, retryDelays: [], guarantee: 'hold-forward' };
 
 async function agentOnBlackHole() {
-  const a = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false });
+  // the not-yet interval off: these tests count handshakes per send to an address that never answers, which that interval
+  // would hold back on purpose (holdQueueBounds pins it); here only the in-flight coalescing is under test
+  const a = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false, notYetAttemptIntervalMs: 0 });
   const tx = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
   await a.addSecureTransport('relay', tx);
   return { a, tx };

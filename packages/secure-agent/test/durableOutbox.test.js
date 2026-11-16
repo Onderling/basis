@@ -120,6 +120,7 @@ describe('the dead-address verdict survives a restart (bounded)', () => {
     };
     const FAST = { firstSendTimeoutMs: 100, retryDelays: [], guarantee: 'hold-forward' };
     const first = await boot();
+    await first.a.presenceSignal(PEER);                            // it answered once (only then can it be judged dead)
     await first.a.peer.sendTo(PEER, { msgId: 'm1' }, FAST);       // fails once → written off (max 1)
     expect(first.tx.puts).toBeGreaterThan(0);
     await first.a.shutdown();
@@ -134,6 +135,8 @@ describe('the dead-address verdict survives a restart (bounded)', () => {
     const third = await boot({ holdDeadTtlMs: 1 });               // the verdict has expired
     await third.a.peer.sendTo(PEER, { msgId: 'm3' }, FAST);
     expect(third.tx.puts).toBeGreaterThan(0);
+    // …and 'it was seen alive' survived the restarts: its failure counts again at once, without a new sign of life
+    expect(third.a.holdStats().givenUpOn, 'the seen-alive record is kept across a restart').toBe(1);
     await third.a.shutdown();
   });
 });

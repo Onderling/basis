@@ -33,6 +33,21 @@ export function compileGateWords(words = GATE_WORDS, slots = {}) {
   return out;
 }
 
+/** How a line OPENS when it asks how something works ("hoe …", "what is …"; the gate files' `_help.questions`), every
+ *  language together, lower-cased: only a line that opens so is looked up in the help cards. */
+export function helpQuestionOpeners(words = GATE_WORDS) {
+  const out = [];
+  for (const entries of Object.values(words)) for (const w of entries?._help?.questions ?? []) out.push(String(w).toLowerCase());
+  return out;
+}
+
+/** The whole lines that ask for help, every language together, lower-cased. */
+export function helpWords(words = GATE_WORDS) {
+  const out = new Set();
+  for (const entries of Object.values(words)) for (const w of entries?._help?.words ?? []) out.add(String(w).toLowerCase());
+  return out;
+}
+
 /** The trailing verbs per language ("afwas klaar"), as the manifest gate reads them: `{ <lang>: { complete: [...] } }`. */
 export function trailingLexicon(words = GATE_WORDS) {
   const out = {};

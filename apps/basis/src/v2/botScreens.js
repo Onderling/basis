@@ -190,7 +190,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
     if (previous && previous.viewPubKey !== viewPubKey) refuseSoon(previous.viewPubKey);
     const asked = await ask(person, { codes: asked0.codes, replaced: Boolean(previous) });
     if (!asked?.ok) { door.drop(person); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
-    return { ok: true, pending: true, person, code: asked0.code };
+    return { ok: true, pending: true, person };
   }
 
   return {

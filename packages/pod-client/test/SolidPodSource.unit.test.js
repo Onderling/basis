@@ -97,6 +97,57 @@ describe('SolidPodSource — read', () => {
     expect(result.lastModified).toBe('Wed, 28 Apr 2026 10:00:00 GMT');
   });
 
+  it('a read after the resource changed sees the change, never a cached copy (every read revalidates with the pod)', async () => {
+    // A browser's fetch keeps an HTTP cache: a GET or HEAD without a cache mode may be answered from it, with the OLD body
+    // and the OLD ETag, after this same page wrote a new version. Measured in the shared-pod walks (2026-11-15): the key
+    // file's writer read back its own grant as missing for ~25 s, every retry's If-Match then failed, and the member never
+    // got the key. This fetch behaves like that cache: it answers from the cache unless the request asks to revalidate.
+    let server = { body: 'v1', etag: '"1"' };
+    const cache = new Map();
+    const fetchFn = async (url, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const key = `${method} ${url}`;
+      const revalidates = init.cache === 'no-cache' || init.cache === 'no-store' || init.cache === 'reload';
+      if (!revalidates && cache.has(key)) return cache.get(key).clone();
+      const res = makeRes({ body: method === 'HEAD' ? '' : server.body, headers: { etag: server.etag }, url: String(url) });
+      cache.set(key, res.clone());
+      return res;
+    };
+    source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+
+    const first = await source.read('/foo.txt');
+    expect(new TextDecoder().decode(first.content)).toBe('v1');
+    server = { body: 'v2', etag: '"2"' };            // this page's own write landed on the pod
+    const second = await source.read('/foo.txt');
+    expect(new TextDecoder().decode(second.content)).toBe('v2');
+    expect(second.etag).toBe('"2"');
+  });
+
+  it('an existence check revalidates too', async () => {
+    const fetchFn = makeFetch({ [`HEAD ${POD}foo.txt`]: makeRes({ status: 200 }) });
+    source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+    await source.exists('/foo.txt');
+    expect(fetchFn.calls.length).toBeGreaterThan(0);
+    expect(fetchFn.calls.every((c) => c.init.cache === 'no-cache')).toBe(true);
+  });
+
+  it('the ETag belongs to the body it came with: a write landing just after the read cannot pair the old body with the new ETag', async () => {
+    // Measured on a real pod (2026-11-15): the body was taken from a GET and the ETag from a HEAD sent after it; another
+    // writer's PUT in between gave the old body under the new ETag, a write conditioned on that ETag passed, and that
+    // writer's change was lost (13 of 40 runs of the key-file race). This pod changes the resource right after every GET.
+    let server = { body: 'v1', etag: '"1"' };
+    const fetchFn = async (url, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const res = makeRes({ body: method === 'HEAD' ? '' : server.body, headers: { etag: server.etag }, url: String(url) });
+      if (method === 'GET') server = { body: 'v2', etag: '"2"' };   // another writer's PUT lands now
+      return res;
+    };
+    const source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+    const got = await source.read('/foo.txt');
+    expect(new TextDecoder().decode(got.content)).toBe('v1');
+    expect(got.etag).toBe('"1"');
+  });
+
   it('404 → NOT_FOUND', async () => {
     const fetchFn = makeFetch({
       [`GET ${POD}missing.txt`]: makeRes({ status: 404, statusText: 'Not Found' }),
@@ -188,6 +239,23 @@ describe('SolidPodSource — write', () => {
     // PUT was issued
     const put = fetchFn.calls.find(c => c.method === 'PUT');
     expect(put).toBeTruthy();
+  });
+
+  // A pod answers a PUT with no ETag (measured on CSS 7.2.0), and a version asked for by a LATER request may already be
+  // another writer's. So a plain write sends no HEAD afterwards and names no version: here another writer's PUT lands
+  // between ours and anything we could send next, and the result must not hand us their version as ours.
+  it('a plain write sends no HEAD afterwards and returns no version (one that could be another writer\'s)', async () => {
+    let version = 0;
+    const fetchFn = makeFetch({
+      [`PUT ${POD}note.txt`]: () => { version += 2; return makeRes({ status: 205, statusText: 'Reset Content' }); }, // ours, then another writer's
+      [`HEAD ${POD}note.txt`]: () => makeRes({ headers: { etag: `"v${version}"`, 'last-modified': 'later' } }),
+    });
+    const source = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
+
+    const result = await source.write('/note.txt', 'hello', { contentType: 'text/plain' });
+    expect(fetchFn.calls.filter((c) => c.method === 'HEAD')).toHaveLength(0);
+    expect(result.etag ?? null).toBeNull();
+    expect(result.lastModified ?? null).toBeNull();
   });
 
   it('honours If-Match — happy path 200', async () => {

@@ -62,7 +62,11 @@ export const screenLabel = (label) => String(label ?? '').replace(/\s+/g, ' ').t
 
 const sameRelay = (a, b) => String(a ?? '').replace(/\/+$/, '').toLowerCase() === String(b ?? '').replace(/\/+$/, '').toLowerCase();
 
-/** An in-memory set of used nonces, each kept until its own time (the app's default; the bot keeps none: see below). */
+/**
+ * An in-memory set of used nonces, each kept until its own time. In memory only, on purpose: after a restart a spent
+ * offer can be asked about again, but it still needs the right pick, and the screen's key is its own throwaway one, so
+ * a replay grants nothing a fresh pairing would not (accepted, 2026-11-15).
+ */
 export function memoryUsedNonces({ now = Date.now } = {}) {
   const m = new Map();
   return {
@@ -90,7 +94,8 @@ export function createScreenDoor({ pending, used = null, relays = null, note = n
   return {
     /**
      * An offer arrived (pasted, scanned, or over the relay to the bot): checked, kept as the owner's ONE pending offer
-     * (a second replaces the first), and the three codes to pick from returned. Nothing is granted.
+     * (a second replaces the first), and the three codes to pick from returned. Nothing is granted. The REAL code is not
+     * in the answer: a caller that held it could mark it on the person's screen, and the pick would prove nothing.
      * @returns {Promise<{ok: true, codes: string[], previous: object|null}|{ok: false, reason: string}>}
      */
     async ask(owner, { viewPubKey, nonce, label = null, relayUrl = null } = {}) {
@@ -101,7 +106,7 @@ export function createScreenDoor({ pending, used = null, relays = null, note = n
       const previous = pending.get(owner) ?? null;
       const code = await screenCode(viewPubKey, nonce);
       pending.set(owner, { viewPubKey, nonce, label: screenLabel(label), relayUrl: relayUrl ?? null, until: now() + SCREEN_PAIRING_TTL_MS });
-      return { ok: true, codes: codeChoices(code, rand), previous, code };
+      return { ok: true, codes: codeChoices(code, rand), previous };
     },
     /** The owner's pending offer (or null). */
     pendingOf: (owner) => pending.get(owner) ?? null,

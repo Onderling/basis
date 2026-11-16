@@ -10,7 +10,7 @@ import { createRealHouseholdAgent } from '../../src/core/agent/realAgent.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { createOwnDevicesStore } from '../../src/v2/ownDevicesStore.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
-import { loadOwnItems } from '../../src/v2/ownItems.js';
+import { loadOwnItems } from '../../src/assistant/ownItems.js';
 
 const OWN = OWN_DEVICES_SCOPE;
 const NOTE_ADD = encodeGenericOpId('household', 'add', 'note');

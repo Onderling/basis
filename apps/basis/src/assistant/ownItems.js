@@ -7,7 +7,7 @@
  * notes never reach another self's model. A source that fails contributes nothing.
  */
 import { encodeGenericOpId } from '@onderling/app-manifest';
-import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
+import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 
 const OWN = OWN_DEVICES_SCOPE;
 const words = (v) => (typeof v === 'string' ? v.trim() : '');

@@ -227,7 +227,10 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
   }
   const timed = (a) => a.fields.some((f) => f.kind === 'datetime');
   const moment = readDayAndTime(rest, now ? { now } : {});
-  if (!act && moment?.day) act = acts.find(timed) ?? null;
+  // a day alone makes a line an appointment, unless the line ASKS something ("wat is het weer morgen", "…?"): a question
+  // is not an act. The question openers are the gate's own (`_help.questions`); an act word above still names its act.
+  const asks = /\?\s*$/u.test(text) || helpQuestionOpeners().some((o) => lower.startsWith(o));
+  if (!act && moment?.day && !asks) act = acts.find(timed) ?? null;
   if (!act) return null;
   const values = {};
   let words = rest;

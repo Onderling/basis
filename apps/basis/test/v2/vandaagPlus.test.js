@@ -121,6 +121,14 @@ describe('Vandaag — the free line at the top of the sheet', () => {
     expect(plusRead('ooit eens iets')).toBe(null);
     expect(plusRead('  ')).toBe(null);
   });
+  it('a QUESTION that mentions a day is not an appointment (a question is not an act)', () => {
+    for (const line of ['what is the weather tomorrow', 'wat is het weer morgen', 'is het morgen mooi weer?', 'hoe laat begint het morgen']) {
+      expect(plusRead(line), line).toBe(null);
+    }
+    // an act word still names its act, question mark or not; a plain line with a day stays an appointment
+    expect(plusRead('afspraak morgen 14:00 tandarts?')?.actId).toBe('calendar.calendar-event');
+    expect(plusRead('tandarts vrijdag 10:30')?.actId).toBe('calendar.calendar-event');
+  });
   it('a reading that names an act outside the sheet (a circle\'s list, the household\'s chores) is no reading', () => {
     expect(plusRead('zet melk op de boodschappen')).toBe(null);
   });

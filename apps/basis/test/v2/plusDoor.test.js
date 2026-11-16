@@ -276,6 +276,14 @@ describe('a follow-up uses the previous turn, and a refusal stores nothing and i
     expect(await d.settled({}, { saved: true, actId: 'calendar.calendar-event' })).toContain('circle.vandaag.plus_act_saved');
     expect(await d.settled({}, { saved: false }), 'already settled').toBeNull();
   });
+  it('another act saved by its button while the proposed form was open: the proposal is said as not saved, then, not at a later close', async () => {
+    const { d } = door({ interpret: standIn, readAs: ownRoutes, selfOf });
+    await d.read('waar ligt de sleutel?');
+    await d.read('zet dat morgen om 10 in mijn agenda');
+    const said = await d.settled({}, { saved: true, actId: 'household.note' });
+    expect(said).toContain('circle.vandaag.plus_act_not_saved');
+    expect(await d.settled({}, { saved: false }), 'a later close says nothing').toBeNull();
+  });
 });
 
 describe('the conversation follows the ticked self, or a set of selves with a primary', () => {

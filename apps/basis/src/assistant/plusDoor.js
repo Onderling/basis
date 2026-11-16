@@ -328,8 +328,8 @@ export function createPlusDoor({
     /**
      * The form the "+" opened is settled: saved, or closed without saving. Said in THIS conversation only when its last
      * turn is that form (the act's label, what `read` kept when it opened); so a refused proposal is said once, and a
-     * form the "+" did not open from a line says nothing. Read from the thread, not from the door: the phone composes a
-     * door per call. Returns what was said, or null.
+     * form the "+" did not open from a line says nothing. Saving ANOTHER act (`actId`) while it was open settles it as
+     * not saved. Read from the thread, not from the door: the phone composes a door per call. Returns what was said, or null.
      * @param {{asSelf?: string|null, selves?: string[]|null}} opts
      * @param {{saved: boolean, actId?: string|null}} how
      */
@@ -338,9 +338,11 @@ export function createPlusDoor({
       if (!memory || !thread || typeof memory.turns !== 'function') return null;
       const last = memory.turns(thread, 1).at(-1);
       if (last?.who !== 'assistant') return null;
-      const act = PLUS_ACTS.find((a) => (actId ? a.id === actId : true) && plusLabel(t, a) === last.text);
+      const act = PLUS_ACTS.find((a) => plusLabel(t, a) === last.text);
       if (!act) return null;
-      const said = t(saved ? 'circle.vandaag.plus_act_saved' : 'circle.vandaag.plus_act_not_saved', { act: plusLabel(t, act) });
+      // another act saved by its button while this form was open: THIS form was not saved (said now, not at a later close)
+      const kept = saved && (!actId || actId === act.id);
+      const said = t(kept ? 'circle.vandaag.plus_act_saved' : 'circle.vandaag.plus_act_not_saved', { act: plusLabel(t, act) });
       memory.remember(thread, 'assistant', said);
       return said;
     },

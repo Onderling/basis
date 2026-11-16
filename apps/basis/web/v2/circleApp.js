@@ -4783,6 +4783,10 @@ function showVandaagPlus({ edit = null } = {}) {
   };
   // the person's own "+" door, composed for this open: their own model as it is set now, these circles; the conversation
   // follows the self the "+" writes as (its thread, its memory, what it reads, its Forget: `selfKeyOf`, `readAs`)
+  // EVERY way out of the sheet but a save (Klaar, a bookmark that opens its circle, an act that runs at once; the overlay
+  // has no Escape or backdrop close): a form the "+" opened from a line still unsaved is refused, nothing is stored, and
+  // the conversation says so (the shared door's `settled`; phone twin: VandaagPlusModal closeSheet)
+  const leave = () => { if (actId && !editId) plusDoorNow().settled({ asSelf }, { saved: false }).catch(() => null); close(); };
   let _door = null;
   const plusDoorNow = () => {
     if (!_door) {
@@ -4818,14 +4822,14 @@ function showVandaagPlus({ edit = null } = {}) {
       const r = openPin(p, { circles: myCircles() });
       if (r.error) { error = t(r.error); paint(); return; }
       if (r.kind === 'own') { actId = r.actId; error = null; paint(); return; }
-      _pendingPinOpen = r; close(); showDetail(r.circleId);
+      _pendingPinOpen = r; leave(); showDetail(r.circleId);
     },
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => {
       const picked = PLUS_ACTS.find((a) => a.id === id);
       // an act that makes nothing and asks nothing (feedback) runs at once: no empty form in between
       if (actRunsAtOnce(picked)) {
-        close();
+        leave();
         rawCallSkill(picked.appOrigin, picked.opId, { screen: t('circle.vandaag.plus') })
           .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
         return;
@@ -4884,8 +4888,7 @@ function showVandaagPlus({ edit = null } = {}) {
       if (r?.ok === false) { error = r.error ?? t('circle.vandaag.plus_failed', { error: '' }); paint(); return; }
       close(); _showVandaag();
     } : null,
-    // closing with a form the "+" opened from a line still unsaved: refused, nothing stored, and the conversation says so
-    onClose: () => { if (actId && !editId) plusDoorNow().settled({ asSelf }, { saved: false }).catch(() => null); close(); },
+    onClose: () => leave(),
   });
   paint();
   refreshPins().catch(() => {});

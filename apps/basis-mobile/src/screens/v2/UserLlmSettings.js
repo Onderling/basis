@@ -116,5 +116,5 @@ const makeStyles = (theme) => StyleSheet.create({
   msgOk: { color: theme.color.accent },
   save: { marginTop: 12, backgroundColor: theme.color.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   saveBusy: { opacity: 0.6 },
-  saveText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  saveText: { color: theme.color.accentContrast, fontWeight: '700', fontSize: 15 },
 });

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { decodeGenericOpId } from '@onderling/app-manifest';
-import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusActs, plusMomentNeedsTime, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 // N CALENDAR days from now at this clock time — never `now + N × 24h`, which on a DST night lands on the wrong day
 const daysFromNow = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
@@ -120,6 +120,18 @@ describe('Vandaag — the free line at the top of the sheet', () => {
     expect(plusRead('tandarts vrijdag 10:30')?.actId).toBe('calendar.calendar-event');
     expect(plusRead('ooit eens iets')).toBe(null);
     expect(plusRead('  ')).toBe(null);
+  });
+  it('a day without a time keeps the day and fills in NO time: the form asks for it (no 09:00 nobody said)', () => {
+    const a = plusRead('afspraak morgen tandarts');
+    expect(a.actId).toBe('calendar.calendar-event');
+    expect(a.values.when).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const act = PLUS_ACTS.find((x) => x.id === a.actId);
+    expect(plusMomentNeedsTime(act, a.values)).toBe(a.values.when);
+    // a time said: nothing to ask
+    const b = plusRead('afspraak morgen 14:00 tandarts');
+    expect(plusMomentNeedsTime(act, b.values)).toBe(null);
+    // a note has no moment: nothing to ask
+    expect(plusMomentNeedsTime(PLUS_ACTS.find((x) => x.id === 'household.note'), { body: 'x' })).toBe(null);
   });
   it('a QUESTION that mentions a day is not an appointment (a question is not an act)', () => {
     for (const line of ['what is the weather tomorrow', 'wat is het weer morgen', 'is het morgen mooi weer?', 'hoe laat begint het morgen']) {

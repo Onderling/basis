@@ -1499,6 +1499,10 @@
       "text": "Save",
       "doc": "Vandaag → '+': save the own note or appointment."
     },
+    "plus_which_time": {
+      "text": "Which time on {{day}}?",
+      "doc": "Vandaag → '+': a day was said but no time; the form asks for the time (Save waits), never fills one in."
+    },
     "plus_empty": {
       "text": "Fill this in first.",
       "doc": "Vandaag → '+': something needed is empty."

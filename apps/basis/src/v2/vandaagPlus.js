@@ -389,9 +389,12 @@ export function plusCardLabel(t, to) {
  */
 export function plusDoneLine(result, { opId, args = {}, t } = {}) {
   const said = replyLine(result, { opId, args, t });
-  if (said || opId !== 'listEntries' || !result || result.ok === false || result.error) return said;
+  // ANY read that answers items (a list's entries, the own agenda's appointments, …) is said by its name and its lines,
+  // empty as "nothing on it": a read the "+" ran never ends in "could not read that"
+  if (said || !result || result.ok === false || result.error || !(Array.isArray(result.items) || opId === 'listEntries')) return said;
   const name = result.title ?? args?.list ?? '';
-  const items = (Array.isArray(result.items) ? result.items : []).map((i) => i?.label ?? i?.text ?? '').filter(Boolean);
+  const items = (Array.isArray(result.items) ? result.items : []).map((i) => i?.label ?? i?.text ?? i?.title ?? '').filter(Boolean);
+  if (!name) return items.length ? items.join(', ') : t('circle.vandaag.plus_read_none');
   return items.length ? t('circle.vandaag.plus_list_items', { name, items: items.join(', ') }) : t('circle.vandaag.plus_list_empty', { name });
 }
 

@@ -439,3 +439,21 @@ describe('the model is told it is the person\'s OWN place, never a household (jo
     expect(said + system, 'no circle named in the own place').not.toMatch(/in this circle/);
   });
 });
+
+describe('a read the model picks is answered in words, also when it is empty (no "could not read")', () => {
+  // the own agenda's read as the calendar answers it: its name, and each appointment's label
+  const agenda = (items) => () => async (app, op) => (op === 'listEvents' ? { ok: true, title: 'Agenda', items } : { items: [] });
+  const readTwice = vi.fn(async () => ({ opId: 'listEvents', args: { days: 2 } }));
+
+  it('"wat heb ik morgen gepland?" with an appointment: its label, under the agenda\'s name', async () => {
+    const { d } = door({ interpret: readTwice, readAs: agenda([{ id: 'e1', label: 'tandarts — wo 18 nov 10:00' }]), selfOf: () => ({ key: 'me', isDefault: true }) });
+    const r = await d.read('wat heb ik morgen gepland?');
+    expect(r.done).toContain('circle.vandaag.plus_list_items');
+    expect(r.done).toContain('tandarts');
+  });
+  it('an empty agenda: "nothing on it", never "could not read that"', async () => {
+    const { d } = door({ interpret: readTwice, readAs: agenda([]), selfOf: () => ({ key: 'me', isDefault: true }) });
+    const r = await d.read('wat heb ik morgen gepland?');
+    expect(r.done).toContain('circle.vandaag.plus_list_empty');
+  });
+});

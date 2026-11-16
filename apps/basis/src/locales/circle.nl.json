@@ -1590,6 +1590,10 @@
       "text": "{{act}}: niet bewaard. Er is niets opgeslagen.",
       "doc": "The \"+\" conversation: the form the \"+\" opened from a line was closed without saving (a refused proposal); nothing was stored."
     },
+    "plus_read_none": {
+      "text": "Niets gevonden.",
+      "doc": "The \"+\": a read it ran (one the model picked) answered no items and carries no name to say it by."
+    },
     "plus_model_unreachable": {
       "text": "Je eigen model is nu niet bereikbaar. Probeer het straks opnieuw; de vaste woorden en de knoppen werken wel.",
       "doc": "The \"+\": the person's own model is set but could not be reached for this line."

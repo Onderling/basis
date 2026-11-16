@@ -82,11 +82,12 @@ describe('a row of news carries what is new by kind', () => {
   });
 });
 
-describe('an appointment written on its maker\'s device says "me": the statement names the author', () => {
-  it('a local stamp names nobody; the snapshot\'s author address does', () => {
-    const appt = { id: 'e1', type: 'calendar-event', createdBy: 'me' };
-    expect(landingEntryFor({ circleId: 'c1', item: appt })).toBeNull();
-    expect(landingEntryFor({ circleId: 'c1', item: appt, authorRef: 'addr-b' })).toMatchObject({ actor: 'addr-b', payload: { kind: 'calendar-event' } });
-    expect(landingEntryFor({ circleId: 'c1', item: appt, authorRef: 'addr-a', self: 'addr-a' })).toBeNull();
+// A local stamp ('me') names nobody, and who served the snapshot is never the author: rowAuthor.test.js (the writer
+// stamps the circle's self; a sibling's own appointment is no news).
+describe('an appointment names its maker by the circle\'s self', () => {
+  it('a local stamp names nobody; the row\'s own maker does', () => {
+    expect(landingEntryFor({ circleId: 'c1', item: { id: 'e1', type: 'calendar-event', createdBy: 'me' } })).toBeNull();
+    expect(landingEntryFor({ circleId: 'c1', item: { id: 'e1', type: 'calendar-event', createdBy: 'addr-b' } }))
+      .toMatchObject({ actor: 'addr-b', payload: { kind: 'calendar-event' } });
   });
 });

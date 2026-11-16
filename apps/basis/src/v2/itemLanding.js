@@ -20,12 +20,14 @@ import { assigneesOf } from '@onderling/item-store';
 export const ITEM_LANDED = 'item-landed';
 
 /**
- * Who wrote a store row: the carried author, else its creator, else the statement's author (`authorRef`, the address
- * that said the snapshot). A local stamp ('me', which a writer's own device puts on its row) names nobody here.
+ * Who wrote a store row: the carried author, else its creator. Never who SERVED the snapshot it came in (a server's
+ * synthesised catch-up, a sibling device): that is not who wrote the row, and reading it as the author made a person's
+ * own appointment from their other device news. A writer in a circle stamps the circle's self (rowAuthor.js); the
+ * local stamp 'me' names nobody here (an old row, or one from a device that still writes it): no author, no news.
  */
-export function itemAuthor(item, authorRef = null) {
+export function itemAuthor(item) {
   const named = (x) => (typeof x === 'string' && x && x !== 'me' ? x : null);
-  return named(item?.source?.from) ?? named(item?.createdBy) ?? named(authorRef);
+  return named(item?.source?.from) ?? named(item?.createdBy);
 }
 
 /**
@@ -48,13 +50,12 @@ export function landingKindOf(item) {
  * @param {object} a.item        the store row as it landed
  * @param {boolean} [a.fresh]    first time this device holds it (the rail's landing flag)
  * @param {string|null} [a.self] the self this device speaks as in that circle
- * @param {string|null} [a.authorRef] the address that said the snapshot (the rail's statement author)
  * @param {number} [a.now]
  */
-export function landingEntryFor({ circleId, item, fresh = true, self = null, authorRef = null, now = Date.now() } = {}) {
+export function landingEntryFor({ circleId, item, fresh = true, self = null, now = Date.now() } = {}) {
   if (!fresh || typeof circleId !== 'string' || !circleId || typeof item?.id !== 'string') return null;
   const kind = landingKindOf(item);
-  const author = itemAuthor(item, authorRef);
+  const author = itemAuthor(item);
   if (!kind || typeof author !== 'string' || !author || (self && author === self)) return null;
   return makeSilentEntry({
     id: landingIdOf(circleId, item.id), circleId, kind: ITEM_LANDED, actor: author, ts: now,

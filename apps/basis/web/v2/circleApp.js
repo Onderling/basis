@@ -345,6 +345,7 @@ import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
 import { makeListsOps } from '../../src/v2/listsOps.js';
+import { rowAuthorFor } from '../../src/v2/rowAuthor.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -625,7 +626,7 @@ async function shareItemIntoCircle({ itemId, fromCircleId, toCircleId, by, recip
     policyOf: _circlePolicy,
     // recipient re-seal: the resolved keys + the injected copy-mode re-sealer (pod-client crypto).
     recipientKeys, sealCopy: sealCopyToRecipients,
-    itemId, fromCircleId, toCircleId, by: by ?? LOCAL_ACTOR,
+    itemId, fromCircleId, toCircleId, by: by ?? rowAuthorWeb(fromCircleId) ?? undefined,
     recipient, recipients: who,
   });
 }
@@ -683,7 +684,7 @@ async function shareItemToContact({ itemId, fromCircleId, toCircleId, by, recipi
       (typeof _peerAgent?.sendPeerMessage === 'function'
         ? _peerAgent.sendPeerMessage(to, envelope)
         : Promise.resolve()),
-    itemId, fromCircleId, toCircleId, by: by ?? LOCAL_ACTOR,
+    itemId, fromCircleId, toCircleId, by: by ?? rowAuthorWeb(fromCircleId) ?? undefined,
     recipient, recipientNetworkKey, verify, includeHistory,
   });
 }
@@ -867,6 +868,9 @@ import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circ
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
 const LOCAL_ACTOR = 'me';
+// who a row this shell writes INTO A CIRCLE names as its maker: the circle's self, never the local 'me' (rowAuthor.js;
+// the phone's twin in phoneAppOps). 'me' stays for this device's own stores (a contact thread, its own media).
+const rowAuthorWeb = rowAuthorFor({ circleSelf: (circleId) => circleHouseholdAgent?.circleSelf?.(circleId) ?? null });
 
 /* ─────────── basis's own ops → the waist ─────────── */
 // The seams only a browser has, handed to the SAME handler table mobile builds in `hostOps.js`. What
@@ -904,7 +908,8 @@ function listsOpsForShell() {
     storeFor: (circleId) => circleHouseholdAgent?.circleStoreFor?.(circleId),
     t,
     activeCircle: () => getActiveCircle(),
-    localActor: LOCAL_ACTOR,
+    // a row names its maker by the circle's self, never the local 'me' (rowAuthor.js; the phone's twin in phoneAppOps)
+    localActor: rowAuthorWeb,
   });
 }
 

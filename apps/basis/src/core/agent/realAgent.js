@@ -311,6 +311,7 @@ import { mergeManifests }                  from '../../manifestMerge.js';
 import { sharedCopyIdFor, sharedFieldsOf, withSharedMark } from '../../v2/sharedAppointment.js';
 import { personaOfContact, DEFAULT_PERSONA } from '../../v2/contactPersona.js';
 import { pairCircleIdFor, isPairCircleId } from '../../v2/pairCircleId.js';
+import { rowAuthorFor } from '../../v2/rowAuthor.js';
 import { isDirectPayload } from '../../v2/directDoors.js';   // a block refuses direct contact, never a circle's   // an own appointment shared with a contact
 import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
@@ -5289,6 +5290,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     const pk = p.personKey ? { version: p.personKey.version, pubKey: p.personKeyPubOf(p.personKey) } : null;
     return { webid: (isDefault ? chatId : p.chatId)?.pubKey ?? null, sendAs: isDefault ? null : (p.chatId?.pubKey ?? null), personKey: pk };
   };
+  // who a row this device writes names as its maker, per circle (rowAuthor.js): the circle's self, never the local 'me'
+  const rowAuthor = rowAuthorFor({ circleSelf });
   hostAgent.register('bindCirclePersona', async ({ parts }) => {
     const d = parts?.[0]?.data ?? {};
     return [DataPart(await bindCirclePersona({ circleId: d.circleId, personaId: d.personaId ?? null, relayUrl: d.relayUrl ?? null }))];
@@ -6482,7 +6485,8 @@ export async function createRealHouseholdAgent(opts = {}) {
             // a task given to me by someone else is its own news (an edit that is); a new task that arrives already
             // given to me is that, not a second plain landing
             const assigned = assignedEntryFor({ circleId, item, previous: landing?.previous ?? null, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
-            const entry = assigned ?? landingEntryFor({ circleId, item, fresh: landing?.fresh !== false, self: circleSelfRef(circleId), authorRef: landing?.authorRef ?? null });
+            // the row's own maker decides (never who served the snapshot: a server's catch-up, a sibling device)
+            const entry = assigned ?? landingEntryFor({ circleId, item, fresh: landing?.fresh !== false, self: circleSelfRef(circleId) });
             // once per row (per assignment): a re-application (a rebuild from the log) is not a second arrival
             if (entry && !opts.deviceLog.query().some((e) => e.id === entry.id)) opts.deviceLog.append(entry);
           } catch { /* a news mark never fails the merge */ }
@@ -7316,7 +7320,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         // No localisation on a bare agent: a key IS the message (the basis default table's rule); a call's language wins.
         t: tLang,
         activeCircle: () => resolveCircleId({}),
-        localActor: 'me',
+        // the row's maker per circle (rowAuthor.js): the door person or the circle's self, never the local 'me'
+        localActor: rowAuthor,
         // a household bot: a chore ticked by its words is the chore's own `completeTask`, as the person (the gate)
         ...(opts.tasksCircleId ? { completeChore: ({ circleId, entry, ctx }) => callSkill('tasks', 'completeTask', { id: entry.id, circleId }, ctx) } : {}),
         // a household bot: what is done or has passed follows the household's setting
@@ -8431,17 +8436,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       storeFor: (circleId) => householdService.stores.getStore(circleId),
       activeCircle: () => resolveCircleId({}),
       t: tLang,
-      // a PAIR circle is written as its self (the lens the contact knows, as `writeSharedCopy` writes the copy): a row
-      // authored by the general 'me' is one no pair roster names, and the rail may drop it (L350's rsvp that vanished)
-      // — and only that self: a pair circle whose self this device does not run is not ours to write (null → `no-self`);
-      // falling back to the general key would be the same defect in another coat. 'me' is for ordinary circles only.
-      // A name the call passes must BE that self in a pair circle (`writeSharedCopy` passes it); any other — 'me' included —
-      // is refused too. An ordinary circle keeps the caller's actor, else 'me'.
-      localActor: (circleId, named) => {
-        if (!isPairCircleId(circleId)) return named ?? 'me';
-        const self = circleSelf(circleId)?.webid ?? null;
-        return self && (!named || named === self) ? self : null;
-      },
+      // the row's maker, per circle (rowAuthor.js): a PAIR circle is written as its self only (the lens the contact
+      // knows, as `writeSharedCopy` writes the copy; a name the call passes must BE that self); an ORDINARY circle as the
+      // actor the call names (a door person), else the circle's self. Never the local 'me' in a circle's store: a
+      // receiver reads that as nobody. No self here → null → `no-self`, never the general key.
+      localActor: rowAuthor,
       // AN ANSWER is signed by the answering self's circle identity, and in an ordinary circle it is from that self's
       // roster id (never the 'me' placeholder no roster names) — or from the door person the call names (a function
       // profile's `telegram:…`). Which answers stand is the roster's rule (rsvpItems.js `rosterAnswerRule`): this

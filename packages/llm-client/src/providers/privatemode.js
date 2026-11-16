@@ -119,7 +119,9 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
  * @param {string|null} [cacheKey]
  */
 export function cacheSaltFor(secret, cacheKey = null) {
-  return createHmac('sha256', String(secret)).update(`prompt-cache:${cacheKey ?? ''}`).digest('base64');
+  // HEX, never base64: Privatemode refuses a cache_salt longer than 128 characters or holding '@', '/', '\' or NUL
+  // (400), and base64 carries '/' for most digests — the bot answered nothing for every such key. 64 hex = 256 bits.
+  return createHmac('sha256', String(secret)).update(`prompt-cache:${cacheKey ?? ''}`).digest('hex');
 }
 
 /**

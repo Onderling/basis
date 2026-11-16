@@ -96,10 +96,21 @@ describe('prompt caching: one secret per box, a salt per person', () => {
     expect(salts[3]).toBeTruthy();
     for (const s of salts) {
       expect(s).not.toContain(SECRET);
-      expect(Buffer.from(s, 'base64').length).toBeGreaterThanOrEqual(32);   // ≥256 bits, as Privatemode asks
+      expect(Buffer.from(s, 'hex').length).toBeGreaterThanOrEqual(32);   // ≥256 bits, as Privatemode asks
     }
     // the key never travels as the salt (the salt reveals neither the secret nor whose it is)
     expect(salts[0]).not.toContain('telegram');
+  });
+
+  it('a cache_salt Privatemode accepts, for every key: at most 128 characters, never @ / \\ or NUL', async () => {
+    // Privatemode answers 400 "Parameter 'cache_salt' must be at most 128 characters and must not contain '@', '/',
+    // '\', or NUL" (measured on the box, 2026-11-16): a base64 digest carried '/' for most keys, and the bot went silent
+    const client = fakeClient(toolReply);
+    const p = await privatemodeProvider({ client, cacheSalt: SECRET });
+    for (let i = 0; i < 5000; i += 1) await p.invoke(req(`telegram:${i}`));
+    await p.invoke(req());
+    const bad = client.calls.map((c) => c.body.cache_salt).filter((s) => typeof s !== 'string' || !s || s.length > 128 || /[@/\\\u0000]/.test(s));
+    expect(bad, `rejected salts, e.g. ${bad[0]}`).toEqual([]);
   });
 
   it('without a secret: no cache_salt — caching stays off', async () => {

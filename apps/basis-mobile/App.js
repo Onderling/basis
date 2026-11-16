@@ -14,6 +14,8 @@
  * imports).
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as sodium from 'react-native-libsodium';
+import { installPhoneSignatureEquation } from '../basis/src/v2/signatureEquations.js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
 import { flushPendingSaves } from '@onderling/local-store';
@@ -30,6 +32,7 @@ import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
 import RestoreFlowModal from './src/screens/v2/RestoreFlowModal.js';
 import { pendingEnrollOffer, restoreFinishApplies } from '../basis/src/v2/enrollOffer.js';
 import RestoreFinishModal from './src/screens/v2/RestoreFinishModal.js';
+import ActStateBar from './src/rn/ActStateBar.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
@@ -63,13 +66,12 @@ import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { sealedLocalBackend, sealedKeyValue } from '../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { backendSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
-import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
+import { circlePodWriterFor } from './src/core/phonePodSession.js';
 // γ-next.recipe — per-circle pending-recipe cache (AsyncStorage-backed).
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeCircleRecipePendingStoreRN } from './src/core/circleRecipePendingStorageRN.js';
 import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, getCirclePodFetch, getActiveRealPodRouting, getCirclePodWebId } from './src/core/circlePods.js';
-import { discoverPodRoot } from '../basis/src/web/podStorage.js';
 // γ-next.rules — per-circle pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen reads on rules-screen open + clears after the
@@ -81,11 +83,17 @@ import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStor
 // the γ.4 resolver applies / discards.
 import { makeCirclePolicyStoreRN } from './src/core/circleStoresRN.js';
 import { forgetCircleSealStrategyFor } from './src/core/circlePods.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../basis/src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../basis/src/v2/policyUpdateLane.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
 import Constants from 'expo-constants';
+
+// THE SIGNATURE CHECK: libsodium's C over JSI behind the one strict rule. The kernel takes it only after it agreed on
+// the edge-case vectors and on an honest and a tampered signature; until then (and on a refusal) tweetnacl answers.
+installPhoneSignatureEquation(sodium)
+  .then((eq) => console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`))
+  .catch(() => { /* tweetnacl stays */ });
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);
@@ -209,6 +217,11 @@ export default function App() {
   // (found 2026-07-30, right after the first message round-trip landed). Bumping this is the notification.
   const [circlesRevision, setCirclesRevision] = useState(0);
   const onCirclesChanged = useCallback(() => setCirclesRevision((n) => n + 1), []);
+  // A contact card opened as a LINK is drained by the hidden ChatScreen; its own sheet and its 'added' line would be
+  // invisible there, so it hands the card to the launcher, which opens its own add sheet (the scanner's path).
+  const [contactLink, setContactLink] = useState(null);
+  const onContactLink = useCallback((payload) => setContactLink({ payload, at: Date.now() }), []);
+  const onContactLinkDone = useCallback(() => setContactLink(null), []);
 
   const registerCircleBotSink = useCallback((fn) => {
     circleBotSinkRef.current = typeof fn === 'function' ? fn : null;
@@ -275,8 +288,8 @@ export default function App() {
       headStore: makePolicyHeadStore(AsyncStorage),
       readPolicy: (cid) => policyStore.get(cid),
       // a policy that arrives may change the circle's storage posture — drop the strategy composed from the old one
-      writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy); forgetCircleSealStrategyFor(cid); return r; },
-      adminsOf: adminsOfViaSkill((...a) => bundleRef.current?.callSkill?.(...a)),
+      writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); forgetCircleSealStrategyFor(cid); return r; },
+      membersOf: membersOfViaSkill((...a) => bundleRef.current?.callSkill?.(...a)),   // the roster the receiver gate counts
     });
   }
 
@@ -308,23 +321,13 @@ export default function App() {
   // falls through to the local AsyncStorage side.  Refreshed on mount and
   // every time the SecureStore restore completes.
   const circlePodWriterRef = useRef(null);
-  // S4 — when signed in, route pinboard's items to the user's REAL pod (web parity with
-  // circleApp). Same attachPod seam; the RN authenticated fetch is the OidcSessionRN bearer.
-  // Best-effort; fires on session restore + once the bundle is up (whichever lands later).
-  const maybeAttachPinboardPod = useCallback(async () => {
-    const session = sessionRef.current;
-    const agent = bundleRef.current?.agent;
-    if (!agent?.attachPinboardPod || !session?.isAuthenticated?.() || !session.webid) return;
-    const sessionShim = { fetch: session.getAuthenticatedFetch(), webid: session.webid };
-    const podRoot = await discoverPodRoot(sessionShim).catch(() => null);
-    if (podRoot) agent.attachPinboardPod({ podRoot, webid: session.webid, fetch: sessionShim.fetch }).catch(() => {});
-  }, []);
+  // the sign-in's steps live in src/core/phonePodSession.js (the phone in Node runs the same ones). Pinboard's own
+  // store is not attached to the pod (web parity; scripts/lint-no-pinboard-pod-attach.mjs).
   const refreshCirclePodWriter = useCallback(async () => {
-    const w = await buildCirclePodWriter(sessionRef.current).catch(() => null);
+    const w = await circlePodWriterFor(sessionRef.current);
     circlePodWriterRef.current = w;
     if (w) dlog.boot('circle pod writer ready @', w.podRoot);
-    maybeAttachPinboardPod();   // restore completed → attach pinboard's item store too
-  }, [maybeAttachPinboardPod]);
+  }, []);
   const getCirclePodWriter = useCallback(() => circlePodWriterRef.current, []);
 
   useEffect(() => {
@@ -497,6 +500,8 @@ export default function App() {
           // (received sealed copies mirror to the user's pod once signed in; local-only while null). Same
           // thunk the launcher's other tiered stores read (getCirclePodWriter → circlePodWriterRef.current).
           getSharedWithMePodWriter: getCirclePodWriter,
+          // a JOINED circle's posture is not known until its policy arrives: the join marks it pending in the policy store
+          markPolicyPending: (cid) => makeCirclePolicyStoreRN(AsyncStorage).markPending(cid),
           // S4 — multi-member sealing: route pinboard redeem/leave to the circle's producer.
           pinboardControlAgent: circleControlAgentRouter,
           // Cache-mode mirroring (RN parity): a pod-backed circle's store rides a cache-mode PseudoPod.
@@ -613,7 +618,6 @@ export default function App() {
             else b.agent.dismissRestorePending?.().catch?.(() => {});
           });
         }
-        maybeAttachPinboardPod();   // S4 — bundle up → attach pinboard's item store if already signed in
         // Mark the first-boot seed as done so the next launch skips it.
         // Fire-and-forget; failures are non-fatal (next launch re-seeds,
         // which is harmless because realAgent's listOpen probe is the
@@ -655,7 +659,9 @@ export default function App() {
           stored preference, resolves 'system' against the live OS scheme, and
           re-renders on change — the My-data toggle recolours render-time readers live. */}
       <ThemeProvider>
-      <View style={styles.root}>
+      {/* Every touch is noted for the shared act state (actState.js): only an act begun right after one paints its
+          pending · done · failed — background work through the same waist paints nothing. `false`: the touch goes on. */}
+      <View style={styles.root} onStartShouldSetResponderCapture={() => { bundleRef.current?.actState?.noteInteraction?.(); return false; }}>
         {/* ChatScreen stays mounted (peer-wiring keeps routing
             inbound DMs / mesh) but is visually hidden behind the launcher
             overlay.  No "← chat" route reveals it; chat now lives inside
@@ -666,6 +672,7 @@ export default function App() {
           <ChatScreen
             // A join completed in THIS shell (the invite-link path) must reach the launcher's list.
             onCirclesChanged={onCirclesChanged}
+            onContactLink={onContactLink}
             bundle={bundle}
             bootError={bootError}
             eventLog={eventLogRef.current}
@@ -689,15 +696,19 @@ export default function App() {
           onAcceptFallback={acceptFallbackOffer}
           // Bumped when a circle is joined/created from another surface → the launcher reloads its list.
           circlesRevision={circlesRevision}
+          // a contact card opened as a link, handed over by the hidden ChatScreen: the launcher opens its add sheet
+          contactLink={contactLink}
+          onContactLinkDone={onContactLinkDone}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}
           circleRecipePendingStore={circleRecipePendingStoreRef.current}
-          circleRulesPendingStore={circleRulesPendingStoreRef.current}
           circlePolicyLane={circlePolicyLaneRef.current}
           /* no onBack (no chat shell to fall back to) +
              no onChatRoute (the circle view IS the chat, no route). */
         />
+        {/* The act the person just took: pending · done · failed, one shared strip for every op (web parity: cc-act-state). */}
+        <ActStateBar store={bundle?.actState ?? null} />
         <RestoreFlowModal
           visible={restoreFlowPending && !!bundle}
           callSkill={bundle?.callSkill}

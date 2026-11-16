@@ -119,7 +119,12 @@ export function createAddressedDeliver({
         ...(ex.file && typeof ex.file === 'object' ? { file: stripBytes(ex.file) } : {}),
         // The turn that brought a hidden contact back: the thread's one-line marker is painted from this.
         ...(ex.returned === true ? { returned: true } : {}),
+        // A turn the app's door held after a refusal: what it could not keep (the app's closed set, carried as given).
+        ...(typeof ex.held === 'string' && ex.held ? { held: ex.held } : {}),
         sentAt:       typeof envelope?.ts === 'number' ? envelope.ts : Date.now(),
+        // an inbound turn: when it ARRIVED on this device (the sender's time stays in sentAt). What "new since I
+        // looked" compares, so a message the relay held for hours still counts once it lands.
+        ...(direction === 'in' ? { receivedAt: Date.now() } : {}),
         nonce:        envelope?.id ?? null,
       },
     };
@@ -159,6 +164,19 @@ export function createAddressedDeliver({
     return turns;
   }
 
+  let seeded = null;
+  function seedNonces(store) {
+    seeded ??= (async () => {
+      try {
+        for (const it of (await store.listOpen?.({})) ?? []) {
+          const n = it?.source?.nonce;
+          if (typeof n === 'string' && n) seenNonces.add(n);
+        }
+      } catch { seeded = null; }   // a failed read is tried again on the next turn
+    })();
+    return seeded;
+  }
+
   /** Persist one turn (out or in) as a durable item, dedup on the msg id. */
   async function persistTurn(envelope, { to, direction }) {
     const store = await resolveStore();
@@ -171,6 +189,10 @@ export function createAddressedDeliver({
     const draft = await projectItem(envelope, { to, direction });
     if (!draft) return { itemId: null };
     const nonce = envelope?.id ?? null;
+    // The dedupe set lives in memory; after a restart it is seeded ONCE from what the store already holds, so a relay
+    // re-delivering an old message is recognised as the turn it is (never a second row, never a fresh receivedAt that
+    // would make it new again).
+    if (nonce) await seedNonces(store);
     if (nonce && seenNonces.has(nonce)) return { itemId: null, deduped: true };
     if (nonce) seenNonces.add(nonce);
     const [item] = await store.addItems([draft], { actor: envelope?.author ?? localActor ?? 'me' });
@@ -259,10 +281,12 @@ export function chatTurnsFromItems(items, { threadKey } = {}) {
       text:      it.text ?? '',
       messageId: s.nonce ?? it.id ?? '',
       ts:        typeof s.sentAt === 'number' ? s.sentAt : (it.addedAt ?? 0),
+      ...(typeof s.receivedAt === 'number' ? { receivedAt: s.receivedAt } : {}),
       ...(s.replyTo ? { replyTo: s.replyTo } : {}),
       ...(Array.isArray(s.buttons) ? { buttons: s.buttons } : {}),
       ...(s.file && typeof s.file === 'object' ? { file: s.file } : {}),
       ...(s.returned === true ? { returned: true } : {}),
+      ...(typeof s.held === 'string' && s.held ? { held: s.held } : {}),
     });
   }
   out.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));

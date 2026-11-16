@@ -43,6 +43,8 @@ export const RETAIN = Object.freeze({
   // Not a log class — a STORE row kept aside so it can be put back for a while (a removed list, an entry in the trash)
   // and dropped unread past its window. One window for every keep-aside (30 days to restore, Frits on 2026-10-05).
   KEEP_ASIDE: 'keepAside',
+  // A Nearby room conversation this device chose to keep (the person's setting, default 7 days), then dropped.
+  ROOM: 'room',
 });
 
 /*
@@ -82,7 +84,15 @@ const LOCAL_BINDING = Object.freeze({ signs: SIGNS.LOCAL, subject: SUBJECT.NONE,
 /** A circle lane's usual binding: signed per circle, about nothing in particular, folded with the roster rule. */
 const CIRCLE_BINDING = (over = {}) => Object.freeze({ signs: SIGNS.CIRCLE, subject: SUBJECT.NONE, accepts: ACCEPTS.ROSTER, syncPolicy: SYNC.CIRCLE, ...over });
 
-const K = (lane, wakes, retain, audit, binding = LOCAL_BINDING) => Object.freeze({ lane, wakes, retain, audit, ...binding });
+/**
+ * `mirrored`: does the person's own history mirror (and its export) keep entries of this kind? REQUIRED on every kind
+ * (docs/decisions.md 2026-11-13): it is a separate question from `syncPolicy`, which says what is CARRIED between devices
+ * and members. A kind declared without it throws here, at load.
+ */
+const K = (lane, wakes, retain, audit, binding = LOCAL_BINDING, mirrored) => {
+  if (typeof mirrored !== 'boolean') throw new TypeError('entryKinds: every kind declares `mirrored` (true or false)');
+  return Object.freeze({ lane, wakes, retain, audit, ...binding, mirrored });
+};
 
 /**
  * The table. A kind absent from it is treated as `system / never wakes / short / not auditable` — the
@@ -90,47 +100,62 @@ const K = (lane, wakes, retain, audit, binding = LOCAL_BINDING) => Object.freeze
  */
 export const ENTRY_KINDS = Object.freeze({
   // ── human-facing ──────────────────────────────────────────────────────────
-  'chat-message':    K(LANE.HUMAN, true,  RETAIN.RECORD, false, CIRCLE_BINDING()),   // the conversation's RECORD — never drops
-  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),     // a task LINE in the conversation — derived from a head, never the statement itself
-  ask:               K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),   // legacy content kinds: demo seed + noticeboard intents, never a signed statement
-  offer:             K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),
-  lend:              K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),
+  'chat-message':    K(LANE.HUMAN, true,  RETAIN.RECORD, false, CIRCLE_BINDING(), true),   // the conversation's RECORD — never drops
+  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING, true),     // a task LINE in the conversation — derived from a head, never the statement itself
+  ask:               K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING, true),   // legacy content kinds: demo seed + noticeboard intents, never a signed statement
+  offer:             K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING, true),
+  lend:              K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING, true),
   // A person's turn with an assistant (the household bot's door): their words and its replies. NOT the record — what
   // a turn DID (a list line, an appointment, a setting) is a store row and stays; the words are plumbing to it, which is
   // the chat class by its own definition. The record rule is for people's conversations with each other. Written by
   // the device that hosts the door, about the one person whose thread it is; never accepted from a peer, never carried.
-  'assistant-turn':  K(LANE.HUMAN, false, RETAIN.CHAT, false, { signs: SIGNS.LOCAL, subject: SUBJECT.PERSON, accepts: ACCEPTS.NONE, syncPolicy: SYNC.NONE }),
+  'assistant-turn':  K(LANE.HUMAN, false, RETAIN.CHAT, false, { signs: SIGNS.LOCAL, subject: SUBJECT.PERSON, accepts: ACCEPTS.NONE, syncPolicy: SYNC.NONE }, false),
 
   // ── system lane ───────────────────────────────────────────────────────────
   // `governance` carries ONE per-event exception, which stays explicit rather than becoming a second
   // table: a decision OPENING may wake (it needs a vote), individual votes and resolves must not.
   // See `governanceWakes()`.
-  governance:        K(LANE.SYSTEM, false, RETAIN.AUDIT, true, CIRCLE_BINDING()),
-  report:            K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
+  governance:        K(LANE.SYSTEM, false, RETAIN.AUDIT, true, CIRCLE_BINDING(), true),
+  report:            K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING, true),
   // The items lane's signed statements: the carrier of a store head (a full-item snapshot, a removal), verified
   // at the rail and merged into the circle's store. Plumbing — the head is what a screen reads and what a
   // conversation line would be derived from; the statement itself must never paint. Same retention as the
   // human task kind: the store row is the durable head, the statements age out and catch-up re-serves heads.
-  'items':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING()),
-  'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
+  'items':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING(), true),
+  // The two kinds production appended unregistered (measured over the suites, 2026-11-13), declared as they behaved:
+  // a panel's 'this changed, repaint' ping and an app's alert bubble. Plumbing, not the record: not mirrored.
+  'item-changed':    K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, false),
+  notification:      K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, false),
+  'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, true),
+  // A store row someone else wrote, held by this device for the first time: a REFERENCE (circle, item id, kind,
+  // author), never its words. The store keeps no landing time, so this is what makes a late arrival news. Written by
+  // this device about itself, never carried; the item's own row is the durable head.
+  'item-landed':     K(LANE.SYSTEM, false, RETAIN.CHAT, false, LOCAL_BINDING, true),
   // A planned occurrence that RAN (pending work): written once per occurrence id by the host that ran it — first
   // write wins, so a second host or a repeat never records a second run. Short: the row's own `lastRunAt` is the
   // durable head; the mark only has to outlive the occurrence's window.
-  'intention-done':  K(LANE.SYSTEM, false, RETAIN.SHORT, true, LOCAL_BINDING),
-  'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true, CIRCLE_BINDING({ accepts: ACCEPTS.KEY })),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening
-  membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.CIRCLE, SIGNS.ROOT], subject: [SUBJECT.PERSON, SUBJECT.DEVICE], accepts: ACCEPTS.MEMBERSHIP, syncPolicy: SYNC.CIRCLE }),   // the roster refolds from these — never drops on a clock; a `member-props` the fold calls dead leaves via dropEntries, L121
-  grants:            K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.DEVICE, SIGNS.PERSON], subject: SUBJECT.NONE, accepts: ACCEPTS.DEVICE_SET, syncPolicy: SYNC.SIBLINGS }),   // the connection-grant set refolds from these — a revoke that compacts away silently re-admits a view
+  'intention-done':  K(LANE.SYSTEM, false, RETAIN.SHORT, true, LOCAL_BINDING, true),
+  'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true, CIRCLE_BINDING({ accepts: ACCEPTS.KEY }), true),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening
+  membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.CIRCLE, SIGNS.ROOT], subject: [SUBJECT.PERSON, SUBJECT.DEVICE], accepts: ACCEPTS.MEMBERSHIP, syncPolicy: SYNC.CIRCLE }, true),   // the roster refolds from these — never drops on a clock; a `member-props` the fold calls dead leaves via dropEntries, L121
+  grants:            K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.DEVICE, SIGNS.PERSON], subject: SUBJECT.NONE, accepts: ACCEPTS.DEVICE_SET, syncPolicy: SYNC.SIBLINGS }, true),   // the connection-grant set refolds from these — a revoke that compacts away silently re-admits a view
 
   // ── the agent trail (per-agent action log) ────────────────────────────────
-  'agent-action':    K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
-  'settings-change': K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
+  'agent-action':    K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING, true),
+  'settings-change': K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING, true),
 
   // ── compaction output ─────────────────────────────────────────────────────
   // What old audit entries FOLD into instead of being dropped (retention step D): `{from, to, counts,
   // actors, foldedCount}` — the shape of what happened survives, and says how much it folded. Auditable
   // itself so an external append cannot rewrite it (the log's own compactor merges internally, not via
   // append); never pruned — a summary that expires would be the silent forgetting it exists to prevent.
-  'audit-summary':   K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
+  'audit-summary':   K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING, true),
+
+  // ── the Nearby room, kept on this device (nearbyKept.js) ──────────────────
+  // A line of a room conversation (the other side named by THEIR room key) and the link a shared card makes from that
+  // room key to the person's address. Written by this device about itself: never carried, never accepted from a peer,
+  // never a wake, never painted as a conversation line (the contact thread projects them as one 'earlier' block).
+  'nearby-line':     K(LANE.SYSTEM, false, RETAIN.ROOM, false, LOCAL_BINDING, false),
+  'nearby-card':     K(LANE.SYSTEM, false, RETAIN.ROOM, false, LOCAL_BINDING, false),
 });
 
 /**
@@ -142,7 +167,8 @@ export const ENTRY_KINDS = Object.freeze({
 export const VIEWER_FACING_SYSTEM_KINDS = Object.freeze(['membership', 'governance']);
 
 /** The conservative default for an unregistered kind — never wakes, never reads as conversation. */
-export const UNKNOWN_KIND = K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING);   // accepts: none — refused from a peer by construction
+// unregistered: plumbing by the table's own default, so not the record either (a privacy filter must not fail open)
+export const UNKNOWN_KIND = K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, false);   // accepts: none — refused from a peer by construction
 
 /**
  * The binding columns of a kind, with the two that may name several levels normalised to arrays: a
@@ -189,6 +215,7 @@ export const RETENTION_DEFAULTS = Object.freeze({
   [RETAIN.SHORT]: param({ key: 'retention.short', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 }),    // pure plumbing — roster pings, delivery state
   [RETAIN.CHAT]:  param({ key: 'retention.chat',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // content whose durable head lives elsewhere
   [RETAIN.AUDIT]: param({ key: 'retention.audit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // governance, reports, the agent trail — DETAIL window (key events moved to RECORD — the chain never drops)
+  [RETAIN.ROOM]: param({ key: 'retention.room', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 }),   // a kept Nearby room conversation; the person's `nearby.keepDays` sets the live window
   [RETAIN.KEEP_ASIDE]: param({ key: 'retention.keepAside', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 24 * 60 * 60 * 1000 }),   // a removed list or an entry in the trash, restorable, then dropped by the lists' sweep
 });
 
@@ -222,3 +249,6 @@ export function kindWakes(kind, payload = null) {
 export function governanceWakes(event) {
   return !!event && event.event === 'propose';
 }
+
+/** Does the person's own history mirror (and its export) keep this kind? (`mirrored` on the kind; an unknown kind: yes.) */
+export function isMirroredKind(kind) { return entryKind(kind).mirrored !== false; }

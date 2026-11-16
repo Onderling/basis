@@ -60,6 +60,8 @@ export const ROLE_CONTROL_KEYS = Object.freeze({
   confirm_demote:      'circle.admin.role_confirm.demote',
   confirm_handover:    'circle.admin.role_confirm.handover',
   confirm_no_one_else: 'circle.admin.role_confirm.no_one_else',
+  handover_let_app_choose: 'circle.admin.handover.let_app_choose',
+  handover_appoint_first:  'circle.admin.handover.appoint_first',
   notice_promoted:     'circle.admin.role_notice.promoted',
   notice_demoted:      'circle.admin.role_notice.demoted',
   notice_handed_over:  'circle.admin.role_notice.handed_over',
@@ -168,7 +170,14 @@ export function roleControlFor({ members, member, myRef } = {}) {
 export function roleChangeConfirm({ control, name, t } = {}) {
   if (!control) return null;
   const tr = translatorOr(t, 'circleRoleControl.js');
-  return confirmRequestForOp(SET_MEMBER_ROLE_OP, { t: tr, message: tr(control.confirmKey, { name }) });
+  const request = confirmRequestForOp(SET_MEMBER_ROLE_OP, { t: tr, message: tr(control.confirmKey, { name }) });
+  // THE LAST ADMIN CHOOSES (Frits 2026-11-10: notified, "maybe appoint someone, or let the app choose"): the handover's
+  // two buttons say the two ways. Accept steps down now and the circle passes to a member chosen from the log; the
+  // other closes the question so the admin can make someone admin on their row first.
+  if (request && control.consequence === 'handover') {
+    return { ...request, acceptLabel: tr(ROLE_CONTROL_KEYS.handover_let_app_choose), cancelLabel: tr(ROLE_CONTROL_KEYS.handover_appoint_first) };
+  }
+  return request;
 }
 
 /**

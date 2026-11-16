@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, until, teardown, addCardOf } from './support/pairRealAgents.js';
 import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
@@ -88,18 +88,26 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     expect(out, 'a run with no Telegram token must say so rather than look broken').toMatch(/telegram\s+off/);
   });
 
-  it('keeps a direct message written to it while nobody is watching', async () => {
+  it('checks signatures with node:crypto behind the strict rule (it agreed on the vectors at boot)', () => {
+    expect(out).toMatch(/\[security\] signature equation: node-crypto/);
+  });
+
+  it('keeps a direct message written to it while nobody is watching (from a stranger: as a request)', async () => {
     const card = cardFrom(out);
+    // the sender holds the box's card (it scanned it); on the box's side the sender is still a stranger
+    await addCardOf(sender, null, { payload: /onderling-contact:\/\/[A-Za-z0-9_-]+/.exec(out)[0] });
     await sender.contactThreadChannel.sendTurn({
       peerAddr: card.peerAddr, threadId: card.peerAddr, text: 'is er nog brood?', messageId: 'to-device-1',
     }).sent;
 
-    const landed = await until(
-      async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'is er nog brood?') ?? null,
+    // nobody chose the sender on this box (a person's profile, its policy request): the message is KEPT as a message
+    // request, not on a thread, and the walk log counts it (the verdict only, never who or what)
+    const held = await until(
+      async () => walkLog(dataDir).find((e) => e.kind === 'message-request' && e.verdict === 'held') ?? null,
       { timeout: 30_000, step: 500 },
     );
-    expect(landed, `the device never recorded the message. Its output:\n${out.slice(-1200)}`).toBeTruthy();
-    expect(landed.from, 'the device did not record who wrote').toBeTruthy();
+    expect(held, `the device never kept the message. Its output:\n${out.slice(-1200)}`).toBeTruthy();
+    expect(walkLog(dataDir).some((e) => e.kind === 'contact-turn' && e.text === 'is er nog brood?'), 'a stranger\'s turn reached a thread').toBe(false);
   }, 60_000);
 
   it('is a full agent, not a listener — every signed lane is actually carried', () => {
@@ -118,11 +126,11 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     expect(run?.relay, 'the run header does not name the wire it joined').toBeTruthy();
   });
 
-  it('asks every lane for what it missed while it was off', async () => {
-    // The kicks are deliberately staggered over the first few seconds, so this waits for them rather
-    // than assuming they have already run — the difference between a slow kick and no kick at all is
-    // the whole point of checking.
-    const EXPECTED = ['governance', 'membership', 'grants', 'known-peers', 'tasks', 'chat'];
+  it('runs the start queue: asks my own devices for what it missed, and every circle it is in (here: none)', async () => {
+    // The start queue runs a few seconds after the start, so this waits for it rather than assuming it already ran —
+    // the difference between a slow ask and no ask at all is the whole point of checking. This box is in no circle,
+    // so no lane is asked per circle; the queue's own record says how many circles it covered.
+    const EXPECTED = ['grants', 'known-peers', 'person-key', 'profile-facts', 'own-store', 'primary-device', 'circle-follow'];
     const kicks = await until(
       async () => {
         const lanes = walkLog(dataDir).filter((e) => e.kind === 'catch-up-kick').map((e) => e.lane);
@@ -136,5 +144,8 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     for (const lane of EXPECTED) {
       expect(kicks, `nothing pulled the ${lane} lane on reconnect`).toContain(lane);
     }
+    const run = await until(async () => walkLog(dataDir).find((e) => e.kind === 'start-queue') ?? null, { timeout: 20_000, step: 500 });
+    expect(run, 'the start queue never finished').toBeTruthy();
+    expect(run.circles).toBe(0);
   }, 30_000);
 });

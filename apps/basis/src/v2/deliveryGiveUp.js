@@ -65,10 +65,19 @@ export function makeGiveUpConsumers({ deliveryMap, onWarn = null } = {}) {
       try { if (deliveryMap?.get?.(msgId) != null) deliveryMap.set(msgId, LEFT); } catch { /* the message went regardless */ }
     },
 
-    /** It left, waited at the relay, and the relay gave up. */
-    onUndelivered: ({ msgId, reason } = {}) => giveUp(
-      msgId,
-      `[delivery] relay gave up on ${String(msgId)} (${reason ?? 'unknown'})`,
-    ),
+    /**
+     * It left, waited at the relay, and the relay gave up. The line says WHAT was lost: a message the delivery map
+     * knows is a person's own (a bubble); anything else is lane traffic (a statement, a receipt) that catch-up can bring
+     * again. With the kind and the recipient's first characters, from the transport's own memory of its send.
+     */
+    onUndelivered: ({ msgId, reason, to = null, subtype = null } = {}) => {
+      let bubble = false;
+      try { bubble = msgId != null && deliveryMap?.get?.(msgId) != null; } catch { bubble = false; }
+      giveUp(
+        msgId,
+        `[delivery] relay gave up on ${String(msgId)} (${reason ?? 'unknown'}) · ${bubble ? 'bubble' : 'control'}`
+        + `${subtype ? ` · ${subtype}` : ''}${to ? ` → ${String(to).slice(0, 8)}…` : ''}`,
+      );
+    },
   };
 }

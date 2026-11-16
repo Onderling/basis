@@ -308,7 +308,7 @@ describe('chatRows — membership notices as rendered projections (2026-08-29)',
       circleId: 'k1', viewerId: 'me', t, members: [{ webid: 'newbie', handle: 'piet' }],
     });
     const notice = rows.find((r) => r.actor === 'bot');
-    expect(notice?.event.payload.text, 'named through the reveal ladder, in the app\'s own @handle form').toBe('circle.membership.someone_joined:@piet');
+    expect(notice?.event.payload.text, 'named through the reveal ladder, as the name is written').toBe('circle.membership.someone_joined:piet');
   });
 
   it('is derived, so it is idempotent by construction: the same log projects the same one row', () => {
@@ -322,5 +322,15 @@ describe('chatRows — membership notices as rendered projections (2026-08-29)',
   it('conservation: a caller that passes no translator gets exactly the pre-existing rows', () => {
     const rows = chatRows({ events: [chat, membership('e1', { kind: 'evict', subject: 'me', author: 'admin' })], circleId: 'k1', viewerId: 'me' });
     expect(rows.filter((r) => r.actor === 'bot')).toEqual([]);
+  });
+});
+
+describe('two members called Jan in the chat', () => {
+  it('the second Jan\'s line reads "Jan · 2" (rows from the one roster normaliser)', async () => {
+    const { normalizeCircleMembers } = await import('@onderling/kring-host/circleMembers');
+    const { stampSenderLabels } = await import('../../src/v2/circleStream.js');
+    const members = normalizeCircleMembers({ members: [{ webid: 'webid:jan1', handle: 'Jan' }, { webid: 'webid:jan2', handle: 'Jan' }] });
+    const rows = stampSenderLabels([{ actor: 'webid:jan1' }, { actor: 'webid:jan2' }], { members, viewerId: 'webid:me' });
+    expect(rows.map((r) => r.senderLabel)).toEqual(['Jan', 'Jan · 2']);
   });
 });

@@ -40,7 +40,7 @@ describe('any-admin — immediate enactment', () => {
     const r = await orch.propose({ circleId: 'c1', action: 'removeMember', subject: 'm3', actor: { ref: 'admin0' } });
     expect(r).toMatchObject({ ok: true, status: DECISION_STATUS.APPROVED, enacted: true });
     expect(enact).toHaveBeenCalledTimes(1);
-    expect(enact).toHaveBeenCalledWith('c1', 'removeMember', 'm3');
+    expect(enact).toHaveBeenCalledWith('c1', 'removeMember', 'm3', expect.any(String));   // + the deciding proposal's id
     expect(events.map((e) => e.event)).toEqual(['propose', 'resolve']);
   });
 
@@ -69,7 +69,7 @@ describe('member-vote — proposal, tally, enact on threshold', () => {
     const third = await orch.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });                                  // 3/5
     expect(third).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
     expect(enact).toHaveBeenCalledTimes(1);
-    expect(enact).toHaveBeenCalledWith('c1', 'removeMember', 'm3');
+    expect(enact).toHaveBeenCalledWith('c1', 'removeMember', 'm3', expect.any(String));   // + the deciding proposal's id
   });
 
   it('Decision A: a non-admin device does NOT enact an approved vote — it awaits the admin', async () => {
@@ -106,7 +106,7 @@ describe('admin override — the past-deadline valve', () => {
     expect(enact).not.toHaveBeenCalled();
     const adminForce = await orch.override({ circleId: 'c1', proposalId, actor: { ref: 'admin0' } });
     expect(adminForce).toMatchObject({ ok: true, status: DECISION_STATUS.APPROVED, reason: 'admin-override' });
-    expect(enact).toHaveBeenCalledWith('c1', 'removeMember', 'm3');
+    expect(enact).toHaveBeenCalledWith('c1', 'removeMember', 'm3', expect.any(String));   // + the deciding proposal's id
   });
 
   it('override before the deadline is refused', async () => {

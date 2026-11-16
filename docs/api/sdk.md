@@ -54,11 +54,13 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `Bootstrap` | class | [`core.md`](core.md#bootstrap) |
 | `browses` | function | [`core.md`](core.md#browses) |
 | `buildSkillTopic` | function | [`core.md`](core.md#buildskilltopic) |
+| `canonicalDeep` | function | [`core.md`](core.md#canonicaldeep) |
 | `canonicalize` | function | [`core.md`](core.md#canonicalize) |
 | `canPromote` | function | [`core.md`](core.md#canpromote) |
 | `CapabilityToken` | class | [`core.md`](core.md#capabilitytoken) |
 | `caretakerOrder` | function | [`core.md`](core.md#caretakerorder) |
 | `carriedSenderCredential` | function | [`core.md`](core.md#carriedsendercredential) |
+| `causalPlace` | function | [`core.md`](core.md#causalplace) |
 | `CEREMONY_KINDS` | constant | [`core.md`](core.md#ceremony_kinds) |
 | `ceremonyCommitment` | function | [`core.md`](core.md#ceremonycommitment) |
 | `ceremonyRevealFacts` | function | [`core.md`](core.md#ceremonyrevealfacts) |
@@ -83,6 +85,8 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `createSenderBinding` | function | [`core.md`](core.md#createsenderbinding) |
 | `createSignatureMemo` | function | [`core.md`](core.md#createsignaturememo) |
 | `createSpineAppender` | function | [`core.md`](core.md#createspineappender) |
+| `createTimeSlice` | function | [`core.md`](core.md#createtimeslice) |
+| `createVerdictMemo` | function | [`core.md`](core.md#createverdictmemo) |
 | `DataPart` | function | [`core.md`](core.md#datapart) |
 | `DataSource` | class | [`core.md`](core.md#datasource) |
 | `DataSourceAccessDeniedError` | class | [`core.md`](core.md#datasourceaccessdeniederror) |
@@ -108,12 +112,16 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `DISCOVERABILITY` | constant | [`core.md`](core.md#discoverability) |
 | `DISCOVERABILITY_ORDER` | constant | [`core.md`](core.md#discoverability_order) |
 | `dropSubscriber` | function | [`core.md`](core.md#dropsubscriber) |
+| `ED25519_ACCEPTED` | constant | [`core.md`](core.md#ed25519_accepted) |
+| `ED25519_EDGE_VECTORS` | constant | [`core.md`](core.md#ed25519_edge_vectors) |
+| `ed25519Disagreements` | function | [`core.md`](core.md#ed25519disagreements) |
 | `Emitter` | class | [`core.md`](core.md#emitter) |
 | `envelopeByteLength` | function | [`core.md`](core.md#envelopebytelength) |
 | `envelopeExceedsLimit` | function | [`core.md`](core.md#envelopeexceedslimit) |
 | `EnvelopeTooLargeError` | class | [`core.md`](core.md#envelopetoolargeerror) |
 | `EVICTION_KIND` | constant | [`core.md`](core.md#eviction_kind) |
 | `EVICTION_STMT_VERSION` | constant | [`core.md`](core.md#eviction_stmt_version) |
+| `exactVerdictKey` | function | [`core.md`](core.md#exactverdictkey) |
 | `FallbackTable` | class | [`core.md`](core.md#fallbacktable) |
 | `FilePart` | function | [`core.md`](core.md#filepart) |
 | `FileSystemSource` | class | [`core.md`](core.md#filesystemsource) |
@@ -171,6 +179,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `maxExposure` | function | [`core.md`](core.md#maxexposure) |
 | `MEMBER_KINDS` | constant | [`core.md`](core.md#member_kinds) |
 | `MEMBER_PROPS_FIELDS` | constant | [`core.md`](core.md#member_props_fields) |
+| `memberStatusFrom` | function | [`core.md`](core.md#memberstatusfrom) |
 | `MemoryAdapter` | class | [`core.md`](core.md#memoryadapter) |
 | `MemorySource` | class | [`core.md`](core.md#memorysource) |
 | `MemoryStorageBackend` | class | [`core.md`](core.md#memorystoragebackend) |
@@ -182,6 +191,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `normalizeDiscoverability` | function | [`core.md`](core.md#normalizediscoverability) |
 | `offeringMatches` | function | [`core.md`](core.md#offeringmatches) |
 | `OfflineTransport` | class | [`core.md`](core.md#offlinetransport) |
+| `onEarlierCircleLink` | function | [`core.md`](core.md#onearliercirclelink) |
 | `openFromPersonKey` | function | [`core.md`](core.md#openfrompersonkey) |
 | `openSealed` | function | [`core.md`](core.md#opensealed) |
 | `openTunnelOW` | function | [`core.md`](core.md#opentunnelow) |
@@ -208,6 +218,8 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `PingScheduler` | class | [`core.md`](core.md#pingscheduler) |
 | `PodCapabilityToken` | class | [`core.md`](core.md#podcapabilitytoken) |
 | `PolicyEngine` | class | [`core.md`](core.md#policyengine) |
+| `processSignatureMemo` | function | [`core.md`](core.md#processsignaturememo) |
+| `processVerdictMemo` | function | [`core.md`](core.md#processverdictmemo) |
 | `publish` | function | [`core.md`](core.md#publish) |
 | `publishes` | function | [`core.md`](core.md#publishes) |
 | `pullPeerList` | function | [`core.md`](core.md#pullpeerlist) |
@@ -255,6 +267,8 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `setUnionWithDedupe` | function | [`core.md`](core.md#setunionwithdedupe) |
 | `signAddressPossession` | function | [`core.md`](core.md#signaddresspossession) |
 | `signAddressPossessionFromSeed` | function | [`core.md`](core.md#signaddresspossessionfromseed) |
+| `signatureEquationBatches` | function | [`core.md`](core.md#signatureequationbatches) |
+| `signatureEquationName` | function | [`core.md`](core.md#signatureequationname) |
 | `signCeremonyCommitmentFromSeed` | function | [`core.md`](core.md#signceremonycommitmentfromseed) |
 | `signCeremonyReveal` | function | [`core.md`](core.md#signceremonyreveal) |
 | `signCircleLink` | function | [`core.md`](core.md#signcirclelink) |
@@ -273,6 +287,9 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `SkillsPubSub` | class | [`core.md`](core.md#skillspubsub) |
 | `SPINE_STATEMENT_ITEM` | constant | [`core.md`](core.md#spine_statement_item) |
 | `SPINE_STMT_VERSION` | constant | [`core.md`](core.md#spine_stmt_version) |
+| `spineSignedMessage` | function | [`core.md`](core.md#spinesignedmessage) |
+| `spineVerdictKey` | function | [`core.md`](core.md#spineverdictkey) |
+| `staleSender` | function | [`core.md`](core.md#stalesender) |
 | `STANDARD_RANKS` | constant | [`core.md`](core.md#standard_ranks) |
 | `StateManager` | class | [`core.md`](core.md#statemanager) |
 | `STATEMENT_DOMAINS` | constant | [`core.md`](core.md#statement_domains) |
@@ -281,6 +298,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `storePersonKey` | function | [`core.md`](core.md#storepersonkey) |
 | `streamBidi` | function | [`core.md`](core.md#streambidi) |
 | `streamOut` | function | [`core.md`](core.md#streamout) |
+| `strictSignatureShapeOk` | function | [`core.md`](core.md#strictsignatureshapeok) |
 | `subscribe` | function | [`core.md`](core.md#subscribe) |
 | `Task` | class | [`core.md`](core.md#task) |
 | `TaskGrantManager` | class | [`core.md`](core.md#taskgrantmanager) |
@@ -288,6 +306,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `TIER_LEVEL` | constant | [`core.md`](core.md#tier_level) |
 | `tierForRouteVia` | function | [`core.md`](core.md#tierforroutevia) |
 | `tierForTransport` | function | [`core.md`](core.md#tierfortransport) |
+| `TIME_SLICE_MS` | constant | [`core.md`](core.md#time_slice_ms) |
 | `tokenAgentKeyFor` | function | [`core.md`](core.md#tokenagentkeyfor) |
 | `tokenGate` | function | [`core.md`](core.md#tokengate) |
 | `TokenRegistry` | class | [`core.md`](core.md#tokenregistry) |
@@ -299,6 +318,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `unregisterRoleBundle` | function | [`core.md`](core.md#unregisterrolebundle) |
 | `UNSAFE_JSON_KEYS` | constant | [`core.md`](core.md#unsafe_json_keys) |
 | `unsubscribe` | function | [`core.md`](core.md#unsubscribe) |
+| `useSignatureEquation` | function | [`core.md`](core.md#usesignatureequation) |
 | `validateMnemonic` | function | [`core.md`](core.md#validatemnemonic) |
 | `verifyAddressPossession` | function | [`core.md`](core.md#verifyaddresspossession) |
 | `verifyCeremonyCommitmentDeclaration` | function | [`core.md`](core.md#verifyceremonycommitmentdeclaration) |
@@ -309,6 +329,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `verifyDeviceDelegation` | function | [`core.md`](core.md#verifydevicedelegation) |
 | `verifyDeviceRevocation` | function | [`core.md`](core.md#verifydevicerevocation) |
 | `verifyDeviceStatement` | function | [`core.md`](core.md#verifydevicestatement) |
+| `verifyEd25519StrictBatch` | function | [`core.md`](core.md#verifyed25519strictbatch) |
 | `verifyEviction` | function | [`core.md`](core.md#verifyeviction) |
 | `verifyGroupProof` | function | [`core.md`](core.md#verifygroupproof) |
 | `verifyOrigin` | function | [`core.md`](core.md#verifyorigin) |
@@ -351,6 +372,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `buildKeyEvent` | function | [`pod-client.md`](pod-client.md#buildkeyevent) |
 | `CapabilityAuth` | class | [`pod-client.md`](pod-client.md#capabilityauth) |
 | `CapabilityError` | class | [`pod-client.md`](pod-client.md#capabilityerror) |
+| `changeKeyResource` | function | [`pod-client.md`](pod-client.md#changekeyresource) |
 | `chooseSealScheme` | function | [`pod-client.md`](pod-client.md#choosesealscheme) |
 | `circleStorageClient` | function | [`pod-client.md`](pod-client.md#circlestorageclient) |
 | `collapseKeyEvents` | function | [`pod-client.md`](pod-client.md#collapsekeyevents) |
@@ -386,6 +408,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `isSealed` | function | [`pod-client.md`](pod-client.md#issealed) |
 | `KEY_EVENT_KIND` | constant | [`pod-client.md`](pod-client.md#key_event_kind) |
 | `keyIdOf` | function | [`pod-client.md`](pod-client.md#keyidof) |
+| `KeyWriteContendedError` | class | [`pod-client.md`](pod-client.md#keywritecontendederror) |
 | `makeGroupOpener` | function | [`pod-client.md`](pod-client.md#makegroupopener) |
 | `makeGroupSealer` | function | [`pod-client.md`](pod-client.md#makegroupsealer) |
 | `makeOpener` | function | [`pod-client.md`](pod-client.md#makeopener) |
@@ -393,6 +416,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `MalformedResourceError` | class | [`pod-client.md`](pod-client.md#malformedresourceerror) |
 | `mapSourceCode` | function | [`pod-client.md`](pod-client.md#mapsourcecode) |
 | `MAX_KEYS_PER_VERSION` | constant | [`pod-client.md`](pod-client.md#max_keys_per_version) |
+| `MemberUnknownError` | class | [`pod-client.md`](pod-client.md#memberunknownerror) |
 | `MemoryTombstones` | class | [`pod-client.md`](pod-client.md#memorytombstones) |
 | `messageRef` | function | [`pod-client.md`](pod-client.md#messageref) |
 | `migrateVaultToPod` | function | [`pod-client.md`](pod-client.md#migratevaulttopod) |

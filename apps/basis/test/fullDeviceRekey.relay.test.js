@@ -137,8 +137,22 @@ describe('a re-key run on a device that was not the point', () => {
       expect(await until(() => (A2.agent.circleAddressFor(C2) !== oldAddr ? true : null), { timeout: 20000, step: 200 }), 'the box still presents the old address').toBe(true);
       const newAddr = A2.agent.circleAddressFor(C2);
       const annaOnBea = async () => (((await B.agent.callSkill('pinboard', 'listGroupMembers', { groupId: C2 }))?.members ?? []).find((m) => m.webid === A.pubKey) ?? null);
-      expect(await until(async () => { const row = await annaOnBea(); const set = [row?.circleAddress, ...(row?.circleAddresses ?? [])]; return row?.circleAddress === newAddr && !set.includes(oldAddr) ? true : null; }, { timeout: 30000, step: 300 }),
-        `Bea's row for Anna did not move: ${JSON.stringify(await annaOnBea())}`).toBe(true);
+      const moved = await until(async () => { const row = await annaOnBea(); const set = [row?.circleAddress, ...(row?.circleAddresses ?? [])]; return row?.circleAddress === newAddr && !set.includes(oldAddr) ? true : null; }, { timeout: 30000, step: 300 });
+      if (!moved) {
+        // THE PROBE for an intermittent CI red (2026-11-13, once with the items catch-up composed): what Bea HOLDS when
+        // her row for Anna did not move, so the next red names its branch — no statement from the new address arrived,
+        // it arrived and was refused, or it landed and the roster fold did not take it
+        const short = (a) => (typeof a === 'string' ? a.slice(0, 8) : a);
+        const stmts = (node) => (node.agent.membershipRail.storedStatements(C2) ?? []).map((x) => x?.body).filter(Boolean);
+        const byAddr = (node, addr) => stmts(node).filter((b) => b.author === addr).map((b) => b.kind);
+        const row = await annaOnBea();
+        console.log('[rekey-probe]', JSON.stringify({
+          bea: { fromNew: byAddr(B, newAddr), fromOld: byAddr(B, oldAddr), total: stmts(B).length, row: { circleAddress: short(row?.circleAddress), circleAddresses: (row?.circleAddresses ?? []).map(short) } },
+          box: { fromNew: byAddr(A2, newAddr), total: stmts(A2).length },
+          newAddr: short(newAddr), oldAddr: short(oldAddr),
+        }));
+      }
+      expect(moved, `Bea's row for Anna did not move: ${JSON.stringify(await annaOnBea())}`).toBe(true);
       expect(annaStmts(A2).some((x) => x.body.hash === s1), 'the box re-keyed without catching up first').toBe(true);
       expect([...(await B.agent.membershipRail.readVerified(C2)).disputed], 'Anna forked her own key').not.toContain(A.pubKey);
     } finally { A2._routerRef.fn = prior; }

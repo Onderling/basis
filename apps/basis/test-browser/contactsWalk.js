@@ -32,21 +32,33 @@ export async function pairCircleWith(page, otherWebid) {
 }
 
 /**
- * A adds B as a contact (B's link, the sheet, one message) and both hold the pair circle.
+ * `opener` opens `sharer`'s contact link (Mij → share my contact) and answers the add sheet: `sharer` is in their book.
+ */
+export async function addByLink(sharer, opener, { level = null } = {}) {
+  await gotoCircles(sharer.page);
+  await sharer.page.locator('[data-tab="mij"]').first().click(); await sharer.page.waitForTimeout(1200);
+  await sharer.page.locator('.cc-profile__share-contact').click();
+  const link = await sharer.page.locator('.cc-share__link input').inputValue();
+  await gotoCircles(sharer.page);
+  const dest = `${new URL(opener.page.url()).pathname}${new URL(opener.page.url()).search}${link.slice(link.indexOf('#'))}`;
+  await opener.page.goto('about:blank'); await opener.page.goto(dest);
+  await expect(opener.page.locator('[data-testid="contact-add-sheet"]'), 'the opener is asked first').toBeVisible({ timeout: 30_000 });
+  if (level) await opener.page.locator('.cc-lens__level').selectOption(level);
+  await opener.page.locator('.cc-lens__ok').click();
+}
+
+/**
+ * A and B become contacts the way two people who both chose each other do: each opens the other's link (a first message
+ * from someone not chosen is a request since 2026-11-12, so a one-sided add would make A's first message a request on
+ * B's side; the walks that use this are about what follows, not about that door). Then A writes once and both hold the
+ * pair circle.
  * @returns {Promise<{aId: string, bId: string, pairId: string}>}
  */
 export async function becomeContacts(A, B, { level = null } = {}) {
   const aId = await whoAmI(A.page); const bId = await whoAmI(B.page);
-  await gotoCircles(B.page);
-  await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
-  await B.page.locator('.cc-profile__share-contact').click();
-  const link = await B.page.locator('.cc-share__link input').inputValue();
-  await gotoCircles(B.page);
-  const dest = `${new URL(A.page.url()).pathname}${new URL(A.page.url()).search}${link.slice(link.indexOf('#'))}`;
-  await A.page.goto('about:blank'); await A.page.goto(dest);
-  await expect(A.page.locator('[data-testid="contact-add-sheet"]'), 'A is asked first').toBeVisible({ timeout: 30_000 });
-  if (level) await A.page.locator('.cc-lens__level').selectOption(level);
-  await A.page.locator('.cc-lens__ok').click();
+  await addByLink(B, A, { level });   // A chooses B
+  await addByLink(A, B);              // B chooses A
+  await gotoCircles(A.page);
   const hi = `hoi ${Date.now().toString(36)}`;
   const sent = await sendDirectMessage(A.page, hi, { to: bId });
   expect(sent.sent, `A could not write: ${sent.why}`).toBe(true);

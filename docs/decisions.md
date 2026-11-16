@@ -617,6 +617,12 @@ device.
 Concretely: unlinkable to other members, to anyone observing the wire, and to every relay you did not use.
 The relay you do use can correlate your circle addresses and **can read nothing**.
 
+*Corrected 2026-11-14 (Frits; see the entry "A circle link proof names the member"):* "unlinkable to other members"
+holds per PERSONA, not per person. A member is listed in each circle under their persona's key, the same in every
+circle that persona is in, so someone in two of your circles sees it is the same persona. Who wants two circles kept
+apart uses a persona per each. Circles where members know each other only per circle are a later design (after the
+alpha).
+
 Because the relay correlates anyway, the cheap implementation is also the right one: **one socket carrying
 several registered addresses**, not N connections.
 
@@ -974,6 +980,9 @@ deployment controls, which is what invariant 7 asks for — sensitive data does 
 host. It also keeps the access-control model as WAC, which the storage layout and the grants work already
 assume.
 
+**Superseded in part, 2026-08-27:** the access-control model is ACP, and only ACP — see that entry. Self-hosting on
+Community Solid Server stands; a pod hosted for Onderling is served with CSS's ACP configuration.
+
 **Recorded rather than decided:** this entry exists because the choice was made by doing, and an unwritten
 choice is one that gets silently re-opened. Revisit only if hosting a pod becomes the thing standing
 between a real neighbourhood and using this.
@@ -1074,6 +1083,21 @@ distinguished the two. `SecurityLayer` now **warns once, naming the fix**, and k
 **synchronous**, because the receive path is. An authorizer cannot do I/O; it answers from state already in
 memory. That is why the roster has to be assembled ahead of time — and why assembling it as a side effect of
 opening a screen is a real gap rather than a detail.
+
+*Amended 2026-11-10 (Frits, "ok", in the review of the July–September decisions):* **a circle address whose roster
+this device has not read is REFUSED, never allowed.** The old rule (refuse only where a roster IS known, never on the
+strength of not knowing) admitted any well-signed sender into a circle this device had not read yet, counted and
+warned; it is reversed. Because the port is synchronous and a roster can be behind, the port gains a THIRD answer
+beside allow and refuse: `stale`, carrying an opaque bucket the kernel never reads (`staleSender`; the kernel stays
+circle-blind). The secure agent PARKS a stale envelope per bucket, signature verified but not delivered (no handler,
+no acknowledgement, no receipt), at most 64 per bucket for at most 60 s (internal parameters), the oldest dropped first
+and counted. The app answers `stale` for a circle address with no roster read and for a sender not on the roster that
+was read, reads that circle's roster again, and the parked envelopes are judged ONCE more: accepted ones are delivered
+in arrival order, the rest are dropped and counted, nothing is parked twice. Every circle-identity install reads that
+circle's roster, and the boot primer reads rosters before it installs identities.
+*Amended 2026-11-12 (Fable, keeping the decision; the fast start):* every install still reads its circle's roster, but
+the reads run in turn, not all at once: one at a time, giving the thread back between them, the circle on screen first;
+a held message moves its circle first (its read starts at once). Nothing is let in unchecked.
 
 ---
 
@@ -1213,6 +1237,35 @@ chose, and you can choose yourself* — but it is now a description of behaviour
 
 ---
 
+## 2026-08-19 — A connection belongs to the person, not to the device that paired it; the companion is a device of yours (Frits)
+
+*Recorded 2026-11-12: decided in a session on 2026-08-19 and written into `docs/architecture.md` the next day, but never
+entered here.*
+
+Two rulings. **A connection is a property of the person**, not of the device it was paired on: grants and revocations
+are entries on the device log's grants lane, the active-grant set is a projection folded from them (never a second
+store), so revocation survives a restart and restore carries it; the person's own devices exchange the lane live, so a
+revoke made on the phone reaches the laptop's door — "unpairing the kitchen tablet on your phone must not leave your
+laptop still admitting it", and a revoke that waits for a reboot is not a revoke. The trust base is add-a-device
+enrolment (only an enrolled, unrevoked device's statements count) and revoke wins. Telling the view to drop is a
+convenience, never the gate. **The companion is a device of yours**, enrolled with add-a-device like any other; the
+blind holder for a host you do not own (a rented server) is parked as a variant. Where it runs today:
+`docs/architecture.md`, the Surfaces home ("A connection belongs to the person").
+
+## 2026-08-27 — Pod access control is ACP, and only ACP: no WAC path (Frits)
+
+*Recorded 2026-11-12: decided 2026-08-27 and written only into `docs/architecture.md` (which gave the date as
+2026-08-26), never here, so the 2026-07-31 entry's "WAC" stood unchallenged in this file.*
+
+Frits: "ACP is the way to go, no compatibility with older methods." A circle grants a member read access by writing
+a Solid Access Control Resource (`<container>/.acr`) directly. WAC honours a different resource (`.acl`), and on a
+WAC-served pod the `.acr` write succeeds as an ordinary file and grants nothing: members cannot read their own circle.
+It fails closed, and the writer now refuses out loud when a container advertises a WAC control resource. So a pod
+hosted for Onderling must be served with an ACP configuration (CSS: `@css:config/file-acp.json`), a provisioning
+choice. **There is deliberately no WAC compatibility path:** two access models would mean two implementations of
+every grant, revoke and rotation, each able to drift. Supersedes the access-model sentence of 2026-07-31 (self-hosted
+CSS stands). Kept honest by `apps/basis/test/circlePod2Pod.css.test.js`, which needs an ACP server and fails on WAC.
+
 ## 2026-09-03 — A thread is keyed by IDENTITY, and one person may not present as several (Frits)
 
 **Status:** settled and built (both shells).
@@ -1267,28 +1320,6 @@ open question (the person, the admins, the group).
 **Where.** `packages/core/src/security/rosterFold.js` (`equivocators` returns the fork siblings; `forkAt` / the
 removal in the depth loop); spec in `test/rosterFold.test.js`.
 
-## 2026-10-31 — The stable point: one address per persona per circle, spine statements only from the point (Frits)
-
-A member's devices used to hold a circle address each, so co-members saw a device count, a revoke re-keyed the circle,
-and two devices signing at once forked the member's chain. Rulings. (1) **One address per persona per circle.** The
-per-circle key derives from the persona's circle root (root → persona → circle, epoched), not from a device seed; every
-FULL device of the persona (a phone, a companion) holds it, a LIGHT device (a web login, a borrowed laptop) does not
-and works through the point. Co-members see one member, one address. (2) **The point.** One device per persona signs
-the circle's SPINE statements (membership, role, key, governance): the companion if there is one, otherwise the device
-the person chose as main; the first device writes itself as point when a second enrols, and the "main device" tap moves
-it. The point is its own record, apart from the primary contact address. A device without the circle root cannot be the
-point. (3) **Spine statements only from the point.** The other devices hand the ACT (kind, subject, payload — never key
-material, never an identity of their own choosing) to the point over the own-devices lane; the point signs it as the
-member, on its own head, and fans it. Chat and items stay any-device (they are not chained). An act waits for an
-offline point and is re-sent for seven days on connect and when the point moves; the point remembers an act id for the
-same seven days, so a re-send is signed once. Past seven days the act is dropped and the person is told it was not sent.
-A double sign after a forgotten id is accepted as the cheaper failure: the acts settle the same applied twice, on one key
-and one head. (4) **Revoke.** A light device: stop its fan, drop its delegation, no re-key. A full device: the ceremony
-re-keys (only the remaining full devices get the new epoch).
-
-**This is a convention, not an enforcement** (the enforceability test): a STOLEN full device that ignores rule (3) can
-fork the shared key on purpose. By the fork rule (2026-09-25) the person then loses standing from that depth and is told
-— the same as a stolen per-device key before this — and the re-key plus an admin's re-admit is the way back.
 ## 2026-10-22 — The household bot reads several items in one sentence with the MODEL, not a deterministic rule (Frits)
 
 A member wrote "balkondeur isoleren, gangdeur isoleren" and got ONE chore; the proposal was a deterministic split on
@@ -1337,8 +1368,9 @@ row (bot-only, never fanned); `enrolForgets` keeps its cc-help special case. Led
 
 Three calls from the Saturday sitting. (1) **Relays refer, never host.** A relay forwards a feed ask to the node that
 announced it serves feeds (the companion, the person's always-on device) and never holds or serves a feed itself; a
-desktop relay from the installer is the same relay role; when relay and companion run in one process, the companion
-flag serves the feed. (2) **Feedback ≠ help.** Help is internal to Basis (the help bot, the
+desktop relay from the installer is the same relay role. *Amended 2026-11-10 (Frits):* the relay is its own installer
+and its own process, never in one process with the companion; companion and bot share one process with role flags.
+(2) **Feedback ≠ help.** Help is internal to Basis (the help bot, the
 local deck, L435 as a contact). Feedback is a SEPARATE contact, "Onderling", the maker's agent persona on an always-on
 device (L419), seeded in every install in place of the accidental household-bot card (L397); a feedback door is
 reachable from any place in the app (the gear, the + sheet), and a circle or bot may offer its own feedback command as
@@ -1373,6 +1405,29 @@ Acceptance: the enrol-race story (one enrol in ten, 2026-09-13) and the pairing 
 walk. Order: 5c-2a as (a) now, the fold through 5d, then this as the first post-fold arc; `docs/architecture.md`'s
 data-plane section is rewritten from the code AFTER it lands, not before. Ledger: L467.
 
+## 2026-10-31 — The stable point: one address per persona per circle, spine statements only from the point (Frits)
+
+A member's devices used to hold a circle address each, so co-members saw a device count, a revoke re-keyed the circle,
+and two devices signing at once forked the member's chain. Rulings. (1) **One address per persona per circle.** The
+per-circle key derives from the persona's circle root (root → persona → circle, epoched), not from a device seed; every
+FULL device of the persona (a phone, a companion) holds it, a LIGHT device (a web login, a borrowed laptop) does not
+and works through the point. Co-members see one member, one address. (2) **The point.** One device per persona signs
+the circle's SPINE statements (membership, role, key, governance): the companion if there is one, otherwise the device
+the person chose as main; the first device writes itself as point when a second enrols, and the "main device" tap moves
+it. The point is its own record, apart from the primary contact address. A device without the circle root cannot be the
+point. (3) **Spine statements only from the point.** The other devices hand the ACT (kind, subject, payload — never key
+material, never an identity of their own choosing) to the point over the own-devices lane; the point signs it as the
+member, on its own head, and fans it. Chat and items stay any-device (they are not chained). An act waits for an
+offline point and is re-sent for seven days on connect and when the point moves; the point remembers an act id for the
+same seven days, so a re-send is signed once. Past seven days the act is dropped and the person is told it was not sent.
+A double sign after a forgotten id is accepted as the cheaper failure: the acts settle the same applied twice, on one key
+and one head. (4) **Revoke.** A light device: stop its fan, drop its delegation, no re-key. A full device: the ceremony
+re-keys (only the remaining full devices get the new epoch).
+
+**This is a convention, not an enforcement** (the enforceability test): a STOLEN full device that ignores rule (3) can
+fork the shared key on purpose. By the fork rule (2026-09-25) the person then loses standing from that depth and is told
+— the same as a stolen per-device key before this — and the re-key plus an admin's re-admit is the way back.
+
 ## 2026-11-06 — A word where a key would be: a person nobody has named is "someone", never a piece of their key (Frits)
 
 From the two-phone walk's sitting. Until now the reveal ladder's last resort was the key, shortened (`peer-PflwUn`):
@@ -1383,3 +1438,441 @@ and every place a person is painted reads it: the contact list, the chat title a
 membership notices, the members list, the chat sender, the circle list's preview, the admin page. An identifier a
 person chose to be known by — a `webid:`, a `did:`, a URL — is still a name. The cost is accepted: two unnamed people
 both read "someone" and are told apart by their faces. Ledger: L650 (closes L621).
+
+## 2026-11-06 — The name in a circle is for people: no format rule, no '@', and joining says one line (Frits)
+
+From the two-phone walk's sitting. The name a person uses in a circle was an identifier: lowercase, digits, `-`/`_`,
+3 to 30 characters, painted `@name`. "Tester B" could not be used. Frits: **the name is for people. Any letters,
+spaces and capitals, 1 to 40 characters, no '@'.** One rule in the join wizard (`isValidName`) and the same rule where
+the circle store saves it (`validateHandle` in pinboard); a test pins the two together. Join step 3 says one line,
+"You join as Frits.", under the chosen persona's name or your own; the rest waits in a fold: another name for this
+circle (an optional mask), the persona, how much you show, the address, and joining as a new persona. The address
+sentence is honest about what a new address hides: the link from the relay, not from members who are in both circles
+(the default persona's identity stays the same across circles, 2026-11-07). A new persona is the real separation.
+Uniqueness of the name within a circle still holds for now; dropping it waits for a suffix that tells two equal names
+apart on screen. Ledger: L718 (with L629, L633).
+
+## 2026-11-09 — Two people may share a name in a circle; a bot's name stays its own (Frits 2026-11-06, Fable)
+
+Follows from the name being for people. **The name in a circle is no longer unique: uniqueness stays on the key.**
+Three places used to refuse a name another member held: the save-name op (`setMyHandle`), the admin's redeem of a
+join, and the roster fold's `member-props` rule. The first two refuse no person's name. One case stays: **a bot's name is its own** (a bot is addressed by its name in
+chat). The admin's redeem refuses a joiner named like a current bot (case-blind, from the folded roster's proven kind),
+and the fold refuses a statement that would give a bot and anyone else one name, deny-wins. Two
+members with one name are told apart on screen by the avatar and, only on a collision, a small number: the first
+in roster order is "Jan", the next "Jan · 2" (`withNameNumbers` in the roster normaliser, painted by the reveal
+ladder). Ledger: L718.
+
+## 2026-11-10 — The companion is your always-on device, nothing more; node roles are composed per person (Frits)
+
+**The companion is the person's always-on device: nothing more, nothing less.** Its one defining property is that it
+stays online, so the person stays reachable (hold and forward) while their phone or browser is away. It is not a
+privileged broker, matcher or router.
+
+**Functions that only a node can run** (serving a feed, holding a connector to a credential, other Node-only work)
+are separate roles. Their natural home is often the companion, because it is the person's node, but that is a
+default, not a rule: a person may run a plain always-on agent on device A and another agent on device B that serves
+feeds and holds connectors. Which device carries which role is the person's choice. The code keeps these roles
+modular so an agent is composed from them (the SDK side of this repo), while the Basis app stays one app. The relay
+is a separate installer and process (the 2026-10-24 entry, amended today). A relay refers a feed ask to whichever
+node announced it serves feeds, as decided on 2026-10-24; that node need not be the companion.
+
+## 2026-11-10 — Bots and apps bring their own nouns and words; Basis's screens show what nouns declare (Frits)
+
+**The rule, for every bot and app, the household bot being the first:** a bot or app brings its functions as nouns
+and verbs in its own manifest. Its functions reach people through every surface that projects the manifest: a chat
+(Telegram, the assistant thread behind the "+"), the circle screens, a slash command. Basis's own screens (Today,
+Mij, the "+") never name a noun. A noun DECLARES how it shows (`presents`: label, moment, order, mine) and its own
+words (`names`), and Basis builds its views from those declarations; a person decides per block which nouns appear
+there. A new bot's "chore" therefore needs no change to Basis, and Basis's locale carries no bot vocabulary.
+
+This joins three earlier calls into one. 2026-09-05: the household bot's functions (lists by chat, nudges, a daily
+summary) keep working in Telegram and inside Basis; nothing is deleted. 2026-09-16: household is broken up into
+standard nouns and verbs, the first realm extension; the name stays only as a wizard suggestion. 2026-10-16: the
+facets above are how Basis shows any noun (built). The in-app bot of 2026-09-05 is the assistant thread: it reads
+the same phrases as the Telegram bot from one shared rule set. Mij's "open" count includes unfinished list items.
+The household manifest's device and identity actions move out of it after the alpha (a move, no behaviour change).
+
+## 2026-11-11 — One send gate: the address decides the circle, and every send says why it went where it went (Frits, Fable)
+
+Every app-level peer message leaves through one function in the agent (`peerSend`, realAgent), and below it one wire
+call. The gate decides by what this device KNOWS, not by what a caller remembered to pass: a member's per-circle
+address in one of my circles is that circle's traffic (my circle self, the circle's connection points), whether or not
+the caller named the circle; a caller's circle that disagrees with the roster is refused; my own devices are reached as
+siblings; anything else keeps the person path, so a first message to a new card still goes. The transport layer still
+never learns that a circle exists: the circle travels down as points (architecture §4, "Per-peer is not enough for a
+circle"). Before this, the circle was an optional extra beside a raw address and ~40 callers could forget it; such a
+send was reported delivered and refused at the other end.
+
+Each send writes ONE record (`agent/send.decision`, codes and scalars only, never an address or a circle id): what the
+gate decided, each candidate transport by kind with why it is or is not eligible and whether it reaches, the one chosen,
+and the outcome. It shows in the copy-log door and, on a test build, in logcat, so a failure on a phone names its branch
+without a new instrument. Connection points compare in one form (`samePoint`): spellings of one relay match, two names
+for one host do not.
+
+## 2026-11-12 — A first message from someone you did not choose is a request; the persona decides who may write first (Frits)
+
+A first contact turn from someone the person did not choose is HELD as a message request (`message-request`, in the
+self's own-devices store, beside the contact book and never in it), decided at the contact channel's door before
+anything is kept: no contact row, no pair circle, no thread turn, no delivery receipt. Before this, the card riding a
+first message went straight into the book and the pair roster made a circle, so "in the book" meant "wrote first", and
+the receipt and the person key's allowlist could not tell a chosen contact from a stranger. Known, and so let on as
+before: one's own devices, a member of a circle one is in, a contact in the book (hidden ones too), and anyone one wrote
+to first. The person accepts (the held card goes into the book as a scanned card does, the held turns move into the
+thread in order), ignores (kept, still acceptable), or blocks. A file or a threaded answer from someone not known is not
+kept; a request holds no files.
+
+**The persona is the policy** for who may write first: a profile property `firstMessages`, `request` or `open` (anyone,
+within the stranger budgets), reaching every device of the person with the profile's facts and never released by a
+reveal preset. A person's persona is `request` until they choose; a function profile's is `open` (a bot is a persona
+whose door is open; its own admission still decides). The persona a message is for is the one whose identity answers
+on the address it arrived on. The feedback persona ("Onderling") is open; the general persona is not bridged to it.
+A box is managed through its profile like any device, not through environment settings.
+
+**People in my circles may write to me** (a second profile property, `circleMembersMayWrite`, default on): a member of
+one of THAT persona's circles, seen on this device's own roster, gets a thread when they write privately, but no contact
+row; the person's answer is the choice that makes them a contact. Off: their first private message is a request.
+Circles of another persona do not count, so being in a circle with one persona does not open the others.
+
+**Switched off after a member already wrote** (2026-11-14, found walking the phone: the member's next message landed
+nowhere). Answered: the answer made them a contact, and a contact is let on whatever the switch says. Never answered:
+their next message is a request (the person turned the switch off to stop exactly this), held WITHOUT a card (their card
+rode only their first message), shown by the name they have in the circle; their earlier turns stay in the thread.
+Accepting a request without a card puts no row in the book: the held turns move into the thread and the request goes;
+the book row comes when the person answers, as for a member who may write. **Reversed for a member by Frits, 2026-11-14:**
+Accept on a circle MEMBER's request counts as the choice: it makes the contact (their identity, named as in the circle),
+as an answer would, so their next message lands in the thread and does not ask again. A stranger's request without a
+card (a turn held after a refusal) is unchanged: Accept puts the turns in the thread and no one in the book.
+
+**Nothing at the contact door is dropped silently** (same day). A turn the request's hold refuses (no card on a new
+request, a card naming someone else, a file, too large, or the hold failing) is written to the refusal log with its
+reason code from a closed set, then held anyway, marked with that reason: what made it unholdable is left off (the
+card, the file) or cut to the bound (the text). Only a turn there is no self to hold it for is dropped, and both
+refusals are logged. The stranger budgets in front of the door still drop past their bounds, with their own count line.
+
+**Block is about direct contact, never a circle** (Frits, after comparing Signal, WhatsApp and Telegram, which all keep a
+block one-on-one). The block list (`/block`) is kept by the secure agent, alias-aware, but enforced only by the app's
+DIRECT doors: the contact channel (before anything else: no request, no thread, no receipt), files and threaded answers,
+and the person's own direct send to them (refused, with the reason). Circle traffic never asks it, so every member's
+device keeps the same view of the circle; before this, a block dropped everything from the person and refused every send
+to them, circle traffic included: a silent half-removal on one device. In a circle the person can hide someone's posts
+on their own device; removal stays the admin's. The block is on this device for now: a block reaching all the person's
+devices is a later step. A block is by identity and the addresses it had; a fresh key gets past it as a new stranger,
+and the stranger budgets are the defence there. Ledger: L806, L807, L808.
+
+## 2026-11-12 — One strict rule for a valid signature; no remembered verdicts (Frits, the L619 fast-start brief)
+
+**One rule.** Ed25519 libraries disagree on crafted signatures: on the 12 published edge-case vectors tweetnacl (what
+every device ran) accepted seven, node:crypto and WebCrypto five, libsodium one. A faster check on one device would
+then accept what another refuses, and a member could split a circle's roster. So every signature check in the platform
+applies one rule first, as byte checks: S < L, the key and R canonically encoded and not of small order, then the
+cofactorless equation (`verifyEd25519Strict`, rule set `ed25519-strict-1`, written out in
+`docs/conventions/signed-bodies.md`, the vectors in `@onderling/core/conformance`). It accepts less than before and
+nothing an honest signer makes. It ships on all three shells at once, by construction (it is in `AgentIdentity.verify`
+and the three checks that called the library directly), and before any device uses a faster check behind it.
+
+**No remembered verdicts.** A "this signature checked out" mark that survives a restart (verify-once step C1, or the
+same for membership and keys) is not built: stored chat is never re-verified on read, so it saved nothing; the
+signed lanes are covered by checking each signature once per process (the shared memo) and, later, by checking a
+circle when it is first needed; and a remembered mark would travel with a history restore, a verdict from another
+device. Ledger: L619, L829.
+## 2026-11-12 — A signature verdict is remembered only in memory, once per process; nothing persisted, nothing from another device (Frits)
+
+What a start costs on a phone is first-time signature checks (measured on a mid-range Android phone: one Ed25519 check in pure
+JavaScript is about 61 ms, and a start with 18 circles does about 90 of them in its first 15 seconds). Repeats were
+already answered from memory. What may be remembered, and what may not:
+
+- **Only the pure check is remembered**: (the verifier, the key, the signature, the sha-256 of the signed bytes) →
+  true. One memo per process (`processSignatureMemo` in the kernel), bounded by bytes (8 MiB, a parameter), used by
+  every rail, a circle-link proof, a ceremony reveal and a device delegation under their own verifier names, so one
+  verifier's "true" is never another's. A failure is never remembered. The only writer is the real check, after it
+  returned true.
+- **No verdict is persisted**, inside or beside the log, and none is accepted from another device or a restore: a
+  remembered mark in the device log would travel with a history restore, a verdict made elsewhere. Considered and
+  dropped: remembering the verdict of chat and item statements in the sealed log record (it saved nothing, since stored
+  chat is not re-verified on read, and the rail lanes have a way with no new trust).
+- **What binds is re-decided on every read**: the binding of a key to a member, the fold, fork detection, revocation,
+  the admin check. Only the cryptographic fact is remembered.
+- A read that asks for some kinds drops the others before checking signatures (the kind is inside the signed bytes);
+  a read that computes a chain, a fork or a lane's head over the whole lane keeps checking the whole lane.
+
+Ledger: L619, L821.
+
+## 2026-11-12 — One strict rule for a valid signature; no remembered verdicts (Frits, the L619 fast-start brief)
+
+**One rule.** Ed25519 libraries disagree on crafted signatures: on the 12 published edge-case vectors tweetnacl (what
+every device ran) accepted seven, node:crypto and WebCrypto five, libsodium one. A faster check on one device would
+then accept what another refuses, and a member could split a circle's roster. So every signature check in the platform
+applies one rule first, as byte checks: S < L, the key and R canonically encoded and not of small order, then the
+cofactorless equation (`verifyEd25519Strict`, rule set `ed25519-strict-1`, written out in
+`docs/conventions/signed-bodies.md`, the vectors in `@onderling/core/conformance`). It accepts less than before and
+nothing an honest signer makes. It ships on all three shells at once, by construction (it is in `AgentIdentity.verify`
+and the three checks that called the library directly), and before any device uses a faster check behind it.
+
+**No remembered verdicts.** A "this signature checked out" mark that survives a restart (verify-once step C1, or the
+same for membership and keys) is not built: stored chat is never re-verified on read, so it saved nothing; the
+signed lanes are covered by checking each signature once per process (the shared memo) and, later, by checking a
+circle when it is first needed; and a remembered mark would travel with a history restore, a verdict from another
+device. Ledger: L619, L829.
+
+## 2026-11-12 — Compacting superseded member properties is paused until a tombstone can prove itself (Frits's brief)
+
+A device compacts a `member-props` statement the roster fold calls dead into a tombstone: chain fields kept, payload
+and signature gone. The tombstone keeps the causal edge on the device that made it, but a member who joins LATER
+cannot accept it (nothing to verify), so it lacks that parent, and the fold skips a missing parent: the late joiner
+gives the author's later statements a lower causal depth. Proven (`apps/basis/test/v2/lateJoinerFoldOrder.test.js`):
+an admin who evicts a member right after seeing their newest name folds as an eviction on the devices that were there,
+and as no eviction on a device that joined later. Two devices of one circle, two rosters, nobody misbehaving.
+
+So compaction is OFF (`COMPACT_SUPERSEDED_PROPS` in `apps/basis/src/v2/membershipRail.js`): dead statements stay
+whole, are served to late joiners like any other, and every device folds the same. The price: the log keeps old
+member properties (a face thumbnail per change). It turns back on with the statement format whose signature covers a
+header that a tombstone keeps, so a tombstone proves itself and can be sent on. The decision to pause on a red finding
+was set in advance in the L619 fast-start brief (Frits, 2026-11-12). What the pause does NOT undo: tombstones made
+before it stay on the devices that ran with compaction on, and nothing serves a tombstone (a catch-up sends only what
+it can vouch for), so a member who joins such a circle later still lacks those parents. That is pre-launch state with
+no compatibility owed: the alpha starts from fresh circles (and the statement format change founds every circle again).
+Ledger: L827, L833.
+
+*Amended 2026-11-13 (the statement format v2, L833 — the condition this entry named):* compaction is ON again
+(`COMPACT_SUPERSEDED_PROPS = true`). A tombstone now keeps the signed header (its payload dropped, its digest and
+authorRef kept), so it proves itself, a catch-up serves it, and a member who joins later accepts it and folds the same
+roster: `apps/basis/test/v2/tombstoneProvesItself.test.js` and the relay walk `lateJoinerAfterCompaction` (with
+tombstones on the admin's side) are green. Every circle is founded again by the format change (no compatibility owed).
+
+## 2026-11-13 — Who decides is enforced on every member's device, judged by the rule the act was made under (Fable, Opus; the governance work Frits set)
+
+The circle policy names a decision class per governed act (remove a member, change a role, change the rules, change the
+settings). Until now only an honest app asked for the vote; a modified app, or a path that skipped the door, could
+remove a member or change the rules alone, and every device applied it. Now every member's device checks it:
+
+- **The device's own tally.** A governed statement that needed a vote names its proposal; the receiving device
+  re-tallies that proposal from the votes it holds, about the same subject. A recorded "approved" counts for nothing
+  on its own. Where one admin may decide (any-admin, or admin-quorum while the circle has one admin) the statement stands alone.
+- **The rule the act was made under.** Every removal, role change and rules change carries the settings version its
+  device had seen (`policyVersion`), stamped where the statement is built, whichever path wrote it (a screen, the
+  box bot, a slash command, the assistant). It is judged by that version, so a decision taken under a looser rule is
+  not undone when the circle tightens later. A stamp the device has not seen yet waits; no stamp is judged by the rule
+  in force now. An author's stamps never go back, and an author's own later settings change draws a line through
+  that author's hash chain: what they signed before it keeps its stamp, what they sign after it does not.
+- **No clock.** A tally reads the votes, and an admin's override after the deadline is judged at the resolve's own
+  signed time, so every device reaches the same answer about the same statements.
+- **The settings themselves.** Two admins' settings at one version merge "who decides" strictest-first per act, so a
+  tightening beside an unrelated change is never lost to hash order.
+- **Shown, never silent.** A refused change stays on the lane and is listed in the circle's governance view.
+
+Not covered yet: admissions (`join`) are not gated (the policy has no admission class), and the drawn sample is held
+back for the alpha. Residues, accepted: an admin can sign an override with a false time, and an admin who never stamps
+above an old version keeps being judged by it; both are signed, attributable and visible. And a settings change
+written on a device whose copy of its author's membership chain lags names an older tip, so that author's acts in
+between are refused everywhere (a removal among them leaves the member in; L855). Where it lives:
+`apps/basis/src/v2/governanceReceiverGate.js`, the kernel's `foldRoster` (`governedGate`), `docs/catalogue/governance.md`.
+Ledger: L663, L855, L856, L858.
+
+## 2026-11-13 — What the history mirror keeps is declared per kind; the conversation with the assistant and what was heard nearby stay out (Fable's ruling, recorded at Frits's request)
+
+**Status:** decided; the build is its own change, before the alpha. Frits can reverse it here.
+
+**Context:** the "+" now opens on the person's kept conversation with the assistant (`assistant-turn` entries on the
+device log, the chat retention class, with "Forget this conversation"). Measured while reviewing it: a turn is never
+carried to a member or another device and is never in a bug report, but the personal history mirror and the export
+archive follow the whole device log with no filter. So the conversation would sit, sealed, on the person's pod or in
+a file: past the chat retention window, and past Forget (a restore would bring a forgotten conversation back; the
+build's red-first test measures that).
+
+**Decision:** every entry kind declares whether the mirror keeps it (one required field in the entry-kind table,
+`packages/item-store`; a guard is red for a kind without it). The mirror and the export read only that field. Left
+out:
+
+- **the conversation with the assistant** (`assistant-turn`): Forget has to be final, and the sheet says the
+  conversation ages out;
+- **what was heard nearby** (`nearby-line`, `nearby-card`): those are other people's lines with the room's retention;
+  a copy on a pod outlives the room.
+
+Everything else is mirrored as before, the audit kinds included. What a line to the assistant MADE (a list entry, an
+appointment) is a store row and is mirrored as before.
+
+**Alternatives:** filter on the kind's sync policy `none` (rejected: that policy says what is carried between devices
+and members, not what a person's own record keeps; 14 kinds declare it, and the filter would drop the audit trail the
+mirror exists for); filter the one kind by name (rejected: a list of one that the next kind forgets).
+
+**The price:** after a lost device the conversation with the assistant is gone, also for someone who would have
+wanted it kept; and the "earlier, nearby" block in a contact's thread does not come back on a restored device. A
+mirror written before this still holds such entries on the pod; a restore never brings them back. Ledger: L875, L668.
+
+## 2026-11-13 — A posture's name is a promise: no "central pod" circle type until members stop learning each other's addresses (Fable's ruling, recorded at Frits's request)
+
+**Status:** decided for the alpha; what comes after is Frits's call.
+
+**Context:** a circle on one central pod was asked for as "members not exchanging contact data, just a central
+storage place". A walk over the relay and one shared pod measured what the existing pod-only data move does: with
+two repairs (the pod listing and the pod chat read-back each read the wrong shape, so no chat was ever read back from
+a real pod) a chat line crosses on the pod alone. But a join and a removal still travel member to member, a removal
+does not arrive without the relay, and a task does not cross without the relay either (measured; items have no pod
+read-back, so by reading they are fanned as in any circle). So only chat keeps to the pod, and members still learn
+each other's device and relay addresses.
+
+**Decision:** the repairs land; the posture gets no name of its own and is not offered when a circle is made. Naming
+it "central" now would promise the privacy property it does not have. The name and the offer come together with
+membership and items on the pod (new carriers), after the alpha, if the posture is wanted at all.
+
+**Where it stands in the code:** the pod-only data move is reachable only under the policy value `personal`
+(`apps/basis/src/v2/circleDataPolicy.js`). The create wizard does not offer that value (`OFFERED_STORAGE_POSTURES`
+is none and shared, and the wizard's choice overrides a template's `personal` preference); a circle that already
+holds it, or one made programmatically, can still have it. The two walks pin what crosses and what does not
+(`apps/basis/test/centralPodCircle.relay.test.js`, `centralPodMembership.relay.test.js`). Ledger: L745, L610.
+
+## 2026-11-14 — A circle link proof names the member; one address, one member in a circle (Frits, ledger answer; Fable ruled the shape)
+
+**Status:** decided and built.
+
+**Context:** the proof that a per-circle address belongs in a circle was a signature by the address's key over the
+circle and the address only. Leaving the member out was deliberate (2026-08-02, recorded in
+`circleAddressAnnouncement.js`): naming the member's key in a signature would prove to anyone that address and person
+are one. Two facts reversed it. Every membership statement (join, leave, role, profile) is already signed by the
+per-circle key over a payload that names the member, since the membership lane became circle-scoped, so that link
+already exists inside the circle. And an unbound proof could be COPIED: a member put another member's address and its
+proof on their own roster row, the roster listed it as theirs, and a device bound that address to the copier as a
+person (measured: accepted).
+
+**Decision (Frits):** the key on the roster is the PERSONA's key; recognising one persona across its circles is
+natural, and who does not want that makes a persona per circle. So the proof names the member:
+`onderling-circle-link-v2 | circle | address | member`, the member being the persona's identity in that circle. A
+verifier takes the member from the ROW it writes or reads (the redeem's sender, the announcement's member, the trail
+row's `redeemedBy` / `confirmedBy`), never from a field travelling with the proof. The earlier proof is refused; a
+device that meets one writes `earlier-link-proof` to its device log (no circle id, no address). Circles made before
+this lose their addresses and are made again (pre-launch, no compatibility).
+
+**And one address, one member in a circle:** the key holder could still sign a second proof naming another member.
+An address a member's row already holds stays theirs: an announcement placing it under another member is refused
+(`address-held-by-another-member`), and a joiner presenting it at redeem records none (the join goes on).
+
+**Not decided here:** complete unlinkability between circles (members knowing each other only per circle) is a
+design for after the alpha. Code: `packages/core/src/identity/circleLink.js`, `circleAddressAnnouncement.js`,
+`packages/circles/src/circleAddress.js` (`addressHolderIn`). Ledger: L917, L919, L921.
+
+## 2026-11-14 — The circle key: who makes the first one, when it is granted, who may hold it, and never plain text (Fable's rulings, recorded; Frits told the same day)
+
+**Status:** decided and built.
+
+**Context:** the first walks of a shared-pod circle and of two phones in a circle without a pod found four faults in
+how a circle's key is made and handed out. A joiner's device made its own first key on opening the circle and sealed a
+post under it, so the founder saw ciphertext. A join rebuilt the key's audience from one device's memory and dropped
+holders it did not know. Nothing removed a holder whose removal was lost. And a sealed circle with no key yet stored
+its posts unsealed.
+
+**Decision:**
+
+- **Only a device that may admit makes a circle's first key.** The same authority check as the receivers' key rail
+  decides who may establish it. A member's device takes the key from the key log and never makes its own; until it
+  holds one, its posts are refused with the existing sentence.
+- **The key is granted after the join is recorded, never before.** A failed join used to leave a key holder who was no
+  member; now the worst case is a member without the key, which the next start repairs. Every key change that adds
+  someone asks again whether they are still in after the admission it acts on (pinboard's internal `memberStatus`).
+- **The key's audience follows the membership.** On the key owner's device the stored audience is compared with who
+  should hold it, and a holder the membership places out is revoked with the existing revoke. It never adds. If any of
+  the lists it compares against cannot be read, nothing is revoked that round. It runs for group-key circles only.
+- **A sealed circle never falls back to plain text.** With no seal strategy a scoped write is refused, not stored in
+  the clear. A joined circle's posture is NOT KNOWN until its policy arrived (the join's reply carries it, a mark holds
+  it meanwhile), and not known refuses the write.
+
+**The price:** a member cannot post in a circle until the founder's or an admin's device has been reachable once after
+their join; a joiner whose grant failed once waits for the next start.
+
+Code: `apps/basis/src/v2/keyRail.js`, `circleControlAgent.js`, `circlePodProducer.js`, `keyAudienceCheck.js`,
+`circlePolicyStore.js` (`markPending`). Ledger: L934, L899, L907, L909.
+
+## 2026-11-14 — An approved decision is enacted by an admin, and now there is a button for it (Fable; keeps the choice of 2026-07-26)
+
+**Status:** decided and built.
+
+**Context:** a browser walk showed a removal approved by a member's yes (2 of 3) that never landed. The choice of
+2026-07-26 stands that a received message never removes someone by itself: an admin's device enacts. But that step had
+no control anywhere; it only ever ran when the completing vote was an admin's own.
+
+**Decision:** keep the explicit step, and give it a control: an approved, open decision shows an Enact button to an
+admin on both shells, and a waiting line ("awaiting an admin") to everyone else. The Decisions entry is back in the
+circle's menu, and the "A decision opened" line in the conversation leads to the Decisions screen.
+
+**The price:** a voted removal needs one more tap by an admin, and with no admin around it waits (the absent admin is
+a design for after the alpha). Enacting automatically on an admin's device would reverse the July decision; that is
+Frits's to choose, and it is one value in `circlePolicy.js`.
+
+Code: `apps/basis/src/v2/governanceView.js` (`canEnact`), `governanceHost.js`. Ledger: L893, L887.
+
+## 2026-11-15 — No vote freeze for the alpha: a vote counts the members as they are now, and the screen says who joined since (Frits; reverses his choice of 2026-11-14)
+
+Admissions are not governed, so an admin who may admit alone can admit accounts and win a members' vote with them. On
+2026-11-14 Frits chose to freeze a vote on the members of the moment it was proposed (the proposal naming the
+membership statements it was made under). It was built and reviewed, and is NOT adopted, because the log cannot prove
+the order of a join and a proposal: each lane is its own hash chain, and the statements a proposal would name are a
+floor its author chooses. So a proposer could name an old snapshot in which they and their allies were the majority,
+and every device would agree (a new power for every member); and the freeze never stopped an admin who admits first and
+proposes after. Any rule that lets the left-out members count lets packed accounts block or win; any rule that does not
+lets an old snapshot leave real members out. The order can only come from governing admissions.
+
+So, for the alpha:
+
+- **A vote counts the roster as it is now**, and only the votes of members on it (a vote by someone who has left or was
+  removed since counts for nothing).
+- **The limit is said and shown.** An open decision on the Decisions screen says how many of today's members joined
+  since it was made ("3 members joined since this proposal was made"), counted from the joins whose signed time is after
+  the proposal's. A join's time is set by the device that wrote it, so this informs and decides nothing.
+- **Governed admissions** (who may admit is decided like who may remove) are designed after the alpha.
+
+Where it lives: `apps/basis/src/v2/governanceDecision.js` (the tally), `governanceView.js` (`joinsSince`,
+`joinedSinceLine`), `packages/circles/src/circleMembershipWriters.js` (the join's `at`). Ledger: L856, L945.
+
+## 2026-11-15 — Pinboard's own store is not written through to the person's pod (Fable; privacy, before the alpha)
+
+**Status:** decided and built; the sealed design is for after the alpha.
+
+**Context:** signing in to a pod attached pinboard's own store to it, and that store writes through unsealed, so the
+pod's host could read what landed there.
+
+**Decision:** neither shell attaches pinboard's own store to the person's pod. That store gets pod routing again only
+together with a seal (sealed, per field), as a design after the alpha.
+
+Code: the attach is gone from both shells' sign-in; `scripts/lint-no-pinboard-pod-attach.mjs` (in `npm run guards`)
+fails if it comes back. Ledger: L935.
+
+## 2026-11-15 — How the app reads and writes a pod: ask the pod, one response for body and version, remember what you wrote (Fable ruled the shapes; Opus measured)
+
+**Status:** decided and built.
+
+**Context:** two members' changes to one pod resource were sometimes lost although every write was conditional. It was
+first read as the pod server returning an old body under a new ETag, and a double read was built around that. Measured
+the next day, the fault was ours, three times over:
+
+1. A browser's HTTP cache (and the phone's networking cache) answered a read with an old copy for seconds after the
+   same page wrote a new version.
+2. Our read took the body from one request and the ETag from a second one sent after it. A write landing between the
+   two gave the old body under the new ETag. Counted on a real pod: 13 lost of 40 with the second request, 0 of 40 with
+   the ETag from the body's own response.
+3. A pod answers a write with no version at all (measured on the Community Solid Server 7.2.0), so our client took
+   "its" version from a later request, which could be another writer's, and its next write then passed over their
+   change.
+
+**Decision:**
+
+- **Every pod request asks the pod.** Reads and existence checks are sent to revalidate; a cached copy is never the
+  answer.
+- **A read's version comes from the response that carried the body.** Never from a second request.
+- **After a write the client remembers what it WROTE** (a digest of the bytes), never a version. At its next default
+  write or delete of that resource it reads once: still what it wrote, it writes on that response's version; changed,
+  it refuses with a conflict and the caller reads and merges. A write-once resource costs no extra request. A read
+  always replaces what is remembered; a not-found read clears it.
+- **A plain write names no version** and sends no request after it.
+- **The pod server version is pinned** (7.2.0) in our own pod image and every test harness: a new release does not
+  change what our pods do without a test run on it.
+
+The double read and the read-back of 2026-11-14 are removed: they worked around our own fault. No report went to the
+pod server's maintainers; there was nothing of theirs to report.
+
+**What this says about method:** the first diagnosis blamed the server on a probe that saw the symptom and not its
+cause. The count that settled it ran both variants in one loop.
+
+Code: `packages/pod-client/src/SolidPodSource.js`, `PodClient.js` (`#conditionFor`, `#rememberRead`),
+`apps/basis/src/web/podStorage.js`, `deploy/css-pod/Dockerfile`, `scripts/css-harness.mjs`;
+`docs/agent-notes-known-gotchas.md` (React Native turns a revalidating read into a query on the URL).
+Ledger: L899, L936, L941, L942.

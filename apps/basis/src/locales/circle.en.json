@@ -81,8 +81,8 @@
           "doc": "Join wizard — step 2 label."
         },
         "handle": {
-          "text": "Name",
-          "doc": "Join wizard — step 3 label (pick a handle)."
+          "text": "Who",
+          "doc": "Join wizard: step 3 label (who joins)."
         }
       },
       "cancel": {
@@ -159,20 +159,20 @@
       },
       "handle": {
         "title": {
-          "text": "Pick a name",
-          "doc": "Join wizard — handle step heading."
+          "text": "Who joins",
+          "doc": "Join wizard, step 3 heading: who joins this circle."
         },
         "intro": {
-          "text": "Your name is how other members address you in this circle. Lowercase letters, digits, underscore or dash; 3–30 characters.",
-          "doc": "Join wizard — handle step intro."
+          "text": "Members of this circle see this name. Your other circles keep theirs.",
+          "doc": "Join wizard: the hint under the optional name for this circle."
         },
         "label": {
-          "text": "Name",
-          "doc": "Join wizard — handle input label."
+          "text": "Your name in this circle",
+          "doc": "Join wizard: label of the optional name for this circle (empty = the persona's name)."
         },
         "placeholder": {
-          "text": "e.g. alice",
-          "doc": "Join wizard — handle input placeholder."
+          "text": "e.g. Alice",
+          "doc": "Join wizard: placeholder of the optional name for this circle."
         },
         "suggestions": {
           "text": "Suggestions",
@@ -181,20 +181,24 @@
       },
       "link": {
         "label": {
-          "text": "Continue as",
-          "doc": "Join wizard — cross-circle linkability choice label."
+          "text": "Address in this circle",
+          "doc": "Join wizard: the address choice label."
         },
         "fresh": {
-          "text": "A fresh identity (unlinkable)",
-          "doc": "Join wizard — fresh/unlinkable key option."
+          "text": "A new address for this circle",
+          "doc": "Join wizard: the default address option (this circle's own address)."
         },
         "same_person": {
-          "text": "The same person as in {{name}}",
-          "doc": "Join wizard — continue-as-existing-self option."
+          "text": "The same address as in {{name}}",
+          "doc": "Join wizard: present the address used in another circle ({{name}} = that circle)."
         },
         "hint": {
-          "text": "A fresh identity keeps this circle unlinkable from your others. Continuing as an existing self proves you are the same person to anyone in both circles.",
-          "doc": "Join wizard — linkability explanation."
+          "text": "The relay cannot see that your circles belong together. Members who are in both circles can.",
+          "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
+        },
+        "hint_same": {
+          "text": "The relay and the members of both circles see that this is the same person.",
+          "doc": "Join wizard: the sentence under the address choice when the same address as in another circle is chosen (the relay and members of both circles see one person)."
         }
       },
       "persona": {
@@ -211,8 +215,8 @@
           "doc": "Join wizard — default persona option label."
         },
         "hint": {
-          "text": "Only what this persona discloses in this circle is shared — nothing on first join. Adjust later under Me → personas.",
-          "doc": "Join wizard — persona disclosure hint."
+          "text": "Only what this persona shares in this circle is shared. Nothing on a first join. You can change it later under Me, personas.",
+          "doc": "Join wizard: persona disclosure hint."
         },
         "already_in": {
           "text": "You are already here as {{persona}} — joining as another persona can be done from another device.",
@@ -231,6 +235,38 @@
         "suggested": {
           "text": "This circle suggests: {{level}}",
           "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)."
+        }
+      },
+      "join_as": {
+        "line": {
+          "text": "You join as {{name}}.",
+          "doc": "Join wizard step 3: the one line naming who joins ({{name}} = the name members will see)."
+        },
+        "no_name": {
+          "text": "Choose the name members of this circle will see.",
+          "doc": "Join wizard step 3: shown instead of the one line when there is no name yet (the fold opens with the name field)."
+        },
+        "fold": {
+          "text": "Another name in this circle, or more privacy",
+          "doc": "Join wizard step 3: the fold holding the optional name, the persona, how much you show and the address."
+        }
+      },
+      "new_persona": {
+        "hint": {
+          "text": "Fully separate, also for members? Join as a new persona.",
+          "doc": "Join wizard: the real separation. A new persona is a different person to everyone, members included."
+        },
+        "button": {
+          "text": "As a new persona",
+          "doc": "Join wizard: makes a new persona and joins as it."
+        },
+        "label": {
+          "text": "Name of the new persona",
+          "doc": "Join wizard: the name field for the new persona."
+        },
+        "make": {
+          "text": "Make it",
+          "doc": "Join wizard: confirms making the new persona."
         }
       }
     }
@@ -319,6 +355,14 @@
     "link_copied": {
       "text": "Link copied.",
       "doc": "The invite on web, when the browser has no share sheet: the link went to the clipboard."
+    },
+    "expired_code": {
+      "text": "This invite is no longer valid. Ask whoever invited you for a new one.",
+      "doc": "The inviter's device refused the join: the code is unknown, expired or rotated away (`invalid-or-expired-code`)."
+    },
+    "join_refused": {
+      "text": "The circle did not let you in with this invite. Ask whoever invited you for a new one.",
+      "doc": "The inviter's device refused the join for a reason it does not name (`join-refused`, the catch-all of the closed refusal set)."
     }
   },
   "members": {
@@ -640,6 +684,18 @@
       "persona_no_connection": {
         "text": "Not sent: this persona has no connection to the circle (tap to retry)",
         "doc": "The circle belongs to one of your personas and that persona has no connection of its own to the circle's relay right now, so the message did not leave (it is never sent under another identity). Retryable once the connection is back."
+      },
+      "held_waiting": {
+        "text": "Waiting for a connection. It goes by itself once there is one.",
+        "doc": "A message to a contact is held on this device because it has no connection to send on (no connection point yet). Not a failure: it leaves by itself once there is one, and the bubble moves on. Pairs with the pending state."
+      },
+      "unknown_address": {
+        "text": "Not sent: this device does not know who that address is. Add their card first, then send again.",
+        "doc": "A contact turn the send gate held (no reason to send on the person key) and gave up at its time limit: not sent, and why."
+      },
+      "peer_unreachable": {
+        "text": "Not reached, maybe offline (tap to retry)",
+        "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."
       }
     },
     "unknown_sender": {
@@ -649,6 +705,24 @@
     "app_sender": {
       "text": "Onderling",
       "doc": "The sender shown on a bubble the APP wrote — a command reply, a caretaker notice, \"you were removed\". Until 2026-08-28 these carried `unknown_sender` (\"Onbekend lid\"), because the bot actor is a sentinel and never resolves against the roster: the app spoke to people as a stranger nobody could place. The product's OWN NAME is used rather than \"de assistent\", because these lines are not all the assistant answering — a removal notice is the app telling you something, and attributing that to an assistant misdescribes who is speaking. If the assistant is later given its own voice, that is a second actor, not a rename of this one."
+    }
+  },
+  "act": {
+    "pending": {
+      "text": "Working…",
+      "doc": "The shared act strip (actState.js): an act the person just took is still running, shown only after a short delay so a fast act never flickers. One line for every op; a screen invents no Save feedback of its own."
+    },
+    "done": {
+      "text": "Done.",
+      "doc": "The shared act strip: the act ended well and its op has no reply-family line of its own (replyLine.js words the ones that do). Clears by itself."
+    },
+    "failed": {
+      "text": "That did not work.",
+      "doc": "The shared act strip: the act failed and nothing said why. Stays until the next act or a tap."
+    },
+    "failed_with": {
+      "text": "That did not work: {{error}}",
+      "doc": "The shared act strip: the act failed with words from the op or the error. Stays until the next act or a tap."
     }
   },
   "tabs": {
@@ -820,6 +894,10 @@
       "chat-message": {
         "text": "Message",
         "doc": "embeds[] chip type label — chat message."
+      },
+      "lend": {
+        "text": "Lending",
+        "doc": "embeds[] chip type label — lending an item (a noticeboard lend post)."
       }
     }
   },
@@ -879,6 +957,10 @@
     "pick_topic": {
       "text": "Fine. Then pick a topic yourself:",
       "doc": "Task #13 Phase 2 — heading above the set-topic chips after the user declines forwarding (or types /help)."
+    },
+    "all_topics": {
+      "text": "All topics",
+      "doc": "Help: the chip after the five likeliest topics of an unanswered question; it posts every topic."
     },
     "no_llm_topics": {
       "text": "Without an assistant I can only answer these set topics. Pick one:",
@@ -1274,8 +1356,8 @@
       "doc": "An empty task block: nothing open."
     },
     "block_empty_news": {
-      "text": "{{title}} — none",
-      "doc": "An empty \"circles with news\" block: none."
+      "text": "No circles here yet",
+      "doc": "An empty \"circles with news\" block when the page shows no circles at all."
     },
     "block_untitled": {
       "text": "This block",
@@ -1292,6 +1374,14 @@
     "block_empty_awaiting": {
       "text": "{{title}} — nothing",
       "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "block_empty_news_in": {
+      "text": "Nothing new in {{name}}",
+      "doc": "An empty \"circles with news\" block over one circle: it names the circle, so Today never goes empty without saying what it looked at."
+    },
+    "block_empty_news_count": {
+      "text": "Nothing new in your {{count}} circles",
+      "doc": "An empty \"circles with news\" block over several circles: how many it looked at."
     }
   },
   "vandaag": {
@@ -1441,9 +1531,13 @@
       "text": "Say what you want — \"note: milk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
-    "plus_referral": {
-      "text": "That is something for {{name}} → open",
-      "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
+    "plus_circle_ask": {
+      "text": "“{{line}}”: in which circle?",
+      "doc": "The \"+\" line reads to an act more than one of the person's circles holds: the card asks which circle (one button per circle, and Cancel); nothing runs until one is chosen."
+    },
+    "plus_circle_in": {
+      "text": "In {{name}}",
+      "doc": "The \"+\" card's button for one circle: run the act the line reads to in that circle, as the person."
     },
     "pin_to_plus": {
       "text": "Pin to +",
@@ -1469,9 +1563,21 @@
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
+    "plus_help": {
+      "text": "I can do this for you: {{acts}}. Or ask me how something works.",
+      "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
+    },
     "plus_line_unread": {
-      "text": "I could not read that — fill in the fields below.",
+      "text": "I could not read that.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_forget": {
+      "text": "Forget this conversation",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Your conversation with the assistant",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
     },
     "act_done": {
       "text": "Done",
@@ -3633,6 +3739,10 @@
       "text": "Nobody nearby right now.",
       "doc": "Shown when no peers are visible on the local network."
     },
+    "header_cannot_discover": {
+      "text": "This device cannot find people nearby: a browser has no Wi-Fi discovery or Bluetooth. Open Onderling on your phone to meet people here.",
+      "doc": "Nearby's top line on a device that cannot discover anyone (a browser has no Wi-Fi discovery or Bluetooth): the room stays empty here; the phone is where people meet nearby."
+    },
     "anon_peer": {
       "text": "someone",
       "doc": "Fallback row label when a peer has no derivable pseudonym."
@@ -3689,10 +3799,6 @@
       "text": "nothing shown yet",
       "doc": "Summary when neither allow is on."
     },
-    "reach_share": {
-      "text": "Share how to reach me",
-      "doc": "Rung 4: the action in a nearby thread that shares my {transport→address} map (all-or-nothing; the NKN address only if the publication lock allows)."
-    },
     "reach_shared_you": {
       "text": "You shared how to reach you.",
       "doc": "Thread line after sharing."
@@ -3713,6 +3819,18 @@
       "text": "Not now",
       "doc": "Decline the ask-back; the bar goes away, their card stays."
     },
+    "answer_row": {
+      "text": "{{name}} answered: {{text}}",
+      "doc": "Under my ask: an answer that arrived in the room. It opens no thread; sharing my card is the way to a contact."
+    },
+    "share_card_with": {
+      "text": "Share your card with {{name}}",
+      "doc": "On an answer to my ask: hand over how to reach me (my own address, the relay) and ask for theirs. The only way from the room to a contact."
+    },
+    "earlier_in_room": {
+      "text": "Earlier, in the room",
+      "doc": "A contact thread: the header of a kept Nearby visit with this person (shown after a card share; kept on this device only, for the person's chosen number of days)."
+    },
     "my_ask_row": {
       "text": "Your ask · heard by {{heard}} · {{min}} min left",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
@@ -3726,8 +3844,8 @@
       "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
     },
     "as_self_caveat": {
-      "text": "That is a name you show, not a separate address: whoever is looking here can tell it comes from the same device.",
-      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+      "text": "The room sees a new key each time. The network still sees your device.",
+      "doc": "Nearby → You here: what the room key does and does not hide. A new key per entry and per self; the network (IP, MAC) still sees the device."
     },
     "first_use_title": {
       "text": "What may this room see of you?",
@@ -4020,52 +4138,6 @@
       "doc": "P1 §5 — empty state for the skill list."
     }
   },
-  "chatFilter": {
-    "note": {
-      "text": "This only changes what you see here.",
-      "doc": "P1.7 — the filter strip is a reading preference, not a circle setting."
-    },
-    "last_kind": {
-      "text": "That's the last one — turning it off would leave nothing to read.",
-      "doc": "P1.7 — why the final selected kind-chip is disabled."
-    },
-    "kind": {
-      "chat-message": {
-        "text": "Messages",
-        "doc": "P1.7 — kind chip: plain chat."
-      },
-      "task": {
-        "text": "Tasks",
-        "doc": "P1.7 — kind chip."
-      },
-      "ask": {
-        "text": "Questions",
-        "doc": "P1.7 — kind chip."
-      },
-      "offer": {
-        "text": "Offers",
-        "doc": "P1.7 — kind chip."
-      },
-      "lend": {
-        "text": "Lending",
-        "doc": "P1.7 — kind chip."
-      }
-    },
-    "authors": {
-      "all": {
-        "text": "Everyone",
-        "doc": "P1.7 — author chip: people + agents."
-      },
-      "people": {
-        "text": "People",
-        "doc": "P1.7 — author chip: hide agent chatter (Frits' case)."
-      },
-      "agents": {
-        "text": "Agents",
-        "doc": "P1.7 — author chip: only what the agents said."
-      }
-    }
-  },
   "rules": {
     "title": {
       "text": "House rules",
@@ -4074,6 +4146,14 @@
     "save": {
       "text": "Save rules",
       "doc": "Save the rules document."
+    },
+    "change_proposed": {
+      "text": "A proposal to change the rules is open: in this circle the admins decide that together. The rules change when it is decided.",
+      "doc": "After saving the rules in a circle where changing them is decided together: nothing changed yet, a proposal is open."
+    },
+    "change_refused": {
+      "text": "The rules were not changed: this circle did not allow it from this device.",
+      "doc": "After saving the rules when the circle refused the change (not an admin, or the write was refused): the rules stand as they were."
     },
     "preview": {
       "text": "Preview (as a new member)",
@@ -5839,6 +5919,14 @@
       "text": "Show",
       "doc": "The thread header's control when the contact is hidden: show them in Contacts again (the person's own act; a message from them does the same)."
     },
+    "more": {
+      "text": "More",
+      "doc": "A contact thread: the ⋯ button that holds Hide and Delete."
+    },
+    "self_here": {
+      "text": "You are {{name}} here; what does this contact see of you?",
+      "doc": "A contact thread: the avatar top right, the persona you are in this thread; its tap shows what the contact sees of you."
+    },
     "hide_note": {
       "text": "Only from your list. Their circles and this conversation stay; a message from them brings them back.",
       "doc": "What hiding IS and is not, said under the control (amendment 3: Contacts only — their circles, roster row and member card are untouched). Never a notification."
@@ -5920,6 +6008,10 @@
     "sending": {
       "text": "sending…",
       "doc": "P5 — transient state while a turn is in flight to the bot."
+    },
+    "write_needs_card": {
+      "text": "You can’t write to {{name}} here yet: you share no circle that shows their address. Add their card first.",
+      "doc": "A contact shown from the peer graph (a co-member, no card) whom no shared circle shows an address for: writing would leave on the person key, so the thread says why and sends nothing (the send gate, 2026-11-12)."
     },
     "send_failed": {
       "text": "Couldn’t reach {{name}} — they may be offline.",
@@ -6030,8 +6122,52 @@
       "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
     },
     "blocked": {
-      "text": "Blocked",
+      "text": "Blocked on this device",
       "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
+    },
+    "held": {
+      "cut": {
+        "text": "This message was too long and was cut short.",
+        "doc": "One plain line on a message held after its text was cut to the request's size bound: the person must not take it for the whole message."
+      },
+      "file": {
+        "text": "A file came with this message and was not kept.",
+        "doc": "One plain line on a message held after the file that came with it was left off (a request keeps no files)."
+      }
+    },
+    "requests": {
+      "title": {
+        "text": "Requests",
+        "doc": "Heading of the requests section at the top of Contacten: first messages from people the person did not choose."
+      },
+      "says": {
+        "text": "Says they are {{name}}",
+        "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {{name}} is that name."
+      },
+      "member": {
+        "text": "{{name}}, from your circle",
+        "doc": "A request row from a member of one of your circles whom you never answered (after you stopped letting circle members write first): the name they have in the circle, as your own device's roster shows it, so not marked as a claim."
+      },
+      "no_name": {
+        "text": "Someone without a name",
+        "doc": "A request row whose sender's card gives no name."
+      },
+      "accept": {
+        "text": "Accept",
+        "doc": "Accept a request: the sender becomes a contact and their messages move into the thread."
+      },
+      "ignore": {
+        "text": "Ignore",
+        "doc": "Ignore a request: it stays, folded, and can still be accepted; the sender sees nothing different."
+      },
+      "block": {
+        "text": "Block on this device",
+        "doc": "Block the sender of a request, on this device only: their direct messages are refused; circles are untouched."
+      },
+      "ignored_fold": {
+        "text": "Ignored ({{n}})",
+        "doc": "The fold holding ignored requests. {{n}} is how many."
+      }
     }
   },
   "pairedDevices": {
@@ -6178,6 +6314,14 @@
     "posted": {
       "text": "Posted.",
       "doc": "S1 — toast after a post is created."
+    },
+    "key_not_ready": {
+      "text": "This circle's key is not on this device yet. Try again in a moment.",
+      "doc": "Shown when a write into a sealed circle is refused because this device cannot seal for it yet (its key pair or the circle's policy is not there yet): nothing was written in the clear. Wording Frits's."
+    },
+    "media_unavailable": {
+      "text": "Pictures cannot be sealed for this circle on this device yet.",
+      "doc": "Shown when a post with a picture is refused because the circle's sealed-media gateway is not there: no picture goes out unsealed."
     },
     "post_failed": {
       "text": "Couldn’t post — try again.",
@@ -6336,6 +6480,10 @@
     "scan": {
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "assistant": {
+      "text": "Assistant",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
     },
     "share_contact": {
       "text": "Share my card",
@@ -6959,6 +7107,54 @@
       "text": "This pairing code is incomplete.",
       "doc": "Refusal: key or nonce missing."
     },
+    "connection_pick_code": {
+      "text": "Which code does the other screen show? Pick that one.",
+      "doc": "The screen door: three codes, the person picks the one their screen shows (before any tick)."
+    },
+    "connection_none_of_these": {
+      "text": "None of these",
+      "doc": "The screen door: the code on my screen is not among the three (nothing is connected)."
+    },
+    "connection_scan": {
+      "text": "Scan the code on the screen",
+      "doc": "Phone: opens the camera to read the pairing code the other screen shows."
+    },
+    "connection_offer_pairing-not-an-offer": {
+      "text": "This pairing code is incomplete.",
+      "doc": "Refusal (screen door): no key or nonce in the offer."
+    },
+    "connection_offer_pairing-other-relay": {
+      "text": "That screen waits on another relay than this device, so it cannot be connected from here.",
+      "doc": "Refusal (screen door): the offer's relay is not one this device is on (the grant could never reach it)."
+    },
+    "connection_offer_pairing-nonce-replayed": {
+      "text": "This pairing code was already used. Make a new one on the screen.",
+      "doc": "Refusal (screen door): an offer whose nonce was already granted here."
+    },
+    "connection_offer_pairing-nothing-pending": {
+      "text": "Paste the pairing code again.",
+      "doc": "Refusal (screen door): a pick with no offer waiting."
+    },
+    "connection_offer_pairing-expired": {
+      "text": "Too late. Make a new pairing code on the screen.",
+      "doc": "Refusal (screen door): the pick came after the offer's lifetime."
+    },
+    "connection_offer_pairing-wrong-code": {
+      "text": "That is not the code on your screen, so nothing was connected. Make a new pairing code on the screen.",
+      "doc": "Refusal (screen door): the picked code is not the screen's (or 'none of these'); the offer is gone."
+    },
+    "connection_offer_pairing-no-pick": {
+      "text": "Pick the code your screen shows first.",
+      "doc": "Refusal: a grant asked for before the right pick."
+    },
+    "connection_offer_nothing-picked": {
+      "text": "Tick at least one thing it may see or do.",
+      "doc": "Refusal: the ticks grant nothing."
+    },
+    "connection_offer_grant-failed": {
+      "text": "Connecting did not work. Try again.",
+      "doc": "Refusal: the grant op failed."
+    },
     "mnemonic_written": {
       "text": "Written down",
       "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."
@@ -7014,6 +7210,16 @@
       "text": "Remove admin role",
       "doc": "The same control the other way: an admin becomes a member again. Neutral wording on purpose — it sits on your OWN row too, which is how someone steps back from running a circle."
     },
+    "handover": {
+      "let_app_choose": {
+        "text": "Step down; let the app choose",
+        "doc": "The last admin stepping down: the button that steps down now; the circle passes to a member chosen from the log (Frits 2026-11-10)."
+      },
+      "appoint_first": {
+        "text": "Appoint someone first",
+        "doc": "The last admin stepping down: the button that closes the question so they can make someone admin on their row first."
+      }
+    },
     "role_confirm": {
       "promote": {
         "text": "{{name}} will be able to admit people, change the rules and remove members.",
@@ -7024,7 +7230,7 @@
         "doc": "Confirm body for an ordinary demotion — another admin remains, so nothing is handed over."
       },
       "handover": {
-        "text": "{{name}} is the only admin. After this nobody is running this circle, so it passes to one of the other members — which one follows from the log; nobody picks.",
+        "text": "{{name}} is the only admin. Step down now and the circle passes to one of the other members, chosen from the log (nobody picks); or appoint someone first: make them admin on their row, then step down.",
         "doc": "Confirm body when the LAST admin steps back. The fold answers this by handing over (appointing a caretaker from whoever is left), not by refusing it, so the person must be told that the circle changes hands. Deliberately does NOT name the successor: that is derived from the log and a shell guessing at it would give one circle two stories."
       },
       "no_one_else": {
@@ -7117,7 +7323,7 @@
       "doc": "One row of the blocked list: the name the person saw when they blocked, and the day. Never the key."
     },
     "muted_row_unnamed": {
-      "text": "Someone (blocked {{date}})",
+      "text": "Unknown (blocked {{date}})",
       "doc": "A block kept without a name (made before names were kept, or from /block with a bare address)."
     },
     "unmute": {
@@ -7127,6 +7333,14 @@
     "removed": {
       "text": "{{name}} is no longer in this circle. They keep any other circle you share.",
       "doc": "B4 — confirmation after removing a member; states the per-circle scope, which is the thing that used to be untrue."
+    },
+    "remove_proposed": {
+      "text": "A proposal to remove {{name}} is open: this circle decides that together. You will see when it is decided.",
+      "doc": "After an admin taps Remove in a circle that decides removals together: nothing happened yet, a proposal is open."
+    },
+    "role_proposed": {
+      "text": "A proposal to change {{name}}'s role is open: this circle decides that together, as it does its settings. You will see it once it is decided.",
+      "doc": "After making someone an admin (or an admin a member) in a circle that decides its settings together: nothing changed yet, a proposal is open."
     }
   },
   "userLlm": {
@@ -7387,6 +7601,10 @@
       "changePolicy": {
         "text": "Change setting",
         "doc": "Governed action — change a circle policy setting."
+      },
+      "changeRole": {
+        "text": "Change role",
+        "doc": "Governed action — make a member an admin, or an admin a member (decided by the circle's settings rule)."
       }
     },
     "class": {
@@ -7401,6 +7619,10 @@
       "member_vote": {
         "text": "member vote",
         "doc": "Decision-class — a majority of the whole circle must agree."
+      },
+      "random_sample": {
+        "text": "drawn members decide",
+        "doc": "Decision class random-sample: members drawn from the proposal's own hash decide (the wizard's two-member mediation: two drawn, both agree; a larger draw by majority is a drawn jury). Frits 2026-11-10."
       }
     },
     "status": {
@@ -7437,6 +7659,14 @@
       "text": "closes {{when}}",
       "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
     },
+    "joined_since_one": {
+      "text": "1 member joined since this proposal was made",
+      "doc": "Decisions screen, an open proposal: one member on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
+    },
+    "joined_since_n": {
+      "text": "{{count}} members joined since this proposal was made",
+      "doc": "Decisions screen, an open proposal: {{count}} members on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
+    },
     "awaiting_enactment": {
       "text": "awaiting an admin",
       "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."
@@ -7444,6 +7674,14 @@
     "disputed_line": {
       "text": "conflicting history from {{who}} — evidence attached",
       "doc": "Governance L3 — equivocation (fork-proof) alert."
+    },
+    "refused_changeRule": {
+      "text": "{{who}} changed the rules without the vote this circle requires. The change is not applied.",
+      "doc": "Governance: an admin's rules change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened (Frits 2026-11-10: kept and shown, never applied)."
+    },
+    "refused_changePolicy": {
+      "text": "{{who}} changed the settings without the vote this circle requires. The change is not applied.",
+      "doc": "Governance: an admin's settings change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened."
     },
     "review_remove": {
       "text": "Review & remove",
@@ -7460,6 +7698,30 @@
     "report_reason_prompt": {
       "text": "Why are you reporting this member?",
       "doc": "Governance §8 — prompt for the report reason."
+    },
+    "member_left": {
+      "text": "a member who has left",
+      "doc": "How the Decisions screen names a reported member the admin’s roster no longer holds: never their key."
+    },
+    "enact": {
+      "text": "Carry out",
+      "doc": "An admin's button on an approved decision that waits: carries it out (the default is that an admin does this explicitly)."
+    },
+    "enacted": {
+      "text": "Done: the decision is carried out.",
+      "doc": "Shown after an admin enacted an approved decision."
+    },
+    "enact_failed": {
+      "text": "This could not be carried out. Try again.",
+      "doc": "Shown when an admin’s Carry out did not go through: it must not look done."
+    },
+    "vote_failed": {
+      "text": "Your vote did not go through. Try again.",
+      "doc": "Shown on the Decisions screen when a vote was refused or failed: a vote that did not go through must not look cast."
+    },
+    "open_from_notice": {
+      "text": "Go to Decisions",
+      "doc": "The button on the line that says a decision opened: opens the circle’s Decisions screen (the same place as the circle menu’s entry)."
     },
     "notify_vote_opened": {
       "text": "A decision opened: {{action}} — your vote may be needed",
@@ -7632,6 +7894,30 @@
     "personas_tagline": {
       "text": "filters + exceptions on the general one",
       "doc": "mij#personas — section 2 tagline: personas are filters/exceptions on the truth layer."
+    },
+    "first_messages": {
+      "text": "Who may write to this persona first",
+      "doc": "mij#personas — a persona card: heading of the choice who may send it a first private message (the firstMessages property)."
+    },
+    "first_messages_request": {
+      "text": "Only people I chose: anyone else's first message waits as a request",
+      "doc": "mij#personas — the request choice: a first message from someone not in the book is held until the person accepts it."
+    },
+    "first_messages_open": {
+      "text": "Anyone: a first message comes straight in",
+      "doc": "mij#personas — the open choice: anyone's first message lands as a conversation."
+    },
+    "circle_members": {
+      "text": "People in this persona's circles",
+      "doc": "mij#personas — a persona card: heading of the choice whether circle members may write privately (circleMembersMayWrite)."
+    },
+    "circle_members_on": {
+      "text": "May write to me: their message opens a conversation",
+      "doc": "mij#personas — on (the default): a co-member's first private message is a thread, not a request."
+    },
+    "circle_members_off": {
+      "text": "Ask first, like anyone else: their message waits as a request",
+      "doc": "mij#personas — off: a co-member's first private message is a request like a stranger's."
     },
     "truth_tag": {
       "text": "truth layer",
@@ -7854,6 +8140,10 @@
     "self_required": {
       "text": "This device holds more than one persona — say which one this is for.",
       "doc": "An op that issues as one of the person's selves (a grant, an install with grants) refused: the device holds more than one self and none was named."
+    },
+    "no_circle_address": {
+      "text": "This person can't be reached in this circle yet. Try again a little later.",
+      "doc": "respondToItem refused: the post's author has no address in that circle on this device yet (no announce reached it). The answer is not sent on their person key; their next announce makes it possible."
     },
     "no_such_persona": {
       "text": "That persona is not on this device.",
@@ -9120,7 +9410,7 @@
       "doc": "Heading of the share panel under Mij."
     },
     "hint": {
-      "text": "Let someone scan the QR, or send them the link. Whoever opens it has you as a contact and can message you directly. It holds no secret.",
+      "text": "Let someone scan the QR, or send them the link. Every time you open this screen there is a new link: the first person who opens it can message you directly; anyone after them lands in your requests.",
       "doc": "What the QR/link does and does not do. Plain Dutch; no \"kaart\"."
     },
     "code_label": {
@@ -9142,6 +9432,18 @@
     "share": {
       "text": "Share…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    },
+    "link_unused": {
+      "text": "Not used yet",
+      "doc": "State of the shared link on the share panel: nobody has opened it and written yet (Frits 2026-11-12)."
+    },
+    "link_used": {
+      "text": "Used on {{date}}",
+      "doc": "State of the shared link: its first opener wrote on {{date}} (day + short month); anyone after them is a request (Frits 2026-11-12)."
+    },
+    "link_withdraw": {
+      "text": "Withdraw this link",
+      "doc": "Button on the share panel: the link stops letting its opener write directly; a new link is shown (Frits 2026-11-12)."
     }
   },
   "tasks": {
@@ -9745,8 +10047,12 @@
       "text": "you",
       "doc": "The reader themselves among the people of a chore or an appointment (\"is van jou\")."
     },
-    "who_someone": {
+    "who_withheld": {
       "text": "someone",
+      "doc": "A person whose name the household's names setting withholds (the bot's sentences): the name exists, the reader may not see it. Not 'Onbekend', which says no name is known."
+    },
+    "who_someone": {
+      "text": "Unknown",
       "doc": "A person the reader may not name (the household's names setting): never their id."
     },
     "who_everyone": {
@@ -10025,6 +10331,46 @@
       "assistant_calendarFeed": {
         "text": "Calendar subscription",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "nearby_keepDays": {
+        "text": "How long a conversation in the room stays on this device (days)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_windowDays": {
+        "text": "How long something new stays in your news (days)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_dm": {
+        "text": "Notify: a direct message",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_removed": {
+        "text": "Notify: being removed from a circle",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_item": {
+        "text": "Notify: a new post, task or appointment",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_line": {
+        "text": "Notify: a line in a circle",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_joined": {
+        "text": "Notify: someone joining",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_setting": {
+        "text": "Notify: a circle setting changed",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_assigned": {
+        "text": "Notify: a task given to me",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_ask": {
+        "text": "Notify: my open question in the room",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10082,6 +10428,14 @@
       },
       "description": {
         "text": "Only the description",
+        "doc": "A choice on the settings screen."
+      },
+      "banner": {
+        "text": "Show a banner",
+        "doc": "A choice on the settings screen."
+      },
+      "list": {
+        "text": "Only on Today",
         "doc": "A choice on the settings screen."
       },
       "off": {
@@ -10210,6 +10564,11 @@
   },
   "settings_home": {
     "title": "Settings",
+    "help": "Help",
+    "help_missing": {
+      "text": "The Help conversation is not on this device (yet).",
+      "doc": "Said when the person opens Help (Settings, the intro's more) and this device holds no Help circle."
+    },
     "appearance": "Appearance",
     "per_circle": "Per circle",
     "no_circles": "You are not in any circle yet.",
@@ -10227,6 +10586,80 @@
     "no_point": {
       "text": "No connection point: this message waits.",
       "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
+    }
+  },
+  "forYou": {
+    "title": {
+      "text": "New for you",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "all_read": {
+      "text": "Mark all read",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "item": {
+      "text": "{{kind}} in {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "line": {
+      "text": "{{circle}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dm": {
+      "text": "{{name}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "joined": {
+      "text": "{{name}} joined {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "removed": {
+      "text": "You were removed from {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "many": {
+      "text": "{{count}} new things in {{name}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "late": {
+      "text": "arrived later",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "news": {
+      "text": "Something new in {{circle}}",
+      "doc": "'Nieuw voor jou': a row for news in a circle that carries no words of its own (an item kind without a chip, a line without text)."
+    },
+    "banner_many": {
+      "text": "{{count}} new things for you",
+      "doc": "The in-app banner when several new things arrive at once (the projection's rows, unfolded)."
+    },
+    "a_circle": {
+      "text": "a circle",
+      "doc": "'Nieuw voor jou': the circle a removal row names when the circle has already left the person's list."
+    },
+    "setting": {
+      "text": "{{who}} changed {{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': a circle setting someone else changed, in the settings screen's own words."
+    },
+    "an_admin": {
+      "text": "An admin",
+      "doc": "'Nieuw voor jou': who changed a setting when the reader holds no name for them (only admins can)."
+    },
+    "assigned": {
+      "text": "A task in {{circle}} is yours now",
+      "doc": "'Nieuw voor jou': someone else gave the person a task."
+    },
+    "ask": {
+      "text": "Your question: {{text}} · heard by {{heard}}",
+      "doc": "'Nieuw voor jou': the person's own open question in the Nearby room, while it is open (the way back to it)."
+    },
+    "someone": {
+      "text": "Someone",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dismiss": {
+      "text": "Dismiss",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
     }
   }
 }

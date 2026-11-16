@@ -64,12 +64,25 @@ walk spawns it, waits for its `{"step":"ready","invite":…,"circleId":…}` lin
 `askMatches.test.js`. The shared moves (launch, poll, tap through modal focus, first boot, emulator-only) are in
 `support/ui.js`.
 
+The peer takes commands on stdin (`peer.send({ do: … })`: `contact-say`, `circle-say`, `gov-accept`, `roster`, `dump`, …)
+**only when started with `--talk`**. Without it a command is read by nobody and the walk times out waiting for an answer
+that cannot come (2026-11-14, the governance walk: two runs lost to it).
+
 ## What's NOT covered (D-2+, tracked in #224 Phase B)
 
 - Cross-device JM scenarios (paired emulators)
 - Native-only journeys: JM-3 push, JM-4 BLE, JM-5 camera, JM-6 voice
 - "Mesh transport ready" runtime assertion (needs nknLib in test env)
 - #253 step 4 special-case buttons ([Help with], [Start DM], [Download])
+
+## Typing into the "+" sheet
+
+Detox's `typeText` and `replaceText` put the words in the "+" line's native field **without the sheet's
+`onChangeText` ever firing**, so the read gets an empty line and answers "I could not read that." (measured 2026-11-14
+with a probe: no change event at all; typed for real through the input method, every key fired and the line ran).
+`plusCircleAct.test.js` types through the device's input method (`adb shell input text`) after waiting for the keyboard,
+and checks the field holds the words before it taps Read. Other fields (the wizard's name, the composer) take Detox
+typing; check a new one with `toHaveText` before blaming what reads it.
 
 ## TestID convention
 

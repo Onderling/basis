@@ -44,7 +44,9 @@ function makeCallSkill() {
 describe('#4 link proof — joiner emits a proof the admin verifies', () => {
   const seed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('me');
   const circleAddressFor = (cid) => deriveCircleAddress(seed, cid);
-  const signCircleLink = (cid, gid, addr) => signCircleLinkFromSeed(seed, cid, gid, addr);
+  // as the host's: the member is this device's self in the joining circle (the redeem's sender there)
+  const ME = 'pk-me';
+  const signCircleLink = (cid, gid, addr, member = ME) => signCircleLinkFromSeed(seed, cid, gid, addr, member);
 
   it('presents the SOURCE address + a valid proof; the admin accepts it', async () => {
     const { callSkill, redeemArgs } = makeCallSkill();
@@ -54,13 +56,15 @@ describe('#4 link proof — joiner emits a proof the admin verifies', () => {
     expect(redeemArgs.circleAddress).toBe(deriveCircleAddress(seed, SOURCE));
     expect(typeof redeemArgs.circleAddressProof).toBe('string');
     // the admin's verifier accepts it (bound to the JOINING circle)
-    expect(verifyCircleLink({ groupId: JOINING, address: redeemArgs.circleAddress, proof: redeemArgs.circleAddressProof })).toBe(true);
+    expect(verifyCircleLink({ groupId: JOINING, address: redeemArgs.circleAddress, memberRef: ME, proof: redeemArgs.circleAddressProof })).toBe(true);
+    // …and only for this joiner: the same proof on another member's row is refused
+    expect(verifyCircleLink({ groupId: JOINING, address: redeemArgs.circleAddress, memberRef: 'pk-copier', proof: redeemArgs.circleAddressProof })).toBe(false);
   });
 
   it('the emitted proof does NOT verify for a different joining circle (no cross-circle replay)', async () => {
     const { callSkill, redeemArgs } = makeCallSkill();
     await finalSubmit({ state: linkableState(), callSkill, circleAddressFor, signCircleLink });
-    expect(verifyCircleLink({ groupId: 'some-other-circle', address: redeemArgs.circleAddress, proof: redeemArgs.circleAddressProof })).toBe(false);
+    expect(verifyCircleLink({ groupId: 'some-other-circle', address: redeemArgs.circleAddress, memberRef: ME, proof: redeemArgs.circleAddressProof })).toBe(false);
   });
 
   it('a forged proof (attacker who only knows the address) is rejected by the admin', async () => {
@@ -68,8 +72,8 @@ describe('#4 link proof — joiner emits a proof the admin verifies', () => {
     // attacker presents the victim's SOURCE address but signs with THEIR OWN key
     const victimAddress = deriveCircleAddress(seed, SOURCE);
     const attackerSeed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('attacker');
-    const forged = signCircleLinkFromSeed(attackerSeed, SOURCE, JOINING, victimAddress);
-    expect(verifyCircleLink({ groupId: JOINING, address: victimAddress, proof: forged })).toBe(false);
+    const forged = signCircleLinkFromSeed(attackerSeed, SOURCE, JOINING, victimAddress, ME);
+    expect(verifyCircleLink({ groupId: JOINING, address: victimAddress, memberRef: ME, proof: forged })).toBe(false);
     void redeemArgs;
   });
 
@@ -115,8 +119,42 @@ describe('J-NP2 — the admin-offline case is a typed NOTICE, not a generic fail
     // "Offline, try later" on a genuine refusal would send people retrying forever.
     const state = unreachableState();
     await finalSubmit({ state, callSkill, sendPeerRedeem: async () => ({ error: 'code-revoked' }) });
-    expect(state.submitErrorKey).toBeNull();
-    expect(state.submitError).toBe('code-revoked');
+    // a code outside the closed refusal set reads as the catch-all refusal, in words, never as "offline"
+    expect(state.submitErrorKey).toBe('circle.invite.join_refused');
+    expect(state.submitErrorReason).toBe('join-refused');
+    expect(state.submitErrorKey).not.toBe('circle.nearbyScreen.join_no_admin');
   });
 });
 
+
+describe("the admin's per-circle address on a peer redeem reply is taken only from the admin's own reply", () => {
+  // The joiner records the admin's address + proof with the proof's member = the invite's admin. A reply is matched by
+  // its request id; whoever sent it, the proof would have named the member it was told to. So the address is recorded
+  // only when the reply's verified sender IS the invite's admin; another sender's reply still completes the join.
+  const state = () => ({ invite: { kind: 'membershipCode', code: 'C', groupId: 'g1', adminPeerAddr: 'admin-addr' }, handle: 'jan', existingSelves: [], linkChoice: 'fresh' });
+  const run = async (repliedBy) => {
+    const remote = {};
+    const callSkill = vi.fn(async (app, op, args) => {
+      if (op === 'redeemMembershipCode') return { error: 'invalid-or-expired-code' };
+      if (op === 'recordRemoteRedemption') { Object.assign(remote, args); return { ok: true }; }
+      return { ok: true };
+    });
+    const reply = { ok: true, codeId: 'k', circleAddress: 'ADMIN-CIRCLE-ADDR', circleAddressProof: 'PROOF', ...(repliedBy ? { repliedBy } : {}) };
+    await finalSubmit({ state: state(), callSkill, sendPeerRedeem: async () => reply });
+    return remote;
+  };
+  it('the admin\'s own reply: the address and proof are passed on (the substrate verifies them)', async () => {
+    const r = await run('admin-addr');
+    expect(r.confirmedBy).toBe('admin-addr');
+    expect(r.confirmedByCircleAddress).toBe('ADMIN-CIRCLE-ADDR');
+    expect(r.confirmedByCircleAddressProof).toBe('PROOF');
+  });
+  it('a reply from anyone else (or with no known sender): the join goes on, no address is recorded for the admin', async () => {
+    for (const by of ['someone-else', null]) {
+      const r = await run(by);
+      expect(r.confirmedBy).toBe('admin-addr');
+      expect(r.confirmedByCircleAddress).toBeUndefined();
+      expect(r.confirmedByCircleAddressProof).toBeUndefined();
+    }
+  });
+});

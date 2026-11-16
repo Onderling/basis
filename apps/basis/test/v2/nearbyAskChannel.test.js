@@ -140,11 +140,10 @@ describe('an inbound ask is untrusted', () => {
 });
 
 describe('an inbound answer is untrusted too', () => {
-  it('takes `from` from the wire and opens the channel with THAT sender', () => {
+  it('takes `from` from the wire, never the payload', () => {
     const { ch } = build();
     const a = ch.receiveAnswer({ subtype: ANSWER_MESSAGE, answer: { askId: 'ask-1', text: 'ja', from: 'someone-else' } }, 'real');
     expect(a.from).toBe('real');
-    expect(a.opensDirectChannel).toBe(true);
   });
 
   it('rejects a malformed answer', () => {
@@ -160,6 +159,6 @@ describe('an inbound answer is untrusted too', () => {
       subtype: ANSWER_MESSAGE,
       answer: { askId: 'ask-1', text: 'ja', matches: [{ tags: ['fiets'] }] },
     }, 'them');
-    expect(Object.keys(a).sort()).toEqual(['askId', 'from', 'opensDirectChannel', 'receivedAt', 'text']);
+    expect(Object.keys(a).sort()).toEqual(['askId', 'from', 'receivedAt', 'text']);
   });
 });

@@ -98,6 +98,9 @@ export const SEC = Object.freeze({
   SENDER_NOT_BOUND:       'SENDER_NOT_BOUND',
   // …and a valid signature by a key no roster vouches for is a valid signature from a stranger.
   SENDER_NOT_AUTHORIZED:  'SENDER_NOT_AUTHORIZED',
+  // The authorizer cannot vouch for the sender YET (its snapshot may be behind): the error carries the authorizer's
+  // opaque `bucket`, and the envelope's dedup entry is released, so the host may hold it and judge it once more.
+  SENDER_STALE:           'SENDER_STALE',
 });
 
 /**
@@ -614,11 +617,21 @@ export class SecurityLayer {
       senderKey,
       from:        env._from,
       to:          env._to,
+      // which envelope: a stale verdict is asked again for the same envelope at its re-judge, so a counter can count
+      // envelopes, not verdicts
+      id:          env._id,
       ownAddress:  this.ownAddressFor(env._to),
       pattern:     env._p,
       // a HI that answers one (`_re`) is the peer's reciprocal; a HI without is their first contact
       answering:   !!env._re || env?.payload?.ack === true,
     });
+    if (!verdict.allow && verdict.stale) {
+      this.#dedup.delete(env._id);   // so the same verified envelope can be judged again, once
+      throw Object.assign(new SecurityError(
+        SEC.SENDER_STALE,
+        `Envelope ${env._id} is validly signed by a key that cannot be vouched for yet (${verdict.reason})`,
+      ), { bucket: verdict.bucket });
+    }
     if (!verdict.allow) {
       this.#refusedUnauthorized += 1;
       throw new SecurityError(
@@ -658,6 +671,18 @@ export class SecurityLayer {
       if (env._p === P.HI) {
         this.#peers.set(env._from, senderKey);
         this.#noteEstablished(env._id, env._from);
+      } else if (verdict.allow && typeof verdict.bucket === 'string' && verdict.bucket) {
+        // SENT TO ONE OF OUR SCOPED (circle) ADDRESSES, from an address whose key we have not bound YET. The roster may
+        // simply be ahead of the binding (a member's address learned a moment later), so this is "cannot vouch yet",
+        // not "a stranger": released for ONE more judgement and refused as stale under that bucket, so the host parks
+        // it UNREAD and re-judges it through this whole check once a roster read binds the key. Not admitted by parking;
+        // still unbound at the re-judge, it is dropped. Anything not to a scoped address of ours is refused below, as
+        // before. (Found: a founder's post dropped at a joiner that bound her circle address a moment later.)
+        this.#dedup.delete(env._id);
+        throw Object.assign(new SecurityError(
+          SEC.SENDER_STALE,
+          `Envelope ${env._id} comes from "${env._from}", whose key is not bound here yet (held for one more judgement)`,
+        ), { bucket: verdict.bucket, staleReason: 'unbound-sender' });
       } else {
         throw new SecurityError(
           SEC.UNKNOWN_SENDER,

@@ -52,6 +52,7 @@ test('a no-relay device adopts the scanned card\'s point and stays reachable aft
     const hi = `hoi ${Date.now().toString(36)}`;
     const sent = await sendDirectMessage(A.page, hi, { to: bId });
     expect(sent.sent, `A could not write: ${sent.why}`).toBe(true);
+    // A opened B's OWN shared link: A's first message carries its token, so B's door lets A on (L806), no accept
     await waitForContactMessageDetailed(B.page, hi);
     const back = `terug ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(B.page, back, { to: aId });

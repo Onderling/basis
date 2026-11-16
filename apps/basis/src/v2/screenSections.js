@@ -42,6 +42,8 @@ export const SCREEN_SECTIONS = Object.freeze({
     Object.freeze({ id: 'proposal-status',   titleKey: null }),
     Object.freeze({ id: 'proposal-tally',    titleKey: null }),
     Object.freeze({ id: 'proposal-deadline', titleKey: null }),
+    // how many of today's members joined since the proposal was made (a shown hint: the vote counts the roster as it is now)
+    Object.freeze({ id: 'proposal-joined-since', titleKey: null }),
     Object.freeze({ id: 'proposal-awaiting', titleKey: 'circle.governance.awaiting_enactment' }),
     Object.freeze({ id: 'proposal-vote',     titleKey: null }),
     Object.freeze({ id: 'proposal-override', titleKey: 'circle.governance.override' }),
@@ -52,6 +54,8 @@ export const SCREEN_SECTIONS = Object.freeze({
   // own acts and bookmarks that open a circle's op there) and their own acts (a note, an appointment, …). The "+" makes
   // things; Share my card and Scan live on Mij.
   plusSheet: Object.freeze([
+    // the kept conversation with the assistant (the last turns, oldest first), above the line it continues
+    Object.freeze({ id: 'plus-thread', titleKey: null }),
     Object.freeze({ id: 'plus-line', titleKey: null }),
     Object.freeze({ id: 'plus-pinned', titleKey: 'circle.vandaag.pinned_title' }),
     Object.freeze({ id: 'plus-own',  titleKey: null }),

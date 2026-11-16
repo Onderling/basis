@@ -41,14 +41,14 @@ describe('makeCircleGovernance — enact routing', () => {
     const { gov, callSkill } = host({ governance: { removeMember: 'any-admin' } });
     const r = await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2@id', actor: { ref: 'admin0' } });
     expect(r.status).toBe(DECISION_STATUS.APPROVED);
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful', proposalId: expect.any(String) });   // the decision rides the statement
   });
 
   it('changeRule enacts via editGroupRules with the rules subject', async () => {
     const { gov, callSkill } = host({ governance: { changeRule: 'any-admin' } });
     const rules = { name: 'Huisregels', quietHours: '22-07' };
     await gov.propose({ circleId: 'c1', action: 'changeRule', subject: rules, actor: { ref: 'admin0' } });
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'editGroupRules', { groupId: 'c1', rules });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'editGroupRules', { groupId: 'c1', rules, proposalId: expect.any(String) });
   });
 });
 
@@ -72,7 +72,7 @@ describe('the admin enact gate (Decision A)', () => {
     asAdmin.events.push(voteEvent({ proposalId: p2.proposalId, voter: 'm0', choice: 'yes' }), voteEvent({ proposalId: p2.proposalId, voter: 'm1', choice: 'yes' }));
     const tip2 = await asAdmin.gov.tally({ circleId: 'c1', proposalId: p2.proposalId });
     expect(tip2).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
-    expect(asAdmin.callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful' });
+    expect(asAdmin.callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful', proposalId: expect.any(String) });   // the decision rides the statement
   });
 
   it('a device votes only as its own self — a caller-named voter does not decide', async () => {
@@ -108,7 +108,7 @@ describe('a member PROPOSES a circle-policy change (the changePolicy action, ena
     const admin = host({ governance: { changePolicy: 'any-admin' }, localActorRef: 'admin0', events, setPolicy });
     const done = await admin.gov.vote({ circleId: 'c1', proposalId: r.proposalId, choice: 'yes' });
     expect(done).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
-    expect(setPolicy).toHaveBeenCalledWith('c1', patch);
+    expect(setPolicy).toHaveBeenCalledWith('c1', patch, { proposalId: expect.any(String) });
 
     const no = await member.gov.propose({ circleId: 'c1', action: 'changePolicy', subject: { view: 'screen' }, actor: { role: 'member' } });
     expect((await admin.gov.vote({ circleId: 'c1', proposalId: no.proposalId, choice: 'no' })).status).toBe(DECISION_STATUS.REJECTED);

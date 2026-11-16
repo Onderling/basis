@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { readInviteUsage, joinedSince, memberIdsOf } from '../../src/v2/inviteUsage.js';
+import { phoneWiringSource } from '../support/phoneWiringSource.js';
 
 const KEY = 'zWOPwK1R5XsnsQe3vT0b7yHk2LmN9pQrS4tUvWxYz01';
 const t = (k, v = {}) => (k === 'circle.invite.joined' ? `${v.name} is erbij gekomen.` : k === 'circle.reply.who_someone' ? 'iemand' : k);
@@ -41,7 +42,8 @@ describe('an open invite', () => {
   // lane's signal never fired and the open invite stayed at "0 of 6" while the joiner was in. The admit hook nudges it.
   it('the admin\'s own admission nudges an open invite (the lane signal never fires for a local write)', () => {
     const web = read('../../web/v2/circleApp.js');
-    const chat = read('../../../basis-mobile/src/screens/ChatScreen.js');
+    // the phone's admit hook, read through its whole composition (screen → src/core/phoneInboundWiring.js → the shared map)
+    const chat = phoneWiringSource();
     expect(/onAdmitted:\s*\(a\)\s*=>\s*\{\s*refreshOpenInvite\(\)/.test(web)).toBe(true);
     expect(/onAdmitted:\s*\(a\)\s*=>\s*\{\s*onCirclesChanged\?\.\(\)/.test(chat)).toBe(true);
   });

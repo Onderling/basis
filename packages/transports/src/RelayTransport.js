@@ -623,8 +623,10 @@ export class RelayTransport extends Transport {
         // id (an id-less payload is one the app never tracked). Until 2026-09-16 the envelope id was reported
         // as `msgId`, and both shells' give-up consumers marked a message that did not exist: a message the
         // relay threw away after 24 h kept looking fine.
-        const appId = this.appMessageIdFor(msg.id);
-        try { this.onUndelivered?.({ msgId: appId ?? msg.id, envelopeId: msg.id, reason: msg.reason ?? 'unknown' }); }
+        const sent = this.sentEnvelopeFor(msg.id);
+        const appId = sent?.msgId ?? null;
+        // who it was for and what kind it was: this transport's own memory of its send (the relay's frame names neither)
+        try { this.onUndelivered?.({ msgId: appId ?? msg.id, envelopeId: msg.id, reason: msg.reason ?? 'unknown', to: sent?.to ?? null, subtype: sent?.subtype ?? null }); }
         catch { /* a consumer that throws must not take the socket down */ }
         return;
       }

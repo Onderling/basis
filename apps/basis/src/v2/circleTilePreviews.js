@@ -9,13 +9,14 @@
  * the resulting per-circle map.
  *
  * Output shape per circleId:
- *   { subtitle: string|null, ts: number, unread: number }
+ *   { subtitle: string|null, ts: number, unread: number, kinds: string[], unreadIds: Array<{id, at}> }
  *
  *   subtitle = "<actor>: <text>" when the most-recent event carries both
  *              (e.g. a post / chat-message payload), or null when no
  *              event matched a renderable shape (host falls back to the
  *              member-count meta).
- *   ts       = ms-epoch of the most-recent matched event (0 when none).
+ *   ts       = when the most-recent matched event ARRIVED on this device (`landedAt`; 0 when none): what the news is
+ *              ordered by. Not when it was said: a tile that shows a time shows this one.
  *   unread   = number of events for this circle whose `ts > seenAt[id]` AND that
  *              `countsAsUnread` — what OTHERS said on the human lane
  *              (default seenAt 0 → "all of that is unread the first time").
@@ -27,6 +28,9 @@
  */
 import { eventCircleId } from './circleStream.js';
 import { isKeyLike } from './personLabel.js';
+import { isItemLanding } from './itemLanding.js';
+import { landedTimeOf } from '../eventLog.js';
+import { itemKindChip } from './embedChips.js';
 import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item-store';
 
 // Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
@@ -40,33 +44,49 @@ const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_
  * @param {object[]} [opts.circles=[]]  normalised circles ({ id, ... })
  * @param {Object<string,number>} [opts.seenAt={}]  { [circleId]: epochMs }
  * @param {string[]} [opts.myRefs=[]]  this person's refs — their own lines are never unread
- * @returns {Object<string, {subtitle: string|null, ts: number, unread: number}>}
+ * @param {(key: string) => string} [opts.t]  the translator: a landed item's subtitle names its kind in words
+ * @param {Set<string>} [opts.readIds]  every id the person READ, on any of their devices (`readMarks.js`): never new
+ * @returns {Object<string, {subtitle: string|null, ts: number, unread: number, kinds: string[], unreadIds: Array<{id: string, at: number}>}>}
  */
-export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null } = {}) {
+export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [], actorLabel = null, t = null, readIds = null } = {}) {
   const known = new Set((circles || []).map((c) => c?.id).filter(Boolean));
   const out = {};
   // Seed entries for every known circle so the host can drive layout
   // off a stable keyset even when a circle has zero events.
-  for (const id of known) out[id] = { subtitle: null, ts: 0, unread: 0 };
+  for (const id of known) out[id] = { subtitle: null, ts: 0, unread: 0, kinds: [], unreadIds: [] };
 
   const sorted = [...(events || [])]
     .filter((e) => e && typeof e === 'object')
-    .sort((a, b) => (b?.ts ?? 0) - (a?.ts ?? 0));
+    .sort((a, b) => landedTimeOf(b) - landedTimeOf(a));   // newest ARRIVAL first
 
   for (const event of sorted) {
     const cid = eventCircleId(event);
     if (!cid || !known.has(cid)) continue;
     const entry = out[cid];
+    // News is a line on the human lane or an item that landed (and is still held); a system row (a notification, a
+    // statement) never speaks on the tile
+    const landing = isItemLanding(event);
+    if (!landing && entryKind(event.type).lane !== LANE.HUMAN) continue;
 
     // First touch sets subtitle + ts (sorted newest-first).
     if (entry.subtitle === null && entry.ts === 0) {
-      const sub = renderSubtitle(event, { actorLabel });
+      const sub = landing ? landingSubtitle(event, { actorLabel, t }) : renderSubtitle(event, { actorLabel });
       if (sub) entry.subtitle = sub;
-      entry.ts = typeof event.ts === 'number' ? event.ts : 0;
+      entry.ts = landedTimeOf(event);
     }
     // Unread: what someone ELSE said, newer than the host-supplied seenAt.
     const seen = typeof seenAt[cid] === 'number' ? seenAt[cid] : 0;
-    if ((event.ts ?? 0) > seen && countsAsUnread(event, { myRefs })) entry.unread += 1;
+    // new = LANDED here after I looked (a line the relay held for hours counts once it arrives)
+    // …and read on none of my devices (the read set holds the source's id: a landed item's, a line's own)
+    const sourceId = landing ? event.payload.itemId : event.id;
+    if (landedTimeOf(event) > seen && countsAsUnread(event, { myRefs }) && !(readIds && readIds.has(sourceId))) {
+      entry.unread += 1;
+      // what opening the circle marks read: the id with the SOURCE's time (the same on every device)
+      entry.unreadIds.push({ id: sourceId, at: landing ? (event.payload.saidAt ?? event.ts ?? 0) : (event.ts ?? 0) });
+      // what is new, by kind (the label a row of news carries): a landed item's own kind, else the line's kind
+      const kind = landing ? event.payload.kind : (event.payload?.kind ?? event.type);
+      if (typeof kind === 'string' && !entry.kinds.includes(kind)) entry.kinds.push(kind);
+    }
   }
 
   return out;
@@ -88,7 +108,7 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
  */
 export function countsAsUnread(event, { myRefs = [] } = {}) {
   if (!event || typeof event !== 'object') return false;
-  if (entryKind(event.type).lane !== LANE.HUMAN) return false;
+  if (!isItemLanding(event) && entryKind(event.type).lane !== LANE.HUMAN) return false;
   const actor = event.actor ?? event.payload?.actor ?? null;
   if (actor === 'bot' && event.payload?.scope === 'self') return false;
   return !(actor && myRefs.includes(actor));
@@ -116,7 +136,20 @@ export function renderSubtitle(event, { actorLabel = null } = {}) {
   return actor ? `${actor}: ${trimmed}` : trimmed;
 }
 
-function pickText(payload) {
+/** A landed item on the tile: who (a name, never a key) and its kind in words: "Tester B: 🙋 Vraag". */
+function landingSubtitle(event, { actorLabel = null, t = null } = {}) {
+  const chip = itemKindChip(event.payload?.kind);
+  if (!chip) return null;
+  const word = typeof t === 'function' ? t(chip.labelKey) : null;
+  const what = word && word !== chip.labelKey ? `${chip.icon} ${word}` : chip.icon;
+  const raw = event.actor ?? null;
+  const named = raw && typeof actorLabel === 'function' ? actorLabel(raw) : null;
+  const actor = named ?? (raw && !isKeyLike(raw) ? raw : null);
+  return actor ? `${actor}: ${what}` : what;
+}
+
+/** The words an event's payload carries (a line's text, a post's body, a title), or null: the tile's and the news rows'. */
+export function pickText(payload) {
   const candidates = [payload.text, payload.body, payload.message, payload.title, payload.label];
   for (const c of candidates) {
     if (typeof c === 'string' && c.trim()) return c.trim();

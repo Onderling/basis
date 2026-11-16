@@ -52,6 +52,16 @@ export function buildRulesDoc(answers = {}) {
   return normalizeRulesDoc({ ...DEFAULT_RULES_DOC, ...(answers && typeof answers === 'object' ? answers : {}) });
 }
 
+/**
+ * The structured rules out of a `getGroupRules` answer: the agent's answer carries them as `doc` (its `rules` is the
+ * rendered text); the raw pinboard skill answers the stored item, with them under `source.rules`. Null when the
+ * circle has none. The one reader for every screen that shows or edits a circle's rules.
+ */
+export function rulesDocFromAnswer(res) {
+  const d = res?.doc ?? res?.rules?.source?.rules ?? null;
+  return d && typeof d === 'object' ? d : null;
+}
+
 /** True when every REQUIRED question has a non-blank answer. */
 export function isRulesComplete(doc) {
   const d = normalizeRulesDoc(doc);

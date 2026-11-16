@@ -96,7 +96,7 @@ describe('binding a member’s per-circle address to the key that signs there', 
     expect(calls[0][0]).toBe(member.circleAddress);
     expect(calls[0][1], 'the person is still named').toBe(member.pubKey);
     expect(calls[0][2], 'and the key that signs at that address is the circle one')
-      .toEqual({ signingKey: member.circleAddress });
+      .toEqual({ signingKey: member.circleAddress, proven: false });   // no circleAddressProof on this row: bound for the seal, not proven
   });
 
   it('the signing key is the address today, and an explicit one wins (the L2 seam)', () => {

@@ -18,6 +18,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t as defaultT } from '../../core/localisation.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 import {
   DEFAULT_SETTINGS_TEMPLATE,
   loadSettingsTemplate,
@@ -35,6 +36,7 @@ export default function GuidedSetupPanel({
   onDone,
   onClose,
 }) {
+  const sheetCap = useSheetCap(0.8);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [template, setTemplate] = useState(templateProp || DEFAULT_SETTINGS_TEMPLATE);
@@ -75,7 +77,7 @@ export default function GuidedSetupPanel({
   return (
     <Modal visible={!!visible} transparent animationType="fade" onRequestClose={() => close({ handoff: false })}>
       <View style={styles.overlay}>
-        <View style={styles.card} testID="guided-setup">
+        <View style={[styles.card, sheetCap]} testID="guided-setup">
           <View style={styles.head}>
             <Text style={styles.title}>{t('circle.guided.title')}</Text>
             <Pressable
@@ -92,7 +94,7 @@ export default function GuidedSetupPanel({
           {!step ? (
             <Text style={styles.say} testID="guided-done">{t('circle.guided.applied')}</Text>
           ) : (
-            <ScrollView contentContainerStyle={styles.body}>
+            <ScrollView style={SHEET_SCROLL} contentContainerStyle={styles.body}>
               <Text style={styles.say} testID="guided-say">{step.say ?? step.ask ?? ''}</Text>
 
               {step.ask ? (
@@ -161,7 +163,7 @@ export default function GuidedSetupPanel({
 
 const makeStyles = (theme) => StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', paddingHorizontal: 18 },
-  card:         { backgroundColor: theme.color.paper, borderRadius: theme.radius.md, padding: 18, maxHeight: '80%' },
+  card:         { backgroundColor: theme.color.paper, borderRadius: theme.radius.md, padding: 18 },
   head:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   title:        { fontSize: 18, fontWeight: '600', fontFamily: theme.font.serif, color: theme.color.ink },
   close:        { fontSize: 18, color: theme.color.inkSoft },

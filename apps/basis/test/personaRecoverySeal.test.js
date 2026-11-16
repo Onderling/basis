@@ -43,7 +43,7 @@ describe('the recovery seal is the root\'s, not the default persona\'s', () => {
     expect(settingsStrategies.length, 'the settings mirror was provisioned').toBe(1);
     expect(seal.open(settingsStrategies[0].seal('settings'))).toBe('settings');
     expect(() => asDefault.open(settingsStrategies[0].seal('settings'))).toThrow();
-    deviceLog.append({ id: 'm-1', kind: 'chat-message', circleId: 'c', ts: Date.now(), payload: { text: 'een regel' } });
+    deviceLog.append({ id: 'm-1', type: 'chat-message', kind: 'chat-message', circleId: 'c', ts: Date.now(), payload: { text: 'een regel' } });
     const archive = await phone.exportHistoryArchive();
     const back = async (strategy) => {
       const fresh = new EventLog({ initial: [], muted: [] });

@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  createAsk, isAskLive, evaluateIncomingAsk, askActions, answerAsk, nearbyThreadDescriptor,
+  createAsk, isAskLive, evaluateIncomingAsk, askActions, answerAsk,
   ASK_DEFAULT_TTL_MS, ASK_MAX_TTL_MS, ASK_MAX_TEXT,
 } from '../../src/v2/nearbyAsks.js';
 
@@ -154,14 +154,9 @@ describe('answering is the disclosure', () => {
     const { answer } = answerAsk({ ask: ask(), text: 'ik heb er een', from: 'room-addr-2', now: at(10) });
     // Handing back "we matched on fiets, repareren" would disclose the responder's drivers by the back door.
     expect(Object.keys(answer).sort()).toEqual(
-      ['askId', 'createdAt', 'from', 'opensDirectChannel', 'text'],
+      ['askId', 'createdAt', 'from', 'text'],
     );
     expect(JSON.stringify(answer)).not.toContain('fiets');
-  });
-
-  it('answering opens the pairwise channel — rung 3 of the ladder', () => {
-    const { answer } = answerAsk({ ask: ask(), text: 'yes', now: at(0) });
-    expect(answer.opensDirectChannel).toBe(true);
   });
 
   it('cannot answer an expired ask', () => {
@@ -180,30 +175,4 @@ describe('answering is the disclosure', () => {
   });
 });
 
-describe('what answering opens — rung 3, not rung 4', () => {
-  it('THE DISTINCTION: the thread is TRANSIENT, never a contact', () => {
-    // Rung 3 is "we are talking now". Rung 4 is "I can reach you from home", and that is a deliberate
-    // exchange of the transport→address map. Quietly saving a café encounter into contacts would climb a
-    // rung nobody chose — so the descriptor says so, and both shells read it.
-    const th = nearbyThreadDescriptor('peer-room-address-1234');
-    expect(th.transient).toBe(true);
-    expect(th.origin).toBe('nearby-answer');
-    expect(th.peerAddress).toBe('peer-room-address-1234');
-  });
-
-  it('labels with a chosen face, not the full address', () => {
-    expect(nearbyThreadDescriptor('abcdefghijklmnop').label).toBe('abcdefgh');
-    expect(nearbyThreadDescriptor('abc', { label: 'iemand' }).label).toBe('iemand');
-  });
-
-  it('is frozen, so a host cannot flip transient off in passing', () => {
-    const th = nearbyThreadDescriptor('peer-1');
-    expect(Object.isFrozen(th)).toBe(true);
-  });
-
-  it('no address ⇒ no thread', () => {
-    expect(nearbyThreadDescriptor(null)).toBeNull();
-    expect(nearbyThreadDescriptor('')).toBeNull();
-  });
-});
 

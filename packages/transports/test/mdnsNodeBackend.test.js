@@ -120,7 +120,7 @@ describe('two Node transports over real sockets', () => {
   async function peer(discovery) {
     const identity = await AgentIdentity.fromSeed(new Uint8Array(randomBytes(32)), throwawayVault());
     const { native, emitter } = createMdnsNodeBackend({ discovery, host: '127.0.0.1' });
-    const t = new MdnsTransport({ identity, native, emitter });
+    const t = new MdnsTransport({ identity, lanIdentity: identity, native, emitter });   // the LAN key pinned to a known key: this exercises the hello, not the key choice
     open.push(t);
     return { identity, transport: t };
   }

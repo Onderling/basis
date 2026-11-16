@@ -487,6 +487,43 @@ Uses vitest's expect, so it must run inside a vitest test.
 - `[opts.label='DataSource']` `string`
 - `[opts.supportsQuery=false]` `boolean` — also exercise `query()`.
 
+## `src/conformance/ed25519Conformance.js`
+
+### `ED25519_EDGE_VECTORS`
+
+**Kind:** constant · **Import:** `ED25519_EDGE_VECTORS` from `'@onderling/core'`, `'@onderling/core/conformance'`
+
+Ed25519 conformance: the 12 published edge-case vectors and the answer the platform's strict rule gives on each.
+
+Source: ed25519-speccheck (github.com/novifinancial/ed25519-speccheck, cases.json, fetched 2026-11-12), the vectors of
+"Taming the many EdDSAs" (Chalkias, Garillot, Nikolaenko, 2020). Each is [message, public key, signature] in hex.
+Under the platform's rule (`crypto/ed25519Strict.js`, rule set 'ed25519-strict-1') exactly case 3 is valid.
+
+An adapter that checks signatures faster (a native module, node:crypto, WebCrypto) proves it gives the same answer
+by running `ed25519Disagreements(verify)` and expecting an empty list. Runner-agnostic: no test framework needed.
+
+### `ED25519_ACCEPTED`
+
+**Kind:** constant · **Import:** `ED25519_ACCEPTED` from `'@onderling/core'`, `'@onderling/core/conformance'`
+
+The vector indexes that are VALID under the strict rule.
+
+### `ed25519Disagreements`
+
+**Kind:** function · **Import:** `ed25519Disagreements` from `'@onderling/core'`, `'@onderling/core/conformance'`
+
+```js
+ed25519Disagreements(verify)
+```
+
+Where a check disagrees with the rule on the vectors.
+
+**Parameters**
+
+- `verify` `(msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean`
+
+**Returns:** `Array<{ index: number, expected: boolean, got: boolean }>`
+
 ## `src/conformance/storageBackendConformance.js`
 
 ### `REQUIRED_STORAGE_BACKEND_METHODS`
@@ -604,6 +641,82 @@ package barrel as `b64decode`.
 - `str` `string` — base64url-encoded input
 
 **Returns:** `Uint8Array` — decoded bytes
+
+## `src/crypto/ed25519Strict.js`
+
+### `strictSignatureShapeOk`
+
+**Kind:** function · **Import:** `strictSignatureShapeOk` from `'@onderling/core'`
+
+```js
+strictSignatureShapeOk(sig, key)
+```
+
+The byte rule alone (no equation): may this (signature, key) pair be handed to a library at all?
+
+**Parameters**
+
+- `sig` `Uint8Array` — 64 bytes
+- `key` `Uint8Array` — 32 bytes
+
+### `verifyEd25519StrictBatch`
+
+**Kind:** function · **Import:** `verifyEd25519StrictBatch` from `'@onderling/core'`
+
+```js
+async verifyEd25519StrictBatch(items)
+```
+
+Many checks at once, each with the byte rule in front: the installed equation's `verifyBatch` when it has one (an
+async check such as WebCrypto, which never blocks the thread), else one by one.
+
+**Parameters**
+
+- `items` `Array<{msg: Uint8Array, sig: Uint8Array, key: Uint8Array}>`
+
+**Returns:** `Promise<boolean[]>`
+
+### `useSignatureEquation`
+
+**Kind:** function · **Import:** `useSignatureEquation` from `'@onderling/core'`
+
+```js
+async useSignatureEquation(eq)
+```
+
+A FASTER EQUATION, installed once by the shell (node:crypto on the box, WebCrypto's batch on the web; a native module
+on the phone later), BEHIND the byte rule. Taken only if, with the rule in front, it gives the platform's answer on
+the twelve edge-case vectors, accepts an honest signature and refuses that signature tampered; otherwise the current
+equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never replaceable. An
+equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path. A `verifyBatch`
+is vetted HERE too, through the batch itself (the vectors with the rule in front, an honest and a tampered
+signature): the one place the rule "nothing faster without agreeing" lives, for every shell. Async for that reason.
+
+**Parameters**
+
+- `eq` `{name: string, verify?: (msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean, verifyBatch?: (items: Array<{msg: Uint8Array, sig: Uint8Array, key: Uint8Array}>) => Promise<boolean[]>}|null`
+
+**Returns:** `Promise<{ok: boolean, name: string, reason?: string, disagreements?: Array<object>}>`
+
+### `signatureEquationBatches`
+
+**Kind:** function · **Import:** `signatureEquationBatches` from `'@onderling/core'`
+
+```js
+signatureEquationBatches()
+```
+
+Does the installed equation check a batch off the thread (WebCrypto)? A read then checks ahead, as one batch.
+
+### `signatureEquationName`
+
+**Kind:** function · **Import:** `signatureEquationName` from `'@onderling/core'`
+
+```js
+signatureEquationName()
+```
+
+Which equation answers now ('tweetnacl' until a shell installs one). For diagnostics.
 
 ## `src/discovery/GossipProtocol.js`
 
@@ -1369,17 +1482,20 @@ with no visible cause.
 **Kind:** function · **Import:** `circleLinkMessage` from `'@onderling/core'`
 
 ```js
-circleLinkMessage(groupId, address)
+circleLinkMessage(groupId, address, memberRef)
 ```
 
-The canonical challenge a linkable joiner signs. Deterministic; binds join + address.
+The canonical challenge a link proof signs: the circle, the address AND THE MEMBER whose address it is in that circle
+(their identity there). Without the member, a proof said only "whoever holds this address's key linked it to this
+circle", and a member could put a copy of another member's address and proof on their own roster row (the roster then
+showed it as the copier's device, and a device bound it to the copier as a person). v1 (circle + address) is refused.
 
 ### `signCircleLink`
 
 **Kind:** function · **Import:** `signCircleLink` from `'@onderling/core'`
 
 ```js
-signCircleLink(identity, groupId, address)
+signCircleLink(identity, groupId, address, memberRef)
 ```
 
 Sign the link challenge with the SOURCE circle's identity → the base64url proof to present
@@ -1392,7 +1508,7 @@ alongside the address. `identity` is `circleIdentity(derivationSeed, sourceCircl
 **Kind:** function · **Import:** `signCircleLinkFromSeed` from `'@onderling/core'`
 
 ```js
-signCircleLinkFromSeed(derivationSeed, circleId, groupId, address)
+signCircleLinkFromSeed(derivationSeed, circleId, groupId, address, memberRef)
 ```
 
 Vault-free variant: sign the challenge straight from the profile seed + source circleId
@@ -1406,7 +1522,7 @@ the redeem seam so a joiner can prove control of the address they present.
 **Kind:** function · **Import:** `verifyCircleLink` from `'@onderling/core'`
 
 ```js
-verifyCircleLink({ groupId, address, proof, verifySignature = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
+verifyCircleLink({ groupId, address, memberRef, proof, verifySignature, verdictMemo } = {})
 ```
 
 Verify a presented linkage: the proof must be a signature over the challenge by the private
@@ -1414,9 +1530,24 @@ key behind `address`. Deny-by-default — anything missing or malformed is `fals
 
 **Parameters**
 
-- `a` `{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}` — `verifySignature` — the pure signature check, default `AgentIdentity.verify`; a caller that re-derives passes a memo
+- `a` `{groupId:string, address:string, proof:string, verifySignature?: (msg: string, sig: string, pubKey: string) => boolean}` — `verifySignature` — the pure signature check, default the process's memo under the name 'circle-link'
 
 **Returns:** `boolean`
+
+### `onEarlierCircleLink`
+
+**Kind:** function · **Import:** `onEarlierCircleLink` from `'@onderling/core'`
+
+```js
+onEarlierCircleLink(fn)
+```
+
+ONE listener per process: the last setter wins. Harmless, as it only reports (several persona runtimes in one process
+set the same refusal log); a caller that needs it per agent keys it there.
+
+**Parameters**
+
+- `fn` `(() => void)|null` — called once per earlier proof (per process), the first time it is refused
 
 ## `src/identity/deviceDelegation.js`
 
@@ -3841,12 +3972,60 @@ household bot on its own node says so on its row, the circle paints it a bot and
 quiet for its name. Self-said, not an authority: a person who says `function` only silences their own name. The same
 two words a profile record holds (`PROFILE_KINDS` in agent-registry is this list).
 
+### `causalPlace`
+
+**Kind:** function · **Import:** `causalPlace` from `'@onderling/core'`
+
+```js
+causalPlace(statements, a, b)
+```
+
+WHERE `b` STANDS AGAINST `a` in the lane's own causal order (the deps-DAG: each statement's `parentHash` chain union its
+`deps`), the same answer on every device that holds both: 'after' when `a` is an ancestor of `b`, 'before' when `b` is an
+ancestor of `a`, 'same' for one statement, 'concurrent' when neither reaches the other, and null when either is not in
+`statements` (it cannot be placed). Never a wall clock, never the fold's depth tiebreak: equal or greater depth does not
+make an act later, only an ancestry path does.
+
+**Parameters**
+
+- `statements` `Array<object>`
+- `a` `string` — a statement hash
+- `b` `string` — a statement hash
+
+**Returns:** `'after'|'before'|'same'|'concurrent'|null`
+
+### `memberStatusFrom`
+
+**Kind:** function · **Import:** `memberStatusFrom` from `'@onderling/core'`
+
+```js
+memberStatusFrom({ folded, statements = [], webid, after = null } = {})
+```
+
+IS THIS MEMBER IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? Decided from a roster fold and the statements it was
+given (the key router's question, pinboard `memberStatus`). 'in' only when the subject is on the FOLDED roster (the fold
+admitted them: its gates, the author's authority, deny-wins at a depth) and no exit of theirs comes after the admission;
+'out' when their last exit comes AFTER it (by ancestry, `causalPlace`); null when it cannot be said:
+  - a named admission that is not a `join` of THIS subject (another statement, another member's join);
+  - a join the fold did not admit (an author who may not admit, a redemption row not arrived yet, a removal that won
+    at the same depth) with no exit after it: not on the roster, so not 'in';
+  - an exit concurrent with the admission, or an admission or exit this device does not hold.
+With no admission named: the subject's last join that took effect; a subject on the roster with NO join at all was
+admitted by the circle's creation or its seed (a founder, a seeded member) and is 'in'. Once such a member is removed
+the answer is null, not 'out' (there is no admission to place the exit after): safe, the change is not made.
+
+**Parameters**
+
+- `a` `{ folded: object, statements: Array<object>, webid: string, after?: (string|null) }`
+
+**Returns:** `{ status: ('in'|'out'|null), reason?: string }`
+
 ### `foldRoster`
 
 **Kind:** function · **Import:** `foldRoster` from `'@onderling/core'`
 
 ```js
-foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {} } = {})
+foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {}, governedGate = null } = {})
 ```
 
 Fold spine membership statements into the roster head.
@@ -3858,6 +4037,7 @@ Fold spine membership statements into the roster head.
 - `[opts.founderKinds]` `Record<string, string>` — a founder's kind from its own VERIFIED creation statement (`{ <founder>: 'function' }` when a function profile founded); returned as `kinds` with the admin-authored joins'
 - `[opts.founders]` `Array<string>` — the circle's creators — admin + member by construction, and the fold's starting authority. They are **not evictable**: you cannot be put out of a circle you made. They ARE demotable once another admin exists (Frits, 2026-08-23), so a founder who steps back hands over rather than holding the circle open forever; the last-admin rule is what supplies the "once another admin exists" half.
 - `[opts.seed]` `{ members?: string[], admins?: string[] }` — the roster the spine folds ON TOP OF — the pre-spine materialised HEAD at cutover (the current trail-derived roster). Seed members/admins are the starting state; UNLIKE founders they are ordinary members (evictable, demotable). Absent (the default) the fold starts from the founders alone, exactly as before — so pure-spine callers are unchanged.
+- `[opts.governedGate]` `(statement: object, ctx: {admins: Set<string>}) => boolean` — the circle's "who decides" at the receiver: asked for another person's `evict` / `role` (never a person's own acts); false → it does not take effect. Absent → unchanged (the kernel holds no policy).
 - `[opts.rulesGate]` `{ versions?: string[]|Set<string> }` — RULES-GATED JOINS (task #80, sitting-A decision). When present, a `join` folds ONLY if its signed payload carries a non-empty `rulesAccepted` string — and, when `versions` is a non-empty set, one that is IN it (the set of rules-doc versions this circle has ever had; acceptance of a then-current version stays valid forever). Deny-favouring both ways: no acceptance → the join does not fold, on every device independently — the statement stays on the log as evidence, the joiner lands on nobody's roster. Founders and seed members never fold via `join`, so the gate cannot touch them. Absent (the default), joins fold exactly as before — the projector opts in, the kernel stays pure.
 
 **Returns:** `{ members: string[], admins: string[], rulesAccepted: Record<string,string>, handles: Record<string,string>, adminProvenance: Record<string,string>, caretakerAcknowledged: Record<string,string> }` — sorted members/admins for a stable, comparable result, plus each member's latest accepted rules version (from the join's payload, superseded by later `rules-accept` statements — the per-member "accepted v1, current v2" visibility rides this map), plus HOW each admin holds it: `'founder'` · `'role'` · `` `caretaker:<hash>` `` (see the note where `adminVia` is built), plus which caretakers have SIGNED for their own appointment (`caretakerAcknowledged`: ref → seed hash).
@@ -3927,7 +4107,7 @@ Verdict reasons this module produces on its own. Implementations supply their ow
 **Kind:** function · **Import:** `allowSender` from `'@onderling/core'`
 
 ```js
-allowSender(reason)
+allowSender(reason, bucket)
 ```
 
 The sender may speak here.
@@ -3935,8 +4115,9 @@ The sender may speak here.
 **Parameters**
 
 - `reason` `string` — why — carried into diagnostics, never into a decision
+- `[bucket]` `string` — for traffic to one of the implementation's scoped addresses (a circle's), the same opaque bucket a stale verdict would carry. It decides nothing about THIS sender; it lets `SecurityLayer` park, rather than drop, an envelope to that address whose sender address has no key bound yet (see `SENDER_STALE`).
 
-**Returns:** `{allow: true, reason: string}`
+**Returns:** `{allow: true, reason: string, bucket?: string}`
 
 ### `refuseSender`
 
@@ -3953,6 +4134,25 @@ The sender may not. `SecurityLayer` turns this into a `SENDER_NOT_AUTHORIZED` re
 - `reason` `string`
 
 **Returns:** `{allow: false, reason: string}`
+
+### `staleSender`
+
+**Kind:** function · **Import:** `staleSender` from `'@onderling/core'`
+
+```js
+staleSender(reason, bucket)
+```
+
+The sender cannot be vouched for YET: the implementation's snapshot may be behind (a roster not read, a member not on
+the roster that was read). `SecurityLayer` turns this into a `SENDER_STALE` refusal carrying `bucket`, an opaque
+handle the HOST uses to hold the envelope and judge it again once its snapshot is fresher. The kernel never reads it.
+
+**Parameters**
+
+- `reason` `string`
+- `bucket` `string`
+
+**Returns:** `{allow: false, stale: true, reason: string, bucket: string}`
 
 ### `askSenderAuthorizer`
 
@@ -4077,19 +4277,97 @@ Read the credential off an envelope. One accessor so the field name appears in o
 **Kind:** function · **Import:** `createSignatureMemo` from `'@onderling/core'`
 
 ```js
-createSignatureMemo({ max = SIGNATURE_MEMO_MAX, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
+createSignatureMemo({ maxBytes = SIGNATURE_MEMO_MAX_BYTES, verify = (m, s, k) => AgentIdentity.verify(m, s, k) } = {})
 ```
 
-Build a memo over the pure signature check: `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
+Build a memo over the pure signature check. `verify(msg, sig, pubKey)` answers like `AgentIdentity.verify`, but a
 check that passed once for exactly those bytes, that signature and that key is answered from memory.
+`verifierFor(name)` is the same for a NAMED verifier (a circle-link proof, a ceremony reveal, a delegation): the name
+is part of the key, so one verifier's "true" is never another's, even over the same bytes. ONE agent holds one memo
+and hands it to every rail and check; the only writer is the real check below, after it returned true.
 
 **Parameters**
 
 - `[o]` `object`
-- `[o.max]` `number` — most remembered checks
+- `[o.maxBytes]` `number` — the bound, in bytes of keys held
 - `[o.verify]` `(msg: string, sig: string, pubKey: string) => boolean` — the real check (default AgentIdentity.verify)
 
-**Returns:** `{ verify: (msg: string, sig: string, pubKey: string) => boolean, readonly size: number }`
+**Returns:** `{ checkBatch: (verifier: string, items: Array<{msg: string, sig: string, pubKey: string}>) => Promise<number>, verify: (msg: string, sig: string, pubKey: string) => boolean, verifierFor: (name: string) => ((msg: string, sig: string, pubKey: string) => boolean), readonly size: number, readonly bytes: number }`
+
+### `createVerdictMemo`
+
+**Kind:** function · **Import:** `createVerdictMemo` from `'@onderling/core'`
+
+```js
+createVerdictMemo({ maxBytes = VERDICT_MEMO_MAX_BYTES } = {})
+```
+
+THE VERDICT MEMO, one level up: remember that EXACTLY this input checked out under a pure check, so the work around
+the signature (the canonical form, the payload digest, the header hash) is not redone either. A cold start on the
+Samsung ran the statement check 554 times over 71 distinct statements and the circle-link proof 920 times over 23
+addresses: the signature was already remembered, the canonical form and the hashes around it were not (~2.7 ms each).
+
+The same rule as the signature memo, and the key is the whole input:
+  • only a pure check whose answer depends on its input alone (a statement's own validity, never an authority);
+  • the key is the caller's exact input as bytes (`JSON.stringify` of the statement plus what was asked of it), never
+    a hash the content claims: a copy changed anywhere, or written in another key order, misses and is checked;
+  • only a pass is stored; a refusal is checked again every time;
+  • bounded in bytes, least recently used out first.
+
+**Parameters**
+
+- `[o]` `object`
+- `[o.maxBytes]` `number`
+
+**Returns:** `{ has: (key: string) => boolean, remember: (key: string) => void, readonly size: number, readonly bytes: number }`
+
+### `exactVerdictKey`
+
+**Kind:** function · **Import:** `exactVerdictKey` from `'@onderling/core'`
+
+```js
+exactVerdictKey(value)
+```
+
+The exact key for a verdict: the value's JSON, or null when JSON would make two different inputs look the same (a
+non-finite number or a value with `toJSON`, both written as something else, an `undefined` inside an array, written
+as null, or a function, symbol or bigint, which JSON drops or refuses). A null key is never remembered, so such an input is always checked in full.
+
+**Parameters**
+
+- `value` `*`
+
+**Returns:** `string|null`
+
+### `processVerdictMemo`
+
+**Kind:** function · **Import:** `processVerdictMemo` from `'@onderling/core'`
+
+```js
+processVerdictMemo(name)
+```
+
+The process's verdict memo for one named check ('spine', 'circle-link'): one per check, so one check's pass is never
+read as another's. In memory only, like the signature memo.
+
+**Parameters**
+
+- `name` `string`
+
+### `processSignatureMemo`
+
+**Kind:** function · **Import:** `processSignatureMemo` from `'@onderling/core'`
+
+```js
+processSignatureMemo()
+```
+
+THE process's one memo (verify-once, step A): every rail, the chat rail and the named checks (a circle-link proof, a
+ceremony reveal, a device delegation) use it unless a caller hands its own (a test that counts). One memo per process
+rather than per agent: a production process holds one agent, and a verdict is a pure fact about bytes, a signature
+and a key, the same for any agent that asks. In memory only; never persisted, never taken from another device.
+
+**Returns:** `ReturnType<typeof createSignatureMemo>`
 
 ## `src/security/spineAppender.js`
 
@@ -4137,6 +4415,34 @@ TWO signer modes:
 
 Version of the signed spine body — a self-describing namespaced STRING (docs/conventions/signed-bodies.md).
 
+### `canonicalDeep`
+
+**Kind:** function · **Import:** `canonicalDeep` from `'@onderling/core'`
+
+```js
+canonicalDeep(value)
+```
+
+ONE canonical form, sorted at EVERY depth (today's envelope `canonicalize` sorts the top level only): the same
+statement is the same bytes, whatever order its nested payload keys were written in. Arrays keep their order;
+`undefined` members are left out as JSON leaves them out.
+
+**Parameters**
+
+- `value` `*`
+
+**Returns:** `string`
+
+### `spineSignedMessage`
+
+**Kind:** function · **Import:** `spineSignedMessage` from `'@onderling/core'`
+
+```js
+spineSignedMessage(body)
+```
+
+The exact bytes (as a string) a spine statement's signature and chain hash are over: its canonical header.
+
 ### `signSpine`
 
 **Kind:** function · **Import:** `signSpine` from `'@onderling/core'`
@@ -4160,6 +4466,25 @@ Sign a spine statement of any `kind`. `identity` is the issuer's CIRCLE-SCOPED s
 
 **Returns:** `{ body: object, sig: string, by: string }`
 
+### `spineVerdictKey`
+
+**Kind:** function · **Import:** `spineVerdictKey` from `'@onderling/core'`
+
+```js
+spineVerdictKey(statement, { expectedCircleId, expectedKind } = {})
+```
+
+The verdict memo's key for a statement checked with these expectations: what was asked, then the statement's exact
+content (`exactVerdictKey`); null when the content cannot be keyed exactly (then it is always checked in full).
+One function, so a rail that asks "is this one known already?" asks with the key the check remembers.
+
+**Parameters**
+
+- `statement` `object`
+- `[o]` `{expectedCircleId?: string, expectedKind?: string}`
+
+**Returns:** `string|null`
+
 ### `verifySpine`
 
 **Kind:** function · **Import:** `verifySpine` from `'@onderling/core'`
@@ -4178,7 +4503,7 @@ it) — that is the fold's deny-wins decision.
 - `[opts]` `object`
 - `[opts.expectedCircleId]` `string` — if given, `body.circleId` must match
 - `[opts.expectedKind]` `string` — if given, `body.kind` must match
-- `[opts.verifySignature]` `(msg: string, sig: string, pubKey: string) => boolean` — the pure signature check — default `AgentIdentity.verify`; a caller that re-reads the same statements passes a memo (`createSignatureMemo`)
+- `[opts.verifySignature]` `(msg: string, sig: string, pubKey: string) => boolean` — the pure signature check — default: the process's memo under the verifier name 'spine' (`processSignatureMemo`); a test that counts passes its own
 
 **Returns:** `{ ok: true, body: object } | { ok: false, reason: string }`
 
@@ -4785,6 +5110,33 @@ list, or query to it.
 
 **Methods:** `getSource()` · `addSource()` · `removeSource()` · `read()` · `write()` · `delete()` · `list()` · `query()`
 
+## `src/timeSlice.js`
+
+### `TIME_SLICE_MS`
+
+**Kind:** constant · **Import:** `TIME_SLICE_MS` from `'@onderling/core'`
+
+How long one stretch of work may hold the thread before it gives it back (the start target: never above 100 ms).
+
+### `createTimeSlice`
+
+**Kind:** function · **Import:** `createTimeSlice` from `'@onderling/core'`
+
+```js
+createTimeSlice({ budgetMs = TIME_SLICE_MS, now = () => Date.now(), yieldFn = giveBack } = {})
+```
+
+One slice for one piece of long work (a read): call the returned function at every step.
+
+**Parameters**
+
+- `[o]` `object`
+- `[o.budgetMs]` `number` — a stretch longer than this yields
+- `[o.now]` `() => number`
+- `[o.yieldFn]` `() => Promise<void>` — how to give the thread back (default: one macrotask)
+
+**Returns:** `() => Promise<void>`
+
 ## `src/transport/InternalTransport.js`
 
 ### `InternalBus`
@@ -4876,7 +5228,7 @@ interaction primitives (sendOneWay/sendAck/request/respond/sendHello), reply
 correlation, auto-ACK of AS envelopes, SecurityLayer wiring, and receive-handler
 dispatch. See the file header for the full port contract.
 
-**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `holdsAddress()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_frameRefused()` · `_receive()` · `appMessageIdFor()` · `_send()` · `_awaitReply()`
+**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_defaultSenderFor()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `holdsAddress()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_frameRefused()` · `_receive()` · `appMessageIdFor()` · `sentEnvelopeFor()` · `_send()` · `_awaitReply()`
 
 ## `src/transport/discoverability.js`
 
@@ -5059,9 +5411,9 @@ the peer source. One object, both shells, no duplicate.
 **Parameters**
 
 - `[opts]` `object`
-- `[opts.onDegraded]` `(report: object) => void` — forwarded to the control
+- `[opts.onDegraded]` `(report: object) => void` — forwarded to the control THE LAN KEY is a property of the surface too (`setLanIdentity`): what a LAN transport says on the network is a room key while a room is open and a rest key otherwise, and an app asks for that here, never of the transport. A key asked for before the transport lands is applied when it lands.
 
-**Returns:** `{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void> }`
+**Returns:** `{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void>, setLanIdentity: (identity: object|null, o?: {self?: string}) => Promise<string|null>, lanAddress: () => string|null, setLanWhisper: (secrets: Function|null) => void }`
 
 ## `src/transport/nearbyPeers.js`
 

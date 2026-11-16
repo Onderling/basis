@@ -50,6 +50,7 @@ export function renderCircleNearby(container, {
   onPrefillCard = null,   // async () => ({label?}) — only what the room self's level releases
   onSay = null,
   onInviteAction = null,
+  onShareCard = null,     // (answerFrom, event) — 'deel je kaart' on an answer to my ask; the press goes with it
 } = {}) {
   const tr = translatorOr(t, 'circleNearby.js');
   container.innerHTML = '';
@@ -294,6 +295,25 @@ export function renderCircleNearby(container, {
       heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)),
     });
     asksBlock.appendChild(mineRow);
+    // the answers stay here, under my ask: no thread opens; sharing my card is the way to a contact
+    for (const a of Array.isArray(e.answers) ? e.answers : []) {
+      const who = a.label ?? String(a.from ?? '').slice(0, 8);
+      const ans = document.createElement('div');
+      ans.className = 'circle-nearby__answer';
+      ans.dataset.from = a.from ?? '';
+      const line = document.createElement('div');
+      line.textContent = tr('circle.nearbyScreen.answer_row', { name: who, text: a.text ?? '' });
+      ans.appendChild(line);
+      if (typeof onShareCard === 'function') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cc-btn cc-btn--quiet circle-nearby__share-card';
+        btn.textContent = tr('circle.nearbyScreen.share_card_with', { name: who });
+        btn.addEventListener('click', (ev) => onShareCard(a.from, ev));
+        ans.appendChild(btn);
+      }
+      asksBlock.appendChild(ans);
+    }
   }
   if (!asks.length) {
     const none = document.createElement('div');

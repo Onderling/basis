@@ -1,9 +1,12 @@
 import { notifyIfResonant } from './driverMatchNotify.js';
 
 /**
- * A circle post from another member that arrived on this device for the first time: announce it. The post itself is
- * already in the circle's store (the lane put it there, verified against the roster); this publishes the notification
- * and runs the on-device driver match, so a post that resonates with this self's drivers says why.
+ * A circle post from another member that arrived on this device for the first time. The post itself is already in the
+ * circle's store (the lane put it there, verified against the roster), and its arrival is already on the device log:
+ * the landing entry the items rail writes for every fresh row (`itemLanding.js`), which is what makes it news. This
+ * runs the on-device driver match only, so a post that resonates with this self's drivers says why. (It used to log a
+ * second, plain notification per post: two rows for one arrival, one of them carrying the circle's id and the wire
+ * text.)
  *
  * @param {object} args
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
@@ -34,18 +37,8 @@ export function makeHandleCirclePost({
       logger.warn?.('[peer] circle-post missing payload.requestId', envelope);
       return;
     }
-    // the post is already in the circle's store (the lane put it there, verified against the roster): announce it
+    // the post is already in the circle's store, and its landing on the device log (the news)
     const result = { itemId: payload.requestId };
-    publishEvent?.({
-      app:   'pinboard',
-      type:  'notification',
-      actor: payload.from ?? fromAddr,
-      payload: {
-        message: `📥 ${payload.kind ?? payload.type ?? 'post'} in ${groupId ?? 'circle'}: ${payload.text ?? '(no text)'}`,
-        ...(payload.requestId ? { postId: payload.requestId } : {}),
-        ...(groupId           ? { groupId }                   : {}),
-      },
-    });
 
     // Drivers #5 — does this post resonate with MY private drivers? Match on-device (the drivers never
     // leave this device) and, on an explainable match, fire a SEPARATE resonance nudge. Best-effort:

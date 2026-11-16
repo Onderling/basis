@@ -15,7 +15,8 @@
  *                   threshold is unreachable, with an ADMIN-OVERRIDE valve once past the deadline
  *                   (safety over liveness, escape-hatch (b)).
  */
-import { decisionClassFor } from './circlePolicy.js';
+import { decisionClassFor, normalizeDecisionSample } from './circlePolicy.js';
+import { caretakerOrder } from '@onderling/core';
 
 export const DECISION_STATUS = { APPROVED: 'approved', PENDING: 'pending', REJECTED: 'rejected' };
 
@@ -79,10 +80,13 @@ export const MEMBER_PROPOSABLE = Object.freeze(['changePolicy']);
  * @param {number|null} [a.deadline]            member-vote deadline (ms); null = open-ended
  * @param {number} [a.now]                      current time (ms) — compared to the deadline
  * @param {boolean} [a.override]                an admin is explicitly forcing a past-deadline vote
+ * @param {string|null} [a.seed]                 the proposal's own hash (`random-sample` draws from it)
+ * @param {*} [a.subject]                        the proposal's subject (a member it is about is never drawn)
+ * @param {string|null} [a.by]                   who proposed it (never drawn)
  * @returns {{status:string, decisionClass:string|null, reason:string, tally?:object,
- *            deadline?:number|null, overrideAvailable?:boolean}}
+ *            deadline?:number|null, overrideAvailable?:boolean, sample?:string[]}}
  */
-export function resolveGovernance({ action, policy, actor = null, members = [], votes = [], deadline = null, now = 0, override = false } = {}) {
+export function resolveGovernance({ action, policy, actor = null, members = [], votes = [], deadline = null, now = 0, override = false, seed = null, subject = null, by = null } = {}) {
   const decisionClass = decisionClassFor(policy, action);
   if (!decisionClass) return { status: DECISION_STATUS.REJECTED, decisionClass: null, reason: 'unknown-action' };
 
@@ -117,13 +121,21 @@ export function resolveGovernance({ action, policy, actor = null, members = [], 
     return { status: DECISION_STATUS.PENDING, decisionClass, reason: 'awaiting-admins', tally };
   }
 
-  // member-vote — strict majority of the FULL membership.
+  if (decisionClass === 'random-sample') {
+    return resolveSample({ policy, roster, admins, isAdmin, final, actor, deadline, now, override, seed, subject, by });
+  }
+
+  // member-vote — strict majority of the FULL membership, counting only the votes of members ON the roster (a vote by
+  // someone who has left or been removed since, or who never was a member, counts for nothing: the base is the roster)
+  const onRoster = new Set(roster.map((m) => m.ref));
+  const memberYes = yes.filter((v) => onRoster.has(v.voter));
+  const memberNo = no.filter((v) => onRoster.has(v.voter));
   const need = majorityOf(roster.length);
-  const tally = { yes: yes.length, no: no.length, need, of: roster.length };
+  const tally = { yes: memberYes.length, no: memberNo.length, need, of: roster.length };
   const expired = deadline != null && now >= deadline;
-  if (yes.length >= need) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'majority', tally, deadline };
+  if (memberYes.length >= need) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'majority', tally, deadline };
   // A no-majority makes the yes-threshold unreachable → reject (no deadlock, and it's a clear NO).
-  if (no.length > roster.length - need) return { status: DECISION_STATUS.REJECTED, decisionClass, reason: 'rejected-by-majority', tally, deadline };
+  if (memberNo.length > roster.length - need) return { status: DECISION_STATUS.REJECTED, decisionClass, reason: 'rejected-by-majority', tally, deadline };
   // Threshold not (yet) reached. Escape-hatch (b): once past the deadline an admin may force it.
   if (expired && override && actor && isAdmin(actor.ref)) {
     return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'admin-override', tally, deadline };
@@ -133,4 +145,43 @@ export function resolveGovernance({ action, policy, actor = null, members = [], 
     reason: expired ? 'deadline-passed' : 'awaiting-votes',
     tally, deadline, overrideAvailable: expired,
   };
+}
+
+/**
+ * The members a `random-sample` decision draws: the roster without the people it is about (the proposer, and the
+ * member the proposal names), in the caretaker succession order seeded by the proposal's own hash (one implementation,
+ * `caretakerOrder`), the first `size`. Every device holding the same roster and proposal draws the same people; a
+ * drawn member who leaves is replaced by the next in that order.
+ */
+export function drawSample({ roster = [], size, seed, subject = null, by = null } = {}) {
+  const about = new Set([by, typeof subject === 'string' ? subject : subject?.member].filter((x) => typeof x === 'string' && x));
+  const eligible = roster.map((m) => m.ref).filter((ref) => !about.has(ref));
+  return caretakerOrder(eligible, String(seed ?? '')).slice(0, size);
+}
+
+function resolveSample({ policy, roster, admins, isAdmin, final, actor, deadline, now, override, seed, subject, by }) {
+  const decisionClass = 'random-sample';
+  const { size, rule } = normalizeDecisionSample(policy?.decisionSample);
+  const sample = drawSample({ roster, size, seed, subject, by });
+  // Nobody left to draw (a circle of two, say): the admins decide together instead, so a small circle is never stuck.
+  if (sample.length === 0) {
+    const need = majorityOf(admins.length);
+    const adminYes = final.filter((v) => v.choice === 'yes' && isAdmin(v.voter)).length;
+    const adminNo = final.filter((v) => v.choice === 'no' && isAdmin(v.voter)).length;
+    const tally = { yes: adminYes, no: adminNo, need, of: admins.length };
+    if (admins.length && adminYes >= need) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'no-sample-admins', tally, sample };
+    if (admins.length && adminNo > admins.length - need) return { status: DECISION_STATUS.REJECTED, decisionClass, reason: 'no-sample-admins', tally, sample };
+    return { status: DECISION_STATUS.PENDING, decisionClass, reason: 'no-sample-admins', tally, sample };
+  }
+  const drawn = new Set(sample);
+  const yes = final.filter((v) => v.choice === 'yes' && drawn.has(v.voter)).length;
+  const no = final.filter((v) => v.choice === 'no' && drawn.has(v.voter)).length;
+  const need = rule === 'unanimous' ? sample.length : majorityOf(sample.length);
+  const tally = { yes, no, need, of: sample.length };
+  const expired = deadline != null && now >= deadline;
+  if (yes >= need) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: rule, tally, deadline, sample };
+  if (no > sample.length - need) return { status: DECISION_STATUS.REJECTED, decisionClass, reason: `${rule}-no`, tally, deadline, sample };
+  // the same escape hatch as a member vote: past the deadline an admin may decide it
+  if (expired && override && actor && isAdmin(actor.ref)) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'admin-override', tally, deadline, sample };
+  return { status: DECISION_STATUS.PENDING, decisionClass, reason: expired ? 'deadline-passed' : 'awaiting-sample', tally, deadline, overrideAvailable: expired, sample };
 }

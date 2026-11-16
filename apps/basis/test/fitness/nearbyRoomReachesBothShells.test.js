@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createNearbyRoomBinding, NEARBY_ROOM_SUBTYPES } from '../../src/v2/nearbyRoomBinding.js';
+import { phoneWiringSource } from '../support/phoneWiringSource.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(HERE, rel), 'utf8');
@@ -25,8 +26,10 @@ describe('the Nearby room reaches both shells', () => {
   it('web: the screen gets screenDeps() and the peer router spreads handlers', () => {
     const src = read('../../web/v2/circleApp.js');
     expect(src).toMatch(/createNearbyScreen\(\{\s*\.\.\.\(ensureNearbyRoom\(\)\?\.screenDeps\(\)/);
-    expect(src).toMatch(/\.\.\.\(ensureNearbyRoom\(agent\)\?\.handlers \?\? \{\}\)/);
-    expect(src).toMatch(/subscribeToAnswers\(/);
+    // spread through the block check (the room is direct contact: a block refuses them)
+    expect(src).toMatch(/\.\.\.blockedAll\([^\n]*ensureNearbyRoom\(agent\)\?\.handlers \?\? \{\}\)/);
+    // an answer reaches the screen through screenDeps (the shared controller re-reads), and opens no thread
+    expect(src).not.toMatch(/openNearbyThread\(/);
   });
 
   it('both shells offer the invite-into-the-room door next to the QR (PLAN-nearby §5)', () => {
@@ -40,8 +43,13 @@ describe('the Nearby room reaches both shells', () => {
     expect(bundle).toMatch(/^\s+nearbyRoom,$/m);
     const host = read('../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js');
     expect(host).toMatch(/createNearbyScreen\(\{\s*\.\.\.\(bundle\?\.nearbyRoom\?\.screenDeps\?\.\(\)/);
-    expect(host).toMatch(/subscribeToAnswers/);
-    const router = read('../../../basis-mobile/src/screens/ChatScreen.js');
-    expect(router).toMatch(/\.\.\.\(bundle\?\.nearbyRoom\?\.handlers \?\? \{\}\)/);
+    expect(host).not.toMatch(/openNearbyThread\(/);
+    // the phone's router spreads the room's handlers itself, or hands the room to the shared inbound wiring, which
+    // spreads them (read through the phone's whole composition: screen → src/core → the shared map)
+    const router = phoneWiringSource();
+    if (/buildInboundWiring\(/.test(router)) {
+      expect(router).toMatch(/nearbyRoom: bundle\?\.nearbyRoom/);
+      expect(router).toMatch(/\.\.\.blockedAll\([^\n]*nearbyRoom\?\.handlers \?\? \{\}\)/);
+    } else expect(router).toMatch(/\.\.\.\(bundle\?\.nearbyRoom\?\.handlers \?\? \{\}\)/);
   });
 });

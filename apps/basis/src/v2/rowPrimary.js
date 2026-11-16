@@ -42,3 +42,18 @@ export function primaryActionFor(row, noun, { manifests = allManifests() } = {})
   }
   return null;
 }
+
+/**
+ * A block act that takes a line the person types (a list's add act: `{kind: 'op', app, opId, args, textArg}`), as the
+ * dispatch both shells hand their `onAction`: the typed line, trimmed, under `textArg`. An empty line, or an act that
+ * names no `textArg`, dispatches nothing (null). One rule both shells call, so neither builds op args itself.
+ *
+ * @param {{kind: string, app: string, opId: string, args?: object, textArg?: string}|null} act
+ * @param {string} text
+ * @returns {{kind: 'row-op', op: {app: string, opId: string, args: object}}|null}
+ */
+export function typedRowOp(act, text) {
+  const line = typeof text === 'string' ? text.trim() : '';
+  if (!line || act?.kind !== 'op' || typeof act.textArg !== 'string' || !act.textArg) return null;
+  return { kind: 'row-op', op: { app: act.app, opId: act.opId, args: { ...(act.args ?? {}), [act.textArg]: line } } };
+}

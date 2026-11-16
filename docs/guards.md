@@ -7,13 +7,14 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 69
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 77
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
 | `agent-count` | — | the basis agent constructs exactly the listed in-process agents, and the list only SHRINKS |
 | `alpha-surface` | — | a hidden surface cannot creep back into a shell by accident |
 | `api-docs` | — | the API-appendix drift guard (source JSDoc ↔ docs/api/), in the `npm run guards` aggregate |
+| `architecture-date` | — | docs/architecture.md carries a "Last updated: YYYY-MM-DD" line, and every change to the |
 | `architecture-reality` | — | docs/architecture.md describes what RUNS. It carries no plans, no considerations, no history of who |
 | `asked-frits` | — | the open-questions table matches the `? Needs Frits` markers it projects |
 | `box-runner` | — | the box runner (deploy/box) stays a working thing, not a script that rotted |
@@ -28,6 +29,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `codenames` | — | no internal PLANNING CODENAMES in public code comments or docs |
 | `content-classification` | — | every durable STORE a shell builds is classified in `enrolForgets.js` |
 | `css-tokens` | — | every `var(--name)` in ANY web file (all of apps/basis/web: style.css, inline `cssText` in the JS) is one a… |
+| `decisions` | — | docs/decisions.md is in date order, and every decision docs/architecture.md cites is in it |
 | `default-literal` | — | PRIMARY |
 | `dep-boundaries` | — | Dependency-boundary fitness function — CLAUDE.md invariant #5 |
 | `disclosure-exit` | G-A1 | the Agent membrane's disclosure gate is the ONLY exit for identity |
@@ -51,9 +53,12 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
 | `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
 | `mobile-buttons` | — | the phone's twin of lint-unstyled-buttons: a button on the phone wears the one button family |
+| `my-circle-ids` | — | the circles this device is in are read through ONE reader (`apps/basis/src/v2/myCircleIds.js`) |
+| `no-pinboard-pod-attach` | — | basis never attaches pinboard's own store to a person's pod while what it writes is |
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |
+| `one-signature-check` | — | every Ed25519 signature check in shipped code goes through ONE function, |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
 | `op-owners` | — | one owner per op. The op ids two or more composed manifests BOTH declare are a baseline that only |
 | `plans-structure` | — | the private plans/ folder keeps the shape it was sorted into (2026-09-25) |
@@ -64,15 +69,18 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `retired-modules` | — | a RETIRED module must stay dead (the legacy-deletion-after-cutover discipline) |
 | `revocation-resolver` | — | a revocation resolver is taken at CONSTRUCTION; nothing may replace one later |
 | `scope-leaks` | — | no CROSS-SCOPE REFERENCE LEAKS in the RN shell screens |
+| `screen-pairing-door` | — | a shell reaches a screen's grant only through the shared pairing, never by itself |
 | `screen-sections` | — | a hand-painted screen whose sections are DECLARED (`apps/basis/src/v2/screenSections.js`) is |
 | `sealed-at-rest` | — | every local store a shell builds is sealed on the way to disk |
 | `searchable-sources` | — | every source file must be findable by search |
+| `sheet-cap` | — | A PHONE SHEET IS CAPPED IN WINDOW PIXELS, NEVER A PERCENTAGE. A card capped with `maxHeight: '85%'` did not… |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
 | `switch-names-its-setting` | — | EVERY SWITCH NAMES WHAT IT SETS. A switch a person can flip that changes nothing is a promise unkept |
 | `theme-tokens` | — | the web design system's drift guards (theme.css regenerates clean; circle.css uses only defined tokens; no … |
 | `typed-commands-reachable` | — | a command a person can TYPE must have a door, in both shells |
+| `ui-copy-dashes` | — | UI COPY IS PLAIN SENTENCES: NO DASH CONSTRUCTIONS |
 | `unbound-names` | — | a Node entry point uses no name that nothing defines |
 | `unconstructed-classes` | — | an exported class that nothing ever `new`s is a liability, not an asset |
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |

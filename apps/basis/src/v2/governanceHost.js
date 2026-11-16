@@ -16,7 +16,7 @@ import { selfRefIn } from './selfRef.js';
 import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
 import { autoEnacts } from './circlePolicy.js';
 import { foldGovernance } from './governanceLog.js';
-import { buildGovernanceView } from './governanceView.js';
+import { buildGovernanceView, joinsSince } from './governanceView.js';
 
 /**
  * @param {object} deps
@@ -36,16 +36,36 @@ export function makeCircleGovernance({
   callSkill, appendGovernanceEvent, getPolicy, getMembers,
   localActorRef, setPolicy = null, rotateKey = null, newProposalId, now = () => 0,
   readGovernanceState,
+  // the circle's verified membership statement bodies: the Decisions view says how many members joined since a proposal
+  // (a shown hint, never a gate); absent → no line
+  readMembershipBodies = null,
+  // the WHOLE removal (`removeCircleMember`: the substrate op, then unbind the member's circle address and re-record the
+  // authorize snapshot), when the wiring has this device's agent; else the bare pinboard op
+  removeMember = null,
+  // the settings version this device holds for a circle: a rules change it enacts is stamped with it, and every
+  // receiving device judges that change by THAT version's rule (the receiver gate)
+  policyVersionOf = null,
 }) {
   if (typeof readGovernanceState !== 'function') {
     throw new Error('makeCircleGovernance: readGovernanceState is required (the rail\'s verified events + disputed set)');
   }
   // Map a governed action to the REAL op. removeMember/editGroupRules are pinboard skills;
   // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
-  async function enact(circleId, action, subject) {
-    if (action === 'removeMember') return callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
-    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject });
-    if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject) : { ok: false, error: 'no-setPolicy' };
+  // `proposalId` rides into the enacted change's statement, so every receiving device can check the decision (the
+  // receiver gate, governanceReceiverGate.js)
+  async function enact(circleId, action, subject, proposalId = null) {
+    // the decision rides what is enacted: the proposal and the settings version this device holds (the receiver gate)
+    let policyVersion = null;
+    try { policyVersion = typeof policyVersionOf === 'function' ? await policyVersionOf(circleId) : null; } catch { policyVersion = null; }
+    const decided = { ...(proposalId ? { proposalId } : {}), ...(Number.isFinite(policyVersion) ? { policyVersion } : {}) };
+    if (action === 'removeMember') {
+      return typeof removeMember === 'function'
+        ? removeMember(circleId, subject, decided)
+        : callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful', ...decided });
+    }
+    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject, ...decided });
+    if (action === 'changeRole')   return callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: subject?.member, role: subject?.role, ...decided });
+    if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject, { proposalId }) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };
     return { ok: false, error: 'unknown-action' };
   }
@@ -86,7 +106,12 @@ export function makeCircleGovernance({
     }
     const me = (ctx.members || []).find((m) => m && m.ref === actorIn(circleId)) || null;
     const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
-    const base = buildGovernanceView({ fold, viewer: me, labelForSubject });
+    let membershipBodies = null;
+    if (typeof readMembershipBodies === 'function') {
+      try { const r = await readMembershipBodies(circleId); membershipBodies = Array.isArray(r) ? r : (Array.isArray(r?.bodies) ? r.bodies : null); } catch { membershipBodies = null; }
+    }
+    const joinedSinceOf = membershipBodies ? (p) => joinsSince(membershipBodies, p.proposedAt, ctx.members) : null;
+    const base = buildGovernanceView({ fold, viewer: me, labelForSubject, joinedSinceOf });
     // L3: surface the disputed authors (equivocators) so the shell can prompt "review & remove".
     const disputed = [...ctx.disputed].map((ref) => ({ ref, label: labelForSubject ? labelForSubject(ref, 'removeMember') : ref }));
     return { ...base, disputed, hasDisputed: disputed.length > 0 };

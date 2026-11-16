@@ -9,6 +9,7 @@
  * AUTHORITATIVE membership — the wall-clock exit path retires with this rider.
  */
 import { selfRefIn } from './selfRef.js';
+import { inAuthorChainUpTo } from './authorChainCut.js';
 import { verifyCeremonyReveal, isCeremonyKind, ceremonyRevealFacts, PERSON_KEY_KIND } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -17,6 +18,15 @@ import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the r
 
 /** The statement kinds the membership lane carries — DERIVED from the manifest's declared appends. */
 export const MEMBERSHIP_RAIL_KINDS = entryKindRegistryFromManifests(membershipManifest).kindsFor(MEMBERSHIP_LANE);
+
+/**
+ * COMPACTION OF SUPERSEDED MEMBER PROPERTIES IS ON AGAIN (format v2, docs/decisions.md). It was paused on 2026-11-12:
+ * a tombstone then had no signature, so a member who joined later could not accept it, lacked that parent and could
+ * fold a different roster (`test/v2/lateJoinerFoldOrder.test.js`). In format v2 the tombstone keeps the signed header
+ * (the payload goes, its digest stays), so it proves itself, a catch-up serves it, and the late joiner keeps the edge
+ * and folds the same roster (`test/v2/tombstoneProvesItself.test.js`).
+ */
+export const COMPACT_SUPERSEDED_PROPS = true;
 
 /** The wire subtypes for the membership lane's fan + catch-up (the governance pair's sibling). */
 export const MEMBERSHIP_BROADCAST = 'circle-membership-broadcast';
@@ -56,18 +66,6 @@ export function addressBindsOnRow(row, author, atSeq = null, { hash = null, chai
   });
 }
 
-/** Is `hash` the statement `upTo` or one of its ancestors along `author`'s own parent chain? `chainOf(hash)` → the body. */
-export function inAuthorChainUpTo(chainOf, author, upTo, hash) {
-  if (hash === upTo) return true;
-  let at = upTo;
-  for (let steps = 0; steps < 100000 && at; steps++) {
-    const b = chainOf(at);
-    if (!b || b.author !== author) return false;   // a gap, or the chain leaves the author: not provably before the cut
-    at = b.parentHash ?? null;
-    if (at === hash) return true;
-  }
-  return false;
-}
 
 export function rosterBindingVerifier(callSkill) {
   // NO re-entrancy breaker, BY CONSTRUCTION (2026-08-21): this verifier reads the roster
@@ -233,16 +231,25 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
   if (typeof circleIdentityFor !== 'function') return null;
   const railRef = { current: null };
   // the lane's own statements by hash, for the retired-address cut (a chain walk reads them, it verifies nothing)
+  // …built ONCE per circle while the log is unchanged (a read binds every statement, and each binding asked for it again)
+  const chains = new Map();   // circleId → { version, lookup }
   const chainFor = (circleId) => {
+    const version = typeof eventLog?.version === 'number' ? eventLog.version : null;
+    const had = chains.get(circleId);
+    if (had && version !== null && had.version === version) return had.lookup;
     const byHash = new Map();
     try { for (const x of railRef.current?.storedStatements?.(circleId) ?? []) if (x?.body?.hash) byHash.set(x.body.hash, x.body); } catch { /* none */ }
-    return (h) => byHash.get(h) ?? null;
+    const lookup = (h) => byHash.get(h) ?? null;
+    if (version !== null) chains.set(circleId, { version, lookup });
+    return lookup;
   };
   const rail = makeCircleEntryRail({
     eventLog,
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
+    // the only statements the roster fold calls dead (`superseded`: member properties a later one replaced)
+    compactableKinds: ['member-props'],
     verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, {
       circleIdentityFor, ownCeremonyCommitmentFor, chainFor,
       storedFor: (circleId) => { try { return railRef.current?.storedStatements?.(circleId) ?? []; } catch { return []; } },

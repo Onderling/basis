@@ -36,8 +36,9 @@ function fakePodClient() {
       if (!store.has(uri)) { const e = new Error('not found'); e.code = 'NOT_FOUND'; throw e; }
       return { content: store.get(uri) };
     },
+    // PodClient's own shape: `{ container, entries }`
     async list(prefix = '') {
-      return [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((uri) => ({ uri }));
+      return { container: prefix, entries: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((uri) => ({ uri })) };
     },
     _raw: store,
   };

@@ -629,7 +629,7 @@ export async function securityStatus(_args, { agent, t }) {
     lines.push(`  Refused (stranger):     ${circle.refusedStrangers}`);
     lines.push(`  Refused (canonical):    ${circle.refusedCanonicalSigners ?? 0}  — members who signed as their global identity`);
     lines.push(`  Canonical-only members: ${circle.canonicalOnlyMembers ?? 0}  — no proven per-circle address yet; linkable across circles`);
-    lines.push(`  Accepted unchecked:     ${circle.unknownRosterAllowances}  — envelopes to a circle whose roster was never read`);
+    lines.push(`  Refused, roster unread: ${circle.unknownRosterRefusals}  (envelopes to a circle whose roster this device has not read yet)`);
   }
   lines.push('');
   lines.push('Every OW envelope to a HI\'d peer is:');

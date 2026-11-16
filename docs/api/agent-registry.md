@@ -1376,6 +1376,53 @@ async restoreProfilesInto(registry, snapshot)
 
 Write an imported snapshot into a (fresh) registry — the pod-less recovery of the profile set.
 
+## `src/firstMessages.js`
+
+### `FIRST_MESSAGE_POLICIES`
+
+**Kind:** constant · **Import:** `FIRST_MESSAGE_POLICIES` from `'@onderling/agent-registry'`
+
+WHO MAY WRITE TO THIS PERSONA FIRST (Frits 2026-11-12: "the persona can be the policy itself"). `request`: a first
+message from someone the persona did not choose is held as a message request; `open`: anyone may write, within the
+stranger budgets. Kept as the profile's own property `firstMessages`, so it is one of the profile's FACTS and reaches
+every device of the person by the facts carry, and no preset releases it (a preset releases only the keys it lists).
+Absent: a function profile's is `open` (a bot takes anyone's first word, its own door admits), a person's is
+`request`. One mechanism for both: a bot is a persona whose door is open.
+
+### `FIRST_MESSAGES_KEY`
+
+**Kind:** constant · **Import:** `FIRST_MESSAGES_KEY` from `'@onderling/agent-registry'`
+
+The profile property that holds the policy.
+
+### `firstMessagesOf`
+
+**Kind:** function · **Import:** `firstMessagesOf` from `'@onderling/agent-registry'`
+
+```js
+firstMessagesOf(entry)
+```
+
+The policy a registry entry stands for: its own property, else what its kind implies.
+
+### `CIRCLE_MEMBERS_KEY`
+
+**Kind:** constant · **Import:** `CIRCLE_MEMBERS_KEY` from `'@onderling/agent-registry'`
+
+"PEOPLE IN MY CIRCLES MAY WRITE TO ME" (Frits 2026-11-12): a member of one of THIS persona's circles may write to it
+privately and gets a thread (not a contact row: they become a contact when the person answers). Off: their first
+private message is a request like anyone's. The profile's own property `circleMembersMayWrite`, a boolean; absent: ON.
+
+### `circleMembersMayWriteOf`
+
+**Kind:** function · **Import:** `circleMembersMayWriteOf` from `'@onderling/agent-registry'`
+
+```js
+circleMembersMayWriteOf(entry)
+```
+
+Whether a registry entry's persona lets its circle members write first: its own property, else on.
+
 ## `src/governedRequest.js`
 
 ### `DEFAULT_GOVERNED_POLICY`
@@ -2190,7 +2237,7 @@ The registry's marker namespace (`_inherit.offering`, …): every key under it i
 
 **Kind:** constant · **Import:** `PERSON_SETTABLE_KEYS` from `'@onderling/agent-registry'`
 
-The keys a person may set through the property ops although this package defines them (their picture, their word on a model, their handle).
+The keys a person may set through the property ops although this package defines them (their picture, their word on a model, their handle, who may write to them first).
 
 ### `isReservedPropertyKey`
 

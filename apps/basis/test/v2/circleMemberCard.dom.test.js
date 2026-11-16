@@ -32,12 +32,12 @@ describe('renderMemberPersonaCard', () => {
     const seen = el.querySelector('.circle-membercard__col--sees');
     const hidden = el.querySelector('.circle-membercard__col--hides');
     // handle visible, real name hidden.
-    expect(seen.querySelector('[data-attr="handle"] .circle-membercard__attr-value').textContent).toBe('@Heron');
+    expect(seen.querySelector('[data-attr="handle"] .circle-membercard__attr-value').textContent).toBe('Heron');
     expect(hidden.querySelector('[data-attr="realName"]')).not.toBeNull();
     expect(hidden.querySelector('[data-attr="realName"] .circle-membercard__attr-value').textContent)
       .toBe('circle.memberCard.hidden_marker');
     // the title reads legibly — the handle (real name is hidden from me).
-    expect(el.querySelector('.circle-membercard__title').textContent).toBe('@Heron');
+    expect(el.querySelector('.circle-membercard__title').textContent).toBe('Heron');
   });
 
   it('shows the real name for a member who RELEASED their name to this circle', () => {

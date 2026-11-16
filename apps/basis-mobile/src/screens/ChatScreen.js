@@ -28,10 +28,11 @@ import {
 
 import {
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, getActiveCircle,
+  runStartQueue, startQueueSiblings,
   renderReply, isQrUri,
-  // E3 — record-panel auto-refresh after a mutation.
+  // record-panel auto-refresh after a mutation.
   itemRefFromReply, REFRESHABLE_VERBS,
-  // E2 — bulk fan-out (`/done all`).
+  // bulk fan-out (`/done all`).
   executeBulkDispatch, lastListingItems,
 } from '@onderling-app/basis';
 
@@ -56,56 +57,26 @@ import {
   ensureDmThread, updatePeerDisplay,
 } from '../core/threadState.js';
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
-// The lane table both shells (and a headless device) build from one place.
-import { buildCircleLanes }    from '../../../basis/src/v2/circleLanes.js';
-import { makeReceiptReceiver, rehydrateDeliveryState } from '../../../basis/src/v2/deliverySettings.js';
-import { pushContactReply }    from '../core/contactReplyInbox.js';
+// The phone's inbound wiring, composed once (src/core/phoneInboundWiring.js) over the handler map every shell shares
+// (src/v2/inboundWiring.js); this screen hands in only its paint.
+import { buildPhoneInboundWiring } from '../core/phoneInboundWiring.js';
 import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
 import { useTheme }          from './v2/themeContext.js';
-import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
-import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
-import { makeCircleGovernancePeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
-import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
-import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer, consumeCircleEntry } from '../../../basis/src/v2/enrollOffer.js';
 import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
-import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
-import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
-import { makeHandleCirclePeerIntro }
-                               from '../../../basis/src/core/handlers/meshIntros.js';
-// B2 — per-circle ADDRESS announcing (web parity): the receive half + the admin's post-join
-// propagation. Same shared source both shells call; each only passes its own `agent`.
-import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin }
-                               from '../../../basis/src/v2/circleAddressAnnounce.js';
-// G11 — no-pod group-key rotation, RECEIVE side: record an inbound key-event into the local per-circle
-// log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
-import { refreshCircleKeyEventsFromLane, getCirclePodWebId } from '../core/circlePods.js';
-// ε.4 — negotiated catch-up protocol substrate.
-import { makeHandleCalendarRsvp }
-                               from '../../../basis/src/core/handlers/calendarRsvp.js';
-import { makeHandleCalendarCancel }
-                               from '../../../basis/src/core/handlers/calendarCancel.js';
-import { makeHandleCirclePost } from '../../../basis/src/core/handlers/circlePost.js';
-import { landedNoticeboardHandler } from '../../../basis/src/v2/noticeboardCarry.js';
+import { getCirclePodWebId } from '../core/circlePods.js';
 import {
-  makeHandleGroupRedeemRequest,
-  makeHandleGroupRedeemResponse,
   makeSendGroupRedeemRequest,
 } from '../../../basis/src/core/handlers/groupRedeem.js';
 // profile-update propagation — the roster "pull-me" signal (announce on a real roster write;
 // receive → record the silent stream entry + re-read). Web parity (circleApp.js).
-import { makeHandleCalendarInvite }
-                               from '../../../basis/src/core/handlers/calendarInvite.js';
-import { makeHandleFileShare } from '../../../basis/src/core/handlers/fileShare.js';
-import { makeHandleThreadedChat } from '../../../basis/src/core/handlers/threadedChat.js';
-// SILENT out-of-circle delivery — inbound `shared-copy` handler: lands a relayed sealed COPY into the per-user
-// "shared with me" store (the launcher lists + opens it). Shared core (web≡mobile), same as circleApp.js.
-import { makeHandleSharedCopy } from '../../../basis/src/core/handlers/sharedCopyReceive.js';
 // Circle roster → household no-pod sync peers (+ per-circle address binding). The ONE shared
 // implementation, called by web (circleApp) and the mobile launcher too.
 import { feedHouseholdRoster } from '../../../basis/src/v2/householdRosterPairing.js';
+import { composePhonePodReadBack } from '../core/phonePodReadBack.js';
+import { myCircleIds } from '../../../basis/src/v2/myCircleIds.js';
 import { computeEmbedButtons } from '../../../basis/src/core/embedButtons.js';
 import { embedButtonText } from '../../../basis/src/v2/replyEmbeds.js';
 import { makeCalendarOutboundHook }
@@ -139,14 +110,12 @@ import MultiFieldFormBubble from '../rn/MultiFieldFormBubble.js';
 import { QrCodeView }     from '@onderling/react-native/qr/view';
 import QrScannerModal     from '../rn/QrScannerModal.js';
 // L125 — a scanned contact card asks first what the contact will see of you (web parity)
-import { useContactLensSheet } from '../../../basis/src/rn/ContactLensSheet.js';
 import { classifyQrPayload } from '@onderling/react-native/qr';
 import { getBasisClassifiers } from '../core/qrClassifiers.js';
 // Extension install (feedback-extension mobile parity) — consent sheet + controller.
 import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../core/mappingsStoreRN.js';
-import { contactPointAdopter } from './v2/RelayQuestionModal.js';
 // ε.6 — multi-offer chooser modal (opt-in via policy.catchUpChooserMode='prompt').
 // ε.6 follow-up — read the same per-circle policy the launcher writes so
 // the chooser mode is honoured on mobile (web reads localStorage
@@ -179,6 +148,8 @@ export default function ChatScreen({
   // reload. Declared here deliberately: the sibling bug fixed the same day was App.js passing
   // `onAcceptFallback` to a screen that never destructured it, which threw on render.
   onCirclesChanged = null,
+  // a contact card opened as a link: handed to the launcher (this shell is mounted hidden; its sheet would not show)
+  onContactLink = null,
   eventLog = null,
   // ε.1 — shared inbox singleton (msgId dedup + ingest mirror + eventLog append).
   // The receiver path here routes through it; rehydrator + future catch-up paths
@@ -251,13 +222,8 @@ export default function ChatScreen({
   }
   const [logsPanelOpen, setLogsPanelOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
-  // a device with no relay of its own adopts the point a scanned card brings (said once)
-  const contactAdopter = useMemo(() => contactPointAdopter(bundle?.agent ?? null), [bundle]);
-  const contactLens = useContactLensSheet({
-    callSkill: bundle?.callSkill ?? null, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor,
-    shareRelease: bundle?.shareCircleRelease, adoptPoint: contactAdopter, t,
-  });
-  // E5 — record/mini-page "⤢ Open in full": holds the reply shown in
+  // (no add sheet here: a contact link is handed to the launcher, the screen the person sees)
+  // record/mini-page "⤢ Open in full": holds the reply shown in
   // the full-height detail modal, or null when closed.
   const [expandedRecord, setExpandedRecord] = useState(null);
   // The per-circle policy store (shared AsyncStorage prefix with the launcher) — the create wizard
@@ -451,17 +417,6 @@ export default function ChatScreen({
   // received nothing while looking perfectly healthy. Taking it as an argument is what keeps the empty dep
   // array honest.
   const buildPeerWiring = useCallback(({ bundle, agent, callSkill, contactChannel, pendingPeerRedeems, sharedWithMeStore }) => {
-    const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
-    // A noticeboard post from another member LANDS in the circle store through the items lane (one carry,
-    // web parity); the shell bridges it into pinboard's index + the notification through the same handler.
-    agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
-      // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
-      handleCirclePost: makeHandleCirclePost({ callSkill, publishEvent, profileIdOf: (cid) => agent.profileIdOf?.(cid) ?? 'default' }),
-      self: agent.identity?.pubKey ?? null,
-    }));
-    const getMyPubKey = () =>
-      agent?.identity?.chat?.pubKey ?? agent?.identity?.host?.webid ?? null;
-
     // Reducer-style state updates from inbound envelopes.
     // ensureDmThread mutates threadStateRef synchronously so multiple
     // inbound calls in the same tick see each other.
@@ -488,390 +443,121 @@ export default function ChatScreen({
       });
     };
 
-    // Mobile publishEvent — fans into the eventLog so /logs picks up
-    // inbound notifications (parity with web's publishEventRef →
-    // event-router).
-    const publishEvent = (e) => {
-      if (!e || typeof e !== 'object') return;
-      const evt = {
-        ...e,
-        id: e.id ?? `peer-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        ts: e.ts ?? Date.now(),
-      };
-      try { eventLogRef.current?.append?.(evt); } catch { /* defensive */ }
-    };
-
-    // A DM that arrived DIRECTLY: store it, which is also what hands it to this person's other
-    // devices. Keyed on the PERSON behind the sender (the channel's `contactId`), the key every row opens.
-    // …and the persist decides whether THIS turn brought a hidden contact back (L106): the live push then
-    // carries the mark, so an open thread paints the marker above the bubble (web parity).
-    const landContactTurn = ({ contactId, fromAddr, text, buttons, messageId, replyTo, ts }) => {
-      // keyed by the PERSON the channel resolved behind the sender address (a turn over the pair route comes
-      // from their per-circle address; keyed by that it sat in a thread no row opens — 2026-09-19)
-      contactChannel?.persistInbound?.({ contactId: contactId ?? fromAddr, fromAddr, text, buttons, messageId, replyTo, ts })
-        ?.then?.((r) => { if (r?.returned) pushContactReply({ fromAddr, threadId: fromAddr, messageId, returned: true, markerOnly: true }); })
-        ?.catch?.(() => { /* durability is best-effort; the live push still lands */ });
-    };
-
-    // Delivery honesty (receiver half) — who is ALLOWED to tell us a message arrived. Built here rather
-    // than at the handler so the roster cache lives as long as the peer wiring does. The shell injects
-    // only its two adapters (the log it already owns, the roster skill); the rule is shared with web.
-    const applyIncomingReceipt = deliveryStateMap
-      ? makeReceiptReceiver({
-        deliveryMap: deliveryStateMap,
-        eventLog:    eventLogRef.current,
-        listCircleMembers: async (circleId) => {
-          const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
-          return Array.isArray(r?.members) ? r.members : [];
-        },
-        // Receipt-keyed outbox removal (web parity): their app confirmed the message arrived, so the
-        // copy still held for THEM is obsolete — a presence flush would resend it.
-        removeHeld: (a) => bundle?.agent?.removeHeld?.(a),
-      })
-      : null;
-    // Rebuild the delivery ladder from the ONE log (web parity — the outbox-as-projection): my recent
-    // sends seed maybe-received (restoring the receipt gate's key set after a restart), logged receipts
-    // advance to stored.
-    if (deliveryStateMap && eventLogRef.current) {
-      try { rehydrateDeliveryState({ eventLog: eventLogRef.current, deliveryMap: deliveryStateMap, localActor: 'me' }); }
-      catch { /* the live ladder still works from here on */ }
-    }
 
     // main-thread bubble landing.
     // Mirrors web's `store.getThread('main').addShellMessage`.
     const addMainBubble = (bubble) => appendBubble('main', bubble);
-
-    const handlers = {
-      // Substrate-only handlers — no UI bubble; just persist local
-      // state + publish a notification for /logs.
-      'circle-peer-intro':      makeHandleCirclePeerIntro({ callSkill }),
-      // B2 — inbound per-circle ADDRESS announcements (web parity). Every announcement carries its
-      // own proof, so the sender is not trusted; recording refreshes the sealing binding AND the
-      // authorize snapshot together, or the member would be reachable and then refused.
-      'circle-address-announce': makeCircleAddressAnnouncePeerHandler({
-        agent,
-        // Sealed-circle audience (the custody arc): a proven device address joins the group key's
-        // readers when THIS device holds the circle's producer; no-ops otherwise (web parity).
-        grantSealedAudience: (circleId, address) => circleControlAgentRouter.grantRecipient({
-          groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address),
-        }),
-      }),
-      // a contact-bot's reply in its Contacten DM thread → the shared inbox
-      // the open ContactThreadScreen subscribes to (cross-screen, like the circle
-      // chat wire).  Guarded: the channel is absent in stub-mode boots.
-      // S1 #3 — also an inbound PEER DM (contact-msg): a person's message lands in
-      // the same inbox (the thread screen routes it by sender address).
-      // Persisting is web parity AND the seam the own-devices fan hangs off: `file-share` and
-      // `chat-message` below already store what they deliver, while a plain DM only ever went to the
-      // live inbox — so a reload lost it and the person's other devices never heard of it.
-      ...(contactChannel ? {
-        [contactChannel.subtypes.in]:  contactChannel.replyHandler((reply) => { landContactTurn(reply); pushContactReply(reply); }),
-        [contactChannel.subtypes.out]: contactChannel.messageHandler((msg) => { landContactTurn(msg); pushContactReply(msg); }),
-        // (the own-devices fan's receive half comes from the lane table below)
-      } : {}),
-      'calendar-rsvp':         makeHandleCalendarRsvp({ callSkill, publishEvent }),
-      'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),
-      'group-redeem-request':  makeHandleGroupRedeemRequest({
-        callSkill, sendPeer, publishEvent,
-        // a member admitted into a PAIR circle is its co-admin (the pair roster's rule; web parity)
-        // …and the launcher re-reads its circles: an open invite then shows the count and who came in (an admin's own
-        // admission is a local write, so the membership lane's signal never fires for it)
-        onAdmitted: (a) => { onCirclesChanged?.(); return bundle?.pairRoster?.onAdmitted?.(a); },
-        // a code bound to one person is theirs from any of their addresses (the canonical chat key)
-        identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
-        // …and return OUR per-circle address for the circle being joined, proven the same way the joiner
-        // proves theirs, so per-circle addressing works in both directions from the join on (web parity).
-        circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
-        signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
-        // B2 — hand the circle the newcomer's proven per-circle address, and the newcomer the
-        // circle's (web parity: the identical shared function, only the agent differs).
-        propagateCircleAddresses: ({ circleId, newMemberWebid }) =>
-          propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
-      }),
-      // joiner-side response. Pairs with
-      // `pendingPeerRedeemsRef` populated by the joinGroup wizard's
-      // sendPeerRedeem call.  Mirror of web's handleGroupRedeemResponse
-      // at main.js:743.
-      'group-redeem-response': makeHandleGroupRedeemResponse({
-        // OBJ-2 — the BUNDLE's shared map (so a v2-launcher join correlates here too); ref is the fallback.
-        pendingMap: pendingPeerRedeems ?? pendingPeerRedeemsRef.current,
-      }),
-      // embed-card bubbles (time-card +
-      // file-card).  Calendar invites land as time-card with RSVP
-      // buttons; file-shares as file-card with [Download] + [Save].
-      'calendar-invite':       makeHandleCalendarInvite({
-        callSkill, addMainBubble, publishEvent,
-      }),
-      // A peer-wire file lands in THAT SENDER's contact thread (decided 2026-09-02): persisted through
-      // the shared channel (the thread is the received copy's durable home) and pushed live to an open
-      // ContactThreadScreen through the same inbox every DM reply rides. It used to go to addMainBubble
-      // → this screen's main thread — which v2 mounts but permanently hides.
-      'file-share':            makeHandleFileShare({
-        deliverToThread: ({ contactId, fromAddr, file, messageId, ts, sealed }) => {
-          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file, ...(sealed ? { sealed } : {}) })
-            ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
-          pushContactReply({ fromAddr, threadId: contactId, text: '', file, ...(sealed ? { sealed } : {}) });
+    // THE INBOUND WIRING: the handler map every shell shares (`buildInboundWiring`, src/v2/inboundWiring.js), and the
+    // phone's composition around it (`buildPhoneInboundWiring`, src/core/phoneInboundWiring.js — the same function the
+    // Node harness boots, so a test of the phone's receive path walks this wiring, not a copy). This screen hands in
+    // only its paint: the main-thread bubble and how it asks the catch-up's consent question (a platform dialog here,
+    // a circle bubble on web). The default handler below (the main-thread bubble) stays the screen's.
+    const { handlers, lanes } = buildPhoneInboundWiring({
+      bundle, agent, callSkill, contactChannel,
+      // the bundle's shared redeem map, so a join made from the launcher correlates here too; the ref is the fallback
+      pendingRedeems: pendingPeerRedeems ?? pendingPeerRedeemsRef.current,
+      sharedWithMeStore: sharedWithMeStore ?? null,
+      eventLog: eventLogRef.current, deliveryStateMap, chatStoredReceipt, onCirclesChanged,
+      recipe: circleRecipePendingStore ? { pendingStore: circleRecipePendingStore, dedup: circleRecipeDedup } : null,
+      rules: circleRulesPendingStore ? { pendingStore: circleRulesPendingStore, dedup: circleRulesDedup } : null,
+      circlePolicyLane,
+      paint: {
+        addMainBubble,
+        // Above the auto-allow ceiling the person gets the real question, as a platform dialog here.
+        chatCatchUpOffer: ({ count, approxBytes, allow }) => {
+          const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
+          Alert.alert(
+            t('circle.chat.catchup_allow'),
+            t('circle.chat.catchup_offer', { count, size: mb }),
+            [
+              { text: t('circle.confirm.cancel'), style: 'cancel' },
+              { text: t('circle.chat.catchup_allow'), onPress: () => { Promise.resolve(allow()).catch(() => {}); } },
+            ],
+          );
         },
-        identityOf: (addr) => agent?.identityOfAddress?.(addr) ?? addr,
-        // A file sealed to the person opens with my key for the version it names (the text turn's seal).
-        openFor: (sealed, fromAddr) => agent?.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
-        // A first file makes the sender a contact row (the graph otherwise only learns at send time).
-        notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
-        publishEvent,
-      }),
-      // A peer answered one of OUR noticeboard posts → the reply lands in THAT REPLIER's contact thread
-      // (same channel + inbox as a file), marked with the post it answers. web≡mobile: the SAME shared
-      // handler circleApp.js registers. It used to fall through to the default handler → the hidden main thread.
-      'chat-message':          makeHandleThreadedChat({
-        deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) => {
-          contactChannel?.persistInbound?.({ contactId, fromAddr, text, messageId, ts, replyTo })
-            ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
-          pushContactReply({ fromAddr, threadId: contactId, text, replyTo });
-        },
-        notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
-        identityOf: (addr) => agent?.identityOfAddress?.(addr) ?? addr,
-        noteAnswer: (addr, requestId) => agent?.noteAnswer?.(addr, requestId),
-      }),
-      // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us; persist it into the
-      // per-user "shared with me" store (the launcher's Mij inbox lists + opens it with this device's own
-      // network-derived sealing key). web≡mobile: SAME handler + store web registers in circleApp.js. Guarded
-      // — with no store on the bundle (older boot) the subtype simply isn't routed.
-      ...(sharedWithMeStore
-        ? { 'shared-copy': makeHandleSharedCopy({ store: sharedWithMeStore, publishEvent }) }
-        : {}),
-      // (the legacy plain-envelope receive is gone — every live chat message arrives as a SIGNED
-      // statement and verifies at the chat rail; the shared inbox remains the migration gate.)
-      // Delivery honesty — the peer's app stored our message. The shared receiver validates (rebuilt,
-      // `from` off the wire), resolves the message's circle off the log, and only lets someone the
-      // circle's ROSTER knows advance it; the map's monotonic rule then orders it. Absent map ⇒ the
-      // handler is a no-op, as before. Fire-and-forget: reading the roster is a skill call and the peer
-      // router does not await its handlers, so a slow read delays the bubble, never the receive loop.
-      'delivery-receipt': (from, payload) => { bundle?.nearbyRoom?.onReceipt?.(from, payload); applyIncomingReceipt?.(payload, from); },
-      // γ-next.recipe — circle screen recipe broadcast.  Caches the
-      // inbound recipe per-circle; the editor pulls on next open and
-      // passes via γ.3's `incomingRecipe` opt.  No bubble UI.
-      ...(circleRecipePendingStore ? {
-        'circle-recipe-broadcast': makeCircleRecipePeerHandler({
-          pendingStore: circleRecipePendingStore,
-          dedup:        circleRecipeDedup,
-        }),
-      } : {}),
-      // γ-next.rules — circle rules document broadcast.  Caches the
-      // inbound rules doc per-circle; the rules editor pulls on next
-      // open and passes via γ.4's `incomingRules` opt.  No bubble UI.
-      ...(circleRulesPendingStore ? {
-        'circle-rules-broadcast': makeCircleRulesPeerHandler({
-          pendingStore: circleRulesPendingStore,
-          dedup:        circleRulesDedup,
-        }),
-      } : {}),
-      // Wave C tail A — ingest fanned governance/report events into the one log so a
-      // vote/report raised on another device replicates here (deduped by the stable id).
-      // notify: an in-app nudge when a decision OPENS (governanceWakeHint gates to propose).
-      // The receive-side governance RAIL (verify before a fanned statement lands) + the pull-all
-      // catch-up pair (the offline-device half of the reliable tier). Built once per router build;
-      // the reconnect kick fires once per app launch — after that the LIVE fan keeps the log current.
-      ...(() => {
-        // THE LANE TABLE, built once for every shell (`buildCircleLanes`): the five signed lanes with
-        // their catch-ups, plus the personal ones — grants, the roster seed, and the turns this person's
-        // own devices hand each other. This shell passes only its own reactions: the delivery receipt,
-        // where the key projection lives, and how it asks the catch-up's consent question (a platform
-        // dialog here, a circle bubble on web).
-        const govRail = bundle?.agent?.circleIdentityFor
-          ? makeGovernanceRail({ eventLog: eventLogRef.current, circleIdentityFor: bundle.agent.circleIdentityFor, myRef: '', callSkill: bundle.callSkill })
-          : null;
-        // the policy lane folds with this rail — a save brings the lane's head up to date before it counts past it
-        if (govRail) circlePolicyLane?.useRail(govRail);
-        // Any governance change (the live fan, or a catch-up batch) may carry a rules-update statement —
-        // fold it into the local rules head; the pre-scan is cheap and no-ops for vote churn.
-        const govChanged = (cid) => {
-          if (govRail) applyRulesUpdates({ rail: govRail, callSkill: bundle.callSkill, circleId: cid }).catch(() => {});
-          // …and the circle's policy, the same way (a joiner catches the founder's up here)
-          if (govRail) circlePolicyLane?.apply(cid, govRail).catch(() => {});
-        };
-        const lanes = buildCircleLanes({
-          agent: bundle?.agent,
-          sendToPeer: (addr, payload, opts) => bundle?.agent?.sendPeerMessage?.(addr, payload, opts),
-          govRail,
-          eventLog: eventLogRef.current,
-          resolveRef: circleResolveRef,
-          podReadSince: circlePodReadSince,
-          dataMoveFor: circleSendDataMove,
-          // The durable-head serve: the preserved rules-update statement still reaches a member who was
-          // offline past the lane's audit window.
-          extraGovStatementsFor: async (cid) => [
-            ...await preservedRulesStatementsFor({ callSkill: bundle.callSkill, circleId: cid }),
-            ...(circlePolicyLane ? await circlePolicyLane.preserved(cid) : []),
-          ],
-          on: {
-            govChange: govChanged,
-            // a landed membership change may be this person's own leave, signed on the main device: the launcher re-reads
-            // its circles (web parity — without it the left circle's tile stays until the next focus)
-            membershipChange: () => { onCirclesChanged?.(); },
-            keyChange: (cid) => refreshCircleKeyEventsFromLane(bundle?.agent?.keyRail, cid).catch(() => {}),
-            chatLanded: ({ msgId, circleId: cid, fromPeerAddr, source }) => {
-              try { chatStoredReceipt?.({ msgId, circleId: cid, fromPeerAddr, source }); }
-              catch { /* the receipt is best-effort; the message landed either way */ }
-            },
-            // Above the auto-allow ceiling the person gets the real question, as a platform dialog here.
-            chatCatchUpOffer: ({ count, approxBytes, allow }) => {
-              const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
-              Alert.alert(
-                t('circle.chat.catchup_allow'),
-                t('circle.chat.catchup_offer', { count, size: mb }),
-                [
-                  { text: t('circle.confirm.cancel'), style: 'cancel' },
-                  { text: t('circle.chat.catchup_allow'), onPress: () => { Promise.resolve(allow()).catch(() => {}); } },
-                ],
-              );
-            },
-            // A turn one of MY OWN devices took delivery of: the channel decides which persist path it
-            // takes and says which side of the conversation it is, so an open thread paints it right.
-            ownDeviceTurn: async (wire) => {
-              const landed = await contactChannel.applyOwnDeviceTurn(wire);
-              if (landed.deduped) return;
-              pushContactReply({
-                fromAddr: landed.fromAddr ?? landed.peerAddr, threadId: landed.contactId,
-                text: landed.text, buttons: landed.buttons, replyTo: landed.replyTo,
-                messageId: landed.messageId, file: landed.file, origin: landed.origin,
-                ...(landed.returned ? { returned: true } : {}),
-              });
-            },
-          },
-        });
-        const { gov: govCatchUp, membership: memCatchUp, key: keyCatchUp,
-                task: itemsCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
-        // Hand the bundle the catch-ups, so a join made from any screen pulls the circle's lanes (`onCircleJoined`).
-        try { if (bundle) bundle.laneCatchUps = lanes.catchUps; } catch { /* a bundle without the slot */ }
-        const grantsCatchUp = bundle?.agent?.grantsCatchUp ?? null;
+      },
+    });
+    const { gov: govCatchUp, membership: memCatchUp, key: keyCatchUp,
+            task: itemsCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
 
-        // The reconnect kicks — once per app launch each; after that the LIVE fan keeps the log current.
-        if (govCatchUp && !globalThis.__onderlingGovCatchUpKicked) {
-          globalThis.__onderlingGovCatchUpKicked = true;
-          setTimeout(() => { govCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2000);
-        }
-        if (memCatchUp && !globalThis.__onderlingMemCatchUpKicked) {
-          globalThis.__onderlingMemCatchUpKicked = true;
-          setTimeout(() => { memCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2500);
-        }
-        // The grants lane: pull my own devices' grant/revoke statements on connect, so a revoke made
-        // elsewhere binds at this door before a stale view is served.
-        if (grantsCatchUp && !globalThis.__onderlingGrantsCatchUpKicked) {
-          globalThis.__onderlingGrantsCatchUpKicked = true;
-          setTimeout(() => { grantsCatchUp.requestFromSiblings().catch(() => {}); }, 2500);
-        }
-        // Who my other devices know (bindings + contact rows) — web parity with the kick above.
-        if (bundle?.agent?.knownPeersSync && !globalThis.__onderlingKnownPeersKicked) {
-          globalThis.__onderlingKnownPeersKicked = true;
-          setTimeout(() => { bundle.agent.knownPeersSync.requestFromSiblings().catch(() => {}); }, 2500);
-        }
-        // The person key a ceremony rotated on another device while this one was off — web parity.
-        if (bundle?.agent?.personKeySync && !globalThis.__onderlingPersonKeyKicked) {
-          globalThis.__onderlingPersonKeyKicked = true;
-          setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
-        }
-        // Each profile's facts (properties + disclosure) as the devices holding the same self have them — web parity.
-        if (bundle?.agent?.profileFactsSync && !globalThis.__onderlingProfileFactsKicked) {
-          globalThis.__onderlingProfileFactsKicked = true;
-          setTimeout(() => { bundle.agent.profileFactsSync.requestFromSiblings().catch(() => {}); }, 2500);
-        }
-        // The person's own store (their own appointments, their planned rows) as their other devices hold it — web parity.
-        if (bundle?.agent?.ownStoreSync && !globalThis.__onderlingOwnStoreKicked) {
-          globalThis.__onderlingOwnStoreKicked = true;
-          setTimeout(() => { bundle.agent.ownStoreSync.requestFromSiblings().catch(() => {}); }, 2500);
-        }
-        // …and which of the person's devices is primary for direct messages (sync-policy §12), web parity.
-        if (bundle?.agent?.primaryDevice && !globalThis.__onderlingPrimaryDeviceKicked) {
-          globalThis.__onderlingPrimaryDeviceKicked = true;
-          setTimeout(() => { bundle.agent.primaryDevice.requestFromSiblings().catch(() => {}); }, 2600);
-        }
-        // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
-        // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
-        // The SAME consume runs after a recovery-file import (the agent calls it: the file's peers are
-        // stashed as an offer), so a restored phone hears its circles again on this launch.
-        if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {
-          globalThis.__onderlingEnrollOfferConsumed = true;
-          const enrolDeps = {
-            agent: bundle.agent,
-            callSkill: bundle.callSkill,
-            sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
-            storage: AsyncStorage,
-            registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
-            // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
-            // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
-            contentPulls: (circleId, siblingAddress) => Promise.allSettled([
-              itemsCatchUp?.requestFrom(siblingAddress, circleId),
-              chatCatchUp?.requestFrom(siblingAddress, circleId),
-            ]),
-          };
-          // A circle another device of the person founded or joined: the same per-circle step, run when the
-          // sibling's carry lands — and asked for on connect, for what happened while the app was closed (web parity).
-          bundle.agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
-          // a circle carried in from a sibling (joined, left, or its put-away mark): the launcher's list is stale (web parity)
-          bundle.agent.circleFollowSync?.onLanded?.(() => { onCirclesChanged?.(); });
-          setTimeout(() => { bundle.agent.circleFollowSync?.requestFromSiblings().catch(() => {}); }, 2700);
-          bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
-            if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
-            if (r?.consumed) onCirclesChanged?.();   // the offer's circles belong on the launcher now (web parity)
-            return r;
-          }).catch(() => { /* retried next launch — the stash only clears on full success */ });
-          setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);
-        }
-        // The build's feedback contact is OFFERED at the feedback door, never added here (web parity): a boot adds
-        // nobody to the book.
-        if (itemsCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
-          globalThis.__onderlingTaskCatchUpKicked = true;
-          setTimeout(() => { itemsCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);
-        }
-        // Pod-only circles never fan — read their statement rows back on the same kick.
-        if (podChatCatchUp && !globalThis.__onderlingPodChatCatchUpKicked) {
-          globalThis.__onderlingPodChatCatchUpKicked = true;
-          setTimeout(async () => {
-            try {
-              const r = await bundle.callSkill('pinboard', 'listMyCircles', {});
-              const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
-              await podChatCatchUp.catchUpAll(ids);
-            } catch { /* best-effort — the next launch retries */ }
-          }, 4000);
-        }
-        if (chatCatchUp && !globalThis.__onderlingChatCatchUpKicked) {
-          globalThis.__onderlingChatCatchUpKicked = true;
-          setTimeout(() => { chatCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
-        }
-        if (keyCatchUp && !globalThis.__onderlingKeyCatchUpKicked) {
-          globalThis.__onderlingKeyCatchUpKicked = true;
-          setTimeout(() => { keyCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
-        }
-        // Background-fetch: when the OS grants a background slot, run the SAME catch-ups the boot kicks
-        // run — pod chat read-back + frontier replay — so messages land while the app is backgrounded.
-        if ((podChatCatchUp || chatCatchUp) && !globalThis.__onderlingBgSyncWired) {
-          globalThis.__onderlingBgSyncWired = true;
-          wireBackgroundSync({
-            runOnce: async () => {
-              try {
-                const r = await bundle.callSkill('pinboard', 'listMyCircles', {});
-                const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
-                if (podChatCatchUp) await podChatCatchUp.catchUpAll(ids);
-                if (chatCatchUp) await chatCatchUp.requestAll({ callSkill: bundle.callSkill });
-              } catch { /* a background slot is best-effort; the next slot retries */ }
-            },
-          }).catch(() => { /* wiring is best-effort — foreground sync is unaffected */ });
-        }
-        return {
-          ...lanes.handlers,
-          // The Nearby room's inbound side — asks, answers, cards, room chat, broadcast invites.
-          ...(bundle?.nearbyRoom?.handlers ?? {}),
-          'circle-governance-broadcast': makeCircleGovernancePeerHandler({
-            eventLog: eventLogRef.current,
-            rail: govRail,
-            onChange: govChanged,
-            onLanded: lanes.landedCarrier?.governance,   // a landed decision reaches my other devices (the one carry)
-            // "A decision opened" is RENDERED from the statement on the log (governanceNotices.js via
-            // chatRows) — the appended gov-notif nudge is retired, web parity.
-          }),
-        };
-      })(),
-    };
+    // THE START QUEUE (shared, startQueue.js) — once per app launch; after that the LIVE fan keeps the log current. The
+    // circle on screen first, then my own devices (grants first), then every other circle, one step at a time: every
+    // lane's catch-up and every own-device ask, in one order (web and the box run the same queue).
+    if (!globalThis.__onderlingStartQueueRun) {
+      globalThis.__onderlingStartQueueRun = true;
+      setTimeout(() => {
+        runStartQueue({
+          catchUps: { membership: memCatchUp, gov: govCatchUp, key: keyCatchUp, task: itemsCatchUp, chat: chatCatchUp },
+          siblings: startQueueSiblings(bundle?.agent),
+          callSkill: bundle.callSkill,
+          firstCircle: () => getActiveCircle(),
+          readFirst: (cid) => bundle?.agent?.readCircleRosterFirst?.(cid),
+        }).catch(() => {});
+      }, 2000);
+    }
+    // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
+    // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
+    // The SAME consume runs after a recovery-file import (the agent calls it: the file's peers are
+    // stashed as an offer), so a restored phone hears its circles again on this launch.
+    if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {
+      globalThis.__onderlingEnrollOfferConsumed = true;
+      const enrolDeps = {
+        // a circle that arrives without its policy: its posture not known until the policy lands (web parity)
+        markPolicyPending: bundle.markPolicyPending ?? null,
+        agent: bundle.agent,
+        callSkill: bundle.callSkill,
+        sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
+        storage: AsyncStorage,
+        registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
+        // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
+        // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
+        contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+          itemsCatchUp?.requestFrom(siblingAddress, circleId),
+          chatCatchUp?.requestFrom(siblingAddress, circleId),
+        ]),
+      };
+      // A circle another device of the person founded or joined: the same per-circle step, run when the
+      // sibling's carry lands — and asked for on connect, for what happened while the app was closed (web parity).
+      bundle.agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+      // a circle carried in from a sibling (joined, left, or its put-away mark): the launcher's list is stale (web parity)
+      bundle.agent.circleFollowSync?.onLanded?.(() => { onCirclesChanged?.(); });
+      setTimeout(() => { bundle.agent.circleFollowSync?.requestFromSiblings().catch(() => {}); }, 2700);
+      bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
+        if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+        if (r?.consumed) onCirclesChanged?.();   // the offer's circles belong on the launcher now (web parity)
+        return r;
+      }).catch(() => { /* retried next launch — the stash only clears on full success */ });
+      setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);
+    }
+    // The build's feedback contact is OFFERED at the feedback door, never added here (web parity): a boot adds
+    // nobody to the book.
+    // Pod-only circles never fan — read their statement rows back on the same kick.
+    if (podChatCatchUp && !globalThis.__onderlingPodChatCatchUpKicked) {
+      globalThis.__onderlingPodChatCatchUpKicked = true;
+      setTimeout(async () => {
+        try {
+          await podChatCatchUp.catchUpAll(await myCircleIds(bundle.callSkill));
+        } catch { /* best-effort — the next launch retries */ }
+      }, 4000);
+    }
+    // …and when a circle is opened and when the app comes back to the front (web parity; no timer)
+    if (podChatCatchUp && !globalThis.__onderlingPodReadBack) {
+      globalThis.__onderlingPodReadBack = composePhonePodReadBack({ podChatCatchUp, callSkill: bundle.callSkill });
+      AppState.addEventListener?.('change', (st) => { if (st === 'active') globalThis.__onderlingPodReadBack?.onForeground().catch(() => {}); });
+    }
+    // Background-fetch: when the OS grants a background slot, run the SAME catch-ups the boot kicks
+    // run — pod chat read-back + frontier replay — so messages land while the app is backgrounded.
+    if ((podChatCatchUp || chatCatchUp) && !globalThis.__onderlingBgSyncWired) {
+      globalThis.__onderlingBgSyncWired = true;
+      wireBackgroundSync({
+        runOnce: async () => {
+          try {
+            if (podChatCatchUp) await podChatCatchUp.catchUpAll(await myCircleIds(bundle.callSkill));
+            if (chatCatchUp) await chatCatchUp.requestAll({ callSkill: bundle.callSkill });
+          } catch { /* a background slot is best-effort; the next slot retries */ }
+        },
+      }).catch(() => { /* wiring is best-effort — foreground sync is unaffected */ });
+    }
     const defaultHandler = makeHandleChatMessage({
       ensureDmThread:    handleDmThreadOpen,
       appendBubble,
@@ -941,7 +627,7 @@ export default function ChatScreen({
         args:      dispatch.args,
       });
       let rendered;
-      let replyForRefresh = null;   // E3 — captured reply → itemRef for panel refresh
+      let replyForRefresh = null;   // captured reply → itemRef for panel refresh
       if (dispatch.kind === 'ready') {
         // F1 (5.3) — bind item-creating dispatches to the open circle
         // so a task / post created while a circle is active lands in
@@ -1019,7 +705,7 @@ export default function ChatScreen({
           });
         }
       } else if (dispatch.kind === 'bulk') {
-        // E2 — `/done all`: resolve candidate ids from the freshest
+        // `/done all`: resolve candidate ids from the freshest
         // list in this thread (prefer the same app), fan-out via
         // executeBulkDispatch, render the summary.  Mobile has no
         // filter-router, so cross-thread propagation is the action
@@ -1072,7 +758,7 @@ export default function ChatScreen({
           .reduce((n, it) => n + (it.buttons?.length ?? 0), 0),
       });
 
-      // E3 — store the source on every refreshable-shape reply (lists +
+      // store the source on every refreshable-shape reply (lists +
       // record / mini-page / embed panels) so it can be re-fetched.  The
       // verb gate at refresh time still protects against re-running a
       // mutation-sourced panel.
@@ -1094,7 +780,7 @@ export default function ChatScreen({
         return next;
       });
 
-      // E3 — when this dispatch was a MUTATION that changed an item,
+      // when this dispatch was a MUTATION that changed an item,
       // auto-refresh any open record/mini-page/embed panel in OTHER
       // threads showing that item (mirrors web's onPanelStale path,
       // which excludes the dispatching thread).  Fire-and-forget.
@@ -1717,26 +1403,10 @@ export default function ChatScreen({
             callSkill={bootState.kind === 'ready' ? bootState.bundle.callSkill : undefined}
             t={t}
             theme={theme}
-            // joinGroupWizard's cross-instance
-            // fallback (membershipCode-with-adminPeerAddr).  Constructed
-            // inline so it closes over the live agent + pendingMap.
-            // OBJ-2 — the BUNDLE's shared sender (same pending-map the response handler resolves against,
-            // and the same one the v2 launcher uses), so classic + v2 joins both correlate.
-            sendPeerRedeem={bootState.kind === 'ready' ? bootState.bundle.sendPeerRedeem : undefined}
-            // J-CP1 — be on the circle's endpoint BEFORE the redeem (same seams the v2 launcher passes).
-            // This host is where a TAPPED INVITE LINK lands, and it is precisely the host that has NOT been
-            // told which relay the invite names: without these two the redeem goes out over whatever
-            // transport this device happens to have, waits out a handshake timeout, and the join fails or
-            // crawls. Only consumed by JoinGroupWizardModal; other wizards ignore them.
-            dialEndpoint={(url) => bootState.kind === 'ready'
-              ? bootState.bundle.reconnectPeer?.({ relayUrl: url })
-              : undefined}
-            activeEndpointUrl={() => bootState.kind === 'ready'
-              ? (bootState.bundle.activeRelayUrl?.() ?? null)
-              : null}
-            // which persona this device holds a circle as (the second-persona warning); inert here until this host
-            // passes `circles` too, like the launcher does
-            profileIdOf={(cid) => (bootState.kind === 'ready' ? (bootState.bundle.agent?.profileIdOf?.(cid) ?? null) : null)}
+            // the seams every join needs (the redeem, the circle's address and link proof, the endpoint dial): the SAME set
+            // the launcher's join gets (agentBundle `joinWizardSeams`). This host is where a TAPPED INVITE LINK lands; it
+            // once passed no address seam, so a join from a link wrote no membership record. Other wizards ignore them.
+            {...(bootState.kind === 'ready' ? (bootState.bundle.joinWizardSeams ?? {}) : {})}
             // Post-join reachability (G13). Only consumed by JoinGroupWizardModal; other wizards ignore it.
             //
             // This host is where a TAPPED INVITE LINK lands, and it passed neither of the two things a join
@@ -1761,7 +1431,7 @@ export default function ChatScreen({
             getMyPeerAddr={() => bootState.kind === 'ready'
               ? (bootState.bundle.agent?.peer?.address ?? null)
               : null}
-            // N1+E8 — persist the create wizard's chosen policy (incl. the
+            // persist the create wizard's chosen policy (incl. the
             // neighbourhood chat-off default) onto the new circle, reusing the same
             // AsyncStorage policy store the launcher reads.  Only consumed
             // by CreateGroupWizardModal; other wizards ignore it.
@@ -1842,7 +1512,7 @@ export default function ChatScreen({
         t={t}
       />
 
-      {/* E5 — record/mini-page "⤢ Open in full" detail modal. */}
+      {/* record/mini-page "⤢ Open in full" detail modal. */}
       <RecordDetailModal
         visible={!!expandedRecord}
         record={expandedRecord}
@@ -1854,7 +1524,6 @@ export default function ChatScreen({
           classifies the scanned text and routes by kind:
           - 'contact' → callSkill('pinboard','addContactFromQr',{payload})
           - 'invite'  → setPendingWizard({opId:'joinGroup', args:{invite:payload}}) */}
-      {contactLens.sheet}
       <QrScannerModal
         visible={qrScannerOpen}
         onClose={() => setQrScannerOpen(false)}
@@ -1884,26 +1553,22 @@ export default function ChatScreen({
     onQrScanResult(res);
   }
 
+  // What a link says to the person, from this HIDDEN shell (App.js mounts it out of sight for its peer wiring): a native
+  // alert, which shows whatever view the shell sits in. Its own chat bubble nobody would see (an enrol link was
+  // stashed in silence, an unreadable one said nothing).
+  const sayToPerson = (text) => { try { Alert.alert('', text); } catch { /* no window yet */ } };
+
   async function onQrScanResult(res) {
     setQrScannerOpen(false);
     if (!res || res.kind === 'unknown') {
-      appendBotText(t('chat.scan_unknown'));
+      sayToPerson(t('chat.scan_unknown'));
       return;
     }
     const payload = res.payload;
     if (res.kind === 'contact') {
-      // Call the pinboard substrate skill that decodes the URL + adds the
-      // contact in one round-trip.  Then synthesise a confirmation bubble.
-      try {
-        // …after the sheet (L125): what they will see of you, prefilled; closing it adds nothing. This path recorded
-        // no persona at all before — every add path now records one.
-        const reply = bootState.kind === 'ready' ? await contactLens.addWithSheet(payload) : null;
-        if (reply === null) return;
-        if (reply?.error) appendBotText(t('chat.scan_failed', { error: reply.error }));
-        else              appendBotText(t('chat.scan_contact_added'));
-      } catch (err) {
-        appendBotText(t('chat.scan_failed', { error: err?.message ?? String(err) }));
-      }
+      // the launcher, which the person sees, opens the add sheet for it (this shell's own sheet would not show)
+      if (typeof onContactLink === 'function') onContactLink(payload);
+      else sayToPerson(t('chat.scan_failed', { error: 'no screen to add the contact on' }));
       return;
     }
     if (res.kind === 'enroll') {
@@ -1913,11 +1578,11 @@ export default function ChatScreen({
       // out of its own address bar, and then opens the flow; this shell says where to finish it,
       // because the flow lives on another screen (see docs/conventions/web-mobile-exceptions.md).
       const stashed = await stashEnrollOffer(AsyncStorage, payload).catch(() => ({ ok: false }));
-      appendBotText(stashed.ok ? t('chat.scan_enroll_stashed') : t('chat.scan_enroll_failed'));
+      sayToPerson(stashed.ok ? t('chat.scan_enroll_stashed') : t('chat.scan_enroll_failed'));
       return;
     }
     if (res.kind === 'invite') {
-      appendBotText(t('chat.scan_invite_open'));
+      // the join wizard is a modal: it shows over whatever is on screen, so the invite needs no notice of its own
       // opId MUST match the WIZARD_REGISTRY key ('joinGroupWizard',
       // not 'joinGroup') — wizardModalFor() looks it up by exact key,
       // and a mismatch silently renders nothing (the bug: /scan-qr of
@@ -1926,7 +1591,7 @@ export default function ChatScreen({
       setPendingWizard({ opId: 'joinGroupWizard', args: { invite: payload } });
       return;
     }
-    appendBotText(t('chat.scan_unknown'));
+    sayToPerson(t('chat.scan_unknown'));
   }
 
   function appendBotText(text) {
@@ -1945,10 +1610,10 @@ export default function ChatScreen({
 
 /* ── message bubble ─────────────────────────────────────────────── */
 
-// E1 — notification severity → left-accent colour.
+// notification severity → left-accent colour.
 const NOTIFICATION_ACCENTS = { info: '#4a78b0', success: '#3f8f5b', warning: '#b08a2e', error: '#b04a4a' };
 
-// E1 — human-readable byte size (B / KB / MB / GB).
+// human-readable byte size (B / KB / MB / GB).
 function formatFileSize(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return '';
   if (bytes < 1024) return `${bytes} B`;
@@ -2065,7 +1730,7 @@ function MessageBubble({ msg, onButtonTap, onFollowUpTap, onQuickReplyTap, onFor
     const recFollowUps = Array.isArray(r.followUps) ? r.followUps : null;
     return (
       <View style={[styles.bubble, styles.bubbleBot, styles.bubbleList]} testID={`bubble-bot-record-${msg.id}`}>
-        {/* E5 — header row: title + "⤢ Open in full" detail affordance. */}
+        {/* header row: title + "⤢ Open in full" detail affordance. */}
         {(r.title || recordCanExpand(r)) && (
           <View style={styles.recordHeaderRow}>
             {r.title ? <Text style={[styles.briefSectionLabel, styles.recordHeaderTitle]}>{r.title}</Text> : <View style={{ flex: 1 }} />}
@@ -2484,7 +2149,7 @@ const styles = StyleSheet.create({
   bubblePending:    { fontStyle: 'italic', color: '#666' },
   bubbleErrorText:  { fontSize: 14, color: '#b00' },
   bubbleList:       { paddingVertical: 6 },
-  // E1 — notification + file bubbles.
+  // notification + file bubbles.
   bubbleNotification: { borderLeftWidth: 4, paddingLeft: 10 },
   notificationTitle:  { fontSize: 14, fontWeight: '700', color: '#333', marginBottom: 2 },
   bubbleFile:         { borderWidth: 1, borderColor: '#d9d9d9' },

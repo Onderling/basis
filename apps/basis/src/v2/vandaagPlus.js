@@ -10,6 +10,10 @@ import { nounWord } from './nounNames.js';
 import { attachEntriesFor } from './attachEntries.js';
 import { catalogueManifests } from './manifestSources.js';
 import { renderGate } from '@onderling/app-manifest';
+import { listsGateRules } from './circleGate.js';
+import { GATE_WORDS, helpWords, helpQuestionOpeners } from './gateWords.js';
+import { answerHelp } from './help/helpAnswer.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * The acts the "+" offers: the composed manifests' attach entries declared for the OWN scope (`surfaces.attach.scopes`,
@@ -236,36 +240,96 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
 }
 
 /**
- * What the "+" line comes to — the sheet talks to the person's OWN agent only:
+ * What the "+" line comes to:
  *   - `{ kind: 'own', actId, values }` — one of the sheet's own acts (`plusRead`), made on the own scope;
- *   - `{ kind: 'referral', to: [{ circleId, name }] }` — the line names something that lives in a circle: the circles
- *     whose own manifests' gate reads it ("that is for <circle> → open"). A referral carries NO op: the sheet opens
- *     the circle, it never acts there (the own scope cannot write a circle — this keeps the sheet from trying);
+ *   - `{ kind: 'circle', command, to, circleId, atOnce }` — the line names something that lives in a circle. Each circle
+ *     reads it with the SAME phrase table the box reads (`listsGateRules` over that circle's lists), then its own
+ *     manifests' gate, offering only what works there. `atOnce` when the target is unambiguous: exactly one circle reads
+ *     it, or the line names one of those that do (`circleId` set); otherwise a card with the circles in `to` to choose
+ *     from (`circleId` null). The shell runs `command` as the person through `callSkill`, so the circle's own doors
+ *     and governance apply: the "+" has no authority the circle's own composer lacks;
  *   - null — no reading.
  * @param {string} line
- * @param {{ circles?: Array<{id: string, name?: string, manifestsByOrigin: object, availability?: {of: Function}|null}>, acts?: object[], manifestsByOrigin?: object, now?: number }} [o]
+ * @param {{ circles?: Array<{id: string, name?: string, lists?: object[], manifestsByOrigin: object, availability?: {of: Function}|null}>, acts?: object[], manifestsByOrigin?: object, now?: number }} [o]
  */
-export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
+export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifestsByOrigin, now, lang = null } = {}) {
+  // "help", "?": what the "+" can do (read first: the help cards' matcher alone answers "help" with the wrong card)
+  const asked = word(line).toLowerCase();
+  if (helpWords().has(asked.replace(/[!.?]+$/u, '') || asked)) return { kind: 'help', acts: acts.map((a) => a.id) };
   const own = plusRead(line, { acts, manifestsByOrigin, now });
   if (own) return { kind: 'own', ...own };
   const text = word(line);
   if (!text) return null;
-  const to = [];
-  for (const c of Array.isArray(circles) ? circles : []) {
-    const ms = Object.values(c?.manifestsByOrigin ?? {}).filter(Boolean);
-    const av = c?.availability ?? null;
-    const offers = new Set(attachEntriesFor({ manifestsByOrigin: c?.manifestsByOrigin ?? {}, availability: av }).map((e) => `${e.appOrigin}.${e.opId}`));
-    // only what works there: an op the circle's availability hides is not offered (the same three-rung answer the + menu reads)
-    const shown = (opId) => !av || av.of(opId).state !== 'hidden';
-    const reads = renderGate(ms).some((rule) => {
-      let cmd = null;
-      try { cmd = rule.command(text); } catch { cmd = null; }
-      // read by this circle's own phrasing, for an op this circle offers (or names, when the gate says its app)
-      return !!cmd && shown(cmd.opId) && (offers.has(`${cmd.appOrigin}.${cmd.opId}`) || ms.some((m) => m.app === cmd.appOrigin && (m.operations ?? []).some((o) => o.id === cmd.opId)));
-    });
-    if (reads) to.push({ circleId: c.id, name: c.name ?? '' });
+  const all = Array.isArray(circles) ? circles : [];
+  // "<circle>: …" names the circle: the rest is read there only
+  const m = /^([^:]{1,60}):\s*(.+)$/u.exec(text);
+  const named = m ? all.filter((c) => c?.name && String(c.name).trim().toLowerCase() === m[1].trim().toLowerCase()) : [];
+  const [scope, rest] = named.length === 1 ? [named, m[2]] : [all, text];
+  // a line that names a list some circle HOLDS is about that list: those circles read it, and a manifest's looser
+  // phrasing elsewhere does not count (the tasks gate reads "zet melk op …" as a new task anywhere)
+  const read = scope.map((c) => ({ circle: c, ...circleReading(rest, c) })).filter((x) => x.command);
+  const byList = read.filter((x) => x.fromLists);
+  const readers = byList.length ? byList : read;
+  if (!readers.length) {
+    // nothing to do here: a line that ASKS how something works ("hoe …", gate words `_help.questions`) is looked up in the
+    // help cards (before any model reads it); only such a line: the cards' matcher alone hits ordinary lines on a keyword
+    const asks = helpQuestionOpeners().some((o) => text.toLowerCase().startsWith(o));
+    const card = asks ? answerHelp(text, { lang: lang ?? undefined }) : null;
+    return card ? { kind: 'help', card: { cardId: card.source?.cardId ?? null, text: card.text } } : null;
   }
-  return to.length ? { kind: 'referral', to } : null;
+  const to = readers.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }));
+  const pick = readers.length === 1 ? readers[0] : null;
+  const command = (pick ?? readers[0]).command;
+  return {
+    kind: 'circle', atOnce: !!pick, circleId: pick ? pick.circle.id : null, to,
+    command: pick ? { ...command, args: { ...command.args, circleId: pick.circle.id } } : command,
+  };
+}
+
+/**
+ * What the "+" answers in its thread to a help reading (`plusLineOutcome` kind 'help'): a card's own text, or what the "+"
+ * can do: its own acts by name, and that it answers how things work. Both shells say this one line.
+ * @param {{acts?: string[], card?: {text: string}|null}} o
+ * @param {{t: Function, acts?: object[]}} a
+ */
+export function plusHelpAnswer(o, { t, acts = PLUS_ACTS } = {}) {
+  if (o?.card?.text) return o.card.text;
+  const names = (o?.acts ?? acts.map((a) => a.id)).map((id) => acts.find((a) => a.id === id)).filter(Boolean).map((a) => plusLabel(t, a));
+  return t('circle.vandaag.plus_help', { acts: names.join(', ') });
+}
+
+/**
+ * One circle's reading of a line: the box's lists table first (`fromLists`: the circle holds the list it names), then the
+ * circle's manifests' gate; only an op it offers. `{command: null}` when it reads nothing.
+ */
+function circleReading(text, c) {
+  const ms = Object.values(c?.manifestsByOrigin ?? {}).filter(Boolean);
+  const av = c?.availability ?? null;
+  const shown = (opId) => !av || av.of(opId).state !== 'hidden';
+  const appOf = (opId) => ms.find((m) => m.app === 'lists' && (m.operations ?? []).some((o) => o.id === opId))?.app
+    ?? ms.find((m) => (m.operations ?? []).some((o) => o.id === opId))?.app ?? null;
+  const tryRules = (rules, needOffer) => {
+    for (const rule of rules) {
+      let cmd = null;
+      try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+      if (!cmd?.opId) continue;
+      const app = cmd.appOrigin ?? appOf(cmd.opId);
+      if (!app || !shown(cmd.opId)) continue;
+      if (needOffer && !offered(c, app, cmd.opId, ms, av)) continue;
+      return { appOrigin: app, opId: cmd.opId, args: { ...(cmd.args ?? {}) } };
+    }
+    return null;
+  };
+  const lists = Array.isArray(c?.lists) ? c.lists : [];
+  const fromLists = lists.length ? tryRules(listsGateRules(null, lists, { greeting: false }), false) : null;
+  if (fromLists) return { command: fromLists, fromLists: true };
+  return { command: tryRules(renderGate(ms), true), fromLists: false };
+}
+
+/** Whether a circle offers an op (the + menu's entries, or an op its manifests declare). */
+function offered(c, app, opId, ms, av) {
+  const offers = new Set(attachEntriesFor({ manifestsByOrigin: c?.manifestsByOrigin ?? {}, availability: av }).map((e) => `${e.appOrigin}.${e.opId}`));
+  return offers.has(`${app}.${opId}`) || ms.some((m) => m.app === app && (m.operations ?? []).some((o) => o.id === opId));
 }
 
 /**
@@ -333,4 +397,64 @@ export function plusFollowUp(book, actId) {
   if ((page.blocks ?? []).some((b) => b?.type === type)) return null;
   // a notes block takes the page's recent-notes default (userScreenBlocks.js); an agenda shows five
   return { opId: 'screen-add-block', args: { pageId: page.id, type, config: type === 'notes' ? {} : { limit: 5 } } };
+}
+
+/**
+ * The op a "+" circle reading runs in one circle (`plusLineOutcome`'s `command`, at once or after the card's pick):
+ * the command's own app and op, with the circle it runs in. Both shells run it as the person through `callSkill`.
+ * @param {{appOrigin: string, opId: string, args?: object}|null} command
+ * @param {string} circleId
+ * @returns {{app: string, opId: string, args: object}|null}
+ */
+export function plusCircleOp(command, circleId) {
+  if (!command?.appOrigin || !command?.opId || typeof circleId !== 'string' || !circleId) return null;
+  return { app: command.appOrigin, opId: command.opId, args: { ...(command.args ?? {}), circleId } };
+}
+
+/** How many suggestions the "+" shows under its line at once. */
+export const PLUS_SUGGESTIONS_SHOWN = param({ key: 'assistant.plusSuggestionsShown', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
+
+/**
+ * What the person can type in the "+" HERE: the gate rules' own examples (every language the gate speaks; each is
+ * proven by the gate-words guard to give its rule's op), kept only where the "+" reads it with this person's circles
+ * (`plusLineOutcome`: the circle filter, so a line that would do nothing is never offered). Computed once per sheet
+ * open from the same circles the read uses.
+ * @param {{circles?: object[], acts?: object[], manifestsByOrigin?: object, words?: object, lang?: string|null}} [o]  lang: the person's language, whose examples come first
+ * @returns {string[]}
+ */
+export function plusSuggestionPool({ circles = [], acts = PLUS_ACTS, manifestsByOrigin, words = GATE_WORDS, lang = null } = {}) {
+  const seen = new Set();
+  const out = [];
+  // the person's own language first; the others after it, since the "+" reads every language's lines
+  const langs = Object.keys(words ?? {}).sort((a, b) => (b === lang) - (a === lang));
+  for (const entries of langs.map((l) => words[l])) {
+    for (const [id, entry] of Object.entries(entries ?? {})) {
+      if (id.startsWith('_')) continue;   // a word list, not a rule
+      for (const ex of entry?.examples ?? []) {
+        if (typeof ex !== 'string' || seen.has(ex)) continue;
+        seen.add(ex);
+        let read = null;
+        try { read = plusLineOutcome(ex, { circles, acts, manifestsByOrigin }); } catch { read = null; }
+        if (read) out.push(ex);
+      }
+    }
+  }
+  return out;
+}
+
+const suggestWords = (v) => String(v ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/**
+ * The suggestions for what is typed so far: the pool's lines in which every typed word starts a word of the line,
+ * at most `limit`; none under two letters, and none once the line is typed in full.
+ * @param {string[]} pool @param {string} typed @param {{limit?: number}} [o]
+ */
+export function plusSuggest(pool, typed, { limit = PLUS_SUGGESTIONS_SHOWN } = {}) {
+  const t = String(typed ?? '').trim().toLowerCase();
+  if (t.length < 2) return [];
+  const want = suggestWords(t);
+  return (Array.isArray(pool) ? pool : [])
+    .filter((line) => line.toLowerCase() !== t)
+    .filter((line) => { const have = suggestWords(line); return want.every((w) => have.some((h) => h.startsWith(w))); })
+    .slice(0, limit);
 }

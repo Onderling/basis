@@ -15,6 +15,17 @@ const okCall = (extra = {}) => vi.fn(async (app, op, args) => {
 });
 
 describe('quickCreateCircle', () => {
+  it('names its kind (the wizard no longer assumes one): a household by default, as before; the caller may name another', async () => {
+    const { TEMPLATE_INVITE_MAX_REDEMPTIONS } = await import('../../src/v2/circleTemplates.js');
+    const home = okCall();
+    await quickCreateCircle({ callSkill: home, name: 'Thuis', founderPubKey: 'webid:founder' });
+    expect(home.mock.calls.at(-1)[2].inviteMaxRedemptions, 'a quick create keeps the household ceiling it always had')
+      .toBe(TEMPLATE_INVITE_MAX_REDEMPTIONS.household);
+    const street = okCall();
+    await quickCreateCircle({ callSkill: street, name: 'Straat', founderPubKey: 'webid:founder', kind: 'neighbourhood' });
+    expect(street.mock.calls.at(-1)[2].inviteMaxRedemptions).toBe(TEMPLATE_INVITE_MAX_REDEMPTIONS.neighbourhood);
+  });
+
   it('dispatches createGroupV2 with the typed name and a derived id', async () => {
     const callSkill = okCall();
     const res = await quickCreateCircle({ callSkill, name: 'Selwerd Circle!', founderPubKey: 'webid:founder' });

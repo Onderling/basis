@@ -13,7 +13,7 @@
  *   Step 1: parse invite → fetch group rules → show rules text →
  *           [Accept rules] required to advance
  *   Step 2: show privacy notice → [I accept] required to advance
- *   Step 3: pick a handle (text input + 3 suggestions) → submit
+ *   Step 3: who joins: one line naming the name members will see, and a fold for another name or more privacy → submit
  *           chains redeemInviteWithGate + setMyHandle + redeemInvite
  *           in sequence; on success closes the panel + emits success.
  *
@@ -31,13 +31,17 @@
  */
 
 // State-machine pieces (decodeInvite, summariseEmbeddedRules,
-// fetchGroupRules, isValidHandle, handleSuggestions, finalSubmit) moved to
+// fetchGroupRules, isValidName, handleSuggestions, finalSubmit) moved to
 // ../../core/wizards/joinGroupState.js so basis-mobile's RN wizard can reuse
 // them. The privacy notice is the locale's circle.join.wizard.privacy.notice.
 import {
-  handleSuggestions as HANDLE_SUGGESTIONS,
+  handleSuggestions,
   decodeInvite,
-  isValidHandle,
+  joinAsLine,
+  joinNeedsName,
+  joinFoldStartsOpen,
+  joinAsNewPersona,
+  addressHintKey,
   initialState,
   fetchGroupRules,
   finalSubmit,
@@ -46,7 +50,6 @@ import {
   setConsentDecline,
   loadPersonas,
   setPersona,
-  applyPersonaHandle,
   applyCharterOfferingsDefault,
   setShareOfferingsAtJoin,
   prepareJoinIdentity,
@@ -144,7 +147,7 @@ export function renderJoinGroupWizard(opts) {
         return;
       }
       rerender(); // failure path: show submitError
-    }, () => { state.step = 2; rerender(); }, onClose, rerender);
+    }, () => { state.step = 2; rerender(); }, onClose, rerender, callSkill);
   }
 }
 
@@ -350,7 +353,7 @@ function renderPrivacyStep(container, doc, state, onNext, onBack, onCancel, rere
   ]);
 }
 
-function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rerender) {
+function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rerender, callSkill) {
   const wrap = doc.createElement('div');
   wrap.className = 'cc-wizard-body';
 
@@ -358,59 +361,35 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
   heading.textContent = t('circle.join.wizard.handle.title');
   wrap.appendChild(heading);
 
-  const blurb = doc.createElement('p');
-  blurb.className = 'cc-wizard-blurb';
-  blurb.textContent = t('circle.join.wizard.handle.intro');
-  wrap.appendChild(blurb);
+  // THE ONE LINE: who joins, under which name. Everything else waits in the fold below (joinGroupState.js).
+  const line = doc.createElement('p');
+  line.className = 'cc-wizard-join-as';
+  line.textContent = joinAsLine(state, t);
+  wrap.appendChild(line);
+  const refresh = () => {
+    line.textContent = joinAsLine(state, t);
+    const submitBtn = container.querySelector('.cc-wizard-submit');
+    if (submitBtn) submitBtn.disabled = joinNeedsName(state) || state.submitting;
+  };
 
-  // The one handle field both wizards share (_wizardKit.js). Typing keeps focus — only the submit button's state refreshes.
-  mkHandleField(wrap, doc, {
-    t, value: state.handle, suggestions: HANDLE_SUGGESTIONS(),
-    onInput: (v) => {
-      state.handle = v;
-      const submitBtn = container.querySelector('.cc-wizard-submit');
-      if (submitBtn) submitBtn.disabled = !isValidHandle(state.handle) || state.submitting;
-    },
+  // THE FOLD: another name in this circle, or more privacy. Open when it holds the one thing left to do.
+  const fold = doc.createElement('details');
+  fold.className = 'cc-wizard-fold';
+  fold.open = state.foldOpen === true || joinFoldStartsOpen(state);
+  fold.addEventListener('toggle', () => { state.foldOpen = fold.open; });
+  const summary = doc.createElement('summary');
+  summary.textContent = t('circle.join.wizard.join_as.fold');
+  fold.appendChild(summary);
+
+  // Another name in this circle: an optional mask. Empty = the persona's name. Typing keeps focus.
+  mkHandleField(fold, doc, {
+    t, value: state.handle, suggestions: handleSuggestions(state.priorHandles ?? []),
+    label: t('circle.join.wizard.handle.label'), hint: t('circle.join.wizard.handle.intro'),
+    onInput: (v) => { state.handle = v; refresh(); },
     onPick: (v) => { state.handle = v; rerender(); },
   });
 
-  // #4 — SENSITIVE: continue as an existing self? Default is a FRESH, unlinkable key (same
-  // name in two circles = coincidence). Choosing an existing self presents THAT circle's key
-  // + a signing proof → provably the same person to anyone in both circles. Shown only when
-  // the joiner already belongs to other circles.
-  if (Array.isArray(state.existingSelves) && state.existingSelves.length) {
-    const lWrap = doc.createElement('div');
-    lWrap.className = 'cc-wizard-link';
-    const lLabel = doc.createElement('div');
-    lLabel.className = 'cc-wizard-field-label';
-    lLabel.textContent = t('circle.join.wizard.link.label');
-    lWrap.appendChild(lLabel);
-    const lSelect = doc.createElement('select');
-    lSelect.className = 'cc-wizard-link-select';
-    const fresh = doc.createElement('option');
-    fresh.value = 'fresh';
-    fresh.textContent = t('circle.join.wizard.link.fresh');
-    lSelect.appendChild(fresh);
-    for (const self of state.existingSelves) {
-      const opt = doc.createElement('option');
-      opt.value = self.circleId;
-      opt.textContent = t('circle.join.wizard.link.same_person', { name: self.name });
-      lSelect.appendChild(opt);
-    }
-    lSelect.value = state.linkChoice || 'fresh';
-    lSelect.addEventListener('change', () => { setLinkChoice(state, lSelect.value); rerender(); });
-    lWrap.appendChild(lSelect);
-    const lHint = doc.createElement('p');
-    lHint.className = 'cc-wizard-blurb';
-    lHint.textContent = t('circle.join.wizard.link.hint');
-    lWrap.appendChild(lHint);
-    wrap.appendChild(lWrap);
-  }
-
-  // Property layer — join-with-persona. Choose a persona whose per-circle
-  // disclosure applies here, or "join minimally" (the protective default: share
-  // no background). On a FIRST join a persona still discloses nothing until you
-  // set its sharing in "About me"; this is the identity you enter the circle as.
+  // The persona you join as: its name is the name, and only what it shares in this circle is shared.
   if (Array.isArray(state.personas) && state.personas.length) {
     const pWrap = doc.createElement('div');
     pWrap.className = 'cc-wizard-persona';
@@ -433,13 +412,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
       select.appendChild(opt);
     }
     select.value = state.persona ?? '';
-    select.addEventListener('change', () => {
-      setPersona(state, select.value);
-      // …and the persona brings its own handle into the field, when the field is still empty. Prefill,
-      // never override: going back to this picker must not undo what the person typed.
-      applyPersonaHandle({ state, callSkill }).then((r) => { if (r.applied) rerender(); }).catch(() => {});
-      if (state.heldAs) rerender();   // the second-persona refusal follows the choice
-    });
+    select.addEventListener('change', () => { setPersona(state, select.value); rerender(); });
     pWrap.appendChild(select);
 
     const pHint = doc.createElement('div');
@@ -456,14 +429,82 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
       warn.textContent = t('circle.join.wizard.persona.already_in', { persona: personaLabel(held, t) });
       pWrap.appendChild(warn);
     }
-    wrap.appendChild(pWrap);
+    fold.appendChild(pWrap);
+  }
+
+  // The address. A new one is the default, and the sentence under it says honestly what it hides: the link
+  // from the relay, not from members who are in both circles. Presenting another circle's address is offered
+  // only when there is one.
+  {
+    const lWrap = doc.createElement('div');
+    lWrap.className = 'cc-wizard-address';
+    if (Array.isArray(state.existingSelves) && state.existingSelves.length) {
+      const lLabel = doc.createElement('div');
+      lLabel.className = 'cc-wizard-field-label';
+      lLabel.textContent = t('circle.join.wizard.link.label');
+      lWrap.appendChild(lLabel);
+      const lSelect = doc.createElement('select');
+      lSelect.className = 'cc-wizard-link-select';
+      const fresh = doc.createElement('option');
+      fresh.value = 'fresh';
+      fresh.textContent = t('circle.join.wizard.link.fresh');
+      lSelect.appendChild(fresh);
+      for (const self of state.existingSelves) {
+        const opt = doc.createElement('option');
+        opt.value = self.circleId;
+        opt.textContent = t('circle.join.wizard.link.same_person', { name: self.name });
+        lSelect.appendChild(opt);
+      }
+      lSelect.value = state.linkChoice || 'fresh';
+      lSelect.addEventListener('change', () => { setLinkChoice(state, lSelect.value); rerender(); });
+      lWrap.appendChild(lSelect);
+    }
+    const lHint = doc.createElement('div');
+    lHint.className = 'cc-wizard-field-hint cc-wizard-address-hint';
+    lHint.textContent = t(addressHintKey(state));
+    lWrap.appendChild(lHint);
+    fold.appendChild(lWrap);
+  }
+
+  // The real separation: a new persona, a different person to everyone, members included.
+  {
+    const nWrap = doc.createElement('div');
+    nWrap.className = 'cc-wizard-new-persona';
+    const nHint = doc.createElement('div');
+    nHint.className = 'cc-wizard-field-hint';
+    nHint.textContent = t('circle.join.wizard.new_persona.hint');
+    nWrap.appendChild(nHint);
+    if (state.newPersonaOpen) {
+      const input = mkHandleField(nWrap, doc, {
+        t, value: state.newPersonaName ?? '', label: t('circle.join.wizard.new_persona.label'),
+        onInput: (v) => { state.newPersonaName = v; },
+      });
+      input.classList.add('cc-wizard-new-persona-name');
+      const make = doc.createElement('button');
+      make.type = 'button';
+      make.className = 'cc-wizard-new-persona-make';
+      make.textContent = t('circle.join.wizard.new_persona.make');
+      make.addEventListener('click', async () => {
+        const r = await joinAsNewPersona({ state, callSkill, name: state.newPersonaName });
+        if (r.ok) { state.newPersonaOpen = false; state.newPersonaName = ''; }
+        rerender();
+      });
+      nWrap.appendChild(make);
+    } else {
+      const open = doc.createElement('button');
+      open.type = 'button';
+      open.className = 'cc-wizard-new-persona-open';
+      open.textContent = t('circle.join.wizard.new_persona.button');
+      open.addEventListener('click', () => { state.newPersonaOpen = true; state.foldOpen = true; rerender(); });
+      nWrap.appendChild(open);
+    }
+    fold.appendChild(nWrap);
   }
 
   // Reveal level (§1.6 · NOTE-reveal-state-and-profile-updates) — how much of your persona other
   // members see in THIS circle. The joiner PICKS it here (default = the resolved preset from
   // prepareJoinIdentity: your saved "usual level", else the fallback); the circle's suggested level
-  // is a NON-BINDING hint, never forced. This is what makes the join release VISIBLE + yours to set
-  // instead of silently applying the fallback (the reveal-at-join UI the wizard used to omit).
+  // is a NON-BINDING hint, never forced.
   {
     const rWrap = doc.createElement('div');
     rWrap.className = 'cc-wizard-reveal';
@@ -492,8 +533,9 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
       rSug.textContent = t('circle.join.wizard.reveal.suggested', { level: t(`circle.reveal.preset.${state.circleSuggestedReveal}`) });
       rWrap.appendChild(rSug);
     }
-    wrap.appendChild(rWrap);
+    fold.appendChild(rWrap);
   }
+  wrap.appendChild(fold);
 
   // Fold-in phase C — the charter-driven offering-sharing default, VISIBLE and
   // uncheckable (never silent). Rendered only when the invite carried the circle's
@@ -543,7 +585,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     { label: t('circle.join.wizard.back'),   onClick: onBack,   kind: 'secondary', disabled: state.submitting },
     { label: t('circle.join.wizard.cancel'), onClick: onCancel, kind: 'secondary', disabled: state.submitting },
     { label: t('circle.join.wizard.join'),   onClick: onSubmit,
-      disabled: !isValidHandle(state.handle) || state.submitting,
+      disabled: joinNeedsName(state) || state.submitting,
       kind: 'primary', className: 'cc-wizard-submit' },
   ]);
 }
@@ -579,7 +621,7 @@ function renderActions(container, doc, buttons) {
 }
 
 // decodeInvite, fetchGroupRules, summariseEmbeddedRules,
-// isValidHandle moved to ../../core/wizards/joinGroupState.js
+// isValidName moved to ../../core/wizards/joinGroupState.js
 // 
 
 // finalSubmit moved to../../core/wizards/joinGroupState.js.

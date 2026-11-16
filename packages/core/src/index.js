@@ -37,7 +37,7 @@ export { parseUntrustedJson, UNSAFE_JSON_KEYS } from './security/untrustedJson.j
 export { Bootstrap, deriveVaultAtRestKeyFrom } from './identity/Bootstrap.js';
 // identity step 3 — per-circle addresses (unlinkability layer)
 export { deriveCircleSeed, deriveCircleAddress, circleIdentity, deriveCircleId, deriveCircleRoot } from './identity/circleAddress.js';
-export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircleLink } from './identity/circleLink.js';
+export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircleLink, onEarlierCircleLink } from './identity/circleLink.js';
 // The per-device derivation root + the root-signed delegation record (add-a-device):
 // owner root → profile seed → DEVICE seed → per-circle seed; each device presents distinct addresses.
 export {
@@ -91,7 +91,7 @@ export { SecurityLayer, SecurityError, SEC } from './security/SecurityLayer.js';
 // port the kernel calls and never implements (kernel vs substrate).
 export { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCredential, isEd25519PubKey }
   from './security/senderKey.js';
-export { SENDER_AUTHORIZATION, allowSender, refuseSender, askSenderAuthorizer }
+export { SENDER_AUTHORIZATION, allowSender, refuseSender, staleSender, askSenderAuthorizer }
   from './security/senderAuthorization.js';
 // The internal bus's roster: an in-process layer admits exactly the keys it adopted (`adoptInProcessPeer`).
 export { createInProcessSenderAuthorizer, IN_PROCESS_SENDER }
@@ -114,12 +114,15 @@ export {
 export {
   signSpine,
   verifySpine,
+  spineVerdictKey,
   SPINE_STMT_VERSION,
+  spineSignedMessage,
+  canonicalDeep,
 }                                            from './security/spineStatement.js';
 // The WRITE side: append a signed spine statement to a circle's store, chained to its author's own frontier.
 export { createSpineAppender, SPINE_STATEMENT_ITEM } from './security/spineAppender.js';
 // The membership HEAD folded from the spine chain (deny-wins, deterministic; who is member / who is admin).
-export { foldRoster, caretakerOrder, MEMBER_PROPS_FIELDS, MEMBER_KINDS } from './security/rosterFold.js';
+export { foldRoster, caretakerOrder, causalPlace, memberStatusFrom, MEMBER_PROPS_FIELDS, MEMBER_KINDS } from './security/rosterFold.js';
 export {
   signEviction,
   verifyEviction,
@@ -194,7 +197,10 @@ export {
   ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
   signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
 } from './identity/ceremonyCommitment.js';
-export { createSignatureMemo } from './security/signatureMemo.js';   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
+export { createSignatureMemo, processSignatureMemo, createVerdictMemo, processVerdictMemo, exactVerdictKey } from './security/signatureMemo.js';   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
+export { ED25519_EDGE_VECTORS, ED25519_ACCEPTED, ed25519Disagreements } from './conformance/ed25519Conformance.js';   // the edge-case vectors a fast equation must agree on (shipped: the box and the web self-test with them)
+export { useSignatureEquation, signatureEquationName, verifyEd25519StrictBatch, strictSignatureShapeOk, signatureEquationBatches } from './crypto/ed25519Strict.js';   // a faster equation behind the one strict rule (the box: node:crypto; the web: WebCrypto's batch)
+export { createTimeSlice, TIME_SLICE_MS } from './timeSlice.js';   // long work gives the thread back   // verify-on-read checks each distinct signature once   // who may retire a device address: the owner root, at a ceremony
 export { CEREMONY_KINDS, ADDRESS_REVOKE_KIND, isCeremonyKind, ceremonyRevealFacts } from './security/ceremonyKinds.js';   // the kinds only the root may make, and what each reveal covers
 export { PERSON_KEY_KIND, personKeyFacts, isSelfPersonKeyStatement, foldPersonKeys } from './security/personKeyFold.js';
 export { PERSON_KEY_VAULT_KEY, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, signWithPersonKey, personKeyAnnouncement, loadPersonKey, storePersonKey, signPersonKeyLink, verifyPersonKeyChain, personKeyLinkMessage, sealToPersonKey, openFromPersonKey } from './identity/personKey.js';   // the rotating person key: derivation, the sealed-vault entry, the announcement shape   // the person's current (rotating) key per circle — the person-key head

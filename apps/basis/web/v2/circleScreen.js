@@ -24,15 +24,18 @@
  */
 
 import { blockEmptyLine, blockOpensWhole } from '../../src/v2/blockTitle.js';
+import { paintFace } from './faceView.js';
+import { labelShown } from '../../src/v2/personLabel.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
-import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
+import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, newsKindIcons } from '../../src/v2/embedChips.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { identityLineWords, agentRowWords } from '../../src/v2/mijWords.js';
 import { dateLocaleOf } from '../../src/v2/whenWords.js';
 import { whereTag } from '../../src/v2/rowWhere.js';
 import { nounHeading } from '../../src/v2/nounNames.js';
+import { typedRowOp } from '../../src/v2/rowPrimary.js';
 
 /**
  * Render an array of materialized blocks into a container.
@@ -172,6 +175,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       else renderItems(section, block, tr, onAction);
       break;
     case 'rules':        renderRules(section, block, tr);        break;
+    case 'forYou':       renderForYou(section, block, tr, onAction);       break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
     case 'awaiting':      renderAwaiting(section, block, tr, onAction); break;
     case 'onboarding':   renderOnboarding(section, block, tr, onAction); break;
@@ -256,6 +260,70 @@ function renderAwaiting(section, block, tr, onAction) {
   }
 }
 
+// "Nieuw voor jou": what came in for the person, each row a tap to its source and a ✕ to set it aside (both mark it
+// read on all their devices), "Alles gelezen" at the foot. Rows come whole from the shared projection; this only paints.
+function renderForYou(section, block, tr, onAction) {
+  section.classList.add('circle-screen__for-you');
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr('circle.forYou.title');
+  section.appendChild(title);
+  const items = block.content?.items ?? [];
+  const list = document.createElement('ul');
+  list.className = 'circle-screen__for-you-list';
+  for (const row of items) {
+    const li = document.createElement('li');
+    li.className = 'circle-screen__for-you-row';
+    li.dataset.kind = row.kind;
+    li.dataset.id = row.id;
+    const icon = document.createElement('span');
+    icon.className = 'circle-screen__for-you-icon';
+    icon.textContent = row.icon ?? '';
+    const text = document.createElement('span');
+    text.className = 'circle-screen__for-you-text';
+    text.textContent = row.text;
+    li.append(icon, text);
+    // the persona the row is for, when the device holds more than one: its face (the initial, as on every person row)
+    if (row.self) {
+      const who = row.self.name ?? tr('circle.switcher.you');
+      const face = document.createElement('span');
+      face.className = 'circle-screen__for-you-face';
+      face.dataset.self = row.self.id;
+      face.title = who;
+      face.setAttribute('aria-label', who);
+      paintFace(face, { name: who });
+      li.appendChild(face);
+    }
+    if (row.late) {
+      const late = document.createElement('span');
+      late.className = 'circle-screen__for-you-late';
+      late.textContent = tr('circle.forYou.late');
+      li.appendChild(late);
+    }
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'circle-screen__for-you-dismiss';
+    dismiss.textContent = '✕';
+    dismiss.setAttribute('aria-label', tr('circle.forYou.dismiss'));
+    dismiss.addEventListener('click', (e) => { e.stopPropagation(); onAction?.({ kind: 'for-you-read', rows: [row] }); });
+    li.appendChild(dismiss);
+    if (typeof onAction === 'function') {
+      li.tabIndex = 0;
+      li.addEventListener('click', () => onAction({ kind: 'for-you-open', row }));
+    }
+    list.appendChild(li);
+  }
+  section.appendChild(list);
+  if (items.length > 0 && typeof onAction === 'function') {
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'circle-screen__for-you-all';
+    all.textContent = tr('circle.forYou.all_read');
+    all.addEventListener('click', () => onAction({ kind: 'for-you-read', rows: items }));
+    section.appendChild(all);
+  }
+}
+
 function renderCirclesUnread(section, block, tr, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
@@ -269,10 +337,14 @@ function renderCirclesUnread(section, block, tr, onAction) {
     li.dataset.circleId = row.circleId ?? '';
     const name = document.createElement('span');
     name.textContent = row.name ?? row.circleId;
+    // what is new there, by kind (the item-kind vocabulary's icons)
+    const kinds = document.createElement('span');
+    kinds.className = 'circle-screen__circles-unread-kinds';
+    kinds.textContent = newsKindIcons(row.kinds);
     const n = document.createElement('span');
     n.className = 'circle-screen__circles-unread-count';
     n.textContent = tr('circle.screen.unread_count', { count: row.unread });
-    li.append(name, n);
+    li.append(name, kinds, n);
     if (typeof onAction === 'function') {
       li.tabIndex = 0;
       li.addEventListener('click', () => onAction({ kind: 'open-circle', circleId: row.circleId }));
@@ -348,7 +420,7 @@ function renderNoticeboard(section, block, tr) {
     // Stamped by `materializeNoticeboard` through the reveal ladder (batch 4) — paint only.
     const sender = row?.senderSelf
       ? null
-      : (row?.senderLabel ?? (row?.senderLabelKey ? tr(row.senderLabelKey) : null));
+      : labelShown({ primary: row?.senderLabel, primaryKey: row?.senderLabelKey, primaryNumber: row?.senderLabelNumber }, tr);
     if (sender) {
       const s = document.createElement('span');
       s.className = 'circle-screen__noticeboard-sender';
@@ -449,7 +521,33 @@ function renderLists(section, block, tr, onAction) {
       ul.appendChild(li);
     }
     section.appendChild(ul);
+    if (l.add) addField(section, l, tr, onAction);
   }
+}
+
+/** A list's add field: a typed line goes on that list through the act the block carries (`typedRowOp`). */
+function addField(section, l, tr, onAction) {
+  if (typeof onAction !== 'function') return;
+  const form = document.createElement('form');
+  form.className = 'circle-screen__list-add';
+  form.dataset.listId = l.id ?? '';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = tr(l.add.placeholderKey ?? 'circle.lists.add_prompt');
+  input.setAttribute('aria-label', input.placeholder);
+  const b = document.createElement('button');
+  b.type = 'submit';
+  b.className = 'cc-btn cc-btn--quiet';
+  b.textContent = tr(l.add.labelKey ?? 'circle.container.add');
+  form.append(input, b);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const go = typedRowOp(l.add, input.value);
+    if (!go) return;
+    onAction(go);
+    input.value = '';
+  });
+  section.appendChild(form);
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */

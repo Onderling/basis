@@ -12,6 +12,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { bootPeer, teardown, gotoCircles, log, sendDirectMessage, waitForContactMessageDetailed } from './peerHarness.js';
+import { addByLink } from './contactsWalk.js';
 import { fillFounderHandle } from './helpers.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
@@ -64,6 +65,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     await picker.selectOption(buurt);
     await A.page.locator('.cc-wizard-input').first().fill('Proeftuin');
     await fillFounderHandle(A.page, 'anna');
+    await A.page.locator('input[type="radio"][value="neighbourhood"]:visible').first().check();   // the kind, asked here
     for (let i = 0; i < 5; i += 1) { await A.page.locator('.cc-wizard-btn-primary').first().click(); await A.page.waitForTimeout(300); }
     await expect(A.page.locator('.cc-wizard-review'), 'the review names the founding persona').toContainText('Buurt');
     await A.page.locator('.cc-wizard-btn-primary').first().click();
@@ -106,6 +108,9 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     expect((await bookRow(B.page, aId))?.persona, 'and the persona').toBe('default');
     log('STEP3 L125 the add sheet', 'PASS', 'default persona, level handle');
 
+    // A chooses B too (a first message from someone not chosen is a request since 2026-11-12; this walk is about the
+    // add sheet, the lens and delete, not about that door)
+    await addByLink(B, A);
     // ── B writes; the pair circle forms ──────────────────────────────────────────────────────────────
     await gotoCircles(B.page);
     const first = `hoi Anna ${Date.now().toString(36)}`;
@@ -119,7 +124,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
 
     // ── L125: change the level later, on the thread header ───────────────────────────────────────────
     await openThread(B.page, aId);
-    await B.page.locator('.cc-cthread__lens').click();
+    await B.page.locator('.cc-cthread__self').click();
     await expect(B.page.locator('[data-testid="contact-lens"]'), 'the lens control opens').toBeVisible({ timeout: 10_000 });
     expect(await B.page.locator('.cc-lens__level').inputValue(), 'it shows what was chosen at the add').toBe('handle');
     await B.page.locator('.cc-lens__level').selectOption('profile');
@@ -129,6 +134,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
 
     // ── L114: delete; their next message brings them back, marked ──────────────────────────────────
     await openThread(B.page, aId);
+    await B.page.locator('.cc-cthread__more').click();   // Delete lives in the ⋯
     await B.page.locator('.cc-cthread__delete').click();
     await B.page.locator('.cc-confirm__accept').click();
     await expect.poll(async () => { const r = await bookRow(B.page, aId); return r ? { hidden: r.hidden, deleted: Number.isFinite(r.deletedAt) } : null; },

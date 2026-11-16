@@ -108,8 +108,7 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   ../../../../packages/<pkg>`, which `pnpm install` creates from the declared dep. If you can't run a full install
   (the offline store is often incomplete here), materialize the link by hand, mirroring an existing one (e.g.
   `@onderling/redaction`). **Tell:** an import that resolves in one package but throws `ERR_MODULE_NOT_FOUND` in
-  another. *Concrete (2026-07-08):* feedback-split F1 added `@onderling/{core,pod-client,pseudo-pod}` to
-  `apps/feedback-pipeline`; links were materialized by hand pending the next install. *Concrete (2026-07-09):* the
+  another. *Concrete (2026-07-09):* the
   versioning/agents work hand-materialized `@onderling/versioning` into `apps/basis`, `apps/basis-mobile`,
   and `packages/substrate-stack`; `@onderling/substrate-stack` into `apps/{pinboard,tasks-v0,household}`; and
   `@onderling-app/agents` + `@onderling/agent-registry` into `apps/basis` — all pending the next real install.
@@ -252,31 +251,24 @@ since then. **Fix (2026-07-13):** added `@onderling-app/agents` to `metro.config
 an `extraSubpathResolvers` case (package-exports stays disabled). (Added 2026-07-13, mobile feedback parity.)
 
 ### New workspace dep into basis: `@onderling/attribute-charter` (2026-07-16, property-layer Phase 3)
-`apps/basis/src/feedback/charterConsent.js` imports `@onderling/attribute-charter`. It's a pure-JS package
+`apps/basis/src/v2/charterConsent.js` imports `@onderling/attribute-charter`. It's a pure-JS package
 (`@noble/hashes` only), so it bundles fine — BUT the workspace edge wasn't in the lockfile, so materialize the
 link: `apps/basis/node_modules/@onderling/attribute-charter -> ../../../../packages/attribute-charter`.
 **Tell:** `Cannot find module '@onderling/attribute-charter'` from a basis test/build → the symlink is missing
-(a fresh `pnpm install` after the lockfile picks it up also fixes it). Same pattern as the feedback-pipeline edge.
+(a fresh `pnpm install` after the lockfile picks it up also fixes it).
 
 - **The `onderling-feedback` link dep is GONE (2026-09-05).** basis and basis-mobile no longer import the
   sibling feedback repo: feedback is an external bot that reaches basis as a contact. The `link:` entries, the
   Metro resolvers for `onderling-feedback/{public,testing}`, the `eld` watch folder/resolver and the Vite
   external hack were all removed with it. If a build asks for `onderling-feedback` or `eld`, something re-imported
   the bot's code into a shell — that is the drift, not a missing symlink.
-- **Mobile bundle 500s on the feedback chain — TWO missing Metro resolvers (fixed 2026-07-25).** Surfaced when
-  actually bundling for a device. (1) `onderling-feedback/public` had NO hand-resolver (Metro exports-off), so the
-  bundle failed immediately — added `resolveRequest` cases mapping `onderling-feedback/{public,testing}` to the
-  sibling checkout (`../feedback/src/public/index.js`, `../feedback/test/helpers/mock-llm.js`). (2) The `eld`
-  language-detector resolver pointed at `apps/feedback-pipeline/node_modules/eld` (never installed there) — `eld`
-  is HOISTED to the ROOT `node_modules/eld`; repointed the resolver + added `node_modules/eld` to `watchFolders`
-  (else Metro "Failed to get the SHA-1"). With both, `apps/basis-mobile` bundles (2591 modules). Only THEN does the
-  next layer show: the connected **dev-client APK is stale** — missing native modules (ExpoSecureStore →
-  ExpoWebBrowser → expo-auth-session → …). Do NOT shim these one-by-one (cascade + degrades auth/secure-store);
-  **rebuild the dev client** (`expo run:android`) so it carries the app's current native deps.
+- **A stale dev-client APK shows as missing native modules** (ExpoSecureStore → ExpoWebBrowser → expo-auth-session → …).
+  Do NOT shim these one by one (a cascade, and it degrades auth/secure-store): **rebuild the dev client**
+  (`expo run:android`) so it carries the app's current native deps.
 
 ## mDNS: the native module gained a split — an old app binary silently cannot do ghost mode
 
-`MdnsModule` (Android, `packages/react-native/android/src/main/java/com/onderling/mdns/MdnsModule.kt`) used to
+`MdnsModule` (Android, `packages/react-native/android/src/main/java/com/canopy/mdns/MdnsModule.kt`) used to
 expose one `start()` that registered the service AND began browsing. It now also exposes `startAdvertising` /
 `stopAdvertising` / `startDiscovery` / `stopDiscovery`, and `MdnsTransport` feature-detects them via
 `MdnsTransport.supportsSplit()`.
@@ -324,9 +316,6 @@ documented above).
 run the install and check the totals of the neighbouring suites immediately. And note the shells resolve
 `file:` workspace deps as **symlinks** — verify with `ls -la apps/<app>/node_modules/@onderling/core`; a real
 directory there means the tree is broken.
-
-*(A silver lining: running the relink also fixed pre-existing breakage — `apps/pinboard-mobile` went from 3
-failing test files to 940/940, and it had been that way for a while.)*
 
 ## Mobile screens have NO test coverage — `vitest` excludes `src/screens/**`
 
@@ -700,13 +689,6 @@ fails with `stat .: permission denied`, which read as a build failure. The updat
 before any work; any script a box runs under another user must do the same. The test reproduces it by
 entering a directory, `chmod 000` on it, then exec'ing the script.
 
-### `npm run coverage` prints the snapshot; it does not write it (2026-09-24)
-
-`apps/basis/scripts/surface-coverage.mjs` writes the markdown to STDOUT. `npm run coverage` therefore shows the table
-and leaves `docs/surface-coverage.md` untouched, and the fitness test (`surfaceCoverageFresh`) stays red after a
-manifest change although "coverage was run". Refresh it with
-`node scripts/surface-coverage.mjs > docs/surface-coverage.md` from `apps/basis`.
-
 ## Driving the phone by hand (`adb`) — the traps, collected from the 2026-08-29/30 walks
 
 Use the Detox suite (`apps/basis-mobile/e2e/`) first. When you must hand-drive:
@@ -787,10 +769,52 @@ Found writing `apps/basis-mobile/e2e/walkFixes20261008.test.js`; each cost a run
 - **Verify by logcat, not by guessing**: `adb logcat -d -s ReactNativeJS | grep -E "\[link\]|addContactFromQr"` shows
   whether the link drained and whether the add ran.
 
+## An accessibility role Android does not know closes the app (2026-11-11)
+
+React Native on Android maps `accessibilityRole` onto a native enum and throws `IllegalArgumentException: Invalid
+accessibility role value: …` when the view paints, so the app dies at that moment. The act strip used `"status"` (a
+valid web ARIA role, not an Android one), and the first act after joining a circle closed the app; vitest never paints a
+screen, so only the emulator showed it. A crash under Detox looks like "not visible within …" with the home screen in
+the screenshot: read `adb logcat -d -b crash` first. `apps/basis-mobile/test/accessibilityRolesAndroid.test.js` reads the
+allowed roles from React Native's Android source and holds every role the phone paints to them.
+
+## One relay under two names silently loses a circle's scope (emulator walks, 2026-11-11)
+
+The emulator reaches the host as `10.0.2.2`; a harness peer on the host reaches the same relay as `127.0.0.1`. When the
+peer dials, announces and invites under its own spelling, the phone records the circle's point as `ws://127.0.0.1:…`, its
+own socket (`ws://10.0.2.2:…`) no longer matches that point by url, the circle-scoped route rules it ineligible, a second
+socket "beside" the point cannot connect from inside the emulator, and the send falls to NKN — reported as delivered,
+received by nobody. It looks exactly like a lost message in the product. A harness peer must dial, announce and invite
+under the SAME name the phone uses: `e2e/support/relayPeer.mjs` uses the host's LAN address for both. Name such a branch
+with the route's own reasoning (the candidates, each one's url, eligibility and `canReach`), not by reading.
+
+Since the send gate: points compare by `pointKey` (`@onderling/secure-agent`), so SPELLINGS of one relay match (a trailing
+slash, the host's case, a written-out default port, http(s) for ws(s)). Two NAMES for one host (an IP and a domain,
+`10.0.2.2` and `127.0.0.1`) still do not: that needs a lookup the routing layer must not make. Every send now writes one
+`agent/send.decision` record (copy-log door, logcat on a test build): a scoped send that found no eligible transport
+because of this reads `"reason":"point-mismatch"` with each candidate as `kind:why:reach`.
+
 ## Building a mobile APK to verify a fix: three traps (2026-10-09)
 
 Each one produced an APK that did not carry the code it was built to test.
 
+- **A release build fails at `:app:collectReleaseDependencies` with "Java heap space"** (2026-11-13): on a machine
+  short of memory, the Gradle daemons left by earlier builds (one per worktree) hold gigabytes. `./gradlew --stop`
+  in the worktree's `android/` freed ~7.6 GB and the next build went through.
+- **`mk-worktree.sh` stops part-way with "cp: cannot create hard link … Too many links"** (2026-11-13): every worktree
+  hardlinks the same `node_modules`, and ext4 allows a file about 65,000 links, so with ~45 worktrees the most-shared
+  files reach the cap. The copy stops at the first such file (an old demo app's), the script exits under `set -e`, and
+  the apps after it alphabetically (pinboard, tasks-v0, …) get no `node_modules` and no relink: tests then fail on
+  missing modules, not on code. Fix: remove merged worktrees (`git worktree remove --force <path>`) to free links,
+  and finish a broken one by copying the missing `node_modules` (by value where linking fails) and running
+  `node scripts/relink-workspace.mjs` in it.
+- **A worktree made by `plans/tools/mk-worktree.sh` has no `react-native-libsodium`** (2026-11-13): the phone's
+  native signature check (pinned 1.7.0 in `apps/basis-mobile/package.json`) was installed in one probe worktree only,
+  and the script copies `node_modules` from the shared checkout, which never got it. The release bundle then fails at
+  `:app:createBundleReleaseJsAndAssets` with "Unable to resolve module react-native-libsodium from App.js". CI installs
+  fresh and is fine. Fix for a local build: hardlink the installed package (with its postinstall's prebuilt
+  `libsodium/`) from a worktree that has it, `cp -al <that>/apps/basis-mobile/node_modules/react-native-libsodium
+  apps/basis-mobile/node_modules/`; its `libsodium-wrappers` dependency is already in the tree.
 - **Build only the app's test APK**: `./gradlew :app:assembleRelease :app:assembleAndroidTest -DtestBuildType=release`
   (what `.detoxrc.js` runs). A bare `assembleAndroidTest` also builds every library module's tests and dies on
   `:expo-dev-client:mergeDebugAndroidTestJavaResource` (6 × `META-INF/LICENSE.md`). The app already picks one; the
@@ -830,3 +854,58 @@ served the old pre-bundle: the "red" run passes on the new code. Seen bumping th
 
 **Fix:** move `node_modules/.vite` aside (it regenerates; never delete `node_modules` itself) before each run that must
 load a swapped package, and once more after swapping back.
+
+## Working traps for agents in this checkout (collected 2026-11-10)
+
+Each of these cost at least one session before it was written down. They were kept in the agents' private notes and
+moved here so every agent reads them in one place.
+
+- **A suite is green only when BOTH vitest lines say so.** An empty `describe` left after deleting tests reads
+  `Tests 877 passed` and `Test Files 1 failed` ("No test found in suite"), and CI fails. Summarise with
+  `grep -E "Test Files|Tests "`; after deleting tests, check no `describe` is left empty.
+- **vitest workers grow to ~3 GB each.** With the default worker count and two agents at work the machine ran out of
+  memory and the kernel killed workers and services. Run vitest with `--maxWorkers=2`, one suite or browser run at a
+  time across agents, never during a gradle APK build.
+- **`pgrep -f "<words>"` in a waiter matches the waiter itself**, because its own command line holds the same words,
+  so `while pgrep -f "playwright test"; do …` never ends. Wait on the run's PID (`kill -0 $pid`), a pattern the waiter
+  does not contain (`node .*playwright`), or a log line.
+- **An untracked directory can be live tooling.** A leftover app directory from a rename held another app's real
+  `node_modules`, which the worktree script maps into each new worktree; removing it broke every new worktree for an
+  hour. Grep the worktree script, `scripts/relink-workspace.mjs` and the lockfiles for the path, then move it aside;
+  never `rm -rf` an untracked directory.
+- **The workspace tree is managed, not rotten.** Before calling a dependency a resolution blocker, read
+  `scripts/relink-workspace.mjs` and check the package really imports it (a real `import`, not JSDoc): a pure
+  dependency-injected package "not resolving X" usually means X is not its dependency.
+- **A new mobile import from `@onderling-app/basis` must be exported by `apps/basis/src/index.js`.** The basis suite
+  cannot see the mobile entry's import list; only `apps/basis-mobile`'s `basisIndexExports.test.js` catches it, and on a
+  phone it is a crash. Run `npx vitest run` in `apps/basis-mobile` before the PR.
+- **A change to what a shared screen asks or gates breaks the browser walks, not vitest.** Only the Playwright suites
+  drive the real screens. Grep `apps/basis/test-browser/` for the helpers that walk the screen (`createCircleViaWizard`,
+  `joinFromInvite`, …) and run those specs; grep it for the old labels after a merge-resolve too.
+- **`gh pr merge --auto` merges at once on this repo** when no check is required, so "merge on green" must read
+  `gh pr checks <n>` first, every check including the e2e job. PR CI says nothing about the browser shards, which run
+  only after the merge: read the development run of each merge before the next one.
+- **A bare `git push` from a worktree made without upstream pushes nothing**, and `-q | tail` hides it; the PR then
+  shows checks for its old head. Push with `git push origin HEAD:<branch>`, and before merging compare
+  `gh pr view <n> --json headRefOid` with the local HEAD.
+- **Worktrees share hard-linked `node_modules`; ext4 caps links per file.** With ~60 worktrees the worktree script
+  printed "Too many links" and built an incomplete `node_modules`. Remove each merged PR's worktree
+  (`git worktree remove --force`, `git worktree prune`), and start long-running waiters from the main checkout, not from
+  a worktree that may be removed under them.
+- **Never print a process's or container's environment, even filtered.** A dump filtered on `TOKEN` printed an API
+  key that had to be rotated. Print variable NAMES only (`… | sed 's/=.*//'`) or ask for one known non-secret
+  variable by name; the same for `ps e`, `/proc/*/environ` and `.env` files.
+- **A batch of real model calls spends a shared, finite quota.** One evaluation batch used a provider's monthly token
+  limit and took the live bot's model down, because the test key and the live key were one organisation. Before any
+  batch: estimate tokens (calls × prompt and tool-list size), check the remaining quota, and ask (see also the
+  `LIVE_LLM=1` rule in CLAUDE.md).
+
+## React Native's fetch turns `cache: 'no-cache'` into a query on the URL (2026-11-15)
+
+Every pod request asks the pod whether its copy is current (`cache: 'no-cache'` in `SolidPodSource` and the pod writer),
+because a browser's HTTP cache, and the phone's OkHttp disk cache (React Native's networking module builds its client
+with a 10 MB `http-cache`), can answer a GET or HEAD with an old body after a write. React Native's `fetch` is
+whatwg-fetch, which does not send a cache mode: on a GET or HEAD with `no-cache` or `no-store` it appends `_=<ms>` to the
+URL instead (a new URL each time, so the cache misses). The Community Solid Server ignores an unknown query (measured on
+7.2.0: `/` and `/?_=<ms>` give the same answer), so this works there. A pod server that does NOT ignore an unknown query
+would break on the phone only. Not yet proven on a phone: the DPoP proof with that query on the URL.

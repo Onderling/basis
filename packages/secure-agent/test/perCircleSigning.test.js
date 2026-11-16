@@ -73,26 +73,18 @@ describe('a send can speak as a per-circle identity', () => {
     await anna.shutdown(); await bram.shutdown();
   });
 
-  it('an unregistered sendAs falls back to the canonical identity and SAYS so', async () => {
+  it('an unregistered sendAs is REFUSED, never sent as the canonical identity (sendAsUnregisteredRefused.test.js)', async () => {
     const bus = new InternalBus();
-    const warnings = [];
-    const originalWarn = console.warn;
-    console.warn = (...a) => warnings.push(a.join(' '));
-    try {
-      const anna = await agent();
-      const bram = await agent();
-      const annaTx = new InternalTransport(bus, anna.identity.pubKey);
-      await anna.addSecureTransport('relay', annaTx);
-      await bram.addSecureTransport('relay', new InternalTransport(bus, bram.identity.pubKey));
-
-      const wire = watch(annaTx);
-      await anna.peer.sendTo(bram.identity.pubKey, { text: 'x' },
-        { ...FAST, sendAs: 'an-address-with-no-identity-behind-it' });
-
-      expect(wire.every(({ env }) => env._from === anna.identity.pubKey)).toBe(true);
-      expect(warnings.join('\n')).toMatch(/no identity registered for own address/);
-      await anna.shutdown(); await bram.shutdown();
-    } finally { console.warn = originalWarn; }
+    const anna = await agent();
+    const bram = await agent();
+    const annaTx = new InternalTransport(bus, anna.identity.pubKey);
+    await anna.addSecureTransport('relay', annaTx);
+    await bram.addSecureTransport('relay', new InternalTransport(bus, bram.identity.pubKey));
+    const wire = watch(annaTx);
+    await expect(anna.peer.sendTo(bram.identity.pubKey, { text: 'x' },
+      { ...FAST, sendAs: 'an-address-with-no-identity-behind-it' })).rejects.toMatchObject({ code: 'SEND_AS_UNREGISTERED' });
+    expect(wire).toEqual([]);
+    await anna.shutdown(); await bram.shutdown();
   });
 
   it('ordinary sends are untouched — no sendAs, no per-circle anything', async () => {

@@ -30,7 +30,7 @@ import {
   buildRulesObjectFromState, finalSubmit,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
-  CIRCLE_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
+  CREATE_KIND_CHOICES, chooseKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
   setStoragePolicy,
@@ -219,7 +219,26 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
     });
   }
 
-  // EVERYTHING ELSE behind one fold: the kind, who founds it, its purpose and tags here — and, opened, the further
+  // THE KIND AND THE PURPOSE, asked here and never assumed: the kind's template fills what the circle can do; its
+  // sentence goes into the purpose field as a suggestion the person sees and can change ("other": none). A
+  // neighbourhood also asks its size, with the chat advice (noticeboard-first, open chat off by default).
+  appendRadioField(wrap, doc, t('circle.kindPicker'), state.kind ?? null,
+    CREATE_KIND_CHOICES.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })),
+    (k) => { Object.assign(state, chooseKind(state, k, t)); rerender(); },
+    { consequenceGroup: 'kind' });
+  if (state.kind === 'neighbourhood') {
+    appendRadioField(wrap, doc, t('circle.size.label'), state.size ?? null,
+      [{ id: 'small', label: t('circle.size.small') },
+       { id: 'large', label: t('circle.size.large') }],
+      (sz) => { Object.assign(state, setSize(state, sz)); rerender(); },
+      { consequenceGroup: 'size' });
+    appendChatAdvice(wrap, doc, state, rerender);
+  }
+  appendField(wrap, doc, t('circle.wizard.create.purpose'), 'purpose',
+    state.purpose, (v) => { state.purpose = v; },
+    { placeholder: t('circle.wizard.create.purpose_placeholder') });
+
+  // EVERYTHING ELSE behind one fold: who founds it, who sees whose name, its tags — and, opened, the further
   // steps (members, rules, offerings, technical). Closed, the defaults stand and Next goes to the review.
   const fold = doc.createElement('details');
   fold.className = 'cc-wizard-advanced';
@@ -238,23 +257,6 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   hint.textContent = t('circle.wizard.create.advanced_hint');
   fold.appendChild(hint);
 
-  // N1+E8 — kind picker.  Picking a kind applies the matching template
-  // (β.4) in place; for a neighbourhood it also surfaces the size question +
-  // chat advice (neighbourhood is noticeboard-first, open chat off by default).
-  appendRadioField(fold, doc, t('circle.kindPicker'), state.kind ?? null,
-    CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })),
-    (k) => { Object.assign(state, setKind(state, k)); rerender(); },
-    { consequenceGroup: 'kind' });
-
-  if (state.kind === 'neighbourhood') {
-    appendRadioField(fold, doc, t('circle.size.label'), state.size ?? null,
-      [{ id: 'small', label: t('circle.size.small') },
-       { id: 'large', label: t('circle.size.large') }],
-      (sz) => { Object.assign(state, setSize(state, sz)); rerender(); },
-      { consequenceGroup: 'size' });
-    appendChatAdvice(fold, doc, state, rerender);
-  }
-
   // who sees whose name: per pair unless chosen here — never widened by the kind
   appendRadioField(fold, doc, t('circle.wizard.create.reveal_label'), state.revealPolicy,
     REVEAL_POLICIES.map((p) => ({ id: p.id, label: t(p.labelKey) })),
@@ -263,9 +265,6 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
 
   appendFounderPersona(fold, doc, state);
 
-  appendField(fold, doc, t('circle.wizard.create.purpose'), 'purpose',
-    state.purpose, (v) => { state.purpose = v; },
-    { placeholder: purposeOrDefault({ kind: state.kind }, t) });
   appendField(fold, doc, t('circle.wizard.create.tags'), 'tags',
     state.tags, (v) => { state.tags = v; },
     { placeholder: t('circle.wizard.create.tags_placeholder') });

@@ -29,7 +29,7 @@ describe('the face paint sites hold the opener', () => {
     const [bea, bob] = el.querySelectorAll('.circle-view__member-face');
     expect(bea.querySelector('img')?.getAttribute('src')).toBe('blob:opened');
     expect(bob.querySelector('img')).toBeNull();
-    expect(bob.textContent).toBe('@');
+    expect(bob.textContent).toBe('B');   // the name's first letter (it was the '@' of '@bob')
   });
 
   it('the Contacten row opens each row\'s picture with ITS pair circle', async () => {

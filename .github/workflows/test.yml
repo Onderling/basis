@@ -203,7 +203,13 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Relink workspace (the second half of installing — see header)
         run: node scripts/relink-workspace.mjs
+      # the base branch, so a guard can compare a file with it (lint-architecture-date: a change to
+      # docs/architecture.md must move its "Last updated" date); one commit is enough
+      - name: Fetch the base branch
+        run: git fetch --depth=1 origin "${{ github.base_ref || 'development' }}:refs/remotes/origin/guard-base" || true
       - name: Guards aggregate
+        env:
+          GUARD_BASE_REF: origin/guard-base
         run: npm run guards
       # the box's updater, against a real git remote and a fake docker (`deploy/box/test`, node:test — outside
       # every app suite, so it ran nowhere until 2026-10-05)
@@ -340,7 +346,10 @@ jobs:
     # THE TAIL: after a merge (a push to development or live) and by hand — never on a pull request.
     needs: same-bytes
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.same-bytes.outputs.same != 'true' }}
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: on 2026-11-12 ubuntu-latest became 26.04, and Playwright refuses it
+    # ("Playwright does not support chromium on ubuntu26.04-x64"), so every shard failed before a test ran.
+    # Move to latest when the Playwright in package.json lists 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false

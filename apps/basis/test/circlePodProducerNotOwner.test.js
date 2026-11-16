@@ -4,8 +4,8 @@
  * rotation), and not mint a first key (a rival to the founder's). It reads what the founder wrote.
  */
 import { describe, it, expect } from 'vitest';
+import { produceWithPair } from './support/deviceSealingKeyPair.js';
 import { generateKeypair } from '@onderling/pod-client';
-import { createCirclePodProducer } from '../src/v2/circlePodProducer.js';
 
 class MemVault { #m = new Map(); async get(k) { return this.#m.get(k); } async set(k, v) { this.#m.set(k, String(v)); } async delete(k) { this.#m.delete(k); } }
 function spyPod() {
@@ -26,13 +26,13 @@ describe('a producer that does not own the circle root', () => {
     const vault = new MemVault();
     await vault.set('cc.circle-groupkey:c1', JSON.stringify({ version: 1, stale: true }));
     const pod = spyPod();
-    await createCirclePodProducer({ circleId: 'c1', storagePosture: 'p2', vault, generateKeypair, makePodClient: () => pod.client, circleRootUri: ROOT, ownsRoot: false });
+    await produceWithPair({ circleId: 'c1', storagePosture: 'p2', vault, generateKeypair, makePodClient: () => pod.client, circleRootUri: ROOT, ownsRoot: false });
     expect(pod.writes.filter((u) => u.includes('/.keys/'))).toEqual([]);
   });
 
   it('the owner still restores and bootstraps as before', async () => {
     const pod = spyPod();
-    await createCirclePodProducer({ circleId: 'c1', storagePosture: 'p2', vault: new MemVault(), generateKeypair, makePodClient: () => pod.client, circleRootUri: ROOT });
+    await produceWithPair({ circleId: 'c1', storagePosture: 'p2', vault: new MemVault(), generateKeypair, makePodClient: () => pod.client, circleRootUri: ROOT });
     expect(pod.writes.some((u) => u === `${ROOT}/.keys/group.json`)).toBe(true);
   });
 });

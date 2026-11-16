@@ -75,3 +75,32 @@ describe('screenForEmbedType', () => {
     expect(screenForEmbedType('request')).toBeNull();
   });
 });
+
+describe('itemKindChip — the small kind chip on a conversation item', () => {
+  it('plain chat carries none; a noticeboard ask reads as a request; lending has its own', async () => {
+    const { itemKindChip } = await import('../../src/v2/embedChips.js');
+    expect(itemKindChip('chat-message')).toBeNull();
+    expect(itemKindChip('message')).toBeNull();
+    expect(itemKindChip(undefined)).toBeNull();
+    expect(itemKindChip('ask')).toMatchObject({ type: 'request', labelKey: 'circle.embed.type.request' });
+    expect(itemKindChip('offer')).toMatchObject({ type: 'offer', icon: '🎁' });
+    expect(itemKindChip('lend')).toMatchObject({ type: 'lend', labelKey: 'circle.embed.type.lend' });
+    expect(itemKindChip('task')).toMatchObject({ type: 'task' });
+  });
+
+  it('a kind outside the vocabulary paints nothing, never its raw name', async () => {
+    const { itemKindChip } = await import('../../src/v2/embedChips.js');
+    expect(itemKindChip('circle-post')).toBeNull();
+  });
+
+  it('every chip type has a label in both locales', async () => {
+    const { itemKindChip } = await import('../../src/v2/embedChips.js');
+    const { readFileSync } = await import('node:fs');
+    for (const lang of ['nl', 'en']) {
+      const types = JSON.parse(readFileSync(new URL(`../../src/locales/circle.${lang}.json`, import.meta.url), 'utf8')).embed.type;
+      for (const k of ['ask', 'offer', 'lend', 'task', 'calendar-event', 'note']) {
+        expect(types[itemKindChip(k).type]?.text, `${lang}: ${k}`).toBeTruthy();
+      }
+    }
+  });
+});

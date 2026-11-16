@@ -60,20 +60,18 @@ describe('setMyHandle — per-circle handle uniqueness', () => {
     return bundle;
   }
 
-  it('rejects a handle another member of the circle already goes by', async () => {
+  it('accepts a name another member of the circle already goes by (two people may share a name)', async () => {
     const bundle = await circleWithBobAsJan();
-    const clash = await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, ANNE);
-    expect(clash.error).toBe('invalid-handle');
-    expect(clash.reason).toBe('handle-taken');
-    // The rejected claim did not change Anne's own profile.
-    expect((await callSkill(bundle.agent, 'getMyProfile', {}, ANNE)).entry?.handle ?? null).toBe(null);
+    const same = await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, ANNE);
+    expect(same.error).toBeUndefined();
+    expect((await callSkill(bundle.agent, 'getMyProfile', {}, ANNE)).entry?.handle).toBe('jan');
   });
 
-  it('is case-insensitive — `Jan` collides with a member on `jan`', async () => {
+  it('…in any case: "Jan" beside a member on "jan" is accepted and kept as typed', async () => {
     const bundle = await circleWithBobAsJan();
-    const clash = await callSkill(bundle.agent, 'setMyHandle', { handle: 'Jan' }, ANNE);
-    expect(clash.error).toBe('invalid-handle');
-    expect(clash.reason).toBe('handle-taken');
+    const same = await callSkill(bundle.agent, 'setMyHandle', { handle: 'Jan' }, ANNE);
+    expect(same.error).toBeUndefined();
+    expect(same.handle).toBe('Jan');
   });
 
   it('lets a member RE-SET their own current handle (not a collision)', async () => {
@@ -82,15 +80,15 @@ describe('setMyHandle — per-circle handle uniqueness', () => {
     const again = await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, ANNE);
     expect(again.error).toBeUndefined();
     expect(again.handle).toBe('jan');
-    // ...and re-setting via a different case is still fine for the owner.
+    // ...and re-setting via a different case is still fine for the owner (kept as typed).
     const cased = await callSkill(bundle.agent, 'setMyHandle', { handle: 'JAN' }, ANNE);
     expect(cased.error).toBeUndefined();
-    expect(cased.handle).toBe('jan');
+    expect(cased.handle).toBe('JAN');
   });
 
   it('still applies format validation before the uniqueness check', async () => {
     const bundle = await buildBundle();
-    const tooShort = await callSkill(bundle.agent, 'setMyHandle', { handle: 'an' }, BOB);
+    const tooShort = await callSkill(bundle.agent, 'setMyHandle', { handle: '   ' }, BOB);
     expect(tooShort.error).toBe('invalid-handle');
     expect(tooShort.reason).toBe('too-short');
   });
@@ -115,29 +113,27 @@ describe('join-redeem — per-circle handle uniqueness (admin/host side)', () =>
     return { bundle, code: r.code };
   }
 
-  it('rejects a second joiner claiming a handle already taken in the circle', async () => {
+  it('admits a second joiner with a name another member already has', async () => {
     const { bundle, code } = await adminWithCode();
     const first = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
       { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
     expect(first.error).toBeUndefined();
     expect(first.redemptionId).toBeTruthy();
 
-    const clash = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
+    const second = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
       { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE);
-    expect(clash.error).toBe('handle-taken');
-
-    // The rejected join must NOT have written a redemption for CAROL.
+    expect(second.error).toBeUndefined();
     const reds = await bundle.itemStore.listOpen({ type: 'membership-redemption' });
-    expect(reds.some((i) => i?.source?.redeemedBy === CAROL)).toBe(false);
+    expect(reds.some((i) => i?.source?.redeemedBy === CAROL)).toBe(true);
   });
 
-  it('is case-insensitive — `Jan` collides with a joiner already on `jan`', async () => {
+  it('admits "Jan" beside a joiner already on "jan"', async () => {
     const { bundle, code } = await adminWithCode();
     await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
       { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
     const clash = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
       { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'Jan' }, ANNE);
-    expect(clash.error).toBe('handle-taken');
+    expect(clash.error).toBeUndefined();
   });
 
   it('lets the SAME joiner re-present their own handle (not a collision)', async () => {

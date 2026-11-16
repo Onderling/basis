@@ -50,7 +50,7 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
     // Beheer is back since 2026-09-13). The gates beneath it are unchanged, observable through
     // `gatedActions`: viewAs + rules on by default, files hidden (lists+notes off), share dropped by the
     // platform gate (mobile-only).
-    expect(menuActions(el)).toEqual(['invite', 'settings', 'admin']);
+    expect(menuActions(el)).toEqual(['invite', 'settings', 'admin', 'governance']);
     const gated = gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
     expect(gated).toContain('viewAs');
     expect(gated).toContain('rules');
@@ -67,7 +67,7 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
     expect(gated).toContain('files');        // lists on (lists || notes)
     const el = mount();
     renderCircleView(el, { circle, rows: [], t, policy: noDir, more: fullMore() });
-    expect(menuActions(el)).toEqual(['invite', 'settings', 'admin']);   // the painted menu is the alpha's, whatever the gates
+    expect(menuActions(el)).toEqual(['invite', 'settings', 'admin', 'governance']);   // the painted menu is the alpha's, whatever the gates (Decisions back since 2026-11-14)
   });
 
   it('handler-presence gate: an action with no more[id] callback is omitted', () => {

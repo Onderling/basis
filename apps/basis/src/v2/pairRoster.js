@@ -173,6 +173,8 @@ export function createPairRoster({
     pairCircleIdFor: async (contactWebid) => pairCircleIdFor(await meFor(contactWebid), contactWebid),
     /** Where a message to this contact goes once the pair roster exists (see `pairRouteFor`). */
     routeFor: async (contactWebid) => pairRouteFor({ callSkill, selfWebid: await meFor(contactWebid), contactWebid }),
+    /** Every address the pair circle's roster knows (see `pairRosterAddressesFor`), or null when no pair circle is here. */
+    rosterAddressesFor: async (contactWebid) => pairRosterAddressesFor({ callSkill, selfWebid: await meFor(contactWebid), contactWebid }),
     /**
      * What this side's next turn to `contactWebid` should carry: `{ pairInvite }` when this side founds and the
      * contact is not on the roster yet; `{ pairRequest: true }` when the other side founds and no roster exists here;
@@ -266,18 +268,64 @@ export function createPairRoster({
  * no pair roster is here yet (the message goes to the profile address, as before) or the contact is not on it.
  * This is what closes the window after a revoke for every contact written to: the ceremony retires a stolen
  * device's address from the pair roster and announces the rotation there, and the profile address is not used.
+ *
+ * …AND A MEMBER'S PER-CIRCLE ADDRESS (2026-11-11): a thread opened at an address that is a member's circle address in
+ * one of my circles (the noticeboard's Ask does this by design) is CIRCLE traffic. The route is that circle: the turn
+ * leaves as MY per-circle address there, scoped to the circle's connection points (architecture §4, "per-peer is not
+ * enough for a circle"). Without it the turn left unscoped, signed with my canonical key: the member's device refused it
+ * (inside a circle only the per-circle key may speak), or routing took a transport that cannot carry a per-circle
+ * address (live NKN) and it was lost. ONE resolver for both: a pair roster when there is one, else the circle the
+ * address belongs to; a person address with neither keeps the profile path.
  */
 export async function pairRouteFor({ callSkill, selfWebid, contactWebid } = {}) {
+  if (typeof callSkill !== 'function' || typeof selfWebid !== 'string' || typeof contactWebid !== 'string' || !contactWebid || contactWebid === selfWebid) return null;
+  let mine;
+  try { mine = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { return null; }
+  // the pair circle with this contact, when it exists
+  try {
+    const circleId = pairCircleIdFor(selfWebid, contactWebid);
+    if (mine.includes(circleId)) {
+      const row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === contactWebid);
+      const to = typeof row?.circleAddress === 'string' && row.circleAddress ? row.circleAddress : null;
+      if (to) return { to, circleId, personKey: row.personKey ?? null };
+    }
+  } catch { /* no pair route; the circle-address route below may still answer */ }
+  // else: the address is a member's per-circle address in one of my circles → that circle is the route
+  for (const circleId of mine) {
+    if (isPairCircleId(circleId)) continue;   // a pair circle answered above or has no such row
+    try {
+      const row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [])
+        .find((m) => m?.circleAddress === contactWebid);
+      if (row) return { to: contactWebid, circleId, personKey: row.personKey ?? null };
+    } catch { /* an unreadable roster says nothing */ }
+  }
+  return null;
+}
+
+/**
+ * EVERY ADDRESS THE PAIR CIRCLE'S ROSTER KNOWS — for deciding whether an address a turn (or a receipt) came from
+ * belongs to this pair circle. `routeFor` names ONE address, the one my router would pick; the contact's other device
+ * writes from another per-circle address of the same circle, and a check against the one address alone calls it a
+ * stranger. Every address field of every roster row (per-circle address, signing key, stable id, webid); null when no
+ * pair circle is here or the roster cannot be read (no opinion — the caller decides what no opinion means).
+ *
+ * @returns {Promise<{ circleId: string, addresses: Set<string> }|null>}
+ */
+export async function pairRosterAddressesFor({ callSkill, selfWebid, contactWebid } = {}) {
   if (typeof callSkill !== 'function' || typeof selfWebid !== 'string' || typeof contactWebid !== 'string' || !contactWebid || contactWebid === selfWebid) return null;
   let circleId;
   try { circleId = pairCircleIdFor(selfWebid, contactWebid); } catch { return null; }
   try {
     const mine = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [];
     if (!mine.includes(circleId)) return null;
-    const row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === contactWebid);
-    const to = typeof row?.circleAddress === 'string' && row.circleAddress ? row.circleAddress : null;
-    if (!to) return null;
-    return { to, circleId, personKey: row.personKey ?? null };
+    const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
+    const addresses = new Set();
+    for (const m of rows) {
+      for (const v of [m?.circleAddress, m?.pubKey, m?.signingPublicKey, m?.addr, m?.stableId, m?.webid]) {
+        if (typeof v === 'string' && v) addresses.add(v);
+      }
+    }
+    return addresses.size ? { circleId, addresses } : null;
   } catch { return null; }
 }
 

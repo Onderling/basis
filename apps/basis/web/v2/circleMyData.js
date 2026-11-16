@@ -69,10 +69,12 @@ export function renderCircleMyData(container, {
   onUnpairConnection = null,
   // Pairing a NEW connection. `connectionChoices` = { ops, sections } already projected by the
   // shared module (the shell never derives a menu — the menu IS the manifest, projected once).
-  // `onPairConnection(args)` receives the compiled grant args; absent ⇒ no pairing form.
+  // `screenPairing` = the shared pairing (`appScreenPairing.js`): offer → pick one of three codes → grant; it is the
+  // only way from a pasted offer to the grant (the shell holds no format knowledge and never calls the op). `onPaired`
+  // re-reads the list after a grant. Absent ⇒ no pairing form.
   connectionChoices = null,
-  onPairConnection = null,
-  parseConnectionOffer = null,   // the shared parser, injected so the shell holds no format knowledge
+  screenPairing = null,
+  onPaired = null,
   notifications,
   onToggleNotifications,
   // The personal history mirror (a sealed copy of the device log on the user's own storage).
@@ -875,9 +877,10 @@ export function renderCircleMyData(container, {
     },
     'connection-add': () => {
       // ── pair a new connection ──────────────────────────────────────────────────────────────────
-      // Two steps on purpose. A person pastes what the other screen shows, and only THEN sees what
-      // they are about to hand over — deciding before you can see the choices is not consent.
-      if (typeof onPairConnection === 'function' && connectionChoices && typeof parseConnectionOffer === 'function') {
+      // Three steps on purpose. A person pastes what the other screen shows; picks, from three, the code that
+      // screen shows (the screen door: a planted offer yields a code they cannot find on their screen); and only
+      // THEN sees what they are about to hand over — deciding before you can see the choices is not consent.
+      if (screenPairing && connectionChoices) {
         const sec = section(tr('circle.mydata.connection_add'));
         const input = document.createElement('input');
         input.type = 'text';
@@ -890,6 +893,12 @@ export function renderCircleMyData(container, {
         note.className = 'cc-mydata__connection-note';
         note.style.cssText = 'font-size:.9em;opacity:.75;min-height:1.2em;';
         sec.appendChild(note);
+
+        // the screen door's step: three codes and 'none of these'
+        const codesBox = document.createElement('div');
+        codesBox.className = 'cc-mydata__connection-codes';
+        codesBox.hidden = true;
+        sec.appendChild(codesBox);
 
         const picker = document.createElement('div');
         picker.className = 'cc-mydata__connection-picker';
@@ -954,31 +963,58 @@ export function renderCircleMyData(container, {
         confirm.textContent = tr('circle.mydata.connection_confirm');
         picker.appendChild(confirm);
 
-        let offer = null;
-        input.addEventListener('input', () => {
-          const parsed = parseConnectionOffer(input.value.trim());
-          offer = parsed && parsed.ok ? parsed : null;
-          picker.hidden = !offer;
-          // A refusal names ITS OWN reason rather than a generic "invalid": a mistyped code, a code
-          // from a newer version and a code for something else entirely are different problems.
-          note.textContent = input.value.trim() === ''
-            ? ''
-            : (offer
-              ? tr('circle.mydata.connection_recognised', { name: offer.label || offer.viewPubKey.slice(0, 8) })
-              : tr(`circle.mydata.connection_offer_${(parsed && parsed.reason) || 'unreadable'}`));
+        // A refusal names ITS OWN reason rather than a generic "invalid": a mistyped code, a code from a newer
+        // version, a code for something else, a wrong pick and a late one are different problems.
+        const refused = (reason) => { note.textContent = tr(`circle.mydata.connection_offer_${reason || 'unreadable'}`); };
+        const reset = () => { codesBox.hidden = true; codesBox.textContent = ''; picker.hidden = true; };
+        let label = null;
+        input.addEventListener('input', async () => {
+          reset();
+          const text = input.value.trim();
+          if (text === '') { note.textContent = ''; screenPairing.cancel(); return; }
+          const r = await screenPairing.offer(text);
+          if (input.value.trim() !== text) return;   // typed on meanwhile: the newer text answers
+          if (!r.ok) { refused(r.reason); return; }
+          label = r.label || r.viewPubKey.slice(0, 8);
+          note.textContent = tr('circle.mydata.connection_pick_code');
+          const choose = async (code) => {
+            const p = await screenPairing.pick(code);
+            codesBox.hidden = true; codesBox.textContent = '';
+            if (!p.ok) { refused(p.reason); return; }
+            note.textContent = tr('circle.mydata.connection_recognised', { name: label });
+            picker.hidden = false;
+          };
+          for (const code of r.codes) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'cc-btn cc-btn--quiet cc-mydata__connection-code';
+            b.dataset.code = code;
+            b.textContent = code;
+            b.style.cssText = 'font-family:monospace;letter-spacing:.15em;margin:.2rem .4rem .2rem 0;';
+            b.addEventListener('click', () => choose(code));
+            codesBox.appendChild(b);
+          }
+          const none = document.createElement('button');
+          none.type = 'button';
+          none.className = 'cc-btn cc-btn--quiet cc-mydata__connection-none';
+          none.textContent = tr('circle.mydata.connection_none_of_these');
+          none.addEventListener('click', () => choose(''));
+          codesBox.appendChild(none);
+          codesBox.hidden = false;
         });
 
-        confirm.addEventListener('click', () => {
-          if (!offer) return;
+        confirm.addEventListener('click', async () => {
+          if (!screenPairing.picked) { refused('pairing-no-pick'); return; }
           // no self chosen where one must be: say so, grant nothing
           if (selfSelect && !selfSelect.value) { note.textContent = tr('circle.mydata.connection_pick_self'); return; }
           const picked = (box) => [...box.querySelectorAll('input[type=checkbox]')].filter((c) => c.checked).map((c) => c.value);
-          onPairConnection({
-            viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label,
+          const r = await screenPairing.grant({
             ops: picked(opsBox), sections: picked(secBox),
             ...(selfSelect ? { persona: selfSelect.value } : {}),
           });
-          input.value = ''; note.textContent = ''; picker.hidden = true; offer = null;
+          if (!r.ok) { refused(r.reason); if (r.reason === 'nothing-picked') return; }
+          input.value = ''; if (r.ok) note.textContent = ''; reset();
+          if (typeof onPaired === 'function') onPaired();
         });
         container.appendChild(sec);
       }

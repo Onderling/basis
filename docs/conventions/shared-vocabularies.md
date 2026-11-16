@@ -30,6 +30,7 @@ far end — which is usually the case. Duplicate vocabularies are nearly always 
 | **Circle templates** — the policy axes a new circle starts from | `apps/basis/src/v2/kringTemplates.js` | template seeds, user overrides per key |
 | **Action label maps** — action id → locale key | beside the logic that produces the actions | frozen + a test asserting exact membership |
 | **Item types** | `packages/item-types/` | schema registry |
+| **Item kind chip** — an item's kind as a person reads it (icon + word: task · appointment · request · offer · lend · note · message), on a conversation item, an embed chip and a row of news | `apps/basis/src/v2/embedChips.js` (`itemKindChip`, `newsKindIcons`) → labels in `circle.embed.type.*` | `embedChips.test.js`: every chip type has a label in both locales |
 | **Reply families** — what a person reads after an op ran: add · done · removed · chore · appointment · list (op id → family; one line per family, folded within a turn) | `apps/basis/src/v2/replyLine.js` (`REPLY_FAMILY`, `replyLine`, `replyLines`); the day in it is `whenWords.js` | `replyLine.test.js` — every op on the household bot's map that acts has a family |
 | **Reminder rules** — `morning` · `evening-before` · `before:<min>` · `at:<HH:MM>`, and each type's time anchor | `packages/item-types/src/reminderRules.js` (`REMINDER_RULE_KINDS`, `parseReminderRule`, `TIME_ANCHORS`) | `lint-duplicate-vocab`; `reminderRules.test.js` pins the four |
 

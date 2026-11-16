@@ -6,7 +6,7 @@
  * identities, instantiates createControlAgent, or wraps the circle pod-client." This
  * is that producer: for ONE circle it composes the S4 sealing substrate into a
  * per-circle storage producer —
- *   • a per-circle X25519 sealing identity (always, vault-backed), and
+ *   • the device's per-circle X25519 sealing key pair (the address key's image, handed in by the agent), and
  *   • for a SEALED posture (p2/p3): a per-circle control agent over the circle's
  *     pod-client — bootstrapped, holding the recipient-wrapped group key, ready to
  *     grant/seal on join and revoke/rotate on leave (forward secrecy).
@@ -21,10 +21,64 @@
  * storage in the browser, NO OIDC/CSS) — a real Solid pod-client is the env-gated
  * swap later. p0/p1 circles seal nothing → `controlAgent` is null (plain storage).
  */
-import { createCircleSealingIdentity } from './circleSealingIdentity.js';
 import { createCircleControlAgent } from './circleControlAgent.js';
+import { processRefusalLog } from './refusalLog.js';
+import { circleHasPod } from './circleDataPolicy.js';
 
 const SEALED_POSTURES = new Set(['p2', 'p3']);
+
+/** Does this storage posture seal content on the device (p2 group key, p3 recipient seal)? */
+export function isSealedPosture(posture) { return SEALED_POSTURES.has(posture); }
+
+/**
+ * Does this circle seal, by its policy: `true`, `false`, or `null` while the policy is NOT KNOWN yet (not read, or the read
+ * failed). A policy that was read and names no posture is a plaintext circle (p0). Unknown is never the plaintext answer:
+ * a write into a circle whose posture is not known yet is refused like a sealed one.
+ * @param {object|null|undefined} policy
+ * @returns {boolean|null}
+ */
+// a JOINED circle whose policy has not arrived yet (`policyPending`) is not known either: its writes are refused
+export function sealedAnswer(policy) { return (policy == null || policy.policyPending === true) ? null : isSealedPosture(policy.storagePosture ?? 'p0'); }
+
+/**
+ * A sealed circle's producer is built only with the device's per-circle sealing key pair (the address key's image):
+ * the key every member's grant wraps to. Without it there is NO producer yet — never a stand-in key. A random
+ * per-circle key kept in the vault used to stand in when the agent was not up yet (a page that opened a circle before
+ * its agent existed): the device then opened the circle's key with a key nobody had wrapped to ("not a recipient"),
+ * and kept doing so, because the producer was cached for the page's life. The shell notes the circle and builds the
+ * producer when the key pair is there (`createProducerKeyWait`).
+ */
+export class SealingKeyPairMissingError extends Error {
+  constructor(circleId) {
+    super(`circle ${String(circleId).slice(0, 12)}… is sealed and this device has no sealing key pair for it yet — no producer until it has`);
+    this.name = 'SealingKeyPairMissingError';
+    this.code = 'NO_SEALING_KEY_PAIR';
+    this.circleId = circleId;
+  }
+}
+
+/**
+ * The circles whose producer waits for this device's key pair, and the one re-drive: when the shell binds its agent
+ * (the moment the key pairs exist), it drains the list through its own `ensureCirclePod`. No timer: the bind is the
+ * event. Both shells compose it (the box builds no circle producer).
+ * @returns {{ note: (circleId:string, policy:object) => void, drain: (ensure:(circleId:string, policy:object)=>Promise<any>) => Promise<number>, size: () => number }}
+ */
+export function createProducerKeyWait() {
+  const waiting = new Map();   // circleId → the policy it was asked with
+  return {
+    note(circleId, policy) { if (circleId) waiting.set(circleId, policy); },
+    async drain(ensure) {
+      const list = [...waiting.entries()];
+      waiting.clear();
+      let n = 0;
+      for (const [circleId, policy] of list) {
+        try { if (await ensure(circleId, policy)) n += 1; } catch { /* the shell's ensure reports its own failure */ }
+      }
+      return n;
+    },
+    size: () => waiting.size,
+  };
+}
 
 /** A no-op ACL sharing: an in-memory pseudo-pod has no ACL layer; real grant/revoke is env-gated. */
 function memorySharing() {
@@ -61,6 +115,9 @@ export async function createCirclePodProducer({
   sharing,
   bootstrap = true,
   ownsRoot = true,
+  // whether THIS device may establish the circle's first key (`selfMayEstablishKey`: its self is an admin there). Absent:
+  // allowed, as before (a composition that does not say). A member's device never mints a first key of its own.
+  mayEstablish = null,
   keyEventLog = null,
   sealingKeyPair = null,
   controllerKeyPrefix = 'cc.circle-controller-key',
@@ -91,15 +148,14 @@ export async function createCirclePodProducer({
   // ONE sealing key family (2026-09-04): the device's sealing keypair is the ed2curve image of its
   // per-circle ADDRESS key, handed in by the agent (`circleSealingKeyPairFor`). Every grant in the
   // circle already wraps to `sealingPublicKeyFromNetworkKey(address)`; opening with anything else
-  // meant a member's own group key was wrapped to a key it did not hold. The random per-circle vault
-  // identity remains only for a host with no agent (the producer's own tests).
-  const sealingIdentity = (sealingKeyPair?.publicKey && sealingKeyPair?.privateKey)
-    ? {
-      ensure: async () => sealingKeyPair,
-      publicKey: async () => sealingKeyPair.publicKey,
-      rosterEntry: async (webId, role = 'member') => ({ webId: String(webId), publicKey: sealingKeyPair.publicKey, role }),
-    }
-    : createCircleSealingIdentity({ circleId, store: vault });
+  // meant a member's own group key was wrapped to a key it did not hold. No key pair → no producer
+  // (SealingKeyPairMissingError): there is no stand-in key.
+  if (!sealingKeyPair?.publicKey || !sealingKeyPair?.privateKey) throw new SealingKeyPairMissingError(circleId);
+  const sealingIdentity = {
+    ensure: async () => sealingKeyPair,
+    publicKey: async () => sealingKeyPair.publicKey,
+    rosterEntry: async (webId, role = 'member') => ({ webId: String(webId), publicKey: sealingKeyPair.publicKey, role }),
+  };
   const selfKey = await sealingIdentity.ensure();   // {publicKey, privateKey}
   if (typeof generateKeypair !== 'function' || typeof makePodClient !== 'function') {
     throw new Error('createCirclePodProducer: a sealed (p2/p3) circle needs generateKeypair + makePodClient');
@@ -134,23 +190,52 @@ export async function createCirclePodProducer({
   // The pod WebIDs members gave at redemption (roster ref → WebID): kept on THIS device only, never on the roster or
   // the pod, so the next boot's roster seed grants and later revokes the identity a member's pod session holds.
   const podAgentsVaultKey = `${groupKeyPrefix}:pod-agents:${circleId}`;
+  // WHO EACH KEY WAS GRANTED FOR, by THIS device (the audience round's only source): written when this device's grant
+  // ADDED the key to the file, never when the key was already a recipient (so presenting someone else's address finds
+  // the key there and leaves no note); the first note for a key stands; this device's revoke removes it. Beside the
+  // pod-agents note: this device only, never on the pod, the roster or the lane.
+  const holderNotesVaultKey = `${groupKeyPrefix}:key-holders:${circleId}`;
+  let holderNotes = {};
+  try { const raw = await vault.get(holderNotesVaultKey); if (raw) holderNotes = JSON.parse(raw) ?? {}; } catch { holderNotes = {}; }
+  const saveHolderNotes = async () => { try { await vault.set(holderNotesVaultKey, JSON.stringify(holderNotes)); } catch { /* best-effort */ } };
+  const keyHolders = {
+    of: (key) => (typeof holderNotes[key] === 'string' ? holderNotes[key] : null),
+    async note(key, person) {
+      if (typeof key !== 'string' || !key || typeof person !== 'string' || !person || holderNotes[key]) return false;
+      holderNotes[key] = person; await saveHolderNotes(); return true;
+    },
+    async forget(key) { if (!(key in holderNotes)) return false; delete holderNotes[key]; await saveHolderNotes(); return true; },
+    forgetPerson: async (person) => { let n = 0; for (const [k, p] of Object.entries(holderNotes)) if (p === person) { delete holderNotes[k]; n += 1; } if (n) await saveHolderNotes(); return n; },
+  };
   let savedPodAgents = {};
   try { const raw = await vault.get(podAgentsVaultKey); if (raw) savedPodAgents = JSON.parse(raw) ?? {}; } catch { savedPodAgents = {}; }
-
-  const savedRes = await vault.get(groupKeyVaultKey);
-  if (savedRes && ownsRoot) {
-    try { await podClient.write(keyResourceUri, savedRes, { contentType: 'application/json' }); } catch { /* fresh-bootstrap below */ }
-  }
 
   // Include THIS device's own per-circle sealing identity in the bootstrap roster, so the
   // local member is a recipient of the group key and can seal/open the circle's content
   // (otherwise only the abstract controller key could). Dedupe by publicKey.
   const selfEntry = { webId: `circle:${circleId}:self`, publicKey: selfKey.publicKey, role: 'member' };
   const fullRoster = roster.some((m) => m?.publicKey === selfKey.publicKey) ? roster : [...roster, selfEntry];
+  // ONLY A DEVICE THAT MAY ADMIT ESTABLISHES THE CIRCLE'S FIRST KEY. In a circle without a pod every device 'owns' the
+  // root (its own local store), so a member's producer minted its own first key (at its bootstrap, and in addMember
+  // when its key store was empty) and sealed under it, unreadable to the founder (2026-11-14). A member's device takes
+  // the key from the key log instead (strategyFromKeyLog).
+  let mayMint = true;
+  if (typeof mayEstablish === 'function') {
+    let answer = null;
+    try { answer = await mayEstablish(); } catch { answer = null; }
+    // CANNOT TELL (the roster not readable, or not holding this self yet): no producer YET, as a missing key pair —
+    // the shell keeps nothing and asks again at the next ask (never 'may', never 'may not' kept for good)
+    if (answer !== true && answer !== false) {
+      const err = new Error(`createCirclePodProducer: cannot tell yet whether this device may establish circle ${circleId}'s first key`);
+      err.code = 'ESTABLISH_NOT_KNOWN';
+      throw err;
+    }
+    mayMint = answer;
+  }
   const controlAgent = createCircleControlAgent({
     circleId, storagePosture, podClient,
     sharing: sharing ?? memorySharing(),
-    controllerKey, circleRootUri: root, roster: fullRoster, podAgents: savedPodAgents,
+    controllerKey, circleRootUri: root, roster: fullRoster, podAgents: savedPodAgents, mayEstablish: mayMint,
     // No-pod distribution: the control agent fans every versioned key AS a log key-event through this
     // sink (rotation on remove → fanned to the REMAINING members only, backward secrecy). Absent → pod-only.
     keyEventLog,
@@ -166,9 +251,18 @@ export async function createCirclePodProducer({
     try { if (controlAgent?.podAgents) await vault.set(podAgentsVaultKey, JSON.stringify(controlAgent.podAgents())); } catch { /* best-effort */ }
   }
 
-  if (bootstrap && ownsRoot && controlAgent) { await controlAgent.bootstrap(); await persistGroupKey(); }
+  // The vault copy goes back ONLY where the pod holds nothing (the in-memory pod after a reload); on a pod that holds the
+  // file, the pod wins and the copy is refreshed from it below (persistGroupKey). Through the one key-resource write.
+  if (ownsRoot && controlAgent) {
+    let saved = null;
+    try { const raw = await vault.get(groupKeyVaultKey); saved = raw ? JSON.parse(raw) : null; } catch { saved = null; }
+    if (saved) { try { await controlAgent.restoreIfEmpty(saved); } catch { /* fresh bootstrap below */ } }
+  }
+  if (bootstrap && ownsRoot && controlAgent && mayMint) { await controlAgent.bootstrap(); await persistGroupKey(); }
 
-  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey };
+  // `keyFromLog`: a member's device of a circle whose root it holds locally (no pod) but whose first key it may not
+  // establish: its key is the KEY LOG's (strategyFromKeyLog), never a copy in its own store that would not move on
+  return { circleId, storagePosture, sealingIdentity, controlAgent, podClient, circleRootUri: root, persist: persistGroupKey, ownsRoot, keyFromLog: ownsRoot && !mayMint, controllerPublicKey: controllerKey.publicKey, keyHolders };
 }
 
 /**
@@ -182,7 +276,23 @@ export async function createCirclePodProducer({
  * @param {(circleId:string) => (object|Promise<object|null>)} getProducer  resolve a circle's producer.
  * @returns {{ addMember: Function, removeMember: Function }}
  */
-export function createCircleControlAgentRouter(getProducer) {
+/**
+ * Keep a joiner's pod WebID in this device's pod-agents note for a circle whose producer is not built yet: the producer
+ * reads the note when it is built, and the seed's grant then names that WebID. Device-local (the producer's own vault
+ * key): never the roster, the lane or the pod.
+ * @param {{ vault: {get: Function, set: Function}, circleId: string, webId: string, podAgent: string, groupKeyPrefix?: string }} a
+ */
+export async function notePodAgentFor({ vault, circleId, webId, podAgent, groupKeyPrefix = 'cc.circle-groupkey' }) {
+  if (!vault || !circleId || !webId || typeof podAgent !== 'string' || !podAgent) return false;
+  const key = `${groupKeyPrefix}:pod-agents:${circleId}`;
+  let saved = {};
+  try { const raw = await vault.get(key); if (raw) saved = JSON.parse(raw) ?? {}; } catch { saved = {}; }
+  if (saved[webId] === podAgent) return false;
+  await vault.set(key, JSON.stringify({ ...saved, [webId]: podAgent }));
+  return true;
+}
+
+export function createCircleControlAgentRouter(getProducer, { refusals = null, memberStatusOf = null, audienceCheck = null, policyOf = null, ensureCirclePod = null, notePodAgent = null } = {}) {
   // Best-effort, and LOUD when it fails. Sealing degrading gracefully is the intended posture — a
   // membership event must not fail because a circle's pod is unreachable. But this catch sat between
   // the caller and every key operation, so a control-agent that threw looked exactly like one that
@@ -194,33 +304,106 @@ export function createCircleControlAgentRouter(getProducer) {
     const prod = await getProducer(groupId);
     if (!prod?.controlAgent) return null;            // circle not sealed / producer not live → no-op (null: nothing routed)
     // the control agent's own answer — or `{ routed: true }` — so a caller can tell a routed act from no producer
-    try { const out = await fn(prod.controlAgent); await prod.persist?.(); return out ?? { routed: true }; }
+    try {
+      const out = await fn(prod.controlAgent);
+      await prod.persist?.();
+      // after a membership event: one audience round on the key owner's device (its own rotation is not a membership
+      // event, so a revoke there never starts another round)
+      if (typeof audienceCheck === 'function' && prod.ownsRoot === true) { try { await audienceCheck(groupId, prod); } catch { /* said inside */ } }
+      return out ?? { routed: true };
+    }
     catch (err) {
       console.warn(
         `[circlePods] ${what} did not reach circle ${groupId}'s group key → the key audience is unchanged:`,
         err?.message ?? err,
       );
+      // a key change that was NOT made says so in the device's log, with its reason (never an id): another device kept
+      // changing the key, or the roster could not say whether the member is still a member
+      const reason = { KEY_WRITE_CONTENDED: 'key-write-contended', MEMBER_UNKNOWN: 'member-unknown', KEY_WRITE_UNCONDITIONED: 'key-write-unconditioned' }[err?.code] ?? null;
+      if (reason) (refusals ?? processRefusalLog()).note({ tag: 'key', lane: 'key', check: String(what).split(' ')[0], reason });
     }
   };
   return {
-    async addMember({ webId, publicKey, role, groupId, podAgent = null }) {
+    async addMember({ webId, publicKey, role, groupId, podAgent = null, admittedBy = null }) {
       if (!webId || !publicKey) return;
-      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role, podAgent }), `granting ${webId}`);
+      // AN ADMISSION NEVER ROUTES ITS GRANT TO NOTHING. The producer is built when the circle is opened; an admission
+      // before that (the circle not opened since a restart) found none: no key change, no key event, the newcomer had no
+      // key (and on a pod circle the joiner's pod WebID, which travels only to this grant, was lost). So: build the
+      // producer now for any circle that seals or has a pod; with still none, keep the WebID in this
+      // device's pod-agents note for the seed to use when the producer is built.
+      if (groupId && typeof ensureCirclePod === 'function' && typeof policyOf === 'function' && !(await getProducer(groupId))?.controlAgent) {
+        try { const policy = await policyOf(groupId); if (policy && (isSealedPosture(policy.storagePosture) || circleHasPod(policy.pod))) await ensureCirclePod(groupId, policy); }
+        catch { /* the note below keeps the WebID */ }
+      }
+      if (podAgent && typeof notePodAgent === 'function' && !(await getProducer(groupId))?.controlAgent) {
+        try { await notePodAgent(groupId, webId, podAgent); } catch { /* nothing more to keep */ }
+        return;
+      }
+      // asked again on EVERY compute of the key change: is the member still in after the admission this grant follows
+      // (`admittedBy`: the join's hash; none: their last folded join)? in → go on, out → the change is dropped (the
+      // removal stands), cannot place → MemberUnknownError: nothing written, refusal-logged
+      const isMember = typeof memberStatusOf === 'function'
+        ? async () => { const st = await memberStatusOf(groupId, webId, admittedBy); return st === 'in' ? true : st === 'out' ? false : null; }
+        : null;
+      await route(groupId, async (ca) => {
+        const out = await ca.addMember({ webId, publicKey, role, podAgent, isMember });
+        if (out?.added) { const prod = await getProducer(groupId); await prod?.keyHolders?.note?.(publicKey, webId); }
+        return out;
+      }, `granting ${webId}`);
     },
     async removeMember({ webId, force, policy, groupId }) {
       if (!webId) return;
-      await route(groupId, (ca) => ca.removeMember({ webId, force, policy }), `revoking ${webId}`);
+      await route(groupId, async (ca) => {
+        const out = await ca.removeMember({ webId, force, policy });
+        if (out?.removed) { const prod = await getProducer(groupId); await prod?.keyHolders?.forgetPerson?.(webId); }
+        return out;
+      }, `revoking ${webId}`);
     },
     // Device-grained audience surgery (the custody arc): the member stays; one of their devices'
     // sealing keys joins or leaves the group key's audience.
-    async grantRecipient({ publicKey, groupId }) {
+    async grantRecipient({ publicKey, groupId, ownerWebId = null, ownDevice = false }) {
       if (!publicKey) return;
-      return route(groupId, (ca) => ca.grantRecipient?.({ publicKey }), 'enrolling a device');
+      // a member's DEVICE joins the key's audience only while its OWNER is in (their last join, asked on every compute).
+      // Only THIS device's own address (the point granting itself, a rotation past an old address: realAgent) says so
+      // explicitly and asks nothing; a grant with neither an owner nor that flag is refused, never made unasked.
+      if (!ownerWebId && ownDevice !== true) {
+        console.warn(`[circlePods] enrolling a device in circle ${groupId} refused: no owner named`);
+        (refusals ?? processRefusalLog()).note({ tag: 'key', lane: 'key', check: 'enrolling', reason: 'member-unknown' });
+        return null;
+      }
+      const isMember = (typeof memberStatusOf === 'function' && ownerWebId)
+        ? async () => { const st = await memberStatusOf(groupId, ownerWebId, null); return st === 'in' ? true : st === 'out' ? false : null; }
+        : null;
+      return route(groupId, async (ca) => {
+        const out = await ca.grantRecipient?.({ publicKey, isMember });
+        if (out?.granted && ownerWebId) { const prod = await getProducer(groupId); await prod?.keyHolders?.note?.(publicKey, ownerWebId); }
+        return out;
+      }, 'enrolling a device');
     },
     async revokeRecipient({ publicKey, policy, groupId }) {
       if (!publicKey) return;
-      return route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }), 'revoking a device');
+      return route(groupId, async (ca) => {
+        const out = await ca.revokeRecipient?.({ publicKey, policy });
+        if (out?.rotated) { const prod = await getProducer(groupId); await prod?.keyHolders?.forget?.(publicKey); }
+        return out;
+      }, 'revoking a device');
     },
+  };
+}
+
+/**
+ * The router's `memberStatusOf`, over the waist: pinboard's memberStatus (in / out / null). A read that fails answers
+ * null (cannot say), never a yes.
+ * @param {(app:string, op:string, args:object) => Promise<any>} callSkill
+ * @returns {(groupId:string, webid:string, after:(string|null)) => Promise<'in'|'out'|null>}
+ */
+export function memberStatusReader(callSkill) {
+  return async (groupId, webid, after = null) => {
+    if (typeof callSkill !== 'function') return null;
+    try {
+      const r = await callSkill('pinboard', 'memberStatus', { groupId, webid, ...(after ? { after } : {}) });
+      return r?.status === 'in' || r?.status === 'out' ? r.status : null;
+    } catch { return null; }
   };
 }
 

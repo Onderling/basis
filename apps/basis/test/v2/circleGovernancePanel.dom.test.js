@@ -115,12 +115,16 @@ describe('renderGovernancePanel', () => {
     const onDismissReport = vi.fn(); const onActReport = vi.fn();
     renderGovernancePanel(c, {
       view: { open: [], closed: [] }, t: (k) => k, isAdmin: true, onSetClass: () => {},
-      reports: [{ reportId: 'r1', targetType: 'member', targetRef: 'm2', targetLabel: 'Kees', reason: 'spam' }],
+      // the member is named by THIS admin's roster (reportNameOf), not by the reporter's label (L897)
+      reports: [{ reportId: 'r1', targetType: 'member', targetRef: 'm2', targetLabel: 'that guy', reason: 'spam' }],
+      reportNameOf: (ref) => (ref === 'm2' ? 'Kees' : null),
       onDismissReport, onActReport,
     });
     const card = c.querySelector('.circle-governance__report[data-report="r1"]');
     expect(card).toBeTruthy();
     expect(c.textContent).toContain('Kees');
+    expect(c.textContent).not.toContain('that guy');
+    expect(c.textContent).not.toContain('m2');
     expect(c.textContent).toContain('spam');
     c.querySelector('.circle-governance__report-act').click();
     expect(onActReport).toHaveBeenCalledWith('r1');

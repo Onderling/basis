@@ -27,14 +27,14 @@ export { OFFERING_AXES };
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
 import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat } from '../../v2/circleTemplates.js';
-import { CIRCLE_POLICY_ENUMS, CIRCLE_FEATURES } from '../../v2/circlePolicy.js';
+import { CIRCLE_POLICY_ENUMS, CIRCLE_FEATURES, DRAWN_SAMPLE_ENABLED } from '../../v2/circlePolicy.js';
 import { INVITE_CEILING_FALLBACK } from '@onderling-app/pinboard/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 // The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
-import { loadPersonas, loadPriorHandles, handleSuggestions, isValidHandle, personaLabel } from './joinGroupState.js';
+import { loadPersonas, loadPriorHandles, handleSuggestions, isValidName, personaLabel } from './joinGroupState.js';
 import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
-export { loadPersonas, isValidHandle, personaLabel };
+export { loadPersonas, isValidName, personaLabel };
 
 // How long the founder's release may take after the create has answered — it runs after the wizard, never in it.
 // Parameter register (#36), device-scoped, internal.
@@ -55,11 +55,18 @@ export const LEAVE_POLICIES = Object.freeze([
   { id: 'notify-first', label: 'Leavers notify the circle before going' },
 ]);
 
-export const CONFLICT_POLICIES = Object.freeze([
+/** The conflict answer → the class that decides a removal (the drawn pair is `random-sample`, size 2, unanimous). */
+export const CONFLICT_TO_CLASS = Object.freeze({ 'admin-decides': 'any-admin', mediation: 'random-sample', vote: 'member-vote' });
+
+/** Every conflict answer the wizard knows. */
+export const ALL_CONFLICT_POLICIES = Object.freeze([
   { id: 'admin-decides', label: 'Admin decides' },
   { id: 'mediation',     label: 'Mediation by two random members' },
   { id: 'vote',          label: 'Member vote' },
 ]);
+
+/** The conflict answers the wizard OFFERS ("two random members mediate" only once the drawn sample is enabled). */
+export const CONFLICT_POLICIES = Object.freeze(ALL_CONFLICT_POLICIES.filter((p) => DRAWN_SAMPLE_ENABLED || p.id !== 'mediation'));
 
 /**
  * The wizard's storage choices. The IDS are not written here — they are the canonical posture names,
@@ -134,12 +141,29 @@ export function setAdvanced(state, on) {
   return { ...state, advanced: on === true };
 }
 
-/** The purpose a circle gets when nobody typed one: its kind's own sentence, never an empty value. */
-export function purposeOrDefault(state, t) {
-  const typed = String(state?.purpose ?? '').trim();
-  if (typed) return typed;
-  const kind = CIRCLE_KINDS.includes(state?.kind) ? state.kind : 'other';
-  return typeof t === 'function' ? t(`circle.wizard.create.default_purpose_${kind}`) : '';
+/** The kinds the first step asks: the templates that exist, then "other" (no template: the neutral defaults). */
+export const CREATE_KIND_CHOICES = Object.freeze([...CIRCLE_KINDS, 'other']);
+
+/** The purpose a kind suggests: its own sentence, shown in the field where the person can change it; none for "other". */
+export function suggestedPurpose(kind, t) {
+  return CIRCLE_KINDS.includes(kind) && typeof t === 'function' ? t(`circle.wizard.create.default_purpose_${kind}`) : '';
+}
+
+/**
+ * THE KIND, PICKED ON THE FIRST STEP: its template fills what the circle can do (`setKind`), and its sentence goes into
+ * the purpose field as a suggestion the person sees. Another pick replaces a suggestion they did not touch; what they
+ * typed stays. Nothing is chosen for them: a new circle has no kind until this is called.
+ */
+export function chooseKind(state, kind, t) {
+  const before = String(state?.purpose ?? '');
+  const untouched = !before.trim() || before === suggestedPurpose(state?.kind, t);
+  const next = setKind(state, kind);
+  return { ...next, kind, purpose: untouched ? suggestedPurpose(kind, t) : before };
+}
+
+/** The purpose a circle is made with: what the field holds. Nothing is filled in that the person did not see. */
+export function purposeOrDefault(state) {
+  return String(state?.purpose ?? '').trim();
 }
 /** The state as it is created: the defaults the short path did not ask for filled in (`t` for the purpose's words). */
 export function withCreateDefaults(state, t) {
@@ -343,6 +367,14 @@ export function policyPatchFromState(state) {
   if (s.consensusRequired !== undefined) {
     patch.governance = { changePolicy: s.consensusRequired ? 'admin-quorum' : 'any-admin' };
   }
+  // The conflict question COMPILES too (Frits 2026-11-10: make the mediation real): who decides a removal (and a
+  // report, which rides the removal class) is what the founder answered. It used to be text in the rules, read by
+  // nothing, while any one admin removed whoever they liked.
+  const removal = s.conflictPolicy === 'mediation' && !DRAWN_SAMPLE_ENABLED ? null : CONFLICT_TO_CLASS[s.conflictPolicy];   // the drawn sample is held back
+  if (removal) {
+    patch.governance = { ...(patch.governance ?? {}), removeMember: removal };
+    if (removal === 'random-sample') patch.decisionSample = { size: 2, rule: 'unanimous' };   // two drawn members, both agree
+  }
   // Decision 3 — the two fields the reader has always asked for and nobody ever wrote. Without them a
   // circle cannot remember which template made it, so its conversation has no relation to the kind its
   // creator chose (S3/J-CW2, J-CW3).
@@ -354,11 +386,11 @@ export function policyPatchFromState(state) {
 /* ─── Initial state ─────────────────────────────────────────── */
 
 export function initialState() {
-  // a household by default (the short path asks no kind): its template fills what the circle can DO, as a pick would —
-  // but not who sees whose name. A create that never asked must not widen that: members see each other's names per
-  // pair until someone chooses "everyone" under Geavanceerd (`setRevealPolicy`) or in settings afterwards. Held as a
-  // touched axis, so no kind picked in the fold moves it either — only the reveal choice itself does.
-  return markAxisTouched({ ...setKind(blankState(), 'household'), revealPolicy: 'pairwise' }, 'revealPolicy');
+  // NO KIND until the person picks one on the first step (`chooseKind`): the neutral template fills the axes meanwhile,
+  // and the step cannot be left without a kind (`identityComplete`). Who sees whose name stays per pair until someone
+  // chooses "everyone" under Geavanceerd (`setRevealPolicy`) or in settings afterwards; held as a touched axis, so no
+  // kind picked moves it — only the reveal choice itself does.
+  return markAxisTouched({ ...setKind(blankState(), null), kind: null, revealPolicy: 'pairwise' }, 'revealPolicy');
 }
 
 /** Who sees whose name in the circle — the choice under Geavanceerd, worded for both shells and the review. */
@@ -411,7 +443,7 @@ function blankState() {
     // Step 3 — rules & conflict
     // 5.5a — structured v2 rules doc (purpose syncs from Step 1 at submit).
     rulesDoc:              { ...DEFAULT_RULES_DOC },
-    conflictPolicy:        'mediation',
+    conflictPolicy:        DRAWN_SAMPLE_ENABLED ? 'mediation' : 'admin-decides',   // mediation is held back for the alpha
     // Step 4 — offerings (5.5c): a list of `{name,openness,posture,status,radius}`
     // rows; rows without a name are dropped at submit.
     offerings:             [],
@@ -506,18 +538,18 @@ export async function loadFounderHandle({ callSkill } = {}) {
 }
 
 /**
- * THE HANDLE THE FOUNDER IS OFFERED: their own name first — the name of the persona the circle is founded as, else
- * the profile's name — lowercased into a handle ("Tester B" → "tester-b"), then the handles they used before. A prior
- * handle never pushes the name out: a walk (2026-11-05) offered only "pzwopwk1", an id-derived handle from an earlier
- * circle, to a person called "Tester B".
+ * THE NAME THE FOUNDER IS OFFERED: their own name first, as they write it: the name of the persona the circle is
+ * founded as, else the profile's name ("Tester B"), then the names they used before. A prior name never pushes the
+ * own name out: a walk (2026-11-05) offered only "pzwopwk1", an id-derived handle from an earlier circle, to a person
+ * called "Tester B".
  *
  * @param {{ personaName?: string|null, profileName?: string|null, prior?: string[] }} a
- * @returns {string[]}  at most 8, valid handles, no repeats
+ * @returns {string[]}  at most 8, valid names, no repeats
  */
 export function founderHandleSuggestions({ personaName = null, profileName = null, prior = [] } = {}) {
-  const fromName = (n) => (typeof n === 'string' && n.trim() ? handleSuggestions(n).slice(0, 1) : []);
+  const fromName = (n) => (typeof n === 'string' && isValidName(n) ? [n.trim()] : []);
   const own = [...fromName(personaName), ...fromName(profileName)];
-  const before = handleSuggestions(Array.isArray(prior) ? prior : [], '');
+  const before = handleSuggestions(Array.isArray(prior) ? prior : []);
   return [...new Set([...own, ...before])].slice(0, 8);
 }
 
@@ -528,10 +560,11 @@ export function founderHandleSuggestionsFor(state) {
   return founderHandleSuggestions({ personaName, profileName: state?.profileName ?? null, prior: state?.priorHandles ?? [] });
 }
 
-/** Can the identity step be left? A name, a valid id, and — when the founder needs one — a valid handle. */
+/** Can the identity step be left? A name, a valid id, a kind, and — when the founder needs one — a valid handle. */
 export function identityComplete(state) {
   if (!state?.name?.trim() || !isValidSlug(state.groupId)) return false;
-  return !state.needsHandle || isValidHandle(String(state.handle ?? '').trim());
+  if (!CREATE_KIND_CHOICES.includes(state.kind)) return false;   // the kind is asked, never assumed
+  return !state.needsHandle || isValidName(String(state.handle ?? '').trim());
 }
 
 export function founderPersonaName(state, t = null) {
@@ -717,7 +750,7 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
     // they are on — this new circle included. After the create, bounded; `named` is its outcome.
     let named = Promise.resolve(false);
     const handle = String(state.handle ?? '').trim();
-    if (state.needsHandle && isValidHandle(handle)) {
+    if (state.needsHandle && isValidName(handle)) {
       // named by the new circle, so a circle made AS a persona names the persona and never renames the default self
       named = withinMs(Promise.resolve().then(() => callSkill('pinboard', 'setMyHandle', { handle, groupId: result.groupId })), releaseTimeoutMs)
         .then((r) => !r?.error)

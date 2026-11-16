@@ -41,6 +41,12 @@ export const DELIVERY_REASON_LABELS = Object.freeze({
   'persona-no-connection': 'circle.chat.delivery.persona_no_connection',
   // …or the message is HELD for that reason (a hold-forward send): waiting, not failed — it goes out by itself
   'persona-waiting': 'circle.chat.delivery.persona_waiting',
+  // a turn to a contact held on this device until it has a connection (no connection point yet): waiting, not failed
+  'held': 'circle.chat.delivery.held_waiting',
+  // the one person this turn was for could not be reached right now — retrying helps once they are
+  'peer-unreachable': 'circle.chat.delivery.peer_unreachable',
+  // a turn held for an address this device could not tie to anyone (the send gate), and given up at its time limit
+  'unknown-address': 'circle.chat.delivery.unknown_address',
 });
 
 /**

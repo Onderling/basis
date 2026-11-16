@@ -22,8 +22,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 
 import {
   bootRealAgentNode, connectAgentsOverBus, pairCircle,
-  goOffline, goOnline, until, teardown,
-} from './support/pairRealAgents.js';
+  goOffline, goOnline, until, teardown, sendInCircle } from './support/pairRealAgents.js';
 
 const CIRCLE_ID = 'offline-chores';
 // A known-paired peer → no first-contact HI wait / no handshake backoff needed.
@@ -63,8 +62,8 @@ describe('offline delivery for a REAL circle task on the signed lane (held at th
     await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Offline chores', handle: 'bee' });
 
     // Warm the handshake while both are online so the later hold is a real offline-hold.
-    const warm = await A.agent.sendPeerMessage(
-      B.pubKey, { type: 'p2p-chat', subtype: 'chat-message', msgId: 'warm-1', body: 'warm' }, WARM,
+    const warm = await sendInCircle(A, B, CIRCLE_ID,
+      { type: 'p2p-chat', subtype: 'chat-message', msgId: 'warm-1', body: 'warm' }, WARM,
     );
     expect(warm.held, 'online send delivers immediately (not held)').toBe(false);
     await until(() => B.received.find((m) => m.payload?.body === 'warm'));

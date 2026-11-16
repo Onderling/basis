@@ -181,16 +181,19 @@ describe('createSecureAgent — S1 mute + helloGate', () => {
     await a2.shutdown();
   });
 
-  it('sendTo throws when target is muted', async () => {
+  // A block is about DIRECT contact (Frits 2026-11-12) and this layer cannot tell a direct message from circle traffic,
+  // so it enforces nothing: it keeps the list and answers `covers`; the app's direct doors and direct send ask it.
+  it('a blocked peer is covered by the list, and this layer does not refuse a send to them', async () => {
     const fakeNkn = makeFakeNkn({ address: 'app.fake.123' });
     const sa = await createSecureAgent({
       vault: new VaultMemory(), nknLib: fakeNkn,
     });
     await sa.peer.connect();
     await sa.mute.add('app.peer.456');
-    await expect(
-      sa.peer.sendTo('app.peer.456', { type: 'p2p-chat', body: 'hi' })
-    ).rejects.toThrow(/muted/);
+    expect(await sa.mute.covers('app.peer.456')).toBe(true);
+    expect(await sa.mute.covers('app.peer.789')).toBe(false);
+    const r = await sa.peer.sendTo('app.peer.456', { type: 'p2p-chat', body: 'hi' }).catch((e) => ({ error: String(e?.message ?? e) }));
+    expect(String(r?.error ?? '')).not.toMatch(/muted/);
     await sa.shutdown();
   });
 
@@ -221,7 +224,7 @@ describe('createSecureAgent — S1 mute + helloGate', () => {
     await sa.shutdown();
   });
 
-  it('helloGate as a custom function is composed with mute base gate', async () => {
+  it('helloGate as a custom function is composed (the block list is not a hello gate)', async () => {
     const calls = [];
     const customGate = async (env) => {
       calls.push(env._from);
@@ -231,25 +234,25 @@ describe('createSecureAgent — S1 mute + helloGate', () => {
       vault: new VaultMemory(), helloGate: customGate,
     });
     const gate = sa.agent.helloGate;
-    // Mute-block kicks in BEFORE user gate; muted peer → false, user gate not called
+    // a blocked peer is NOT refused at the greeting: circle traffic needs the session; the app's direct doors refuse them
     await sa.mute.add('app.good.muted');
-    expect(await gate({ _from: 'app.good.muted', payload: {} })).toBe(false);
-    expect(calls).toEqual([]);   // user gate not invoked for muted peer
-    // Non-muted but failing custom gate → false
+    expect(await gate({ _from: 'app.good.muted', payload: {} })).toBe(true);
+    expect(calls).toEqual(['app.good.muted']);
+    // failing custom gate → false
     expect(await gate({ _from: 'app.bad.42', payload: {} })).toBe(false);
-    expect(calls).toEqual(['app.bad.42']);
+    expect(calls).toEqual(['app.good.muted', 'app.bad.42']);
     // Non-muted, passing custom → true
     expect(await gate({ _from: 'app.good.99', payload: {} })).toBe(true);
     await sa.shutdown();
   });
 
-  it('no helloGate opt → mute-only base gate is still installed', async () => {
+  it('no helloGate opt → the base gate is installed, and a blocked peer still greets (the block is the app\'s)', async () => {
     const sa = await createSecureAgent({ vault: new VaultMemory() });
     const gate = sa.agent.helloGate;
     expect(typeof gate).toBe('function');
     expect(await gate({ _from: 'app.fresh', payload: {} })).toBe(true);
     await sa.mute.add('app.bad');
-    expect(await gate({ _from: 'app.bad', payload: {} })).toBe(false);
+    expect(await gate({ _from: 'app.bad', payload: {} })).toBe(true);
     await sa.shutdown();
   });
 
@@ -744,11 +747,8 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     // through the transport's listener — we're testing the mute fan-out
     // at the secure-agent receive step.)
     const tx = sa._peerTransportForTest ?? null;
-    // We didn't expose it; instead just call isPeerMuted via sendTo:
-    // a muted addr's send must throw → equivalent assertion.
-    await expect(
-      sa.peer.sendTo('app.attacker.999', { body: 'hi' })
-    ).rejects.toThrow(/muted/);
+    // the alias fan: the address is covered by a block made by webid (what the app's direct doors ask)
+    expect(await sa.mute.covers('app.attacker.999')).toBe(true);
     await sa.shutdown();
   });
 
@@ -763,7 +763,7 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     await sa.peer.connect();
     sa.agent.security.registerPeer('app.b.000', 'pk-b');
     await sa.mute.add('sid-banned');
-    await expect(sa.peer.sendTo('app.b.000', { body: 'x' })).rejects.toThrow(/muted/);
+    expect(await sa.mute.covers('app.b.000')).toBe(true);
     await sa.shutdown();
   });
 
@@ -778,7 +778,7 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     await sa.peer.connect();
     sa.agent.security.registerPeer('app.c.111', 'pk-c');
     await sa.mute.add('pk-c');
-    await expect(sa.peer.sendTo('app.c.111', { body: 'x' })).rejects.toThrow(/muted/);
+    expect(await sa.mute.covers('app.c.111')).toBe(true);
     await sa.shutdown();
   });
 

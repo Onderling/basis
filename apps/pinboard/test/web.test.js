@@ -181,14 +181,14 @@ describe('Pinboard V1 web UI — Phase 5 (intent tabs + moderation)', () => {
 describe('Pinboard V1 web UI — Phase 6 (profile)', () => {
   it('setMyHandle + getMyProfile via REST', async () => {
     const set = await callRest('setMyHandle', { handle: '@Alice-Test' });
-    expect(set.handle).toBe('alice-test');
+    expect(set.handle).toBe('Alice-Test');
 
     const profile = await callRest('getMyProfile', {});
-    expect(profile.entry.handle).toBe('alice-test');
+    expect(profile.entry.handle).toBe('Alice-Test');
   });
 
   it('setMyHandle rejects invalid input over REST', async () => {
-    const r = await callRest('setMyHandle', { handle: 'an' });
+    const r = await callRest('setMyHandle', { handle: '   ' });
     expect(r.error).toBe('invalid-handle');
     expect(r.reason).toBe('too-short');
   });

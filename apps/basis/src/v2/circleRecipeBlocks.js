@@ -32,7 +32,7 @@
 import { BLOCK_TYPES } from './circleRecipe.js';
 import { isFeatureEnabled } from './circlePolicy.js';
 import { circleRows, stampSenderLabels } from './circleStream.js';
-import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
+import { normalizeRulesDoc, isRulesEmpty, rulesDocFromAnswer } from './circleRules.js';
 import { enabledFeatures } from './circlePolicy.js';
 import { enrichEmbedsWithTitles } from './embedResolve.js';
 import { isNoticeboardPost } from './circlePinboardScope.js';
@@ -300,7 +300,10 @@ async function materializeLists(block, circleId, { callSkill, policy } = {}) {
       // an open entry's one act: ticked off, through the lists' own op (the same act /list-done takes)
       ...(e.done === true ? {} : { primary: { kind: 'op', app: 'lists', opId: 'markListItemDone', args: { circleId, item: e.id, list: l.id }, labelKey: 'circle.vandaag.act_done' } }),
     }));
-    return { id: l.id, title: r?.title ?? l.label ?? l.id, entries };
+    // the list's add act: a line the person types goes on THIS list, through the lists' own op (the same one the
+    // circle's Lists screen and "zet melk op de boodschappen" run); `textArg` names the arg the typed line fills
+    const add = { kind: 'op', app: 'lists', opId: 'addToList', args: { circleId, list: l.id }, textArg: 'text', labelKey: 'circle.container.add', placeholderKey: 'circle.lists.add_prompt' };
+    return { id: l.id, title: r?.title ?? l.label ?? l.id, add, entries };
   }));
   return { ...empty, status: 'ok', content: { lists } };
 }
@@ -318,11 +321,7 @@ async function materializeRules(block, circleId, { callSkill } = {}) {
   }
   const res = await callSkill('pinboard', 'getGroupRules', { groupId: circleId });
   const rules = res?.rules ?? null;
-  // Rules doc lives on the pinboard item under source.doc (created by the
-  // rules wizard); fall through to a top-level `doc` for any legacy
-  // shape and let normalizeRulesDoc fill in the canonical fields.
-  const docRaw = rules?.source?.doc ?? rules?.doc ?? null;
-  const doc = normalizeRulesDoc(docRaw);
+  const doc = normalizeRulesDoc(rulesDocFromAnswer(res));
   return {
     blockId: block.id, type: 'rules',
     status: isRulesEmpty(doc) ? 'empty' : 'ok',

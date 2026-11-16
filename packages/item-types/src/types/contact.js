@@ -105,6 +105,9 @@ export const CONTACT_SCHEMA = {
     // the role the host gave this person — a value from core's `ROLES` (or a role an app registered there). Not an
     // enum here: roles are extensible at runtime, and this package does not depend on core.
     role:        { type: 'string', minLength: 1 },
+    // the one-time token of the shared link this contact was added from (L806): carried, sealed, by the first turn to
+    // them, then cleared. A link's first opener is let on by it; absent on every other row.
+    linkToken:   { type: 'string', minLength: 16 },
   },
   examples: [KEYLESS_CONTACT_EXAMPLE],
 };

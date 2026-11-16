@@ -118,7 +118,7 @@ describe('two circles, two selves: what the co-member of both can tie together',
     };
     expect(facts.message.wireFrom, 'the X message never leaves from the persona').not.toContain('persona-main');
     expect(facts.message.wireFrom).not.toContain('persona-in-Y');
-    expect(facts.message.labelOnCor, 'Cor names the X author as she is in X').toBe('@anne-x');
+    expect(facts.message.labelOnCor, 'Cor names the X author as she is in X').toBe('anne-x');
   }, 60_000);
 
   it('Cor\'s rosters: nothing of the persona in X, nothing of the default in Y — and the X message still reads anne-x', async () => {
@@ -133,6 +133,6 @@ describe('two circles, two selves: what the co-member of both can tie together',
     expect(facts.rosters.yCarries, 'Y knows nothing of the default').toEqual([]);
     const st = cor.chatRail.storedStatements(X).find((s) => s?.body?.payload?.text === 'hallo straat');
     facts.messageLaterLabel = memberLabelFor(st?.body?.payload?.authorRef, { members: await readRoster(cor, X), viewerId: cor.agent.identity.chat.pubKey });
-    expect(facts.messageLaterLabel, 'the X message is still anne-x after everything').toBe('@anne-x');
+    expect(facts.messageLaterLabel, 'the X message is still anne-x after everything').toBe('anne-x');
   }, 60_000);
 });

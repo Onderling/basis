@@ -84,7 +84,7 @@ export function viewAsDirectory({ members = [], viewer = {}, policy = 'pairwise'
  *
  * @param {CircleMember} member
  * @param {{viewerId?:string|null, policy?:'open'|'pairwise'}} [opts]
- * @returns {{primary:string|null, primaryKey:string|null, secondary:string|null, revealed:boolean}}
+ * @returns {{primary:string|null, primaryKey:string|null, primaryNumber:number|null, secondary:string|null, revealed:boolean}}
  *   `primary` is always safe to render, or null — then paint `t(primaryKey)` ("someone"); `secondary` is the real
  *   name ONLY when it may be shown.
  */
@@ -97,13 +97,17 @@ export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwis
   // Never fall back to the real name for an unreleased member. Past the handle and a released name, an identifier
   // the person chose (a webid, a URL) is still theirs to be known by; an opaque key is not a name — that member is
   // "someone" (`primaryKey`), never a key or a piece of one (`personLabel.js`).
-  const named = handle ? `@${handle}` : ((revealed && realName) ? realName : null);
+  // two members with one name: the later one carries a small number (`withNameNumbers`), "Jan · 2"
+  const shownHandle = handle && Number.isInteger(m.nameNumber) && m.nameNumber > 1 ? `${handle} · ${m.nameNumber}` : handle;
+  const named = shownHandle ? shownHandle : ((revealed && realName) ? realName : null);
   const byId = named == null && typeof m.id === 'string' && m.id && !isKeyLike(m.id) ? m.id : null;
   const primary = named ?? byId;
   return {
     revealed,
     primary,
     primaryKey: primary == null ? SOMEONE_LABEL_KEY : null,
+    // a later one of several unnamed people in one view: "Onbekend · 2" (`labelShown` paints it)
+    primaryNumber: primary == null && Number.isInteger(m.unnamedNumber) && m.unnamedNumber > 1 ? m.unnamedNumber : null,
     secondary: (revealed && realName && handle) ? realName : null,
   };
 }

@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
-import { parseVocab, parseRows, parseUnknown, parseManifestLanes, audit } from './lint-entry-kinds-complete.mjs';
+import { parseVocab, parseRows, parseUnknown, parseManifestLanes, parseMirrored, audit } from './lint-entry-kinds-complete.mjs';
 
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
@@ -24,7 +24,9 @@ describe('lint-entry-kinds-complete', () => {
     const manifests = execSync("git ls-files 'apps/basis/src/v2/*Manifest.js'", { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
     const lanes = parseManifestLanes(manifests, read);
     expect(lanes.length).toBeGreaterThanOrEqual(6);
-    expect(audit({ rows, unknown: parseUnknown(SRC), vocab: VOCAB, manifestLanes: lanes })).toEqual([]);
+    expect(audit({ rows, unknown: parseUnknown(SRC), vocab: VOCAB, manifestLanes: lanes, mirrored: parseMirrored(SRC) })).toEqual([]);
+    // every real row declares whether the person's own mirror keeps it
+    expect(Object.values(parseMirrored(SRC)).every((v) => v === 'true' || v === 'false')).toBe(true);
   });
 
   it('a row with no binding, a missing cell, or a token no vocabulary has — each is named', () => {
@@ -39,6 +41,12 @@ describe('lint-entry-kinds-complete', () => {
     expect(problems.some((p) => /'partial': binding lacks the 'syncPolicy' cell/.test(p))).toBe(true);
     expect(problems.some((p) => /'alien': accepts names ACCEPTS\.MAGIC/.test(p))).toBe(true);
     expect(problems.filter((p) => /'ok'/.test(p))).toEqual([]);
+  });
+
+  it('a row that does not declare `mirrored` is named', () => {
+    const problems = audit({ rows: {}, unknown: 'LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING, true', vocab: VOCAB, manifestLanes: [], mirrored: { forgot: null, said: 'false' } });
+    expect(problems.some((p) => /'forgot': declares no `mirrored`/.test(p))).toBe(true);
+    expect(problems.filter((p) => /'said'/.test(p))).toEqual([]);
   });
 
   it('an unknown kind that would accept something is a problem', () => {

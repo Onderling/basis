@@ -139,7 +139,7 @@ export function wireChat({
         if (typeof reliableSend === 'function') {
           // `sendOpts.sendAs` — the self this turn is sent AS (a persona answering in its own circle); absent = the
           // device's general self, as before
-          return await reliableSend(to, wire, { guarantee: 'hold-forward', ...(sendOpts?.sendAs ? { sendAs: sendOpts.sendAs } : {}) });
+          return await reliableSend(to, wire, { guarantee: 'hold-forward', ...(sendOpts?.sendAs ? { sendAs: sendOpts.sendAs } : {}), ...(sendOpts?.circleId ? { circleId: sendOpts.circleId } : {}) });
         }
         // without the host's sender there is no way to speak as another self: refuse rather than send as the general one
         if (sendOpts?.sendAs) throw new Error('cannot send as another self without the host sender');
@@ -334,7 +334,9 @@ export function wireChat({
     // The shared core sends to the one peer (per-peer transport) and dedups; it keeps no copy of the turn.
     let localId = null;
     try {
-      const { itemId } = await deliverCore.deliver(envelope, { to: toPubKey, ...(args.sendAs ? { sendOpts: { sendAs: args.sendAs } } : {}) });
+      // `circleId`: a turn INSIDE a circle (an answer to a circle post) is that circle's traffic, never the person path
+      const sendOpts = { ...(args.sendAs ? { sendAs: args.sendAs } : {}), ...(args.circleId ? { circleId: args.circleId } : {}) };
+      const { itemId } = await deliverCore.deliver(envelope, { to: toPubKey, ...(Object.keys(sendOpts).length ? { sendOpts } : {}) });
       localId = itemId ?? null;
     } catch (err) {
       // A tagged transport failure reproduces the legacy soft return; anything

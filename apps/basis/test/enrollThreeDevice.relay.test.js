@@ -22,6 +22,12 @@ import {
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
+import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
+
+const memStorage = () => {
+  const m = new Map();
+  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, removeItem: (k) => { m.delete(k); } };
+};
 
 const GROUP = 'circle-v1-walk';
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
@@ -56,9 +62,15 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
   });
 
   it('the whole walk', async () => {
+    // ── The OFFER, as a shell hands it over: A builds it (its circles, its address), the new install stashes it
+    //    before the ceremony and consumes it after the enrolled boot. That is how a new device learns its circles. ──
+    const built = await A.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
+    expect(built.ok, JSON.stringify(built)).toBe(true);
+    const storage = memStorage();
+    expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
     // ── The ceremony on a fresh install (the phrase typed on the NEW device). ──
     const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
-    const pre = await bootRealAgentNode('A2-pre', { agentOpts: vaults });
+    const pre = await bootRealAgentNode('A2-pre', { agentOpts: { ...vaults, enrollOfferStorage: storage } });
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(typeof phrase).toBe('string');
     const enrolled = await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'walk-device' });
@@ -76,19 +88,27 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
     //    B's address are handed over — the registry/QR-offer's role, not this walk's subject. ──
     await connectNodesOverRelay([A2], { relayUrl });
     await bindCircleAddresses([A2], GROUP);
-    await A2.agent.addCirclePeer(GROUP, B.pubKey);
+    // THE CONSUME, what the shells run once per boot: the circle recorded, the roster seeded from the sibling
+    const consumed = await consumeEnrollOffer({
+      agent: A2.agent,
+      callSkill: (app, op, args) => A2.agent.callSkill(app, op, args),
+      sendPeerMessage: (to, payload, opts) => A2.agent.sendPeerMessage(to, payload, opts),
+      storage,
+    });
+    expect(consumed.circles.find((c) => c.circleId === GROUP)?.ok, JSON.stringify(consumed)).toBe(true);
+    await bindCircleAddresses([A2], GROUP);
 
     // ── The announcement: minted by A′'s own agent, carried over the REAL relay. ──
     const mine = ownAnnouncementFor({ agent: A2.agent, circleId: GROUP });
     expect(mine?.circleAddress).toBe(addrA2);
-    await A2.agent.sendPeerMessage(B.pubKey, {
+    await A2.agent.sendPeerMessage(B.agent.circleAddressFor(GROUP), {
       type: 'p2p-chat',
       subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND,
       circleId: GROUP,
       msgId: 'v1-walk-announce',
       ts: Date.now(),
       announcements: [mine],
-    }, SEND);
+    }, { ...SEND, circleId: GROUP });   // circle traffic: to B in the circle, as the product sends it
 
     // ── B's roster row for A becomes the SET — through the production receive side. ──
     const row = await until(async () => {
@@ -108,10 +128,10 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
     // hand-off as above); the wire envelope is byte-shaped like broadcastCircleChatStatement's.
     const appended = await A2.chatRail.appendMessage(GROUP, { msgId: 'v1-walk-chat', ts: Date.now(), text, actor: A2.pubKey });
     expect(appended?.statement, 'A′ signed with its per-circle identity').toBeTruthy();
-    await A2.agent.sendPeerMessage(B.pubKey, {
+    await A2.agent.sendPeerMessage(B.agent.circleAddressFor(GROUP), {
       type: 'p2p-chat', subtype: 'circle-chat-statement',
       circleId: GROUP, msgId: 'v1-walk-chat', ts: Date.now(), event: appended.statement, fromWebid: A2.pubKey,
-    }, SEND);
+    }, { ...SEND, circleId: GROUP });
     const landed = await until(
       () => B.chatEvents.find((e) => e?.payload?.text === text),
       { timeout: 20000, step: 100 },

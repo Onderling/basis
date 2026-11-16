@@ -17,6 +17,7 @@ vi.mock('../src/transport/MdnsTransport.js', () => {
     constructor(opts) {
       this.identity = opts.identity;
       this.hostname = opts.hostname;
+      this.hostnamePrefix = opts.hostnamePrefix;
       this.address  = opts.identity.pubKey;
     }
     connect() { return mdnsState.connectImpl(); }
@@ -61,7 +62,9 @@ describe('buildMeshTransports', () => {
       identity, relayUrl: 'ws://relay.test',
     });
     expect(mdns).toBeTruthy();
-    expect(mdns.hostname).toBe('dw-PUBKEY_a');          // `<prefix>-<pubKey[0..8]>`
+    // the name follows the LAN key: the builder hands only the prefix, never a slice of the agent's key
+    expect(mdns.hostname).toBeUndefined();
+    expect(mdns.hostnamePrefix).toBe('dw');
     expect(ble).toBeTruthy();
     // CHANGED deliberately (Nearby step J, R1): BLE now SCANS but does not ADVERTISE by default. A BLE
     // advertisement has no network boundary, so it is opted into rather than inherited.
@@ -90,7 +93,8 @@ describe('buildMeshTransports', () => {
 
   it('honours a custom hostnamePrefix', async () => {
     const { mdns } = await buildMeshTransports({ identity, hostnamePrefix: 'cc' });
-    expect(mdns.hostname).toBe('cc-PUBKEY_a');
+    expect(mdns.hostname).toBeUndefined();
+    expect(mdns.hostnamePrefix).toBe('cc');
   });
 
   it('enable flags skip individual transports', async () => {

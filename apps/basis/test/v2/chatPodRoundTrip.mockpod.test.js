@@ -113,7 +113,7 @@ describe('chat pod re-root — the SIGNED statement over the shared pod', () => 
 
     const catchUp = makePodChatCatchUp({
       rail: bob.rail,
-      podReadSince: (circleId, q) => readSealedMessagesSince(backend, open, { circleId, ...q }).then((res) => res.items),
+      podReadSince: (circleId, q) => readSealedMessagesSince(backend, open, { circleId, ...q }),
       eventLog: bob.eventLog,
     });
     const res = await catchUp.catchUpCircle(CIRCLE);

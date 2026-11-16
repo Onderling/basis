@@ -26,8 +26,10 @@ const QUIET = { warn() {}, info() {} };
 
 const seedOf = (n) => new Uint8Array(32).fill(n);
 const addressOf = (n, circle = CIRCLE) => deriveCircleAddress(seedOf(n), circle);
-const proofOf = (n, circle = CIRCLE) =>
-  signCircleLinkFromSeed(seedOf(n), circle, circle, deriveCircleAddress(seedOf(n), circle));
+// the proof names the member whose address it is: seed 3 is Bram's, 4 Cato's, any other this device's (ME)
+const memberOfSeed = (n) => ({ 3: 'pk-bram', 4: 'pk-cato' })[n] ?? 'pk-me';
+const proofOf = (n, circle = CIRCLE, member = memberOfSeed(n)) =>
+  signCircleLinkFromSeed(seedOf(n), circle, circle, deriveCircleAddress(seedOf(n), circle), member);
 
 const ME = 'pk-me';
 const BRAM = 'pk-bram';
@@ -44,7 +46,8 @@ function fakeAgent({ rows = [], selfWebid = ME, seed = MY_SEED } = {}) {
   const agent = {
     identity: { chat: { pubKey: selfWebid } },
     circleAddressFor: (cid) => deriveCircleAddress(seedOf(seed), cid),
-    signCircleLink:   (cid, gid, addr) => signCircleLinkFromSeed(seedOf(seed), cid, gid, addr),
+    // as the host's: the member defaults to this device's self in the circle
+    signCircleLink:   (cid, gid, addr, member = selfWebid) => signCircleLinkFromSeed(seedOf(seed), cid, gid, addr, member),
     registerPeerAddress: (address, pubKey, opts) => { log.registered.push({ address, pubKey, opts }); return true; },
     recordCircleSenders: async ({ circleId, members }) => {
       log.snapshots.push({ circleId, keys: members.map((m) => m.circleAddress ?? m.pubKey) });
@@ -191,7 +194,7 @@ describe('receiving an announcement', () => {
 
     // The address became sealable…
     expect(log.registered).toContainEqual({
-      address: addressOf(3), pubKey: BRAM, opts: { signingKey: addressOf(3) },
+      address: addressOf(3), pubKey: BRAM, opts: { signingKey: addressOf(3), proven: true },   // an announcement is recorded only on its verified proof
     });
     // …and the same key became ALLOWED TO SPEAK. Without this, bram is now addressable and every
     // envelope he sends is refused with SENDER_NOT_AUTHORIZED — a failure that appears only later.
@@ -233,7 +236,7 @@ describe('receiving an announcement', () => {
     const elsewhere = {
       circleId: 'werk-7', memberWebid: BRAM,
       circleAddress: addressOf(3, 'werk-7'),
-      circleAddressProof: signCircleLinkFromSeed(seedOf(3), 'werk-7', 'werk-7', addressOf(3, 'werk-7')),
+      circleAddressProof: signCircleLinkFromSeed(seedOf(3), 'werk-7', 'werk-7', addressOf(3, 'werk-7'), BRAM),
     };
     const res = await handler('pk-admin', envelopeOf([elsewhere]));
     expect(res.recorded).toBe(0);
@@ -326,5 +329,24 @@ describe('the admin\'s post-join propagation', () => {
       agent, circleId: CIRCLE, newMemberWebid: CATO, logger: QUIET,
     });
     expect(out).toEqual({ toCircle: 0, toNewMember: 0, announced: 0 });
+  });
+});
+
+describe('the newcomer is alive when the circle tells them its addresses', () => {
+  it('signals the newcomer present (clears a give-up their not-yet-answering address earned) before the fan to them', async () => {
+    const rows = [
+      { webid: ME, pubKey: ME },
+      { webid: BRAM, pubKey: BRAM, circleAddress: addressOf(3), circleAddressProof: proofOf(3) },
+      { webid: CATO, pubKey: CATO, circleAddress: addressOf(4), circleAddressProof: proofOf(4) },
+    ];
+    const { agent, log } = fakeAgent({ rows });
+    const order = [];
+    agent.presenceSignal = async (addr) => { order.push(`presence:${addr}`); return { flushed: 0 }; };
+    const call = agent.callSkill;
+    agent.callSkill = async (app, op, args) => { if (op === 'broadcastCircleAddresses') order.push(`fan:${(args.to ?? []).join(',')}`); return call(app, op, args); };
+    await propagateCircleAddressesAfterJoin({ agent, circleId: CIRCLE, newMemberWebid: CATO, logger: QUIET });
+    expect(order[0], 'presence first').toBe(`presence:${CATO}`);
+    expect(order).toContain(`fan:${CATO}`);
+    expect(log.skills.length).toBeGreaterThan(0);
   });
 });

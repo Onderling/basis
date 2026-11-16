@@ -156,8 +156,6 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
 
       return Object.freeze({
         askId, text, from: fromAddress ?? null, receivedAt: now(),
-        // Rung 3: an answer arriving is what opens the pairwise channel with whoever sent it.
-        opensDirectChannel: true,
       });
     },
   };

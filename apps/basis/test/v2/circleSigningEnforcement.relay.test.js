@@ -31,6 +31,7 @@
  * anything and were therefore the likeliest permanent exception to an enforcement built on join
  * proofs. Two devices' views of them are checked, because they differ.
  */
+import { sendBypassingTheGate } from '../../../e2e-journeys/journeys/_app.mjs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startJourneyRelay } from '../support/testRelay.js';
 import {
@@ -232,16 +233,18 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
   /* ── Adversarial ─────────────────────────────────────────────────────────────────────────── */
 
   it('ADVERSARIAL: a MEMBER signing canonically at a per-circle address is REFUSED', async () => {
-    // The change, proved. `sendPeerMessage` carries no `sendAs`, so this envelope is signed by the
-    // admin's canonical identity — a real member of this circle, declining per-circle signing, on
-    // the real send path. Every cryptographic check passes; the roster refuses it anyway, because
-    // that member has proved they can sign per-circle and the leak is therefore not on offer.
+    // The change, proved. This envelope is signed by the admin's canonical identity — a real member of
+    // this circle, declining per-circle signing. Every cryptographic check passes; the roster refuses it
+    // anyway, because that member has proved they can sign per-circle and the leak is therefore not on offer.
+    // Sent BELOW the app's send gate (the raw secure agent), as an adversary would: the app itself can no
+    // longer produce this envelope, since `sendPeerMessage` to a member's circle address now leaves as the
+    // circle's self whether or not the caller names the circle (peerSendGate.js).
     const bramInA = bram.agent.circleAddressFor(CIRCLE_A);
     expect(typeof bramInA).toBe('string');
 
     const before = bram.agent.circleSenderAuthorization();
     const text = `canonical-in-circle-${rnd()}`;
-    await admin.agent.sendPeerMessage(bramInA, chatEnvelope(CIRCLE_A, text));
+    await admin.agent.sa.peer.sendTo(bramInA, chatEnvelope(CIRCLE_A, text), { guarantee: 'hold-forward' });
     await settle(1500);
 
     const after = bram.agent.circleSenderAuthorization();
@@ -268,7 +271,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
 
     const before = cato.agent.circleSenderAuthorization();
     const text = `wrong-circle-${rnd()}`;
-    await bram.agent.sendPeerMessage(catoInB, chatEnvelope(CIRCLE_B, text));
+    await sendBypassingTheGate(bram, catoInB, chatEnvelope(CIRCLE_B, text), { reason: 'the receiver refuses a chat signed for another circle; our gate would never send it' });
     await settle(1500);
 
     const after = cato.agent.circleSenderAuthorization();

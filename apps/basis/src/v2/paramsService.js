@@ -35,6 +35,9 @@ import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF, THEME_PREFS } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
 import { START_SCREEN, START_SCREEN_CHOICES } from './startScreen.js';
+import { NOTIFY_WINDOW_KEY, NOTIFY_WINDOW_DAYS } from './readMarks.js';
+import { KEEP_DAYS_KEY, KEEP_DAYS } from './nearbyKept.js';
+import { NOTIFY_POLICY_PARAMS } from './notifyBanner.js';
 import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, QUIET_KEY, QUIET_DEFAULT, USAGE_VISIBLE_KEY, USAGE_VISIBLE, MONTHLY_TOKEN_LIMIT_KEY, MONTHLY_TOKEN_LIMIT, ROLES_KEY, ROLES_PRESET, HOUSEHOLD_IN_APP_KEY, IN_APP_MODE, CALENDAR_FEED_KEY, CALENDAR_FEED_MODE, ASSIGN_POLICIES, NAMES_POLICIES, PASSED_POLICIES, CANCEL_POLICIES, REMINDERS_MODES, USAGE_VISIBILITY, ROLES_PRESETS, IN_APP_MODES, CALENDAR_FEED_MODES } from './botSettings.js';
 import { REMINDER_RULES_KEY, REMINDER_RULES_PARAM } from './reminderWords.js';
 
@@ -112,6 +115,12 @@ export const BASIS_USER_PARAMS = [
   { key: 'assistant.apps',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSISTANT_APPS },
   // where the app opens on this device: Vandaag (default) · the circles list · the tab last used (startScreen.js)
   { key: 'home.startScreen',                    scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: START_SCREEN, choices: START_SCREEN_CHOICES },
+  // how long a row of news lives (days); read marks are kept for twice this (the person's own keeping-time)
+  { key: NOTIFY_WINDOW_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: NOTIFY_WINDOW_DAYS },
+  // how long a Nearby room conversation stays on this device (days; 0 = nothing is kept): Frits 2026-11-09, a setting
+  { key: KEEP_DAYS_KEY,                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: KEEP_DAYS },
+  // which kinds of news show a banner while the app is open (banner · list · off), one setting per kind
+  ...NOTIFY_POLICY_PARAMS,
   // How much a door's assistant remembers of a person's conversation when they have not chosen (off · short · long);
   // the person's own choice on their thread wins. Set by the bot's admin.
   { key: ASSISTANT_MEMORY_DEFAULT_KEY,          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_MEMORY_MODE, choices: MEMORY_MODES },

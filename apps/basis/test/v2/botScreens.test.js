@@ -4,7 +4,8 @@
  * lists and drops them; revoking the person drops them all.
  */
 import { describe, it, expect } from 'vitest';
-import { createBotScreens, parseScreenLink, screenCode, codeChoices, screenLabel, SCREEN_LINK_TTL_MS } from '../../src/v2/botScreens.js';
+import { createBotScreens, parseScreenLink } from '../../src/v2/botScreens.js';
+import { screenCode, codeChoices, screenLabel, SCREEN_PAIRING_TTL_MS } from '../../src/v2/screenDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
@@ -16,6 +17,7 @@ function setup({ tellRefused = null } = {}) {
   const privately = [];
   const asked = [];
   const refused = [];
+  const expected = []; const registeredFirst = [];
   const admitted = new Set(['telegram:1']);
   let reachable = true;
   const screens = createBotScreens({
@@ -28,11 +30,12 @@ function setup({ tellRefused = null } = {}) {
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
     notify: (person, key, params) => { told.push({ person, key, params }); },
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
-    tellRefused: tellRefused ?? (async (k) => { refused.push(k); }),
+    tellRefused: tellRefused ?? (async (k) => { refused.push(k); if (expected.includes(k)) registeredFirst.push(k); }),
+    expectRefusal: (k) => { expected.push(k); },
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: 'wss://relay.example' }),
     now: () => clock,
   });
-  return { threads, screens, grants, told, privately, asked, refused, admitted, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
+  return { threads, screens, grants, told, privately, asked, refused, expected, registeredFirst, admitted, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
 }
 const linkText = (link, minutes) => `link ${link} (${minutes} min)`;
 const start = async (ctx, person = 'telegram:1') => { const r = await ctx.screens.start(person, linkText); return r.ok ? ctx.privately.at(-1).text : null; };
@@ -127,12 +130,14 @@ describe('a person connects a screen to the bot', () => {
     const ctx = setup(); const { screens, grants, told } = ctx;
     const n = nonceOf(await start(ctx));
     const offered = await screens.offer({ from: 'VIEW1', viewPubKey: 'VIEW1', nonce: n });
-    expect(offered).toMatchObject({ ok: true, pending: true, person: 'telegram:1', code: await screenCode('VIEW1', n) });
+    expect(offered).toMatchObject({ ok: true, pending: true, person: 'telegram:1' });
+    expect(offered.code, 'the real code is never handed back (a caller could mark it on the screen)').toBeUndefined();
     expect(grants, 'nothing is granted before the person says yes').toEqual([]);
     expect(ctx.asked).toHaveLength(1);
     expect(ctx.asked[0].codes).toHaveLength(3);
-    expect(ctx.asked[0].codes).toContain(offered.code);
-    const ok = await screens.confirm('telegram:1', offered.code, { isPrivate: true });
+    const offeredCode = await screenCode('VIEW1', n);   // what the screen shows
+    expect(ctx.asked[0].codes).toContain(offeredCode);
+    const ok = await screens.confirm('telegram:1', offeredCode, { isPrivate: true });
     expect(ok).toMatchObject({ ok: true, person: 'telegram:1' });
     expect(grants[0]).toMatchObject({ viewPubKey: 'VIEW1', actingAs: 'telegram:1', ops: ['lists.addToList', 'assistant.assistant-overview'], nonce: n });
     expect(told).toEqual([{ person: 'telegram:1', key: 'circle.bot.screen_connected', params: { n: 2 } }]);
@@ -154,7 +159,7 @@ describe('a person connects a screen to the bot', () => {
   it('refused: too late, from another key than it names, a nonce nobody asked for; a new link ends the old one', async () => {
     const ctx = setup(); const { screens, grants, tick } = ctx;
     const late = nonceOf(await start(ctx));
-    tick(SCREEN_LINK_TTL_MS + 1);
+    tick(SCREEN_PAIRING_TTL_MS + 1);
     expect(await screens.offer({ from: 'V', viewPubKey: 'V', nonce: late })).toMatchObject({ ok: false, reason: 'expired' });
     const n = nonceOf(await start(ctx));
     expect(await screens.offer({ from: 'OTHER', viewPubKey: 'V', nonce: n })).toMatchObject({ ok: false, reason: 'wrong-sender' });
@@ -199,7 +204,7 @@ describe('a person connects a screen to the bot', () => {
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['B']);
     // too late
     const codeD = await offerFor('D');
-    ctx.tick(SCREEN_LINK_TTL_MS + 1);
+    ctx.tick(SCREEN_PAIRING_TTL_MS + 1);
     expect(await ctx.screens.confirm('telegram:1', codeD, { isPrivate: true })).toMatchObject({ ok: false, reason: 'expired' });
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['B']);
   });
@@ -238,11 +243,25 @@ describe('the paste route (/koppel-scherm)', () => {
     expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' })).toMatchObject({ ok: false, reason: 'not-admitted' });
     ctx.admitted.add('telegram:1');
     const r = await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9', label: 'laptop' });
-    expect(r).toMatchObject({ ok: true, pending: true, code: await screenCode('P', 'n9') });
+    expect(r).toMatchObject({ ok: true, pending: true });
+    expect(r.code, 'the real code is never handed back').toBeUndefined();
     expect(ctx.grants).toEqual([]);
     expect(await ctx.screens.confirm('telegram:1', 'ja', { isPrivate: true })).toMatchObject({ declined: true });
     await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' });
     expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n9'), { isPrivate: true })).ok).toBe(true);
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['P']);
+  });
+});
+
+describe('a refusal to a screen is registered as the one answer to its offer, before it leaves (the send gate)', () => {
+  it('a wrong code: the screen whose offer was read is told, and that refusal was registered first', async () => {
+    const ctx = setup();
+    const nonce = nonceOf(await start(ctx));
+    await ctx.screens.offer({ from: 'SCREEN-1', viewPubKey: 'SCREEN-1', nonce });
+    await ctx.screens.confirm('telegram:1', 'WRONG', { isPrivate: true });
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(ctx.expected).toEqual(['SCREEN-1']);
+    expect(ctx.refused.at(-1)).toBe('SCREEN-1');
+    expect(ctx.registeredFirst).toEqual(['SCREEN-1']);
   });
 });

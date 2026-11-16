@@ -180,7 +180,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (data-fetching types)
     const callSkill = vi.fn(async () => ({
       rules: {
         id: 'item-1',
-        source: { doc: {
+        source: { rules: {
           purpose:    'Een fijne circle zijn',
           agreements: 'Geen herrie na 22u',
         } },

@@ -22,7 +22,6 @@
 
 export const SHELLS = Object.freeze(['web', 'mobile', 'box']);
 
-const P = (file, test = null) => ({ file, ...(test ? { test } : {}), proposed: true });
 const NA = (why) => ({ na: why });
 const BOX_NO_SCREEN = NA('the box paints no screen: this function is a person\'s, on their own device');
 
@@ -30,91 +29,134 @@ export const FUNCTIONS = Object.freeze([
   // ── alpha one's ten (Frits 2026-10-30) ───────────────────────────────────────────────────────────────────────────
   { id: 'messaging', name: 'Messaging (circle chat, contact threads)', cells: {
     web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'fan-out — a message from A appears in B chat' },   // named by Fable 2026-11-03
-    mobile: null,   // circleChatParity is a parity test, not a story on the phone
-    box: P('apps/basis/test/botJoinsCircle.relay.test.js'),
+    // a Detox walk on the emulator (the D form: run before each release, not in CI): join by invite, a circle line each
+    // way, a contact thread each way, each side read from its own store (Fable's brief 2026-11-10)
+    mobile: { file: 'apps/basis-mobile/e2e/messaging.test.js', test: "the phone's answer in the thread reaches Bram's stored thread" },
+    box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the circle door: a member who names it is answered' },
   } },
   { id: 'nearby', name: 'Nearby', cells: {
-    web: P('apps/basis/test-browser/nearby-level.spec.js'),
+    // not applicable for the alpha (Fable's ruling 2026-11-15, Frits may reverse it): the room's people come only from
+    // discovering transports (Wi-Fi discovery, Bluetooth) and a browser has neither, so on web nobody can be met. The web
+    // screen says so in words (`header_cannot_discover`) and shows what others would see of you; a room carried by the
+    // relay would tell the relay who is near whom, and is a question for after the alpha.
+    web: NA('a browser can do neither Wi-Fi discovery nor Bluetooth, so nobody can be met nearby on web; the screen says so'),
     mobile: null,   // circlesNearbyParity is a parity test
     box: NA('the box joins no Nearby room in alpha one (a venue room is later)'),
   } },
   { id: 'feedback', name: 'Feedback to the maker', cells: {
-    web: P('apps/basis/test-browser/feedback-path-box.spec.js'),
-    mobile: null,   // feedbackDoorMobile is a unit of the door
-    box: P('apps/basis/test/alphaFeedbackPath.relay.test.js'),
+    web: { file: 'apps/basis/test-browser/feedback-path-box.spec.js', test: 'a visitor writes to the maker' },
+    mobile: { file: 'apps/basis-mobile/e2e/feedbackDoor.test.js', test: 'a note written there reaches the maker, and the answer shows in the thread' },
+    box: { file: 'apps/basis/test/alphaFeedbackPath.relay.test.js', test: 'what the person writes lands on the box' },
   } },
   { id: 'personas', name: 'Personas', cells: {
-    web: P('apps/basis/test-browser/persona-switcher.spec.js'),
-    mobile: null,   // personaSwitcherParity is a parity test
+    // a person joins another's circle as a persona chosen in the join wizard: the other member's roster and chat show the
+    // persona, never the general name, also after a reload
+    web: { file: 'apps/basis/test-browser/walk-persona-joins-a-circle.spec.js', test: 'a person joins a circle as a persona' },
+    // the phone joins a circle as a new persona made in the join wizard; the other member's roster has the persona, its
+    // lines arrive from it, and after a restart it still speaks there as the persona
+    mobile: { file: 'apps/basis-mobile/e2e/personas.test.js', test: 'after a restart the phone still speaks in the circle as the persona' },
     // a box enrolled with persona W rejoins W's circle as W (never the general persona) and keeps it through a membership
     // change — named by Fable 2026-11-05
     box: { file: 'apps/basis/test/personaOnTheBox.relay.test.js', test: 'on its first start it rejoins Y AS W' },
   } },
   { id: 'pod-sync', name: 'Syncing through a pod', cells: {
-    web: null,      // walk-pod only LOGS its findings and passes regardless — no proof (and no person can make a pod circle yet, L571)
-    mobile: null,   // circlePods is a unit
+    // two members of a shared-pod circle: B away while A posts, A stops, B comes back with every WebSocket closed and
+    // reads the post from the pod (the page is seen reading it)
+    web: { file: 'apps/basis/test-browser/walk-pod-sync.spec.js', test: 'a member who was away reads the post from the pod, with the relay out of reach' },
+    // the phone in Node on a real Solid server (CI's live-pod job): Bram's phone, away while Anna's posted in their
+    // shared-pod circle, comes back to the front with no relay and reads the post from the pod (the app's own read-back
+    // entry, his own per-circle key)
+    mobile: { file: 'apps/basis-mobile/test/podSyncPhone.mobile.css.test.js', test: 'Bram, away while Anna posted, comes back to the front with no relay and reads the post from the pod' },
     box: NA('the box holds circles by relay and catch-up; its registry mirror is covered under restore and devices'),
   } },
-  // REQUIRED on all three: a normal and a pod-only circle on each; the central pod on web (the CSS-gated test).
-  // Today no person can MAKE a central-pod or pod-only circle on any shell (the wizard sets no storage; a change after
-  // creation is refused) — the scope is Frits's call (L571). ⓘ 'hybrid' is in circleDataPolicy's table but is not one of
-  // the three types Frits named: outside the tested set, no cell.
-  // web: apps/basis/test-browser/walk-circle-types-pod.spec.js walks all three through the wizard; normal is green, the
-  // two pod types are fixme until a web pod sign-in can complete — so the cell stays red until they are green too.
-  { id: 'circle-types', name: 'Circle types (normal, central pod, pod-only)', cells: { web: null, mobile: null, box: null } },
+  // REQUIRED on all three: the circle types a person can MAKE in the alpha, normal and shared pod (storage 'shared': the
+  // pod carries the message, the fan carries a pointer, a member away reads it back from the pod). Pod-only ('personal')
+  // and the name 'central' are out for the alpha (decision 2026-11-13 in docs/decisions.md); its relay walks pin what it does.
+  // ⓘ 'hybrid' is in circleDataPolicy's table but is not a type a person makes: outside the tested set, no cell.
+  { id: 'circle-types', name: 'Circle types (normal, shared pod)', cells: {
+    // made in the wizard, a member's message reaches the other member, and the send took its branch (the pod for the
+    // shared pod, the fan-out for normal; asserted beside the message); pod-only is skipped there with the decision
+    // (the title is per case, `${type}: …`; its 'shared pod' and 'normal' cases carry the cell)
+    web: { file: 'apps/basis/test-browser/walk-circle-types-pod.spec.js', test: "made in the wizard, a member's message reaches the other member, and the send took its branch" },
+    // two phones in Node (the mobile composition) on a real ACP CSS: the same two types through the create wizard's steps,
+    // the post reaches the member's phone, the branch read from the founder phone's own log (what the phone's screens
+    // show is the phone session's)
+    mobile: { file: 'apps/basis-mobile/test/circleTypesPhone.mobile.css.test.js', test: "made in the wizard, a member's message reaches the other member, and the send took its branch" },
+    box: null,
+  } },
   { id: 'assistant', name: 'Personal assistant / chat', cells: {
-    web: P('apps/basis/test-browser/circle-view-bot.spec.js'),
-    mobile: null,   // REQUIRED: the assistant on the phone
-    box: P('apps/basis/test/botReplyLines.box.test.js'),
+    web: { file: 'apps/basis/test-browser/circle-view-bot.spec.js', test: '"@assistant add X" engages the bot' },
+    // the assistant since L668 is the "+" kept conversation, read ON THE DEVICE (word rule first, the model when one is
+    // set): the line runs in the circle that holds the list, is kept with its answer, an unknown line is answered
+    // plainly, Forget empties it. (The brief's first story, a bot over the relay, was the design before L668.)
+    mobile: { file: 'apps/basis-mobile/e2e/plusCircleAct.test.js', test: '"zet melk op de boodschappen" in the "+" runs in that circle and says so' },
+    box: { file: 'apps/basis/test/botReplyLines.box.test.js', test: 'an add by the word rule is one Telegram line' },
   } },
   // hopping = a member carries for a member (Frits 2026-11-03). Its EVENTUAL half is the catch-up: a member only the
   // LAN reaches pulls a statement from the member who reaches both. The story's LAN is a second relay standing in for
   // mDNS, and it boots the shared agent composition rather than a browser or the device-runner — named for web and box
-  // by Fable 2026-11-03 on that basis. The mobile cell is an mDNS story on the phones (later). The LIVE push is not built.
+  // by Fable 2026-11-03 on that basis. The mobile cell (Fable's brief 2026-11-10): the same story with a PHONE as the
+  // member who reaches both and serves — the phone's own bundle and inbound wiring (test/support/mobileNode.js). The live
+  // mDNS hop between two phones stays a step of the two-phone walk. The LIVE push is not built.
   { id: 'hopping', name: 'Hopping', cells: {
     web: { file: 'apps/basis/test/lanCatchUpCarriesAStatement.relay.test.js', test: 'holds his statement after her catch-up with Anna' },
-    mobile: null,
+    mobile: { file: 'apps/basis-mobile/test/lanCatchUpCarriesAStatement.mobile.relay.test.js', test: "holds his statement after her catch-up with Anna's phone" },
     box: { file: 'apps/basis/test/lanCatchUpCarriesAStatement.relay.test.js', test: 'holds his statement after her catch-up with Anna' },
   } },
   { id: 'task-sharing', name: 'Task sharing', cells: {
     web: { file: 'apps/basis/test-browser/journeys.spec.js', test: 'task-handoff — A adds a task, B claims it' },   // named by Fable 2026-11-03
-    mobile: P('apps/basis-mobile/test/multiCircleSeparation.test.js'),
-    box: P('apps/basis/test/choresOnTheBox.relay.test.js'),
+    mobile: { file: 'apps/basis-mobile/e2e/taskSharing.test.js', test: 'Bram claims it: the phone shows it as taken, no longer open to claim' },
+    box: { file: 'apps/basis/test/choresOnTheBox.relay.test.js', test: 'Ann adds a chore; Bert claims it' },
   } },
   { id: 'asking', name: 'Asking questions', cells: {
-    web: P('apps/basis/test-browser/walk-ask-matches.spec.js'),
-    mobile: P('apps/basis-mobile/e2e/askMatches.test.js'),
+    web: { file: 'apps/basis/test-browser/walk-ask-matches.spec.js', test: 'an ask shows the asker who offers it' },
+    mobile: { file: 'apps/basis-mobile/e2e/askMatches.test.js', test: 'asks the board, and sees Bram under its own ask' },
     box: NA('the box is no person who asks or answers; the question items it carries are covered by task and list sync'),
   } },
   // ── the six that joined alpha one's tested set (Frits 2026-11-03) ───────────────────────────────────────────────
   { id: 'governance', name: 'Governance (proposals, votes, roles, removal, signed reports)', cells: {
-    web: P('apps/basis/test-browser/walk-member-proposes-policy.spec.js'),
-    mobile: null,   // adminRoleControlGreyed is a unit
-    box: P('apps/basis/test-browser/screen-admin-box.spec.js'),
+    // the proposal half; roles, removal and signed reports come with the governance-by-role work
+    web: { file: 'apps/basis/test-browser/walk-member-proposes-policy.spec.js', test: 'Save is a proposal; the admin' },
+    // the phone as a member: its Save is a proposal, the admin (a real agent on the relay) says yes, the phone holds it
+    // (its admin half: governanceAdmin.test.js, the phone removes a member and that member's device drops the circle; the
+    // REPORT half waits on a surface question: the alpha trims the governance panel, the only place an admin sees a report)
+    mobile: { file: 'apps/basis-mobile/e2e/governanceProposal.test.js', test: "Bram, the admin, says yes: the phone holds the circle's new settings" },
+    // the box OBEYING the circle (screen-admin-box is the admin's screen, not the box) — Fable 2026-11-10
+    box: { file: 'apps/basis/test/botJoinsCircle.relay.test.js', test: 'the box forgets the circle and its record of it goes' },
   } },
   { id: 'lists-agenda', name: 'Lists, agenda, reminders', cells: {
-    web: P('apps/basis/test-browser/vandaag-lists-block.spec.js'),
-    mobile: null,   // listsBlockOnThePhone is a unit of the block
-    box: P('apps/basis/test/agendaLinkWalk.relay.test.js'),
+    // the item crossing to another member (vandaag-lists-block is one page) — Fable 2026-11-10; the reminder is its own story
+    web: { file: 'apps/basis/test-browser/walk-attach-appointment.spec.js', test: 'an appointment made from it reaches the other member' },
+    // the circle's lists on the phone's Vandaag, both ways with a real second person (the reminder is its own story)
+    mobile: { file: 'apps/basis-mobile/e2e/listsAgenda.test.js', test: 'the phone ticks it off, and Bram has it no longer open' },
+    box: { file: 'apps/basis/test/agendaLinkWalk.relay.test.js', test: 'the link carries the agenda' },
   } },
   { id: 'attachments', name: 'Files and media as attachments (circles, contact threads)', cells: {
-    web: P('apps/basis/test-browser/circle-attach-file.spec.js'),
-    mobile: null,   // attachmentPicker is a unit
+    // a file crossing to someone (circle-attach-file is one page) — Fable 2026-11-10
+    web: { file: 'apps/basis/test-browser/walk-dm-photo.spec.js', test: 'a camera-sized photo sent to a contact arrives' },
+    // the phone's own "+" op (mountPhoneAppOps) sends a file into a contact thread; the other phone stores the same
+    // bytes through its own wiring (Fable 2026-11-11). A CIRCLE file's bytes cannot cross yet on any shell: one
+    // in-memory media bucket per session (the real bucket is not built); a plain circle offers no file entry at all.
+    mobile: { file: 'apps/basis-mobile/test/attachmentsMobile.relay.test.js', test: "Anna's thread '+' sends a file; Bob's phone stores the same bytes in his thread with her" },
     box: NA('the box renders no files in alpha one; keeping attachments available is later'),
   } },
   { id: 'restore-devices', name: 'Restore and your devices (phrase, second device, revoke)', cells: {
-    web: P('apps/basis/test-browser/walk-own-devices-follow.spec.js'),
-    mobile: P('apps/basis-mobile/test/identityRecoveryJourney.test.js'),   // boots the mobile bundle: same identity, same addresses
-    box: P('apps/basis/test/revokeTheBox.relay.test.js'),
+    web: { file: 'apps/basis/test-browser/walk-own-devices-follow.spec.js', test: 'one person, two devices' },
+    mobile: { file: 'apps/basis-mobile/test/identityRecoveryJourney.test.js', test: 'phrase → fresh install → restore' },   // boots the mobile bundle
+    box: { file: 'apps/basis/test/revokeTheBox.relay.test.js', test: '3 · the ceremony' },
   } },
   { id: 'help-onboarding', name: 'Help and onboarding', cells: {
-    web: P('apps/basis/test-browser/walk-first-five-minutes.spec.js'),
-    mobile: null,   // helpCircleOnboarding is a unit
+    web: { file: 'apps/basis/test-browser/walk-first-five-minutes.spec.js', test: 'first five minutes: onboarding, a handle' },
+    // a Detox walk on the emulator (not in CI; run before each release and the two-phone walk): a fresh install's help
+    // circle, a first circle from Today, its invite link joined by a real second person, a first message each way
+    mobile: { file: 'apps/basis-mobile/e2e/firstFiveMinutes.test.js', test: 'a first message each way' },
     box: BOX_NO_SCREEN,
   } },
   { id: 'connected-screens', name: 'Connected screens', cells: {
-    web: P('apps/basis/test-browser/screen-connect-box.spec.js'),
-    mobile: null,   // REQUIRED: the phone approves a screen's code
-    box: P('apps/basis/test/screenConnect.relay.test.js'),
+    web: { file: 'apps/basis/test-browser/screen-connect-box.spec.js', test: 'the screen in a browser' },
+    // the phone in Node (the mobile composition) pastes the screen's throwaway offer into its own bot thread, picks the
+    // screen's code from three there, and the screen acts as the person over the relay (the camera scan is the phone session's)
+    mobile: { file: 'apps/basis-mobile/test/screenConnectPhone.mobile.relay.test.js', test: "the phone pastes the screen's offer, picks its code in its own bot thread, and the screen acts as the person" },
+    box: { file: 'apps/basis/test/screenConnect.relay.test.js', test: '/scherm → a link' },
   } },
 ]);

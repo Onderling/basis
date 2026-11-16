@@ -7,9 +7,10 @@
  * verify (circleSealing.css.test.js).
  */
 import { describe, it, expect } from 'vitest';
+import { produceWithPair } from './support/deviceSealingKeyPair.js';
 import { PodClient, createSealedPodClient, createSealedPodDataSource, generateKeypair } from '@onderling/pod-client';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
-import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../src/v2/circlePodProducer.js';
+import { createCircleControlAgentRouter, seedCircleRoster } from '../src/v2/circlePodProducer.js';
 
 class MemVault {
   #m = new Map();
@@ -29,7 +30,7 @@ function makePodClient(circleId) {
 describe('createCirclePodProducer', () => {
   it('p0 circle → crypto-free no-op (no control agent, no sealing identity)', async () => {
     const vault = new MemVault();
-    const prod = await createCirclePodProducer({ circleId: 'c0', storagePosture: 'p0', vault });
+    const prod = await produceWithPair({ circleId: 'c0', storagePosture: 'p0', vault });
     expect(prod.controlAgent).toBeNull();
     expect(prod.podClient).toBeNull();
     expect(prod.sealingIdentity).toBeNull();   // p0 never seals → no x25519 keygen (browser-safe)
@@ -37,14 +38,14 @@ describe('createCirclePodProducer', () => {
 
   it('rejects a sealed circle without generateKeypair + makePodClient', async () => {
     const vault = new MemVault();
-    await expect(createCirclePodProducer({ circleId: 'c', storagePosture: 'p2', vault }))
+    await expect(produceWithPair({ circleId: 'c', storagePosture: 'p2', vault }))
       .rejects.toThrow(/generateKeypair|makePodClient/);
   });
 
   it('p2 circle → a real control agent bootstrapped over its own pseudo-pod; sealed round-trip', async () => {
     const vault = new MemVault();
     const alice = generateKeypair();
-    const prod = await createCirclePodProducer({
+    const prod = await produceWithPair({
       circleId: 'alpha', storagePosture: 'p2', vault,
       roster: [{ webId: 'did:alice', publicKey: alice.publicKey, role: 'admin' }],
       generateKeypair, makePodClient,
@@ -62,7 +63,7 @@ describe('createCirclePodProducer', () => {
 
   it('persists the controller key across producers for the same circle (vault-backed)', async () => {
     const vault = new MemVault();
-    const mk = (n = 0) => createCirclePodProducer({
+    const mk = (n = 0) => produceWithPair({
       circleId: 'beta', storagePosture: 'p2', vault, generateKeypair, makePodClient, bootstrap: n === 0,
     });
     await mk(0);
@@ -77,12 +78,12 @@ describe('createCirclePodProducer', () => {
     const vault = new MemVault();
     const text = 'overleeft een reload';
     // session 1 — seal a string under the circle's group key
-    const p1 = await createCirclePodProducer({ circleId: 'dur', storagePosture: 'p2', vault, generateKeypair, makePodClient });
+    const p1 = await produceWithPair({ circleId: 'dur', storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const id1 = await p1.sealingIdentity.ensure();
     const sealed = (await p1.controlAgent.sealingStrategy(id1.privateKey)).seal(text);
     expect(await vault.get('cc.circle-groupkey:dur')).toBeTruthy();   // group key persisted to the vault
     // session 2 — SAME vault, FRESH pseudo-pod (makePodClient mints a new in-memory backend)
-    const p2 = await createCirclePodProducer({ circleId: 'dur', storagePosture: 'p2', vault, generateKeypair, makePodClient });
+    const p2 = await produceWithPair({ circleId: 'dur', storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const id2 = await p2.sealingIdentity.ensure();
     expect(id2.publicKey).toBe(id1.publicKey);                        // same persisted sealing identity
     const s2 = await p2.controlAgent.sealingStrategy(id2.privateKey);
@@ -92,7 +93,7 @@ describe('createCirclePodProducer', () => {
   it('control-agent router grows the roster: a redeemed member becomes able to decrypt the circle', async () => {
     const vault = new MemVault();
     const bob = generateKeypair();
-    const prod = await createCirclePodProducer({ circleId: 'rg', storagePosture: 'p2', vault, generateKeypair, makePodClient });
+    const prod = await produceWithPair({ circleId: 'rg', storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const pods = new Map([['rg', prod]]);
     const router = createCircleControlAgentRouter((id) => pods.get(id) ?? null);
 
@@ -113,7 +114,7 @@ describe('createCirclePodProducer', () => {
   it('seedCircleRoster wraps the group key to members who joined before the producer was live', async () => {
     const vault = new MemVault();
     const bob = generateKeypair();
-    const prod = await createCirclePodProducer({ circleId: 'seed', storagePosture: 'p2', vault, generateKeypair, makePodClient });
+    const prod = await produceWithPair({ circleId: 'seed', storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const pods = new Map([['seed', prod]]);
     const router = createCircleControlAgentRouter((id) => pods.get(id) ?? null);
     await expect(prod.controlAgent.sealingStrategy(bob.privateKey)).rejects.toThrow();   // not a recipient yet
@@ -143,7 +144,7 @@ describe('createCirclePodProducer', () => {
 
   it('scopes by circle: two sealed circles get different sealing identities', async () => {
     const vault = new MemVault();
-    const mk = (circleId) => createCirclePodProducer({ circleId, storagePosture: 'p2', vault, generateKeypair, makePodClient });
+    const mk = (circleId) => produceWithPair({ circleId, storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const a = await (await mk('x')).sealingIdentity.ensure();
     const b = await (await mk('y')).sealingIdentity.ensure();
     expect(a.publicKey).not.toBe(b.publicKey);
@@ -173,7 +174,7 @@ describe('circle group-key provisioning → getCircleSealStrategy activates L1b'
   for (const posture of ['p2', 'p3']) {
     it(`${posture}: bootstrap provisions the key; a granted member round-trips through createSealedPodDataSource`, async () => {
       const vault = new MemVault();
-      const prod = await createCirclePodProducer({ circleId: `prov-${posture}`, storagePosture: posture, vault, generateKeypair, makePodClient });
+      const prod = await produceWithPair({ circleId: `prov-${posture}`, storagePosture: posture, vault, generateKeypair, makePodClient });
 
       // bootstrap wrote the group-key resource to the circle's pod key store
       const keyRes = await prod.podClient.read(`${prod.circleRootUri}/.keys/group.json`, { decode: 'string' });
@@ -196,7 +197,7 @@ describe('circle group-key provisioning → getCircleSealStrategy activates L1b'
     it(`${posture}: a NON-granted member gets no plaintext (strategy gate rejects; ciphertext stays sealed)`, async () => {
       const vault = new MemVault();
       const outsider = generateKeypair();
-      const prod = await createCirclePodProducer({ circleId: `deny-${posture}`, storagePosture: posture, vault, generateKeypair, makePodClient });
+      const prod = await produceWithPair({ circleId: `deny-${posture}`, storagePosture: posture, vault, generateKeypair, makePodClient });
 
       // the outsider is not a recipient of the group-key resource → the strategy gate rejects
       // (getCircleSealStrategy catches this → null, so L1b never engages with a bogus strategy).
@@ -216,7 +217,7 @@ describe('circle group-key provisioning → getCircleSealStrategy activates L1b'
 
   it('re-bootstrap is idempotent: no rotation, no duplicate roster, SAME group key', async () => {
     const vault = new MemVault();
-    const prod = await createCirclePodProducer({ circleId: 'idem', storagePosture: 'p2', vault, generateKeypair, makePodClient });
+    const prod = await produceWithPair({ circleId: 'idem', storagePosture: 'p2', vault, generateKeypair, makePodClient });
     const self = await prod.sealingIdentity.ensure();
     const before = (await prod.controlAgent.sealingStrategy(self.privateKey)).seal('v1-ct');
 

@@ -12,8 +12,10 @@
 
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
+import { buildDeliveryChip } from './circleView.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
+import { heldNoteKey } from '../../src/v2/heldNote.js';
 import { paintFace } from './faceView.js';
 import { buildAttachControl } from './attachControl.js';
 
@@ -37,7 +39,12 @@ function _ensurePrivacyPulseKeyframes() {
 
 export function renderContactThread(container, {
   name = '',
-  noRelay = false,   // this device knows no relay: the composer says the message waits
+  // My own bubbles carry their delivery state, as a circle's do (the same ladder, map and chip — `buildDeliveryChip`):
+  // `deliveryStateFor(messageId)` → a state or null; `deliveryReasonFor(messageId)` → why, when known; a tap on a
+  // retryable chip calls `onRetryDelivery(messageId)`. All optional: absent, the bubble says nothing, as before.
+  deliveryStateFor = null,
+  deliveryReasonFor = null,
+  onRetryDelivery = null,
   attachMenu = [],          // the contact-scoped "+" entries (attachEntriesFor({scope: 'contact'}))
   onAttachCommand = null,   // (entry) => dispatch it to this contact; absent → no "+"
   face = null,       // the contact's picture as the pair circle carries it (a sealed media ref) — null = the initial
@@ -46,6 +53,7 @@ export function renderContactThread(container, {
   skills = [],
   busy = false,
   error = null,
+  cannotWrite = false,     // a co-member no shared circle shows an address for: say so instead of sending (the send gate)
   t,
   onSend,
   onBack,
@@ -64,6 +72,7 @@ export function renderContactThread(container, {
   contactId = null,        // the thread's key, on the root as data-contact-id — what a probe reads to name the open thread
   onOpenLens = null,       // L125: () => void — "what does this contact see of you?"; a person's thread only (with `hidden`)
   onDelete = null,         // L114: () => void — delete this contact (the shell confirms first); a person's thread only
+  self = null,             // who you are in this thread (`contactThreadSelf`: `{id, name}`); its avatar, top right, opens the lens
   deletedAt = null,        // L114: when this contact was deleted — a return after it says "verwijderd", not "verborgen"
 } = {}) {
   if (!container) return container;
@@ -144,9 +153,26 @@ export function renderContactThread(container, {
     }
     header.appendChild(toggle);
   }
-  // HIDE / SHOW (L106, Frits 2026-09-19): the person takes this contact out of their sight, or back. The row
-  // stays — their circles, this thread and the pair roster untouched — and a message from them brings them back;
-  // the note under the control says exactly that, so nobody hides someone expecting silence (that is Blokkeren).
+  // THE HEADER HOLDS ONE ROW (Frits, the UX sitting: "I do like the dot menu"): who you are in this thread, top right
+  // (its tap opens the lens: which persona this contact knows, and how much), and a ⋯ with the two acts on the contact.
+  // A person's thread only: a bot has no pair roster to say a release on, and is removed, not hidden.
+  const acts = document.createElement('div');
+  acts.className = 'cc-cthread__acts';
+  if (typeof hidden === 'boolean' && typeof onOpenLens === 'function') {
+    const me = document.createElement('button');
+    me.type = 'button';
+    me.className = 'cc-cthread__self cc-contacts__icon';
+    const label = tr('circle.contacts.self_here', { name: self?.name ?? tr('circle.switcher.you') });
+    me.setAttribute('aria-label', label);
+    me.title = label;
+    paintFace(me, { face: self?.face ?? null, name: self?.name ?? tr('circle.switcher.you') }, { resolvePicture });
+    me.addEventListener('click', () => onOpenLens());
+    acts.appendChild(me);
+  }
+  const menuItems = [];
+  // HIDE / SHOW (L106, Frits 2026-09-19): the person takes this contact out of their sight, or back. The row stays
+  // (their circles, this thread and the pair roster untouched) and a message from them brings them back; the note
+  // beside the control says exactly that, so nobody hides someone expecting silence (that is Blokkeren).
   if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
     const hide = document.createElement('button');
     hide.type = 'button';
@@ -154,34 +180,37 @@ export function renderContactThread(container, {
     hide.dataset.hidden = String(hidden);
     hide.textContent = tr(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide');
     hide.addEventListener('click', () => onToggleHidden(!hidden));
-    header.appendChild(hide);
+    const note = document.createElement('div');
+    note.className = 'cc-cthread__hide-note';
+    note.textContent = tr('circle.contacts.hide_note');
+    menuItems.push(hide, note);
   }
-  // WHO YOU ARE TO THEM (Frits 2026-09-24; a separate self since 2026-10-12): which persona this contact knows, and how much — changed here,
-  // beside the other per-contact control. A person's thread only: a bot has no pair roster to say a release on.
-  if (typeof hidden === 'boolean' && typeof onOpenLens === 'function') {
-    const lens = document.createElement('button');
-    lens.type = 'button';
-    lens.className = 'cc-btn cc-btn--quiet cc-cthread__lens';
-    lens.textContent = tr('circle.contacts.lens.open');
-    lens.addEventListener('click', () => onOpenLens());
-    header.appendChild(lens);
-  }
-  // DELETE (L114): hide + leave the pair circle — a relationship act. The shell asks first (the confirm is the undo).
+  // DELETE (L114): hide + leave the pair circle, a relationship act. The shell asks first (the confirm is the undo).
   if (typeof hidden === 'boolean' && typeof onDelete === 'function') {
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'cc-btn cc-btn--danger cc-cthread__delete';
     del.textContent = tr('circle.contacts.delete');
     del.addEventListener('click', () => onDelete());
-    header.appendChild(del);
+    menuItems.push(del);
   }
+  if (menuItems.length) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'cc-cthread__more';
+    more.textContent = '⋯';
+    more.setAttribute('aria-label', tr('circle.contacts.more'));
+    more.setAttribute('aria-expanded', 'false');
+    const menu = document.createElement('div');
+    menu.className = 'cc-cthread__menu';
+    menu.hidden = true;
+    for (const item of menuItems) menu.appendChild(item);
+    more.addEventListener('click', () => { menu.hidden = !menu.hidden; more.setAttribute('aria-expanded', String(!menu.hidden)); });
+    acts.appendChild(more);
+    acts.appendChild(menu);
+  }
+  if (acts.childElementCount) header.appendChild(acts);
   container.appendChild(header);
-  if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
-    const note = document.createElement('div');
-    note.className = 'cc-cthread__hide-note';
-    note.textContent = tr('circle.contacts.hide_note');
-    container.appendChild(note);
-  }
   // The pre-send floor, said where the participant reads before typing: personal details are removed on
   // this device before a message leaves it. Only for a contact that declared it.
   if (floor && floor.label) {
@@ -204,6 +233,15 @@ export function renderContactThread(container, {
       sys.className = 'cc-cthread__system';
       sys.textContent = tr(markerKey);
       log.appendChild(sys);
+    }
+    // A turn the door held after a refusal says what it could not keep (the text cut, a file left off): one plain line
+    // on that turn, so the person does not take it for the whole message. web≡mobile with ContactThreadScreen.
+    const heldKey = heldNoteKey(m.held);
+    if (heldKey) {
+      const note = document.createElement('div');
+      note.className = 'cc-cthread__system cc-cthread__held';
+      note.textContent = tr(heldKey);
+      log.appendChild(note);
     }
     const row = document.createElement('div');
     const side = m.origin === 'user' ? 'user' : 'bot';
@@ -258,6 +296,20 @@ export function renderContactThread(container, {
         if (el) { el.dataset.section = d.id; bubble.appendChild(el); }
       }
     }
+    // My own turn's delivery state: the state lives on the shared map under the id the turn was sent with, and the chip
+    // repaints in place when it moves (`paintDeliveryChip`, keyed by `data-row-id`), so a tap on a bubble's words is
+    // never lost to a whole-thread redraw. A turn with no id (an older live push) carries none.
+    if (side === 'user' && m.messageId && typeof deliveryStateFor === 'function') {
+      bubble.dataset.rowId = m.messageId;
+      const meta = document.createElement('div');
+      meta.className = 'cc-cthread__meta';
+      const chip = buildDeliveryChip(deliveryStateFor(m.messageId), {
+        tr, rowId: m.messageId, onRetryDelivery,
+        reason: typeof deliveryReasonFor === 'function' ? deliveryReasonFor(m.messageId) : null,
+      });
+      if (chip) meta.appendChild(chip);
+      bubble.appendChild(meta);
+    }
     row.appendChild(bubble);
     if (Array.isArray(m.buttons) && m.buttons.length) {
       const btnRow = document.createElement('div');
@@ -283,6 +335,13 @@ export function renderContactThread(container, {
   }
   container.appendChild(log);
 
+  if (cannotWrite) {
+    const why = document.createElement('div');
+    why.className = 'cc-cthread__error';
+    why.dataset.reason = 'write-needs-card';
+    why.textContent = tr('circle.contacts.write_needs_card', { name });
+    container.appendChild(why);
+  }
   if (error) {
     const err = document.createElement('div');
     err.className = 'cc-cthread__error';
@@ -379,15 +438,8 @@ export function renderContactThread(container, {
     if (cmd && typeof onSkillTap === 'function') { onSkillTap({ id: cmd.opId }, cmd.rest); return; }
     if (typeof onSend === 'function') onSend(text);
   });
-  // No connection point: the person stands HERE when a message would vanish, so the composer says it waits
-  // (the relay question's predicate, handed by the host; the bubble's own state replaces this with L716)
-  if (noRelay) {
-    const wait = document.createElement('p');
-    wait.className = 'cc-composer__no-point';
-    wait.dataset.role = 'no-point';
-    wait.textContent = tr('circle.composer.no_point');
-    container.appendChild(wait);
-  }
+  // No connection point: the bubble itself says the message waits (its held state, above), so the composer no longer
+  // carries a line for it — one place that says one thing about one message.
   container.appendChild(composer);
 
   return container;

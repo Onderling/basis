@@ -722,7 +722,7 @@
         "doc": "Step-1 title"
       },
       "raise_intro": {
-        "text": "Describe what happened. This goes to the circle; admins see it, and two random members do too if the circle resolves conflicts by mediation.",
+        "text": "Describe what happened. This goes to the circle; admins see it.",
         "doc": "Step-1 intro"
       },
       "about_post_label": {
@@ -774,7 +774,7 @@
         "doc": "Step-3 title"
       },
       "file_intro": {
-        "text": "Check it over. A filed dispute is visible to admins, and to mediators if the circle uses mediation. You can follow it up with another post.",
+        "text": "Check it over. A filed dispute is visible to admins. You can follow it up with another post.",
         "doc": "Step-3 intro"
       },
       "review_summary": {
@@ -814,7 +814,7 @@
         "doc": "Success step title"
       },
       "success_intro": {
-        "text": "Admins will see it in the circle, and mediators too if the circle uses mediation.",
+        "text": "Admins will see it in the circle.",
         "doc": "Success step intro"
       }
     }

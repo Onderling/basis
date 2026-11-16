@@ -14,6 +14,12 @@ import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib
 
 export const CONTACT_SCHEME = 'onderling-contact://';
 export const CONTACT_LINK_PARAM = 'contact';
+/**
+ * The one-time token a SHARED link carries beside the card (L806, Frits 2026-11-12): every "Share my contact" mints one
+ * for the persona shared as (pinboard's `mintSharedCard`); the first turn that carries it is let on as if chosen, anyone
+ * after is a request. It rides the fragment with the card, so no server sees it; the raw code carries none.
+ */
+export const SHARED_LINK_TOKEN_PARAM = 't';
 
 /**
  * How the contact QR is DRAWN, one answer for both shells (their QR libraries differ; the settings do not). A card
@@ -30,19 +36,22 @@ const B64URL = /^[A-Za-z0-9_-]+$/;
  * The link for a card, on the app served at `appUrl`.
  * @param {string} appUrl   where the app is served (origin + path, a query is kept, a fragment replaced)
  * @param {string} payload  the `onderling-contact://…` card
+ * @param {string|null} [token] the shared link's one-time token (base64url), or none
  * @returns {{ok:true, link:string}|{ok:false, reason:string}}
  */
-export function contactCardLink(appUrl, payload) {
+export function contactCardLink(appUrl, payload, token = null) {
   const body = bodyOf(payload);
   if (!body) return { ok: false, reason: 'not-a-contact-card' };
   if (typeof appUrl !== 'string' || !/^https?:\/\//.test(appUrl)) return { ok: false, reason: 'bad-app-url' };
-  return { ok: true, link: `${appUrl.split('#')[0]}#${CONTACT_LINK_PARAM}=${body}` };
+  const tok = typeof token === 'string' && B64URL.test(token) ? `&${SHARED_LINK_TOKEN_PARAM}=${token}` : '';
+  return { ok: true, link: `${appUrl.split('#')[0]}#${CONTACT_LINK_PARAM}=${body}${tok}` };
 }
 
 /**
- * The card from a link — or from a bare hash, or the raw code (one paste box takes anything).
+ * The card from a link — or from a bare hash, or the raw code (one paste box takes anything) — and the shared link's
+ * token when the link carries a well-formed one.
  * @param {string} hrefOrHash
- * @returns {{ok:true, payload:string}|{ok:false, reason:string}}
+ * @returns {{ok:true, payload:string, token?:string}|{ok:false, reason:string}}
  */
 export function contactCardFromLink(hrefOrHash) {
   if (typeof hrefOrHash !== 'string' || !hrefOrHash.trim()) return { ok: false, reason: 'not-a-contact-link' };
@@ -52,7 +61,8 @@ export function contactCardFromLink(hrefOrHash) {
   const hash = hashIdx >= 0 ? s.slice(hashIdx + 1) : s;
   const m = new RegExp(`(?:^|&)${CONTACT_LINK_PARAM}=([^&]+)`).exec(hash);
   if (!m || !B64URL.test(m[1])) return { ok: false, reason: 'not-a-contact-link' };
-  return { ok: true, payload: CONTACT_SCHEME + m[1] };
+  const tok = new RegExp(`(?:^|&)${SHARED_LINK_TOKEN_PARAM}=([^&]+)`).exec(hash);
+  return { ok: true, payload: CONTACT_SCHEME + m[1], ...(tok && B64URL.test(tok[1]) ? { token: tok[1] } : {}) };
 }
 
 function bodyOf(payload) {
@@ -73,16 +83,62 @@ function bodyOf(payload) {
  * but opens an https link in the browser, where the app adds the contact — the invite QR has always worked that
  * way. The in-app scanner reads both forms, so a QR of the link scans in the app too. Without a link the QR is the
  * raw code, which only the in-app scanner reads.
+ *
+ * EVERY SHOWING MINTS A NEW LINK (L806, Frits 2026-11-12): the link carries a fresh one-time token for the persona shared
+ * as, so its first opener is let on as if chosen; anyone after is a request. Only a link carries it (the code is the bare
+ * card), so without a link nothing is minted; a mint that fails leaves the plain link (its opener is a request).
  * @param {{ callSkill: (app: string, op: string, args: object) => Promise<any>, appUrl?: string|null }} a
- * @returns {Promise<{ payload: string|null, link: string|null, qr: string|null, qrEncodes: 'link'|'code'|null }>}
+ * @returns {Promise<{ payload: string|null, link: string|null, qr: string|null, qrEncodes: 'link'|'code'|null, token: string|null }>}
  */
 export async function loadShareMyContact({ callSkill, appUrl = null } = {}) {
   let payload = null;
   try { payload = (await callSkill('pinboard', 'getContactShareQr', {}))?.payload ?? null; } catch { payload = null; }
-  if (typeof payload !== 'string' || !payload) return { payload: null, link: null, qr: null, qrEncodes: null };
-  const linkR = appUrl ? contactCardLink(appUrl, payload) : { ok: false };
-  const link = linkR.ok ? linkR.link : null;
-  return { payload, link, qr: link ?? payload, qrEncodes: link ? 'link' : 'code' };
+  if (typeof payload !== 'string' || !payload) return { payload: null, link: null, qr: null, qrEncodes: null, token: null };
+  const plain = appUrl ? contactCardLink(appUrl, payload) : { ok: false };
+  let token = null;
+  if (plain.ok) {
+    try {
+      const minted = await callSkill('pinboard', 'mintSharedCard', {});
+      token = typeof minted?.token === 'string' && B64URL.test(minted.token) ? minted.token : null;
+    } catch { token = null; }
+  }
+  const link = plain.ok ? contactCardLink(appUrl, payload, token).link : null;
+  return { payload, link, qr: link ?? payload, qrEncodes: link ? 'link' : 'code', token };
+}
+
+/**
+ * The state of the link the panel shows, for both shells to say: not used yet, used (when), or gone (withdrawn, expired,
+ * or not yet carried to this device). Read from pinboard's `listSharedCards`.
+ * @param {{ callSkill: Function, token: string|null }} a
+ * @returns {Promise<{ state: 'unused'|'used'|'gone', usedAt: number|null }>}
+ */
+export async function sharedLinkState({ callSkill, token } = {}) {
+  if (typeof token !== 'string' || !token) return { state: 'gone', usedAt: null };
+  let links = [];
+  try { links = (await callSkill('pinboard', 'listSharedCards', {}))?.links ?? []; } catch { links = []; }
+  const l = Array.isArray(links) ? links.find((x) => x?.token === token) : null;
+  if (!l) return { state: 'gone', usedAt: null };
+  return l.state === 'used' ? { state: 'used', usedAt: Number.isFinite(l.usedAt) ? l.usedAt : null } : { state: 'unused', usedAt: null };
+}
+
+/**
+ * The link's state in words, one answer for both shells: "Not used yet", "Used on 14 Nov", or null (nothing to say).
+ * @param {{ state: string, usedAt: number|null }} st
+ * @param {{ t: (k: string, v?: object) => string, lang?: string, tz?: string }} opts
+ */
+export function sharedLinkWords(st, { t, lang = 'nl', tz } = {}) {
+  if (st?.state === 'unused') return t('circle.shareContact.link_unused');
+  if (st?.state !== 'used') return null;
+  const date = Number.isFinite(st.usedAt)
+    ? new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'nl-NL', { day: 'numeric', month: 'short', ...(tz ? { timeZone: tz } : {}) }).format(new Date(st.usedAt))
+    : '';
+  return t('circle.shareContact.link_used', { date });
+}
+
+/** Withdraw the link the panel shows ("Withdraw this link"): its later opener is a request. */
+export async function withdrawSharedLink({ callSkill, token } = {}) {
+  if (typeof token !== 'string' || !token) return false;
+  try { return (await callSkill('pinboard', 'withdrawSharedCard', { token }))?.withdrawn === true; } catch { return false; }
 }
 
 /**

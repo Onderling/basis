@@ -81,8 +81,8 @@
           "doc": "Join wizard — step 2 label."
         },
         "handle": {
-          "text": "Naam",
-          "doc": "Join wizard — step 3 label (pick a handle)."
+          "text": "Wie",
+          "doc": "Join wizard: step 3 label (who joins)."
         }
       },
       "cancel": {
@@ -159,20 +159,20 @@
       },
       "handle": {
         "title": {
-          "text": "Kies een naam",
-          "doc": "Join wizard — handle step heading."
+          "text": "Wie doet mee",
+          "doc": "Join wizard, step 3 heading: who joins this circle."
         },
         "intro": {
-          "text": "Je naam is hoe andere leden je aanspreken in deze kring. Kleine letters, cijfers, liggend streepje of underscore; 3–30 tekens.",
-          "doc": "Join wizard — handle step intro."
+          "text": "Leden van deze kring zien deze naam. Je andere kringen houden die van hen.",
+          "doc": "Join wizard: the hint under the optional name for this circle."
         },
         "label": {
-          "text": "Naam",
-          "doc": "Join wizard — handle input label."
+          "text": "Je naam in deze kring",
+          "doc": "Join wizard: label of the optional name for this circle (empty = the persona's name)."
         },
         "placeholder": {
-          "text": "bijv. alice",
-          "doc": "Join wizard — handle input placeholder."
+          "text": "bijv. Alice",
+          "doc": "Join wizard: placeholder of the optional name for this circle."
         },
         "suggestions": {
           "text": "Suggesties",
@@ -181,20 +181,24 @@
       },
       "link": {
         "label": {
-          "text": "Ga verder als",
-          "doc": "Join wizard — cross-circle linkability choice label."
+          "text": "Adres in deze kring",
+          "doc": "Join wizard: the address choice label."
         },
         "fresh": {
-          "text": "Een nieuwe identiteit (niet te koppelen)",
-          "doc": "Join wizard — fresh/unlinkable key option."
+          "text": "Een nieuw adres voor deze kring",
+          "doc": "Join wizard: the default address option (this circle's own address)."
         },
         "same_person": {
-          "text": "Dezelfde persoon als in {{name}}",
-          "doc": "Join wizard — continue-as-existing-self option."
+          "text": "Hetzelfde adres als in {{name}}",
+          "doc": "Join wizard: present the address used in another circle ({{name}} = that circle)."
         },
         "hint": {
-          "text": "Een nieuwe identiteit houdt deze kring los van je andere kringen. Als dezelfde persoon verdergaan bewijst dat je dezelfde bent voor iedereen in beide kringen.",
-          "doc": "Join wizard — linkability explanation."
+          "text": "De relay ziet niet dat je kringen bij elkaar horen. Leden die in beide kringen zitten wel.",
+          "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
+        },
+        "hint_same": {
+          "text": "De relay en de leden van beide kringen zien dat dit dezelfde persoon is.",
+          "doc": "Join wizard: the sentence under the address choice when the same address as in another circle is chosen (the relay and members of both circles see one person)."
         }
       },
       "persona": {
@@ -211,8 +215,8 @@
           "doc": "Join wizard — default persona option label."
         },
         "hint": {
-          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld — niets bij een eerste keer. Later aanpassen kan bij Mij → persona's.",
-          "doc": "Join wizard — persona disclosure hint."
+          "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld. Niets bij een eerste keer. Later aanpassen kan bij Mij, persona's.",
+          "doc": "Join wizard: persona disclosure hint."
         },
         "already_in": {
           "text": "Je bent hier al als {{persona}} — met een andere persona kan dat vanaf een ander apparaat.",
@@ -231,6 +235,38 @@
         "suggested": {
           "text": "Deze kring stelt voor: {{level}}",
           "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)."
+        }
+      },
+      "join_as": {
+        "line": {
+          "text": "Je doet mee als {{name}}.",
+          "doc": "Join wizard step 3: the one line naming who joins ({{name}} = the name members will see)."
+        },
+        "no_name": {
+          "text": "Kies de naam die leden van deze kring zien.",
+          "doc": "Join wizard step 3: shown instead of the one line when there is no name yet (the fold opens with the name field)."
+        },
+        "fold": {
+          "text": "Anders heten in deze kring, of meer privacy",
+          "doc": "Join wizard step 3: the fold holding the optional name, the persona, how much you show and the address."
+        }
+      },
+      "new_persona": {
+        "hint": {
+          "text": "Helemaal los, ook voor leden? Doe mee als nieuwe persona.",
+          "doc": "Join wizard: the real separation. A new persona is a different person to everyone, members included."
+        },
+        "button": {
+          "text": "Als nieuwe persona",
+          "doc": "Join wizard: makes a new persona and joins as it."
+        },
+        "label": {
+          "text": "Naam van de nieuwe persona",
+          "doc": "Join wizard: the name field for the new persona."
+        },
+        "make": {
+          "text": "Maken",
+          "doc": "Join wizard: confirms making the new persona."
         }
       }
     }
@@ -319,6 +355,14 @@
     "link_copied": {
       "text": "Link gekopieerd.",
       "doc": "The invite on web, when the browser has no share sheet: the link went to the clipboard."
+    },
+    "expired_code": {
+      "text": "Deze uitnodiging is niet meer geldig. Vraag wie je uitnodigde om een nieuwe.",
+      "doc": "The inviter's device refused the join: the code is unknown, expired or rotated away (`invalid-or-expired-code`)."
+    },
+    "join_refused": {
+      "text": "De kring liet je niet binnen met deze uitnodiging. Vraag wie je uitnodigde om een nieuwe.",
+      "doc": "The inviter's device refused the join for a reason it does not name (`join-refused`, the catch-all of the closed refusal set)."
     }
   },
   "members": {
@@ -640,6 +684,18 @@
       "persona_no_connection": {
         "text": "Niet verstuurd: deze persona heeft geen verbinding met de kring (tik om opnieuw te proberen)",
         "doc": "The circle belongs to one of your personas and that persona has no connection of its own to the circle's relay right now, so the message did not leave (it is never sent under another identity). Retryable once the connection is back."
+      },
+      "held_waiting": {
+        "text": "Wacht tot er een verbinding is. Het gaat dan vanzelf.",
+        "doc": "A message to a contact is held on this device because it has no connection to send on (no connection point yet). Not a failure: it leaves by itself once there is one, and the bubble moves on. Pairs with the pending state."
+      },
+      "unknown_address": {
+        "text": "Niet verstuurd: dit apparaat weet niet van wie dat adres is. Voeg eerst hun kaartje toe en stuur het dan opnieuw.",
+        "doc": "A contact turn the send gate held (no reason to send on the person key) and gave up at its time limit: not sent, and why."
+      },
+      "peer_unreachable": {
+        "text": "Niet bereikt, misschien offline (tik om opnieuw te proberen)",
+        "doc": "A message to one person did not reach them right now: their device is not on any connection point we share. Retryable."
       }
     },
     "unknown_sender": {
@@ -649,6 +705,24 @@
     "app_sender": {
       "text": "Onderling",
       "doc": "The sender shown on a bubble the APP wrote — a command reply, a caretaker notice, \"you were removed\". Until 2026-08-28 these carried `unknown_sender` (\"Onbekend lid\"), because the bot actor is a sentinel and never resolves against the roster: the app spoke to people as a stranger nobody could place. The product's OWN NAME is used rather than \"de assistent\", because these lines are not all the assistant answering — a removal notice is the app telling you something, and attributing that to an assistant misdescribes who is speaking. If the assistant is later given its own voice, that is a second actor, not a rename of this one."
+    }
+  },
+  "act": {
+    "pending": {
+      "text": "Bezig…",
+      "doc": "The shared act strip (actState.js): an act the person just took is still running, shown only after a short delay so a fast act never flickers. One line for every op; a screen invents no Save feedback of its own."
+    },
+    "done": {
+      "text": "Klaar.",
+      "doc": "The shared act strip: the act ended well and its op has no reply-family line of its own (replyLine.js words the ones that do). Clears by itself."
+    },
+    "failed": {
+      "text": "Dat is niet gelukt.",
+      "doc": "The shared act strip: the act failed and nothing said why. Stays until the next act or a tap."
+    },
+    "failed_with": {
+      "text": "Dat is niet gelukt: {{error}}",
+      "doc": "The shared act strip: the act failed with words from the op or the error. Stays until the next act or a tap."
     }
   },
   "tabs": {
@@ -820,6 +894,10 @@
       "chat-message": {
         "text": "Bericht",
         "doc": "embeds[] chip type label — chat message."
+      },
+      "lend": {
+        "text": "Lenen",
+        "doc": "embeds[] chip type label — lending an item (a noticeboard lend post)."
       }
     }
   },
@@ -879,6 +957,10 @@
     "pick_topic": {
       "text": "Prima. Kies dan zelf een onderwerp:",
       "doc": "Task #13 Phase 2 — heading above the set-topic chips after the user declines forwarding (or types /help)."
+    },
+    "all_topics": {
+      "text": "Alle onderwerpen",
+      "doc": "Help: the chip after the five likeliest topics of an unanswered question; it posts every topic."
     },
     "no_llm_topics": {
       "text": "Zonder assistent kan ik alleen deze vaste onderwerpen beantwoorden. Kies er een:",
@@ -1275,8 +1357,8 @@
       "doc": "An empty task block: nothing open."
     },
     "block_empty_news": {
-      "text": "{{title}} — geen",
-      "doc": "An empty \"circles with news\" block: none."
+      "text": "Nog geen kringen hier",
+      "doc": "An empty \"circles with news\" block when the page shows no circles at all."
     },
     "block_untitled": {
       "text": "Dit blok",
@@ -1293,6 +1375,14 @@
     "block_empty_awaiting": {
       "text": "{{title}} — niets",
       "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "block_empty_news_in": {
+      "text": "Niets nieuws in {{name}}",
+      "doc": "An empty \"circles with news\" block over one circle: it names the circle, so Today never goes empty without saying what it looked at."
+    },
+    "block_empty_news_count": {
+      "text": "Niets nieuws in je {{count}} kringen",
+      "doc": "An empty \"circles with news\" block over several circles: how many it looked at."
     }
   },
   "vandaag": {
@@ -1444,9 +1534,13 @@
       "text": "Zeg wat je wilt — \"notitie: melk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
-    "plus_referral": {
-      "text": "Dat is iets voor {{name}} → openen",
-      "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
+    "plus_circle_ask": {
+      "text": "“{{line}}”: in welke kring?",
+      "doc": "The \"+\" line reads to an act more than one of the person's circles holds: the card asks which circle (one button per circle, and Cancel); nothing runs until one is chosen."
+    },
+    "plus_circle_in": {
+      "text": "In {{name}}",
+      "doc": "The \"+\" card's button for one circle: run the act the line reads to in that circle, as the person."
     },
     "pin_to_plus": {
       "text": "Vastzetten in +",
@@ -1472,9 +1566,21 @@
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
+    "plus_help": {
+      "text": "Dit kan ik voor je doen: {{acts}}. Of vraag hoe iets werkt.",
+      "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
+    },
     "plus_line_unread": {
-      "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
+      "text": "Dat kon ik niet lezen.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_forget": {
+      "text": "Vergeet dit gesprek",
+      "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."
+    },
+    "plus_thread": {
+      "text": "Je gesprek met de assistent",
+      "doc": "The \"+\" sheet: the accessible name of the kept conversation shown above the line."
     },
     "act_done": {
       "text": "Klaar",
@@ -3638,6 +3744,10 @@
       "text": "Op dit moment niemand in de buurt.",
       "doc": "Empty state."
     },
+    "header_cannot_discover": {
+      "text": "Dit apparaat kan geen mensen in de buurt vinden: een browser heeft geen wifi-zoeken of Bluetooth. Open Onderling op je telefoon om hier mensen te ontmoeten.",
+      "doc": "Nearby's top line on a device that cannot discover anyone (a browser has no Wi-Fi discovery or Bluetooth): the room stays empty here; the phone is where people meet nearby."
+    },
     "anon_peer": {
       "text": "iemand",
       "doc": "Fallback row label."
@@ -3694,10 +3804,6 @@
       "text": "nog niets getoond",
       "doc": "Summary when neither allow is on."
     },
-    "reach_share": {
-      "text": "Deel hoe ik bereikbaar ben",
-      "doc": "Rung 4: the action in a nearby thread that shares my {transport→address} map (all-or-nothing; the NKN address only if the publication lock allows)."
-    },
     "reach_shared_you": {
       "text": "Je hebt gedeeld hoe je bereikbaar bent.",
       "doc": "Thread line after sharing."
@@ -3718,6 +3824,18 @@
       "text": "Nu niet",
       "doc": "Decline the ask-back; the bar goes away, their card stays."
     },
+    "answer_row": {
+      "text": "{{name}} antwoordde: {{text}}",
+      "doc": "Under my ask: an answer that arrived in the room. It opens no thread; sharing my card is the way to a contact."
+    },
+    "share_card_with": {
+      "text": "Deel je kaart met {{name}}",
+      "doc": "On an answer to my ask: hand over how to reach me (my own address, the relay) and ask for theirs. The only way from the room to a contact."
+    },
+    "earlier_in_room": {
+      "text": "Eerder, in de ruimte",
+      "doc": "A contact thread: the header of a kept Nearby visit with this person (shown after a card share; kept on this device only, for the person's chosen number of days)."
+    },
     "my_ask_row": {
       "text": "Jouw vraag · door {{heard}} gehoord · nog {{min}} min",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
@@ -3731,8 +3849,8 @@
       "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
     },
     "as_self_caveat": {
-      "text": "Dat is een naam die je laat zien, geen apart adres: wie hier meekijkt, kan zien dat het van hetzelfde apparaat komt.",
-      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+      "text": "De ruimte ziet elke keer een nieuwe sleutel. Het netwerk ziet nog steeds je apparaat.",
+      "doc": "Nearby → You here: what the room key does and does not hide. A new key per entry and per self; the network (IP, MAC) still sees the device."
     },
     "first_use_title": {
       "text": "Wat mag deze ruimte van je zien?",
@@ -4025,52 +4143,6 @@
       "doc": "P1 §5 — empty state for the skill list."
     }
   },
-  "chatFilter": {
-    "note": {
-      "text": "Dit verandert alleen wat jij hier ziet.",
-      "doc": "P1.7 — the filter strip is a reading preference, not a circle setting."
-    },
-    "last_kind": {
-      "text": "Dit is de laatste — uitzetten laat niets over om te lezen.",
-      "doc": "P1.7 — why the final selected kind-chip is disabled."
-    },
-    "kind": {
-      "chat-message": {
-        "text": "Berichten",
-        "doc": "P1.7 — kind chip: plain chat."
-      },
-      "task": {
-        "text": "Taken",
-        "doc": "P1.7 — kind chip."
-      },
-      "ask": {
-        "text": "Vragen",
-        "doc": "P1.7 — kind chip."
-      },
-      "offer": {
-        "text": "Aanbod",
-        "doc": "P1.7 — kind chip."
-      },
-      "lend": {
-        "text": "Lenen",
-        "doc": "P1.7 — kind chip."
-      }
-    },
-    "authors": {
-      "all": {
-        "text": "Iedereen",
-        "doc": "P1.7 — author chip: people + agents."
-      },
-      "people": {
-        "text": "Mensen",
-        "doc": "P1.7 — author chip: hide agent chatter (Frits' case)."
-      },
-      "agents": {
-        "text": "Bots",
-        "doc": "P1.7 — author chip: only what the agents said."
-      }
-    }
-  },
   "rules": {
     "title": {
       "text": "Huisregels",
@@ -4079,6 +4151,14 @@
     "save": {
       "text": "Regels opslaan",
       "doc": "Save the rules document."
+    },
+    "change_proposed": {
+      "text": "Er staat een voorstel open om de regels te veranderen: in deze kring beslissen de beheerders dat samen. De regels veranderen als er besloten is.",
+      "doc": "After saving the rules in a circle where changing them is decided together: nothing changed yet, a proposal is open."
+    },
+    "change_refused": {
+      "text": "De regels zijn niet veranderd: deze kring stond dat vanaf dit apparaat niet toe.",
+      "doc": "After saving the rules when the circle refused the change (not an admin, or the write was refused): the rules stand as they were."
     },
     "preview": {
       "text": "Voorbeeld (zoals een nieuw lid het ziet)",
@@ -5844,6 +5924,14 @@
       "text": "Tonen",
       "doc": "The thread header's control when the contact is hidden: show them in Contacten again (the person's own act; a message from them does the same)."
     },
+    "more": {
+      "text": "Meer",
+      "doc": "A contact thread: the ⋯ button that holds Hide and Delete."
+    },
+    "self_here": {
+      "text": "Hier ben je {{name}}; wat ziet dit contact van je?",
+      "doc": "A contact thread: the avatar top right, the persona you are in this thread; its tap shows what the contact sees of you."
+    },
     "hide_note": {
       "text": "Alleen uit je lijst. Hun kringen en dit gesprek blijven; een bericht van hen brengt ze terug.",
       "doc": "What hiding IS and is not, said under the control (amendment 3: Contacten only — their circles, roster row and member card are untouched). Never a notification."
@@ -5925,6 +6013,10 @@
     "sending": {
       "text": "versturen…",
       "doc": "P5 — transient state while a turn is in flight to the bot."
+    },
+    "write_needs_card": {
+      "text": "Je kunt {{name}} hier nog niet schrijven: jullie delen geen kring die hun adres toont. Voeg eerst hun kaartje toe.",
+      "doc": "A contact shown from the peer graph (a co-member, no card) whom no shared circle shows an address for: writing would leave on the person key, so the thread says why and sends nothing (the send gate, 2026-11-12)."
     },
     "send_failed": {
       "text": "Kon {{name}} niet bereiken — mogelijk offline.",
@@ -6035,8 +6127,49 @@
       "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
     },
     "blocked": {
-      "text": "Geblokkeerd",
+      "text": "Geblokkeerd op dit apparaat",
       "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
+    },
+    "held": {
+      "cut": {
+        "text": "Dit bericht was te lang en is ingekort."
+      },
+      "file": {
+        "text": "Bij dit bericht zat een bestand; dat is niet bewaard."
+      }
+    },
+    "requests": {
+      "title": {
+        "text": "Verzoeken",
+        "doc": "Heading of the requests section at the top of Contacten: first messages from people the person did not choose."
+      },
+      "says": {
+        "text": "Zegt {{name}} te zijn",
+        "doc": "A request row: the name the sender's card gives, marked as their claim (unverified). {{name}} is that name."
+      },
+      "member": {
+        "text": "{{name}}, uit je kring"
+      },
+      "no_name": {
+        "text": "Iemand zonder naam",
+        "doc": "A request row whose sender's card gives no name."
+      },
+      "accept": {
+        "text": "Accepteren",
+        "doc": "Accept a request: the sender becomes a contact and their messages move into the thread."
+      },
+      "ignore": {
+        "text": "Negeren",
+        "doc": "Ignore a request: it stays, folded, and can still be accepted; the sender sees nothing different."
+      },
+      "block": {
+        "text": "Blokkeren op dit apparaat",
+        "doc": "Block the sender of a request, on this device only: their direct messages are refused; circles are untouched."
+      },
+      "ignored_fold": {
+        "text": "Genegeerd ({{n}})",
+        "doc": "The fold holding ignored requests. {{n}} is how many."
+      }
     }
   },
   "pairedDevices": {
@@ -6183,6 +6316,14 @@
     "posted": {
       "text": "Geplaatst.",
       "doc": "S1 — toast after a post is created."
+    },
+    "key_not_ready": {
+      "text": "De sleutel van deze kring staat nog niet op dit apparaat. Probeer het zo opnieuw.",
+      "doc": "Shown when a write into a sealed circle is refused because this device cannot seal for it yet (its key pair or the circle's policy is not there yet): nothing was written in the clear. Wording Frits's."
+    },
+    "media_unavailable": {
+      "text": "Foto's kunnen voor deze kring op dit apparaat nog niet versleuteld worden.",
+      "doc": "Shown when a post with a picture is refused because the circle's sealed-media gateway is not there: no picture goes out unsealed."
     },
     "post_failed": {
       "text": "Kon niet plaatsen — probeer opnieuw.",
@@ -6341,6 +6482,10 @@
     "scan": {
       "text": "Scan",
       "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "assistant": {
+      "text": "Assistent",
+      "doc": "Mij → opens the person's ongoing conversation with the assistant (the \"+\" sheet)."
     },
     "share_contact": {
       "text": "Deel mijn kaart",
@@ -6964,6 +7109,54 @@
       "text": "Deze koppelcode is onvolledig.",
       "doc": "Refusal: sleutel of nonce ontbreekt."
     },
+    "connection_pick_code": {
+      "text": "Welke code staat op het andere scherm? Kies die.",
+      "doc": "The screen door: three codes, the person picks the one their screen shows (before any tick)."
+    },
+    "connection_none_of_these": {
+      "text": "Geen van deze",
+      "doc": "The screen door: the code on my screen is not among the three (nothing is connected)."
+    },
+    "connection_scan": {
+      "text": "Scan de code op het scherm",
+      "doc": "Phone: opens the camera to read the pairing code the other screen shows."
+    },
+    "connection_offer_pairing-not-an-offer": {
+      "text": "Deze koppelcode is onvolledig.",
+      "doc": "Refusal (screen door): no key or nonce in the offer."
+    },
+    "connection_offer_pairing-other-relay": {
+      "text": "Dat scherm wacht op een andere relay dan dit apparaat, dus het kan hier niet gekoppeld worden.",
+      "doc": "Refusal (screen door): the offer's relay is not one this device is on (the grant could never reach it)."
+    },
+    "connection_offer_pairing-nonce-replayed": {
+      "text": "Deze koppelcode is al gebruikt. Maak een nieuwe op het scherm.",
+      "doc": "Refusal (screen door): an offer whose nonce was already granted here."
+    },
+    "connection_offer_pairing-nothing-pending": {
+      "text": "Plak de koppelcode opnieuw.",
+      "doc": "Refusal (screen door): a pick with no offer waiting."
+    },
+    "connection_offer_pairing-expired": {
+      "text": "Te laat. Maak een nieuwe koppelcode op het scherm.",
+      "doc": "Refusal (screen door): the pick came after the offer's lifetime."
+    },
+    "connection_offer_pairing-wrong-code": {
+      "text": "Dat is niet de code op je scherm, dus er is niets gekoppeld. Maak een nieuwe koppelcode op het scherm.",
+      "doc": "Refusal (screen door): the picked code is not the screen's (or 'none of these'); the offer is gone."
+    },
+    "connection_offer_pairing-no-pick": {
+      "text": "Kies eerst de code die je scherm toont.",
+      "doc": "Refusal: a grant asked for before the right pick."
+    },
+    "connection_offer_nothing-picked": {
+      "text": "Vink minstens één ding aan dat het mag zien of doen.",
+      "doc": "Refusal: the ticks grant nothing."
+    },
+    "connection_offer_grant-failed": {
+      "text": "Koppelen is niet gelukt. Probeer het opnieuw.",
+      "doc": "Refusal: the grant op failed."
+    },
     "mnemonic_written": {
       "text": "Opgeschreven",
       "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."
@@ -7020,6 +7213,16 @@
       "text": "Beheerdersrol intrekken",
       "doc": "The same control the other way: an admin becomes a member again. Neutral wording on purpose — it sits on your OWN row too, which is how someone steps back from running a circle."
     },
+    "handover": {
+      "let_app_choose": {
+        "text": "Stap terug; laat de app kiezen",
+        "doc": "The last admin stepping down: the button that steps down now; the circle passes to a member chosen from the log (Frits 2026-11-10)."
+      },
+      "appoint_first": {
+        "text": "Eerst iemand aanwijzen",
+        "doc": "The last admin stepping down: the button that closes the question so they can make someone admin on their row first."
+      }
+    },
     "role_confirm": {
       "promote": {
         "text": "{{name}} kan dan mensen toelaten, de regels wijzigen en leden verwijderen.",
@@ -7030,7 +7233,7 @@
         "doc": "Confirm body for an ordinary demotion — another admin remains, so nothing is handed over."
       },
       "handover": {
-        "text": "{{name}} is de enige beheerder. Hierna beheert niemand deze kring meer, dus gaat het beheer over op een van de andere leden — wie dat wordt volgt uit het logboek; niemand kiest dat.",
+        "text": "{{name}} is de enige beheerder. Stap nu terug en de kring gaat naar een van de andere leden, gekozen uit het logboek (niemand kiest); of wijs eerst iemand aan: maak die beheerder op hun regel, en stap dan terug.",
         "doc": "Confirm body when the LAST admin steps back. The fold answers this by handing over (appointing a caretaker from whoever is left), not by refusing it, so the person must be told that the circle changes hands. Deliberately does NOT name the successor: that is derived from the log and a shell guessing at it would give one circle two stories."
       },
       "no_one_else": {
@@ -7123,7 +7326,7 @@
       "doc": "One row of the blocked list: the name the person saw when they blocked, and the day. Never the key."
     },
     "muted_row_unnamed": {
-      "text": "Iemand (geblokkeerd {{date}})",
+      "text": "Onbekend (geblokkeerd {{date}})",
       "doc": "A block kept without a name (made before names were kept, or from /block with a bare address)."
     },
     "unmute": {
@@ -7133,6 +7336,14 @@
     "removed": {
       "text": "{{name}} zit niet meer in deze kring. Andere kringen die jullie delen blijven ongewijzigd.",
       "doc": "B4 — confirmation after removing a member; states the per-circle scope, which is the thing that used to be untrue."
+    },
+    "remove_proposed": {
+      "text": "Er staat een voorstel open om {{name}} te verwijderen: deze kring beslist dat samen. Je ziet het als er besloten is.",
+      "doc": "Na Verwijderen in een kring die samen over verwijderen beslist: er is nog niets gebeurd, er staat een voorstel open."
+    },
+    "role_proposed": {
+      "text": "Er staat een voorstel open om de rol van {{name}} te veranderen: deze kring beslist dat samen, net als de instellingen. Je ziet het als er besloten is.",
+      "doc": "After making someone an admin (or an admin a member) in a circle that decides its settings together: nothing changed yet, a proposal is open."
     }
   },
   "userLlm": {
@@ -7393,6 +7604,10 @@
       "changePolicy": {
         "text": "Instelling wijzigen",
         "doc": "Governed action — change a circle policy setting."
+      },
+      "changeRole": {
+        "text": "Rol veranderen",
+        "doc": "Governed action — make a member an admin, or an admin a member (decided by the circle's settings rule)."
       }
     },
     "class": {
@@ -7407,6 +7622,10 @@
       "member_vote": {
         "text": "stemming leden",
         "doc": "Decision-class — a majority of the whole circle must agree."
+      },
+      "random_sample": {
+        "text": "gelote leden beslissen",
+        "doc": "Decision class random-sample: members drawn from the proposal's own hash decide (the wizard's two-member mediation: two drawn, both agree; a larger draw by majority is a drawn jury). Frits 2026-11-10."
       }
     },
     "status": {
@@ -7443,6 +7662,14 @@
       "text": "sluit {{when}}",
       "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
     },
+    "joined_since_one": {
+      "text": "1 lid is erbij gekomen sinds dit voorstel is gedaan",
+      "doc": "Decisions screen, an open proposal: one member on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
+    },
+    "joined_since_n": {
+      "text": "{{count}} leden zijn erbij gekomen sinds dit voorstel is gedaan",
+      "doc": "Decisions screen, an open proposal: {{count}} members on the roster joined after the proposal was made (the vote counts the roster as it is now; a shown hint, the join time is self-declared)."
+    },
     "awaiting_enactment": {
       "text": "wacht op een beheerder",
       "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."
@@ -7450,6 +7677,14 @@
     "disputed_line": {
       "text": "tegenstrijdige historie van {{who}} — bewijs bijgevoegd",
       "doc": "Governance L3 — equivocation (fork-proof) alert."
+    },
+    "refused_changeRule": {
+      "text": "{{who}} heeft de regels veranderd zonder de stemming die deze kring vraagt. De wijziging wordt niet toegepast.",
+      "doc": "Governance: an admin's rules change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened (Frits 2026-11-10: kept and shown, never applied)."
+    },
+    "refused_changePolicy": {
+      "text": "{{who}} heeft de instellingen veranderd zonder de stemming die deze kring vraagt. De wijziging wordt niet toegepast.",
+      "doc": "Governance: an admin's settings change that skipped the vote the circle's rule requires. Every device refuses it; this line shows that it happened."
     },
     "review_remove": {
       "text": "Bekijk & verwijder",
@@ -7466,6 +7701,24 @@
     "report_reason_prompt": {
       "text": "Waarom meld je dit lid?",
       "doc": "Governance §8 — prompt for the report reason."
+    },
+    "member_left": {
+      "text": "een lid dat is vertrokken"
+    },
+    "enact": {
+      "text": "Uitvoeren"
+    },
+    "enacted": {
+      "text": "Gedaan: het besluit is uitgevoerd."
+    },
+    "enact_failed": {
+      "text": "Dit kon niet worden uitgevoerd. Probeer het nog eens."
+    },
+    "vote_failed": {
+      "text": "Je stem is niet doorgekomen. Probeer het nog eens."
+    },
+    "open_from_notice": {
+      "text": "Naar Besluiten"
     },
     "notify_vote_opened": {
       "text": "Er is een besluit geopend: {{action}} — je stem is misschien nodig",
@@ -7638,6 +7891,30 @@
     "personas_tagline": {
       "text": "filters + uitzonderingen op de algemene",
       "doc": "mij#personas — sectie 2 tagline: persona's zijn filters/uitzonderingen op de waarheidslaag."
+    },
+    "first_messages": {
+      "text": "Wie mag deze persona als eerste schrijven",
+      "doc": "mij#personas — persona-kaart: kop van de keuze wie een eerste privébericht mag sturen (eigenschap firstMessages)."
+    },
+    "first_messages_request": {
+      "text": "Alleen wie ik koos: een eerste bericht van een ander wacht als verzoek",
+      "doc": "mij#personas — keuze verzoek: een eerste bericht van iemand buiten het adresboek wacht tot de persoon het aanneemt."
+    },
+    "first_messages_open": {
+      "text": "Iedereen: een eerste bericht komt meteen binnen",
+      "doc": "mij#personas — keuze open: ieders eerste bericht wordt een gesprek."
+    },
+    "circle_members": {
+      "text": "Mensen in de kringen van deze persona",
+      "doc": "mij#personas — persona-kaart: kop van de keuze of kringleden privé mogen schrijven (circleMembersMayWrite)."
+    },
+    "circle_members_on": {
+      "text": "Mogen mij schrijven: hun bericht opent een gesprek",
+      "doc": "mij#personas — aan (standaard): het eerste privébericht van een kringlid is een gesprek, geen verzoek."
+    },
+    "circle_members_off": {
+      "text": "Eerst vragen, zoals ieder ander: hun bericht wacht als verzoek",
+      "doc": "mij#personas — uit: het eerste privébericht van een kringlid is een verzoek, zoals van een vreemde."
     },
     "truth_tag": {
       "text": "waarheidslaag",
@@ -7860,6 +8137,10 @@
     "self_required": {
       "text": "Dit apparaat heeft meer dan één persona — zeg als wie je dit doet.",
       "doc": "An op that issues as one of the person's selves (a grant, an install with grants) refused: the device holds more than one self and none was named."
+    },
+    "no_circle_address": {
+      "text": "Deze persoon is in deze kring nog niet bereikbaar. Probeer het straks opnieuw.",
+      "doc": "respondToItem refused: the post's author has no address in that circle on this device yet (no announce reached it). The answer is not sent on their person key; their next announce makes it possible."
     },
     "no_such_persona": {
       "text": "Die persona is niet op dit apparaat.",
@@ -9126,7 +9407,7 @@
       "doc": "Heading of the share panel under Mij."
     },
     "hint": {
-      "text": "Laat de QR scannen, of stuur de link. Wie hem opent, heeft jou als contact en kan je direct een bericht sturen. Er staat geen geheim in.",
+      "text": "Laat de QR scannen, of stuur de link. Elke keer dat je dit scherm opent, is er een nieuwe link: de eerste die hem opent kan je direct een bericht sturen; wie daarna komt, staat bij je verzoeken.",
       "doc": "What the QR/link does and does not do. Plain Dutch; no \"kaart\"."
     },
     "code_label": {
@@ -9148,6 +9429,18 @@
     "share": {
       "text": "Delen…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    },
+    "link_unused": {
+      "text": "Nog niet gebruikt",
+      "doc": "State of the shared link on the share panel: nobody has opened it and written yet (Frits 2026-11-12)."
+    },
+    "link_used": {
+      "text": "Gebruikt op {{date}}",
+      "doc": "State of the shared link: its first opener wrote on {{date}} (day + short month); anyone after them is a request (Frits 2026-11-12)."
+    },
+    "link_withdraw": {
+      "text": "Link intrekken",
+      "doc": "Button on the share panel: the link stops letting its opener write directly; a new link is shown (Frits 2026-11-12)."
     }
   },
   "tasks": {
@@ -9751,8 +10044,12 @@
       "text": "jou",
       "doc": "The reader themselves among the people of a chore or an appointment (\"is van jou\")."
     },
-    "who_someone": {
+    "who_withheld": {
       "text": "iemand",
+      "doc": "A person whose name the household's names setting withholds (the bot's sentences): the name exists, the reader may not see it. Not 'Onbekend', which says no name is known."
+    },
+    "who_someone": {
+      "text": "Onbekend",
       "doc": "A person the reader may not name (the household's names setting): never their id."
     },
     "who_everyone": {
@@ -10031,6 +10328,46 @@
       "assistant_calendarFeed": {
         "text": "Agenda-abonnement",
         "doc": "A setting's label (projected from the parameter register)."
+      },
+      "nearby_keepDays": {
+        "text": "Hoe lang een gesprek in de ruimte op dit apparaat blijft (dagen)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_windowDays": {
+        "text": "Hoe lang iets nieuws in je nieuws blijft (dagen)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_dm": {
+        "text": "Melding: een direct bericht",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_removed": {
+        "text": "Melding: je bent uit een kring gehaald",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_item": {
+        "text": "Melding: een nieuw bericht, taak of afspraak",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_line": {
+        "text": "Melding: een regel in een kring",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_joined": {
+        "text": "Melding: iemand doet mee",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_setting": {
+        "text": "Melding: een instelling van een kring is veranderd",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_assigned": {
+        "text": "Melding: een taak voor mij",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "notify_policy_ask": {
+        "text": "Melding: mijn open vraag in de ruimte",
+        "doc": "A setting's label (projected from the parameter register)."
       }
     },
     "opt": {
@@ -10088,6 +10425,14 @@
       },
       "description": {
         "text": "Alleen de beschrijving",
+        "doc": "A choice on the settings screen."
+      },
+      "banner": {
+        "text": "Toon een melding bovenaan",
+        "doc": "A choice on the settings screen."
+      },
+      "list": {
+        "text": "Alleen op Vandaag",
         "doc": "A choice on the settings screen."
       },
       "off": {
@@ -10216,6 +10561,11 @@
   },
   "settings_home": {
     "title": "Instellingen",
+    "help": "Hulp",
+    "help_missing": {
+      "text": "Het Hulp-gesprek staat (nog) niet op dit apparaat.",
+      "doc": "Gezegd als de persoon Hulp opent (Instellingen, de intro's meer) en dit apparaat geen Hulp-kring heeft."
+    },
     "appearance": "Weergave",
     "per_circle": "Per kring",
     "no_circles": "Je zit nog in geen enkele kring.",
@@ -10233,6 +10583,80 @@
     "no_point": {
       "text": "Geen verbindingspunt: dit bericht wacht.",
       "doc": "Above every composer (circle and contact) while this device knows no relay: what is written waits. Goes when the bubble shows its own waiting state (L716)."
+    }
+  },
+  "forYou": {
+    "title": {
+      "text": "Nieuw voor jou",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "all_read": {
+      "text": "Alles gelezen",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "item": {
+      "text": "{{kind}} in {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "line": {
+      "text": "{{circle}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dm": {
+      "text": "{{name}}: {{text}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "joined": {
+      "text": "{{name}} is erbij in {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "removed": {
+      "text": "Je bent verwijderd uit {{circle}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "many": {
+      "text": "{{count}} nieuwe dingen bij {{name}}",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "late": {
+      "text": "kwam later binnen",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "news": {
+      "text": "Iets nieuws in {{circle}}",
+      "doc": "'Nieuw voor jou': a row for news in a circle that carries no words of its own (an item kind without a chip, a line without text)."
+    },
+    "banner_many": {
+      "text": "{{count}} nieuwe dingen voor jou",
+      "doc": "The in-app banner when several new things arrive at once (the projection's rows, unfolded)."
+    },
+    "a_circle": {
+      "text": "een kring",
+      "doc": "'Nieuw voor jou': the circle a removal row names when the circle has already left the person's list."
+    },
+    "setting": {
+      "text": "{{who}} veranderde {{circle}}: {{change}}",
+      "doc": "'Nieuw voor jou': a circle setting someone else changed, in the settings screen's own words."
+    },
+    "an_admin": {
+      "text": "Een beheerder",
+      "doc": "'Nieuw voor jou': who changed a setting when the reader holds no name for them (only admins can)."
+    },
+    "assigned": {
+      "text": "Een taak in {{circle}} is nu van jou",
+      "doc": "'Nieuw voor jou': someone else gave the person a task."
+    },
+    "ask": {
+      "text": "Je vraag: {{text}} · gehoord door {{heard}}",
+      "doc": "'Nieuw voor jou': the person's own open question in the Nearby room, while it is open (the way back to it)."
+    },
+    "someone": {
+      "text": "Iemand",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    },
+    "dismiss": {
+      "text": "Weghalen",
+      "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
     }
   }
 }

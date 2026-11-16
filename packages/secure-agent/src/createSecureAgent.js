@@ -18,8 +18,8 @@
  *
  * # What lands in S1 + S2 + S3 (also this file)
  *
- *   - muteListVaultKey   (A.1)   persistent mute set + send-side block
- *   - helloGate          (A+.1)  PSK / predicate gate + mute base gate
+ *   - muteListVaultKey   (A.1)   persistent block list (kept here, enforced by the app's direct doors: `mute.covers`)
+ *   - helloGate          (A+.1)  PSK / predicate gate (+ the first-contact rate gate)
  *   - webidClaim         (A.2)   sa.claim.sign/verify/serialize/parse
  *   - passphrase         (A.3)   forwards to vault picker → VaultIndexedDB
  *   - webAuthnUnlock     (A+.5)  sa.passkey.{register,unlock} via PRF
@@ -97,6 +97,7 @@ import {
 import { loadAuditLog }       from './auditLog.js';
 import { chunkPayloadForRoute, makeChunkReassembler } from './peerChunking.js';
 import { createSeenInboundRing } from './seenInbound.js';
+import { pointKey } from './pointKey.js';
 
 /**
  * @typedef {object} CreateSecureAgentOpts
@@ -222,6 +223,29 @@ function isApplicationError(err) {
 // and a send held from it re-flushes at each of these delays before falling back to the presence flush.
 const YOUNG_ADDRESS_WINDOW_MS = param({ key: 'secureAgent.youngAddressWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: Object.freeze([2_000, 5_000, 10_000]) });
+/** How many stale envelopes one bucket (a circle) may hold while its sender check is refreshed; the oldest goes first. */
+/** An address never seen alive gets at most ONE wire attempt per this interval; a send in between joins its hold with
+ *  no wire attempt and no wait. 60 s: a send to a dead address costs a full handshake wait (seconds, ~15 s on a phone),
+ *  so a never-answering roster address costs at most one such wait a minute however often the device sends, while a
+ *  newcomer is unaffected (the join signals them present, which drains the hold at once). */
+const NOT_YET_ATTEMPT_INTERVAL_MS = param({ key: 'secureAgent.notYetAttemptIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+/** How many held-for ADDRESSES a flush attempts side by side (each address's own messages still go one after another,
+ *  oldest first). A flush on (re)connect used to walk the addresses one by one, so K unreachable addresses cost K handshake
+ *  waits in a row (~15 s each on a phone). 4: one wait per four addresses, while the handshakes on one relay socket and
+ *  their key work on a phone stay few at once. */
+/** How many addresses the record of 'seen alive at least once' keeps (persisted with the holds); the one longest without a
+ *  sign of life goes first. Without a bound it only grows: a removed member's addresses would stay in it for ever. A time
+ *  bound would be wrong: an address that answered a day ago and is dead now must still be judged dead (that is what the
+ *  dead record saves a phone from: a handshake wait per dead roster address at every boot). 1024: a few hundred contacts'
+ *  circle addresses, while the persisted outbox stays small. Dropped = 'not yet' again: one attempt per interval. */
+const SEEN_ALIVE_MAX = param({ key: 'secureAgent.seenAliveMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1024 });
+const FLUSH_PARALLEL_ADDRESSES = param({ key: 'secureAgent.flushParallelAddresses', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
+const STALE_PARK_MAX = param({ key: 'secureAgent.staleParkMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
+/** How long a parked stale envelope waits for a refreshed sender check before its bucket is judged once more. */
+const STALE_PARK_TTL_MS = param({ key: 'secureAgent.staleParkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+/** How many bytes of parked envelopes one bucket (a circle) may hold; parked input is unauthenticated, so it is capped by
+ *  size as well as by count, the oldest going first. */
+const STALE_PARK_MAX_BYTES = param({ key: 'secureAgent.staleParkMaxBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_048_576 });
 
 export async function createSecureAgent(opts = {}) {
   // warn about stubbed opts so callers know what's wired now
@@ -343,23 +367,22 @@ export async function createSecureAgent(opts = {}) {
       console.info(`[secure-agent] dropped an inbound envelope from …${from.slice(-6)} (${reason}) — subtype ${env?.payload?.subtype ?? env?._p ?? '?'}; further drops of this kind from this sender are counted, not said`);
     }
   };
-  const muteBlockGate = async (env) => {
-    if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return false; }
-    return true;
-  };
   const rl = (opts.helloRateLimit && typeof opts.helloRateLimit === 'object') ? opts.helloRateLimit : {};
   const boundGate = firstContactRateGate({
     isKnown: async (from) => !agent.peers || !!(await agent.peers.get(from)),
     maxPerWindow: rl.maxPerWindow,
     windowMs:     rl.windowMs,
   });
-  const gates = [muteBlockGate, boundGate, ...(userHelloGate ? [userHelloGate] : [])];
+  // The block list is NOT a gate here (Frits 2026-11-12): a block is about DIRECT contact, and this layer cannot tell a
+  // direct message from circle traffic (nothing below the app learns that a circle exists). The app's direct doors ask
+  // `mute.covers(addr)`; circle traffic never does, so a block never makes one member's view of a circle drift.
+  const gates = [boundGate, ...(userHelloGate ? [userHelloGate] : [])];
   const composedGate = async (env) => {
     for (const g of gates) {
       if (await g(env)) continue;
-      // the mute gate says its own drop; the first-contact limit and an app's own gate say theirs here
+      // the first-contact limit and an app's own gate say their drops here
       if (g === boundGate) noteDrop('first-contact-limited', env);
-      else if (g !== muteBlockGate) noteDrop('hello-gate', env);
+      else noteDrop('hello-gate', env);
       return false;
     }
     return true;
@@ -456,6 +479,8 @@ export async function createSecureAgent(opts = {}) {
     get hasMemberMap() { return !!resolverMemberMap; },
     get hasSecurity()  { return !!agent.security; },
     pubKeyForAddr,
+    /** The person behind `addr` ONLY when they proved the address (no host hook, no crypto-layer fallback), else null. */
+    provenPubKeyForAddr: (addr) => (typeof addr === 'string' && addr ? (provenIdentityOf.get(addr) ?? null) : null),
     resolveByAddr:     resolveMemberByAddr,
     resolveByPubKey:   async (pubKey)   => (pubKey && resolverMemberMap?.resolveByPubKey   ? resolverMemberMap.resolveByPubKey(pubKey)     : null),
     resolveByWebid:    async (webid)    => (webid && resolverMemberMap?.resolveByWebid     ? resolverMemberMap.resolveByWebid(webid)       : null),
@@ -857,6 +882,7 @@ export async function createSecureAgent(opts = {}) {
         // across a restart (for `holdDeadTtlMs`), so every launch does not re-pay a full HI budget per dead
         // roster address (seen on the phone: three dead addresses × a 15 s wait, every boot).
         dead: [...deliveryFailures].map(([addr, f]) => [addr, { n: f.n, at: f.at }]),
+        alive: [...seenAlive],
       });
     } catch { return holdPersist; }          // a queue we cannot serialise stays in memory
     holdPersist = holdPersist.then(async () => {
@@ -881,6 +907,7 @@ export async function createSecureAgent(opts = {}) {
     if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.peers)) return 0;
     let restored = 0;
     const now = Date.now();
+    if (Array.isArray(parsed.alive)) for (const addr of parsed.alive) if (typeof addr === 'string') markSeenAlive(addr);
     if (Array.isArray(parsed.dead)) {
       for (const [addr, f] of parsed.dead) {
         if (typeof addr !== 'string' || !f || typeof f.n !== 'number') continue;
@@ -965,6 +992,23 @@ export async function createSecureAgent(opts = {}) {
   let primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
   /** address → consecutive failed delivery attempts. Cleared by a success or a presence signal. */
   const deliveryFailures = new Map();
+  /** Addresses that have shown a sign of life at least once (an answer, a presence signal, an inbound envelope). Only
+   *  these can be judged DEAD: a failure against an address never seen alive (a newcomer's fresh per-circle address,
+   *  not registered yet) says 'not yet', so it holds and is not counted. Kept across a restart with the holds. */
+  const seenAlive = new Set();
+  const seenAliveMax = Number.isFinite(opts.seenAliveMax) ? opts.seenAliveMax : SEEN_ALIVE_MAX;
+  /** A sign of life: the address moves to the young end of `seenAlive`; past `seenAliveMax` the oldest goes. */
+  function markSeenAlive(addr) {
+    seenAlive.delete(addr);
+    seenAlive.add(addr);
+    while (seenAliveMax > 0 && seenAlive.size > seenAliveMax) seenAlive.delete(seenAlive.values().next().value);
+  }
+  /** address never seen alive → when its last wire attempt was made (`notYetWaits`). In memory: a restart may try once. */
+  const notYetAttemptAt = new Map();
+  const notYetAttemptIntervalMs = Number.isFinite(opts.notYetAttemptIntervalMs) ? opts.notYetAttemptIntervalMs : NOT_YET_ATTEMPT_INTERVAL_MS;
+  const flushParallelAddresses = Number.isFinite(opts.flushParallelAddresses) ? opts.flushParallelAddresses : FLUSH_PARALLEL_ADDRESSES;
+  /** addresses a flush is sending right now (`flushPending`). */
+  const flushingNow = new Set();
 
   // G12 — identity pubKey → the alias addresses bound to it (`registerPeerAddress`). The hold queue is
   // keyed by the address you SENT to, but presence arrives on the address the peer SPEAKS from: a peer
@@ -982,6 +1026,10 @@ export async function createSecureAgent(opts = {}) {
   // the unlinkability we want on the wire and exactly the wrong answer for "flush what I held for
   // them". So the identity link lives here, on the device, where it is nobody else's to see.
   const peerIdentityOf = new Map();
+  // …and the subset of those links the person PROVED (the circle-link signature, checked before the roster row was
+  // written): `registerPeerAddress(…, { proven: true })`. Sealing uses every link; a decision that trusts "this address
+  // is my contact's other device" (the person key's allowlist) reads only these, with no fallback.
+  const provenIdentityOf = new Map();
 
   /** Does this send opt in to the hold-forward delivery guarantee? */
   function wantsHold(sendOpts) {
@@ -1051,7 +1099,9 @@ export async function createSecureAgent(opts = {}) {
       }
       q.delete(key);   // a slot: the newest supersedes (re-set below keeps it at the young end)
     }
-    q.set(key, { payload, opts: sendOpts, ts: Date.now() });
+    // a held entry keeps the send's terms, not its caller's callback (the send that asked for it has already answered)
+    const { onRouteTaken: _cb, ...heldOpts } = sendOpts ?? {};   // eslint-disable-line no-unused-vars
+    q.set(key, { payload, opts: heldOpts, ts: Date.now() });
     // Per-peer cap — a Map iterates in insertion order, so the first key IS the oldest.
     while (holdMaxPerPeer > 0 && q.size > holdMaxPerPeer) {
       const [oldestKey, oldest] = q.entries().next().value;
@@ -1079,6 +1129,16 @@ export async function createSecureAgent(opts = {}) {
   }
 
   /**
+   * Did a send fail because the ADDRESS did not answer (unreachable, the handshake timed out), or because of the ENTRY
+   * itself: a persona of ours with no socket of its own yet, a scope that allows no route to a peer reachable otherwise,
+   * a refusal? Only the first is evidence about the address (it counts towards writing it off, and the entries held
+   * behind it share its fate); the second is ours or the entry's to fix. The one test for that question.
+   */
+  function failureOfTheAddress(err) {
+    return !isApplicationError(err) && !err?.personaNoConnection && !err?.scopedOut;
+  }
+
+  /**
    * Record a failed delivery attempt to an address, and say whether we should stop attempting.
    *
    * "Stop attempting" is the point: an address that no longer answers still passes `canReach` on the
@@ -1087,6 +1147,11 @@ export async function createSecureAgent(opts = {}) {
    * prove otherwise — any presence signal or successful send clears the count (`clearDeliveryFailures`).
    */
   function recordDeliveryFailure(addr) {
+    if (!seenAlive.has(addr)) {
+      // Not yet seen alive: no evidence it is dead. Hold, do not count (a newcomer's address before it answers).
+      if (typeof console !== 'undefined') console.info(`[secure-agent] delivery failure for ${String(addr).slice(0, 16)}… not counted: never seen alive yet`);
+      return false;
+    }
     const n = (deliveryFailures.get(addr)?.n ?? 0) + 1;
     deliveryFailures.set(addr, { n, at: Date.now() });
     const writtenOff = holdMaxDeliveryFailures > 0 && n >= holdMaxDeliveryFailures;
@@ -1097,9 +1162,26 @@ export async function createSecureAgent(opts = {}) {
     return writtenOff;
   }
 
+  /**
+   * Should a send to `addr` join its hold WITHOUT a wire attempt? Only for an address never seen alive whose last attempt
+   * is younger than `notYetAttemptIntervalMs`: at most one attempt per interval (a fresh install or a restore holds a
+   * whole roster of not-yet addresses; one handshake wait per send to each would undo the cold start). Marks the attempt.
+   */
+  function notYetWaits(addr) {
+    if (seenAlive.has(addr) || !(notYetAttemptIntervalMs > 0)) return false;
+    const now = Date.now();
+    const last = notYetAttemptAt.get(addr);
+    if (last != null && now - last < notYetAttemptIntervalMs) return true;
+    notYetAttemptAt.set(addr, now);
+    return false;
+  }
+
   /** This address answered (or announced itself) — it is not a dead address after all. */
   function clearDeliveryFailures(addr) {
-    if (deliveryFailures.delete(addr)) persistHolds();
+    const firstSign = !seenAlive.has(addr);
+    markSeenAlive(addr);
+    notYetAttemptAt.delete(addr);
+    if (deliveryFailures.delete(addr) || firstSign) persistHolds();
   }
 
   /** Have we given up on attempting delivery to this address until it shows a sign of life? */
@@ -1195,16 +1277,41 @@ export async function createSecureAgent(opts = {}) {
    * `rescope` (the hold snapshots the scope it was sent under) and re-send them all.
    */
   async function flushHeld(rescope = null) {
-    let flushed = 0;
+    const addrs = [];
     for (const [addr, q] of [...pendingHold]) {
       if (typeof rescope === 'function') {
         for (const entry of q.values()) {
           try { entry.opts = rescope(entry.opts) ?? entry.opts; } catch { /* keep the terms it was held under */ }
         }
       }
-      flushed += (await flushPending(addr)).flushed;
+      addrs.push(addr);
     }
+    return flushAddresses(addrs, (addr) => flushPending(addr));
+  }
+
+  /**
+   * Flush several addresses SIDE BY SIDE, at most `flushParallelAddresses` at once; each address's own messages go one
+   * after another inside `flushPending`. One address timing out holds only its own slot.
+   */
+  async function flushAddresses(addrs, flushOne) {
+    let flushed = 0;
+    let next = 0;
+    const width = Math.max(1, Math.min(flushParallelAddresses, addrs.length));
+    const lane = async () => {
+      while (next < addrs.length) {
+        const addr = addrs[next++];
+        try { flushed += (await flushOne(addr))?.flushed ?? 0; } catch { /* re-held inside */ }
+      }
+    };
+    await Promise.all(Array.from({ length: width }, lane));
     return { flushed };
+  }
+
+  /** THIS device is connected again: a failure while it had no connection says nothing about a peer, so every not-yet
+   *  address gets its one attempt again (`notYetWaits`), and what was held goes out (side by side, `flushHeld`). */
+  async function connectivityRestored() {
+    notYetAttemptAt.clear();
+    return flushHeld();
   }
   /**
    * Re-send a held message once, best-effort. A message sent AS a persona goes out on that persona's own
@@ -1215,7 +1322,7 @@ export async function createSecureAgent(opts = {}) {
     const once = { ...opts, hold: false, guarantee: 'best-effort' };
     const owner = (typeof opts?.personaOwner === 'string' && opts.personaOwner)
       || (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
-    if (!owner) return _sendWithFailover(addr, payload, once);
+    if (!owner) return notDeliveredThrows(await _sendWithFailover(addr, payload, once));
     const r = await sendAsPersona(addr, payload, once, owner);
     if (r?.delivered === false) {
       const err = new Error(`secure-agent: a persona's held message did not go out (${r.reason})`);
@@ -1224,52 +1331,103 @@ export async function createSecureAgent(opts = {}) {
     }
     return r;
   }
+  /**
+   * A route that ANSWERED `{delivered: false}` (the relay sweep's last answer when none acked) did not deliver: for a send
+   * that holds, that is a failure of the address, thrown, so it is held and never counted as sent or as a sign of life.
+   */
+  function notDeliveredThrows(r) {
+    if (r?.delivered !== false) return r;
+    const err = new Error(`secure-agent: not delivered (${r?.reason ?? 'no ack'})`);
+    err.notDelivered = true;
+    throw err;
+  }
   /** A persona's connection came up, or took a circle address: re-send what is held AS that persona (nothing counted —
    *  it is our connection that changed, not the peer's silence). */
   async function flushHeldOf(owner) {
-    let flushed = 0;
-    for (const [addr, q] of [...pendingHold]) {
-      if (![...q.values()].some((e) => e?.opts?.personaOwner === owner)) continue;
-      flushed += (await flushPending(addr, { countFailures: false })).flushed;
-    }
-    return { flushed };
+    const addrs = [...pendingHold].filter(([, q]) => [...q.values()].some((e) => e?.opts?.personaOwner === owner)).map(([addr]) => addr);
+    return flushAddresses(addrs, (addr) => flushPending(addr, { countFailures: false }));
   }
   async function flushPending(addr, { countFailures = true } = {}) {
     sweepExpiredHolds();
-    const q = pendingHold.get(addr);
-    if (!q || q.size === 0) return { flushed: 0 };
-    const entries = [...q.values()];
-    pendingHold.delete(addr);
+    // an address already being flushed is not taken up by a second flush meanwhile (a reconnect during a flush): the first
+    // sends its queue in order and drains what joins meanwhile (below); what is re-held lands back for the next flush
+    if (flushingNow.has(addr)) return { flushed: 0 };
+    if (!pendingHold.get(addr)?.size) return { flushed: 0 };
+    flushingNow.add(addr);
+    const taken = new Set();   // the payloads this flush has tried: a re-held one is not tried twice in one flush
     let flushed = 0;
-    for (const entry of entries) {
+    try {
+      for (;;) {
+        const q = pendingHold.get(addr);
+        const batch = q ? [...q].filter(([, e]) => !taken.has(e.payload)) : [];
+        if (!batch.length) break;
+        for (const [k, e] of batch) { taken.add(e.payload); q.delete(k); }
+        if (q.size === 0) pendingHold.delete(addr);
+        const r = await flushPendingNow(addr, batch.map(([, e]) => e), { countFailures });
+        flushed += r.flushed;
+        // the address answered: what joined its hold while this flush was in flight (a not-yet address's sends join the
+        // hold without a wire attempt) goes now, after what this flush held, rather than waiting for the next presence
+        if (!r.answered) break;
+      }
+    } finally { flushingNow.delete(addr); }
+    if (flushed && typeof console !== 'undefined') {
+      console.info(`[secure-agent] presence-flush delivered ${flushed} held message(s) to ${String(addr).slice(0, 16)}…`);
+    }
+    return { flushed };
+  }
+  /** Re-hold a flushed entry, unless a NEWER entry already holds its slot (a `key:` slot: the newest supersedes). */
+  function reholdEntry(addr, e) {
+    if (pendingHold.get(addr)?.has(holdKeyFor(e.payload, e.opts)) && holdKeyFor(e.payload, e.opts).startsWith('key:')) return;
+    enqueueHold(addr, e.payload, e.opts);
+  }
+  async function flushPendingNow(addr, entries, { countFailures }) {
+    let flushed = 0;
+    let answered = false;
+    // this flush's attempt is the not-yet address's one attempt for the interval (`notYetWaits`): a send right after it
+    // joins the hold instead of paying the wait again
+    if (!seenAlive.has(addr)) notYetAttemptAt.set(addr, Date.now());
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
       const { payload, opts } = entry;
       try {
         await resendHeld(addr, payload, opts);
         clearDeliveryFailures(addr);
         flushed++;
+        answered = true;
         const sentId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
         try { onHeldSent?.({ addr, msgId: sentId }); } catch { /* a report never breaks the flush */ }
       } catch (err) {
         if (isApplicationError(err)) continue;   // unfixable by resend → drop
-        // Still unreachable → re-hold, unless this address has now failed often enough that re-holding
-        // is just paying for it again later. Giving up is REPORTED, like every other drop.
+        // A failure that belongs to THIS ENTRY (its persona has no socket yet, its scope allows no route) says nothing
+        // about the address: re-hold the entry and try the next one.
+        if (!failureOfTheAddress(err)) { reholdEntry(addr, entry); continue; }
+        // The ADDRESS did not answer → re-hold, unless it has now failed often enough that re-holding is just paying
+        // for it again later. Giving up is REPORTED, like every other drop.
         // A young-address re-flush is a guess at WHEN, not evidence the address is dead: it never counts.
-        // …nor is a persona that has no socket of its own yet: that is ours to fix, not the peer's silence.
-        if (countFailures && !err?.personaNoConnection && recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
-        else enqueueHold(addr, payload, opts);
+        // ONE failure per address per flush: its later messages share its fate, so they are re-held (in order) without
+        // each paying another handshake wait (or, written off, all reported) — one attempt per address per flush
+        const rest = entries.slice(i);
+        if (countFailures && recordDeliveryFailure(addr)) for (const e of rest) dropHeld(addr, e, 'peer-unreachable');
+        else for (const e of rest) reholdEntry(addr, e);
+        break;
       }
     }
-    if (flushed && typeof console !== 'undefined') {
-      console.info(`[secure-agent] presence-flush delivered ${flushed} held message(s) to ${String(addr).slice(0, 16)}…`);
-    }
     persistHolds();     // what got through is now GONE from the durable copy, not just from memory
-    return { flushed };
+    return { flushed, answered };
   }
 
   // Read back the previous run's queue. Kicked here rather than at declaration so every constant it
   // reads (the TTL, the drop reporter) is initialised; nothing sends before boot completes anyway,
   // and `outboxRestored()` is the await for a caller that wants to be certain.
   outboxRestored = restoreHolds().catch(() => 0);
+
+  /** Could a send with NO scope reach `addr` now, on a transport whose socket is open? (Whether a circle's own narrowing,
+   *  not the peer's absence, is what stops a send.) The unscoped route under a pinned transport mode names that transport
+   *  whether or not its socket is open, so `canReach` is asked too. */
+  async function reachableUnscoped(addr) {
+    const unscoped = await route(addr).catch(() => null);
+    return !!unscoped && (typeof unscoped.transport?.canReach !== 'function' || unscoped.transport.canReach(addr) === true);
+  }
 
   /** Is there a live route to `addr` right now? (route() returns null when no
    *  connected transport reports it can reach the peer.) */
@@ -1331,7 +1489,7 @@ export async function createSecureAgent(opts = {}) {
     // a transfer given up on is a receive-boundary drop like any other: said once per reason and sender, counted
     onDrop: (reason, env) => noteDrop(reason, env),
     onPayload: (whole, env) => {
-      handToApp(env._from, whole, env._ts ?? Date.now()).catch(() => { /* handToApp says its own failures */ });
+      handToApp(env._from, whole, env._ts ?? Date.now(), env._to).catch(() => { /* handToApp says its own failures */ });
     },
   });
 
@@ -1368,7 +1526,9 @@ export async function createSecureAgent(opts = {}) {
     const inner = (payload?.type === 'message' && Array.isArray(payload.parts)) ? payload.parts.find((p) => p?.data)?.data : null;
     return inner?.subtype ?? payload?.subtype ?? payload?.type ?? '?';
   }
-  async function handToApp(from, payload, ts) {
+  // `to`: the address this frame arrived on (one of this agent's own): it names WHICH self the message is for, the
+  // same address the handshake answers from. Handed on beside the sender so the app need not guess the self.
+  async function handToApp(from, payload, ts, to = null) {
     if (typeof onPeerMessageFn !== 'function') return;
     const key = seenInbound ? inboundMessageKey(from, payload) : null;
     if (key) {
@@ -1391,7 +1551,7 @@ export async function createSecureAgent(opts = {}) {
     try {
       let verdict;
       try {
-        verdict = await onPeerMessageFn({ from, payload, ts });
+        verdict = await onPeerMessageFn({ from, payload, ts, ...(typeof to === 'string' && to ? { to } : {}) });
       } catch (err) {
         if (typeof console !== 'undefined') console.error('[secure-agent] onPeerMessage threw', err);
         return;
@@ -1413,6 +1573,79 @@ export async function createSecureAgent(opts = {}) {
    *                     RelayTransport, ...) with .on('envelope', …)
    *                     and .sendHello(addr, payload).
    */
+  // ── PARKED, NOT DROPPED, NOT DELIVERED ───────────────────────────────────────────────────────────────────────────
+  // When the sender authorizer answers "stale" (it cannot vouch for this sender YET), the verified envelope waits here
+  // under the authorizer's opaque bucket: no app handler, no ack, no receipt (the transport refused it before any of
+  // those). The host is told (`onParked`) so it can refresh its snapshot, and the bucket is re-judged EXACTLY ONCE when
+  // the host says so (`rejudgeParked`) or at the time limit: accepted → delivered in arrival order; still not → dropped
+  // and counted, never parked a second time. Bounded per bucket, the oldest dropped first; one bucket cannot crowd out
+  // another.
+  const parkOpts = opts.parkStale ?? {};
+  const PARK_MAX = Number.isInteger(parkOpts.max) && parkOpts.max > 0 ? parkOpts.max : STALE_PARK_MAX;
+  const PARK_TTL_MS = Number.isFinite(parkOpts.ttlMs) && parkOpts.ttlMs > 0 ? parkOpts.ttlMs : STALE_PARK_TTL_MS;
+  // TWO REASONS, ONE PARK: 'stale-roster' (the sender check cannot vouch for the key yet) and 'unbound-sender' (an
+  // envelope to one of our circle addresses from an address whose key is not bound here yet). Same structure, same caps,
+  // same host trigger, same single re-judge through the FULL check: parking admits nothing.
+  const PARK_MAX_BYTES = Number.isInteger(parkOpts.maxBytes) && parkOpts.maxBytes > 0 ? parkOpts.maxBytes : STALE_PARK_MAX_BYTES;
+  const parked = new Map();          // bucket → { items: [{ tx, raw, reason, size }], bytes, timer }
+  const rejudging = new Set();       // envelope ids being judged the second (last) time
+  const refusedAtRejudge = new Set(); // …and those of them the second judgement refused (any security error)
+  const parkStats = { parked: 0, droppedOverflow: 0, droppedAfterRejudge: 0, deliveredAfterRejudge: 0, unboundSender: 0, droppedOversize: 0 };
+  let onParkedFn = typeof parkOpts.onParked === 'function' ? parkOpts.onParked : null;
+  // what happened to parked input, by code (no ids, no addresses): park · overflow · admit · drop, and how the re-judge
+  // came (`host` = a roster read asked for it, `ttl` = the time limit, i.e. expiry)
+  let onParkEventFn = typeof parkOpts.onEvent === 'function' ? parkOpts.onEvent : null;
+  const parkEvent = (e) => { try { onParkEventFn?.(e); } catch { /* the host's record never breaks the receive path */ } };
+  const sizeOf = (raw) => { try { return JSON.stringify(raw).length; } catch { return PARK_MAX_BYTES + 1; } };
+  function parkStale(tx, raw, bucket, reason = 'stale-roster') {
+    const id = raw?._id;
+    if (typeof bucket !== 'string' || !bucket || typeof id !== 'string') return;
+    if (rejudging.has(id)) { parkStats.droppedAfterRejudge += 1; parkEvent({ kind: 'drop', reason, cause: 'stale-again' }); return; }   // the one second chance is spent
+    const size = sizeOf(raw);
+    if (size > PARK_MAX_BYTES) { parkStats.droppedOversize += 1; parkEvent({ kind: 'overflow', reason, cause: 'oversize' }); return; }
+    let b = parked.get(bucket);
+    if (!b) {
+      b = { items: [], bytes: 0, timer: setTimeout(() => rejudgeParked(bucket, 'ttl'), PARK_TTL_MS) };
+      b.timer.unref?.();
+      parked.set(bucket, b);
+    }
+    if (b.items.some((it) => it.raw?._id === id)) return;   // the same envelope twice (a relay redelivery)
+    b.items.push({ tx, raw, reason, size });
+    b.bytes += size;
+    parkStats.parked += 1;
+    if (reason === 'unbound-sender') parkStats.unboundSender += 1;
+    parkEvent({ kind: 'park', reason });
+    while (b.items.length > PARK_MAX || b.bytes > PARK_MAX_BYTES) {
+      const cause = b.items.length > PARK_MAX ? 'count' : 'bytes';
+      const out = b.items.shift();
+      b.bytes -= out?.size ?? 0;
+      parkStats.droppedOverflow += 1;
+      parkEvent({ kind: 'overflow', reason: out?.reason ?? reason, cause });
+    }
+    try { onParkedFn?.(bucket, { reason }); } catch { /* the host's refresh is best-effort; the time limit still re-judges */ }
+  }
+  /** Judge a bucket's parked envelopes once more, in arrival order. `trigger`: 'host' (a roster read) or 'ttl' (expiry). */
+  function rejudgeParked(bucket, trigger = 'host') {
+    const b = parked.get(bucket);
+    if (!b) return 0;
+    parked.delete(bucket);
+    clearTimeout(b.timer);
+    for (const { tx, raw, reason } of b.items) {
+      rejudging.add(raw._id);
+      const before = parkStats.droppedAfterRejudge;
+      let threw = false;
+      try { tx._receive(raw); } catch { threw = true; /* a transport that throws on receive refuses the envelope */ }
+      rejudging.delete(raw._id);
+      const refused = refusedAtRejudge.delete(raw._id) || threw;
+      // stale a second time is counted where it is refused (`parkStale`); refused outright is counted here; only an
+      // envelope no security error stopped counts as delivered
+      if (parkStats.droppedAfterRejudge !== before) continue;
+      if (refused) { parkStats.droppedAfterRejudge += 1; parkEvent({ kind: 'drop', reason, cause: trigger === 'ttl' ? 'expired' : 'refused' }); }
+      else { parkStats.deliveredAfterRejudge += 1; parkEvent({ kind: 'admit', reason, cause: trigger }); }
+    }
+    return b.items.length;
+  }
+
   function makeReceiveHandler(tx) {
     // Auto-wire SecurityLayer so every outbound envelope is signed
     // + nacl.box encrypted with a per-peer shared secret.  HI stays
@@ -1424,6 +1657,8 @@ export async function createSecureAgent(opts = {}) {
     // unknown sender, a bad signature, an oversize frame — reached no listener at all, and "refused"
     // was indistinguishable from "never arrived". Same event, same place an app already listens.
     tx.on('security-error', (err, raw) => {
+      if (typeof raw?._id === 'string' && rejudging.has(raw._id)) refusedAtRejudge.add(raw._id);
+      if (err?.code === 'SENDER_STALE') { parkStale(tx, raw, err.bucket, err.staleReason === 'unbound-sender' ? 'unbound-sender' : 'stale-roster'); return; }
       try { agent.emit('security-error', err, raw); } catch { /* a listener that throws must not take the receive path down */ }
     });
     // bilateral HI auto-handshake on receive.  When we
@@ -1464,10 +1699,6 @@ export async function createSecureAgent(opts = {}) {
             && typeof agent.security?.learnPeerKey === 'function') {
         agent.security.learnPeerKey(env.payload.pubKey, env.payload.pubKey);
       }
-      // drop envelopes from muted peers BEFORE any further
-      // bookkeeping (no reciprocal HI, no onPeerMessage fire).
-      // fanout the check across resolver-known aliases.
-      if (await isPeerMuted(env?._from)) { mutedDrops += 1; noteDrop('muted', env); return; }
       // 5.7c — circle override enforcement runs AFTER mute (so muted
       // peers never reach the override layer) and BEFORE rate-limit /
       // reciprocal HI / onPeerMessage.  When the local user has
@@ -1621,7 +1852,7 @@ export async function createSecureAgent(opts = {}) {
       // A greeting is this channel's own handshake — answered above and told as `peer` — never a message for the app:
       // handed on, its payload (no subtype, no type) reached every router as a frame it could not route.
       // Handed on now; awaited at the end, so the presence flush below never waits on an app handler.
-      const handed = env?._p !== 'HI' ? handToApp(env._from, env.payload, env._ts ?? Date.now()) : null;
+      const handed = env?._p !== 'HI' ? handToApp(env._from, env.payload, env._ts ?? Date.now(), env._to) : null;
       // Delivery guarantee — PRESENCE-FLUSH. Any inbound envelope from a peer
       // (their reconnect HI, or any message) proves they are reachable now, so
       // flush anything we were holding for them. Fire-and-forget: re-hold on a
@@ -1747,7 +1978,7 @@ export async function createSecureAgent(opts = {}) {
       // event that makes those holds sendable, so it flushes them; whatever still cannot route re-holds.
       // Same on every reconnect. Found 2026-09-13: a fresh install that wrote to its seeded contact in
       // its first second parked the message until the contact happened to speak first.
-      tx.on('connect', () => { flushHeld().catch(() => { /* re-hold handled inside */ }); });
+      tx.on('connect', () => { connectivityRestored().catch(() => { /* re-hold handled inside */ }); });
       await tx.connect();
       // `connect()` only REQUESTS the socket — it deliberately does not await it, so that
       // `agent.start()` never blocks on a relay that may be unreachable. That is right for boot and
@@ -1985,7 +2216,9 @@ export async function createSecureAgent(opts = {}) {
     makeReceiveHandler(tx);                 // inbound for the persona lands in this one agent
     // what the persona could not send while it had no socket goes out now, on this socket (`resendHeld` keeps a
     // persona's held message on that persona's sockets) — as the primary socket's connect does for the default's
-    tx.on?.('connect', () => { flushHeldOf(socketIdentity.pubKey).catch(() => { /* re-hold handled inside */ }); });
+    // a persona socket's connect clears ALL not-yet clocks, not only those of this persona's sends: the clocks are per
+    // address, not per sender, and this device having a connection again says nothing about any peer (`connectivityRestored`)
+    tx.on?.('connect', () => { notYetAttemptAt.clear(); flushHeldOf(socketIdentity.pubKey).catch(() => { /* re-hold handled inside */ }); });
     await tx.connect();
     personaTransports.set(key, { url, identity: socketIdentity, tx });
     if (auditAutoLog) audit('relay.add.persona', url);
@@ -2111,12 +2344,47 @@ export async function createSecureAgent(opts = {}) {
    * be made VISIBLE by the caller rather than left as silent holding.
    */
   function eligibleUnderScope(transport, scope) {
-    if (!transport) return false;
-    if (scope?.requireAliasCapable && transport.supportsAliases !== true) return false;
-    const points = Array.isArray(scope?.points) ? scope.points.filter(Boolean) : [];
-    if (points.length === 0) return true;
-    const url = typeof transport.url === 'string' && transport.url ? transport.url : null;
-    return url ? points.includes(url) : true;
+    return whyUnderScope(transport, scope) === 'ok';
+  }
+  /** Why a transport is (not) eligible under a scope: 'ok' · 'no-aliases' · 'point-mismatch'. Points compare by
+   *  `pointKey`, never as raw strings: one relay reaches us under several spellings, and a raw comparison made a
+   *  circle's traffic skip its own relay. */
+  function whyUnderScope(transport, scope) {
+    if (!transport) return 'absent';
+    if (scope?.requireAliasCapable && transport.supportsAliases !== true) return 'no-aliases';
+    const points = Array.isArray(scope?.points) ? scope.points.map(pointKey).filter(Boolean) : [];
+    if (points.length === 0) return 'ok';
+    const url = typeof transport.url === 'string' && transport.url ? pointKey(transport.url) : null;
+    return !url || points.includes(url) ? 'ok' : 'point-mismatch';
+  }
+  /** A transport's KIND for a record a person may read: never its name when the name carries a url. */
+  function kindOf(transport, name = null) {
+    if (transport && transport === relayTransport) return 'relay';
+    if (transport && transport === peerTransport) return 'nkn';
+    const n = name ?? [...extraTransports.entries()].find(([, t]) => t === transport)?.[0] ?? null;
+    if (typeof n !== 'string' || !n) return 'other';
+    if (n.startsWith(RELAY_NAME_PREFIX) || (transport && typeof transport.url === 'string' && transport.url)) return 'relay';
+    return /^[a-z][a-z0-9-]{0,15}$/i.test(n) ? n.toLowerCase() : 'other';
+  }
+  /**
+   * THE ROUTE DECISION, DESCRIBED — what `route` would choose for `addr` under `scope`, and why each candidate was or
+   * was not eligible, without sending. By transport KIND and short codes only (no address, no url), so the app's
+   * send gate can write it into a log a person may hand over: every failure then names its branch.
+   *
+   * @returns {Promise<{scoped: boolean, chosen: string|null, candidates: Array<{kind: string, eligible: boolean, why: string, reach: boolean}>}>}
+   */
+  async function explainRoute(addr, scope = null) {
+    const reachable = (t) => (typeof t?.canReach !== 'function' ? true : t.canReach(addr) === true);
+    const candidates = [relayTransport, ...extraTransports.values(), peerTransport].filter(Boolean).map((t) => {
+      const why = scope ? whyUnderScope(t, scope) : 'ok';
+      return { kind: kindOf(t), eligible: why === 'ok', why, reach: reachable(t) };
+    });
+    let chosen = null;
+    try {
+      const sel = await route(addr, scope);
+      chosen = sel ? kindOf(sel.transport, sel.name) : null;
+    } catch { chosen = null; }
+    return { scoped: !!scope, chosen, candidates };
   }
 
   async function route(addr, scope = null) {
@@ -2142,8 +2410,11 @@ export async function createSecureAgent(opts = {}) {
         console.info(`[secure-agent] "${name}" cannot carry per-circle addresses — under the accepted fallback, `
           + `${String(addr).slice(0, 16)}… goes to the person's own address ${String(target).slice(0, 16)}…`);
       } else if (pick.supportsAliases !== true && typeof console !== 'undefined') {
-        console.warn(`[secure-agent] "${name}" cannot carry per-circle addresses and no identity is bound to `
-          + `${String(addr).slice(0, 16)}… — sending to the alias itself, which may reach nobody`);
+        // Said as what it is: this device holds no person identity FOR THIS ADDRESS (no roster bound it here). It is
+        // not a claim about the address itself; a person's own key reads the same way, and the old wording ("no
+        // identity is bound") sent a diagnosis after a mapping that was never missing.
+        console.warn(`[secure-agent] "${name}" cannot carry per-circle addresses, and this device knows no person `
+          + `behind ${String(addr).slice(0, 16)}… to send to instead; sending to that address as given, which may reach nobody`);
       }
       return { name, transport: pick, address: await addressFor(target, name) };
     }
@@ -2235,6 +2506,26 @@ export async function createSecureAgent(opts = {}) {
    * to a fresh peer races the handshake.
    */
   async function sendToPeer(addr, payload, opts = {}) {
+    // `requireSendAs`: a send that may ONLY speak as `sendAs` (a Nearby room key) is refused outright when no identity
+    // is registered for it: never held (a room message does not outlive the visit), never the canonical identity.
+    if (opts?.requireSendAs === true) {
+      const as = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
+      if (!as || typeof agent.security?.selfIdentityFor !== 'function' || !agent.security.selfIdentityFor(as)) {
+        throw Object.assign(new Error('secure-agent: refused, no identity is registered for the address this send must speak as'),
+          { code: 'SEND_AS_UNREGISTERED' });
+      }
+    }
+    // Every other send that names WHO speaks (`sendAs`, an address of ours) and has no identity behind it is held (when
+    // the caller asked to hold) or refused: never signed with the canonical identity instead, which would hand the
+    // circle and the relay the person's main key, the one link a per-circle address exists to withhold.
+    {
+      const as = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
+      if (as && as !== identity.pubKey && !(typeof agent.security?.selfIdentityFor === 'function' && agent.security.selfIdentityFor(as))) {
+        if (wantsHold(opts)) return enqueueHold(addr, payload, opts, 'send-as-unregistered');
+        throw Object.assign(new Error(`secure-agent: refused, no identity is registered for ${String(as).slice(0, 16)}… (the address this send must speak as)`),
+          { code: 'SEND_AS_UNREGISTERED' });
+      }
+    }
     // A send that speaks as a PERSONA's address leaves on that persona's own sockets — never the default's routes.
     const owner = (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
     if (owner) return sendAsPersona(addr, payload, opts, owner);
@@ -2275,18 +2566,20 @@ export async function createSecureAgent(opts = {}) {
         // route under a pinned transport mode names that transport whether or not its socket is open,
         // so a send in the first second after boot — socket still opening — used to be labelled as
         // scoped out (an offer to accept the address fallback, which cannot help) instead of offline.
-        const unscoped = await route(addr).catch(() => null);
-        const reachableNow = !!unscoped && (typeof unscoped.transport?.canReach !== 'function' || unscoped.transport.canReach(addr) === true);
-        const scopedOut = !!opts?.scope && reachableNow;
+        const scopedOut = !!opts?.scope && await reachableUnscoped(addr);
         return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
       }
+      // not yet seen alive and attempted within the interval: join the hold, no wire attempt (`notYetWaits`)
+      if (notYetWaits(addr)) return enqueueHold(addr, payload, opts);
       try {
-        const result = await _sendWithHandshakeRetry(addr, payload, opts);
+        const result = notDeliveredThrows(await _sendWithHandshakeRetry(addr, payload, opts));
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
         clearDeliveryFailures(addr);          // it answered — not a dead address
         return { held: false, delivered: true, msgId, result };
       } catch (err) {
         if (isApplicationError(err)) throw err;
+        // A failure of the send's own terms (`failureOfTheAddress`) is held without counting against the address.
+        if (!failureOfTheAddress(err)) return enqueueHold(addr, payload, opts);
         // A transport-class failure AFTER the route said yes — the only evidence we get that an address
         // is dead rather than briefly offline, so it is what the give-up counter counts.
         if (recordDeliveryFailure(addr)) {
@@ -2364,14 +2657,26 @@ export async function createSecureAgent(opts = {}) {
    * socket, which would show the relay that the two are one device (the very link a persona exists to prevent).
    */
   async function sendAsPersona(addr, payload, opts, owner) {
-    if (await isPeerMuted(addr)) throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
-    const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points) : null;
+    // points compare by pointKey, as the general route does: one relay under two spellings is one point
+    const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points.map(pointKey).filter(Boolean)) : null;
     // A send AS one of the persona's circle addresses goes out only on a socket that holds that address: on one that does
     // not, the relay would see the persona's own key speak into the circle (and the circle refuses it). None yet → held.
     const speaksAs = typeof opts?.sendAs === 'string' && opts.sendAs !== owner ? opts.sendAs : null;
-    const sockets = [...personaTransports.entries()]
-      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)))
-      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs));
+    // A transport whose OWN address is the one spoken as (the LAN under a persona's room key) is that persona's socket
+    // too, and the only one for that address: a room key never rides a relay.
+    const lan = speaksAs
+      ? [...extraTransports.entries()].filter(([, t]) => t?.address === speaksAs).map(([name, t]) => [name, { tx: t }])
+      : [];
+    // A LAN connection where this address of the persona was PROVEN to the peer (a whisper match: a sibling, a contact)
+    // carries it first; the persona's own relay sockets after.
+    const proven = speaksAs && !lan.length
+      ? [...extraTransports.entries()]
+        .filter(([, t]) => t?.address !== speaksAs && t?.holdsAddress?.(speaksAs) === true && t?.canReach?.(addr) === true)
+        .map(([name, t]) => [name, { tx: t }])
+      : [];
+    const sockets = lan.length ? lan : [...proven, ...[...personaTransports.entries()]
+      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(pointKey(e.url))))
+      .filter(([, e]) => !speaksAs || (e.tx.addresses ?? []).includes(speaksAs))];
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     // Not sendable now: held on hold-forward, exactly as the general persona's send would be — and every flush re-sends
     // it through `resendHeld`, which keeps it on this persona's own sockets.
@@ -2383,7 +2688,7 @@ export async function createSecureAgent(opts = {}) {
     for (const [key, e] of sockets) {
       try {
         const r = await _sendOverRoute(addr, payload, { name: key, transport: e.tx, address: addr }, opts);
-        if (r?.delivered !== false) return { held: false, delivered: true, msgId, result: r };
+        if (r?.delivered !== false) { routeTaken(opts, e.tx, key); return { held: false, delivered: true, msgId, result: r }; }
         last = { held: false, delivered: false, msgId, reason: r?.reason ?? 'not-delivered', persona: owner };
       } catch (err) {
         if (isApplicationError(err)) throw err;
@@ -2393,14 +2698,14 @@ export async function createSecureAgent(opts = {}) {
     return holdOr(last);
   }
 
+  /** Tell the caller which KIND of route carried its send (`opts.onRouteTaken`), so a record names the route TAKEN, not
+   *  one recomputed beside the send. Called once, only when a transport took the message; never with a url. */
+  function routeTaken(opts, transport, name) {
+    if (typeof opts?.onRouteTaken !== 'function') return;
+    try { opts.onRouteTaken(kindOf(transport, name)); } catch { /* the caller's record never breaks a send */ }
+  }
+
   async function _sendWithFailover(addr, payload, opts = {}) {
-    // refuse to send to a muted peer (alias-aware) up front.
-    // This is an APPLICATION decision, never a transport failure: no
-    // re-route, no degrade.  Throws so the caller knows the intent didn't
-    // reach the wire.
-    if (await isPeerMuted(addr)) {
-      throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
-    }
 
     const budget = Math.max(1, Number.isInteger(opts.failoverBudget)
       ? opts.failoverBudget
@@ -2449,7 +2754,7 @@ export async function createSecureAgent(opts = {}) {
           if (isApplicationError(err)) throw err;   // a refusal is a refusal on every relay
           lastErr = err; continue;
         }
-        if (res?.delivered) return res;
+        if (res?.delivered) { routeTaken(opts, transport, name); return res; }
         lastResult = res ?? lastResult;
       }
       // Nobody acked: the peer is offline, or on a relay this device does not hold. The hold-forward
@@ -2461,10 +2766,13 @@ export async function createSecureAgent(opts = {}) {
     for (let attempt = 0; attempt < budget; attempt++) {
       const sel = await route(addr, opts?.scope ?? null);
       if (!sel) {
-        throw new Error(
+        const err = new Error(
           `Peer transport not connected (mode=${transportMode}).  ` +
           `Call sa.peer.connect() and/or sa.relay.connect() first.`,
         );
+        // the entry's own scope is what stopped it when the peer is reachable unscoped (`failureOfTheAddress`)
+        err.scopedOut = !!opts?.scope && await reachableUnscoped(addr);
+        throw err;
       }
       // The router keeps returning a transport we've already exhausted
       // (single-transport mode, or every alternative degraded) → no fresh
@@ -2475,7 +2783,9 @@ export async function createSecureAgent(opts = {}) {
       tried.add(sel.name);
 
       try {
-        return await _sendOverRoute(addr, payload, sel, opts);
+        const res = await _sendOverRoute(addr, payload, sel, opts);
+        if (res?.held !== true && res?.delivered !== false) routeTaken(opts, sel.transport, sel.name);
+        return res;
       } catch (err) {
         lastErr = err;
         // Application/skill error → never re-route (a different transport
@@ -2517,12 +2827,11 @@ export async function createSecureAgent(opts = {}) {
     const sendAs = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
     const sendingIdentity = (sendAs && typeof agent.security?.selfIdentityFor === 'function')
       ? agent.security.selfIdentityFor(sendAs) : null;
-    if (sendAs && !sendingIdentity && typeof console !== 'undefined') {
-      // Named here, where the address is known, rather than surfacing three layers away as "my
-      // messages in this circle never arrive": without the identity we would sign as the canonical
-      // self while claiming the per-circle address, and the recipient would reject every envelope.
-      console.warn(`[secure-agent] no identity registered for own address ${String(sendAs).slice(0, 16)}…`
-        + ' — falling back to the canonical identity; per-circle signing is OFF for this send.');
+    if (sendAs && sendAs !== identity.pubKey && !sendingIdentity) {
+      // The send path refuses this before routing (sendToPeer); here too, for any caller that reaches the handshake
+      // directly: never the canonical identity in place of an address of ours that has no identity behind it.
+      throw Object.assign(new Error(`secure-agent: refused, no identity is registered for ${String(sendAs).slice(0, 16)}…`),
+        { code: 'SEND_AS_UNREGISTERED' });
     }
     // A transport that cannot carry per-circle addresses cannot carry one as the SENDER either: its
     // authenticated wire sender is our canonical address, and it binds the envelope's `_from` to that
@@ -2836,6 +3145,8 @@ export async function createSecureAgent(opts = {}) {
         if (!set) { set = new Set(); peerAliases.set(pubKey, set); }
         set.add(address);
         peerIdentityOf.set(address, pubKey);
+        // a binding is proven only as it is made now: a later unproven one replaces an earlier proof
+        if (opts?.proven === true) provenIdentityOf.set(address, pubKey); else provenIdentityOf.delete(address);
       }
       return true;
     },
@@ -2886,6 +3197,16 @@ export async function createSecureAgent(opts = {}) {
     /** Diagnostic: the addresses this device holds an identity of its own for. */
     get selfIdentityAddresses() { return agent.security?.selfAddresses ?? []; },
 
+    /** Judge one bucket's parked envelopes once more (the host refreshed its snapshot). Returns how many. */
+    rejudgeParked: (bucket) => rejudgeParked(bucket),
+    /** How many envelopes wait in one bucket right now. */
+    parkedCount: (bucket) => parked.get(bucket)?.items.length ?? 0,
+    /** Parking counters: parked, droppedOverflow, droppedAfterRejudge, deliveredAfterRejudge. */
+    get parkStats() { return { ...parkStats }; },
+    /** The host's hook: an envelope was parked under `bucket` (refresh the snapshot, then `rejudgeParked`). */
+    onParked(fn) { onParkedFn = typeof fn === 'function' ? fn : null; },
+    /** The host's record of parked input: `({ kind: park|overflow|admit|drop, reason, cause })`, codes only. */
+    onParkEvent(fn) { onParkEventFn = typeof fn === 'function' ? fn : null; },
     /**
      * Decision 1 step 3 — install the ROSTER AUTHORIZE step.
      *
@@ -2926,6 +3247,7 @@ export async function createSecureAgent(opts = {}) {
       // signing key, which is not the person (see `peerIdentityOf`).
       const pubKey = peerIdentityOf.get(address) ?? agent.security.getPeerKey?.(address) ?? null;
       peerIdentityOf.delete(address);
+      provenIdentityOf.delete(address);
       agent.security.unregisterPeer(address);
       if (pubKey) {
         const set = peerAliases.get(pubKey);
@@ -2938,6 +3260,8 @@ export async function createSecureAgent(opts = {}) {
       connect: connectPeer,
       sendTo:  sendToPeer,
       invoke:  invokePeer,
+      /** The route decision for `addr` under `scope`, described by kind without sending (see `explainRoute`). */
+      explainRoute,
       /** The skills other agents' task requests reach here (`acceptPeerSkillCalls`); [] when the route is off. */
       callableSkills: () => (peerSkillCalls ? peerSkillCalls.reachableSkills() : []),
       /** Whether other agents' task requests are taken at all (the composition's `acceptPeerSkillCalls`). Off → a call
@@ -3024,6 +3348,8 @@ export async function createSecureAgent(opts = {}) {
     /** Our own terms changed (the address-fallback setting): re-stamp every held entry through `rescope`
      *  and re-send it — see `flushHeld`. Resolves `{ flushed }` across all peers. */
     flushHeld: ({ rescope = null } = {}) => flushHeld(rescope),
+    /** This device is connected again (what the relay socket's 'connect' runs): the not-yet clocks clear, the holds flush. */
+    connectivityRestored: () => connectivityRestored(),
     /** Receipt-keyed removal: the peer's app confirmed `msgId` arrived, so every copy still held for
      *  them (any of their addresses) is obsolete. Per-peer, never global; not a drop, so not reported. */
     removeHeld: (a) => removeHeld(a),
@@ -3060,6 +3386,9 @@ export async function createSecureAgent(opts = {}) {
         return r;
       },
       has:    (addr) => muteSet.has(addr),
+      /** Is this address, or any address the resolver binds to the same person, on the block list? Asked by the app's
+       *  DIRECT doors (a block is about direct contact; this layer enforces nothing). */
+      covers: (addr) => isPeerMuted(addr),
       list:   ()     => muteSet.list(),
       entries: ()    => muteSet.entries(),
       clear:  ()     => muteSet.clear(),

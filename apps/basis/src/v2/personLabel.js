@@ -2,7 +2,7 @@
  * personLabel — what a person is CALLED on screen, in one place. Never a key.
  *
  * In order: the name they gave themselves (their card's display name), else the handle they use in a circle you
- * share, else "someone" (`circle.reply.who_someone`). A key, or the first characters of one, is never a name: a
+ * share, else "Onbekend" (`circle.reply.who_someone`; several in one view numbered, "Onbekend · 2"). A key, or the first characters of one, is never a name: a
  * two-phone walk (2026-11-05) found keys on the contact list, in chat titles, in the composer, in "Share with…",
  * in "… is now an admin" and in the circle list's preview, each from its own `name ?? handle ?? id` fallback.
  *
@@ -14,7 +14,7 @@
  * `senderLabelKey`), so a shell paints `label ?? t(labelKey)` and holds no naming logic of its own.
  */
 
-/** The words for a person nobody has named: "someone" / "iemand". */
+/** The words for a person nobody has named: "Unknown" / "Onbekend". */
 export const SOMEONE_LABEL_KEY = 'circle.reply.who_someone';
 
 /** A string that is an identifier someone chose (a webid, a did, a URL) rather than an opaque key. */
@@ -40,7 +40,8 @@ export function isKeyLike(text, ids = []) {
   for (const id of ids) {
     if (typeof id !== 'string' || !id || isChosenIdentifier(id)) continue;
     if (s === id) return true;
-    if (s.length >= 6 && id.startsWith(s.replace(/[.…]+$/, ''))) return true;
+    // a prefix, in any case: early handles were made from a key by lowercasing its start ('pzwopwk1')
+    if (s.length >= 6 && id.toLowerCase().startsWith(s.replace(/[.…]+$/, '').toLowerCase())) return true;
   }
   // an opaque key on its own: one long run of key characters, no space (a name a person types has neither length
   // nor this alphabet alone — 32+ base64url/hex characters is a key)
@@ -52,15 +53,15 @@ export function isKeyLike(text, ids = []) {
  *
  * @param {object} p
  * @param {string|null} [p.displayName]  the name on their card (what they called themselves)
- * @param {string|null} [p.handle]       the handle they use in a circle you share (painted `@handle`)
+ * @param {string|null} [p.handle]       the name they use in a circle you share (painted as written)
  * @param {Array<string|null|undefined>} [p.ids]  their ids on this row — never shown, only refused as a label
  * @returns {{ label: string|null, labelKey: string|null }}  exactly one of the two is set
  */
 export function personLabel({ displayName = null, handle = null, ids = [] } = {}) {
   if (typeof displayName === 'string' && displayName.trim() && !isKeyLike(displayName, ids)) return { label: displayName.trim(), labelKey: null };
   if (typeof handle === 'string' && handle.trim() && !isKeyLike(handle, ids)) {
-    const h = handle.trim();
-    return { label: h.startsWith('@') ? h : `@${h}`, labelKey: null };
+    // the name as the person wrote it: no '@' (it was the old display prefix of a handle, and the name is for people)
+    return { label: handle.trim().replace(/^@\s*/, ''), labelKey: null };
   }
   return { label: null, labelKey: SOMEONE_LABEL_KEY };
 }
@@ -90,4 +91,20 @@ export function nameShown(row, t, { ids = [] } = {}) {
  */
 export function memberShown(m, t) {
   return nameShown({ name: m?.displayName || null, handle: m?.handle || null }, t, { ids: [m?.webid] });
+}
+
+/**
+ * The TEXT for a label the ladder or a projection stamped (`{ primary, primaryKey, primaryNumber }`, or a chat row's
+ * `{ senderLabel, senderLabelKey, senderLabelNumber }` passed as the same three): the name, else the unnamed words, with
+ * the number a later unnamed person in the same view carries ("Onbekend · 2"), as a shared name carries its own.
+ *
+ * @param {{primary?: string|null, primaryKey?: string|null, primaryNumber?: number|null}|null} l
+ * @param {(key: string, args?: object) => string} t
+ * @returns {string|null}
+ */
+export function labelShown(l, t) {
+  if (typeof l?.primary === 'string' && l.primary) return l.primary;
+  if (!l?.primaryKey) return null;
+  const words = t(l.primaryKey);
+  return Number.isInteger(l.primaryNumber) && l.primaryNumber > 1 ? `${words} · ${l.primaryNumber}` : words;
 }

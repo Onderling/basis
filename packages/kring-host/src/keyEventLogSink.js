@@ -56,9 +56,10 @@ export const KEY_EVENT_PEER_TYPE = 'group-key-event';
  *   `recipientWebidsFromRoster`.
  * @param {(event:object) => (Array<string>|Promise<Array<string>>)} [o.resolveRecipientWebids]
  *   the same recipients as webids, for the `fanStatement` narrowing.
- * @returns {{ append: (event:object) => Promise<void> }}
+ * @param {(why:string) => void} [o.onFanFailed]  told when the fan through the waist fails (the refusal log)
+ * @returns {{ append: (event:object) => Promise<void> }}  resolves once the event is recorded and signed; the fan runs on
  */
-export function makeKeyEventLogSink({ groupId = null, resolveRecipientAddrs, sendPeer, recordLocal = null, sendOptions, emitStatement = null, statementSubtype = null, fanStatement = null, resolveRecipientWebids = null } = {}) {
+export function makeKeyEventLogSink({ groupId = null, resolveRecipientAddrs, sendPeer, recordLocal = null, sendOptions, emitStatement = null, statementSubtype = null, fanStatement = null, resolveRecipientWebids = null, onFanFailed = null } = {}) {
   if (typeof resolveRecipientAddrs !== 'function') throw new Error('makeKeyEventLogSink: resolveRecipientAddrs required');
   if (typeof sendPeer !== 'function') throw new Error('makeKeyEventLogSink: sendPeer required');
   return {
@@ -80,7 +81,16 @@ export function makeKeyEventLogSink({ groupId = null, resolveRecipientAddrs, sen
         // No lane in this composition (`undefined`) — the log-less honest degrade: the pre-lane raw fan.
         payload = { type: KEY_EVENT_PEER_TYPE, subtype: KEY_EVENT_PEER_TYPE, groupId: groupId ?? event.groupId ?? null, event };
       }
-      // (3) fan to the event's recipients only (the remaining members).
+      // (3) fan to the event's recipients only (the remaining members), NOT AWAITED: the append returns once the event is
+      // recorded and signed. Its caller can be an admission whose reply the newcomer is waiting for, and the fan to that
+      // newcomer cannot land before the newcomer's own join finishes (its per-circle address goes on the relay in its
+      // post-join step): awaited, the reply waited on it and the joiner gave up (2026-11-14). A newcomer the fan misses
+      // takes the key by its post-join key pull; a fan that fails is said (`onFanFailed`).
+      runFan(event, statement, payload).catch(() => { /* said inside */ });
+    },
+  };
+
+  async function runFan(event, statement, payload) {
       let addrs = [];
       try { addrs = await resolveRecipientAddrs(event); } catch { addrs = []; }
       addrs = Array.isArray(addrs) ? addrs : [];
@@ -99,14 +109,20 @@ export function makeKeyEventLogSink({ groupId = null, resolveRecipientAddrs, sen
           await fanStatement(groupId ?? event.groupId ?? null, statement,
             Array.isArray(webids) && webids.length ? webids : null);
           return;
-        } catch { /* fall through to the direct fan below */ }
+        } catch (err) {
+          // said, then the direct fan below
+          try { onFanFailed?.(err?.message ?? String(err)); } catch { /* a report never breaks the fan */ }
+        }
       }
       // The direct peer fan: the log-less degrade (no lane, so no statement to hand the waist), and
       // the fallback for a composition that wires no `fanStatement`.
+      // It names the circle it fans for, so the app's send gate takes the circle's route (its self, its points), never
+      // the person path: key traffic under the person key is refused by every member inside a circle.
+      const cid = groupId ?? event.groupId ?? null;
+      const opts = cid ? { ...(sendOptions ?? {}), circleId: cid } : sendOptions;
       await Promise.all(addrs.map((addr) =>
-        Promise.resolve(sendPeer(addr, payload, sendOptions)).catch(() => { /* best-effort per recipient */ })));
-    },
-  };
+        Promise.resolve(sendPeer(addr, payload, opts)).catch(() => { /* best-effort per recipient */ })));
+  }
 }
 
 /**

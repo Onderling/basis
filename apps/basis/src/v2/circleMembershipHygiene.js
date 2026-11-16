@@ -83,6 +83,8 @@ const skillSeam = (agent, callSkill) =>
  */
 export async function removeCircleMember({
   agent = null, callSkill = null, circleId, memberWebid = null, memberStableId = null, policy = 'graceful',
+  // the decision that enacted it, when governance did: its proposal and the settings version held (the receiver gate)
+  proposalId = null, policyVersion = null,
 } = {}) {
   const out = { ok: false, unbound: 0, rosterKeys: 0, remaining: 0 };
   const skill = skillSeam(agent, callSkill);
@@ -106,6 +108,8 @@ export async function removeCircleMember({
       ...(memberWebid ? { memberWebid } : {}),
       ...(memberStableId ? { memberStableId } : {}),
       policy,
+      ...(proposalId ? { proposalId } : {}),
+      ...(Number.isFinite(policyVersion) ? { policyVersion } : {}),
     });
   } catch (err) { res = { error: err?.message ?? 'remove-failed' }; }
   if (res?.error) { out.error = res.error; return out; }

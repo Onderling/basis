@@ -136,8 +136,8 @@ describe('persistence — wizard policy reaches the circle store (E8 link)', () 
     // The pod axis is NOT a template axis any more: the storage radio is the authority and its default is
     // "No pod" — a template's `personal` only means something once a pod is attached (W27, 2026-08-30).
     expect(patch.pod).toBe('none');
-    // A circle created without opening "Geavanceerd" is a household: sealed (Frits, 2026-09-25 — the wizard does not
-    // ask), no pod, the household template's features.
-    expect(policyPatchFromState(initialState())).toMatchObject({ kind: 'household', storagePosture: 'p2', pod: 'none', features: { chat: true } });
+    // A household picked on the first step (the kind is asked, never assumed): sealed (Frits, 2026-09-25 — the wizard
+    // does not ask about sealing), no pod, the household template's features.
+    expect(policyPatchFromState(setKind(initialState(), 'household'))).toMatchObject({ kind: 'household', storagePosture: 'p2', pod: 'none', features: { chat: true } });
   });
 });

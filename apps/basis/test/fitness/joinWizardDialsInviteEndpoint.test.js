@@ -33,7 +33,18 @@ const SHELL_ROOTS = [
   dir('../../../basis-mobile/src'),
 ];
 
-const SEAMS = ['dialEndpoint', 'activeEndpointUrl'];
+// `circleAddressFor` too (2026-11-13): the chat shell's host passed none, so a join from a tapped invite link wrote no
+// membership record, and after a restart a persona's circle was not known as the persona's (the phone's personas walk).
+const SEAMS = ['dialEndpoint', 'activeEndpointUrl', 'circleAddressFor'];
+
+/** The phone's one set of join seams (agentBundle `joinWizardSeams`): a host that spreads it passes them all, provided
+ *  the set itself names every seam (checked below). */
+const SHARED_SET = 'joinWizardSeams';
+const sharedSetBlock = () => {
+  const src = readFileSync(join(REPO, 'apps/basis-mobile/src/core/agentBundle.js'), 'utf8');
+  const at = src.indexOf(`${SHARED_SET}: {`);
+  return at < 0 ? '' : jsxProps(src, at + SHARED_SET.length + 2).slice(0, 2500);
+};
 
 function jsFiles(root) {
   const out = [];
@@ -134,8 +145,14 @@ describe('the join wizard is always given the invite endpoint (J-CP1)', () => {
 
   it('and every one of them passes both endpoint seams', () => {
     const missing = mounts
-      .map((m) => ({ at: `${m.file}:${m.line}`, seams: SEAMS.filter((s) => !m.props.includes(s)) }))
+      .map((m) => ({ at: `${m.file}:${m.line}`, seams: SEAMS.filter((s) => !m.props.includes(s) && !m.props.includes(SHARED_SET)) }))
       .filter((m) => m.seams.length > 0);
     expect(missing).toEqual([]);
+  });
+
+  it("and the phone's shared set, which its hosts spread, names every seam", () => {
+    const block = sharedSetBlock();
+    expect(block, 'agentBundle builds joinWizardSeams').not.toBe('');
+    expect(SEAMS.filter((s) => !block.includes(s))).toEqual([]);
   });
 });

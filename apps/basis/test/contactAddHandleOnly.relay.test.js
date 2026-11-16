@@ -14,6 +14,7 @@ import { bootRealAgentNode, connectNodesOverRelay, until, teardown, readRoster }
 import { pairCircleIdFor } from '../src/v2/pairRoster.js';
 import { addContactAs } from '../src/v2/contactLens.js';
 import { EventLog } from '../src/eventLog.js';
+import { acceptMessageRequest } from '../src/v2/messageRequestAccept.js';
 
 const book = async (n) => ((await n.agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []);
 
@@ -32,6 +33,9 @@ async function walk(level) {
   expect(added?.contact?.webid, `Bea added Anna: ${JSON.stringify(added)}`).toBe(anna.pubKey);
   // a turn each way: Bea introduces herself (her card rides the first turn), Anna answers — the pair circle forms
   await bea.contactThreadChannel.sendTurn({ peerAddr: anna.pubKey, threadId: anna.pubKey, text: `hoi Anna (${level})`, messageId: `b-${level}` }).sent;
+  // Anna never chose Bea: the turn is a request on her side, and she accepts it (the held card goes into her book)
+  await until(async () => (((await anna.agent.callSkill('pinboard', 'listMessageRequests', {}))?.requests ?? []).some((q) => q.from === bea.pubKey) ? true : null), { timeout: 20_000, step: 200 });
+  await acceptMessageRequest({ callSkill: (a, o, x) => anna.agent.callSkill(a, o, x), channel: anna.contactThreadChannel, from: bea.pubKey });
   await until(async () => ((await book(anna)).find((c) => c.webid === bea.pubKey) ? true : null), { timeout: 20_000, step: 200 });
   await anna.contactThreadChannel.sendTurn({ peerAddr: bea.pubKey, threadId: bea.pubKey, text: `hoi Bea (${level})`, messageId: `a-${level}` }).sent;
   const pairId = pairCircleIdFor(anna.pubKey, bea.pubKey);

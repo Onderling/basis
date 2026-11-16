@@ -20,15 +20,21 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   edit = null,
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
   selves = [], writeAsSelf = null,
-  // the line named something that lives in a circle: the sheet opens it there (`onOpenCircle(id)`), never acts on it
-  onOpenCircle = null,
+  // the line read to an act more than one circle holds: the card asks which; a pick → `onCircleRun(card, circleId)`, which
+  // runs it as the person and answers `{done}` (what it did) or `{error}`; nothing runs before a pick
+  onCircleRun = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
   // an act that makes nothing (feedback): the host runs it at once — the sheet only hands it over
   onRunAct = null,
   // Vastgezet: the pins to paint (each with `label` and `key`); `onOpenPin(pin)` → `{actId}` (an own act), a line (why
   // nothing opened), or null (it opened a circle); × → `onUnpin(key)`; ☆/★ beside an own act → `onTogglePin(actId)`
-  pinned = [], onOpenPin = null, onUnpin = null, pinnedActIds = [], onTogglePin = null }) {
+  pinned = [], onOpenPin = null, onUnpin = null, pinnedActIds = [], onTogglePin = null,
+  // the kept conversation with the assistant (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to
+  // empty it — web twin: vandaagPlus.js `plus-thread`
+  turns = [], onForget = null,
+  // what can be typed here: `suggestFor(line)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
+  suggestFor = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
@@ -37,9 +43,10 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [busy, setBusy] = useState(false);
   const [asSelf, setAsSelf] = useState(writeAsSelf);
   const [line, setLine] = useState('');
-  const [referral, setReferral] = useState(null);
+  const [card, setCard] = useState(null);
+  const [done, setDone] = useState(null);
   useEffect(() => {
-    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); setReferral(null); return; }
+    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); setCard(null); setDone(null); return; }
     if (edit?.act) { setActId(edit.act.id); setValues(edit.values ?? {}); setAsSelf(edit.asSelf ?? 'default'); }  // changed as the self that made it
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
@@ -62,13 +69,24 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     setBusy(false);
     if (said) setError(said);
   };
-  // the free line: what it understood picks the act and fills the fields below (editable before Save), never a circle
+  // the free line: an own act picks the act and fills the fields below (editable before Save); a circle's act ran at
+  // once (`done`) or asks which circle (`card`)
   const read = async () => {
+    setDone(null);
     const r = await onRead?.(line);
-    setReferral(Array.isArray(r?.referral) && r.referral.length ? r.referral : null);
-    if (r?.referral) setError(null);
+    setCard(r?.card && Array.isArray(r.card.to) && r.card.to.length ? r.card : null);
+    if (r?.card) setError(null);
+    else if (r && 'done' in r) { setDone(r.done ?? null); setError(null); }
     else if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
     else if (r?.error) setError(r.error);
+  };
+  const runIn = async (circleId) => {
+    const c = card;
+    setCard(null);
+    setBusy(true);
+    const r = await onCircleRun?.(c, circleId);
+    setBusy(false);
+    if (r?.error) setError(r.error); else { setDone(r?.done ?? null); setError(null); }
   };
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -78,7 +96,16 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
             const piece = {
-              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (
+              'plus-thread': () => (!edit && Array.isArray(turns) && turns.length ? (
+            <View testID="vandaag-plus-thread" accessibilityLabel={t('circle.vandaag.plus_thread')}>
+              {turns.map((turn, i) => (
+                <Text key={`${turn.ts ?? i}-${i}`} testID={`vandaag-plus-turn-${turn.who === 'you' ? 'you' : 'assistant'}`}
+                  style={[styles.turn, turn.who === 'you' ? styles.turnYou : null]}>{turn.text}</Text>
+              ))}
+              {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={onForget} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
+            </View>
+          ) : null),
+              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
               <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
@@ -86,7 +113,11 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
             </View>
-          ) : null),
+            {/* as the person types: the lines the "+" reads here that start with it; a tap puts one in the line (web twin) */}
+            {!act && typeof suggestFor === 'function' ? (suggestFor(line) ?? []).map((s) => (
+              <Btn key={s} variant="ghost" style={styles.btnAt} onPress={() => setLine(s)} testID="vandaag-plus-suggestion" label={s} />
+            )) : null}
+          </>) : null),
               'plus-own': () => (selves.length > 1 && !asSelf ? (
             <View>
               <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
@@ -154,10 +185,17 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               </View>
             );
           })}
-          {referral ? referral.map((r) => (
-            <Btn key={r.circleId} label={t('circle.vandaag.plus_referral', { name: r.name || t('circle.screens.untitled') })}
-              onPress={() => onOpenCircle?.(r.circleId)} testID={`vandaag-plus-referral-${r.circleId}`} style={styles.btnAt} />
-          )) : null}
+          {card ? (
+            <View testID="vandaag-plus-card">
+              <Text style={styles.label}>{t('circle.vandaag.plus_circle_ask', { line: card.line ?? '' })}</Text>
+              {card.to.map((r) => (
+                <Btn key={r.circleId} label={t('circle.vandaag.plus_circle_in', { name: r.name || t('circle.screens.untitled') })}
+                  onPress={() => runIn(r.circleId)} disabled={busy} testID={`vandaag-plus-card-in-${r.circleId}`} style={styles.btnAt} />
+              ))}
+              <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => setCard(null)} testID="vandaag-plus-card-no" style={styles.btnAt} />
+            </View>
+          ) : null}
+          {done ? <Text style={styles.label} testID="vandaag-plus-done">{done}</Text> : null}
           {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
           {/* the way out, not one of the acts */}
           <Btn variant="ghost" onPress={onClose} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
@@ -173,6 +211,9 @@ const makeStyles = (theme) => StyleSheet.create({
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 4 },
   field: { gap: 4, marginBottom: 8 },
   label: { fontSize: 13, color: theme.color.inkSoft },
+  // a turn of the kept conversation: the assistant's on the left, the person's own to the right
+  turn: { fontSize: 14, color: theme.color.ink, marginVertical: 2, alignSelf: 'flex-start' },
+  turnYou: { alignSelf: 'flex-end', color: theme.color.inkSoft },
   input: { fontSize: 14, paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, color: theme.color.ink },
   btnAt: { alignSelf: 'flex-start', marginTop: 6 },   // one button family (Btn), each at its own width as on web
   btnText: { color: theme.color.ink, fontSize: 14 },

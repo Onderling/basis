@@ -37,9 +37,9 @@ const rowsFor = (events) => chatRows({
 });
 
 describe('chatRows — the sender stamp', () => {
-  it('a member with a handle gets @handle (pairwise, unrevealed: never the real name)', () => {
+  it('a member with a handle gets their name in the circle (pairwise, unrevealed: never the real name)', () => {
     const [row] = rowsFor([chatEvent('webid:ella', 'hoi')]);
-    expect(row.senderLabel).toBe('@ella');
+    expect(row.senderLabel).toBe('ella');
     expect(row.senderLabelKey).toBeNull();
     expect(row.senderSelf).toBe(false);
   });
@@ -100,7 +100,7 @@ describe('renderCircleView — the paint half', () => {
   it('paints the stamped label, ignoring any payload-claimed name', () => {
     const [row] = rowsFor([chatEvent('webid:ella', 'hoi', { senderDisplay: 'Aangeklede Leugen' })]);
     const el = paint(row);
-    expect(el.querySelector('.circle-view__bubble-sender')?.textContent).toBe('@ella');
+    expect(el.querySelector('.circle-view__bubble-sender')?.textContent).toBe('ella');
     expect(el.textContent).not.toContain('Aangeklede Leugen');
   });
 
@@ -134,6 +134,6 @@ describe('materializeNoticeboard — the screen shares the stamp', () => {
     });
     const [item] = block.content.items;
     expect(item.actor).toBe('webid:ella');
-    expect(item.senderLabel).toBe('@ella');
+    expect(item.senderLabel).toBe('ella');
   });
 });

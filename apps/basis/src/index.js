@@ -37,7 +37,6 @@ export { makeContactTurnFan, makeContactTurnPeerHandler, contactTurnToWire, CONT
 export { listContacts, peerToContactRow, pinboardContactToRow, mergeContacts } from './v2/contactsSource.js';
 // S4 (pinboard dissolution — pod foundation, SAFE offline slice): per-circle sealing
 // identity + control-agent composition over the @onderling/pod-client sealing substrate.
-export { createCircleSealingIdentity } from './v2/circleSealingIdentity.js';
 export { createCircleControlAgent } from './v2/circleControlAgent.js';
 export { addBotToGraph } from './v2/addBot.js';
 // The pure, offline help-answer engine (ported onderling.org matcher + cards):
@@ -81,10 +80,13 @@ export { circleSourcesFromAgent, makeResolvingCallSkill, DEFAULT_CIRCLE_ORIGINS 
 export { loadCircleItems, normalizeContentItem }      from './v2/circleContent.js';
 export { quickCreateCircle }                          from './v2/circleCreate.js';
 export { itemCircleId, isInCircle, scopeItems }       from './v2/circleScope.js';
-export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES, NOTICEBOARD_REFRESH_EVENTS } from './v2/circlePinboardScope.js';
-export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from './v2/circlePodProducer.js';
+export { scopePinboardCallSkill, scopedWriteFailureKey, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES, NOTICEBOARD_REFRESH_EVENTS } from './v2/circlePinboardScope.js';
+export { createCirclePodProducer, createCircleControlAgentRouter, notePodAgentFor, seedCircleRoster, createProducerKeyWait, SealingKeyPairMissingError, isSealedPosture, sealedAnswer, memberStatusReader } from './v2/circlePodProducer.js';
+export { checkKeyAudience, runKeyAudienceCheck } from './v2/keyAudienceCheck.js';
+export { createPodReadBack } from './v2/podReadBack.js';
 export { realPodRouting, podRootFromWebid, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
+export { runStartQueue, startQueueSiblings, START_LANES } from './v2/startQueue.js';
 export {
   CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, decisionDeadlineDays,
   DEFAULT_CIRCLE_POLICY, normalizeCirclePolicy, mergeCirclePolicy, policyPatch,
@@ -123,7 +125,7 @@ export {
   eventCircleId,
   // circle-scoped stream + chip filters.
   buildCircleStream, CIRCLE_STREAM_KIND_FILTERS,
-  projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows, mutedActorSet,
+  projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows, mutedActorSet, sendersToPlace,
   // C15 — per-circle chat projection (excludes the silent system lane).
   buildCircleChat,
   // Who a row is FROM, through the reveal ladder — for surfaces that carry the author on the row
@@ -220,7 +222,8 @@ export {
   addScreen, renameScreen, removeScreen, setActiveScreen, getActiveScreen, updateScreen,
   createUserScreenStore, localStorageScreenIo, localUserScreenStore, SCREEN_VERSIONS_KEY,
 } from './v2/userScreens.js';
-export { materializeScreen } from './v2/userScreenBlocks.js';
+export { materializeScreen, forYouRows } from './v2/userScreenBlocks.js';
+export { createBannerDriver, notifyPolicyKey } from './v2/notifyBanner.js';
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 export { createScreenBlocksCache } from './v2/screenBlocksCache.js';
 export {
@@ -253,7 +256,7 @@ export { createNetworkChangeWatcher }           from './v2/networkChangeWatcher.
 export { createNearbyScreen, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey }
                                                 from './v2/nearbyScreen.js';
 export {
-  createAsk, isAskLive, evaluateIncomingAsk, askActions, answerAsk, nearbyThreadDescriptor,
+  createAsk, isAskLive, evaluateIncomingAsk, askActions, answerAsk,
   ASK_DEFAULT_TTL_MS, ASK_MAX_TTL_MS, ASK_MAX_TEXT,
 } from './v2/nearbyAsks.js';
 export { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE, ASK_MAX_TAGS }
@@ -266,10 +269,6 @@ export {
   invitePublishAllows, mayPublish, prepareBroadcastInvite, isInviteLive, receiveInvite, inviteActions,
   BROADCAST_INVITE_MAX_TTL_MS, INVITE_MESSAGE,
 } from './v2/nearbyInvites.js';
-export {
-  DEFAULT_CHAT_FILTER, CHAT_AUTHORS, normalizeChatFilter, applyChatFilter, chatFilterChips,
-  localStorageChatFilterIo, asyncStorageChatFilterIo,
-} from './v2/chatFilter.js';
 export {
   RETENTION_CHOICES_DAYS, DEFAULT_RETENTION_DAYS, normalizeRetentionDays, retentionFromDays, daysToMs,
 } from './v2/retentionPref.js';
@@ -359,7 +358,7 @@ export { VIEWER_KINDS, viewAsDirectory } from './v2/circleViewAs.js';
 export {
   personaAttributes, memberPersonaView, selfViewSplit,
   personaPresetKeys, revealPresetLabelKey, PERSONA_TIER_KEYS, REVEAL_PRESETS,
-  revealPresetWords,
+  revealPresetWords, viewerChipLabel,
 } from './v2/memberCards.js';
 export { normalizeCircleMembers, circleMemberCount } from '@onderling/kring-host/circleMembers';
 // 5.9d — Proof-of-Location placeholder seam (real attestation deferred).
@@ -418,3 +417,4 @@ export {
 // Shared locale blocks (`circle.*`, `consequence.*`, `role.*`) — both shells merge these so they can't drift.
 export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale, sharedLocale, mergeShared } from './locales/index.js';
 export { fieldAfterLoad } from './v2/fieldAfterLoad.js';
+export { itemKindChip } from './v2/embedChips.js';

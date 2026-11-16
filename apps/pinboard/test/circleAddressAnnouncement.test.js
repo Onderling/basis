@@ -32,8 +32,9 @@ const ADMIN  = 'pk-admin';
 
 const seedOf = (n) => new Uint8Array(32).fill(n);
 const addressOf = (n, circle = CIRCLE) => deriveCircleAddress(seedOf(n), circle);
-const proofOf = (n, circle = CIRCLE, addr = null) =>
-  signCircleLinkFromSeed(seedOf(n), circle, circle, addr ?? deriveCircleAddress(seedOf(n), circle));
+// the proof names the member whose row the address goes on: Bram's by default, the admin's for the admin's seed
+const proofOf = (n, circle = CIRCLE, addr = null, member = n === ADMIN_SEED ? ADMIN : BRAM) =>
+  signCircleLinkFromSeed(seedOf(n), circle, circle, addr ?? deriveCircleAddress(seedOf(n), circle), member);
 
 const BRAM_SEED = 3;
 const ADMIN_SEED = 7;
@@ -78,31 +79,32 @@ const announce = (bundle, over = {}, from = ME) => callSkill(bundle.agent, 'reco
   ...over,
 }, from);
 
+/** The admin's announce, carried by the local bridge: a member this device knows (as `confirmedBy`) without an address. */
+const announceAdmin = (bundle, over = {}, from = ME) => announce(bundle, {
+  memberWebid: ADMIN, circleAddress: addressOf(ADMIN_SEED), circleAddressProof: proofOf(ADMIN_SEED), ...over,
+}, from);
+
 describe('recordCircleAddressAnnouncement — the receive half of per-circle address announcing', () => {
-  it('records a PROVEN address for a member this device only knew as an intro', async () => {
+  it('records a PROVEN address for a member this device knew without one (the admin it joined through)', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    // Before: a member with no address at all — the exact state that made joiner↔joiner fail.
-    expect((await rowFor(bundle, BRAM))?.circleAddress).toBeUndefined();
+    // Before: the admin is a member here only as `confirmedBy`, with no address: the state that made sends to them fail.
+    expect((await rowFor(bundle, ADMIN))?.circleAddress).toBeUndefined();
 
-    const res = await announce(bundle);
+    const res = await announceAdmin(bundle);
     expect(res.ok).toBe(true);
 
-    const row = await rowFor(bundle, BRAM);
-    expect(row.circleAddress).toBe(addressOf(BRAM_SEED));
+    const row = await rowFor(bundle, ADMIN);
+    expect(row.circleAddress).toBe(addressOf(ADMIN_SEED));
     // The key must land WITH the address: `bindCircleAddressKeys` silently skips a row carrying one
     // without the other, so a half-written row is an address that can never be sealed to.
-    expect(row.pubKey).toBe(BRAM);
-    // …and the proof is kept, so this device can relay the fact on to a member who joins later.
-    expect(row.circleAddressProof).toBe(proofOf(BRAM_SEED));
+    expect(row.pubKey).toBe(ADMIN);
   });
 
   it('the recorded address is what the send path actually resolves, with the fallback OFF', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
 
     const resolved = await resolveMemberAddress(await rowFor(bundle, BRAM), {
       circleId: CIRCLE, preferCircleAddress: true, allowFallback: false,
@@ -114,21 +116,19 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('REFUSES an unproven address — and says so, rather than silently doing nothing', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
 
-    const res = await announce(bundle, { circleAddressProof: undefined });
+    const res = await announceAdmin(bundle, { circleAddressProof: undefined });
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('unproven-address');
-    expect((await rowFor(bundle, BRAM))?.circleAddress).toBeUndefined();
+    expect((await rowFor(bundle, ADMIN))?.circleAddress).toBeUndefined();
   });
 
   it('REFUSES an address whose proof was signed by someone else — seeing an address is not holding it', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
 
-    const res = await announce(bundle, {
-      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(BRAM_SEED)),
+    const res = await announceAdmin(bundle, {
+      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(ADMIN_SEED), ADMIN),
     });
     expect(res.ok).toBe(false);
     expect((await rowFor(bundle, BRAM))?.circleAddress).toBeUndefined();
@@ -137,12 +137,11 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('REFUSES a proof minted for a DIFFERENT circle (no cross-circle replay)', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
 
-    const elsewhere = addressOf(BRAM_SEED, 'werk-7');
-    const res = await announce(bundle, {
+    const elsewhere = addressOf(ADMIN_SEED, 'werk-7');
+    const res = await announceAdmin(bundle, {
       circleAddress: elsewhere,
-      circleAddressProof: proofOf(BRAM_SEED, 'werk-7', elsewhere),
+      circleAddressProof: proofOf(ADMIN_SEED, 'werk-7', elsewhere),
     });
     expect(res.ok).toBe(false);
     expect((await rowFor(bundle, BRAM))?.circleAddress).toBeUndefined();
@@ -151,8 +150,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('a RE-ANNOUNCE of a NEW address is ADDED to the set — the PRIMARY stays the address that joined (2026-09-17: a member\'s primary contact address is their CHOICE, never "whoever announced last")', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
     expect((await rowFor(bundle, BRAM)).circleAddress).toBe(addressOf(BRAM_SEED));
 
     // Bram's second device (a box he enrolled) announces its own address in this circle and proves it.
@@ -174,8 +172,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('`primary: true` — the member\'s CHOICE — makes the announced address the primary; a later plain announce from another device does not displace it', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
     const NEXT = 11, THIRD = 13;
     await announce(bundle, { circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT) });
     // "Make this my primary contact address" — tapped on the box.
@@ -194,7 +191,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     const again = await announce(bundle, { circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT), primary: true });
     expect(again.unchanged).toBe(true);
     // an UNPROVEN primary is refused like any unproven address
-    const forged = await announce(bundle, { circleAddress: addressOf(12), circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12)), primary: true });
+    const forged = await announce(bundle, { circleAddress: addressOf(12), circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12), BRAM), primary: true });
     expect(forged.ok).toBe(false);
     expect((await rowFor(bundle, BRAM)).circleAddress).toBe(addressOf(NEXT));
   });
@@ -202,8 +199,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('a RE-ANNOUNCE keeps every proven address in the set — nothing is evicted', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
 
     const NEXT = 11;
     await announce(bundle, { circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT) });
@@ -217,12 +213,11 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('an UNPROVEN address never enters the set, even when a proven one already exists', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
 
     const res = await announce(bundle, {
       circleAddress: addressOf(12),
-      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12)),
+      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12), BRAM),
     });
     expect(res.ok).toBe(false);
     expect((await rowFor(bundle, BRAM)).circleAddresses).toEqual([addressOf(BRAM_SEED)]);
@@ -231,8 +226,7 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('re-announcing an UNCHANGED address writes nothing at all', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
 
     const again = await announce(bundle);
     expect(again.ok).toBe(true);
@@ -253,11 +247,11 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     // own. An announce that patched the first shape only would appear to work and change nothing.
     const NEXT = 13;
     const res = await announce(bundle, {
-      memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT),
+      memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT, CIRCLE, null, ADMIN),
     });
     expect(res.ok).toBe(true);
     expect((await rowFor(bundle, ADMIN)).circleAddresses, 'added behind the primary — the mirror row follows the same rule').toEqual([addressOf(ADMIN_SEED), addressOf(NEXT)]);
-    const chose = await announce(bundle, { memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT), primary: true });
+    const chose = await announce(bundle, { memberWebid: ADMIN, circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT, CIRCLE, null, ADMIN), primary: true });
     expect(chose.ok).toBe(true);
     expect((await rowFor(bundle, ADMIN)).circleAddress, 'and the admin\'s choice of primary lands on the mirror row').toBe(addressOf(NEXT));
   });
@@ -276,13 +270,12 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
   it('a REMOTE caller may only write their OWN row — `memberWebid` is ignored, never honoured', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
 
     // A remote peer naming SOMEONE ELSE's row: refused outright rather than silently redirected.
     const res = await announce(bundle, {}, 'pk-someone-else');
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('may-only-write-own-row');
-    expect((await rowFor(bundle, BRAM))?.circleAddress).toBeUndefined();
+    expect(await rowFor(bundle, BRAM), 'nothing written for the member it named').toBeNull();
   });
 
   it('a REMOTE non-member cannot announce themselves INTO the circle', async () => {
@@ -293,25 +286,52 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     const res = await callSkill(bundle.agent, 'recordCircleAddressAnnouncement', {
       groupId: CIRCLE,
       circleAddress: addressOf(STRANGER_SEED),
-      circleAddressProof: proofOf(STRANGER_SEED),
+      circleAddressProof: proofOf(STRANGER_SEED, CIRCLE, null, 'pk-stranger'),   // a good proof: membership is what refuses
     }, 'pk-stranger');
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('not-a-member');
     expect(await rowFor(bundle, 'pk-stranger')).toBeNull();
   });
 
+  it('a member who COPIES another member\'s address and proof onto their own row is refused: the proof names the other member', async () => {
+    const bundle = await buildBundle();
+    await recordJoin(bundle);
+    await announce(bundle);   // Bram's proven address is on Bram's row
+
+    const res = await callSkill(bundle.agent, 'recordCircleAddressAnnouncement', {
+      groupId: CIRCLE, circleAddress: addressOf(BRAM_SEED), circleAddressProof: proofOf(BRAM_SEED),
+    }, ADMIN);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('unproven-address');
+    expect((await rowFor(bundle, ADMIN))?.circleAddresses ?? []).not.toContain(addressOf(BRAM_SEED));
+  });
+
+  it('one address, one member: a proof that names a SECOND member for an address another member holds is refused', async () => {
+    const bundle = await buildBundle();
+    await recordJoin(bundle);
+    await announce(bundle);   // Bram holds his address
+
+    // the key behind Bram's address signs a proof naming the admin (the key holder colluding, or one person reusing it)
+    const res = await callSkill(bundle.agent, 'recordCircleAddressAnnouncement', {
+      groupId: CIRCLE, circleAddress: addressOf(BRAM_SEED), circleAddressProof: proofOf(BRAM_SEED, CIRCLE, null, ADMIN),
+    }, ADMIN);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('address-held-by-another-member');
+    expect((await rowFor(bundle, ADMIN))?.circleAddress).not.toBe(addressOf(BRAM_SEED));
+    expect((await rowFor(bundle, BRAM)).circleAddress, 'the earlier holder keeps it').toBe(addressOf(BRAM_SEED));
+  });
+
   it('a REMOTE member CAN re-announce their own address (the ordinary re-announce over the wire)', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
 
     const res = await callSkill(bundle.agent, 'recordCircleAddressAnnouncement', {
       groupId: CIRCLE,
-      circleAddress: addressOf(BRAM_SEED),
-      circleAddressProof: proofOf(BRAM_SEED),
-    }, BRAM);
+      circleAddress: addressOf(ADMIN_SEED),
+      circleAddressProof: proofOf(ADMIN_SEED),
+    }, ADMIN);
     expect(res.ok).toBe(true);
-    expect((await rowFor(bundle, BRAM)).circleAddress).toBe(addressOf(BRAM_SEED));
+    expect((await rowFor(bundle, ADMIN)).circleAddress).toBe(addressOf(ADMIN_SEED));
   });
 });
 
@@ -322,8 +342,7 @@ describe('the fan-out tries a member\'s proven address SET in order (primary fir
   async function bundleWithTwoBramAddresses(reliableSend) {
     const bundle = await buildBundle(reliableSend);
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
     await announce(bundle, { circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT), primary: true });
     return bundle;
   }
@@ -377,8 +396,7 @@ describe('broadcastCircleAddresses — the send half', () => {
   it('fans the proven ones (and only those) to the circle', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
-    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
-    await announce(bundle);
+    await announce(bundle);   // the local carrier hands Bram's proven address over (the join-time relay)
 
     const res = await callSkill(bundle.agent, 'broadcastCircleAddresses', {
       groupId: CIRCLE,

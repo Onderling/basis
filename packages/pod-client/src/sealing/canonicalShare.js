@@ -48,33 +48,17 @@
 // CURRENT version only (grant carries history forward untouched) — never retroactive access to pre-grant
 // history. Expanding that (grant historic versions) is a deliberate POLICY choice, not the default.
 
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { keyStoreSerializer, MAX_KEY_WRITE_ATTEMPTS } from './keyResourceWrite.js';
 import {
   grantMember, rotateGroupKeyResource, buildGroupKeyResource, unwrapGroupKey,
   openSealedAcrossVersions,
 } from './groupKeyResource.js';
 import { generateGroupKey, sealWithGroupKey, sealingPublicKeyFromNetworkKey } from './envelope.js';
 
-/**
- * One promise-chain per KEY STORE, so every controller writing the same group-key resource in this process
- * takes the grant critical section in turn. A chain is enough: each call waits for the previous to settle
- * before it reads, so no two grants compute from the same stale base. Errors are contained, so one failed
- * grant cannot wedge the queue. Cross-DEVICE races still need a store that can compare-and-swap
- * (`keyStore.writeIfUnchanged`) — see the note in the grant core.
- */
-const _grantChains = new WeakMap();
-function _serializerFor(keyStore) {
-  return (fn) => {
-    const prev = _grantChains.get(keyStore) ?? Promise.resolve();
-    const run = prev.then(fn, fn);
-    _grantChains.set(keyStore, run.then(() => undefined, () => undefined));
-    return run;
-  };
-}
-
-/** Bounded optimistic-concurrency retries for a grant (story 1.5); a grant is a pure union, so retrying is safe. */
-// Parameter register (#36) — bounded optimistic-concurrency grant retries (scope:device, kind:internal).
-const MAX_GRANT_ATTEMPTS = param({ key: 'podClient.grantAttempts', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
+// The serializer and the attempt bound are the shared key-resource write's (keyResourceWrite.js), so every
+// writer of one key store in this process — this share and the circle control agent — takes the same chain.
+const _serializerFor = keyStoreSerializer;
+const MAX_GRANT_ATTEMPTS = MAX_KEY_WRITE_ATTEMPTS;
 
 /**
  * Build a canonical-share controller for a single sealed resource. Pure orchestration — pod I/O is injected

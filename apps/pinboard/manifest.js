@@ -100,6 +100,12 @@ const ITEM_TYPES = [
   'post',
   'contact',
   'member',
+  //  - 'message-request' — a first message from someone not chosen, held beside the book until the person answers
+  //    (listMessageRequests / ignoreMessageRequest appliesTo). Canonical in `@onderling/item-types`, own-devices only.
+  'message-request',
+  //  - 'shared-card' — a contact link the person handed out, let on for its first opener only (mint / list / withdraw /
+  //    use appliesTo). Canonical in `@onderling/item-types`, own-devices only.
+  'shared-card',
 ];
 
 // The trio that renders on the noticeboard (ask / offer / lend) — used as
@@ -143,6 +149,9 @@ export const pinboardManifest = {
     // sitting of its own.
     contact:       { atoms: ['add', 'list', 'submit'] },
     member:        { atoms: ['add', 'list'] },
+    // a request is held by the door (`add`, self only, internal), listed and answered; never merged into a view
+    'message-request': { atoms: ['add', 'list', 'submit', 'remove'] },
+    'shared-card':     { atoms: ['add', 'list', 'submit', 'remove'] },
   },
 
   operations: [
@@ -650,6 +659,150 @@ export const pinboardManifest = {
         ui:    { control: 'button', labelKey: 'circle.button.pinboard.setContactHidden' },
       },
     },
+    // ── Requests (Frits 2026-11-12) ──
+    // A first message from someone the person did not choose is a REQUEST, held beside the book (never in it) until the
+    // person accepts, ignores or blocks it. Requests are per self, on the own-devices store, so they reach every device
+    // of the person. Blocking is basis's block set (`mute`, /block).
+    {
+      id:   'listMessageRequests', visibility: 'authenticated', group: 'data', verb: 'list',
+      appliesTo: { type: 'message-request' },
+      params: [
+        { name: 'persona', kind: 'string', required: false },
+        { name: 'state',   kind: 'enum', of: ['open', 'ignored'], required: false },
+      ],
+      surfaces: {
+        slash: { command: '/requests', body: 'flags' },
+        chat:  { reply: 'list', hint: 'list first messages from people you did not choose' },
+      },
+    },
+    {
+      // The door's write (the contact channel, when a turn's sender is not known to this self): never typed, never a
+      // button, self only. Refused with its reason when it cannot be held (no card on a new request, a card naming
+      // someone else, a file, a turn larger than the bound).
+      id:   'holdMessageRequest', visibility: 'private', verb: 'add',
+      circleScoped: false,   // a person's own request, never a circle's
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'turns', policy: 'content' }],   // the held turns merge by union between the person's devices
+      params: [
+        { name: 'from',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'messageId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'ts',        kind: 'number', required: true },
+        { name: 'text',      kind: 'string', required: false },
+        { name: 'card',      kind: 'string', required: false },
+        { name: 'file',      kind: 'boolean', required: false },
+        { name: 'persona',   kind: 'string', required: false },
+        { name: 'memberName', kind: 'string', required: false },   // a co-member never answered: held without a card
+        { name: 'refused',   kind: 'string', required: false },    // the door's fallback after a refusal: held anyway
+      ],
+      surfaces: { internal: true },
+    },
+    {
+      // Accept: the held card into the book (as a scanned card), the request goes, the held turns are returned. The thread
+      // is the contact channel's, so a person's accept goes through basis's shared `acceptMessageRequest`, which puts the
+      // turns there; the Contacten section's button is that function. Not typed: a typed accept would drop the turns.
+      id:   'acceptMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'contact', policy: 'content' }],
+      params: [
+        { name: 'from',         kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona',      kind: 'string', required: false },
+        { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
+      ],
+      surfaces: { internal: true },
+    },
+    {
+      // A request goes without becoming a contact: the block act (the sender onto this device's block list, the request
+      // off every device of the person). Not typed: blocking from a request is the Contacten section's button.
+      id:   'removeMessageRequest', visibility: 'authenticated', verb: 'remove',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      params: [
+        { name: 'from',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: { internal: true },
+    },
+    {
+      id:   'ignoreMessageRequest', visibility: 'authenticated', group: 'admin', verb: 'submit',
+      writes: { scope: 'person' },
+      appliesTo: { type: 'message-request' },
+      resolves: [{ field: 'state', policy: 'content' }],   // the newer write wins between the person's devices; a later turn keeps the mark
+      params: [
+        { name: 'from',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/ignore-request', body: 'flags' },
+        chat:  { reply: 'text', hint: 'ignore a request: it stays and can still be accepted' },
+      },
+    },
+    // ── Shared contact links (Frits 2026-11-12) ──
+    // Every "Share my contact" makes a NEW link for the persona shared as: its first opener is let on as if chosen (a
+    // thread, the card held, no book row until the person answers); anyone after is a request. Used once, valid 30 days,
+    // at most 20 unused per persona. Rows on the own-devices store, so every device of the person knows them.
+    {
+      // The share screen's write, once per showing: never typed (a typed link would be a link nobody sees the state of).
+      id:   'mintSharedCard', visibility: 'authenticated', verb: 'add',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'shared-card' },
+      resolves: [{ field: 'token', policy: 'content' }],   // a new row per link: nothing to merge but its use (the claim)
+      params: [{ name: 'persona', kind: 'string', required: false }],
+      surfaces: { internal: true },
+    },
+    {
+      id:   'listSharedCards', visibility: 'authenticated', group: 'data', verb: 'list',
+      appliesTo: { type: 'shared-card' },
+      params: [{ name: 'persona', kind: 'string', required: false }],
+      surfaces: {
+        slash: { command: '/shared-links', body: 'flags' },
+        chat:  { reply: 'list', hint: 'list the contact links you shared: not used yet, or used on which day' },
+      },
+    },
+    {
+      id:   'withdrawSharedCard', visibility: 'authenticated', group: 'admin', verb: 'remove',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'shared-card' },
+      params: [
+        { name: 'token',   kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/withdraw-link', body: 'flags' },
+        chat:  { reply: 'text', hint: 'withdraw a contact link you shared: whoever opens it later lands in requests' },
+      },
+    },
+    {
+      // The opener's side: the token a contact row kept (it came from a shared link) left with the first turn to them.
+      id:   'clearContactLinkToken', visibility: 'private', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'contact' },
+      resolves: [{ field: 'linkToken', policy: 'content' }],
+      params: [{ name: 'webid', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: { internal: true },
+    },
+    {
+      // The door's write (the contact channel, a first turn carrying a token): never typed, self only. The use is a
+      // first-wins claim between the person's devices.
+      id:   'useSharedCard', visibility: 'private', verb: 'submit',
+      circleScoped: false,
+      writes: { scope: 'person' },
+      appliesTo: { type: 'shared-card' },
+      resolves: [{ field: 'assignee', policy: 'claim' }],
+      params: [
+        { name: 'token',   kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'by',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'card',    kind: 'string', required: false },   // the card the opener's turn carried: names their thread
+        { name: 'persona', kind: 'string', required: false },
+      ],
+      surfaces: { internal: true },
+    },
     {
       // WHAT A CONTACT SEES OF YOU (L125, Frits 2026-09-24): the persona whose release their pair roster carries, and
       // the level it discloses to them. The lens, not a second you — one identity runs (L123). Changed on the thread
@@ -786,6 +939,18 @@ export const pinboardManifest = {
         slash: { command: '/group-members' },
         chat:  { reply: 'list', hint: 'list members of your circle' },
       },
+    },
+    {
+      // Asked again on every recompute of a key change that adds someone: is the member still in, after the admission the
+      // change follows (`after`: the join statement's hash; absent: their last folded join)? 'in' / 'out' / null when it
+      // cannot be placed in the membership lane's causal order. Plumbing for the key router, no person-facing door; NOT
+      // `appliesTo: member` (that is the roster's list, `listGroupMembers`, which a capability ask must keep resolving to).
+      id:   'memberStatus', visibility: 'private', group: 'data', verb: 'list',
+      params: [
+        { name: 'webid', kind: 'string', required: true },
+        { name: 'after', kind: 'string', required: false },
+      ],
+      surfaces: { internal: true },
     },
     {
       id:   'getGroupRules', visibility: 'authenticated', group: 'data', verb: 'list',
@@ -1198,6 +1363,9 @@ export const pinboardManifest = {
         { name: 'groupId',      kind: 'string', required: true, ...ID_NONEMPTY  },
         { name: 'memberWebid',  kind: 'string', required: true, ...STR_NONEMPTY },
         { name: 'role',         kind: 'enum', of: ['admin', 'member'], required: true },
+        // the decision that enacted it (governance): its proposal and the settings version held (the receiver gate)
+        { name: 'proposalId',    kind: 'string', required: false },
+        { name: 'policyVersion', kind: 'number', required: false },
       ],
       // A role is a SPINE fact: equivocation is an attack (two conflicting promotions from one
       // author are a fork-proof), and every device must fold the same answer to who runs the circle.
@@ -1224,6 +1392,9 @@ export const pinboardManifest = {
         { name: 'memberStableId',  kind: 'string' },
         { name: 'reason',          kind: 'string' },
         { name: 'policy',          kind: 'object' },
+        // the decision that enacted it (governance): its proposal and the settings version held (the receiver gate)
+        { name: 'proposalId',    kind: 'string', required: false },
+        { name: 'policyVersion', kind: 'number', required: false },
       ],
       surfaces: {
         chat: { hint: 'Remove a member from a circle. Admin-only; forces a key rotation and reseal.' },
@@ -1271,6 +1442,10 @@ export const pinboardManifest = {
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rules',   kind: 'object', required: true },
+        // the proposal that decided this change, where the circle's rule asked for one (governance enact passes it)
+        { name: 'proposalId', kind: 'string', required: false },
+        // the settings version the author held: every receiver judges this change by that version's rule
+        { name: 'policyVersion', kind: 'number', required: false },
       ],
       resolves: [{ field: 'rules', policy: 'content' }],
       surfaces: {
@@ -1349,25 +1524,10 @@ export const pinboardManifest = {
 
     // ── Reaching each other ─────────────────────────────────────────
     {
-      id:   'recordPeerIntro', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      // A peer announcing itself with an address. Recorded, not trusted: the address still has to prove
-      // itself against the roster before anything is sent to it.
-      params: [
-        { name: 'groupId',      kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'peerAddr',     kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'peerDisplay',  kind: 'string' },
-      ],
-      resolves: [{ field: 'peerAddr', policy: 'content' }],
-      surfaces: {
-        chat: { hint: "Record a peer's introduction (address + display name) for a circle." },
-        ui:   { control: 'page' },
-      },
-    },
-    {
       id:   'addContactFromQr', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'person' },
       params: [
+        { name: 'linkToken', kind: 'string', required: false },   // a shared link's one-time token (L806)
         { name: 'payload', kind: 'string', required: true },   // the card as scanned or pasted (`onderling-contact://…`): every caller passes a string; the skill refuses anything else
         // Which of your personas this contact is added through — what they see of you. Optional: absent
         // means "not recorded", which is a different thing from "the default", and nothing may read it as one.
@@ -1461,6 +1621,8 @@ export const pinboardManifest = {
       surfaces: {
         chat: { hint: 'Fan a signed chat statement to a circle.' },
         ui:   { control: 'page' },
+        // the message's own bubble carries this act's state (its delivery chip); the shared act strip stays quiet
+        actState: 'bubble',
       },
     },
     {

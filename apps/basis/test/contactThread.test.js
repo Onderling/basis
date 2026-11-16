@@ -175,4 +175,13 @@ describe('Verbergen / Tonen in the thread header (L106)', () => {
     expect(sys[0].nextElementSibling?.textContent, 'the marker sits right above the turn that brought them back').toContain('ben ik er nog?');
     expect(sys[0].closest('.cc-cthread__bubble'), 'a system line, not a bubble from either side').toBe(null);
   });
+  it('a turn held after a refusal says what it could not keep: one plain line above its bubble; an unknown note says nothing', () => {
+    const el = renderContactThread(document.createElement('div'), { name: 'W', t, messages: [
+      { origin: 'bot', text: 'heel lang', held: 'cut' }, { origin: 'bot', text: 'gewoon' }, { origin: 'bot', text: 'raar', held: 'nonsense' },
+    ] });
+    const held = el.querySelectorAll('.cc-cthread__held');
+    expect(held.length).toBe(1);
+    expect(held[0].textContent).toBe('circle.contacts.held.cut');
+    expect(held[0].nextElementSibling?.textContent, 'on that turn').toContain('heel lang');
+  });
 });

@@ -474,7 +474,7 @@ export async function joinFromInvite(page, inviteUri, { handle = 'joiner', tag =
   await card.locator('.cc-wizard-btn-primary').first().click().catch(() => {});
   await page.waitForTimeout(1200);
   // Step 3 — handle + submit
-  const handleInput = card.locator('.cc-wizard-handle-input');
+  const handleInput = card.locator('.cc-wizard-handle-input:visible');   // in the fold, shown when there is no name yet
   if (await handleInput.count()) { await handleInput.fill(handle); await page.waitForTimeout(400); }
   await shot(page, `${tag}-step3`);
   const submitBtn = card.locator('.cc-wizard-submit');

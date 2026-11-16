@@ -25,6 +25,8 @@
  * injects `sendToPeer` + registers `replyHandler(onReply)` in its peer router.
  */
 
+import { createMessageRequestDoor } from './messageRequestDoor.js';
+import { heldNoteValid } from './heldNote.js';
 import { createAddressedDeliver, chatTurnsFromItems } from '@onderling/item-store';
 import { cardNamesSender } from './contactCardLink.js';
 import { applyPresendFloor } from './presendFloor.js';
@@ -131,7 +133,89 @@ export function createContactThreadChannel({
   // null for anyone else — the bot accepts a turn as the person only by it, so a device the person revoked is a
   // stranger there. It rides inside the seal when there is one. Absent: turns carry none, as before.
   authFor = null,
+  // A FIRST MESSAGE FROM SOMEONE THE PERSON DID NOT CHOOSE IS A REQUEST (Frits 2026-11-12): `messageRequests` is the
+  // agent's door (`agent.messageRequests`: `policy()`, `isKnown(key)`, `hold(turn)`). Each inbound turn is decided BEFORE
+  // anything is kept (messageRequestDoor.js): a known sender's turn goes on as below; anyone else's is held on their
+  // request and nothing else happens (no card into the book, no pair roster, no thread turn, no receipt). A persona
+  // whose policy is 'open' (anyone may write; a bot's by default) lets a stranger's turn go on, within the stranger
+  // budgets. Absent: every turn goes on, as before.
+  messageRequests = null,
+  // `onDoor({ verdict })`: told each door decision that kept a turn from the thread ('held' | 'dropped'), the verdict
+  // only, never who or what (a host's walk log counts them). Optional.
+  onDoor = null,
+  // A RECEIPT ONLY TO SOMEONE THE PERSON KEPT (Frits 2026-11-11): `isKept(contactId)` → true when the person holds a
+  // non-hidden row for them in the contact book (the agent's `isKeptContact`, which also follows a contact's other device
+  // through the identity link). Kept means accepted: a circle member who wrote first is not kept until the person answers.
+  // A receipt is a read and online signal; anyone the shell cannot vouch for gets none. Absent: none.
+  isKept = null,
 } = {}) {
+  const keptNow = async (contactId) => {
+    if (typeof isKept !== 'function' || !contactId) return false;
+    try { return (await isKept(contactId)) === true; } catch { return false; }
+  };
+  // the person wrote to them first (an outbound turn of theirs in the thread): chosen, so their answer is never a request
+  const wroteTo = async (contactId) => {
+    if (!contactId) return false;
+    try { return (await rehydrateAll()).some((t) => t.contactId === contactId && t.origin === 'user'); } catch { return false; }
+  };
+  let requestDoor = null;
+  // a circle member's card, held until the person answers them (answering makes the contact)
+  const memberCards = new Map();
+  const MEMBER_CARDS_MAX = 500;
+  /** The person writes to `peerAddr`: a member's held card goes into the book now (their answer is the choice). The
+   *  turn waits for it: the send gate asks the book, and an answer judged before the card landed was held as unknown. */
+  const adoptMemberCard = (peerAddr) => {
+    const id = resolveId(peerAddr);
+    const held = memberCards.get(id) ?? memberCards.get(peerAddr);
+    if (!held || typeof onCard !== 'function') return null;   // nothing to adopt: the send is not delayed a tick
+    memberCards.delete(id); memberCards.delete(peerAddr);
+    return Promise.resolve(onCard({ contactId: id, fromAddr: held.fromAddr, card: held.card })).catch(() => {});
+  };
+  const doorFor = () => (requestDoor ??= createMessageRequestDoor({
+    isKnown: (key) => messageRequests.isKnown(key),
+    iWrote: wroteTo,
+    isMember: (m) => (typeof messageRequests.isMember === 'function' ? messageRequests.isMember(m) : false),
+    coMember: typeof messageRequests.coMember === 'function' ? (m) => messageRequests.coMember(m) : null,
+    refusal: typeof messageRequests.refusal === 'function' ? (reason) => messageRequests.refusal(reason) : null,
+    useLink: typeof messageRequests.useLink === 'function' ? (m) => messageRequests.useLink(m) : null,
+    letOnByLink: typeof messageRequests.letOnByLink === 'function' ? (m) => messageRequests.letOnByLink(m) : null,
+    hold: (turn) => messageRequests.hold(turn),
+    now,
+  }));
+  /** The policy for first messages of the persona a turn was written to (`to`): 'open' or 'request' (the default). */
+  const policyNow = async (to = null) => {
+    if (typeof messageRequests?.policy !== 'function') return 'request';
+    try { return (await messageRequests.policy(to)) === 'open' ? 'open' : 'request'; } catch { return 'request'; }
+  };
+  /**
+   * Whether a sender is KNOWN to this person (the door's question, without holding anything): asked by the other doors
+   * into a contact thread (a file, a threaded answer), which keep nothing from someone the person did not choose.
+   * True when there is no door (or it is inactive: a function profile).
+   */
+  async function knownSender(contactId, fromAddr, to = null) {
+    if (await blockedNow(contactId, fromAddr)) return false;   // a block refuses every direct door, first
+    if (!messageRequests || typeof messageRequests.isKnown !== 'function') return true;
+    if ((await policyNow(to)) === 'open') return true;
+    for (const k of [fromAddr, contactId]) {
+      try { if (k && (await messageRequests.isKnown(k)) === true) return true; } catch { /* next */ }
+    }
+    if (await wroteTo(contactId)) return true;
+    try { return typeof messageRequests.isMember === 'function' && (await messageRequests.isMember({ contactId, fromAddr, to })) === true; } catch { return false; }
+  }
+  /** On the person's block list (by either the sender's address or the person behind it)? Asked first, by every direct door. */
+  async function blockedNow(contactId, fromAddr) {
+    if (typeof messageRequests?.isBlocked !== 'function') return false;
+    for (const k of [fromAddr, contactId]) {
+      try { if (k && (await messageRequests.isBlocked(k)) === true) return true; } catch { /* next */ }
+    }
+    return false;
+  }
+  /** 'known' when this turn goes on; 'held' or 'dropped' when the door kept it from everything else; 'blocked' first. */
+  const decideAtDoor = async (m) => {
+    if (await blockedNow(m.contactId, m.fromAddr)) return 'blocked';
+    if (!messageRequests || typeof messageRequests.hold !== 'function') return 'known';
+    return doorFor()({ ...m, policy: await policyNow(m.to ?? null) });
+  };
   const hiddenNow = async (contactId) => {
     if (typeof isHidden !== 'function' || !contactId) return false;
     try { return (await isHidden(contactId)) === true; } catch { return false; }
@@ -179,6 +263,36 @@ export function createContactThreadChannel({
   // admission code and linked-person proof beside it), and the fan takes the note with the turn. Bounded: a note
   // whose turn never landed ages out.
   const heardAsMessage = new Map();
+  let landedHook = null;   // `setLandedHook` — the receipt back to a sender whose turn landed here
+  // WHICH CONTACT A TURN OF MINE WENT TO, by message id, this boot (the delivery map that a receipt advances is per boot
+  // too). It is what lets the receipt RECEIVER refuse a receipt for my DM from anyone but that contact: a contact turn
+  // never reaches the event log with a circle id, so the circle-roster gate has no opinion on it, and without this a
+  // stranger who learns the id could paint "their app has it" on my bubble.
+  const sentTo = new Map();   // msgId → { contactId, peerAddr }
+  const rememberSentTo = (msgId, contactId, peerAddr) => {
+    if (typeof msgId !== 'string' || !msgId) return;
+    sentTo.set(msgId, { contactId: contactId ?? peerAddr ?? null, peerAddr: peerAddr ?? null });
+    if (sentTo.size > 2000) sentTo.delete(sentTo.keys().next().value);   // bounded: the oldest goes
+  };
+  /** The contact a turn of mine went to, or null (not mine, or not this boot). */
+  const contactOfMessage = (msgId) => (typeof msgId === 'string' && sentTo.get(msgId)) || null;
+  /**
+   * Whether, and inside which circle, a landed turn is answered with a receipt (see the landed hook for the why).
+   * `{ send: true }` plainly for a turn from the contact's canonical address; `{ send: true, circleId }` for a per-circle
+   * address the pair roster knows; `{ send: false }` for a per-circle address nothing explains.
+   */
+  const receiptScopeFor = async ({ who, fromAddr }) => {
+    if (typeof fromAddr !== 'string' || !fromAddr) return { send: false };
+    // Their CANONICAL address: the resolver binds no identity behind it (`identityOfAddress` returns a per-circle alias's
+    // person key, and the address itself otherwise). A per-circle address resolves to someone else.
+    if (resolveId(fromAddr) === fromAddr) return { send: true, circleId: null };
+    let known = null;
+    if (pair && typeof pair.rosterAddressesFor === 'function') {
+      try { known = await pair.rosterAddressesFor(who); } catch { known = null; }
+    }
+    if (known?.addresses?.has?.(fromAddr) && typeof known.circleId === 'string') return { send: true, circleId: known.circleId };
+    return { send: false };
+  };
   const noteHeardAsMessage = (fromAddr, messageId, extra) => {
     if (typeof messageId !== 'string' || !messageId) return;
     heardAsMessage.set(`${fromAddr}\n${messageId}`, extra);
@@ -251,7 +365,10 @@ export function createContactThreadChannel({
   function sendTurn({ peerAddr, threadId, text, messageId, replyTo, sender, floor, admission } = {}) {
     if (!peerAddr) throw new Error('contactThreadChannel.sendTurn: peerAddr is required');
     if (typeof sendToPeer !== 'function') throw new Error('contactThreadChannel: sendToPeer is required');
+    // answering a circle member who wrote first is choosing them: their held card goes into the book
+    const adopted = adoptMemberCard(peerAddr);
     const id = messageId ?? mkId();
+    rememberSentTo(id, threadId, peerAddr);
     // The pre-send floor: what a contact declared is applied HERE, the one place every shell's turn
     // passes, so nothing raw leaves the device for such a contact — and the durable copy below is the
     // redacted one, so the thread remembers what actually went out.
@@ -277,6 +394,9 @@ export function createContactThreadChannel({
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
     const sent = (async () => {
+      if (adopted) await adopted;   // the answer's card is in the book before the gate judges the send
+      // a person on the block list gets no direct message from this device: refused with its reason, nothing on the wire
+      if (typeof messageRequests?.isBlocked === 'function' && await blockedNow(resolveId(peerAddr), peerAddr)) return { held: false, delivered: false, refused: 'blocked', reason: 'blocked' };
       let self = null;
       if (typeof selfFor === 'function') { try { self = (await selfFor(peerAddr)) ?? null; } catch { self = null; } }
       if (self?.webid) {
@@ -310,15 +430,22 @@ export function createContactThreadChannel({
       if (typeof myCard === 'function' && (!self || self.personaId) && !cardSentTo.has(cardKey(peerAddr, self))) {
         try { const c = await myCard(self?.personaId ?? null); if (typeof c === 'string' && c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
       }
+      // A SHARED LINK'S TOKEN (L806): the contact came from a link they shared, so the first turn to them carries its
+      // one-time token, INSIDE THE SEAL ONLY (never in the clear), and the row drops it once the turn has left.
+      let linkToken = null;
+      if (typeof messageRequests?.linkTokenFor === 'function' && typeof sealFor === 'function') {
+        try { const tk = await messageRequests.linkTokenFor(peerAddr); linkToken = typeof tk === 'string' && tk ? tk : null; } catch { linkToken = null; }
+      }
+      let tokenSealed = false;
       // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
       // pair roster's material with it: an invite is a join secret).
       // (the seal is the self's: a persona's contact is sealed from the persona's person key — `sealFor` resolves it)
       if (typeof sealFor === 'function') {
         try {
-          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}), ...(envelope.extras.auth ? { auth: envelope.extras.auth } : {}) };
+          const content = { text: floored.text, ...(linkToken ? { linkToken } : {}), ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}), ...(envelope.extras.auth ? { auth: envelope.extras.auth } : {}) };
           const s = await sealFor(peerAddr, content);
           // Sealed: the code travels inside the box only (it admits whoever holds it), and the turn's proof with it.
-          if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; delete envelope.extras.auth; }
+          if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; delete envelope.extras.auth; tokenSealed = !!linkToken; }
         } catch { /* unsealed, as before */ }
       }
       const res = await core.deliver(envelope, {
@@ -327,6 +454,7 @@ export function createContactThreadChannel({
           : (self?.sendAs ? { sendOpts: { sendAs: self.sendAs } } : {})),
       });
       if (cardOnBoard) cardSentTo.add(cardKey(peerAddr, self));   // it left (delivered or held): they have it
+      if (tokenSealed && !res?.error) { try { await messageRequests.linkTokenSent?.(peerAddr); } catch { /* the next turn carries it again; the door lets the same opener on twice */ } }
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       // the fan carries a persona's contact to THAT persona's devices only (the agent's fan is per self)
@@ -360,7 +488,9 @@ export function createContactThreadChannel({
    *   forth: each hand-off looks like a fresh arrival to the other.
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
-  async function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice = false, returned: carriedReturned = false } = {}) {
+  async function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice = false, returned: carriedReturned = false, held: heldIn = null } = {}) {
+    // a turn the door held after a refusal says what it could not keep (`heldNote.js`), stored and carried with the turn
+    const held = heldNoteValid(heldIn);
     // THE TURN THAT BRINGS A HIDDEN CONTACT BACK IS MARKED AS SUCH (L106). Decided where the turn first lands
     // (the contact is hidden here as it arrives), and then carried with the turn — stored, fanned, rehydrated —
     // so every device paints the one-line marker above THIS bubble, whether the row there was unhidden by the
@@ -387,6 +517,7 @@ export function createContactThreadChannel({
         // device keeps them (full, or the description only — the file's own choice on Mij / My data).
         ...(file && typeof file === 'object' ? { file: fileToKeep(file) } : {}),
         ...(isReturn ? { returned: true } : {}),
+        ...(held ? { held } : {}),
       },
     };
     // Hold nothing, still carry: a device that does not keep contact turns fans the turn (bytes included) to
@@ -405,7 +536,23 @@ export function createContactThreadChannel({
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
-        await fanOwn({ direction: 'in', contactId: who, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}) });
+        await fanOwn({ direction: 'in', contactId: who, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}), ...(held ? { held } : {}) });
+        // …and the sender hears that it landed, the way a circle member does: the SAME receipt, the same per-person
+        // setting (the hook is `makeReceiptSender`'s `onStored`; it decides whether anything goes). Only a turn that
+        // came straight from them and carries their id — a carried copy or a duplicate confirms nothing new.
+        if (typeof messageId === 'string' && messageId && typeof landedHook === 'function') {
+          // The receipt goes back the way the turn came, or not at all. A turn from the contact's CANONICAL address
+          // (the address is the identity) is answered plainly. A turn from a PER-CIRCLE address of theirs is answered
+          // inside the pair circle — signed as my per-circle self, as a circle receipt is — when that address is on
+          // the pair circle's roster (any of their devices, not only the one my router would pick). An unscoped answer
+          // to a per-circle address is refused by their authorizer (measured 2026-11-07 on two web apps: "delivered",
+          // never applied) AND hands the relay the link canonical-me ↔ their per-circle address, which that address
+          // exists to withhold — so a per-circle address no pair roster explains gets NO receipt rather than that.
+          const scope = (await keptNow(who)) ? await receiptScopeFor({ who, fromAddr }) : { send: false };
+          if (scope.send) {
+            try { await landedHook({ msgId: messageId, fromPeerAddr: fromAddr, source: 'receiver', ...(scope.circleId ? { circleId: scope.circleId } : {}) }); } catch { /* best-effort, as the circle's */ }
+          }
+        }
       }
       return { ...res, ...(isReturn ? { returned: true } : {}) };
     });
@@ -427,6 +574,7 @@ export function createContactThreadChannel({
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
   function persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, file, viaOwnDevice = false } = {}) {
+    if (!viaOwnDevice) rememberSentTo(messageId, contactId, peerAddr);   // a sent file (the "+") is mine too; a sibling's carry is not this device's send
     const envelope = {
       id:     messageId ?? mkId(),
       kind:   subtypes.out,
@@ -466,7 +614,7 @@ export function createContactThreadChannel({
     const outbound = direction === 'out';
     const res = outbound
       ? await persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, file, viaOwnDevice: true })
-      : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true, returned: wire.returned === true });
+      : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true, returned: wire.returned === true, held: outbound ? null : heldNoteValid(wire.held) });
     return {
       contactId,
       origin:  outbound ? 'user' : 'bot',
@@ -474,6 +622,7 @@ export function createContactThreadChannel({
       itemId:  res?.itemId ?? null,
       text, messageId, replyTo, ts, buttons, file, fromAddr, peerAddr,
       ...(res?.returned === true ? { returned: true } : {}),
+      ...(!outbound && heldNoteValid(wire.held) ? { held: heldNoteValid(wire.held) } : {}),
       ...(!outbound && wire.message === true ? { message: true } : {}),
       ...(!outbound && wire.message === true && typeof wire.admission === 'string' ? { admission: wire.admission } : {}),
       ...(!outbound && wire.message === true && wire.auth && typeof wire.auth === 'object' ? { auth: wire.auth } : {}),
@@ -557,7 +706,7 @@ export function createContactThreadChannel({
   }
 
   function makeInboundHandler(subtype, cb) {
-    return async function onContactInbound(fromAddr, payload) {
+    return async function onContactInbound(fromAddr, payload, ctx = {}) {
       if (!payload || payload.subtype !== subtype) return;   // not ours
       if (typeof cb !== 'function') return;
       let text = payload.text ?? '';
@@ -568,6 +717,8 @@ export function createContactThreadChannel({
       let admission = typeof payload.admission === 'string' ? payload.admission : null;
       // A linked person's proof over this turn (their device's statement) — for a bot's door to check, never trusted here.
       let auth = payload.auth && typeof payload.auth === 'object' ? payload.auth : null;
+      // a shared link's one-time token: read from INSIDE the seal only (L806)
+      let linkToken = null;
       if (payload.sealed && typeof payload.sealed === 'object') {
         // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
         const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
@@ -578,6 +729,20 @@ export function createContactThreadChannel({
         if (typeof content.card === 'string') card = content.card;
         if (typeof content.admission === 'string') admission = content.admission;
         if (content.auth && typeof content.auth === 'object') auth = content.auth;
+        if (typeof content.linkToken === 'string' && content.linkToken) linkToken = content.linkToken;
+      }
+      // THE DOOR, before anything is kept: a sender the person did not choose is held as a request, and nothing below
+      // runs for them (no card into the book, no pair roster, no thread turn, no receipt)
+      if (messageRequests) {
+        const verdict = await decideAtDoor({ contactId: resolveId(fromAddr), fromAddr, text, card, messageId: payload.messageId ?? null, ts: Number.isFinite(payload.ts) ? payload.ts : null, to: ctx?.to ?? null, linkToken });
+        if (verdict !== 'known' && verdict !== 'member') { try { onDoor?.({ verdict }); } catch { /* a count never breaks a turn */ } return; }
+        // a circle member writing first: a thread, but NOT a contact until the person answers. Their card waits for that
+        // answer (bounded, in memory: a later turn carries it again); the pair roster is left until they are a contact.
+        if (verdict === 'member') {
+          if (card) memberCards.set(resolveId(fromAddr), { card, fromAddr });
+          while (memberCards.size > MEMBER_CARDS_MAX) memberCards.delete(memberCards.keys().next().value);
+          card = null; pairInvite = null; pairRequest = false;
+        }
       }
       // The sender's card — taken only when it names the person this message is from (the shell's read of the
       // address); the shell adds it to the book. Never on the thread; the words go on regardless.
@@ -610,5 +775,8 @@ export function createContactThreadChannel({
     };
   }
 
-  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, subtypes };
+  /** What runs when a contact's turn LANDS here (the shells hand it the delivery receipt sender). One; null unsets. */
+  function setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; }
+
+  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, knownSender, setLandedHook, contactOfMessage, subtypes };
 }

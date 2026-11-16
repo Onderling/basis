@@ -192,9 +192,8 @@ describe('conversationKindsRows — the admin control’s model (decision 3’s 
     expect(ask.next).toContain('offer');
   });
 
-  it('an admin MAY empty the conversation — unlike a reader, who cannot empty their own filter', () => {
-    // The admin decides what the circle IS; the reader decides what they look at. `chatFilterChips`
-    // refuses to produce an empty filter; this deliberately does not.
+  it('an admin MAY empty the conversation', () => {
+    // The admin decides what the circle IS; this deliberately allows an empty list.
     let list = resolveConversationKinds({ templateKind: 'neighbourhood' });
     for (const k of [...list]) {
       const row = conversationKindsRows({ circleSetting: list }).find((r) => r.kind === k);

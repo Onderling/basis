@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t, lang } from '../../core/localisation.js';
-import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
+import { removeMemberDoor, changeRoleDoor } from '../../../../basis/src/v2/governanceDoors.js';
 import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circleShare.js';
 // The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
 // through the SAME shared compute web's panel and both members tabs paint — one answer to "how is
@@ -34,7 +34,7 @@ import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import FaceView from './FaceView.js';
 import { rosterRowShown } from '../../../../basis/src/v2/circleViewAs.js';
 
-export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null, revealPolicyOf = null,
+export default function CircleAdminPanelScreen({ callSkill, agent = null, governance = null, groupId, onBack, onLeave = null, resolvePicture = null, revealPolicyOf = null,
   // what this circle shared out, and taking it back (the host binds them to this device's resolvers — `circlePods.js`):
   // `outboundFor()` → {shares, revocable} · `stopShare(share)` → reply · `revokeForRemoved(webid)` → the revoke tally
   outboundFor = null, stopShare = null, revokeForRemoved = null }) {
@@ -84,23 +84,22 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const removeConfirmed = useCallback(async (m) => {
     setNotice(null);
     try {
-      const r = await removeCircleMember({
-        agent, callSkill,
-        circleId: groupId,
-        memberWebid: m.webid,
-        memberStableId: m.stableId,
-      });
-      setNotice(r?.ok
-        ? t('circle.admin.removed', { name: rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t }) })
-        : t('circle.admin.refused'));
+      // THE DOOR (governanceDoors.js): a removal goes through this circle's rule for removing. Where any admin may, it
+      // is done at once (governance enacts the whole removal and leaves its trail); where the circle decides together,
+      // a proposal opens and nobody is removed yet.
+      const name = rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t });
+      const r = await removeMemberDoor({ governance, circleId: groupId, memberWebid: m.webid, actorRef: myWebid || null });
+      setNotice(r.outcome === 'done' ? t('circle.admin.removed', { name })
+        : r.outcome === 'proposed' ? t('circle.admin.remove_proposed', { name })
+          : t('circle.admin.refused'));
       // a removed member loses what this circle shared out (best-effort: the removal already stands)
-      if (r?.ok && m.webid && typeof revokeForRemoved === 'function') {
+      if (r.outcome === 'done' && m.webid && typeof revokeForRemoved === 'function') {
         const w = memberRevokeWords(await Promise.resolve(revokeForRemoved(m.webid)).catch(() => null));
         if (w) setNotice(t(w.key, w.params));
       }
     } catch { setNotice(t('circle.admin.refused')); }
     load();
-  }, [agent, callSkill, groupId, load, revokeForRemoved]);
+  }, [governance, myWebid, groupId, load, revokeForRemoved]);
   // a confirm first, as making someone an admin has (the op's own `ui.confirm`): a removal is one tap from a list
   const remove = useCallback((m) => runConfirmGate({
     request: removeMemberConfirm({ name: rosterRowShown(m, { viewerId: myWebid, policy: revealPolicy, t }), t }),
@@ -127,15 +126,15 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       execute: async () => {
         setNotice(null);
         try {
-          const r = await callSkill('pinboard', 'setMemberRole', {
-            groupId, memberWebid: m.webid, role: control.role,
-          });
-          setNotice(t(roleChangeNoticeWords(r, control).key, { name }));
+          // THE DOOR (governanceDoors.js): a role change follows this circle's settings rule; an admin stepping down
+          // from their own role goes at once
+          const r = await changeRoleDoor({ governance, callSkill, circleId: groupId, memberWebid: m.webid, role: control.role, actorRef: myWebid || null });
+          setNotice(r.outcome === 'proposed' ? t('circle.admin.role_proposed', { name }) : t(roleChangeNoticeWords(r.outcome === 'done' ? r.result : null, control).key, { name }));
         } catch { setNotice(t('circle.admin.refused')); }
         load();
       },
     });
-  }, [callSkill, groupId, load]);
+  }, [governance, callSkill, groupId, myWebid, load]);
   const postAnnounce = useCallback(async () => {
     const text = announce.trim(); if (!text) return;
     setAnnounce(''); setNotice(null);

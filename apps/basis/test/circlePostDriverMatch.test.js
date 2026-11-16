@@ -34,7 +34,8 @@ describe('circle-post → driver match→notify (#5)', () => {
     const { handler, events } = harness({ drivers: SAILING });
     await handler('peer.addr', { groupId: 'b', payload: { requestId: 'r2', text: 'cooking club', tags: ['cooking'], from: 'x' } });
     expect(events.find((e) => e.payload?.driverMatch)).toBeUndefined();
-    expect(events.some((e) => e.payload?.message?.includes('cooking'))).toBe(true);   // normal post notif still fires
+    // and no plain notification either: the post's landing entry is its one record on the log
+    expect(events).toEqual([]);
   });
 
   it('no drivers ⇒ no resonance check, and nothing is ingested (the post is already in the circle store)', async () => {

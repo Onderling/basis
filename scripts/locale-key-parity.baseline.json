@@ -2,7 +2,6 @@
   "web": [
     "circle.admin.saving",
     "circle.calendar.invited",
-    "circle.chatFilter.last_kind",
     "circle.contacts.added",
     "circle.contacts.deleted",
     "circle.contacts.lens.failed",
@@ -15,8 +14,6 @@
     "circle.join.offerings_default.hint",
     "circle.join.offerings_default.label",
     "circle.join.paste",
-    "circle.join.wizard.link.hint",
-    "circle.join.wizard.persona.hint",
     "circle.join.wizard.privacy.mesh_hint",
     "circle.join.wizard.reveal.hint",
     "circle.join.wizard.reveal.suggested",

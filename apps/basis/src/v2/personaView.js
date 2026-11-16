@@ -24,6 +24,9 @@
  * owns the shape.
  */
 
+import { firstContactRows, FIRST_CONTACT_CONTROLS } from './firstContact.js';
+
+const FIRST_CONTACT_KEYS = new Set(FIRST_CONTACT_CONTROLS.map((c) => c.key));
 import { attributeKeys, bucketsFor } from '@onderling/attribute-charter';
 import { isDriverValue, OFFERINGS_INHERIT_KEY, normalizeDriverKind, deriveOfferingCategory, OFFERINGS_TAXONOMY, AVAILABILITY_STATES, availabilityState, locationLabel, isPresentedAttributeKey } from '@onderling/agent-registry';
 
@@ -268,7 +271,8 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
   for (const p of list) {
     // a key with a leading underscore is a marker (no row): the offerings answer, a migration's note; and the handle is an
     // attribute the self's own statements present, never a disclosure choice (no row either)
-    for (const k of Object.keys(p.properties ?? {})) if (!k.startsWith('_') && !isPresentedAttributeKey(k) && !keyOrder.includes(k)) keyOrder.push(k);
+    // the first-contact choices are not rows: the card shows them as their own controls (firstContact.js)
+    for (const k of Object.keys(p.properties ?? {})) if (!k.startsWith('_') && !isPresentedAttributeKey(k) && !FIRST_CONTACT_KEYS.has(k) && !keyOrder.includes(k)) keyOrder.push(k);
   }
   const personaCards = list.map((p) => {
     const isDefault = p.id === defaultId;
@@ -280,7 +284,8 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
       // localised state token, not a raw `away`/`open`.
       return { key, state, value: displayValue(value), l10n: valueL10nFor(key) };
     });
-    return { id: p.id, name: (typeof p.name === 'string' && p.name) ? p.name : p.id, isDefault, entries };
+    // who may write to this persona first: its two first-contact controls (firstContact.js), with the values in force
+    return { id: p.id, name: (typeof p.name === 'string' && p.name) ? p.name : p.id, isDefault, entries, firstContact: firstContactRows(p) };
   });
 
   // ── 3 · per circle: who sees what ────────────────────────────────────────

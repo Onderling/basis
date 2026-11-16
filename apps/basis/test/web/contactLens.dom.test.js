@@ -48,18 +48,37 @@ describe('the lens form', () => {
 });
 
 describe('the thread header offers it', () => {
-  it('on a person\'s thread, beside Verbergen', () => {
+  it('on a person\'s thread: the avatar top right is who you are here, and its tap opens the lens', () => {
     const container = document.createElement('div');
     const onOpenLens = vi.fn();
-    renderContactThread(container, { name: 'Anne', messages: [], t: (k) => k, hidden: false, onToggleHidden: vi.fn(), onOpenLens });
-    container.querySelector('.cc-cthread__lens').click();
+    renderContactThread(container, { name: 'Anne', messages: [], t: (k, v) => (v ? `${k}:${v.name}` : k), hidden: false, onToggleHidden: vi.fn(), onOpenLens, self: { id: 'werk', name: 'Werk' } });
+    const me = container.querySelector('.cc-cthread__self');
+    expect(me.getAttribute('aria-label')).toBe('circle.contacts.self_here:Werk');
+    me.click();
     expect(onOpenLens).toHaveBeenCalled();
+  });
+
+  it('the ⋯ holds Verbergen and Verwijderen (with the note on hiding); closed until tapped', () => {
+    const container = document.createElement('div');
+    const onDelete = vi.fn();
+    renderContactThread(container, { name: 'Anne', messages: [], t: (k) => k, hidden: false, onToggleHidden: vi.fn(), onOpenLens: vi.fn(), onDelete });
+    const menu = container.querySelector('.cc-cthread__menu');
+    expect(menu.hidden).toBe(true);
+    expect([...menu.children].map((c) => c.className)).toEqual(['cc-cthread__hide', 'cc-cthread__hide-note', 'cc-btn cc-btn--danger cc-cthread__delete']);
+    container.querySelector('.cc-cthread__more').click();
+    expect(menu.hidden).toBe(false);
+    menu.querySelector('.cc-cthread__delete').click();
+    expect(onDelete).toHaveBeenCalled();
+    // the header carries no separate Hide, lens or Delete buttons any more
+    expect(container.querySelector('.cc-cthread__lens')).toBeNull();
+    expect([...container.querySelector('.cc-cthread__header').children].some((c) => c.classList?.contains('cc-cthread__hide'))).toBe(false);
   });
 
   it('not on a bot\'s thread (no hidden mark = not a person)', () => {
     const container = document.createElement('div');
     renderContactThread(container, { name: 'Bot', messages: [], t: (k) => k, hidden: null, onOpenLens: vi.fn() });
-    expect(container.querySelector('.cc-cthread__lens')).toBeNull();
+    expect(container.querySelector('.cc-cthread__self')).toBeNull();
+    expect(container.querySelector('.cc-cthread__more')).toBeNull();
   });
 });
 

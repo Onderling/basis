@@ -21,11 +21,31 @@ export const EMBED_TYPE_ICON = Object.freeze({
   'offer':          '🎁',
   'note':           '📝',
   'chat-message':   '💬',
+  'lend':           '🤝',
 });
 
 /** The locale key for a type's human label (renderer falls back to the raw type). */
 export function embedTypeLabelKey(type) {
   return `circle.embed.type.${type}`;
+}
+
+// A conversation row's `kind` as the stream carries it → the item type of the chip vocabulary above. The noticeboard
+// says 'ask' for what the item types call a 'request'; every other kind is already its type's own name.
+const ROW_KIND_TYPE = Object.freeze({ ask: 'request' });
+
+/**
+ * The small kind chip on an item in a circle's conversation (and wherever an item is listed away from its circle):
+ * the same icon and label as an embed chip of that type, so one item reads the same everywhere. Plain chat carries no
+ * chip, and a kind outside the vocabulary carries none either: a raw kind name is never painted.
+ *
+ * @param {string|null|undefined} kind  the row's `payload.kind`
+ * @returns {{type: string, icon: string, labelKey: string}|null}
+ */
+export function itemKindChip(kind) {
+  if (typeof kind !== 'string' || !kind || kind === 'message' || kind === 'chat-message') return null;
+  const type = ROW_KIND_TYPE[kind] ?? kind;
+  if (!Object.prototype.hasOwnProperty.call(EMBED_TYPE_ICON, type)) return null;
+  return { type, icon: EMBED_TYPE_ICON[type], labelKey: embedTypeLabelKey(type) };
 }
 
 // embed `type` → the screen surface that hosts that item (S6.B panel). Tapping a
@@ -91,4 +111,20 @@ function pickLabel(e) {
   if (typeof fromObj === 'string' && fromObj.trim()) return fromObj.trim();
   if (typeof e.label === 'string' && e.label.trim()) return e.label.trim();        // stored label
   return null;
+}
+
+/**
+ * What is new in a circle, as the small icons of the item-kind vocabulary, newest kind first: "💬 🙋". A plain chat line
+ * is the conversation's own icon; a kind outside the vocabulary is left out.
+ *
+ * @param {string[]} kinds
+ * @returns {string}
+ */
+export function newsKindIcons(kinds) {
+  const icons = [];
+  for (const k of Array.isArray(kinds) ? kinds : []) {
+    const icon = (k === 'chat-message' || k === 'message') ? EMBED_TYPE_ICON['chat-message'] : itemKindChip(k)?.icon;
+    if (icon && !icons.includes(icon)) icons.push(icon);
+  }
+  return icons.join(' ');
 }

@@ -70,10 +70,11 @@ describe('web ≡ mobile: all three renderers suppress the label the same way', 
   for (const [what, rel] of RENDERERS) {
     it(`${what} reads senderSelf and paints nothing for it`, () => {
       const src = readFileSync(new URL(rel, import.meta.url), 'utf8');
-      // `senderSelf ? null : (senderLabel ?? key)` — one shape, three files.
+      // `senderSelf ? null : (senderLabel ?? key)`, or the shared `labelShown` over the stamped three (the label, its
+      // key, the number an unnamed sender carries): one shape, three files.
       expect(src, `${what} should branch on senderSelf`).toMatch(/senderSelf\s*\n?\s*\?\s*null/);
       expect(src, `${what} should fall back to the STAMPED label, never a payload name`)
-        .toMatch(/senderLabel\s*\?\?\s*\(/);
+        .toMatch(/senderLabel\s*\?\?\s*\(|labelShown\(\{\s*primary:\s*row\?\.senderLabel,\s*primaryKey:\s*row\?\.senderLabelKey/);
       expect(src, `${what} must not read a name off the payload`).not.toMatch(/payload\??\.\s*senderDisplay/);
     });
   }

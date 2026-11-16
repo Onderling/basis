@@ -40,10 +40,13 @@ export const SENDER_AUTHORIZATION = Object.freeze({
 /**
  * The sender may speak here.
  * @param {string} reason  why — carried into diagnostics, never into a decision
- * @returns {{allow: true, reason: string}}
+ * @param {string} [bucket]  for traffic to one of the implementation's scoped addresses (a circle's), the same opaque
+ *   bucket a stale verdict would carry. It decides nothing about THIS sender; it lets `SecurityLayer` park, rather than
+ *   drop, an envelope to that address whose sender address has no key bound yet (see `SENDER_STALE`).
+ * @returns {{allow: true, reason: string, bucket?: string}}
  */
-export function allowSender(reason) {
-  return { allow: true, reason: String(reason ?? 'allowed') };
+export function allowSender(reason, bucket) {
+  return { allow: true, reason: String(reason ?? 'allowed'), ...(typeof bucket === 'string' && bucket ? { bucket } : {}) };
 }
 
 /**
@@ -53,6 +56,18 @@ export function allowSender(reason) {
  */
 export function refuseSender(reason) {
   return { allow: false, reason: String(reason ?? 'refused') };
+}
+
+/**
+ * The sender cannot be vouched for YET: the implementation's snapshot may be behind (a roster not read, a member not on
+ * the roster that was read). `SecurityLayer` turns this into a `SENDER_STALE` refusal carrying `bucket`, an opaque
+ * handle the HOST uses to hold the envelope and judge it again once its snapshot is fresher. The kernel never reads it.
+ * @param {string} reason
+ * @param {string} bucket
+ * @returns {{allow: false, stale: true, reason: string, bucket: string}}
+ */
+export function staleSender(reason, bucket) {
+  return { allow: false, stale: true, reason: String(reason ?? 'stale'), bucket: String(bucket ?? '') };
 }
 
 /**
@@ -86,5 +101,7 @@ export function askSenderAuthorizer(authorizer, context) {
     return refuseSender(SENDER_AUTHORIZATION.AUTHORIZER_UNCLEAR);
   }
   if (typeof verdict.allow !== 'boolean') return refuseSender(SENDER_AUTHORIZATION.AUTHORIZER_UNCLEAR);
-  return verdict.allow ? allowSender(verdict.reason) : refuseSender(verdict.reason);
+  if (verdict.allow) return allowSender(verdict.reason, typeof verdict.bucket === 'string' ? verdict.bucket : undefined);
+  if (verdict.stale === true && typeof verdict.bucket === 'string' && verdict.bucket) return staleSender(verdict.reason, verdict.bucket);
+  return refuseSender(verdict.reason);
 }

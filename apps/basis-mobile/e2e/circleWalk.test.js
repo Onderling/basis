@@ -33,6 +33,8 @@ describe('a circle made on the phone, and its invite, settings and admin', () =>
     if (hasHandle) {
       await element(by.id('wizard-handle')).replaceText('frits');   // no keyboard opens, so no Back (it would close the wizard)
     }
+    // the kind, asked on the first step (never assumed): its own words in the picker
+    await tapSoon(by.text('Household').withAncestor(by.id('create-group-kind')), 20_000);
     // steps 2–5, then Review → Create
     for (let i = 0; i < 6; i += 1) {
       if (await isVisible(by.id('create-group-create'))) break;

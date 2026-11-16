@@ -60,15 +60,18 @@ describe('Canonical types — registration via default registry', () => {
       'media',
       'membership-code',
       'membership-redemption',
+      'message-request',
       'neighbourhood-job',
       'note',
       'offer',
       'post-answers',
+      'read-marks',
       'removed-entry',
       'removed-list',
       'request',
       'reveal-request',
       'rsvp',
+      'shared-card',
       'shared-ref',
       'task',
       'view',
@@ -132,6 +135,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'membership-code':   { source: { groupId: 'g-1', code: 'abc-123' } },
     // Who answered one of my posts: which post.
     'post-answers':      { source: { itemId: 'i-1', responders: [] } },
+    // What I read in one circle or conversation: which group, the ids read with their source times.
+    'read-marks':        { group: 'c-1', read: [{ id: 'm-1', at: 1 }], prunedBefore: 0 },
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
     // A row of a circle's roster trail: which circle, who redeemed.
     'membership-redemption': { source: { groupId: 'g-1', redeemedBy: 'pk-bram' } },

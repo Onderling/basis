@@ -1,0 +1,33 @@
+/**
+ * WHO MAY WRITE TO THIS PERSONA FIRST (Frits 2026-11-12: "the persona can be the policy itself"). `request`: a first
+ * message from someone the persona did not choose is held as a message request; `open`: anyone may write, within the
+ * stranger budgets. Kept as the profile's own property `firstMessages`, so it is one of the profile's FACTS and reaches
+ * every device of the person by the facts carry, and no preset releases it (a preset releases only the keys it lists).
+ * Absent: a function profile's is `open` (a bot takes anyone's first word, its own door admits), a person's is
+ * `request`. One mechanism for both: a bot is a persona whose door is open.
+ */
+export const FIRST_MESSAGE_POLICIES = Object.freeze(['request', 'open']);
+/** The profile property that holds the policy. */
+export const FIRST_MESSAGES_KEY = 'firstMessages';
+
+/** The policy a registry entry stands for: its own property, else what its kind implies. */
+export function firstMessagesOf(entry) {
+  const own = entry?.properties?.[FIRST_MESSAGES_KEY];
+  const v = own && typeof own === 'object' && own.mode === 'own' ? own.value : undefined;
+  if (FIRST_MESSAGE_POLICIES.includes(v)) return v;
+  return entry?.kind === 'function' ? 'open' : 'request';
+}
+
+/**
+ * "PEOPLE IN MY CIRCLES MAY WRITE TO ME" (Frits 2026-11-12): a member of one of THIS persona's circles may write to it
+ * privately and gets a thread (not a contact row: they become a contact when the person answers). Off: their first
+ * private message is a request like anyone's. The profile's own property `circleMembersMayWrite`, a boolean; absent: ON.
+ */
+export const CIRCLE_MEMBERS_KEY = 'circleMembersMayWrite';
+
+/** Whether a registry entry's persona lets its circle members write first: its own property, else on. */
+export function circleMembersMayWriteOf(entry) {
+  const own = entry?.properties?.[CIRCLE_MEMBERS_KEY];
+  const v = own && typeof own === 'object' && own.mode === 'own' ? own.value : undefined;
+  return v === false ? false : true;
+}

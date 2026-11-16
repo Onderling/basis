@@ -1155,6 +1155,16 @@ The governance exception: only a decision OPENING (`propose`) may wake. An indiv
 routine, and a circle that buzzes on every vote gets muted — after which the decision that mattered is
 missed anyway.
 
+### `isMirroredKind`
+
+**Kind:** function · **Import:** `isMirroredKind` from `'@onderling/item-store'`
+
+```js
+isMirroredKind(kind)
+```
+
+Does the person's own history mirror (and its export) keep this kind? (`mirrored` on the kind; an unknown kind: yes.)
+
 ## `src/errors.js`
 
 ### `ItemNotFoundError`

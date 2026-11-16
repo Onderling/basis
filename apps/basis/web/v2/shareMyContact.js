@@ -13,13 +13,16 @@
  * @param {string|null} a.payload   the `onderling-contact://…` card, or null when none could be made
  * @param {string|null} a.link      the clickable form, or null when the app has no http(s) url (a file:// dev shell)
  * @param {string|null} [a.qr]      what the QR encodes — the link when there is one, else the code (the loader decides)
+ * @param {string|null} [a.linkState] the link's state in words ("Not used yet" / "Used on 14 Nov"), from the shared
+ *   `sharedLinkWords`; null says nothing
+ * @param {(() => void)|null} [a.onWithdraw] "Withdraw this link"; absent when the link carries no token
  * @param {Function} a.t
  * @param {() => void} a.onBack
  */
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { CONTACT_QR } from '../../src/v2/contactCardLink.js';
 
-export function renderShareMyContact(container, { payload = null, link = null, qr = null, t, onBack } = {}) {
+export function renderShareMyContact(container, { payload = null, link = null, qr = null, linkState = null, onWithdraw = null, t, onBack } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'shareMyContact.js');
   container.innerHTML = '';
@@ -109,5 +112,20 @@ export function renderShareMyContact(container, { payload = null, link = null, q
   };
   container.appendChild(copyRow('cc-share__code', payload, tr('circle.shareContact.code_label')));
   if (link) container.appendChild(copyRow('cc-share__link', link, tr('circle.shareContact.link_label')));
+  // the link's state and its withdraw (a shared link lets its first opener write directly; L806)
+  if (link && linkState) {
+    const st = document.createElement('p');
+    st.className = 'cc-share__state';
+    st.textContent = linkState;
+    container.appendChild(st);
+  }
+  if (link && typeof onWithdraw === 'function') {
+    const w = document.createElement('button');
+    w.type = 'button';
+    w.className = 'cc-share__withdraw cc-btn cc-btn--quiet';
+    w.textContent = tr('circle.shareContact.link_withdraw');
+    w.addEventListener('click', () => { w.disabled = true; onWithdraw(); });
+    container.appendChild(w);
+  }
   return container;
 }

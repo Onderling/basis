@@ -43,29 +43,28 @@ async function buildAgent({ members } = {}) {
 // ── Handle validation ─────────────────────────────────────────────────────
 
 describe('validateHandle — pure rules', () => {
-  it('accepts lowercase letters / digits / - / _ within 3..32 chars', () => {
-    for (const h of ['anne', 'oosterpoort-bird-23', 'a_b', 'klusclub_handyman_2026']) {
+  it('accepts a name as people write it: letters, spaces, capitals, 1..40 chars', () => {
+    for (const h of ['anne', 'Anne van Dijk', 'Émile', 'J', 'oosterpoort-bird-23', 'a'.repeat(40)]) {
       expect(validateHandle(h)).toEqual({ ok: true, handle: h });
     }
   });
 
-  it('lowercases the input', () => {
-    expect(validateHandle('Anne-Van-Dijk')).toEqual({ ok: true, handle: 'anne-van-dijk' });
+  it('keeps the name as typed, trimmed', () => {
+    expect(validateHandle('  Anne-Van-Dijk ')).toEqual({ ok: true, handle: 'Anne-Van-Dijk' });
   });
 
   it('strips a leading @', () => {
     expect(validateHandle('@anne')).toEqual({ ok: true, handle: 'anne' });
   });
 
-  it('rejects too-short / too-long', () => {
-    expect(validateHandle('an')).toEqual({ ok: false, reason: 'too-short' });
-    expect(validateHandle('a'.repeat(33))).toEqual({ ok: false, reason: 'too-long' });
+  it('rejects empty / too-long', () => {
+    expect(validateHandle('   ')).toEqual({ ok: false, reason: 'too-short' });
+    expect(validateHandle('a'.repeat(41))).toEqual({ ok: false, reason: 'too-long' });
   });
 
-  it('rejects whitespace + invalid chars', () => {
-    expect(validateHandle('anne dijk').ok).toBe(false);
-    expect(validateHandle('anne!').ok).toBe(false);
-    expect(validateHandle('anne.dijk').ok).toBe(false);
+  it('rejects control characters', () => {
+    expect(validateHandle('anne\u0007').ok).toBe(false);
+    expect(validateHandle('an\nne').ok).toBe(false);
   });
 
   it('rejects non-strings', () => {
@@ -74,9 +73,8 @@ describe('validateHandle — pure rules', () => {
   });
 
   it('exposes the rules constants for UI hints', () => {
-    expect(HANDLE_RULES.minLen).toBe(3);
-    expect(HANDLE_RULES.maxLen).toBe(32);
-    expect(typeof HANDLE_RULES.pattern).toBe('string');
+    expect(HANDLE_RULES.minLen).toBe(1);
+    expect(HANDLE_RULES.maxLen).toBe(40);
   });
 });
 
@@ -92,7 +90,7 @@ describe('Pinboard V1 — setMyHandle / setMyDisplayName', () => {
 
   it('setMyHandle rejects invalid input and does NOT mutate', async () => {
     const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'setMyHandle', { handle: 'an' });
+    const r = await callSkill(bundle.agent, 'setMyHandle', { handle: '   ' });
     expect(r.error).toBe('invalid-handle');
     expect(r.reason).toBe('too-short');
     expect((await callSkill(bundle.agent, 'whoAmI')).handle).toBe(null);

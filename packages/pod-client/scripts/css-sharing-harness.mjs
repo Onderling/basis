@@ -78,7 +78,7 @@ async function main() {
   const base = `http://localhost:${port}/`;
   log(`booting CSS (${CSS_CONFIG}) at ${base}`);
   css = spawn('npx', [
-    '-y', '@solid/community-server@^7',
+    '-y', '@solid/community-server@7.2.0',
     '-c', CSS_CONFIG,
     '-f', dataDir, '-p', String(port), '-b', base, '-l', 'error',
   ], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });

@@ -61,7 +61,10 @@ async function makeFactory(opts = {}) {
 /* ─── US-1 — Harassment workflow ─────────────────────── */
 
 describe('US-1 — Alice mutes a harasser', () => {
-  it('refuses to send to Bob after Alice mutes him', async () => {
+  // A block is about DIRECT contact (Frits 2026-11-12): the secure agent keeps the list and answers `covers`; the app's
+  // direct doors and direct send ask it (blockIsDirectOnly.relay.test.js walks that end to end). So these journeys pin
+  // what this layer still owes: the list holds, covers the person, and survives a reload.
+  it('Alice\'s block covers Bob (what her direct doors and direct send ask)', async () => {
     const alice = await makeFactory();
     // (We don't need a connected transport to verify the SEND-side
     // refusal — the factory exposes `sa.mute` as the source of truth.)
@@ -79,9 +82,8 @@ describe('US-1 — Alice mutes a harasser', () => {
     });
     await a2.peer.connect();
     await a2.mute.add('app.bob.harasser');
-    await expect(
-      a2.peer.sendTo('app.bob.harasser', { body: 'please stop' })
-    ).rejects.toThrow(/muted/);
+    expect(await a2.mute.covers('app.bob.harasser')).toBe(true);
+    expect(await a2.mute.covers('app.carol.friend')).toBe(false);
   });
 
   it('audit log records the mute event Alice can later prove she made', async () => {
@@ -98,7 +100,7 @@ describe('US-1 — Alice mutes a harasser', () => {
     expect(alice.audit.verify()).toEqual({ ok: true });
   });
 
-  it('Alice\'s mute survives a "page reload" — sendTo still refuses', async () => {
+  it('Alice\'s block survives a "page reload": it still covers Bob', async () => {
     const sharedVault = new VaultMemory();
     const fakeNkn1    = makeFakeNknSelf('app.alice.test');
     const a1 = await createSecureAgent({
@@ -116,11 +118,8 @@ describe('US-1 — Alice mutes a harasser', () => {
     await a2.peer.connect();
     // Precondition: mute set restored.
     expect(a2.mute.has('app.bob.harasser')).toBe(true);
-    // The user-experience claim — sendTo still throws — verified
-    // directly through the post-reload factory, not inferred.
-    await expect(
-      a2.peer.sendTo('app.bob.harasser', { body: 'across the reload' })
-    ).rejects.toThrow(/muted/);
+    // what the direct doors ask, through the post-reload factory
+    expect(await a2.mute.covers('app.bob.harasser')).toBe(true);
   });
 });
 
@@ -312,7 +311,7 @@ describe('US-5 — Muting Bob by webid blocks him across devices', () => {
     // Aliases for that addr include the original webid → mute hits.
     const aliases = await alice.resolver.aliasesFor('app.bob.rotated');
     expect(aliases).toContain('https://bob.example/#me');
-    // sendTo to the new addr refuses because the alias matches mute:
+    // the block made by webid covers the new address (what the direct doors ask):
     const fakeNkn = makeFakeNknSelf('app.alice');
     const aliceWithPeerAddr = await createSecureAgent({
       vault:            new VaultMemory(),
@@ -322,9 +321,7 @@ describe('US-5 — Muting Bob by webid blocks him across devices', () => {
     await aliceWithPeerAddr.peer.connect();
     aliceWithPeerAddr.agent.security.registerPeer('app.bob.rotated', bobNewPubKey);
     await aliceWithPeerAddr.mute.add('https://bob.example/#me');
-    await expect(
-      aliceWithPeerAddr.peer.sendTo('app.bob.rotated', { body: 'no' })
-    ).rejects.toThrow(/muted/);
+    expect(await aliceWithPeerAddr.mute.covers('app.bob.rotated')).toBe(true);
   });
 });
 

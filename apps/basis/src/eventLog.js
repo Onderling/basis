@@ -24,6 +24,10 @@ import { matchesFilter } from './filter.js';
 import {
   ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, RETENTION_DEFAULTS,
 } from '@onderling/item-store';
+import { log } from '@onderling/logger';
+
+/** Types already said to be unregistered (once per type per process: the log names a fact once). */
+const UNREGISTERED_SAID = new Set();
 
 /**
  * Per-CLASS retention defaults (one-log step D). "Retention of what?" is the right question — one number
@@ -156,6 +160,9 @@ export function circleOfEntry(e) {
   return e?.circleId ?? e?.payload?.circleId ?? null;
 }
 
+/** The index key of one lane: a type in one circle. */
+const laneKey = (type, circleId) => `${type}\u0000${circleId ?? ''}`;
+
 /**
  * Build a SILENT system entry (pure — no append). Typed entry carrying a
  * first-class `circleId`, the `silent:true` marker, `app:'system'`, and
@@ -227,9 +234,24 @@ export function makeAgentTrailEntry({
   });
 }
 
+/**
+ * When an entry arrived on THIS device: its `landedAt`, else (an entry from before the field) its `ts`. What a
+ * seen-mark and "new" compare; the sender's `ts` stays what a bubble shows and a conversation orders by.
+ *
+ * @param {object} e  a logged entry
+ * @returns {number}
+ */
+export const landedTimeOf = (e) => (typeof e?.landedAt === 'number' ? e.landedAt : (typeof e?.ts === 'number' ? e.ts : 0));
+
 export class EventLog {
   /** @type {LoggedEvent[]} most-recent first */
   #events;
+  /** Bumped by EVERY change to `#events` (append, prune, retention, purge, forget, compact, hydrate, a summary fold):
+   *  the index below is current only while its version equals this. */
+  #version = 0;
+  /** THE INDEX: entries by (type, circle) and by id, most-recent-first like the log; rebuilt lazily when the version
+   *  moved, updated in place only on a plain append. A lane read then costs its lane, not a copy of the whole log. */
+  #idx = null;
   /** @type {(events: LoggedEvent[]) => Promise<void>} */
   #persist;
   /** @type {() => number} */
@@ -299,18 +321,39 @@ export class EventLog {
   append(event) {
     if (!event || typeof event !== 'object') return undefined;
     if (typeof event.id !== 'string' || event.id === '') return undefined;
-    // De-dup on the caller's id.
-    const existing = this.#events.findIndex((e) => e.id === event.id);
+    // De-dup on the caller's id (the index answers whether it is there; only a re-append looks for its place)
+    const existing = this.#index().byId.has(event.id) ? this.#events.findIndex((e) => e.id === event.id) : -1;
+    // When THIS device first held the entry: kept across a re-append (a re-delivery is not a second arrival)
+    let landedAt = null;
     if (existing !== -1) {
       // Invariant 4b: an auditable entry is immutable once written. Return the ORIGINAL so a caller that
       // reads the result still gets a truthful entry rather than the version it hoped to write.
       if (isAuditKind(event.type)) return this.#events[existing];
+      landedAt = this.#events[existing].landedAt ?? null;
       this.#events.splice(existing, 1);
+      this.#changed();
     }
-    // Most-recent first. `seq` is ours: strip any caller-supplied one before stamping.
-    const { seq: _ignored, ...rest } = event;
-    const stored = { ...rest, seq: (this.#seq += 1) };
+    // Most-recent first. `seq` and `landedAt` are ours: strip any caller-supplied ones before stamping. The sender's
+    // `ts` stays as given (when it was said); `landedAt` is this device's clock (when it arrived here), which is what
+    // "new since I looked" compares, so a line the relay held for hours still counts once it lands.
+    const { seq: _ignored, landedAt: _theirs, ...rest } = event;
+    // a type the entry-kind table does not know is plumbing by default (never mirrored, never wakes): say so once, so
+    // the next one gets declared rather than silently treated as the conservative unknown
+    if (typeof event.type === 'string' && !(event.type in ENTRY_KINDS) && !UNREGISTERED_SAID.has(event.type)) {
+      UNREGISTERED_SAID.add(event.type);
+      log.warn('event-log', 'kind.unregistered', { type: event.type });
+    }
+    const stored = { ...rest, landedAt: landedAt ?? this.#now(), seq: (this.#seq += 1) };
+    const current = this.#idx && this.#idx.version === this.#version;
     this.#events.unshift(stored);
+    this.#changed();
+    if (current) {   // a plain append keeps the index: the new entry goes first in its lane, as in the log
+      this.#idx.byId.set(stored.id, stored);
+      const key = laneKey(stored.type, circleOfEntry(stored));
+      const lane = this.#idx.byLane.get(key);
+      if (lane) lane.unshift(stored); else this.#idx.byLane.set(key, [stored]);
+      this.#idx.version = this.#version;
+    }
     this.prune();
     // Persist async — caller doesn't await.
     this.#persist(this.#events.slice()).catch(() => {});
@@ -348,7 +391,7 @@ export class EventLog {
    * @returns {number}
    */
   setRetention(patch = {}) {
-    for (const k of ['short', 'chat', 'audit']) {
+    for (const k of ['short', 'chat', 'audit', 'room']) {
       if (typeof patch?.[k] === 'number' && patch[k] >= 0) this.#retention[k] = patch[k];
     }
     const dropped = this.prune();
@@ -376,6 +419,7 @@ export class EventLog {
     if (typeof olderThanMs !== 'number' || !Number.isFinite(olderThanMs) || olderThanMs < 0) return 0;
     const cutoff = this.#now() - olderThanMs;
     const before = this.#events.length;
+    this.#changed();
     this.#events = this.#events.filter((e) => !(
       PURGEABLE_KINDS.has(e.type)
       && e.ts <= cutoff
@@ -400,6 +444,7 @@ export class EventLog {
     if (typeof circleId !== 'string' || !circleId) return 0;
     const before = this.#events.length;
     this.#events = this.#events.filter((e) => circleOfEntry(e) !== circleId);
+    this.#changed();
     const dropped = before - this.#events.length;
     if (dropped) this.#persist(this.#events.slice()).catch(() => {});
     return dropped;
@@ -422,6 +467,7 @@ export class EventLog {
     const set = new Set(ids ?? []);
     if (set.size === 0 || typeof transform !== 'function') return 0;
     let changed = 0;
+    this.#changed();
     this.#events = this.#events.map((e) => {
       if (!set.has(e.id)) return e;
       const next = transform(e);
@@ -470,6 +516,7 @@ export class EventLog {
       if (cls === 'audit') fold.push(e);   // past the detail window → compact, don't drop
       // short/chat past their window: dropped.
     }
+    if (keep.length !== this.#events.length) this.#changed();   // keep is a subsequence: same length = unchanged
     this.#events = keep;
     for (const e of fold) this.#foldIntoSummary(e);
     return before - this.#events.length;
@@ -511,6 +558,7 @@ export class EventLog {
     };
     if (idx !== -1) this.#events[idx] = summary;
     else this.#events.unshift(summary);
+    this.#changed();
   }
 
   /**
@@ -531,6 +579,8 @@ export class EventLog {
     if (opts.filter) result = result.filter((e) => matchesFilter(e, opts.filter));
     if (typeof opts.since === 'number') result = result.filter((e) => e.ts >= opts.since);
     if (typeof opts.until === 'number') result = result.filter((e) => e.ts <= opts.until);
+    // by ARRIVAL here (`landedAt`), not by the sender's time: a line said long ago and delivered now is inside the bound
+    if (typeof opts.landedSince === 'number') result = result.filter((e) => landedTimeOf(e) >= opts.landedSince);
     if (opts.excludeMuted) {
       result = result.filter((e) => !this.#mutedKeys.has(`${e.app}:${e.type}`));
     }
@@ -540,6 +590,42 @@ export class EventLog {
 
   /** Total events currently in the log (post-prune). */
   get size() { return this.#events.length; }
+
+  /** A number that changes whenever the log does: a reader may keep what it derived from the log while it is unchanged. */
+  get version() { return this.#version; }
+
+  /**
+   * The entries of one TYPE in one circle (the circle as `circleOfEntry` reads it), most-recent-first, from the index:
+   * the same entries, in the same order, as `query({})` filtered by type and circle, without copying the whole log.
+   * @param {string} type
+   * @param {string|null} circleId
+   * @returns {LoggedEvent[]}
+   */
+  entriesOf(type, circleId) {
+    return (this.#index().byLane.get(laneKey(type, circleId)) ?? []).slice();
+  }
+
+  /** The entry with this id, or null. */
+  entryById(id) {
+    return this.#index().byId.get(id) ?? null;
+  }
+
+  #changed() { this.#version += 1; }
+
+  #index() {
+    if (this.#idx && this.#idx.version === this.#version) return this.#idx;
+    const byLane = new Map();
+    const byId = new Map();
+    for (const e of this.#events) {
+      if (!e) continue;
+      if (!byId.has(e.id)) byId.set(e.id, e);
+      const key = laneKey(e.type, circleOfEntry(e));
+      const lane = byLane.get(key);
+      if (lane) lane.push(e); else byLane.set(key, [e]);
+    }
+    this.#idx = { version: this.#version, byLane, byId };
+    return this.#idx;
+  }
 
   /**
    * Subscribe to new appended events.
@@ -567,6 +653,7 @@ export class EventLog {
       if (!e || typeof e.id !== 'string' || e.id === '' || have.has(e.id)) continue;
       const { seq: _ignored, ...rest } = e;
       this.#events.unshift({ ...rest, seq: (this.#seq += 1) });
+      this.#changed();
       have.add(e.id);
       loaded += 1;
     }

@@ -21,6 +21,13 @@
 /** A seam: what it is, why every shell needs it, and the text that proves a shell composes it. `shells` narrows a
  *  seam to the shells it applies to (a view seam has no meaning on the box) — with the reason beside it. */
 export const SEAMS = Object.freeze([
+  // The own-device asks below (grants, known peers, person key, profile facts, own store, primary device) are composed
+  // ONCE by the shared start queue's list (`startQueueSiblings`, startQueue.js), which names each of them; a shell that
+  // hands that list to the queue composes all six.
+  // THE START QUEUE: what a device pulls after it starts (every lane's catch-up, every own-device ask) runs as one
+  // queue in shared code, the circle on screen first and one step at a time. Each shell had its own dozen timers, all
+  // firing at once over every circle, in the window where the person first taps (the cold-start freeze on a phone).
+  { id: 'start-queue', pattern: /runStartQueue\(/, why: 'a start must pull in one order, one step at a time, the circle on screen first — never a burst of timers over every circle' },
   // PRESENCE ONLY WHERE THE PERSON STILL IS: every shell registers its per-circle addresses on the relay from a union
   // of lists (the substrate's, a cached one, a just-joined circle); a circle the fold says was left or removed is taken
   // out by one shared filter. Web and mobile kept a cached list that put a left circle back on the next socket.
@@ -47,7 +54,32 @@ export const SEAMS = Object.freeze([
   // WHICH SELF A SCREEN IS PAIRED FOR: a persona issues its grants as itself, so on a device holding several selves the
   // pairing form asks (the active self preselected) — the shared decision is `connectionSelfChoice`. The box pairs no
   // screen through a form.
+  // A BANNER FOR WHAT IS NOW ON SCREEN GOES AWAY: the shared banner driver raises a notice on any screen; when the person
+  // then opens that thread or circle another way, the shell asks the driver to recheck, or the banner lies over the
+  // opened screen's header (found walking the phone, 2026-11-14: a tap on the thread's ⋯ landed on it). The box paints no
+  // banner, so the seam is web and mobile only.
+  { id: 'banner-recheck-on-open', pattern: /\.recheck\(\)/, shells: ['web', 'mobile'], why: 'a banner raised before its thread or circle was opened stays over the header of that screen and takes the taps meant for it' },
+  // THE SCREEN DOOR in the app: a pasted or scanned screen offer reaches the grant only through the shared pairing (three
+  // codes, one pick). The box has no pairing UI: its door is the household bot's (`botScreens`), which composes the same
+  // screen door (`screenDoor.js`).
+  { id: 'screen-pairing-door', pattern: /createAppScreenPairing\(/, shells: ['web', 'mobile'], why: 'without it a pasted screen offer could be granted without the person picking the code their screen shows' },
+  // WHAT WAS BUILT FROM A CIRCLE'S POLICY GOES WHEN ITS POD OR POSTURE CHANGES: a shell that keeps a producer, a seal
+  // strategy or a media composition per circle subscribes to the policy store's change. The box builds none of them.
+  { id: 'policy-change-drops-producer', pattern: /onPolicyPostureChange\(/, shells: ['web', 'mobile'], why: 'a producer built on half a policy (a pod still at its default) outlives the real one, and a shared-pod member never finds the circle\'s pod' },
   { id: 'connection-self-choice', pattern: /connectionSelfChoice\(/, shells: ['web', 'mobile'], why: 'without it a device holding two selves cannot pair a screen at all (the grant is refused self-required) or pairs it as the wrong self' },
+  // A NEW MEMBER IS NAMED AS THEIR FIRST LINE LANDS: a sender the roster cannot place yet (one this device admitted, a
+  // first line ahead of the membership) makes the shell read the roster once more; the box paints no bubbles
+  // A SEALED CIRCLE'S PRODUCER WAITS FOR THE KEY PAIR: a page or app that asks for a circle's producer before its agent
+  // is up gets none (no stand-in key), and the shell builds it when the agent binds. The box builds no circle producer.
+  // THE KEY'S AUDIENCE FOLLOWS THE MEMBERSHIP: after a producer's roster seed and after each membership event the
+  // router handles, one audience round on the key owner's device takes out a holder the lane places out. The box builds
+  // no circle producer.
+  { id: 'key-audience-check', pattern: /runKeyAudienceCheck\(/, shells: ['web', 'mobile'], why: 'a member whose removal was lost would keep the circle key for good: nothing else compares the key file with the membership' },
+  // THE POD READ-BACK ON OPENING AND ON COMING TO THE FRONT: a pod circle's messages wait on its pod; reading them back
+  // only once per start left a device that missed that moment with nothing. The box holds circles by relay catch-up.
+  { id: 'pod-read-back', pattern: /createPodReadBack\(/, shells: ['web', 'mobile'], why: 'a device whose one read-back at start found the pod out of reach read none of its pod circles\' messages until the next start' },
+  { id: 'producer-waits-for-key-pair', pattern: /createProducerKeyWait\(/, shells: ['web', 'mobile'], why: 'a producer built before the agent opened the circle key with a random key nobody wrapped to, and kept it for the page\'s life: the member could not read the shared pod' },
+  { id: 'roster-reread-for-unplaced-sender', pattern: /sendersToPlace\(/, shells: ['web', 'mobile'], why: 'without it a member who has just joined shows as "Onbekend lid" on their first line until the circle is reopened' },
   { id: 'second-persona-join-refusal', pattern: /profileIdOf(?:: |=\{)\(cid\)/, shells: ['web', 'mobile'], why: 'without the host\'s persona-of-circle reader the wizard cannot say before the submit that the person is already in the circle as another persona' },
   // A SCREEN'S DATA IS A HEAD: Vandaag's blocks kept current by the circles' changes and the event log (`screenHead.js`),
   // so a tab landing on a fresh head reads nothing. A shell that materialized per landing paid the whole read every time
@@ -58,8 +90,15 @@ export const SEAMS = Object.freeze([
   // A RE-KEY MOVES THE PERSON'S CIRCLE ADDRESSES: the revoke ceremony switches to the next circle root and waits while
   // the host registers the new addresses on its relays — a shell that does not is unreachable at them.
   { id: 'circle-root-moved-reregisters', pattern: /onCircleRootMoved\?\.\(/, why: 'after a re-key the person is unreachable at the new circle addresses' },
+  // WHICH RELAY EACH CIRCLE RIDES, handed to the agent: it scopes a circle's sends AND, after a restart, reopens each
+  // persona's own socket at its circles' points. Web and mobile passed it; the box did not, so a box holding a persona's
+  // circle would be silent there after a restart (found 2026-11-13 with the phone's personas walk; Fable's review).
+  { id: 'circle-points-for', pattern: /circlePointsFor: \(/, why: 'without it a persona\'s circle has no socket of its own after a restart: its lines wait and nothing addressed to it arrives' },
   // THE RELAY TRAVELS WITH THE CARD: a device with no relay of its own adopts the point a scanned contact card brings, saved so
   // a restart reconnects to it, and says whose it now uses. Before, it dialled the card's relay only at the first send, unsaid.
+  // READ ON ONE DEVICE = READ ON ALL: a shell that paints news (circle tiles, Today, the contact badges) holds the one
+  // read set and marks what is opened, so a message read on the phone is not news on the laptop. The box paints none.
+  { id: 'read-marks-across-devices', pattern: /createReadMarks\(/, shells: ['web', 'mobile'], why: 'without it a circle or conversation read on one device stays new on every other device of the person' },
   { id: 'contact-scan-adopts-point', pattern: /adoptInheritedPoint\(|contactPointAdopter\(/, shells: ['web', 'mobile'], why: 'a device with no relay scans a card and stays unreachable (until its first send, and again after every restart)' },
   // A SETTING ONLY WHERE IT CHANGES SOMETHING: 'How the bot shows actions' is about a bot that acts; Help only answers.
   // Each host reads the contact book through one predicate before it offers the setting (a walk saw it with no bot).
@@ -97,6 +136,15 @@ export const SEAMS = Object.freeze([
   // persona on its own socket and announces its person key. A shell that built the redeem without it would join every
   // circle as the default, whatever the person picked (2026-10-10).
   { id: 'redeem-as-circle-self', pattern: /circleSelfFor:\s*\(gid\)\s*=>\s*agent\.circleSelf/, why: 'a circle joined as a persona is joined AS it, from every shell' },
+  // THE INVITE EXCHANGE on the person key: the send gate's person-key allowlist lets the joiner's request to the invite's
+  // address, and the inviter's one answer to a request that proved its code, leave on the person key, from what the redeem
+  // code registers with the agent. A shell that builds the redeem without it records 'none' for its joins (and, once the
+  // gate enforces, holds them). Mobile's handler comes from the shared inbound wiring; its sender is agentBundle's.
+  // A RECEIPT ONLY TO SOMEONE THE PERSON KEPT (Frits 2026-11-11): the contact channel answers a landed turn only when the
+  // agent says the sender is a kept contact. A shell that leaves `isKept` out confirms nothing (deny by default), so the
+  // seam keeps every shell's receipts alive and every shell's strangers unanswered.
+  { id: 'contact-receipt-kept', pattern: /isKept:\s*\(id\)\s*=>\s*agent\.isKeptContact/, why: 'a delivery receipt answers only a contact the person kept, on every shell' },
+  { id: 'redeem-invite-exchange', pattern: /inviteExchange:\s*agent\.inviteExchange/, why: 'a join\'s two person-key sends are an allowed case on every shell, registered by the redeem itself' },
   // Each self on its own sockets: a persona's circle registers its per-circle address (and the persona's person address)
   // on the persona's OWN relay sockets, never the default's — or replies to it land on the default's socket and the
   // relay sees two selves on one connection (2026-10-10).
@@ -143,7 +191,7 @@ export const SEAMS = Object.freeze([
   { id: 'change-feed', pattern: /createChangeFeed\(/, shells: ['box'], why: 'a change a member makes in their app reaches the bot\'s event rows and its screens, not only the bot\'s own writes' },
   // The person's own store rides between their own devices (signed by the device, sealed to the person); what a
   // sibling wrote while this device was off is asked for on connect — every shell that holds the person's store.
-  { id: 'own-store-catch-up', pattern: /ownStoreSync\??\.requestFromSiblings\(|kick\(agent\.ownStoreSync/, why: 'an appointment added on the phone while the laptop was off is on the laptop when it comes back' },
+  { id: 'own-store-catch-up', pattern: /ownStoreSync\??\.requestFromSiblings\(|kick\(agent\.ownStoreSync|startQueueSiblings\(/, why: 'an appointment added on the phone while the laptop was off is on the laptop when it comes back' },
   // A person's device runs its OWN planned rows (their week on Saturday) while the app is in front: one host tick, its
   // timer the foreground cadence. The box keeps its own clock (`host-tick`).
   { id: 'person-clock', pattern: /createPersonClock\(/, shells: ['web', 'mobile'], why: 'a person\'s own planned rows (their week overview) run on their phone and in their browser while the app is open' },
@@ -161,7 +209,8 @@ export const SEAMS = Object.freeze([
   // shell. The box composed none until 2026-10-08 and ran on the built-in defaults: the same numbers today, but a
   // window the register changed would have reached web and mobile and never the box — where the bot's turns age out.
   { id: 'retention-window', pattern: /setRetention(?:\?\.)?\(retentionFromDays\(/, why: 'the windowed log classes (plumbing, the bot\'s turns, the trail\'s detail) age out on the window the register holds, on every device' },
-  { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
+  // (the shared inbound wiring, src/v2/inboundWiring.js, builds the lane table: a shell composing it composes this seam)
+  { id: 'lane-table',            pattern: /buildCircleLanes\(|buildInboundWiring\(/,               why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
   // it on the governance change (live fan + catch-up), and serves its head at catch-up — the box above all, the
   // always-on member a joiner catches up from after the lane's audit window has aged the statement out.
@@ -188,6 +237,16 @@ export const SEAMS = Object.freeze([
   // The first message carries the sender's card (2026-09-21): a device that does not hand its card in leaves the
   // other side a nameless row; one that does not take a card in never names the people who write to it.
   { id: 'contact-channel-my-card',   pattern: /myCard:/,                          why: 'the first message to a contact carries my card — name, handle, where to write back, the person key' },
+  // A first message from someone the person did not choose is a REQUEST (Frits 2026-11-12): the channel decides at its
+  // door, before the card, the pair roster or the thread see the turn. A shell without it lets a stranger's first turn
+  // write a contact row and a pair circle (measured), which the receipt and the person key's allowlist then trust.
+  // The agent switches it off on a function profile, whose own door decides.
+  // …and the other doors into a contact thread (a file, a threaded answer to a post) keep nothing from such a sender:
+  // they ask the channel's `knownSender`. Mobile builds both doors in the SHARED inbound wiring (src/v2/inboundWiring.js,
+  // which asks the channel itself), so it has them by construction; web builds its own and is checked here. The box
+  // registers neither door.
+  { id: 'contact-doors-ask-known', pattern: /isKnownSender:\s*\(contactId, fromAddr, to\)/, shells: ['web'], why: 'a file or a threaded turn from someone the person did not choose is not kept, on every painting shell' },
+  { id: 'contact-channel-requests', pattern: /messageRequests:\s*agent\.messageRequests/, why: 'a stranger\'s first message is held as a request, never a contact, on every shell' },
   { id: 'contact-channel-on-card',   pattern: /onCard:/,                          why: 'a card that arrives with a message (naming its sender) goes into the book; the book carry names them on every device' },
   { id: 'pair-roster',           pattern: /createPairRoster\(/,                 why: 'the hidden two-member circle every written-to contact gets; DMs ride it (L105)' },
   { id: 'pair-roster-lens',      pattern: /shareRelease:/,                      why: 'the founder says on a new pair circle what THIS contact\'s persona discloses — which persona a contact sees you as (the lens, persona step 3)' },
@@ -207,11 +266,11 @@ export const SEAMS = Object.freeze([
   // painting shells ask the one rule, and paint the one outcome. The box has no screen to paint it on.
   { id: 'restore-finish-applies', pattern: /restoreFinishApplies\(/, shells: ['web', 'mobile'], why: 'an enrol from an offer is not a restore — "your circles are not here" would tell a person adding a device that their circles are gone' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
-  { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
-  { id: 'known-peers-catchup',   pattern: /knownPeersSync/,                      why: 'who the person knows, on every device: bindings and the contact book' },
-  { id: 'person-key-catchup',    pattern: /personKeySync/,                       why: 'the person key and its chain, on every device' },
-  { id: 'profile-facts-catchup', pattern: /profileFactsSync/,                    why: "a profile's properties and disclosure, the same on every device holding that self" },
-  { id: 'grants-catchup',        pattern: /grantsCatchUp/,                       why: 'the grants lane: what my devices may do' },
+  { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings|startQueueSiblings\(/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
+  { id: 'known-peers-catchup',   pattern: /knownPeersSync|startQueueSiblings\(/,                      why: 'who the person knows, on every device: bindings and the contact book' },
+  { id: 'person-key-catchup',    pattern: /personKeySync|startQueueSiblings\(/,                       why: 'the person key and its chain, on every device' },
+  { id: 'profile-facts-catchup', pattern: /profileFactsSync|startQueueSiblings\(/,                    why: "a profile's properties and disclosure, the same on every device holding that self" },
+  { id: 'grants-catchup',        pattern: /grantsCatchUp|startQueueSiblings\(/,                       why: 'the grants lane: what my devices may do' },
   { id: 'circle-presence',       pattern: /registerCirclePresence/,              why: 'per-circle addresses on the relay and the announce — the three acts every device performs on connect' },
   // Siblings follow a circle (L109, 2026-09-21): a circle founded or joined on one device reaches the others. A shell
   // that hands no consume in hears the carry and joins nothing; one that never asks misses what happened while it was off.
@@ -232,6 +291,11 @@ export const SEAMS = Object.freeze([
   // never acted on (`plusLineOutcome`, with each circle's availability from `circleAvailabilityFor`). A shell reading the
   // line any other way is how the sheet would come to act in a circle.
   { id: 'plus-line-outcome', pattern: /plusLineOutcome\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // THE "+" IS ONE KEPT CONVERSATION: each read of its line is one exchange in the person's own thread (`exchange` on
+  // `createPlusThread`: the line heard, the read run, what it answered kept as the bot's own turn entries). A shell that
+  // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already
+  // keeps the same turns through `botThreads` (the Telegram thread), so it is not a shell of this seam.
+  { id: 'plus-kept-thread', pattern: /plusThread(Now\(\))?\.exchange\(/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
   { id: 'ask-matches', pattern: /askMatchChoices\(/, shells: ['web', 'mobile'], why: 'matches under my own ask come from released offerings only, and only the asker sees them' },
@@ -241,6 +305,16 @@ export const SEAMS = Object.freeze([
   // turns each into the bubble's state. Without it a given-up message keeps looking fine, and a "waiting" bubble keeps
   // waiting after the message has gone. The box paints no bubbles: it has no delivery map to move.
   { id: 'delivery-outcomes-reach-the-bubble', pattern: /makeGiveUpConsumers\(/, shells: ['web', 'mobile'], why: 'a message given up on, or held and then sent, must change its bubble — else it looks fine, or waits for ever' },
+  // A TYPED TURN TO A CONTACT carries its delivery state as a circle message does (the two-phone walk, rows 9 and 11): the
+  // shell follows the send on the shared map (`trackContactTurn`) and hands the channel the receipt sender for turns that
+  // land (`setLandedHook`), so the other side's bubble can reach "their app has it". The box paints no bubbles.
+  { id: 'dm-bubble-carries-delivery', pattern: /trackContactTurn\(/, shells: ['web', 'mobile'], why: 'a person\'s own DM bubble said nothing — sent? waiting? failed? — while the circle bubble beside it did; the state is on the shared map only when the shell writes it there' },
+  // EVERY ACT PAINTS ITS STATE (sitting Part 2 §4): the waist is wrapped once per shell (`wrapCallSkillWithActState`) and one
+  // strip paints the store (`cc-act-state` on web, `ActStateBar` on mobile). A shell that composes neither has screens whose
+  // Save says nothing again. The box has no screen.
+  { id: 'acts-paint-their-state', pattern: /wrapCallSkillWithActState\(/, shells: ['web', 'mobile'], why: 'an act with no pending · done · failed is a Save that says nothing and a join that shows nothing for 23 seconds' },
+  { id: 'act-state-has-a-strip', pattern: /cc-act-state|<ActStateBar\b/, shells: ['web', 'mobile'], why: 'a wrapped waist with nothing painting the store is feedback computed and never shown' },
+  { id: 'dm-landing-answers-with-a-receipt', pattern: /[cC]ontactChannel\??\.setLandedHook(\?\.)?\(/, shells: ['web', 'mobile'], why: 'without the receipt a DM can never reach "their app has it" on the sender\'s side, whatever the sender\'s setting says' },
   // A HEAD HEARS OF A CIRCLE IT DOES NOT KNOW YET: Vandaag re-reads over the shell's circle list, so a change in a circle
   // that list does not hold (joined on another device, through an offer, made by an op) re-reads the list first
   // (`headCircleWatch.js`). Without it the new circle's items stayed off Vandaag until a reload. The box paints no Vandaag.
@@ -252,7 +326,7 @@ export const SEAMS = Object.freeze([
   { id: 'feedback-offer-asks-first', pattern: /confirmFeedbackOffer:/, shells: ['web', 'mobile'], why: 'a feedback door without the confirm cannot add the contact at all — and a shell that seeds instead adds it with no tap' },
   // Who answered a post is recorded where the answer lands: every shell hands the threaded-chat handler the agent's
   // noteAnswer. A shell without it shows the answer in the thread but never offers the poster "accept" for it.
-  { id: 'records-who-answered', pattern: /noteAnswer:/, why: 'an answer to a post lands in the thread but its sender is never recorded as a responder, so the poster cannot accept it' },
+  { id: 'records-who-answered', pattern: /noteAnswer:|buildInboundWiring\(/, why: 'an answer to a post lands in the thread but its sender is never recorded as a responder, so the poster cannot accept it' },
   // An enrolled device is named in the person's own device list by the model this shell reads (the phone's, the
   // browser's): the agent records it as the delegation label when the person typed none. The box names itself 'box'.
   // THE PATTERN NAMES THE SUPPLYING ARROW (`enrolDeviceName: () =>`), not the option name: mobile's bundle passes the
@@ -265,13 +339,17 @@ export const SEAMS = Object.freeze([
   // …and every composer says it while it lasts (Fable, 2026-11-06: the composer is where a message would vanish): the
   // host hands the circle and the contact composer the same predicate.
   { id: 'composer-knows-no-relay', pattern: /noRelay(=\{|:\s*)!_?relayKnown/, shells: ['web', 'mobile'], why: 'a message typed with no connection point waits, and the composer the person types in would not say so' },
+  // THE SIGNATURE CHECK: each shell installs its faster Ed25519 equation behind the one strict rule (core
+  // `useSignatureEquation`): node:crypto on the box, WebCrypto's batch on the web. A shell that does not checks every
+  // signature in pure JS (~10 ms on a laptop, ~61 ms on a mid-range phone, against ~0.15 ms).
+  { id: 'signature-equation', pattern: /install\w*SignatureEquation\(/, why: 'a shell that installs no fast equation checks every signature in pure JS: seconds of a start on a phone' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

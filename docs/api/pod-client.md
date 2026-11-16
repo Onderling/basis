@@ -685,12 +685,23 @@ exactly as `createControlAgent` injects it:
 
 ## `src/sealing/controlAgent.js`
 
+### `MemberUnknownError`
+
+**Kind:** class · **Import:** `MemberUnknownError` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+class MemberUnknownError extends Error
+new MemberUnknownError()
+```
+
+The roster could not say whether the member is still a member: the join's key change is NOT made (never a yes).
+
 ### `createControlAgent`
 
 **Kind:** function · **Import:** `createControlAgent` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
 
 ```js
-createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {} })
+createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null, podAgents = {}, mayEstablish = true })
 ```
 
 Create the household control-agent: applies pod ACL grant/revoke AND group-key rotation together
@@ -1162,6 +1173,38 @@ removal (that version's key never entered their chain).
 
 **Returns:** `string` — plaintext
 
+## `src/sealing/keyResourceWrite.js`
+
+### `KeyWriteContendedError`
+
+**Kind:** class · **Import:** `KeyWriteContendedError` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+class KeyWriteContendedError extends Error
+new KeyWriteContendedError(attempts)
+```
+
+Thrown when every attempt lost a race: the change was NOT written. The caller reports it; nothing is dropped quietly.
+
+### `changeKeyResource`
+
+**Kind:** function · **Import:** `changeKeyResource` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+changeKeyResource(keyStore, compute, { attempts = MAX_KEY_WRITE_ATTEMPTS } = {})
+```
+
+Apply one change to a key resource: `compute(cur)` returns the next resource built on `cur` (the stored one),
+or `null` when there is nothing to change on that base. Serialised in-process; compare-and-swap across devices.
+
+**Parameters**
+
+- `keyStore` `{ read: Function, write: Function, writeIfUnchanged?: Function }`
+- `compute` `(cur: object|null) => (object|null|Promise<object|null>)`
+- `[opts]` `{ attempts?: number }`
+
+**Returns:** `Promise<{ written: object|null, base: object|null }>` — `written` null = nothing to change.
+
 ## `src/sealing/memberIdentity.js`
 
 ### `createMemberSealingIdentity`
@@ -1200,7 +1243,7 @@ Stored as plain JSON — the group key inside is already a recipient-wrapped env
 - `podClient` `{ read: Function, write: Function }` — a PodClient-shaped client
 - `uri` `string` — the key-resource URI (e.g. <pod>/.keys/group.json)
 
-**Returns:** `{ read: () => Promise<object|null>, write: (resource:object) => Promise<void> }`
+**Returns:** `{ read: () => Promise<object|null>, write: (resource:object) => Promise<void>, writeIfUnchanged: (resource:object, cur:object|null) => Promise<boolean> }`
 
 ### `readGroupKey`
 
@@ -1669,7 +1712,8 @@ async readSealedMessagesSince(backend, open, { circleId, sinceTs = 0, max = 200 
 ```
 
 Range-query a circle's rows for every message with `ts >= sinceTs`, opened + returned oldest→newest and
-capped to `max`. This is the read half of the KEY CONVENTION: a single `list('<circleId>/')` prefix walk
+capped to `max`: the OLDEST `max` (one page forward from the watermark), `truncated` when more follow, so a reader
+pages on from the last row's ts. Keeping the freshest instead lost every older row after a long absence. This is the read half of the KEY CONVENTION: a single `list('<circleId>/')` prefix walk
 + a numeric ts filter, no store query language. A row that fails to open (wrong-key / corrupt) is SKIPPED,
 not thrown — one bad row must not sink a whole catch-up batch.
 

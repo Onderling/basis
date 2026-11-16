@@ -501,6 +501,11 @@ export class IdentityPodStore {
       } catch (err) {
         if (err?.code === 'CONFLICT') {
           lastErr = err;
+          // Another device wrote the manifest since this one did. Read it, so the retry builds on THAT version: without
+          // the read the client refuses the same write on every attempt. Overwriting it is right, the manifest is
+          // derived; the retry recomputes the hash from the resources as they are now.
+          try { await this.#podClient.read(manifestUri, { decode: 'string' }); }
+          catch (readErr) { if (readErr?.code !== 'NOT_FOUND') throw readErr; }
           continue;
         }
         throw err;

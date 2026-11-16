@@ -14,7 +14,7 @@
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { HELP_CIRCLE_ID } from './helpCircle.js';
-import { isValidHandle, handleSuggestions } from '../core/wizards/joinGroupState.js';
+import { isValidName } from '../core/wizards/joinGroupState.js';
 
 /** How long "Later" puts the key card away. */
 export const KEY_CARD_SNOOZE_DAYS = param({ key: 'onboarding.keyCardSnoozeDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
@@ -72,10 +72,10 @@ export async function materializeOnboarding(block, { callSkill, circles = [], al
 
 /**
  * THE NAME CARD'S SAVE. The card asks for a NAME ("Zo heet je hier"), and a person types one: "Tester B". That is
- * their display name, set as typed; the handle — the circle's unique, lowercase word — is made from it ("tester-b"),
- * and a handle someone else holds gets a suffix ("tester-b2") rather than a refusal the person would have to
- * understand. Before this the card saved the typed text AS the handle: "Tester B" was refused, both shells dropped
- * the refusal, and the card came back empty (walk, 2026-11-05).
+ * their display name AND the name they use in circles, both as typed; a name someone else holds gets a number
+ * ("Tester B 2") rather than a refusal the person would have to understand. Before this the card saved the typed
+ * text as a lowercase handle: "Tester B" was refused, both shells dropped the refusal, and the card came back empty
+ * (walk, 2026-11-05).
  *
  * @param {string} value  what was typed
  * @param {{ callSkill: (app: string, op: string, args?: object) => Promise<any> }} host
@@ -84,13 +84,13 @@ export async function materializeOnboarding(block, { callSkill, circles = [], al
 export async function saveNameCard(value, { callSkill } = {}) {
   const name = typeof value === 'string' ? value.trim() : '';
   if (!name) return { ok: false, error: 'circle.vandaag.onboarding_handle_empty' };
-  const base = isValidHandle(name.toLowerCase()) ? name.toLowerCase() : (handleSuggestions(name)[0] ?? null);
+  const base = isValidName(name) ? name : null;
   if (!base) return { ok: false, error: 'circle.vandaag.onboarding_handle_unusable' };
   if (typeof callSkill !== 'function') return { ok: false, error: 'circle.vandaag.onboarding_handle_failed' };
   const shown = await Promise.resolve(callSkill('pinboard', 'setMyDisplayName', { displayName: name })).catch(() => null);
   if (!shown || shown.error) return { ok: false, error: 'circle.vandaag.onboarding_handle_failed' };
-  // the handle: the made word, else the same with a number — the first one nobody holds
-  for (const candidate of [base, ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `${base}${n}`)].filter(isValidHandle)) {
+  // the name in circles: the name itself, else the same with a number, the first one nobody holds
+  for (const candidate of [base, ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `${base} ${n}`)].filter(isValidName)) {
     const r = await Promise.resolve(callSkill('pinboard', 'setMyHandle', { handle: candidate })).catch(() => null);
     if (r && !r.error) return { ok: true, name, handle: candidate };
     if (r?.reason !== 'handle-taken') return { ok: false, error: 'circle.vandaag.onboarding_handle_failed' };

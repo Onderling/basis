@@ -83,6 +83,10 @@ const REQ_TIMEOUT = param({ key: 'transport.reqTimeoutMs', scope: PARAM_SCOPE.DE
 // moment after a create or a join, before the presence step binds it) — then it is refused, never sent as the primary.
 const ALIAS_WAIT = param({ key: 'transport.aliasWaitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });  // ms
 // …and how many sends may wait for one address at once (the oldest gives way): a bound on what one unbound address can park.
+// What a transport remembers about its own sends (for a give-up that names only the envelope): a person's messages
+// (a payload with an app message id) and lane traffic in two separate bounds, so the second never pushes the first out.
+const SENT_WITH_APP_ID_MAX = param({ key: 'transport.sentWithAppIdMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2000 });
+const SENT_CONTROL_MAX = param({ key: 'transport.sentControlMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2000 });
 const ALIAS_WAITERS = param({ key: 'transport.aliasWaitersMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 /**
@@ -115,8 +119,8 @@ export class Transport extends Emitter {
   // AFTER the fact — the relay's give-up names the envelope, the app's delivery state is keyed by the msgId, and
   // nothing else ever holds both. Bounded FIFO: a give-up arrives within the relay's queue TTL, and an entry
   // that outlives the cap belonged to a message long since settled either way.
-  #appMessageIds        = new Map();
-  static #APP_MESSAGE_IDS_CAP = 2000;
+  #appMessageIds        = new Map();   // sends that carried an app message id (a person's messages)
+  #controlSends         = new Map();   // every other send (lane traffic): its own bound, so it cannot evict the above
   #envelopeSubscribers  = null;       // Set<(payload, rawEnvelope) => void> — Phase 50.7
 
   /**
@@ -217,6 +221,14 @@ export class Transport extends Emitter {
 
   /** @protected adapters override: start listening at `address`. `opts.sign` proves it is ours. */
   async _bindAddress(_address, _opts) {}
+
+  /**
+   * @protected — the address of ours a send to `to` goes out as when the caller names none. `null` (the default) = the
+   * primary. An adapter whose connections each speak their own keys (the LAN) answers per peer.
+   * @param {string|null} _to
+   * @returns {string|null}
+   */
+  _defaultSenderFor(_to) { return null; }
 
   /** @protected adapters override: stop listening at `address`. */
   _unbindAddress(_address) {}
@@ -405,9 +417,15 @@ export class Transport extends Emitter {
    * @param {string|null|undefined} claimed
    * @returns {string|Promise<string>} the address to stamp as `_from`
    */
-  #senderFor(claimed, { wait = true } = {}) {
+  #senderFor(claimed, { wait = true, to = null } = {}) {
     const asked = typeof claimed === 'string' && claimed ? claimed : null;
-    if (!asked || asked === this.#address || this.#aliases.has(asked)) return asked ?? this.#address;
+    if (!asked) {
+      // no sender named: the adapter may name the one it speaks to THIS peer (a LAN connection speaks only the keys it
+      // proved there); otherwise the primary, as always
+      const own = typeof this._defaultSenderFor === 'function' ? this._defaultSenderFor(to) : null;
+      return typeof own === 'string' && own && this.holdsAddress(own) ? own : this.#address;
+    }
+    if (asked === this.#address || this.#aliases.has(asked)) return asked;
     // An ANSWER (`wait: false`) names an address the far end chose (`_to` on what it sent us): it never waits — a hostile
     // or stale `_to` must not park a timer and a waiter. Only our own outbound sends wait for an address being bound.
     if (!wait) return this.#refuse(asked);
@@ -443,7 +461,7 @@ export class Transport extends Emitter {
    * `opts.from` — send AS one of our extra addresses (see `#senderFor`).
    */
   async sendOneWay(to, payload, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload));
   }
 
@@ -456,7 +474,7 @@ export class Transport extends Emitter {
    * `sendOneWay(to, payload)` for transports that don't use the hint.
    */
   async publishOneWay(to, topic, payload, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     await this._send(to, mkEnvelope(P.OW, typeof from === 'string' ? from : await from, to, payload, { topic }));
   }
 
@@ -465,7 +483,7 @@ export class Transport extends Emitter {
    * Resolves with the AK envelope on success, rejects on timeout.
    */
   async sendAck(to, payload, timeout = ACK_TIMEOUT, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     const env = mkEnvelope(P.AS, typeof from === 'string' ? from : await from, to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
@@ -475,7 +493,7 @@ export class Transport extends Emitter {
    * Resolves with the RS envelope on success, rejects on timeout.
    */
   async request(to, payload, timeout = REQ_TIMEOUT, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     const env = mkEnvelope(P.RQ, typeof from === 'string' ? from : await from, to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
@@ -484,7 +502,7 @@ export class Transport extends Emitter {
    * RS — send a reply to a previous RQ.
    */
   async respond(to, replyToId, payload, opts = {}) {
-    const from = this.#senderFor(opts?.from);
+    const from = this.#senderFor(opts?.from, { to });
     await this._send(to, mkEnvelope(P.RS, typeof from === 'string' ? from : await from, to, payload, { re: replyToId }));
   }
 
@@ -512,7 +530,7 @@ export class Transport extends Emitter {
     // attacker-influenced; a bad value can at worst make an answer wait and fail, never claim an address that is not
     // ours and never speak as the primary to it.
     // an ANSWER (it names the HI it answers, `re`) speaks as an address the far end chose: refused at once if not held
-    const held = this.#senderFor(opts.from, { wait: !opts.re });
+    const held = this.#senderFor(opts.from, { wait: !opts.re, to });
     const from = typeof held === 'string' ? held : await held;
     // `opts.re` — the `_id` of the HI this one ANSWERS.
     //
@@ -736,21 +754,35 @@ export class Transport extends Emitter {
    * @returns {string|null}
    */
   appMessageIdFor(envelopeId) {
-    return (typeof envelopeId === 'string' && this.#appMessageIds.get(envelopeId)) || null;
+    return this.sentEnvelopeFor(envelopeId)?.msgId ?? null;
   }
 
-  #noteAppMessageId(envelope) {
-    const msgId = envelope?.payload?.msgId;
-    if (typeof envelope?._id !== 'string' || typeof msgId !== 'string' || !msgId) return;
-    if (this.#appMessageIds.size >= Transport.#APP_MESSAGE_IDS_CAP) {
-      this.#appMessageIds.delete(this.#appMessageIds.keys().next().value);   // the oldest — Map keeps insertion order
-    }
-    this.#appMessageIds.set(envelope._id, msgId);
+  /**
+   * What this transport remembers about an outgoing envelope: the app's message id (or null), who it went to, and the
+   * payload's kind (`subtype` or `type`). Kept on THIS device only, bounded, never sent: a report naming only the
+   * envelope (the relay's give-up) can then say what was lost and for whom. Null when unknown.
+   * @param {string} envelopeId
+   * @returns {{msgId: string|null, to: string|null, subtype: string|null}|null}
+   */
+  sentEnvelopeFor(envelopeId) {
+    if (typeof envelopeId !== 'string') return null;
+    return this.#appMessageIds.get(envelopeId) ?? this.#controlSends.get(envelopeId) ?? null;
+  }
+
+  #noteAppMessageId(to, envelope) {
+    if (typeof envelope?._id !== 'string') return;
+    const p = envelope.payload;
+    const msgId = typeof p?.msgId === 'string' && p.msgId ? p.msgId : null;
+    const kind = typeof p?.subtype === 'string' ? p.subtype : (typeof p?.type === 'string' ? p.type : null);
+    const map = msgId ? this.#appMessageIds : this.#controlSends;
+    const cap = Number(msgId ? SENT_WITH_APP_ID_MAX : SENT_CONTROL_MAX);
+    if (map.size >= cap) map.delete(map.keys().next().value);   // the oldest of its own kind — Map keeps insertion order
+    map.set(envelope._id, { msgId, to: typeof to === 'string' ? to : null, subtype: kind });
   }
 
   /** Apply SecurityLayer (if set) and call _put. */
   async _send(to, envelope) {
-    this.#noteAppMessageId(envelope);   // before encryption — the payload is opaque after it
+    this.#noteAppMessageId(to, envelope);   // before encryption — the payload is opaque after it
     const outgoing = this.#securityLayer
       ? this.#securityLayer.encrypt(envelope)
       : envelope;

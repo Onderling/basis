@@ -132,3 +132,13 @@ describe('the pair circle is the roster\'s own', () => {
     expect(calls.some((c) => c.op === 'whoAmI')).toBe(false);
   });
 });
+
+describe('who you are in a contact thread (the header avatar)', () => {
+  it('the persona the row records, by its name; none recorded is "you"', async () => {
+    const { contactThreadSelf } = await import('../../src/v2/contactLens.js');
+    const personas = [{ id: 'default', name: 'default' }, { id: 'werk', name: 'Werk' }];
+    const t = (k) => k;
+    expect(contactThreadSelf({ webid: 'w', persona: 'werk' }, personas, { t })).toEqual({ id: 'werk', name: 'Werk' });
+    expect(contactThreadSelf({ webid: 'w' }, personas, { t })).toEqual({ id: 'default', name: 'circle.switcher.you' });
+  });
+});

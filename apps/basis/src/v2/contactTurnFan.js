@@ -32,6 +32,7 @@
  */
 
 /** The wire subtype for a turn fanned to the owner's own devices. */
+import { heldNoteValid } from './heldNote.js';
 import { makeSiblingCarry } from './siblingCarry.js';
 import { NOT_TAKEN } from '../core/handlers/peerRouter.js';   // a verdict the receive record reads: not taken, so a repeat is handed on again
 
@@ -69,8 +70,10 @@ export function contactTurnToWire(turn) {
   if (!contactId) return null;
   const file = fileOnWire(turn.file);
   const text = typeof turn.text === 'string' ? turn.text : '';
-  // A turn with neither words nor a file is nothing to show; the sibling would render an empty bubble.
-  if (!text && !file) return null;
+  // a turn the door held after a refusal: its note is something to show even when nothing else is (a file left off)
+  const held = turn.direction === TURN_DIRECTIONS.out ? null : heldNoteValid(turn.held);
+  // A turn with neither words, a file nor a note is nothing to show; the sibling would render an empty bubble.
+  if (!text && !file && !held) return null;
   return {
     direction,
     contactId,
@@ -84,6 +87,7 @@ export function contactTurnToWire(turn) {
     ...(file ? { file } : {}),
     // The turn that brought a hidden contact back (L106) says so on every device — the marker is painted from it.
     ...(turn.returned === true ? { returned: true } : {}),
+    ...(held ? { held } : {}),
     // A person's MESSAGE (never a bot's reply) says so, with what the door decides on: the receiving sibling, when it
     // is the person's primary, answers it as if it had come direct.
     ...(turn.message === true ? { message: true } : {}),

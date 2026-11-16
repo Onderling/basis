@@ -18,8 +18,9 @@ const turns = [
 
 describe('buildContactUnread', () => {
   it('counts the inbound turns newer than the contact\'s seen-mark; a never-opened thread counts them all', () => {
-    expect(buildContactUnread({ turns, seenAt: { bea: 120 } })).toEqual({ bea: { unread: 1, lastTs: 200 }, cas: { unread: 2, lastTs: 60 } });
-    expect(buildContactUnread({ turns, seenAt: { bea: 200, cas: 60 } })).toEqual({ bea: { unread: 0, lastTs: 200 }, cas: { unread: 0, lastTs: 60 } });
+    const counts = (m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { unread: v.unread, lastTs: v.lastTs }]));
+    expect(counts(buildContactUnread({ turns, seenAt: { bea: 120 } }))).toEqual({ bea: { unread: 1, lastTs: 200 }, cas: { unread: 2, lastTs: 60 } });
+    expect(counts(buildContactUnread({ turns, seenAt: { bea: 200, cas: 60 } }))).toEqual({ bea: { unread: 0, lastTs: 200 }, cas: { unread: 0, lastTs: 60 } });
     expect(buildContactUnread({ turns: [], seenAt: {} })).toEqual({});
   });
   it('the tab shows the sum', () => {
@@ -45,5 +46,18 @@ describe('makeContactSeenStore — the seen-marks on the device, one code for bo
     const m = new Map(); const store = makeContactSeenStore({ getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); } });
     await store.mark('bea', 5);
     expect(await store.read()).toEqual({ bea: 5 });
+  });
+});
+
+describe('a direct message counts by when it ARRIVED here, not when it was sent', () => {
+  it('sent before I looked, received after: new', async () => {
+    const { buildContactUnread } = await import('../../src/v2/contactUnread.js');
+    const turns = [{ contactId: 'b', origin: 'bot', ts: 500, receivedAt: 2000 }, { contactId: 'b', origin: 'bot', ts: 400, receivedAt: 900 }];
+    expect(buildContactUnread({ turns, seenAt: { b: 1000 } }).b.unread).toBe(1);
+  });
+  it('the stored turn carries receivedAt beside its sender time', async () => {
+    const { chatTurnsFromItems } = await import('@onderling/item-store');
+    const [t] = chatTurnsFromItems([{ id: 'i', text: 'hoi', source: { dm: true, threadKey: 'b', direction: 'in', sentAt: 500, receivedAt: 2000, nonce: 'n' } }]);
+    expect(t).toMatchObject({ ts: 500, receivedAt: 2000 });
   });
 });

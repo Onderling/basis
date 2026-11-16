@@ -11,11 +11,11 @@ import {
 import { CIRCLE_TEMPLATES } from '../../../src/v2/circleTemplates.js';
 
 describe('initialState', () => {
-  it('starts as a household — the short path asks no kind, so the household template fills the policy axes', () => {
+  it('starts with no kind (the first step asks it); the neutral template fills the axes meanwhile', () => {
     const s = initialState();
-    expect(s.kind).toBe('household');
+    expect(s.kind).toBeNull();
     expect(s.advanced).toBe(false);
-    expect(s.features).toEqual(CIRCLE_TEMPLATES.household.features);
+    expect(s.features).toEqual(CIRCLE_TEMPLATES._default.features);
     // …but not who sees whose name: a create that never asked does not widen that
     expect(s.revealPolicy).toBe('pairwise');
     // the storage radio stays the authority: no pod, whatever the template prefers

@@ -1,18 +1,12 @@
 /**
- * Two joiners claim the same handle AT THE SAME TIME — story 2.1 of
- * `plans/NOTE-multi-device-user-stories.md`.
+ * Joiners who pick the same name AT THE SAME TIME (story 2.1 of the multi-device user stories).
  *
- * `handleUniqueness.test.js` already proves the rule SEQUENTIALLY: Bram takes `jan`, then Cato is refused.
- * That is the easy half. The story is about ORDERING — Bram and Cato redeem the same invite and both pick
- * `@jan`, and their requests reach the admin interleaved. The rule is only worth anything if it survives
- * that, because a duplicate handle inside one circle is unresolvable after the fact: there is no
- * disambiguation by design (`NOTE-identity-and-linkability.md`, 2026-07-24), so the roster is simply wrong
- * and two people answer to one name.
+ * The name was once unique per circle, and this file proved one winner under the race. Since 2026-11-06 the name is
+ * for people and two people may share one (uniqueness stays on the key; the members list tells two equal names apart
+ * with a small number). What still matters under the race: every joiner lands exactly once, under their own key,
+ * with the name they chose, and none is refused for the name.
  *
- * This is the same shape as the four clobber bugs this corpus has already found — read the current state,
- * decide, then write, with the two steps not atomic — applied to identity instead of keys.
- *
- * Cast: Anna (admin, owns the roster) · Bram and Cato (both want `@jan`) · Dirk (a bystander).
+ * Cast: Anna (admin, owns the roster) · Bram, Cato and Dirk (all want "Jan").
  */
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
@@ -56,55 +50,29 @@ async function claimedHandles(bundle) {
   return reds.map((i) => i?.source?.peerDisplay).filter(Boolean).map((h) => h.toLowerCase());
 }
 
-describe('2.1 — two joiners redeem the same invite and both pick @jan', () => {
-  it('exactly ONE of two concurrent claims wins; the roster holds no duplicate', async () => {
-    const { bundle, code } = await adminWithCode();
-
-    // Both requests are in flight before either has written — the ordering the story is about. A relay
-    // delivering two group-redeem-requests back to back produces exactly this.
-    const [bram, cato] = await Promise.all([
-      callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE),
-      callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE),
-    ]);
-
-    const won = [bram, cato].filter((r) => !r.error);
-    const lost = [bram, cato].filter((r) => r.error);
-    expect(won).toHaveLength(1);                       // exactly one — not zero, not both
-    expect(lost).toHaveLength(1);
-    expect(lost[0].error).toBe('handle-taken');        // …and the loser is told WHY, so they can pick again
-
-    // The durable roster is the real subject: one `jan`, never two.
-    const handles = await claimedHandles(bundle);
-    expect(handles.filter((h) => h === 'jan')).toHaveLength(1);
-  });
-
-  it('the LOSER left no trace — a refused join must not half-write a member', async () => {
+describe('2.1 — joiners redeem the same invite at once and all pick "Jan"', () => {
+  it('both concurrent joiners land, each once, under their own key, both called Jan', async () => {
     const { bundle, code } = await adminWithCode();
     const [bram, cato] = await Promise.all([
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE),
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'Jan' }, ANNE),
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE),
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'Jan' }, ANNE),
     ]);
-    const loserWebid = bram.error ? BOB : CAROL;
-
+    expect([bram, cato].filter((r) => r.error)).toHaveLength(0);
     const reds = await bundle.itemStore.listOpen({ type: 'membership-redemption' });
-    expect(reds.some((i) => i?.source?.redeemedBy === loserWebid)).toBe(false);
-    expect(reds.filter((i) => i?.source?.groupId === GROUP)).toHaveLength(1);
+    const mine = reds.filter((i) => i?.source?.groupId === GROUP);
+    expect(mine.map((i) => i.source.redeemedBy).sort()).toEqual([BOB, CAROL].sort());   // each once
+    expect((await claimedHandles(bundle)).filter((h) => h === 'jan')).toHaveLength(2);
   });
 
-  it('THREE at once still yields exactly one winner', async () => {
-    // Two could pass by luck on a lock that only serialises pairs; three makes that much less likely.
+  it('THREE at once: all three land', async () => {
     const { bundle, code } = await adminWithCode();
     const results = await Promise.all([BOB, CAROL, DAVE].map((who) =>
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: who, peerDisplay: 'jan' }, ANNE)));
-
-    expect(results.filter((r) => !r.error)).toHaveLength(1);
-    expect(results.filter((r) => r.error === 'handle-taken')).toHaveLength(2);
-    expect((await claimedHandles(bundle)).filter((h) => h === 'jan')).toHaveLength(1);
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: who, peerDisplay: 'Jan' }, ANNE)));
+    expect(results.filter((r) => r.error)).toHaveLength(0);
+    expect((await claimedHandles(bundle)).filter((h) => h === 'jan')).toHaveLength(3);
   });
 
   it('the race is only for the SAME handle — different handles all succeed concurrently', async () => {
@@ -119,13 +87,14 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     expect((await claimedHandles(bundle)).sort()).toEqual(['jan', 'klaas', 'piet']);
   });
 
-  it('case-folding holds under the race — `Jan` and `jan` are one claim', async () => {
+  it('names are kept as typed — "jan", "Jan" and "JAN" all land as written', async () => {
     const { bundle, code } = await adminWithCode();
     const results = await Promise.all([[BOB, 'jan'], [CAROL, 'Jan'], [DAVE, 'JAN']].map(([who, h]) =>
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
         { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: who, peerDisplay: h }, ANNE)));
-    expect(results.filter((r) => !r.error)).toHaveLength(1);
-    expect((await claimedHandles(bundle))).toHaveLength(1);
+    expect(results.filter((r) => r.error)).toHaveLength(0);
+    const reds = await bundle.itemStore.listOpen({ type: 'membership-redemption' });
+    expect(reds.map((i) => i?.source?.peerDisplay).filter(Boolean).sort()).toEqual(['JAN', 'Jan', 'jan']);
   });
 
   it('a joiner re-sending their OWN claim concurrently is not a self-collision', async () => {

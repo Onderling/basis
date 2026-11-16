@@ -4,14 +4,10 @@
  * Layer: substrate.  Platform-neutral (depends only on the Vault
  * interface from @onderling/vault).
  *
- * Wires A.1 from the v0.7 security roadmap.  A mute applies to:
- *   - inbound HI       (rejected via the helloGate composition)
- *   - inbound envelopes (dropped before onPeerMessage fires)
- *   - outbound sendTo  (throws — refuse to talk to muted peers)
- *
- * Mute is matched on the NKN peer ADDRESS today.  Future S-slices
- * (S4 identity-resolver) will additionally match on stableId + webid
- * once those mappings are available at this layer.
+ * The block list. This layer KEEPS it and answers whether an address is covered (the secure agent's `mute.covers`,
+ * which fans the check across every address the resolver binds to the same person); it ENFORCES nothing. A block is
+ * about direct contact (Frits 2026-11-12), and below the app nothing can tell a direct message from circle traffic,
+ * so the app's direct doors and its direct send ask, and circle traffic never does.
  */
 
 /**

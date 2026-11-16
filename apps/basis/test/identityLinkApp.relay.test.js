@@ -14,7 +14,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { deviceDelegationsOf } from '@onderling/agent-registry';
 import { verifyDeviceRevocation } from '@onderling/core';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, teardown, until } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, teardown, until, addCardOf } from './support/pairRealAgents.js';
+import { sendBypassingTheGate } from '../../e2e-journeys/journeys/_app.mjs';
 import {
   encodeLinkStartLink, parseLinkOffer, verifyLinkStatement, linkCode, IDENTITY_LINK_SUBTYPE, IDENTITY_LINK_REVOKE_SUBTYPE, LINK_OPS,
 } from '../src/v2/identityLink.js';
@@ -52,8 +53,12 @@ describe('the identity link in the person\'s app', () => {
     expect(made.code).toBe(await linkCode(root, o.nonce));
 
     // a bot no offer was made for, and a statement about another root: not kept
-    await other.agent.sendPeerMessage(web.pubKey, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: other.pubKey, row: 'telegram:1', root, at: Date.now() } });
-    await bot.agent.sendPeerMessage(web.pubKey, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: bot.pubKey, row: 'telegram:9', root: 'ANOTHER-ROOT', at: Date.now() } });
+    // (forged shapes: sent around the sender's gate on purpose, the RECEIVER's refusal is what is measured)
+    const WHY = 'the receiver refuses a statement no offer was made for, or about another root';
+    await sendBypassingTheGate(other, web.pubKey, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: other.pubKey, row: 'telegram:1', root, at: Date.now() } }, { reason: WHY });
+    await sendBypassingTheGate(bot, web.pubKey, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: bot.pubKey, row: 'telegram:9', root: 'ANOTHER-ROOT', at: Date.now() } }, { reason: WHY });
+    // the bot answers a person whose card it holds (the person wrote to it, card and all)
+    await addCardOf(bot, web);
     // the real one
     await bot.agent.sendPeerMessage(web.pubKey, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: bot.pubKey, row: 'telegram:9', root, at: Date.now() } });
     const row = await until(async () => (await contacts()).find((c) => c.webid === bot.pubKey && c.linkedRow) ?? null, { timeout: 20_000, step: 200 });
@@ -69,6 +74,7 @@ describe('the identity link in the person\'s app', () => {
     expect(turn?.payload?.auth, 'the turn carries a statement').toBeTruthy();
     expect(verifyLinkStatement(turn.payload.auth, { node: bot.pubKey, op: LINK_OPS.TURN, args: { text: 'zet melk op de lijst', messageId: sent.messageId }, root }))
       .toMatchObject({ ok: true, root });
+    await addCardOf(web, other);   // someone the person holds a card for, who is not a linked bot
     const plain = web.contactThreadChannel.sendTurn({ peerAddr: other.pubKey, threadId: other.pubKey, text: 'hoi' });
     await plain.sent;
     const toOther = await until(async () => said(other, 'contact-msg').find((m) => m.payload.messageId === plain.messageId) ?? null, { timeout: 20_000, step: 200 });

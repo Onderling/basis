@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderCreateGroupWizard } from '../../src/web/wizards/createGroupWizard.js';
 import {
-  initialState, createSteps, nextCreateStep, prevCreateStep, setAdvanced, purposeOrDefault, withCreateDefaults, REVIEW_STEP,
+  initialState, createSteps, nextCreateStep, prevCreateStep, setAdvanced, purposeOrDefault, withCreateDefaults, REVIEW_STEP, chooseKind,
   setKind, setRevealPolicy, policyPatchFromState,
 } from '../../src/core/wizards/createGroupState.js';
 import { buildRulesObjectFromState } from '../../src/core/wizards/createGroupState.js';
@@ -24,16 +24,18 @@ describe('the path through the create wizard (shared)', () => {
     expect(nextCreateStep(open)).toBe(2);
     expect(prevCreateStep({ ...open, step: REVIEW_STEP })).toBe(5);
   });
-  it('the defaults: a household, rotation on, no pod, a purpose in the kind\'s words when none was typed', () => {
+  it('the defaults: no kind until one is picked, rotation on, no pod; the purpose is what its field holds', () => {
     const s = initialState();
-    expect(s.kind).toBe('household');
+    expect(s.kind).toBeNull();
     expect(s.keyRotationMode).toBeTruthy();
     expect(s.rotationDays).toBeGreaterThan(0);
     expect(s.storagePolicy).toBe('none');
     const t = (k) => `T:${k}`;
-    expect(purposeOrDefault(s, t)).toBe('T:circle.wizard.create.default_purpose_household');
-    expect(purposeOrDefault({ ...s, purpose: '  Samen koken ' }, t)).toBe('Samen koken');
-    expect(buildRulesObjectFromState(withCreateDefaults(s, t)).purpose).toBe('T:circle.wizard.create.default_purpose_household');
+    const home = chooseKind(s, 'household', t);
+    expect(home.purpose, 'the kind\'s sentence, in the field where the person sees it').toBe('T:circle.wizard.create.default_purpose_household');
+    expect(purposeOrDefault({ ...home, purpose: '  Samen koken ' }, t)).toBe('Samen koken');
+    expect(buildRulesObjectFromState(withCreateDefaults(home, t)).purpose).toBe('T:circle.wizard.create.default_purpose_household');
+    expect(purposeOrDefault(s, t), 'nothing invented').toBe('');
   });
   it('who sees whose name stays per pair: not widened by the household default, nor by a kind picked later — only by the choice', () => {
     const s = initialState();
@@ -56,13 +58,18 @@ function boot() {
   return { el, callSkill };
 }
 const typeName = (el, v) => { const n = el.querySelector('input.cc-wizard-input'); n.value = v; n.dispatchEvent(new Event('input')); };
+// the kind, picked on the first step as a person does (its radio)
+const pickKind = (el, k) => { const r = el.querySelector(`input[type=radio][value=${k}]`); r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); r.click(); };
 const review = (el) => Object.fromEntries([...el.querySelectorAll('.cc-wizard-review dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent ?? '']));
 
 describe('the web create wizard', () => {
-  it('asks the name, and Next goes straight to the review; two dots', async () => {
+  it('asks the name and the kind, and Next goes straight to the review; two dots', async () => {
     const { el } = boot();
     typeName(el, 'Thuis');
     expect(el.querySelectorAll('.cc-wizard-step').length).toBe(2);
+    await new Promise((r) => { setTimeout(r, 50); });
+    expect(el.querySelector('.cc-wizard-btn-primary').disabled, 'no kind yet: Next waits').toBe(true);
+    pickKind(el, 'household');
     expect(el.querySelector('[data-role=advanced]')?.open).toBe(false);
     await vi.waitFor(() => expect(el.querySelector('.cc-wizard-btn-primary').disabled).toBe(false));
     el.querySelector('.cc-wizard-btn-primary').click();
@@ -71,6 +78,7 @@ describe('the web create wizard', () => {
   it('the review names the type, the purpose and the rules — no empty value', async () => {
     const { el } = boot();
     typeName(el, 'Thuis');
+    pickKind(el, 'household');
     await vi.waitFor(() => expect(el.querySelector('.cc-wizard-btn-primary').disabled).toBe(false));
     el.querySelector('.cc-wizard-btn-primary').click();
     const r = review(el);
@@ -86,6 +94,7 @@ describe('the web create wizard', () => {
   it('opening "Geavanceerd" walks every step again', async () => {
     const { el } = boot();
     typeName(el, 'Thuis');
+    pickKind(el, 'household');
     const fold = el.querySelector('[data-role=advanced]');
     fold.open = true;
     fold.dispatchEvent(new Event('toggle'));
@@ -101,6 +110,7 @@ describe('the web create wizard — a circle with its own pod', () => {
   it('typing the pod address enables the review: the button follows the field, not the moment the step was drawn', async () => {
     const { el } = boot();
     typeName(el, 'Straat');
+    pickKind(el, 'neighbourhood');
     const fold = el.querySelector('[data-role=advanced]');
     fold.open = true;
     fold.dispatchEvent(new Event('toggle'));

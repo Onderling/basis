@@ -584,26 +584,14 @@
 .cc-mydata__retention-choice.is-on { background: var(--paper-2); border-color: transparent; font-weight: 600; }
 .cc-mydata__retention-note { font-size: 12px; color: var(--ink-soft); margin: 6px 0 0; }
 
-.circle-view__filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; }
-.circle-view__filter--active { background: var(--paper-2); border-radius: 8px; }
-.circle-view__filter-chip { font: inherit; font-size: 12px; line-height: 1; padding: 5px 9px; border-radius: 999px;
-  border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
-.circle-view__filter-chip.is-on { background: var(--paper-2); color: var(--ink); border-color: transparent; }
-.circle-view__filter-chip:disabled { cursor: default; opacity: 0.55; }
-.circle-view__filter-sep { width: 1px; height: 14px; background: var(--line); margin: 0 2px; }
-.circle-view__filter-note { flex-basis: 100%; font-size: 11px; color: var(--ink-soft); }
 
 .circle-view__list { flex: 1; overflow-y: auto; padding: 4px 0 8px; display: flex; flex-direction: column; gap: 9px; }
 .circle-view__empty { color: var(--ink-soft); font-style: italic; padding: 16px 4px; text-align: center; }
 .circle-view__day { align-self: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.8px; padding: 8px 12px; }
-/* Bulletin restyle — the CONVERSATION stream is ONE bot card (mirror of onderling.org's .chatbox):
-   a bot-header strip over the message log, in a 2px-ink-bordered --card container. */
-.circle-view__chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--card); border: 2px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-top: 4px; }
-.circle-view__chat-card .circle-view__list { padding: 14px; }
-/* the bulletin's ink frame is a dark line on paper; inverted in dark it became a bright white box around the chat —
-   in dark the frame takes the theme's line colour instead (the same two dark selectors theme.css uses) */
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .circle-view__chat-card { border-color: var(--line); } }
-:root[data-theme="dark"] .circle-view__chat-card { border-color: var(--line); }
+/* The CONVERSATION stream: the message log straight on the page, no frame around it (a frame took room before any
+   content); a 1:1 bot chat keeps its header strip on top. */
+.circle-view__chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; margin-top: 4px; }
+.circle-view__chat-card .circle-view__list { padding: 8px 2px; }
 /* Bot-header strip: green presence dot + the assistant's name in bold, a --line hairline under it. */
 .circle-view__bot-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
 .circle-view__bot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
@@ -618,7 +606,7 @@
 /* "only you" vs "whole circle" scope (one presentation of the message's scope data) — plain meta text. */
 .circle-view__scope--self  { color: var(--ink-soft); }
 .circle-view__scope--circle { color: var(--ink-soft); }
-.circle-view__bubble-kind { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 0.8px; padding: 2px 7px; border-radius: 4px; background: var(--paper); color: var(--accent-ink); margin-right: 6px; vertical-align: middle; }
+.circle-view__bubble-kind { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: var(--paper); color: var(--accent-ink); margin-right: 6px; vertical-align: middle; }
 .circle-view__bubble-text { font-size: 14px; color: var(--ink); display: inline; }
 /* Per-answer transparency badge (site .msg .src): how a bot answer came about, one small mono line. */
 .circle-view__bubble-provenance { display: block; margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); }
@@ -935,7 +923,7 @@
 }
 
 .cc-cthread { display: flex; flex-direction: column; height: 100%; padding-bottom: 12px; }
-.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; padding-right: 44px; }   /* clear the fixed header avatar (top-right), so the ⋯ is never under it */
 .cc-cthread__lang { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
 .cc-cthread__lang-btn { cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; padding: 3px 9px; background: transparent; border: none; color: var(--ink-soft); }
 .cc-cthread__lang-btn.is-active { background: var(--accent); color: var(--accent-contrast); }
@@ -972,8 +960,22 @@
   background: transparent; border: none; padding: 4px 0; text-decoration: underline; flex: 0 0 auto;
 }
 .cc-cthread__hide-note { font-size: 12px; color: var(--ink-soft); padding: 0 12px 4px; }
+/* the header's one row: who you are here (the avatar, top right) and the ⋯ that holds Hide and Delete */
+.cc-cthread__acts { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
+.cc-cthread__self { cursor: pointer; border: none; padding: 0; background: transparent; }
+.cc-cthread__more { cursor: pointer; font: inherit; font-size: 20px; line-height: 1; color: var(--ink); background: transparent; border: none; padding: 4px 8px; }
+.cc-cthread__menu { position: absolute; top: 100%; right: 0; z-index: 5; min-width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.cc-cthread__menu[hidden] { display: none; }
 .cc-cthread__system { align-self: center; font-size: 12px; font-style: italic; color: var(--ink-soft); padding: 2px 8px; }
 .cc-cthread__sending { font-size: 12px; color: var(--ink-soft); font-style: italic; padding: 2px 4px; }
+/* my own bubble's delivery chip (the circle bubble's chip, same classes) sits on a meta line under the words */
+.cc-cthread__meta { display: flex; justify-content: flex-end; margin-top: 2px; font-size: 12px; min-height: 0; }
+/* THE ACT STRIP (actState.js): the act the person just took — pending · done · failed — one line at the top, for every
+   op; a tap dismisses it. Mobile: rn/ActStateBar.js. */
+.cc-act-state { position: fixed; top: 8px; left: 12px; right: 12px; z-index: 30; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 13px; text-align: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.cc-act-state[data-state="pending"] { color: var(--ink-soft); }
+.cc-act-state[data-state="done"] { border-color: var(--accent); }
+.cc-act-state[data-state="failed"] { border-color: var(--danger); color: var(--danger); }
 .cc-cthread__skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .cc-cthread__skill {
   cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;
@@ -1304,6 +1306,9 @@
 .cc-mij__card-head { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
 .cc-mij__card-name { margin: 0; font-size: 14px; font-weight: 800; color: var(--ink); }
 .cc-mij__card-tag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--card); background: var(--accent-ink); padding: 2px 6px; }
+.cc-mij__first-contact { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.cc-mij__choice { font: inherit; font-size: 12.5px; text-align: left; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; }
+.cc-mij__choice--on { border-color: var(--ink); font-weight: 600; cursor: default; }
 .cc-mij__entry { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid var(--line); }
 .cc-mij__entry:last-child { border-bottom: none; }
 .cc-mij__entry-key { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); flex: 0 0 38%; }
@@ -1399,6 +1404,16 @@
   display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink); line-height: 1.45; margin: 6px 0;
 }
 .cc-wizard-radio-group { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+/* Join step 3: the one line naming who joins, and the fold with the rest */
+.cc-wizard-join-as { margin: 4px 0 12px; font-size: 15px; color: var(--ink); line-height: 1.45; }
+.cc-wizard-fold { margin: 4px 0 10px; }
+.cc-wizard-fold > summary { cursor: pointer; font-size: 13px; color: var(--accent); margin-bottom: 8px; }
+.cc-wizard-address, .cc-wizard-new-persona { margin: 10px 0; }
+.cc-wizard-address-hint, .cc-wizard-new-persona-name { margin-top: 4px; }
+.cc-wizard-new-persona-open, .cc-wizard-new-persona-make {
+  margin-top: 6px; padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent;
+  color: var(--ink); font-size: 13px; cursor: pointer;
+}
 .cc-wizard-offerings-default-box { margin-top: 2px; flex: none; }
 .cc-wizard-offerings-default-hint, .cc-wizard-reveal-suggested {
   font-size: 12px; color: var(--ink-soft); margin: 2px 0 8px; line-height: 1.45;
@@ -1536,6 +1551,10 @@
 .circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
 .circle-screen__row-act:hover { color: var(--accent-ink); }
 .circle-screen__items-list { list-style: none; margin: 0; padding: 0; }
+/* a list's add field on Vandaag: one line, the theme's paper and ink (follows dark mode) */
+.circle-screen__list-add { display: flex; gap: 6px; margin: 4px 0 10px; }
+.circle-screen__list-add input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 14px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; }
+.circle-screen__list-add button { flex: 0 0 auto; }
 
 /* The shared overlay sheet (the "+" sheet, restore, …): the theme's card, so it follows dark mode. */
 .cc-overlay-card { background: var(--card); color: var(--ink); border: 1px solid var(--line); max-width: 26rem; width: 92%; padding: 1.25rem; border-radius: var(--radius); max-height: 80vh; overflow: auto; }
@@ -1588,3 +1607,25 @@
 .cc-profile__gear { margin-left: auto; background: none; border: 0; cursor: pointer; font: inherit; font-size: 20px; line-height: 1; padding: 6px; color: var(--ink); }
 .cc-profile__gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cc-profile__topbar { display: flex; justify-content: flex-end; }
+
+/* "Nieuw voor jou" on Today: one quiet row per thing, a ✕ to set it aside, "Alles gelezen" at the foot */
+.circle-screen__for-you-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.circle-screen__for-you-row { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0; }
+.circle-screen__for-you-icon { flex: none; }
+.circle-screen__for-you-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.circle-screen__for-you-face { flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--paper-2); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--ink-soft); }
+.circle-screen__for-you-late { flex: none; font-size: 11px; color: var(--ink-soft); }
+.circle-screen__for-you-dismiss { flex: none; background: transparent; border: none; color: var(--ink-soft); cursor: pointer; font: inherit; padding: 2px 6px; }
+.circle-screen__for-you-all { margin-top: 6px; background: transparent; border: none; color: var(--accent-ink); cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
+/* Today's circles with news: the name, what is new (icons), the count, with room between them */
+.circle-screen__circles-unread-row > span + span { margin-left: 8px; }
+
+/* THE BANNER: what just came in for you, for a moment at the top (the shared driver decides; this only paints) */
+.cc-banner {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50;
+  max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); font: inherit; text-align: left; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cc-banner[hidden] { display: none; }

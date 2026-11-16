@@ -71,7 +71,7 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
     await fromNode.agent.sendPeerMessage(toAddr, {
       type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: GROUP,
       msgId: `announce-${fromNode.label}-${Date.now()}`, ts: Date.now(), announcements: [mine],
-    }, SEND);
+    }, { ...SEND, circleId: GROUP });   // circle traffic: the circle named
   }
 
   /** V presents a token at a device's door — the REAL A2A gate. */

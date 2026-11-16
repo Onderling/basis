@@ -186,18 +186,40 @@ function openItemAttachmentThumbs(it, opener) {
  * @param {(() => Promise<{mediaGateway:object, localActor:string, t?:Function}|null>)} [getMedia]
  * @returns {(appOrigin:string, opId:string, args?:object)=>Promise<any>}
  */
-export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia) {
+/**
+ * The sentence a shell paints when a scoped write was refused: its locale key, decided once for every shell.
+ * @param {unknown} err  what the scoped call threw
+ * @returns {string}
+ */
+export function scopedWriteFailureKey(err) {
+  const code = err && typeof err === 'object' ? err.message : null;
+  if (code === 'sealed-circle-key-not-ready') return 'circle.noticeboard.key_not_ready';
+  if (code === 'media-gateway-unavailable') return 'circle.noticeboard.media_unavailable';
+  return 'circle.noticeboard.post_failed';
+}
+
+export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia, { sealed = null, policyNow = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return callSkill;
   return async (appOrigin, opId, args = {}) => {
     if (appOrigin !== 'pinboard') return callSkill(appOrigin, opId, args);
+    // THE POLICY AS IT IS NOW (`policyNow`, the store's live read): an open screen built this call with the policy it
+    // read then; a joined circle's policy that was not known yet lands later, and the screen must not stay refused (or
+    // keep a posture that changed) until it is re-opened. The strategy getter and `sealed` receive it.
+    const live = (typeof policyNow === 'function' && (SCOPED_WRITE_OPS.has(opId) || SCOPED_LIST_OPS.has(opId)))
+      ? await Promise.resolve().then(() => policyNow()).catch(() => undefined) : undefined;
     const strategy = (typeof getSealStrategy === 'function'
       && (SCOPED_WRITE_OPS.has(opId) || SCOPED_LIST_OPS.has(opId)))
-      ? await getSealStrategy().catch(() => null) : null;
+      ? await Promise.resolve().then(() => getSealStrategy(live)).catch(() => null) : null;
     if (SCOPED_WRITE_OPS.has(opId)) {
       const scoped = { ...args };
       if (scoped.groupId == null) scoped.groupId = circleId;   // don't clobber an explicit scope
       // Any scoped write's body is sealed at rest for a sealed circle — a post, an announcement, the next
       // kind — keyed on the ARG, not on the op's name (an announcement used to slip through unsealed).
+      // A SEALED circle with no strategy yet (its key pair is not there: the page asked before its agent was up), or one
+      // whose posture is NOT KNOWN yet (`sealed()` is null: its policy is not read), is REFUSED, never written in the
+      // clear: "no strategy" is the plaintext answer only for a circle known not to seal. Every scoped write, not only a
+      // post with text: a member whose key does not open can do nothing in a sealed circle, which is right.
+      if (!strategy && typeof sealed === 'function' && sealed(live) !== false) throw new Error('sealed-circle-key-not-ready');
       if (strategy && typeof scoped.text === 'string' && scoped.text) {
         scoped.text = strategy.seal(scoped.text);
       }

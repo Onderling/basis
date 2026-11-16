@@ -722,7 +722,7 @@
         "doc": "Stap-1 titel"
       },
       "raise_intro": {
-        "text": "Beschrijf wat er gebeurd is. Dit gaat naar de kring; beheerders zien het, en twee willekeurige leden ook als de kring conflicten met bemiddeling oplost.",
+        "text": "Beschrijf wat er gebeurd is. Dit gaat naar de kring; beheerders zien het.",
         "doc": "Stap-1 intro"
       },
       "about_post_label": {
@@ -774,7 +774,7 @@
         "doc": "Stap-3 titel"
       },
       "file_intro": {
-        "text": "Kijk het na. Een ingediend bezwaar is zichtbaar voor beheerders, en voor bemiddelaars als de kring bemiddeling gebruikt. Je kunt er later een bericht over plaatsen.",
+        "text": "Kijk het na. Een ingediend bezwaar is zichtbaar voor beheerders. Je kunt er later een bericht over plaatsen.",
         "doc": "Stap-3 intro"
       },
       "review_summary": {
@@ -814,7 +814,7 @@
         "doc": "Success-stap titel"
       },
       "success_intro": {
-        "text": "Beheerders zien het in de kring, en bemiddelaars ook als de kring bemiddeling gebruikt.",
+        "text": "Beheerders zien het in de kring.",
         "doc": "Success-stap intro"
       }
     }

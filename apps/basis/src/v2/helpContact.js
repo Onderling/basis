@@ -25,6 +25,17 @@ export function contactOpenTarget(c) {
   return { kind: 'thread', contact: c };
 }
 
+/**
+ * Where the Help door goes (Settings' Help, the intro's "more"): the Help circle when this device holds it, else the
+ * line that says why nothing opens. The circle is provisioned once (its marker), so one that is gone stays gone here.
+ * @param {{id?: string}[]|null} circles  the circles this device holds
+ * @returns {{kind: 'circle', circleId: string} | {kind: 'say', key: string}}
+ */
+export function helpDoorTarget(circles = []) {
+  if ((circles || []).some((c) => c?.id === HELP_CIRCLE_ID)) return { kind: 'circle', circleId: HELP_CIRCLE_ID };
+  return { kind: 'say', key: 'circle.settings_home.help_missing' };
+}
+
 /** The circles the launcher paints as tiles: every circle but the help circle (its door is in Contacten). */
 export function tileCircles(circles = []) {
   return (circles || []).filter((c) => c?.id !== HELP_CIRCLE_ID);

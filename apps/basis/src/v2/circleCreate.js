@@ -23,7 +23,7 @@
  * The name is not lost — it stays what people read, and the id becomes what machines match. The UI
  * already prefers the name and treats the id as a fallback, which is why this is cheap.
  */
-import { initialState, finalSubmit, resolveFounderKey, newFounderCircleId } from '../core/wizards/createGroupState.js';
+import { initialState, finalSubmit, resolveFounderKey, newFounderCircleId, chooseKind } from '../core/wizards/createGroupState.js';
 
 /**
  * @param {object} a
@@ -32,12 +32,15 @@ import { initialState, finalSubmit, resolveFounderKey, newFounderCircleId } from
  * @param {string} [a.id]               pin a STABLE id — for a SYSTEM circle only (the help circle),
  *   where every device must independently arrive at the same one. A person's circle never pins.
  * @param {string} [a.founderPubKey]    the creating device's identity key; the id is derived from it
+ * @param {string} [a.kind]            the circle's kind (the wizard asks it; a quick create names it): a household unless said
  * @returns {Promise<object>} `{ groupId, code, expiresAt, … }`
  */
-export async function quickCreateCircle({ callSkill, name, id, founderPubKey, rulesExtra = null, inviteMaxRedemptions = null } = {}) {
+export async function quickCreateCircle({ callSkill, name, id, founderPubKey, rulesExtra = null, inviteMaxRedemptions = null, kind = 'household' } = {}) {
   const clean = String(name ?? '').trim();
   if (!clean) throw new Error('circle name required');
-  const state = initialState();
+  // the kind, named: a new circle has none until someone picks one, and a quick create keeps the household it always
+  // made (its invite ceiling, its rules) unless the caller says otherwise
+  const state = chooseKind(initialState(), kind, null);
   state.name = clean;
   // A caller may pin fields the wizard never asks (the pair roster: `rules.pair`, no apps, one place on its invite).
   if (rulesExtra && typeof rulesExtra === 'object') state.rulesExtra = rulesExtra;

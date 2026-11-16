@@ -21,7 +21,7 @@
  * statements over its turns, reads the start link).
  */
 import { parseUntrustedJson, AgentIdentity, STATEMENT_DOMAINS, verifyDeviceStatement } from '@onderling/core';
-import { screenCode } from './botScreens.js';
+import { screenCode } from './screenDoor.js';
 
 /** The peer-message subtype of the bot's statement to the linked app (linked, or unlinked). */
 export const IDENTITY_LINK_SUBTYPE = 'identity-link';

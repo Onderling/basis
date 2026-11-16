@@ -31,3 +31,9 @@ export {
 export {
   assertActorResolverConformance,
 } from './actorResolverConformance.js';
+
+export {
+  ED25519_EDGE_VECTORS,
+  ED25519_ACCEPTED,
+  ed25519Disagreements,
+} from './ed25519Conformance.js';

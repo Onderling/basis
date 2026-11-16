@@ -96,7 +96,7 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
       await wizard.locator('.cc-wizard-btn-primary').first().click().catch(() => {});
       await page.waitForTimeout(1200);
     }
-    const handleInput = wizard.locator('.cc-wizard-handle-input');
+    const handleInput = wizard.locator('.cc-wizard-handle-input:visible');   // in the fold, shown when there is no name yet
     if (await handleInput.count()) await handleInput.fill('bert');
     await wizard.locator('.cc-wizard-submit').first().click();
     await expect(page.locator('.cc-mydata-modal__card'), 'the join completed (the wizard closed)').toHaveCount(0, { timeout: 90_000 });

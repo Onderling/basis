@@ -11,6 +11,7 @@
  * --only=circlePodGrantToPodWebId` boots an ACP server and mints both.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
+import { produceWithPair } from './support/deviceSealingKeyPair.js';
 
 const CSS_URL = process.env.CSS_URL;
 const HAVE_A = !!(process.env.CSS_A_CLIENT_ID && process.env.CSS_A_CLIENT_SECRET && process.env.CSS_A_WEBID);
@@ -59,7 +60,7 @@ SUITE('a circle member reads the pod with the WebID they joined with (CSS, ACP)'
     const circleId = `pw-${generateKeypair().publicKey.replace(/[^a-zA-Z0-9]/g, '').slice(-12)}`;
     const circleRootUri = `${aliceBase}/${circleId}`;
     const vault = new MemVault();   // the owner device's vault: survives the reload below
-    const build = () => createCirclePodProducer({
+    const build = () => produceWithPair({
       circleId, storagePosture: 'p2', vault, generateKeypair,
       makePodClient: () => alice.client, circleRootUri,
       sharing: createCirclePodSharing({ fetch: alice.fetch, ownerWebId: alice.webid }),

@@ -15,18 +15,16 @@ import {
 } from '../src/core/wizards/joinGroupState.js';
 
 describe('handleSuggestions — prior-handle sourced, no leak', () => {
-  it('returns the joiner OWN prior handles, deduped/lowercased/valid, capped at 8', () => {
-    const out = handleSuggestions(['Jan', 'jan', 'bad!!', 'piet', ''], 'ignored');
-    expect(out).toEqual(['jan', 'piet']); // Jan/jan fold; bad!! + '' dropped
+  it('returns the joiner OWN prior names, deduped case-blind, as written, valid, capped at 8', () => {
+    const out = handleSuggestions(['Jan', 'jan', 'Buur Piet', '', '\u0007'], 'ignored');
+    expect(out).toEqual(['Jan', 'Buur Piet']); // Jan/jan fold to the first; '' and a control character dropped
   });
   it('caps at 8', () => {
     const many = Array.from({ length: 12 }, (_, i) => `buur${i}`);
     expect(handleSuggestions(many, 'x')).toHaveLength(8);
   });
-  it('falls back to a display-name candidate when there are no prior handles', () => {
-    // string first arg == legacy display-name mode; array-but-empty == no priors
-    expect(handleSuggestions('My Name')[0]).toBe('my-name');
-    expect(handleSuggestions([], 'My Name')[0]).toBe('my-name');
+  it('falls back to your own name, as written, when there are no prior names', () => {
+    expect(handleSuggestions([], 'My Name')).toEqual(['My Name']);
   });
 });
 

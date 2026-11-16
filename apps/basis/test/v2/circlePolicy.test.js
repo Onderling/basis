@@ -6,7 +6,7 @@ import {
   defaultViewModeFromPolicy, autoEnacts,
   DEFAULT_MEMBER_OVERRIDE, normalizeMemberOverride, mergeMemberOverride,
   shouldPushNotify,
-  DECISION_KINDS, requiredClassFor, settingsChangeNeedsProposal, decisionClassFor, GOVERNANCE_ACTIONS,
+  DECISION_KINDS, requiredClassFor, settingsChangeNeedsProposal, decisionClassFor, GOVERNANCE_ACTIONS, GOVERNED_ACTIONS,
 } from '../../src/v2/circlePolicy.js';
 
 describe('circlePolicy · normalizeCirclePolicy', () => {
@@ -375,7 +375,7 @@ describe('circlePolicy · governanceEnactment (the enactment-trigger setting)', 
 describe('THE ONE DECISION TABLE (the decision-kind unification)', () => {
   it('every governed decision kind maps to a governance action, and the class resolves through it', () => {
     for (const [kind, action] of Object.entries(DECISION_KINDS)) {
-      expect(GOVERNANCE_ACTIONS).toContain(action);
+      expect(GOVERNED_ACTIONS).toContain(action);
       expect(requiredClassFor({}, kind)).toBe(decisionClassFor({}, action));
     }
     expect(requiredClassFor({}, 'not-a-kind')).toBe(null);

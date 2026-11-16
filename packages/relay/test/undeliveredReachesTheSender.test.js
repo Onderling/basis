@@ -44,12 +44,14 @@ describe('the relay tells the sender it gave up', () => {
 
     // nobody has ever registered this address, so both sends queue
     const absent = (await AgentIdentity.generate(throwawayVault())).pubKey;
-    await tx.sendOneWay(absent, { hello: 1, msgId: 'chat-msg-1' });
-    await tx.sendOneWay(absent, { hello: 2, msgId: 'chat-msg-2' });
+    await tx.sendOneWay(absent, { hello: 1, msgId: 'chat-msg-1', subtype: 'circle-chat' });
+    await tx.sendOneWay(absent, { hello: 2, msgId: 'chat-msg-2', subtype: 'circle-chat' });
     await settle();
 
     expect(seen.length).toBeGreaterThanOrEqual(1);
     expect(seen[0]).toMatchObject({ reason: 'bucket-full' });
+    // who it was for and what kind it was: the sender's own memory of its send (the relay's frame names neither)
+    expect(seen[0]).toMatchObject({ to: absent, subtype: 'circle-chat' });
     // THE id the app can act on — the payload's msgId, which is what the delivery state is keyed by — not
     // the envelope's, which only the wire ever knew. The envelope id rides along, named as such.
     expect(seen[0].msgId).toBe('chat-msg-1');

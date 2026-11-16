@@ -15,12 +15,14 @@
  * shell routes button taps the same way.
  */
 
-import { answerHelp, answerHelpTopic, helpTopics } from './help/helpAnswer.js';
+import { answerHelp, answerHelpTopic, helpTopics, likelyHelpTopics } from './help/helpAnswer.js';
 
 /** Inline-button action namespace for a help affordance (topic chip / consent choice). */
 export const HELP_ACTION_PREFIX = 'help:';
 const TOPIC_PREFIX = 'topic:';
 const CONSENT_PREFIX = 'consent:';
+/** The button `action` string for "all topics": after the likeliest few, the whole list. */
+export const HELP_ALL_ACTION = `${HELP_ACTION_PREFIX}topics`;
 
 /** The button `action` string for a pickable help topic. */
 export function helpTopicAction(id) { return `${HELP_ACTION_PREFIX}${TOPIC_PREFIX}${id}`; }
@@ -34,6 +36,7 @@ export function helpConsentAction(value) { return `${HELP_ACTION_PREFIX}${CONSEN
  */
 export function parseHelpAction(action) {
   if (typeof action !== 'string' || !action.startsWith(HELP_ACTION_PREFIX)) return null;
+  if (action === HELP_ALL_ACTION) return { kind: 'all' };
   const rest = action.slice(HELP_ACTION_PREFIX.length);
   if (rest.startsWith(TOPIC_PREFIX)) {
     const id = rest.slice(TOPIC_PREFIX.length);
@@ -69,8 +72,13 @@ export function routeHelpMessage(query, { lang, llmReady } = {}) {
  * @param {{ lang?: string }} [opts]
  * @returns {Array<{ label: string, action: string }>}
  */
-export function helpTopicChips({ lang } = {}) {
-  return helpTopics({ lang }).map((topic) => ({ label: topic.kop, action: helpTopicAction(topic.id) }));
+export function helpTopicChips({ lang, query = null, allLabel = null } = {}) {
+  const all = helpTopics({ lang }).map((topic) => ({ label: topic.kop, action: helpTopicAction(topic.id) }));
+  // after a question: the five likeliest topics first, the rest behind one "all topics" chip (walk row 81: ~30 buttons
+  // and none of them the one asked for); a question that shares nothing with any topic gets the whole list
+  const likely = typeof query === 'string' && allLabel ? likelyHelpTopics(query, { lang }) : [];
+  if (!likely.length) return all;
+  return [...likely.map((topic) => ({ label: topic.kop, action: helpTopicAction(topic.id) })), { label: allLabel, action: HELP_ALL_ACTION }];
 }
 
 /**

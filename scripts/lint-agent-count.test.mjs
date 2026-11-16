@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { adoptions, constructions, agentCountProblems } from './lint-agent-count.mjs';
+import { adoptions, constructions, agentCountProblems, docNamedAgents, docAgreementProblems } from './lint-agent-count.mjs';
 
 const TODAY = [
   'const adoptInProcess = (peer) => {};',
@@ -28,5 +28,16 @@ describe('lint-agent-count', () => {
     const problems = agentCountProblems(fewer, ['hostAgent'], { 'new Agent({': 1, 'new InternalTransport(bus': 1 });
     expect(problems.join('\n')).toMatch(/no longer adopted — remove it/);
     expect(problems.join('\n')).toMatch(/lower CONSTRUCTION_BASELINE/);
+  });
+  it('reads the agents the doc names in its marked sentence', () => {
+    expect(docNamedAgents('x <!-- lint-agent-count: in-process = hostAgent, pinboardAgent.bundle.agent --> y')).toEqual(['hostAgent', 'pinboardAgent.bundle.agent']);
+    expect(docNamedAgents('no marker here')).toBeNull();
+  });
+  it('is red when the doc and the baseline disagree, either way, or the marker is gone', () => {
+    const doc = '<!-- lint-agent-count: in-process = hostAgent, pinboardAgent.bundle.agent -->';
+    expect(docAgreementProblems(doc, ['hostAgent', 'pinboardAgent.bundle.agent'])).toEqual([]);
+    expect(docAgreementProblems(doc, ['hostAgent']).join('\n')).toMatch(/names pinboardAgent\.bundle\.agent, which is no longer adopted/);
+    expect(docAgreementProblems('<!-- lint-agent-count: in-process = hostAgent -->', ['hostAgent', 'x']).join('\n')).toMatch(/does not name x/);
+    expect(docAgreementProblems('nothing', ['hostAgent']).join('\n')).toMatch(/no .* marker/);
   });
 });

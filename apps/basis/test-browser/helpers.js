@@ -40,7 +40,7 @@ export function circleSlug(name) {
  * Only the two REQUIRED fields are filled (Name, Circle id); every other step is accepted as it comes, so
  * this helper keeps working when a step gains a field and fails loudly if a step gains a required one.
  */
-export async function createCircleViaWizard(page, name, { handle = 'founder' } = {}) {
+export async function createCircleViaWizard(page, name, { handle = 'founder', kind = 'household' } = {}) {
   // the app opens on Vandaag (the home) since 2026-10-15: the create button lives on the circles list
   if (await page.locator('.circle-launcher__new').count() === 0) {
     await page.locator('[data-tab="circles"]').first().click();
@@ -51,6 +51,8 @@ export async function createCircleViaWizard(page, name, { handle = 'founder' } =
   const inputs = page.locator('.cc-wizard-input:visible');
   await inputs.nth(0).fill(name);
   await fillFounderHandle(page, handle);
+  // the kind, asked on the first step (never assumed): the household the specs were written against, unless named
+  await page.locator(`.cc-wizard input[type=radio][value="${kind}"]:visible, input[type=radio][value="${kind}"]:visible`).first().check();
   // The id is NOT typed any more. It used to be `circleSlug(name)` filled into the wizard's second
   // field — which meant this helper MANUFACTURED the very collision the L49 walk went on to report:
   // two peers "independently" naming a circle the same thing shared an id because the harness had

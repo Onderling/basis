@@ -40,7 +40,7 @@ describe('fork notices — rendered from the log', () => {
   it('an admin is told, named', async () => {
     const rows = forkNoticeRows({ events: await forkedLog(), circleId: CIRCLE, viewerId: 'webid:ann', members, t });
     expect(rows).toHaveLength(1);
-    expect(rows[0].event.payload.text).toBe(`${FORK_NOTICE_KEYS.member}(@bea)`);
+    expect(rows[0].event.payload.text).toBe(`${FORK_NOTICE_KEYS.member}(bea)`);
   });
 
   it('a plain member is not — they see the roster change, not an alarm', async () => {

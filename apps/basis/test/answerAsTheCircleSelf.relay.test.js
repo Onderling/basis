@@ -37,7 +37,12 @@ describe('an answer to a post leaves as the circle\'s self', () => {
     const mark = sends.length;
     const r = await anne.agent.callSkill('pinboard', 'respondToItem', { itemId: post.id, body: 'ik help' });
     await new Promise((res) => setTimeout(res, 3000));
-    const names = { [anne.agent.identity.chat.pubKey]: 'anne-main', [W.chatId.pubKey]: 'persona-main' };
+    // an answer to a circle post is that circle's traffic: it leaves as Anne's self IN the circle (her per-circle key there),
+    // never a person key. The two person keys are named too, so a send under either shows up as a failure.
+    const names = {
+      [anne.agent.identity.chat.pubKey]: 'anne-main', [W.chatId.pubKey]: 'persona-main',
+      [anne.agent.circleAddressFor(X)]: 'anne-in-X', [anne.agent.circleAddressFor(Y)]: 'persona-in-Y',
+    };
     return { r, from: [...new Set(sends.slice(mark).map((s) => names[s.from]).filter(Boolean))].sort() };
   }
 
@@ -79,11 +84,13 @@ describe('an answer to a post leaves as the circle\'s self', () => {
   it('in the persona\'s circle: the answer goes out, from the persona\'s key, nothing from the default\'s', async () => {
     const { r, from } = await answerIn(Y, 'wie heeft een boormachine?');
     expect(r?.error ?? null, JSON.stringify(r)).toBe(null);
-    expect(from, 'the answer left as the persona').toContain('persona-main');
+    expect(from, 'the answer left as the persona, in its circle').toContain('persona-in-Y');
     expect(from, 'nothing from the default self while answering in the persona\'s circle').not.toContain('anne-main');
+    expect(from, 'nothing from the default self\'s circle address either').not.toContain('anne-in-X');
+    expect(from, 'never on a person key: a circle post is answered inside the circle').not.toContain('persona-main');
     // …and it ARRIVED at Cor, from the persona's key (what the harness's router hands on, with its verified sender;
     // recording "who answered" on the post is a shell's chat door, composed on mobile only — not this harness)
-    const got = await until(async () => cor.received.find((m) => JSON.stringify(m.payload ?? {}).includes('ik help') && m.from === W.chatId.pubKey) ?? null, { timeout: 20_000, step: 200 });
+    const got = await until(async () => cor.received.find((m) => JSON.stringify(m.payload ?? {}).includes('ik help') && m.from === anne.agent.circleAddressFor(Y)) ?? null, { timeout: 20_000, step: 200 });
     expect(got, 'Cor received the answer from the persona').toBeTruthy();
     expect(JSON.stringify(got.payload).includes(anne.agent.identity.chat.pubKey), 'nothing of the default self inside the answer').toBe(false);
   }, 90_000);
@@ -91,7 +98,9 @@ describe('an answer to a post leaves as the circle\'s self', () => {
   it('in the default\'s circle: unchanged — the answer leaves as the default self', async () => {
     const { r, from } = await answerIn(X, 'kan iemand mijn plant water geven?');
     expect(r?.error ?? null, JSON.stringify(r)).toBe(null);
-    expect(from).toContain('anne-main');
+    expect(from, 'the answer left as the default self, in its circle').toContain('anne-in-X');
     expect(from).not.toContain('persona-main');
+    expect(from).not.toContain('persona-in-Y');
+    expect(from, 'never on a person key').not.toContain('anne-main');
   }, 90_000);
 });

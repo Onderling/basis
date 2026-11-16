@@ -57,7 +57,7 @@ beforeEach(async () => {
   identity = await AgentIdentity.generate(new VaultMemory());
 });
 
-const mk = () => new MdnsTransport({ identity, hostname: 'dw-test' });
+const mk = () => new MdnsTransport({ identity, lanIdentity: identity, hostname: 'dw-test' });   // LAN key pinned
 
 describe('the split is used when the native module has it', () => {
   it('detects the split', () => {

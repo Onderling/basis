@@ -12,10 +12,12 @@ import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 
 import { buildFormSpec, validateAndCoerce } from '../../../../basis/src/forms/buildFormSpec.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 
 export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose, onDispatched,
   // a form already decided by the shared `opFormOrRun` (what is known filled in), and the choices its pickers offer
   spec: given = null, choices = null }) {
+  const sheetCap = useSheetCap(0.85);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const spec = useMemo(() => given ?? (op ? buildFormSpec({
@@ -47,10 +49,10 @@ export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.card} testID="op-page-modal">
+        <View style={[styles.card, sheetCap]} testID="op-page-modal">
           <Text style={styles.title}>{title}</Text>
           {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-          <ScrollView style={styles.fields} keyboardShouldPersistTaps="handled">
+          <ScrollView style={[styles.fields, SHEET_SCROLL]} keyboardShouldPersistTaps="handled">
             {spec.fields.map((f) => (f.readOnly && f.value !== undefined ? (
               <View key={f.name} style={styles.field}>
                 <Text style={styles.label}>{f.labelKey ? t(f.labelKey) : f.name}</Text>
@@ -100,7 +102,7 @@ export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose
 
 const makeStyles = (theme) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 18 },
-  card: { backgroundColor: theme.color.card, borderRadius: 10, padding: 18, maxHeight: '85%' },
+  card: { backgroundColor: theme.color.card, borderRadius: 10, padding: 18 },
   title: { color: theme.color.ink, fontSize: 17, fontWeight: '600', marginBottom: 6 },
   hint: { color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 },
   fields: { flexGrow: 0 },

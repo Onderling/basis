@@ -5,8 +5,8 @@
  * That claim has been carried on the go-live checklist for weeks and was scoped for a fix. It reasons that
  * "the join path checks the handle before anything recognises the identity is the same person". But the
  * identity it would recognise is STABLE across devices: the chat identity is derived from the profile, not
- * the device, so a restored or enrolled device presents the same webid — and `findHandleCollision` skips
- * rows whose webid equals the claimant's.
+ * the device, so a restored or enrolled device presents the same webid. (Since 2026-11-06 no name is refused at
+ * all: two people may share one.)
  *
  * These drive the ADMIN's own skill, which is where the refusal would come from (a joiner running any
  * build only gets in by this returning a row), and pin the rule either way.
@@ -64,12 +64,12 @@ describe('a restored member coming back to a circle they are already in', () => 
     expect(annas.length, 'one person, one row').toBe(1);
   });
 
-  it('while a DIFFERENT person claiming that handle is still refused', async () => {
+  it('and a DIFFERENT person with that name gets in too (two people may share a name since 2026-11-06)', async () => {
     const admin = await buildAdmin();
     await callSkill(admin.agent, 'createGroupV2', { groupId: G, name: G, rules: {} });
     const { code } = await callSkill(admin.agent, 'getCurrentMembershipCode', { groupId: G });
     await redeemAs(admin, code, ANNA, 'anna');
-    const impostor = await redeemAs(admin, code, OTHER, 'anna');
-    expect(impostor.error, 'handle uniqueness still binds for a stranger').toBe('handle-taken');
+    const other = await redeemAs(admin, code, OTHER, 'anna');
+    expect(other.error, 'a shared name is not a refusal; the key tells the two apart').toBeUndefined();
   });
 });

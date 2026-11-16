@@ -198,6 +198,9 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     }
     return circleIdentities.get(circleId);
   };
+  // A Nearby ROOM identity for one entry: the same derivation as a circle's, over a namespace that carries a fresh
+  // nonce ('nearby:<nonce>'). NOT memoised: the namespace is the nonce, and nothing may keep it after the call.
+  const roomIdentityFor = (namespace) => circleIdentity(circleSeed, namespace, new VaultMemory());
   // Memoised on THIS runtime, keyed by circle id: the derivation (sha + an Ed25519 keypair in pure JS) ran dozens of
   // times per circle during a phone boot. Bounded; dies with the runtime; never persisted.
   const circleAddresses = new Map();   // circleId → address
@@ -252,7 +255,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     get circleSeed() { return circleSeed; },
     get circleRoot() { return circleRoot; },
     switchCircleRoot,
-    circleIdentityFor, circleAddressFor, circleSealingKeyPairFor, personKeyPubOf,
+    circleIdentityFor, circleAddressFor, circleSealingKeyPairFor, personKeyPubOf, roomIdentityFor,
     authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
     initialPersonKey, derivedLinkKeyPub,
     // The persona's LIVE identities, set by the agent: its chat identity once the secure agent has loaded it from the

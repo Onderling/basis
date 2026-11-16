@@ -9,20 +9,22 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { phoneWiringSource } from '../../basis/test/support/phoneWiringSource.js';
 
 const here = (p) => resolve(__dirname, p);
 const read = (p) => readFileSync(here(p), 'utf8');
 
 describe('reply-to-post surface parity', () => {
   const webApp    = read('../../basis/web/v2/circleApp.js');
-  const mobileApp = read('../src/screens/ChatScreen.js');
+  // The phone's router is read through its whole composition: screen → src/core/phoneInboundWiring.js → the shared map.
+  const mobileApp = phoneWiringSource();
   const webThread    = read('../../basis/web/v2/contactThread.js');
   const mobileThread = read('../src/screens/v2/ContactThreadScreen.js');
   const mobileBoard  = read('../src/screens/v2/CircleNoticeboard.js');
 
   it('both peer routers route chat-message through the shared threaded-chat handler', () => {
     for (const src of [webApp, mobileApp]) {
-      expect(src).toMatch(/'chat-message':\s+makeHandleThreadedChat\(/);
+      expect(src).toMatch(/'chat-message':\s+(blockedFirst\([^\n]{0,80}?,\s*)?makeHandleThreadedChat\(/);   // through the block check first (a block refuses direct contact)
       expect(src).toMatch(/core\/handlers\/threadedChat\.js/);
     }
   });

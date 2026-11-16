@@ -49,7 +49,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import nodeCrypto, { randomBytes } from 'node:crypto';
 import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -135,9 +135,12 @@ import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, openOfferPers
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
+import { installBoxSignatureEquation } from '../src/v2/signatureEquations.js';
 import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
+import { runStartQueue, startQueueSiblings } from '../src/v2/startQueue.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
+import { blockedFirst } from '../src/v2/directDoors.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
 import { makeCircleGovernancePeerHandler } from '../src/v2/circleLogReceiver.js';
@@ -147,7 +150,7 @@ import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGr
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../src/v2/policyUpdateLane.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
@@ -285,6 +288,9 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-household-cache': contentPaths.household,
     'cc-tasks-cache': contentPaths.tasks,
   };
+  // THE SIGNATURE CHECK: node:crypto behind the one strict rule (taken only if it agrees on the edge-case vectors and on an
+  // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
+  { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
   try {
     const forgot = await runPendingForget({
       markerVault: vault,
@@ -327,6 +333,10 @@ const hiddenLanded = (item) => {
 const writeOrigin = new AsyncLocalStorage();
 const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
 const agent = await createRealHouseholdAgent({
+  // WHICH RELAY EACH CIRCLE RIDES: on a box, the one it is on (every circle it holds is reached there, as its
+  // registration below says). The agent reopens a persona's own socket at that point after a restart: a box holding a
+  // persona's circle (every device of the person is in every circle of the person) is otherwise silent there.
+  circlePointsFor: () => (relayUrl ? [relayUrl] : []),
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
@@ -539,11 +549,17 @@ if (relayUrl) {
     }),
   });
   contactChannel = createContactThreadChannel({
+    // a receipt only to someone the person kept (a non-hidden contact, or a contact's other device)
+    isKept: (id) => agent.isKeptContact?.(id) ?? false,
     // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
     selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     pair: pairRoster,
     // a turn to a bot this person's identity is linked to (`/koppel`) carries this device's statement over it
     authFor: agent.linkedTurnAuth ?? null,
+    // a first message from someone the person did not choose is a request, decided before anything is kept
+    messageRequests: agent.messageRequests ?? null,
+    // what the door kept from the thread, counted in the walk log (the verdict only, never who)
+    onDoor: ({ verdict }) => walkLog({ kind: 'message-request', verdict }),
     sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
@@ -595,13 +611,13 @@ if (relayUrl) {
     headStore: makePolicyHeadStore(circlePolicyKv),
     readPolicy: (cid) => circlePolicyStore.get(cid),
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
-    adminsOf: adminsOfViaSkill(callSkill),
+    membersOf: membersOfViaSkill(callSkill),   // the roster the receiver gate counts
   });
   // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
   // same reaction for a catch-up batch and a live statement.
   const govChanged = (cid) => {
     if (!govRail) return;
-    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
+    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid, readPolicy: circlePolicyLane.readPolicy }).catch(() => {});
     circlePolicyLane.apply(cid, govRail)
       .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
       .catch(() => {});
@@ -712,6 +728,8 @@ if (relayUrl) {
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     // the box holds no pod session, so a pod-backed circle's redeem names no pod WebID: it joins without a pod grant
     podWebId: () => null,
+    // the request to the invite's address may leave on the person key for this redeem (the send gate's invite exchange)
+    inviteExchange: agent.inviteExchange ?? null,
   });
   // After a join: presence in the new circle (the per-circle address on the relay, the announce) and the lanes'
   // catch-up — `registerCirclePresence` is defined below and runs at connect; a join later re-runs it for the one circle.
@@ -769,11 +787,11 @@ if (relayUrl) {
       ...(govRail ? { 'circle-governance-broadcast': makeCircleGovernancePeerHandler({
         eventLog: deviceLog, rail: govRail, onLanded: lanes.landedCarrier?.governance, onChange: govChanged,
       }) } : {}),
-      [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
-      [contactChannel.subtypes.out]: contactChannel.messageHandler(landMessage),
+      [contactChannel.subtypes.in]:  blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), contactChannel.replyHandler(landTurn)),
+      [contactChannel.subtypes.out]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), contactChannel.messageHandler(landMessage)),
       // A join request — for the box, a contact joining the pair circle it founded: admit, promote to co-admin
       // (the pair roster's rule), return the box's proven per-circle address, hand the circle the newcomer's.
-      'group-redeem-request': makeHandleGroupRedeemRequest({
+      'group-redeem-request': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemRequest({
         callSkill, sendPeer,
         publishEvent: (e) => walkLog({ kind: 'redeem', ...(e?.type ? { type: e.type } : {}), circleId: e?.circleId ?? e?.groupId ?? null }),
         onAdmitted: (a) => pairRoster?.onAdmitted?.(a),
@@ -782,9 +800,11 @@ if (relayUrl) {
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
         signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
         propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
+        // the one answer to a proven request may leave on the person key (the send gate's invite exchange)
+        inviteExchange: agent.inviteExchange ?? null,
         logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} },
-      }),
-      'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap: pendingPeerRedeems }),
+      })),
+      'group-redeem-response': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleGroupRedeemResponse({ pendingMap: pendingPeerRedeems })),
       // A member — above all this owner's OTHER device — says where it answers in a circle. Without
       // this the box never learns a sibling's address, its sibling set stays empty, and the fan above
       // has nowhere to go: the one message this device exists to pass on would stop here.
@@ -792,19 +812,19 @@ if (relayUrl) {
       // A roster owner says a row changed; the values are re-read, never carried on this wire.
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       // A screen a person asked to connect (`/scherm`) sends its offer; the door, once up, grants it.
-      [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
+      [SCREEN_OFFER_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => screenOffer.handle?.(from, payload)),
       // a screen waiting for its grant says it is there: nothing to do — its message alone releases what was held for it
-      [SCREEN_WAITING_SUBTYPE]: () => {},
+      [SCREEN_WAITING_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), () => {}),
       // a companion's owner granted this bot ops there: the companion sends the tokens; kept only from a companion contact
-      [COMPANION_GRANT_SUBTYPE]: (from, payload) => companionGrantDoor.accept?.(from, payload),
+      [COMPANION_GRANT_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => companionGrantDoor.accept?.(from, payload)),
       // a linked person revoked one of their devices: the root's tombstone, which any party may deliver
-      [IDENTITY_LINK_REVOKE_SUBTYPE]: (from, payload) => linkRevokeDoor.handle?.(payload),
-      'chat-message': makeHandleThreadedChat({
+      [IDENTITY_LINK_REVOKE_SUBTYPE]: blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), (from, payload) => linkRevokeDoor.handle?.(payload)),
+      'chat-message': blockedFirst((a) => agent?.messageRequests?.isBlocked?.(a), makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
-      }),
+      })),
     },
     // TESTING ONLY (`ONDERLING_WALK_SHAPES=1`, an environment variable, off in every release config): the frame's key
     // NAMES, so an unrouted frame can be identified — never a value, an address, a key or a length
@@ -877,6 +897,8 @@ if (relayUrl) {
   // step, run when the sibling's carry lands; the log says so. Asked for on connect with the other kicks below.
   agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
   agent.circleFollowSync?.onLanded?.((r) => walkLog({ kind: 'circle-follow', from: String(r.from).slice(0, 12), circleId: r.circleId, ok: r.ok, steps: r.steps }));
+  // a self's profile facts arrived from a sibling (its settings, name, policies): when, and whether the general self's
+  agent.profileFactsSync?.onLanded?.((r) => walkLog({ kind: 'profile-facts-landed', general: r.general === true }));
   agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
     if (r?.consumed) {
       walkLog({ kind: 'enroll-offer', cleared: r.cleared, circles: r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps })) });
@@ -918,39 +940,23 @@ if (relayUrl) {
     else if (s.overDay > 0) console.log(`device-runner: ${s.overDay} change(s) have waited over a day for the main device.`);
   }).catch(() => {});
 
-  // The reconnect kicks: pull what arrived while this device was down, on every lane that has one.
-  const kick = (cu, label, ms) => {
-    if (!cu) return;
-    setTimeout(() => {
-      const p = typeof cu.requestFromSiblings === 'function'
-        ? cu.requestFromSiblings()
-        : cu.requestAll({ callSkill });
-      Promise.resolve(p).catch(() => { /* the live fan keeps it current either way */ });
-      walkLog({ kind: 'catch-up-kick', lane: label });
-    }, ms);
-  };
-  kick(lanes.catchUps.gov, 'governance', 2000);
-  kick(lanes.catchUps.membership, 'membership', 2500);
-  kick(agent.grantsCatchUp, 'grants', 2500);
-  kick(agent.knownPeersSync, 'known-peers', 2500);
-  kick(agent.personKeySync, 'person-key', 2500);
-  kick(agent.profileFactsSync, 'profile-facts', 2500);
-  // the person's own store: what a sibling wrote while this box was off
-  kick(agent.ownStoreSync, 'own-store', 2500);
-  // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and
-  // at boot by asking, as both shells do. (Found by the shell-seams guard on its first run, 2026-09-19.)
+  // THE START QUEUE (shared, startQueue.js): what arrived while this device was down, every lane's catch-up and every
+  // own-device ask, in one order and one step at a time (web and the phone run the same queue; the box has no screen,
+  // so no circle goes first). Each step is logged as it starts, and the run once with how many circles it covered.
+  const LANE_LOG = { membership: 'membership', gov: 'governance', key: 'keys', task: 'tasks', chat: 'chat' };
   setTimeout(() => {
-    agent.primaryDevice?.requestFromSiblings?.().catch(() => { /* the carry brings a later claim either way */ });
-    walkLog({ kind: 'catch-up-kick', lane: 'primary-device' });
-  }, 2600);
+    runStartQueue({
+      catchUps: lanes.catchUps,
+      siblings: startQueueSiblings(agent),
+      callSkill,
+      onStep: (st) => walkLog({ kind: 'catch-up-kick', lane: st?.sibling ?? LANE_LOG[st?.lane] ?? st?.lane, ...(st?.circleId ? { circle: String(st.circleId).slice(0, 12) } : {}) }),
+    }).then((r) => walkLog({ kind: 'start-queue', circles: r.circles, steps: r.steps, failed: r.failed })).catch(() => {});
+  }, 2000);
   // The circles the person's other devices are in that this box is not (founded or joined while it was down).
   setTimeout(() => {
     agent.circleFollowSync?.requestFromSiblings?.().catch(() => { /* the carry brings a later one either way */ });
     walkLog({ kind: 'catch-up-kick', lane: 'circle-follow' });
   }, 2700);
-  kick(lanes.catchUps.task, 'tasks', 3000);
-  kick(lanes.catchUps.chat, 'chat', 3500);
-  kick(lanes.catchUps.key, 'keys', 3500);
 }
 
 // ── Telegram, only if a token is here ───────────────────────────────────────────────────────────
@@ -1227,6 +1233,7 @@ if (tgToken || inboxDoor.bridge) {
     },
     // a screen whose offer was not taken is told, so it says so instead of waiting
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
+    expectRefusal: (viewPubKey) => agent.inviteExchange?.expectScreenRefusal?.(viewPubKey),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
     grant: async (g) => {
       const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
@@ -1263,6 +1270,7 @@ if (tgToken || inboxDoor.bridge) {
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
     tellApp: (key, payload) => agent.sendPeerMessage(key, payload),
+    expectAnswer: (key) => agent.inviteExchange?.expectLinkAnswer?.(key),
     listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
     revokeView: async (viewPubKey) => {
       const revoked = (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true;

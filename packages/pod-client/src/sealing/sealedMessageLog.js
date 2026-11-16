@@ -113,7 +113,8 @@ export async function readSealedMessage(backend, open, ref) {
 
 /**
  * Range-query a circle's rows for every message with `ts >= sinceTs`, opened + returned oldest→newest and
- * capped to `max`. This is the read half of the KEY CONVENTION: a single `list('<circleId>/')` prefix walk
+ * capped to `max`: the OLDEST `max` (one page forward from the watermark), `truncated` when more follow, so a reader
+ * pages on from the last row's ts. Keeping the freshest instead lost every older row after a long absence. This is the read half of the KEY CONVENTION: a single `list('<circleId>/')` prefix walk
  * + a numeric ts filter, no store query language. A row that fails to open (wrong-key / corrupt) is SKIPPED,
  * not thrown — one bad row must not sink a whole catch-up batch.
  *
@@ -128,11 +129,16 @@ export async function readSealedMessagesSince(backend, open, { circleId, sinceTs
   const cap = Math.max(1, Math.min(Number.isFinite(max) ? max : 200, 1000));
   const since = Number.isFinite(sinceTs) ? sinceTs : 0;
 
-  const refs = await backend.list(`${circleId}/`);
+  // The refs carry the ts (the key convention), so the page is chosen from the KEYS: sorted oldest first, opened only
+  // until one page plus one row is in hand (the extra row says more follow). Opening every row since the watermark
+  // and slicing after cost a full read of the rest on every page. A key that is not ours (no ts) sorts last.
+  const keyTs = (ref) => { const t = tsFromRef(ref); return Number.isFinite(t) ? t : Infinity; };
+  const refs = (await backend.list(`${circleId}/`))
+    .filter((ref) => keyTs(ref) >= since)   // cheap key-only prune before the get/open
+    .sort((a, b) => keyTs(a) - keyTs(b));
   const rows = [];
   for (const ref of refs) {
-    const ts = tsFromRef(ref);
-    if (Number.isFinite(ts) && ts < since) continue;   // cheap key-only prune before the get/open
+    if (rows.length > cap) break;
     try {
       const msg = await readSealedMessage(backend, open, ref);
       if (msg && Number.isFinite(msg.ts) && msg.ts >= since) rows.push(msg);
@@ -142,6 +148,6 @@ export async function readSealedMessagesSince(backend, open, { circleId, sinceTs
   }
   rows.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   const truncated = rows.length > cap;
-  const items = truncated ? rows.slice(rows.length - cap) : rows;   // keep the freshest N
+  const items = truncated ? rows.slice(0, cap) : rows;   // one page forward; the caller reads on from its last ts
   return { items, truncated };
 }

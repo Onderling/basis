@@ -36,14 +36,16 @@ export class MdnsTransport extends MdnsRouter {
   /**
    * @param {object} opts
    * @param {import('@onderling/core').AgentIdentity} opts.identity
-   * @param {string} [opts.hostname]  — mDNS service name (defaults to pubKey slice)
+   * @param {import('@onderling/core').AgentIdentity} [opts.lanIdentity] — see the shared router
+   * @param {string} [opts.hostname]  — a FIXED mDNS service name; without it the name follows the LAN key
+   * @param {string} [opts.hostnamePrefix]
    */
-  constructor({ identity, hostname = null } = {}) {
+  constructor({ identity, lanIdentity = null, hostname = null, hostnamePrefix = 'dw' } = {}) {
     if (!MdnsNative) throw new Error(
       'MdnsTransport: MdnsModule native module not found. '
       + 'Is MdnsPackage registered in MainApplication.kt?'
     );
-    super({ identity, hostname, native: MdnsNative, emitter: mdnsEmitter });
+    super({ identity, lanIdentity, hostname, hostnamePrefix, native: MdnsNative, emitter: mdnsEmitter });
   }
 
   /**

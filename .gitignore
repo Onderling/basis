@@ -116,3 +116,6 @@ deploy/web/targets/*.env
 # state, never source. One was tracked, so every run showed a deletion in `git status` and one guard
 # reported it as a file it could not read (2026-09-10).
 apps/basis/test-browser/.relay-fixture*.pid
+# patch/notes scratch files must never ride a commit
+*.tmp.py
+*.tmp.md

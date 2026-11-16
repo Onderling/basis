@@ -11,7 +11,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
+import { contactSendRoute } from '../../../../basis/src/v2/contactsSource.js';
+import { HEADER_AVATAR_SIDE_CLEARANCE } from './fab.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
+import { earlierRoomMessages } from '../../../../basis/src/v2/nearbyKept.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
@@ -22,15 +25,20 @@ import FaceView from './FaceView.js';
 // L125 — "what does this contact see of you?", beside Verbergen (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 // L114 — delete as a relationship act (hide + leave the pair circle), and the words above a returning turn (web parity)
+import { heldNoteKey } from '../../../../basis/src/v2/heldNote.js';
 import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/contactDelete.js';
+import { contactThreadSelfFor } from '../../../../basis/src/v2/contactLens.js';
 import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
 import { settleContactAttach } from '../../../../basis/src/v2/contactAttachOutcome.js';
+import { trackContactTurn } from '../../../../basis/src/v2/contactTurnDelivery.js';
+import DeliveryChip from '../../rn/DeliveryChip.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
-export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '', noRelay = false }) {
+// `deliveryStateMap` — the SHARED per-message map (App.js owns it; receipts land there): my own bubbles read it.
+export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '', deliveryStateMap = null }) {
   const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
@@ -39,6 +47,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   const registry = bundle?.contactSkills ?? null;
   const contactId = contact?.contactId;
   const peerAddr = contact?.peerAddr ?? contactId;
+  // where a turn goes: a co-member shown from the peer graph is written to at their circle address (the send gate)
+  const sendTo = useMemo(() => contactSendRoute(contact, peerAddr), [contact, peerAddr]);
   // THE SAME "+" AS A CIRCLE'S COMPOSER (web parity): the projector's contact-scoped entries, each run as an op addressed
   // to this contact (a file today). A walk found no way to send a file here but the `/send-file` slash.
   const contactAttach = useMemo(() => attachEntriesFor({ manifestsByOrigin: { basis: basisManifest }, scope: 'contact' }), []);
@@ -49,9 +59,10 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     try { r = await bundle?.callSkill?.(entry.appOrigin ?? 'basis', entry.opId, { peer: peerAddr }); } catch (err) { r = { error: err?.message ?? String(err) }; }
     // the shared settle step: the sent file joins our side of the thread; a line only when the bubble cannot say it
     const { file, messageId, state, say } = await settleContactAttach(r, { channel, contactId, peerAddr, t });
-    if (file) setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file, delivery: state }]);
+    // the sent file's state goes on the same map every own bubble reads, so its chip paints as a typed turn's does
+    if (file) { if (state) { try { deliveryStateMap?.set?.(messageId, state); } catch { /* mirror */ } } setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: '', messageId, file }]); }
     if (say) Alert.alert(say);
-  }, [bundle, channel, contactId, peerAddr]);
+  }, [bundle, channel, contactId, peerAddr, deliveryStateMap]);
   const name = nameShown(contact, t, { ids: [contactId] });   // the stamped label, else "someone" — never the key
   // The pre-send floor this contact declared (its card → the roster row): the channel applies it on
   // every turn; the header says so before the person types. web≡mobile with contactThread.js.
@@ -88,13 +99,18 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         const a = await channel.rehydrate(contactId);
         const b = (peerAddr && peerAddr !== contactId) ? await channel.rehydrate(peerAddr) : [];
         const durable = [...a, ...b].sort((x, y) => (x.ts ?? 0) - (y.ts ?? 0));
-        if (!alive || durable.length === 0) return;
-        setMessages((prev) => (prev.length ? prev : durable.map((m) => ({
+        // a Nearby visit this person's card linked: 'earlier, in the room', kept on this device only
+        let earlier = [];
+        try { earlier = earlierRoomMessages(bundle?.agent?.earlierInTheRoom?.(peerAddr ?? contactId) ?? [], t); } catch { earlier = []; }
+        if (!alive || (durable.length === 0 && earlier.length === 0)) return;
+        setMessages((prev) => (prev.length ? prev : [...earlier, ...durable].map((m) => ({
           id: mkId(), origin: m.origin, text: m.text ?? '',
+          ...(m.messageId ? { messageId: m.messageId } : {}),   // the id the turn was sent under: what its chip is keyed by
           ...(m.buttons ? { buttons: m.buttons } : {}),
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
           ...(m.returned ? { returned: true } : {}),
+          ...(m.held ? { held: m.held } : {}),   // a turn held after a refusal: what it could not keep (heldNote.js)
         }))));
       } catch { /* best-effort — an empty thread is the honest fallback */ }
     })();
@@ -123,11 +139,35 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     () => (input.startsWith('/') ? commands.suggest(input) : []), [commands, input]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  // My own bubbles read the shared delivery map; a change there (the verdict, a receipt) redraws this screen. The send
+  // path bumps it itself through the map, so one subscription covers every writer.
+  const [, setDeliveryTick] = useState(0);
+  useEffect(() => {
+    if (typeof deliveryStateMap?.subscribe !== 'function') return undefined;
+    return deliveryStateMap.subscribe(() => setDeliveryTick((n) => n + 1));
+  }, [deliveryStateMap]);
+  // Retry re-sends the same turn under the same id (the channel dedups the fan; the receiver dedups by id).
+  const onRetryDelivery = useCallback((msgId) => {
+    const m = messages.find((x) => x.messageId === msgId && x.origin === 'user' && !x.file);
+    if (!m || !channel) return;   // a file retries through its own op; a turn that is not mine has nothing to retry
+    if (sendTo.blocked) return;
+    const { sent } = channel.sendTurn({ peerAddr: sendTo.to ?? peerAddr, threadId: contactId, text: m.text, messageId: msgId, floor });
+    trackContactTurn({ messageId: msgId, sent, deliveryMap: deliveryStateMap }).catch(() => {});
+  }, [messages, channel, peerAddr, sendTo, contactId, floor, deliveryStateMap]);
   // Verbergen / Tonen (L106, web parity — contactThread.js's header control): every person gets the control — a
   // contact from the book, and a stranger who wrote to me (hiding them puts them in the book, hidden). A bot
   // does not: a bot is removed, not hidden. `null` keeps the header without it. The mark is the book's — the ONE
   // pinboard op changes it, on every device of the person; a message from the contact does the same as Tonen.
   const hideable = !!contact && !contact.isBot;
+  // who you are in this thread (the persona this contact knows): the header's avatar, top right (web parity)
+  const [selfHere, setSelfHere] = useState(null);
+  useEffect(() => {
+    if (!hideable || typeof bundle?.callSkill !== 'function') return undefined;
+    let alive = true;
+    contactThreadSelfFor({ callSkill: bundle.callSkill, row: contact, t }).then((s) => { if (alive) setSelfHere(s); }).catch(() => {});
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hideable, contactId]);
   const [hidden, setHidden] = useState(() => (hideable ? contact.hidden === true : null));
   const toggleHidden = useCallback(async () => {
     if (hidden === null || typeof bundle?.callSkill !== 'function') return;
@@ -164,6 +204,15 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
       } },
     ]);
   }, [bundle, contact, contactId, onBack]);
+  // THE ⋯ (Frits, the UX sitting: "I do like the dot menu"): Hide / Show with what hiding is and is not, and Delete; the
+  // platform's own sheet (web: a small menu under the ⋯)
+  const openMore = useCallback(() => {
+    Alert.alert(name, t('circle.contacts.hide_note'), [
+      { text: t(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide'), onPress: () => { toggleHidden(); } },
+      { text: t('circle.contacts.delete'), style: 'destructive', onPress: () => confirmDelete() },
+      { text: t('circle.contacts.lens.cancel'), style: 'cancel' },
+    ]);
+  }, [name, hidden, toggleHidden, confirmDelete]);
   const scrollRef = useRef(null);
 
   // Route inbound replies for THIS thread (by threadId echo, else sender addr).
@@ -222,19 +271,16 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
     // is a conversational turn, because in a conversation a slash is sometimes just a slash.
     const cmd = commands.parse(text);
     if (cmd) { await runSkill(cmd.opId, cmd.rest ? { text: cmd.rest } : {}); return; }
-    setError(false);
-    setBusy(true);
-    try {
-      // The echo is what LEFT the device: with a floor, the redacted text.
-      const { sent, text: sentText } = channel.sendTurn({ peerAddr, threadId: contactId, text, floor });
-      setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: sentText }]);
-      await sent;
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  }, [input, channel, peerAddr, contactId, commands, runSkill, floor]);
+    // The echo is what LEFT the device: with a floor, the redacted text. The bubble carries the send's state from here
+    // on (pending → the verdict; a receipt moves it further): no "versturen…" line and no error line for a typed turn —
+    // the chip says it, and a tap on it retries (web parity: showContactThread's onSend).
+    if (sendTo.blocked) return;   // the line under the thread says why; nothing leaves
+    let turn;
+    try { turn = channel.sendTurn({ peerAddr: sendTo.to ?? peerAddr, threadId: contactId, text, floor }); }
+    catch { setError(true); return; }   // the turn never got an id: nothing is on screen to carry a state
+    setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: turn.text, messageId: turn.messageId }]);
+    await trackContactTurn({ messageId: turn.messageId, sent: turn.sent, deliveryMap: deliveryStateMap });
+  }, [input, channel, peerAddr, sendTo, contactId, commands, runSkill, floor, deliveryStateMap]);
 
   return (
     <View style={styles.wrap} testID="contact-thread-screen">
@@ -246,6 +292,19 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
             opened is visibly the person you tapped in Contacten. */}
         <FaceView row={contact ?? { name }} size={26} resolvePicture={resolvePicture} />
         <Text style={styles.title} numberOfLines={1}>{t('circle.contacts.thread_title', { name })}</Text>
+        {/* who you are here, top right: its tap opens the lens (which persona they know, and how much); then the ⋯ with
+            the acts on the contact. One row that the title gives way to (web parity: contactThread's header). */}
+        {hidden !== null ? (
+          <Pressable onPress={openLens} accessibilityRole="button" testID="contact-thread-self"
+            accessibilityLabel={t('circle.contacts.self_here', { name: selfHere?.name ?? t('circle.switcher.you') })}>
+            <FaceView row={{ name: selfHere?.name ?? t('circle.switcher.you') }} size={26} />
+          </Pressable>
+        ) : null}
+        {hidden !== null ? (
+          <Pressable onPress={openMore} accessibilityRole="button" testID="contact-thread-more" accessibilityLabel={t('circle.contacts.more')} style={styles.more}>
+            <Text style={styles.moreText}>⋯</Text>
+          </Pressable>
+        ) : null}
       </View>
       {/* The mark and the contact's actions get a row of their own that WRAPS: in one row with the title they ran
           past a phone's edge and could not be tapped — hiding, inspecting and deleting a contact did not exist. */}
@@ -255,26 +314,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
             {`${sealedMark.level === 'person' ? '🔐' : '🔒'} ${t(sealedMark.key)}`}
           </Text>
         ) : null}
-        {hidden !== null ? (
-          <Pressable onPress={toggleHidden} accessibilityRole="button" testID="contact-thread-hide" style={styles.hide}>
-            <Text style={styles.hideText}>{t(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide')}</Text>
-          </Pressable>
-        ) : null}
-        {hidden !== null ? (
-          <Pressable onPress={openLens} accessibilityRole="button" testID="contact-thread-lens" style={styles.hide}>
-            <Text style={styles.hideText}>{t('circle.contacts.lens.open')}</Text>
-          </Pressable>
-        ) : null}
-        {hidden !== null ? (
-          <Pressable onPress={confirmDelete} accessibilityRole="button" testID="contact-thread-delete" style={styles.hide}>
-            <Text style={styles.hideText}>{t('circle.contacts.delete')}</Text>
-          </Pressable>
-        ) : null}
       </View>
       {lens.sheet}
-      {hidden !== null ? (
-        <Text style={styles.hideNote} testID="contact-thread-hide-note">{t('circle.contacts.hide_note')}</Text>
-      ) : null}
       {floor ? (
         <Text style={styles.floor} testID="contact-thread-floor">{`🛡 ${t('circle.contacts.presend_floor')}`}</Text>
       ) : null}
@@ -291,6 +332,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
               "Je had dit contact verborgen." — neither side's bubble. web≡mobile with contactThread.js. */}
           {returnedMarkerKey(m, contact?.deletedAt ?? null) ? (
             <Text style={styles.system} testID={`contact-returned-${m.id}`}>{t(returnedMarkerKey(m, contact?.deletedAt ?? null))}</Text>
+          ) : null}
+          {/* A turn the door held after a refusal says what it could not keep (the text cut, a file left off): one plain
+              line on that turn, so the person does not take it for the whole message. web≡mobile with contactThread.js. */}
+          {heldNoteKey(m.held) ? (
+            <Text style={styles.system} testID={`contact-held-${m.id}`}>{t(heldNoteKey(m.held))}</Text>
           ) : null}
           <View style={[styles.msg, m.origin === 'user' ? styles.msgUser : styles.msgBot]}>
             <View style={[styles.bubble, m.origin === 'user' ? styles.bubbleUser : styles.bubbleBot]}>
@@ -335,12 +381,24 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
                 </Text>
               ) : null}
             </View>
+            {/* My own turn's delivery state, off the shared map under the id it was sent with — the same chip a circle
+                bubble carries (web ≡ mobile with contactThread.js). A turn with no id (an older live push) carries none. */}
+            {m.origin === 'user' && m.messageId && deliveryStateMap ? (
+              <DeliveryChip
+                state={deliveryStateMap.get?.(m.messageId) ?? null}
+                reason={deliveryStateMap.reasonOf?.(m.messageId) ?? null}
+                rowId={m.messageId}
+                onRetry={onRetryDelivery}
+                testIDPrefix="contact-delivery"
+              />
+            ) : null}
           </View>
           </React.Fragment>
         ))}
         {busy && <Text style={styles.sending}>{t('circle.contacts.sending')}</Text>}
       </ScrollView>
 
+      {sendTo.blocked ? <Text style={styles.error} testID="contact-thread-write-needs-card">{t('circle.contacts.write_needs_card', { name })}</Text> : null}
       {error && <Text style={styles.error}>{t('circle.contacts.send_failed', { name })}</Text>}
 
       {skills.length > 0 && (
@@ -372,11 +430,6 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
           </Pressable>
         </View>
       ) : null}
-      {contact?.transient && !pendingReach ? (
-        <Pressable onPress={(e) => shareReach(true, 'chip', e?.nativeEvent ?? null)} accessibilityRole="button" testID="reach-share" style={styles.skillChip ?? styles.send}>
-          <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_share')}</Text>
-        </Pressable>
-      ) : null}
       {/* The typed door: what this peer offers, while the command word is being typed. */}
       {suggestions.length > 0 && (
         <View style={styles.suggest} testID="contact-thread-suggest">
@@ -404,7 +457,6 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         </View>
       ) : null}
       {/* no connection point: the composer says the message waits (the host's relay-question predicate; web parity) */}
-      {noRelay ? <Text style={styles.suggestHint} testID="composer-no-point">{t('circle.composer.no_point')}</Text> : null}
       <View style={styles.composer}>
         {contactAttach.length ? (
           <Pressable onPress={() => setAttachOpen((v) => !v)} accessibilityRole="button" accessibilityLabel={t('circle.view.attach')} testID="contact-composer-attach">
@@ -446,14 +498,14 @@ function replyTextFromResult(res) {
 
 const makeStyles = (theme, insets) => StyleSheet.create({
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  // the frame's avatar sits top-right on every tab: the header row keeps its room, so the ⋯ is never under it
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4, paddingRight: HEADER_AVATAR_SIDE_CLEARANCE },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4, rowGap: 2, marginBottom: 8 },
   floor: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingVertical: 4 },
   sealed: { fontSize: 12, color: theme.color.inkSoft },
   sealedPerson: { color: theme.color.green },   // STATUS colour: sealed to the person
-  hide: { paddingHorizontal: 8, paddingVertical: 4 },
-  hideText: { fontSize: 13, color: theme.color.inkSoft, textDecorationLine: 'underline' },
-  hideNote: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingBottom: 4 },
+  more: { paddingHorizontal: 8, paddingVertical: 2 },
+  moreText: { fontSize: 22, lineHeight: 24, color: theme.color.ink },
   system: { fontSize: 12, color: theme.color.inkSoft, textAlign: 'center', paddingVertical: 4, fontStyle: 'italic' },
   back: { fontSize: 13, color: theme.color.inkSoft },
   title: { flexShrink: 1, fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },

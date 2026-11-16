@@ -21,6 +21,7 @@
 // at the roster (deny-by-default at the fold). The record exists so enrollment is auditable and
 // revocation has a durable subject to act on.
 import nacl from 'tweetnacl';
+import { processSignatureMemo } from '../security/signatureMemo.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { AgentIdentity } from './AgentIdentity.js';
@@ -160,7 +161,7 @@ export function verifyDeviceDelegation(record, ownerPubKey = null) {
     if (typeof v !== 'string' || v.length === 0) return false;
   }
   if (ownerPubKey != null && by !== ownerPubKey) return false;
-  try { return AgentIdentity.verify(deviceDelegationMessage(profileId, deviceId, pubKey), sig, by); }
+  try { return processSignatureMemo().verifierFor('device-delegation')(deviceDelegationMessage(profileId, deviceId, pubKey), sig, by); }
   catch { return false; }
 }
 
@@ -206,6 +207,6 @@ export function verifyDeviceRevocation(record, ownerPubKey = null) {
     if (typeof v !== 'string' || v.length === 0) return false;
   }
   if (ownerPubKey != null && by !== ownerPubKey) return false;
-  try { return AgentIdentity.verify(deviceRevocationMessage(profileId, deviceId), sig, by); }
+  try { return processSignatureMemo().verifierFor('device-revocation')(deviceRevocationMessage(profileId, deviceId), sig, by); }
   catch { return false; }
 }

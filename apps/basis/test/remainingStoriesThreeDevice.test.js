@@ -231,14 +231,14 @@ describe('5.2b — the members list respects the reveal gate', () => {
 
   it('an UNRELEASED member shows their handle — never their name, in either line', () => {
     const l = revealedMemberLabel(unrevealed, { viewerId: 'me', policy: 'pairwise' });
-    expect(l.primary).toBe('@fox');
+    expect(l.primary).toBe('fox');
     expect(l.secondary).toBeNull();
     expect(JSON.stringify(l)).not.toContain('Vries');
   });
 
   it('a member who RELEASED their name shows it as the secondary line', () => {
     const l = revealedMemberLabel(revealed, { viewerId: 'me', policy: 'pairwise' });
-    expect(l.primary).toBe('@heron');
+    expect(l.primary).toBe('heron');
     expect(l.secondary).toBe('Cato Jansen');
   });
 

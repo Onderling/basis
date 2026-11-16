@@ -33,9 +33,10 @@ import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSha
 // CONNECTIONS — the same shared projections the web shell paints from, so the two shells cannot
 // drift on what a connection may see or do (invariant 2: web ≡ mobile by construction).
 import {
-  connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant, connectionSelfChoice,
+  connectionRows, connectionOpChoices, connectionSectionChoices, connectionSelfChoice,
 } from '../../../../basis/src/v2/connections.js';
-import { parsePairingOffer } from '../../../../basis/src/v2/connectionPairing.js';
+import { createAppScreenPairing, SCREEN_OFFER_CLASSIFIERS } from '../../../../basis/src/v2/appScreenPairing.js';
+import QrScannerModal from '../../rn/QrScannerModal.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../../../basis/src/v2/syncSelection.js';
 import { makeThisDevicePrimary, makePrimaryResultWords } from '../../../../basis/src/v2/circleAddressAnnounce.js';
 import { CONNECTION_MANIFESTS } from '../../../../basis/src/v2/connectionManifests.js';
@@ -131,7 +132,32 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
     if (!e?.unlinked) setBotLink((b) => (b?.view?.bot?.ok && b.view.bot.botAddress === e.bot ? { ...b, linked: true } : b));
   }), [agent]);
   const [connections, setConnections] = useState([]);  // paired views ("gekoppelde apparaten")
-  const [offerText, setOfferText] = useState('');      // the pasted onderling-connect:// code
+  const [offerText, setOfferText] = useState('');      // the pasted (or scanned) onderling-connect:// code
+  // THE SHARED PAIRING (web parity): offer → the code picked from three → the grant; the only way to `grantSurface`
+  const screenPairing = useMemo(() => createAppScreenPairing({
+    callSkill,
+    relays: () => { try { return (agent?.relays?.list?.() ?? []).map((r) => r?.url).filter(Boolean); } catch { return []; } },
+  }), [callSkill, agent]);
+  const [pairCodes, setPairCodes] = useState(null);   // the three codes to pick from, while an offer waits
+  const [pairPicked, setPairPicked] = useState(false); // the right code was picked: the ticks are shown
+  const [pairNote, setPairNote] = useState(null);      // what the pairing says (pick the code / why it was refused)
+  const [scanOpen, setScanOpen] = useState(false);
+  const onOfferText = useCallback(async (text) => {
+    setOfferText(text); setPairCodes(null); setPairPicked(false);
+    const v = String(text ?? '').trim();
+    if (!v) { setPairNote(null); screenPairing.cancel(); return; }
+    const r = await screenPairing.offer(v);
+    if (!r.ok) { setPairNote(t(`circle.mydata.connection_offer_${r.reason}`)); return; }
+    setPairNote(t('circle.mydata.connection_pick_code'));
+    setPairCodes(r.codes);
+  }, [screenPairing]);
+  const onPickCode = useCallback(async (code) => {
+    setPairCodes(null);
+    const r = await screenPairing.pick(code);
+    if (!r.ok) { setPairNote(t(`circle.mydata.connection_offer_${r.reason}`)); setPairPicked(false); return; }
+    setPairNote(t('circle.mydata.connection_recognised', { name: r.label || '' }));
+    setPairPicked(true);
+  }, [screenPairing]);
   const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
   // which self the screen is for, on a device holding more than one (the active self preselected; `null` = not chosen)
   const selfChoice = useMemo(() => connectionSelfChoice({ held: selfSet?.held ?? [], on: selfSet?.on ?? [] }), [selfSet]);
@@ -925,33 +951,51 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
     ),
     'connection-add': () => (
       <>
-        {/* Pair a new one. Two steps, as on web: paste what the other screen shows, and only THEN
-            see what you are about to hand over — deciding before you can see the choices is not
-            consent. Refusals name their own reason; a newer version is told to update, never guessed. */}
+        {/* Pair a new one. Three steps, as on web: paste (or scan) what the other screen shows; pick, from three,
+            the code that screen shows (the screen door: a planted offer yields a code you cannot find on your
+            screen); and only THEN see what you are about to hand over — deciding before you can see the choices is
+            not consent. Refusals name their own reason; a newer version is told to update, never guessed. The shared
+            pairing is the only way from the offer to the grant (this screen never calls the op). */}
         <Section title={t('circle.mydata.connection_add')}>
           <TextInput
             testID="mydata-connection-offer"
             value={offerText}
-            onChangeText={setOfferText}
+            onChangeText={onOfferText}
             autoCapitalize="none"
             autoCorrect={false}
             placeholder={t('circle.mydata.connection_offer_placeholder')}
             placeholderTextColor={theme.muted}
             style={styles.relayInput}
           />
-          {offerText.trim() !== '' && (() => {
-            const parsed = parsePairingOffer(offerText.trim());
-            if (!parsed.ok) {
-              return <Text style={styles.privacyBody}>{t(`circle.mydata.connection_offer_${parsed.reason}`)}</Text>;
-            }
+          <Pressable testID="mydata-connection-scan" onPress={() => setScanOpen(true)} accessibilityRole="button">
+            <Text style={styles.actionLabel}>{t('circle.mydata.connection_scan')}</Text>
+          </Pressable>
+          <QrScannerModal
+            visible={scanOpen}
+            onClose={() => setScanOpen(false)}
+            classifiers={SCREEN_OFFER_CLASSIFIERS}
+            onResult={(res) => { if (res?.kind === 'connect' && typeof res.payload === 'string') onOfferText(res.payload); }}
+            t={t}
+          />
+          {pairNote ? <Text style={styles.privacyBody} testID="mydata-connection-note">{pairNote}</Text> : null}
+          {pairCodes ? (
+            <View>
+              {pairCodes.map((code) => (
+                <Pressable key={code} testID={`mydata-connection-code-${code}`} onPress={() => onPickCode(code)} accessibilityRole="button">
+                  <Text style={[styles.actionLabel, { fontFamily: 'monospace', letterSpacing: 3 }]}>{code}</Text>
+                </Pressable>
+              ))}
+              <Pressable testID="mydata-connection-none" onPress={() => onPickCode('')} accessibilityRole="button">
+                <Text style={styles.actionLabel}>{t('circle.mydata.connection_none_of_these')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {pairPicked ? (() => {
             const opChoices = connectionOpChoices({ manifests: manifestsForConnections });
             const sectionChoices = connectionSectionChoices({ circles: circlesForConnections });
             const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
             return (
               <View>
-                <Text style={styles.privacyBody}>
-                  {t('circle.mydata.connection_recognised', { name: parsed.label || parsed.viewPubKey.slice(0, 8) })}
-                </Text>
                 {selfChoice.required ? (
                   <>
                     <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_as_self')}</Text>
@@ -986,13 +1030,11 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
                     const persona = selfChoice.required ? (pickedSelf ?? selfChoice.preset) : null;
                     // no self chosen where one must be: say so, grant nothing
                     if (selfChoice.required && !persona) { setSelfMissing(true); return; }
-                    const args = compileConnectionGrant({
-                      viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label, persona,
-                    });
-                    if (!args) return;                 // a pick that grants nothing creates nothing
-                    try { await callSkill('household', 'grantSurface', { ...args, ...(parsed.nonce ? { nonce: parsed.nonce } : {}) }); }
-                    catch { /* the list re-reads; a failure leaves no half-connection */ }
-                    setOfferText(''); setPickedOps([]); setPickedSections([]); setPickedSelf(null);
+                    const r = await screenPairing.grant({ ops: pickedOps, sections: pickedSections, persona });
+                    if (!r.ok) { setPairNote(t(`circle.mydata.connection_offer_${r.reason}`)); if (r.reason === 'nothing-picked') return; }
+                    else setPairNote(null);
+                    setOfferText(''); setPairCodes(null); setPairPicked(false);
+                    setPickedOps([]); setPickedSections([]); setPickedSelf(null);
                     load();
                   }}
                 >
@@ -1000,7 +1042,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
                 </Pressable>
               </View>
             );
-          })()}
+          })() : null}
         </Section>
       </>
     ),

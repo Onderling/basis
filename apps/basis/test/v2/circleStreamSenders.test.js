@@ -40,7 +40,7 @@ describe('sender labels', () => {
 
   it('leaves a resolved member and the viewer alone', () => {
     const [them, mine] = stamp([{ actor: THEM }, { actor: ME }]);
-    expect(them.senderLabel).toBe('@frits');
+    expect(them.senderLabel).toBe('frits');
     expect(mine.senderSelf).toBe(true);
   });
 });
@@ -76,13 +76,29 @@ describe('memberLabelFor — the same resolution, for surfaces that carry the au
   const label = (actor) => memberLabelFor(actor, { members: [anna], viewerId: ME, policy: 'open' });
 
   it('answers the roster label for every address the member can prove', () => {
-    expect(label('webid:anna')).toBe('@anna');
-    expect(label('addr-2')).toBe('@anna');
+    expect(label('webid:anna')).toBe('anna');
+    expect(label('addr-2')).toBe('anna');
   });
 
   it('answers null for someone the roster cannot place — the caller keeps its own fallback', () => {
     expect(label('addr-of-a-stranger')).toBe(null);
     expect(label(null)).toBe(null);
     expect(memberLabelFor('webid:anna', {})).toBe(null);   // no roster yet: no byline, never a wire name
+  });
+});
+
+describe('a sender the roster cannot place yet asks for a roster read, once', () => {
+  it('names the actors that came out as unknown members, never the app, the viewer or one already tried', async () => {
+    const { sendersToPlace } = await import('../../src/v2/circleStream.js');
+    const rows = stampSenderLabels([
+      { actor: 'new-member-addr', ts: 3 },
+      { actor: 'new-member-addr', ts: 4 },
+      { actor: 'known', ts: 2 },
+      { actor: BOT_ACTOR, ts: 1 },
+      { actor: 'me', ts: 0 },
+    ], { members: [{ webid: 'known', handle: 'Bram' }], viewerId: 'me' });
+    expect(sendersToPlace(rows)).toEqual(['new-member-addr']);
+    expect(sendersToPlace(rows, new Set(['new-member-addr'])), 'tried once: not again').toEqual([]);
+    expect(sendersToPlace(null)).toEqual([]);
   });
 });

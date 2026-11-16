@@ -286,7 +286,30 @@ export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}
  * @param {(circleId: string) => Promise<Array<object>>} deps.listCircleMembers  roster rows for a circle
  * @returns {(payload: object, fromAddress: string|null) => Promise<boolean>} whether a receipt was applied
  */
-export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers, removeHeld = null } = {}) {
+/**
+ * The DM half of "who may confirm my message": a receipt for a turn I sent to a CONTACT may come only from that contact —
+ * their canonical address, or any address the pair circle's roster knows for them (their other device writes from
+ * another per-circle address). The channel remembers which contact each of my turns went to (`contactOfMessage`); the
+ * pair roster supplies the circle's addresses. Null when the id is not a contact turn of mine, or nothing can be read:
+ * no opinion, never "nobody" (the receiver's fail-open rule, below).
+ *
+ * @param {{ channel: {contactOfMessage?: Function}|null, pair: {rosterAddressesFor?: Function}|null }} deps
+ * @returns {(msgId: string) => Promise<Set<string>|null>}
+ */
+export function contactReceiptAddresses({ channel = null, pair = null } = {}) {
+  return async function addressesForContactTurn(msgId) {
+    let sent = null;
+    try { sent = channel?.contactOfMessage?.(msgId) ?? null; } catch { sent = null; }
+    if (!sent) return null;
+    const addresses = new Set([sent.contactId, sent.peerAddr].filter((v) => typeof v === 'string' && v));
+    if (sent.contactId && typeof pair?.rosterAddressesFor === 'function') {
+      try { const r = await pair.rosterAddressesFor(sent.contactId); for (const a of r?.addresses ?? []) addresses.add(a); } catch { /* the canonical addresses stand */ }
+    }
+    return addresses.size ? addresses : null;
+  };
+}
+
+export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers, contactAddressesOf = null, removeHeld = null } = {}) {
   /** circleId → Set of every address the roster knows for its members. */
   const byCircle = new Map();
 
@@ -319,9 +342,14 @@ export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers, 
     const msgId = typeof payload?.messageId === 'string' ? payload.messageId : null;
     const circleId = msgId ? circleIdOfMessage(msgId) : null;
     let allowed = circleId ? await addressesFor(circleId) : null;
+    // Not a circle message: a turn to a CONTACT, when the host can say which — then only that contact may confirm it
+    // (`contactReceiptAddresses`). Unknown ⇒ no opinion, the id gate alone, as for a circle whose roster cannot be read.
+    if (!circleId && msgId && typeof contactAddressesOf === 'function') {
+      try { allowed = (await contactAddressesOf(msgId)) ?? null; } catch { allowed = null; }
+    }
     // Someone who joined since this circle's roster was last read is a recipient we have not heard of
     // yet, not an impostor — re-read once before refusing them.
-    if (allowed && typeof fromAddress === 'string' && !allowed.has(fromAddress)) {
+    if (circleId && allowed && typeof fromAddress === 'string' && !allowed.has(fromAddress)) {
       allowed = await addressesFor(circleId, { refresh: true });
     }
     const applied = applyReceipt(payload, fromAddress, deliveryMap, allowed

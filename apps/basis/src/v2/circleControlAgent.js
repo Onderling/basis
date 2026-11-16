@@ -15,7 +15,7 @@
  * p0/p1 circles seal nothing → this returns `null` (the caller uses a plain client).
  */
 import {
-  createControlAgent, createPodKeyStore, resolveCircleStorage, readGroupKey,
+  createControlAgent, createPodKeyStore, resolveCircleStorage, readGroupKey, changeKeyResource,
 } from '@onderling/pod-client';
 
 const SEALED_POSTURES = new Set(['p2', 'p3']);
@@ -46,6 +46,8 @@ export function createCircleControlAgent({
   roster = [],
   keyEventLog = null,
   podAgents = {},
+  // whether this device may establish the circle's first key (only a device whose self may admit)
+  mayEstablish = true,
 } = {}) {
   if (!circleId) throw new Error('createCircleControlAgent: circleId is required');
   if (!SEALED_POSTURES.has(storagePosture)) return null;   // p0/p1 → no sealing, no control agent
@@ -71,6 +73,7 @@ export function createCircleControlAgent({
     keyEventLog,
     groupId: circleId,
     podAgents,
+    mayEstablish,
   });
 
   return {
@@ -80,6 +83,16 @@ export function createCircleControlAgent({
     agent,
     keyStore,
     bootstrap:    () => agent.bootstrap(),
+    /**
+     * Put a saved key resource back ONLY where the pod holds none (the in-memory pod after a reload), through the one
+     * key-resource write. Where the pod holds a file it wins: a saved copy is never written over it (a copy older than
+     * the file took the key from everyone it did not list). Returns whether it wrote.
+     */
+    restoreIfEmpty: async (saved) => {
+      if (!saved || typeof saved !== 'object') return false;
+      const { written } = await changeKeyResource(keyStore, (cur) => (cur ? null : saved));
+      return !!written;
+    },
     addMember:    (m) => agent.addMember(m),
     removeMember: (m) => agent.removeMember(m),
     members:      () => agent.members(),

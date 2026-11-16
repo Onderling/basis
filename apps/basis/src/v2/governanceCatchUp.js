@@ -13,6 +13,7 @@
  */
 import { GOV_EVENT } from './governanceLog.js';
 import { catchUpTargets } from './catchUpTargets.js';
+import { sendOnOnlyChecked } from './sendOnOnlyChecked.js';
 
 export const GOV_CATCHUP_REQUEST = 'circle-governance-catchup-request';
 export const GOV_CATCHUP_BATCH   = 'circle-governance-catchup-batch';
@@ -66,8 +67,10 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
           }
         } catch { /* the durable-head read is best-effort */ }
       }
-      // what this requester may hold of them (the lane's own rule — the governance lane narrows its report kinds)
-      const served = typeof narrowServe === 'function' ? await narrowServe(statements, { fromPeerAddr, circleId }) : statements;
+      // only what this device can still vouch for (checked here, now), then what this requester may hold of them
+      // (the lane's own rule — the governance lane narrows its report kinds)
+      const vouched = sendOnOnlyChecked(statements, circleId, rail);
+      const served = typeof narrowServe === 'function' ? await narrowServe(vouched, { fromPeerAddr, circleId }) : vouched;
       if (served.length === 0) return;   // nothing to serve — silence, not an empty batch
       await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements: served }, { circleId });
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }
@@ -165,11 +168,6 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
   }
 
   return { onRequest, onBatch, requestFrom, requestAll, requestCircle, subtypes: { request: REQ, batch: BATCH } };
-}
-
-/** True when a folded proposal list still has open decisions — the caller may nudge (propose-only wakes). */
-export function hasOpenDecisions(fold) {
-  return (fold?.proposals ?? []).some((p) => p && !p.closed && p.action);
 }
 
 export { GOV_EVENT };

@@ -13,6 +13,15 @@ export const GOVERNANCE_NOTICE_KEYS = Object.freeze({
   decisionOpened: 'circle.governance.notify_vote_opened',
 });
 
+/**
+ * THE LINE IS A WAY IN (L887, 2026-11-14): its one button opens the circle's Decisions screen, the same target as the
+ * circle menu's entry (each shell routes this action to the screen its menu opens). A decision that has closed since is
+ * on that screen too, in its settled list, so the button stays.
+ */
+export const GOVERNANCE_OPEN_ACTION = 'open:governance';
+// both keys a shell reads a bubble button by (web routes `action`, the phone `id`): the same value
+const OPEN_BUTTON = Object.freeze({ id: GOVERNANCE_OPEN_ACTION, action: GOVERNANCE_OPEN_ACTION, labelKey: 'circle.governance.open_from_notice' });
+
 /** What one governance entry means to THIS viewer, or null. Signed statements and the legacy flat shape. */
 export function governanceNoticeFor(payload, { viewerId } = {}) {
   if (!payload || typeof payload !== 'object') return null;
@@ -46,7 +55,7 @@ export function governanceNoticeRows({ events = [], circleId, viewerId, t, wants
     out.push({
       id, ts, app: 'basis', type: 'chat-message', actor: 'bot', circleId, circleName: null,
       event: { id, ts, app: 'basis', type: 'chat-message', actor: 'bot',
-        payload: { circleId, kind: 'chat-message', scope: 'self', text, notice: hit.notice } },
+        payload: { circleId, kind: 'chat-message', scope: 'self', text, notice: hit.notice, buttons: [{ ...OPEN_BUTTON }] } },
     });
   }
   return out;

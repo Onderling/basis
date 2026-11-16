@@ -27,6 +27,7 @@
  *   npx vitest run test/circlePod2Pod.css.test.js
  */
 import { describe, it, expect, beforeAll } from 'vitest';
+import { produceWithPair } from './support/deviceSealingKeyPair.js';
 
 const CSS_URL = process.env.CSS_URL;
 const HAVE_A = !!(process.env.CSS_A_CLIENT_ID && process.env.CSS_A_CLIENT_SECRET && process.env.CSS_A_WEBID);
@@ -78,7 +79,7 @@ SUITE('per-circle producer — ≥2-pod cross-identity (CSS)', () => {
     // ALICE: per-circle producer on HER real pod (p2 sealed), wired with a REAL WAC
     // `sharing` over her authenticated fetch (no more no-op) → addMember grants ACP.
     const sharing = createCirclePodSharing({ fetch: alice.fetch, ownerWebId: alice.webid });
-    const prod = await createCirclePodProducer({
+    const prod = await produceWithPair({
       circleId, storagePosture: 'p2', vault: new MemVault(),
       generateKeypair,
       makePodClient: () => alice.client,

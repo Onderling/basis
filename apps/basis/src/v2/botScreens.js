@@ -26,6 +26,8 @@ import { sha256Hex } from './botAdmission.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { TELEGRAM_LAUNCH_MAX_AGE_S } from './telegramLaunch.js';
 import { parseUntrustedJson } from '@onderling/core';
+// the door every screen pairing goes through (the code, the three to pick from, the pending offer, the refusals)
+import { createScreenDoor, memoryUsedNonces, screenLabel, SCREEN_PAIRING_TTL_MS } from './screenDoor.js';
 
 /**
  * The calls a household bot takes from its connected screens: per screen a burst, then so many a second; and from all
@@ -40,8 +42,6 @@ export const SCREEN_CALL_BUDGET = Object.freeze({
   global: Object.freeze({ burst: SCREEN_CALL_BURST * 2.5, refillPerSec: SCREEN_CALLS_PER_SECOND * 5 }),
 });
 
-/** How long a `/scherm` link may be used (once). */
-export const SCREEN_LINK_TTL_MS = param({ key: 'assistant.screenLinkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60 * 1000 });
 
 const randomNonce = () => {
   const b = new Uint8Array(16);
@@ -50,33 +50,6 @@ const randomNonce = () => {
 };
 const b64url = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64url = (s) => decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/'))));
-
-const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O, 1/I/L: read aloud, typed, compared at a glance
-/**
- * The code a person compares between their chat and the screen: a short fingerprint of the screen's key and the link's
- * nonce. Both sides compute it from what they hold; neither sends it.
- */
-/** Two other codes beside the real one, the three shuffled: the person must PICK the code their screen shows. */
-export function codeChoices(real, rand = Math.random) {
-  const pick = () => Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)]).join('');
-  const set = new Set([real]);
-  for (let tries = 0; set.size < 3 && tries < 50; tries++) set.add(pick());
-  // a random source that keeps repeating itself still yields three distinct codes (and never loops)
-  for (let i = 0; set.size < 3; i++) set.add([...real].map((ch, k) => CODE_ALPHABET[(CODE_ALPHABET.indexOf(ch) + i + 1 + k) % CODE_ALPHABET.length]).join(''));
-  const out = [...set];
-  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
-  return out;
-}
-
-/** A screen's label is someone else's text: one line, 40 characters at most. */
-export const screenLabel = (label) => String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40) || null;
-
-export async function screenCode(viewPubKey, nonce) {
-  const hex = await sha256Hex(`${viewPubKey}|${nonce}`);
-  let out = '';
-  for (let i = 0; i < 4; i++) out += CODE_ALPHABET[parseInt(hex.slice(i * 2, i * 2 + 2), 16) % CODE_ALPHABET.length];
-  return out;
-}
 
 /** A connected screen's own address, for a later visit (`#scherm-bot=<address>`): the browser resumes the grant it kept. */
 export const screenAddressFor = (botAddress) => `#scherm-bot=${encodeURIComponent(botAddress)}`;
@@ -156,6 +129,8 @@ export function parseScreenLaunchLink(link) {
  * @param {(person: string, q: {codes: string[], replaced: boolean}) => Promise<{ok: boolean}>} a.ask  the question, to
  *   the person's PRIVATE door: three codes (the real one and two others) to pick from, and "none of these"
  * @param {(viewPubKey: string) => Promise<void>|void} [a.tellRefused]  tells the screen its offer was not taken
+ * @param {(viewPubKey: string) => void} [a.expectRefusal]  registers that ONE refusal to a screen whose own offer this bot
+ *   read (the send gate lets exactly it leave; the box composes the agent's `inviteExchange.expectScreenRefusal`)
  * @param {() => {appUrl: string|null, botAddress: string|null, relayUrl: string|null}} a.where
  * @param {(initData: string) => Promise<{ok: boolean, telegramId?: string, hash?: string, reason?: string}>} [a.verifyLaunch]
  *   checks Telegram's launch data (the bot's token is in it; `verifyTelegramLaunch`)
@@ -165,7 +140,7 @@ export function parseScreenLaunchLink(link) {
  * @param {(person: string) => string} [a.launchLabel]  what `/schermen` calls a Telegram-launched screen
  * @param {() => number} [a.now]
  */
-export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
+export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, expectRefusal = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
   // when each person last connected a screen: a code tapped again within the offer's window says "connected"
   const connectedAt = new Map();
@@ -178,6 +153,11 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
     usedLaunches.set(hash, t + 2 * TELEGRAM_LAUNCH_MAX_AGE_S * 1000);
     return true;
   };
+  // THE SCREEN DOOR, the bot's: the one pending offer per person on their thread row, a nonce granted once
+  const door = createScreenDoor({
+    pending: { get: (person) => threads.screenOfferOf(person), set: (person, rec) => threads.setScreenOffer(person, rec) },
+    used: memoryUsedNonces({ now }), now, rand,
+  });
   const buttonsFor = (person) => { const b = typeof launchButton === 'function' ? launchButton(person) : null; return b ? [b] : null; };
 
   /** The grant, for an offer the person vouched for (the code they picked, or a launch Telegram signed): their role's column, as them. */
@@ -192,20 +172,25 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
 
   // A screen is told it was refused, never awaited: a screen that does not greet back would hold the person's reply
   // for the handshake ladder (23 s); best-effort — the screen times out on its own.
-  const refuseSoon = (viewPubKey) => { Promise.resolve().then(() => tellRefused?.(viewPubKey)).catch(() => {}); };
+  // only ever for a screen whose own offer was read here (a stored offer, a launch from that key): its one refusal
+  const refuseSoon = (viewPubKey) => {
+    try { expectRefusal?.(viewPubKey); } catch { /* without the registration the gate holds it; the screen's offer times out */ }
+    Promise.resolve().then(() => tellRefused?.(viewPubKey)).catch(() => {});
+  };
 
   /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
   async function askAbout(person, { viewPubKey, nonce, label }) {
     if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
-    const previous = threads.screenOfferOf(person);   // a second offer drops the first, and its screen is told —
+    // the door keeps it as the person's one pending offer: a second offer drops the first, and its screen is told —
     // unless it IS this screen (a reload, a second /scherm on the same browser): the screen asking now must not be the
     // one told it was refused, or it gives up on the offer it just made
+    const asked0 = await door.ask(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm' });
+    if (!asked0.ok) return asked0;
+    const previous = asked0.previous;
     if (previous && previous.viewPubKey !== viewPubKey) refuseSoon(previous.viewPubKey);
-    const code = await screenCode(viewPubKey, nonce);
-    threads.setScreenOffer(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm', until: now() + SCREEN_LINK_TTL_MS });
-    const asked = await ask(person, { codes: codeChoices(code, rand), replaced: Boolean(previous) });
-    if (!asked?.ok) { threads.setScreenOffer(person, null); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
-    return { ok: true, pending: true, person, code };
+    const asked = await ask(person, { codes: asked0.codes, replaced: Boolean(previous) });
+    if (!asked?.ok) { door.drop(person); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
+    return { ok: true, pending: true, person };
   }
 
   return {
@@ -219,10 +204,10 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (!appUrl || !botAddress) return { ok: false, reason: 'no-app-url' };
       if (typeof sendPrivately !== 'function') return { ok: false, reason: 'no-private-door' };
       const nonce = randomNonce();
-      const until = now() + SCREEN_LINK_TTL_MS;
+      const until = now() + SCREEN_PAIRING_TTL_MS;
       threads.setScreenNonce(person, { hash: await sha256Hex(nonce), until });
       const link = encodeScreenLink(appUrl, { botAddress, relayUrl, nonce, botName });
-      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_LINK_TTL_MS / 60000)), remembered ?? '', buttonsFor(person));
+      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_PAIRING_TTL_MS / 60000)), remembered ?? '', buttonsFor(person));
       if (!sent?.ok) { threads.setScreenNonce(person, null); return { ok: false, reason: sent?.reason ?? 'not-reachable' }; }
       return { ok: true, until };
     },
@@ -272,19 +257,20 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
      * group is not accepted). Ja → the grant (their role's column, as them) and the notice; Nee, or too late → nothing.
      */
     async confirm(person, answer, { isPrivate = false } = {}) {
-      const offer = threads.screenOfferOf(person);
+      const offer = door.pendingOf(person);
       if (!offer) {
         // the code tapped again right after the screen connected: say it is connected, not that nothing is waiting
         const at = connectedAt.get(person);
-        return at != null && now() - at < SCREEN_LINK_TTL_MS ? { ok: true, already: true } : { ok: false, reason: 'nothing-pending' };
+        return at != null && now() - at < SCREEN_PAIRING_TTL_MS ? { ok: true, already: true } : { ok: false, reason: 'nothing-pending' };
       }
       if (!isPrivate) return { ok: false, reason: 'not-private' };
-      threads.setScreenOffer(person, null);   // answered (or late): the offer is gone either way
-      const refuse = async () => { refuseSoon(offer.viewPubKey); };
-      if (offer.until < now()) { await refuse(); return { ok: false, reason: 'expired' }; }
-      // only the code the screen shows grants: a wrong code, "none of these", or a bare yes drops the offer
-      const real = await screenCode(offer.viewPubKey, offer.nonce);
-      if (String(answer ?? '').trim().toUpperCase() !== real) { await refuse(); return { ok: true, declined: true }; }
+      // the door's one try: answered (or late), the offer is gone either way; only the code the screen shows grants —
+      // a wrong code, "none of these", or a bare yes drops the offer and its screen is told
+      const picked = await door.answer(person, answer);
+      if (!picked.ok) {
+        refuseSoon(offer.viewPubKey);
+        return picked.reason === 'pairing-expired' ? { ok: false, reason: 'expired' } : { ok: true, declined: true };
+      }
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
       const r = await grantTo(person, { viewPubKey: offer.viewPubKey, label: offer.label, nonce: offer.nonce });
       if (r.ok) connectedAt.set(person, now());
@@ -340,7 +326,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
     /** Revoking a person drops every screen of theirs, and the link they may still hold. */
     async dropAll(person) {
       threads.setScreenNonce(person, null);
-      threads.setScreenOffer(person, null);
+      door.drop(person);
       threads.setTelegramScreen(person, null);
       let n = 0;
       for (const g of await mine(person)) if (await revokeView(g.viewPubKey)) n += 1;

@@ -1,0 +1,356 @@
+/**
+ * mobileNode — a PHONE in Node: the phone's own boot and its own inbound wiring, over a test relay.
+ *
+ * What a story in the function matrix's M form runs on ("the phone does X, the other side sees it"). It is the phone,
+ * not a reassembly of it:
+ *   - the agent comes from the phone's `bootAgentBundle` (src/core/agentBundle.js), given the options App.js gives it,
+ *     built with the same factories (the device log and its sealed store, the admission membrane, the give-up
+ *     consumers, the circle pods, the registry backend). `phoneBootParity.test.js` holds this file to App.js's list;
+ *   - the receive path is the phone's own composition, `buildPhoneInboundWiring` (src/core/phoneInboundWiring.js) —
+ *     the function ChatScreen calls — with the screen's paint replaced by recorders;
+ *   - the ops on the waist are the phone's own mount, `mountPhoneAppOps` (src/core/phoneAppOps.js) — the function the
+ *     launcher calls — with the platform (picker, scanner, dialogs) recorded, and the picker fed by the story;
+ *   - the relay is the one the phone's settings name: written into ITS storage before boot, dialled by the boot's own
+ *     connect (no second dial from here).
+ *
+ * Two departures, both below the phone's code:
+ *   - NKN is UP and reaches nobody (`liveNknStub()`, through the bundle's own test seam `opts.nknLib`): it connects and
+ *     accepts every send, so a message routing wrongly would take it and be lost — as on the emulator, where the phone
+ *     is on live NKN and its test peer is not. A seam that removed NKN would hide every routing bug of that kind (one
+ *     did: the Ask thread's unscoped turn passed here and failed on the emulator, 2026-11-11). `node.nkn.sent` lists
+ *     what left over it. A story that needs NKN ABSENT passes `nknLib: absentNknStub` and says why;
+ *   - each phone gets its OWN module graph (`vi.resetModules()` before its imports). A phone is its own process: the
+ *     AsyncStorage stub, the circle pods' vault and producers, every module-level store are per phone here too. Two
+ *     phones sharing one graph would share all of that and prove nothing about two devices.
+ *
+ * Not composed (screen-only, no state a story reads): the catch-up kicks ChatScreen fires once per launch on timers
+ * (`globalThis` flags — per process, so the second phone would skip them), the restore flows, the theme, the pod
+ * sign-in. A story that needs a catch-up calls it through `node.bundle.laneCatchUps`.
+ */
+import { vi } from 'vitest';
+
+/** NKN ABSENT: a client that never emits 'connect', so the NKN leg stays down. Only for a story that needs it gone. */
+export const absentNknStub = {
+  MultiClient: class { constructor() {} on() {} close() {} },
+};
+
+/**
+ * NKN UP, reaching nobody — the emulator's case (the phone is on live NKN, its peer is not): the client connects and
+ * accepts every send, which goes nowhere. `sent` lists each destination, so a story can say what left over NKN.
+ * @returns {{ MultiClient: Function, sent: string[] }}
+ */
+export function liveNknStub() {
+  const sent = [];
+  return {
+    sent,
+    MultiClient: class {
+      constructor() { this.addr = `nkn.${Math.random().toString(16).slice(2, 12)}`; }
+      on(ev, cb) { if (ev === 'connect') setTimeout(() => cb(), 20); }
+      onConnect(cb) { setTimeout(() => cb(), 20); }
+      onMessage() {}
+      async send(to) { sent.push(String(to)); return null; }
+      close() {}
+    },
+  };
+}
+
+const until = async (pred, { timeoutMs, what }) => {
+  const t0 = Date.now();
+  for (;;) {
+    if (await pred()) return;
+    if (Date.now() - t0 > timeoutMs) throw new Error(`mobileNode: timed out after ${timeoutMs} ms waiting for ${what}`);
+    await new Promise((r) => { setTimeout(r, 50); });
+  }
+};
+
+/**
+ * Boot one phone.
+ * @param {object} p
+ * @param {string} p.name           a label (also the device name recorded at enrolment)
+ * @param {string} p.relayUrl       the test relay (`startJourneyRelay().url`)
+ * @param {number} [p.connectTimeoutMs=20000]
+ * @param {object} [p.nknLib]  the NKN module the phone gets (default: a fresh `liveNknStub()`, NKN up and reaching
+ *   nobody; `absentNknStub` for a story that needs NKN gone)
+ * @returns {Promise<object>} the node: { name, bundle, agent, callSkill, address, eventLog, deliveryMap, landed, nkn, dispose }
+ *   `nkn.sent` = every destination sent over NKN (empty for the absent stub).
+ *   `address` is the phone's chat key, the address a peer sends to. `landed` records what the screen would paint:
+ *   `contactReplies` (the contact-thread inbox), `mainBubbles` (calendar lines), `unrouted` (envelopes the router
+ *   handed to the default handler), `catchUpOffers` (the consent question; allowed by default, as a tap would).
+ */
+export async function bootMobileNode({ name, relayUrl, connectTimeoutMs = 20_000, nknLib = liveNknStub(), restoreFrom = null }) {
+  if (!name || !relayUrl) throw new Error('bootMobileNode: name and relayUrl are required');
+  vi.resetModules();
+  const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+  // A RESTART: what the same phone held on its disk, put back before anything boots (`node.snapshot()` before its
+  // dispose). Everything a phone keeps across launches lives in these two stores here.
+  const fsStub = await import('expo-file-system');
+  const { flushPendingSaves } = await import('@onderling/local-store');
+  if (restoreFrom) {
+    await AsyncStorage.multiSet(restoreFrom.asyncStorage ?? []);
+    fsStub.__load?.(restoreFrom.files ?? []);
+  }
+  const { bootAgentBundle } = await import('../../src/core/agentBundle.js');
+  const { buildPhoneInboundWiring } = await import('../../src/core/phoneInboundWiring.js');
+  const { mountPhoneAppOps } = await import('../../src/core/phoneAppOps.js');
+  const { circlePodWriterFor } = await import('../../src/core/phonePodSession.js');
+  const { composePhonePodReadBack } = await import('../../src/core/phonePodReadBack.js');
+  const { scopePinboardCallSkill } = await import('../../../basis/src/v2/circlePinboardScope.js');
+  const { sealedAnswer } = await import('../../../basis/src/v2/circlePodProducer.js');
+  const { getCircleMediaComposition } = await import('../../src/core/circleMedia.js');
+  // imported in THIS phone's module graph (a later boot resets the registry; a lazy import would get the other phone's)
+  const { feedHouseholdRoster } = await import('../../../basis/src/v2/householdRosterPairing.js');
+  const { subscribeContactReplies } = await import('../../src/core/contactReplyInbox.js');
+  const pods = await import('../../src/core/circlePods.js');
+  const { asyncStorageMappingsStore, MAPPINGS_DEVICE } = await import('../../src/core/mappingsStoreRN.js');
+  const { makeMemberOverrideStoreRN, makeCirclePolicyStoreRN } = await import('../../src/core/circleStoresRN.js');
+  const { makeCircleRecipePendingStoreRN } = await import('../../src/core/circleRecipePendingStorageRN.js');
+  const { makeCircleRulesPendingStoreRN } = await import('../../src/core/circleRulesPendingStorageRN.js');
+  const { t } = await import('../../src/core/localisation.js');
+  const { createAsBackend } = await import('@onderling/react-native/pseudo-pod-adapter');
+  const { createDeliveryStateMap } = await import('@onderling/kring-host/deliveryState');
+  const { EventLog } = await import('../../../basis/src/eventLog.js');
+  const { makeGiveUpConsumers } = await import('../../../basis/src/v2/deliveryGiveUp.js');
+  const { makeCircleMembraneOpts, makeCircleGroupsIndex } = await import('../../../basis/src/v2/circleMembrane.js');
+  // THIS phone's copy-log door: each phone has its own module graph (the reset above), so its own log ring buffer
+  const { logReportView } = await import('../../../basis/src/log/logReport.js');
+  const { sealedLocalBackend } = await import('../../../basis/src/v2/localStoreSeal.js');
+  const { backendSnapshotIo } = await import('../../../basis/src/v2/eventLogPersistence.js');
+  const { createSettingsPodMedium } = await import('../../../basis/src/v2/settingsPodMedium.js');
+  const { createHistoryPodMedium } = await import('../../../basis/src/v2/historyMirror.js');
+  const { createRegistryPodMedium } = await import('../../../basis/src/v2/registryCarrier.js');
+  const { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } = await import('../../../basis/src/v2/policyUpdateLane.js');
+  const { asyncStorageRelayIo } = await import('../../../basis/src/v2/relayPref.js');
+  const { makePeerRouter } = await import('../../../basis/src/core/handlers/peerRouter.js');
+  const {
+    makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore, retentionFromDays,
+  } = await import('@onderling-app/basis');
+
+  // ── what App.js builds before the boot ───────────────────────────────────────────────────────────────────────
+  let bundle = null;
+  // App.js's pod session slots (null until `node.signInToPod(session)`): the circle pods read the session ref, the
+  // bundle the shared-with-me writer
+  const podSessionRef = { current: null };
+  const podWriterRef = { current: null };
+  const eventLog = new EventLog({ initial: [], muted: [] });
+  const deliveryMap = createDeliveryStateMap();
+  const groupsIndex = makeCircleGroupsIndex();
+  const deliverySettings = createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage));
+  let deliverySettingsCache = { sendReceipts: true, allowFallback: false };
+  deliverySettings.get().then((s) => { deliverySettingsCache = s; }).catch(() => {});
+  const chatStoredReceipt = makeReceiptSender({
+    getSettings: () => deliverySettings.get(),
+    sendTo: (to, payload, opts = {}) => (typeof bundle?.agent?.sendPeerMessage === 'function'
+      ? bundle.agent.sendPeerMessage(to, payload, opts)
+      : Promise.reject(new Error('no peer send yet'))),
+  });
+  const recipePendingStore = makeCircleRecipePendingStoreRN(AsyncStorage);
+  const rulesPendingStore = makeCircleRulesPendingStoreRN(AsyncStorage);
+  pods.initCirclePods(AsyncStorage);
+  pods.setCirclePodSession(podSessionRef);   // as App.js: the session ref, empty until a sign-in
+  const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
+  const circlePolicyLane = makeCirclePolicyLane({
+    emitter: () => bundle?.agent?.emitPolicyUpdate ?? null,
+    headStore: makePolicyHeadStore(AsyncStorage),
+    readPolicy: (cid) => policyStore.get(cid),
+    writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); pods.forgetCircleSealStrategyFor(cid); return r; },
+    membersOf: membersOfViaSkill((...a) => bundle?.callSkill?.(...a)),
+  });
+
+  // the relay this phone is set to — in ITS storage, read by the boot's own connect
+  await asyncStorageRelayIo(AsyncStorage).save(relayUrl);
+
+  // ── the boot, with App.js's options (phoneBootParity.test.js holds the list to App.js) ─────────────────────
+  const flags = { settingsKeyMismatch: 0, settingsConflicts: 0, registryKeyMismatch: 0 };
+  let eventSeq = 0;
+  bundle = await bootAgentBundle({
+    t,
+    secureAgentOpts: {
+      ...makeGiveUpConsumers({ deliveryMap }),
+      ...makeCircleMembraneOpts({ overrideStore: makeMemberOverrideStoreRN(AsyncStorage), groupsIndex }),
+    },
+    allowAddressFallback: () => deliverySettingsCache.allowFallback === true,
+    circlesForPeer: (addr) => groupsIndex.groupsFor(addr),
+    asyncStorage: AsyncStorage,
+    onSettingsKeyMismatch: () => { flags.settingsKeyMismatch += 1; },
+    onSettingsConflicts: () => { flags.settingsConflicts += 1; },
+    getSharedWithMePodWriter: () => podWriterRef.current,   // App.js's getCirclePodWriter: null until a pod sign-in
+    markPolicyPending: (cid) => policyStore.markPending(cid),   // App.js's: a joined circle's policy not known yet
+    pinboardControlAgent: pods.circleControlAgentRouter,
+    provisionCircleMedium: pods.provisionCircleMedium,
+    deviceLog: eventLog,
+    deviceLogIo: backendSnapshotIo(sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' }))),
+    enrolDeviceName: () => name,
+    provisionSettingsMedium: async (strategy) => createSettingsPodMedium({
+      fetch: pods.getCirclePodFetch(), podRoot: pods.getActiveRealPodRouting()?.podRoot ?? null, strategy,
+    }),
+    registryBackend: createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }),
+    provisionRegistryMedium: async (strategy) => createRegistryPodMedium({
+      fetch: pods.getCirclePodFetch(), podRoot: pods.getActiveRealPodRouting()?.podRoot ?? null, strategy,
+    }),
+    onRegistryKeyMismatch: () => { flags.registryKeyMismatch += 1; },
+    provisionHistoryMirror: async (strategy) => createHistoryPodMedium({
+      fetch: pods.getCirclePodFetch(), podRoot: pods.getActiveRealPodRouting()?.podRoot ?? null, strategy,
+    }),
+    pinboardCircleDataMove: pods.circleSendDataMove,
+    pinboardPodWrite: pods.circlePodWrite,
+    podWebId: pods.getCirclePodWebId,
+    setKeyEventWiring: pods.setCircleKeyEventWiring,
+    mappingsStore: asyncStorageMappingsStore(AsyncStorage),
+    mappingsDeviceId: MAPPINGS_DEVICE,
+    // a first launch: the demo seed runs, as on a fresh install
+    seedTasks: true,
+    seedPinboardProfile: true,
+    seedPinboardPosts: true,
+    publishEvent: (e) => {
+      if (!e || typeof e !== 'object') return;
+      try { eventLog.append({ ...e, id: e.id ?? `mob-${Date.now()}-${(eventSeq += 1).toString(36)}`, ts: e.ts ?? Date.now() }); }
+      catch { /* defensive */ }
+    },
+    nknLib,   // test-only: NKN up and reaching nobody by default (see the head of this file)
+  });
+
+  // ── what App.js does once the bundle is up ───────────────────────────────────────────────────────────────────
+  try {
+    bundle.nearbyRoom?.setLandedHook?.((info) => chatStoredReceipt(info));
+    bundle.nearbyRoom?.setDeliveryMap?.(deliveryMap);
+  } catch { /* the room works without receipts */ }
+  await bundle.callSkill?.('params', 'get-param', { key: 'retention.chatDays' })
+    .then((r) => eventLog.setRetention?.(retentionFromDays(r?.value)))
+    .catch(() => {});
+  if (bundle.agent) bundle.agent._circleGroupsIndex = groupsIndex;
+
+  // ── what ChatScreen attaches: the phone's own inbound wiring, paint recorded ───────────────────────────────────
+  const landed = { contactReplies: [], mainBubbles: [], unrouted: [], catchUpOffers: [] };
+  const unsubscribe = subscribeContactReplies((reply) => { landed.contactReplies.push(reply); });
+  const { handlers, lanes } = buildPhoneInboundWiring({
+    bundle, agent: bundle.agent, callSkill: bundle.callSkill,
+    contactChannel: bundle.contactChannel,
+    pendingRedeems: bundle.pendingPeerRedeems,
+    sharedWithMeStore: bundle.sharedWithMeStore ?? null,
+    eventLog, deliveryStateMap: deliveryMap, chatStoredReceipt,
+    onCirclesChanged: () => {},
+    recipe: { pendingStore: recipePendingStore, dedup: new Set() },
+    rules: { pendingStore: rulesPendingStore, dedup: new Set() },
+    circlePolicyLane,
+    paint: {
+      addMainBubble: (bubble) => { landed.mainBubbles.push(bubble); },
+      chatCatchUpOffer: ({ count, approxBytes, allow }) => {
+        landed.catchUpOffers.push({ count, approxBytes });
+        Promise.resolve(allow()).catch(() => {});
+      },
+    },
+  });
+  // ChatScreen's pod read-back, composed by the same function (the app's foreground and circle-open entry)
+  const podReadBack = composePhonePodReadBack({ podChatCatchUp: lanes?.catchUps?.podChat ?? null, callSkill: bundle.callSkill });
+  bundle.attachPeerWiring({
+    // the router hands a default handler (from, payload), not the envelope: recorded as `{ from, payload }` (this read
+    // `(env)` and kept only the sender's address, so a story could count unrouted frames but never say what they were)
+    onPeerMessage: makePeerRouter({ handlers, defaultHandler: (from, payload) => { landed.unrouted.push({ from, payload }); } }),
+  });
+
+  // ── what the launcher mounts: the phone's own ops on the waist (src/core/phoneAppOps.js), its platform recorded ─
+  // The file picker is the story's: `node.pickNext(file)` hands the next pick the shape the phone's picker returns
+  // ({ name, type, size, dataB64 }); with nothing queued a pick is a cancel, as a person backing out of the picker.
+  const picks = [];
+  const asked = { qrScans: 0, feedback: [], personCards: [] };
+  let openCircle = null;
+  mountPhoneAppOps({
+    agent: bundle.agent, catalogue: bundle.catalogue, callSkill: bundle.callSkill, t, eventLog,
+    activeCircle: () => openCircle,
+    platform: {
+      openFilePicker: async () => picks.shift() ?? null,
+      openQrScanner: () => { asked.qrScans += 1; },
+      openFeedback: (a) => { asked.feedback.push(a); },
+      confirmFeedbackOffer: async () => true,   // the person taps yes
+      feedbackCard: null,
+      appVersion: 'test',
+      currentScreen: () => null,
+      showPersonCard: (card) => { asked.personCards.push(card); },
+    },
+  });
+
+  // ── on the relay: the boot's own connect, awaited ────────────────────────────────────────────────────────────
+  // (`agent.relay` names the primary relay but carries no socket state; the per-relay list does)
+  const onRelay = () => (bundle.agent?.relays?.list?.() ?? []).some((r) => r.url === relayUrl && r.connected === true);
+  await until(onRelay, { timeoutMs: connectTimeoutMs, what: `${name} on the relay ${relayUrl}` });
+
+  return {
+    name,
+    bundle,
+    /** What this phone holds on its disk now: hand it to `bootMobileNode({ restoreFrom })` after `dispose()` to restart it. */
+    snapshot: async () => ({ _flushed: await flushPendingSaves?.(), asyncStorage: await AsyncStorage.multiGet(await AsyncStorage.getAllKeys()), files: fsStub.__dump?.() ?? [] }),
+    /** Sign in to a pod as App.js does once its session holds tokens: the session into the circle pods' ref and the
+     *  shared-with-me writer built from it (pinboard's own store is not attached to the pod, as in App.js). */
+    signInToPod: async (session) => {
+      podSessionRef.current = session;
+      podWriterRef.current = await circlePodWriterFor(session);
+      return !!session;
+    },
+    /** What the create wizard's `persistPolicy` prop does on the launcher: the new circle's policy into the phone's
+     *  policy store, and the founder's first policy on the lane. */
+    persistPolicy: async (groupId, patch) => {
+      await policyStore.update?.(groupId, patch);
+      await circlePolicyLane?.state(groupId).catch(() => {});   // as the create modal's: awaited and flushed
+      await flushPendingSaves().catch(() => {});
+    },
+    /** Whether this phone can seal for the circle now: its circle pods hold a group key for it (the seal strategy the
+     *  send path asks for; null while the key is not on this device). */
+    canSeal: async (circleId) => !!(await pods.getCircleSealStrategy(circleId, (await policyStore.get?.(circleId)) ?? null).catch(() => null)),
+    /** The circle screen's pinboard call (CircleLauncherScreen's `pinboardCall`): the waist scoped to the circle, its
+     *  writes sealed with the circle's key (or refused while the key is not on this device), its lists filtered to it. */
+    circleCall: async (circleId) => {
+      // the screen holds the circle's policy in its state; read once here, as the open circle does
+      const policy = (await policyStore.get?.(circleId)) ?? null;
+      return scopePinboardCallSkill(
+        bundle.callSkill, circleId,
+        (p) => pods.getCircleSealStrategy(circleId, p ?? policy),
+        async () => { const comp = await getCircleMediaComposition(circleId, policy); return comp?.mediaGateway ? { mediaGateway: comp.mediaGateway, localActor: pods.getCircleActorWebId() || 'me', t } : null; },
+        { sealed: (p) => sealedAnswer(p ?? policy), policyNow: () => policyStore.get?.(circleId) },
+      );
+    },
+    /** Open a sealed text with this phone's own strategy for the circle (what its open path uses): the plaintext, or
+     *  null when this device holds no key that opens it. */
+    openSealed: async (circleId, sealed) => {
+      const strat = await pods.getCircleSealStrategy(circleId, (await policyStore.get?.(circleId)) ?? null).catch(() => null);
+      if (!strat?.open) return null;
+      try { const out = await strat.open(sealed); return typeof out === 'string' ? out : (out?.text ?? out ?? null); } catch { return null; }
+    },
+    /** The circle's policy as this phone's policy store holds it (what the circle pods read). */
+    policyOf: async (circleId) => (await policyStore.get?.(circleId)) ?? null,
+    /** The app's pod read-back (ChatScreen's): `comeToFront()` is what AppState 'active' calls. */
+    podReadBack,
+    comeToFront: () => podReadBack?.onForeground?.() ?? Promise.resolve({ ingested: 0 }),
+    agent: bundle.agent,
+    callSkill: bundle.callSkill,
+    address: bundle.agent?.identity?.chat?.pubKey ?? null,
+    // the same key under the name the relay-test helpers read (`createCircle`, `joinExistingCircle`), so a phone can
+    // stand in any of their roles
+    pubKey: bundle.agent?.identity?.chat?.pubKey ?? null,
+    eventLog,
+    deliveryMap,
+    storage: AsyncStorage,
+    flags,
+    landed,
+    nkn: { sent: nknLib.sent ?? [] },
+    asked,
+    /** The text this phone's "copy log" door shows (its own ring buffer; codes and scalars only). */
+    copyLog: () => logReportView({ at: Date.now() }).text,
+    /** Queue the next file the phone's picker returns ({ name, type, size, dataB64 }). */
+    pickNext: (file) => { picks.push(file); },
+    /** Which circle the launcher has open (the lists write there). */
+    /** Open a circle as the launcher does (CircleLauncherScreen's openCircle): it becomes the one the lists write to,
+     *  and its members are paired (feedHouseholdRoster: their circle addresses bound to their keys). Awaited here; the
+     *  launcher fires it and moves on. */
+    openCircle: async (circleId) => {
+      openCircle = circleId;
+      try { await feedHouseholdRoster({ agent: bundle.agent, circleId }); } catch { /* best-effort, as the launcher */ }
+      // …and what the circle view does on mount (CircleLauncherScreen): build the circle's pod producer and seed its
+      // group-key roster with the members already in (a no-op for a circle without a pod)
+      try { await pods.seedCircleRosterFor({ circleId, policy: (await policyStore.get?.(circleId)) ?? null, callSkill: bundle.callSkill }); } catch { /* best-effort, as the view */ }
+    },
+    async dispose() {
+      unsubscribe?.();
+      await bundle.dispose?.();
+    },
+  };
+}

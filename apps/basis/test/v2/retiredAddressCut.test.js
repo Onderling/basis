@@ -9,7 +9,8 @@
  * @vitest-environment node
  */
 import { describe, it, expect } from 'vitest';
-import { addressBindsOnRow, inAuthorChainUpTo } from '../../src/v2/membershipRail.js';
+import { addressBindsOnRow } from '../../src/v2/membershipRail.js';
+import { inAuthorChainUpTo } from '../../src/v2/authorChainCut.js';
 
 const OLD = 'addr-old';
 const NEW = 'addr-new';

@@ -25,7 +25,7 @@
  */
 import { selfRefIn } from './selfRef.js';
 import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
-import { entryKindRegistryFromManifests, toEventLogItem, kindWakes } from '@onderling/item-store';
+import { entryKindRegistryFromManifests, toEventLogItem, kindWakes, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { cardForCircleWire } from '@onderling/kring-host/circleBroadcast';
 import { chatManifest, CHAT_LANE } from './chatManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
@@ -53,6 +53,10 @@ export const CHAT_CATCHUP_SUBTYPES = Object.freeze({
  * @param {Function} a.callSkill  the waist (roster lookups for the key↔ref binding)
  * @param {Function} [a.verifyBinding]  override the roster binding verifier (tests)
  */
+/** The actors a chat line may carry without a signature: the shells' own optimistic line (`'me'`, web
+ *  `LOCAL_ACTOR` and the phone's appendCircleMessage) and the local bot's bubbles and notices (`'bot'`). */
+const UNSIGNED_LOCAL_ACTORS = new Set(['me', 'bot']);
+
 export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.append !== 'function') {
@@ -236,7 +240,25 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
     return !!e && e.payload?.circleId === circleId;
   };
 
-  return { appendMessage, signEntry, ingest, verify, storedStatements, hasEntry };
+  /** What a catch-up sends on must still be what its author signed, checked here, now (as the circle entry rail's). */
+  const checkSigned = (circleId, statement) => !!statement && statement.tombstone !== true && safeVerify(statement, circleId)?.ok === true;
+
+  /** A STORED chat entry, judged as an arrival (a history restore runs it before the entry lands). A signed one must
+   *  verify, and the text the bubble shows must be the text that was signed. A line with no statement never fanned: it
+   *  lands only when it is this person's own (the shells' local actor, or this device's self in the circle) or the
+   *  local bot's; one naming anyone else would show as THEIR message, so it is refused like a bad signature. */
+  const checkEntry = (entry) => {
+    if (!entry || entry.type !== CHAT_LANE) return false;
+    const p = entry.payload ?? {};
+    if (p.statement === undefined || p.statement === null) {
+      return UNSIGNED_LOCAL_ACTORS.has(entry.actor) || (typeof p.circleId === 'string' && entry.actor === refIn(p.circleId));
+    }
+    if (typeof p.circleId !== 'string' || !checkSigned(p.circleId, p.statement)) return false;
+    const asText = (x) => (typeof x === 'string' ? x : '');   // a landing renders no text as '' (ingest above)
+    return asText(p.text) === asText(p.statement.body?.payload?.text);
+  };
+
+  return { entryKind: CHAT_LANE, appendMessage, signEntry, ingest, verify, storedStatements, hasEntry, checkSigned, checkEntry };
 }
 
 /**
@@ -306,14 +328,20 @@ export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null, 
  *
  * @param {object} a
  * @param {object} a.rail                       the chat rail
- * @param {(circleId:string, q:{sinceTs:number})=>Promise<object[]>} a.podReadSince  the sealed-pod range reader
+ * @param {(circleId:string, q:{sinceTs:number})=>Promise<{items:object[], truncated:boolean}>} a.podReadSince  the
+ *   shared custody's sealed-pod range reader (`circlePodReadSince`): one page forward from `sinceTs`, `truncated` when
+ *   more rows follow; the catch-up reads on page by page, so a long absence loses nothing
  * @param {(circleId:string)=>Promise<string>|string} [a.dataMoveFor]  the circle's data-move branch; absent →
  *   every listed circle is probed (a pod-less circle's reader just returns nothing)
  * @param {{query: Function}} a.eventLog        for the since-watermark (newest landed chat entry per circle)
  */
+/** How far behind its newest landed chat entry the pod read-back starts again (idempotent ingest dedups the overlap). */
+export const POD_CATCHUP_OVERLAP_MS = param({ key: 'chat.podCatchUpOverlapMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 * 60 * 1000 });
+/** Pages the pod read-back reads per kick (the reader's page is 200 rows); the next kick reads on from where it landed. */
+export const POD_CATCHUP_MAX_PAGES = param({ key: 'chat.podCatchUpMaxPages', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
+
 export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eventLog } = {}) {
   if (!rail || typeof podReadSince !== 'function') return null;
-  const OVERLAP_MS = 60 * 60 * 1000;   // re-read an hour behind the watermark; idempotent ingest dedups
 
   async function catchUpCircle(circleId) {
     if (typeof dataMoveFor === 'function') {
@@ -328,15 +356,26 @@ export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eve
         if (e?.type === CHAT_LANE && e.payload?.circleId === circleId && typeof e.ts === 'number' && e.ts > sinceTs) sinceTs = e.ts;
       }
     } catch { sinceTs = 0; }
-    let rows = [];
-    try { rows = (await podReadSince(circleId, { sinceTs: Math.max(0, sinceTs - OVERLAP_MS) })) ?? []; }
-    catch { return { ingested: 0 }; }
     let ingested = 0;
-    for (const row of rows) {
-      const statement = row?.event;
-      if (!statement?.body || !statement?.sig) continue;   // a pre-statement row: the migrated era's copy
-      try { const r = await rail.ingest(circleId, statement); if (r?.ok && !r.existed) ingested += 1; }
-      catch { /* one bad row never blocks the rest */ }
+    let from = Math.max(0, sinceTs - POD_CATCHUP_OVERLAP_MS);
+    // page by page: the reader answers one page forward from `from`; read on from the last row's ts while more follow
+    // The watermark is the newest LANDED chat entry: a kick whose pages held only refused rows lands nothing, so the
+    // next kick starts from the same watermark and reads those pages again (bounded by the page cap; no cursor kept).
+    for (let page = 0; page < POD_CATCHUP_MAX_PAGES; page += 1) {
+      let read;
+      try { read = await podReadSince(circleId, { sinceTs: from }); }
+      catch { return { ingested }; }
+      const rows = read?.items ?? [];
+      for (const row of rows) {
+        const statement = row?.event;
+        if (!statement?.body || !statement?.sig) continue;   // a pre-statement row: the migrated era's copy
+        try { const r = await rail.ingest(circleId, statement); if (r?.ok && !r.existed) ingested += 1; }
+        catch { /* one bad row never blocks the rest */ }
+      }
+      const last = rows[rows.length - 1]?.ts;
+      // done, or no progress (a full page of one ts): the next kick reads on from the newest landed entry
+      if (!read?.truncated || !Number.isFinite(last) || last <= from) break;
+      from = last;
     }
     return { ingested };
   }

@@ -23,7 +23,7 @@
  * writer's store proves nothing about a circle.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown, sendInCircle } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { tEn } from './support/bundleTranslator.js';
 
@@ -76,7 +76,7 @@ describe('the collaborative task corridor — three people, one circle', () => {
     // deterministic rather than a first-contact handshake race.
     await Promise.all([A, B, C].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: CIRCLE })));
     for (const peer of [B, C]) {
-      await A.agent.sendPeerMessage(peer.pubKey,
+      await sendInCircle(A, peer, CIRCLE,
         { type: 'p2p-chat', subtype: 'chat-message', msgId: `warm-${peer.label}`, body: 'warm' },
         { hold: true, firstSendTimeoutMs: 2000, retryDelays: [] });
       await until(() => peer.received.find((m) => m.payload?.body === 'warm'), { timeout: 8000 });

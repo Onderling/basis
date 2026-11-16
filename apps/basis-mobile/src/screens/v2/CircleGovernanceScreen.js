@@ -9,7 +9,7 @@
  * "who decides" decision-class settings per governed action.
  *
  * Thin shell: all logic (fold, resolver, enact-gate, roster assembly) lives in shared src;
- * this file resolves my webid, binds the host, renders the model, and re-reads after each
+ * this file resolves my webid, takes the launcher's one binding, renders the model, and re-reads after each
  * action (persisted state, not the tap). RN screens are excluded from vitest — see
  * REMAINING-WORK.md for the on-device verification checklist.
  */
@@ -18,30 +18,30 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
-import { bindCircleGovernance, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';
-import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
+import Btn from './Btn.js';
+import { changeSettingsDoor } from '../../../../basis/src/v2/governanceDoors.js';
+import { buildSubjectLabeler, subjectLabelerFor, deadlineLine, joinedSinceLine, voteFailedLine, enactOutcomeLine, reportTargetText } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
-import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
-
-const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
+import { GOVERNANCE_ACTIONS, OFFERED_GOVERNANCE_CLASSES, GOVERNANCE_CLASS_KEYS as CLASS_KEY, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
 
-export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy, updatePolicy, circleId, onBack, circleIdentityFor = null, spineGate = null, selfIn = null }) {
+// `governance`: the launcher's ONE binding (governanceOneBindingPerShell) — this screen decides with the same options as
+// every other screen on the phone (its own binding lacked the settings enactor, so approving a settings proposal here
+// closed it rejected).
+export default function CircleGovernanceScreen({ callSkill, governance, circleId, onBack, selfIn = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState({ view: { open: [], closed: [] }, isAdmin: false, policy: null });
+  // the line a failed vote leaves on the screen (voteFailedLine, web twin), until the next vote
+  const [errorKey, setErrorKey] = useState(null);
+  const [noticeKey, setNoticeKey] = useState(null);   // what an admin's Enact did (enactOutcomeLine, web twin)
   const ctxRef = useRef({ gov: null, myWebid: '' });
 
   const load = useCallback(async () => {
     let myWebid = '';
     try { const r = await callSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-    const broadcast = makeGovernanceBroadcast(callSkill);   // the one shared fan (web parity by construction)
-    const gov = bindCircleGovernance({
-      // the self this device is in each circle (a persona's circle is the persona's) — the launcher hands `selfIn`
-      eventLog, callSkill, getPolicy, myRef: (cid) => (typeof selfIn === 'function' ? selfIn(cid) : null) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
-      circleIdentityFor,
-      spineGate,
-    });
+    const gov = governance ?? null;
+    if (!gov) return;
     ctxRef.current = { gov, myWebid };
     let ctx = { policy: {}, members: [] };
     try { ctx = await gov.getContext(circleId); } catch { /* */ }
@@ -52,20 +52,33 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     let roster = [];
     try { roster = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { /* */ }
     const nameOf = buildSubjectLabeler(roster);
-    const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
+    // a person is named from this roster or 'a member who has left', never the key (subjectLabelerFor, shared; web twin)
+    const labelForSubject = subjectLabelerFor(roster, t);
     let view = { open: [], closed: [] };
     try { view = await gov.view(circleId, { labelForSubject }); } catch { /* */ }
     const isAdmin = me?.role === 'admin';
     let reports = [];
     if (isAdmin) { try { reports = (await gov.reports.list(circleId)).open; } catch { /* */ } }
-    setModel({ view, isAdmin, policy: ctx.policy, reports });
-  }, [callSkill, eventLog, getPolicy, circleId]);
+    setModel({ view, isAdmin, policy: ctx.policy, reports, nameOf });
+  }, [callSkill, governance, circleId]);
 
   useEffect(() => { load(); }, [load]);
 
   const onVote = useCallback(async (proposalId, choice) => {
     const { gov, myWebid } = ctxRef.current;
-    try { await gov?.vote({ circleId, proposalId, voter: myWebid, choice }); } catch { /* */ }
+    let r = null;
+    try { r = await gov?.vote({ circleId, proposalId, voter: myWebid, choice }); } catch (err) { r = err; }
+    setErrorKey(voteFailedLine(r)); setNoticeKey(null);   // a vote that did not go through says so: it must not look cast
+    await load();
+  }, [circleId, load]);
+
+  // the admin's Enact (L893): the way vote travels, through the circle's governance handle; it says what it did, or why not
+  const onEnact = useCallback(async (proposalId) => {
+    const { gov } = ctxRef.current;
+    let r = null;
+    try { r = await gov?.tally({ circleId, proposalId }); } catch (err) { r = err; }
+    const line = enactOutcomeLine(r);
+    setErrorKey(line.failed ? line.key : null); setNoticeKey(line.failed ? null : line.key);
     await load();
   }, [circleId, load]);
 
@@ -75,13 +88,13 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     await load();
   }, [circleId, load]);
 
+  // who decides an action is a SETTING: through the circle's settings rule (a proposal where the admins or the circle
+  // decide settings together), and stated on the lane like every other setting
   const onSetClass = useCallback(async (action, cls) => {
-    try {
-      const cur = (await getPolicy(circleId)) ?? {};
-      await updatePolicy?.(circleId, mergeCirclePolicy(cur, { governance: { [action]: cls } }));
-    } catch { /* */ }
+    const { gov, myWebid } = ctxRef.current;
+    try { await changeSettingsDoor({ governance: gov, circleId, patch: { governance: { [action]: cls } }, actorRef: (typeof selfIn === 'function' ? selfIn(circleId) : null) ?? (myWebid || null) }); } catch { /* */ }
     await load();
-  }, [getPolicy, updatePolicy, circleId, load]);
+  }, [circleId, selfIn, load]);
 
   const onReviewDisputed = useCallback(async (ref) => {
     const { gov, myWebid } = ctxRef.current;
@@ -103,9 +116,19 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
   return (
     <ScrollView contentContainerStyle={styles.root} testID="circle-governance">
       <Pressable onPress={onBack} accessibilityRole="button" style={styles.back} testID="circle-governance-back">
-        <Text style={styles.backText}>{`← ${t('circle.back')}`}</Text>
+        <Text style={styles.backText}>{t('circle.back')}</Text>
       </Pressable>
+      {errorKey ? <Text style={{ color: theme.color.danger, marginBottom: 8 }} accessibilityRole="alert" testID="circle-governance-error">{t(errorKey)}</Text> : null}
+      {noticeKey ? <Text style={{ marginBottom: 8 }} accessibilityRole="text" testID="circle-governance-notice">{t(noticeKey)}</Text> : null}
       <Text style={styles.title}>{t('circle.governance.title')}</Text>
+
+      {/* changes made WITHOUT the vote this circle requires: every device refused them (the receiver gate); shown so the
+          members see that it happened (kept and shown, never applied) — web parity: circleGovernancePanel */}
+      {(model.view.refused ?? []).map((r) => (
+        <View key={r.hash ?? `${r.action}-${r.version}`} style={styles.disputed} testID={`gov-refused-${r.action}`}>
+          <Text style={styles.disputedLine}>{t(`circle.governance.refused_${r.action}`, { who: r.label || r.by })}</Text>
+        </View>
+      ))}
 
       {(model.view.disputed ?? []).map((d) => (
         <View key={d.ref} style={styles.disputed} testID={`gov-disputed-${d.ref}`}>
@@ -140,8 +163,18 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
               'proposal-deadline': () => (row.deadline != null ? (
                 <Text style={styles.tally} testID={`governance-deadline-${row.id ?? ''}`}>{deadlineLine(row.deadline, { t, locale: dateLocaleOf(t) })}</Text>
               ) : null),
+              'proposal-joined-since': () => {
+                const line = joinedSinceLine(row.joinedSince, { t });
+                return line ? <Text style={styles.tally} testID={`governance-joined-since-${row.proposalId}`}>{line}</Text> : null;
+              },
               'proposal-awaiting': () => (row.approved && row.awaitingEnactment ? (
-                <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
+                <View>
+                  <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
+                  {/* the admin's act (L893): who sees it is one shared decision (row.canEnact) */}
+                  {row.canEnact ? (
+                    <Btn variant="primary" onPress={() => onEnact(row.proposalId)} label={t('circle.governance.enact')} testID={`governance-enact-${row.proposalId}`} />
+                  ) : null}
+                </View>
               ) : null),
               'proposal-vote': () => (row.canVote ? (
                 <View style={styles.actions}>
@@ -164,7 +197,7 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
                 </Pressable>
               ) : null),
             };
-            const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-awaiting']);
+            const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-joined-since', 'proposal-awaiting']);
             const declared = sectionsOf('governanceProposal');
             const metaRow = declared.filter((d) => META.has(d.id)).map((d) => <React.Fragment key={d.id}>{PAINT[d.id]?.()}</React.Fragment>);
             let metaPlaced = false;
@@ -201,7 +234,8 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
           {model.reports.map((r) => (
             <View key={r.reportId} style={styles.card} testID={`gov-report-${r.reportId}`}>
               <Text style={styles.action}>
-                {t(`circle.governance.report_target.${r.targetType}`)}{(r.targetLabel || r.targetRef) ? `: ${r.targetLabel || r.targetRef}` : ''}
+                {/* named from this admin's own roster, never by the key (reportTargetText, shared; web twin) */}
+                {reportTargetText(r, { nameOf: model.nameOf, t })}
               </Text>
               {r.reason ? <Text style={styles.tally}>{r.reason}</Text> : null}
               <View style={styles.actions}>
@@ -226,12 +260,13 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
               <View key={action} style={styles.setting} testID={`gov-setting-${action}`}>
                 <Text style={styles.settingAction}>{t(`circle.governance.action.${action}`)}</Text>
                 <View style={styles.classRow}>
-                  {GOVERNANCE_CLASSES.map((cls) => (
+                  {OFFERED_GOVERNANCE_CLASSES.map((cls) => (
                     <Pressable
                       key={cls}
                       onPress={() => onSetClass(action, cls)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: cls === current }}
+                      testID={`gov-setting-${action}-${cls}`}
                       style={[styles.classBtn, cls === current && styles.classBtnActive]}
                     >
                       <Text style={[styles.classText, cls === current && styles.classTextActive]}>{t(`circle.governance.class.${CLASS_KEY[cls]}`)}</Text>

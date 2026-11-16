@@ -14,8 +14,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Share, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QrCodeView } from '@onderling/react-native/qr/view';
-import { loadShareMyContact, CONTACT_QR } from '../../../../basis/src/v2/contactCardLink.js';
-import { t } from '../../core/localisation.js';
+import { loadShareMyContact, sharedLinkState, sharedLinkWords, withdrawSharedLink, CONTACT_QR } from '../../../../basis/src/v2/contactCardLink.js';
+import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 
@@ -25,7 +25,9 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: a back link under it cannot be tapped
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
-  const [state, setState] = useState({ loading: true, payload: null, link: null, qr: null });
+  const [state, setState] = useState({ loading: true, payload: null, link: null, qr: null, token: null, linkState: null });
+  // every showing mints a NEW link (L806): a withdraw shows a fresh one, so it reloads like a new showing
+  const [showing, setShowing] = useState(0);
   // A tap enlarges the QR to the screen's width, for a camera across the table; a second tap brings it back.
   const [large, setLarge] = useState(false);
   const { width: screenW } = useWindowDimensions();
@@ -34,11 +36,18 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
   useEffect(() => {
     let alive = true;
     (async () => {
-      const r = typeof callSkill === 'function' ? await loadShareMyContact({ callSkill, appUrl }) : { payload: null, link: null, qr: null };
-      if (alive) setState({ loading: false, ...r });
+      const r = typeof callSkill === 'function' ? await loadShareMyContact({ callSkill, appUrl }) : { payload: null, link: null, qr: null, token: null };
+      const linkState = r.token ? sharedLinkWords(await sharedLinkState({ callSkill, token: r.token }), { t, lang: lang() }) : null;
+      if (alive) setState({ loading: false, ...r, linkState });
     })();
     return () => { alive = false; };
-  }, [callSkill, appUrl]);
+  }, [callSkill, appUrl, showing]);
+
+  const withdraw = async () => {
+    if (!state.token) return;
+    await withdrawSharedLink({ callSkill, token: state.token });
+    setShowing((n) => n + 1);
+  };
 
   const share = () => {
     const message = state.link ?? state.payload;
@@ -69,6 +78,13 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
             <View>
               <Text style={styles.label}>{t('circle.shareContact.link_label')}</Text>
               <Text style={styles.value} selectable numberOfLines={3} testID="share-contact-link">{state.link}</Text>
+              {/* the link's state and its withdraw: its first opener writes directly, anyone after is a request (L806) */}
+              {state.linkState ? <Text style={styles.label} testID="share-contact-link-state">{state.linkState}</Text> : null}
+              {state.token ? (
+                <Pressable onPress={withdraw} accessibilityRole="button" testID="share-contact-withdraw">
+                  <Text style={styles.withdraw}>{t('circle.shareContact.link_withdraw')}</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
           <Pressable style={styles.button} onPress={share} accessibilityRole="button" testID="share-contact-share">
@@ -93,4 +109,5 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   value:      { fontFamily: 'monospace', fontSize: 12, color: theme.color.ink, marginTop: 2 },
   button:     { marginTop: 16, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: theme.color.accent },
   buttonText: { fontSize: 14, fontWeight: '600', color: theme.color.accentContrast },
+  withdraw:   { fontSize: 14, color: theme.color.accent, marginTop: 8 },
 });

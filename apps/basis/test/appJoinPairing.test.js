@@ -78,6 +78,9 @@ describe('app-level circle join between two real agents over a shared InternalBu
     expect(wieOnA[0].webid, 'WIE resolves peer B').toBe(B.pubKey);
 
     // Bonus — a chat A→B message delivers over the same in-process transport.
+    // …to B as a CONTACT: A holds B's card (added through the real door), as a person does before writing directly
+    const bCard = (await B.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+    expect((await A.agent.callSkill('pinboard', 'addContactFromQr', { payload: bCard }))?.error ?? null).toBe(null);
     const body = `hoi vanaf A ${Date.now().toString(36)}`;
     await A.agent.sendPeerMessage(B.pubKey, { type: 'p2p-chat', subtype: 'chat-message', body });
     const gotChat = await until(() => B.received.find((m) => m.payload?.body === body));

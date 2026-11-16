@@ -44,6 +44,7 @@ export async function loadMijModel({ callSkill, personaId, circles = [] } = {}) 
     return {
       id:         r.agentId,
       name:       r.name ?? r.agentId,
+      kind:       r.kind ?? null,
       properties: props?.properties ?? {},
       disclosure: disc?.disclosure ?? { perContext: {} },
     };

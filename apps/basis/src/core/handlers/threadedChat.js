@@ -25,10 +25,15 @@
  *   notePeer(fromAddr)
  *     — make the replier a contact row (the graph otherwise only learns peers at send time).
  */
-export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, noteAnswer, logger = console } = {}) {
+/**
+ * `isKnownSender(contactId, fromAddr)` (optional, the contact channel's `knownSender`): a turn from someone the person
+ * did not choose is not kept here: no row, no thread turn, no answer recorded (a first message is a request, and only
+ * the contact channel's door holds one). Absent: every turn lands, as before.
+ */
+export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, noteAnswer, isKnownSender = null, logger = console } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleThreadedChat: deliverToThread required');
 
-  return function handleThreadedChat(fromAddr, payload) {
+  return function handleThreadedChat(fromAddr, payload, ctx = {}) {
     const body = payload?.body;
     if (typeof body !== 'string' || body === '') {
       // Infrastructure envelopes (handshakes, claims) routinely arrive without a body — not ours.
@@ -36,6 +41,16 @@ export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, 
       return;
     }
     const contactId = contactIdFor(identityOf, fromAddr);
+    if (typeof isKnownSender === 'function') {
+      return Promise.resolve(isKnownSender(contactId, fromAddr, ctx?.to ?? null)).then((known) => {
+        if (known === true) land(contactId, fromAddr, payload, body);
+        else logger.info?.('[peer] a threaded turn from someone not known: not kept (a first message is a request)');
+      }, () => { /* unknown: not kept */ });
+    }
+    land(contactId, fromAddr, payload, body);
+  };
+
+  function land(contactId, fromAddr, payload, body) {
     try { notePeer?.(contactId); } catch { /* a row is a convenience; the thread persists regardless */ }
     const nonce = typeof payload.nonce === 'string' && payload.nonce ? payload.nonce : null;
     try {
@@ -56,7 +71,7 @@ export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, 
     if (typeof payload.threadId === 'string' && payload.threadId && typeof noteAnswer === 'function') {
       Promise.resolve().then(() => noteAnswer(fromAddr, payload.threadId)).catch(() => { /* the answer still landed in the thread */ });
     }
-  };
+  }
 }
 
 /**

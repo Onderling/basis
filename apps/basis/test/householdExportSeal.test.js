@@ -15,7 +15,8 @@ describe('the sealed export', () => {
     expect(Object.keys(key).sort()).toEqual(['publicKey', 'sealedSecret', 'v']);
     const sealed = sealExport(FILE, { publicKey: key.publicKey, sealedSecret: key.sealedSecret });
     expect(isSealedExport(sealed)).toBe(true);
-    expect(JSON.stringify(sealed)).not.toContain('melk');
+    // quoted, as below: a bare 'melk' can occur by chance inside base64 ciphertext
+    expect(JSON.stringify(sealed)).not.toContain('"melk"');
     // a new box: only the file
     const secret = await unlockExportKey({ key: sealed, passphrase: 'correct horse battery', argonOpts: LIGHT });
     expect(openExport(sealed, secret)).toEqual(FILE);
@@ -52,7 +53,9 @@ describe('the shelf seals when the admin has set a key', () => {
     const all = await Promise.all(names.map((n) => shelf.read(n)));
     expect(all.every(isSealedExport)).toBe(true);
     expect(all.map((f) => f.holds)).toEqual([false, false, true]);
-    expect(JSON.stringify(all)).not.toContain('melk');
+    // the QUOTED plaintext form: a bare 'melk' can occur by chance inside base64 ciphertext (m, e, l, k are base64
+    // letters; it did once on development, 2026-11-08), quotes cannot — so this asserts leakage, not luck
+    expect(JSON.stringify(all)).not.toContain('"melk"');
   });
 });
 

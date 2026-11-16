@@ -19,6 +19,7 @@
 import { encodeMembershipCodeUrl } from '../core/wizards/createGroupState.js';
 import { isPodUrl } from './connectionPoints.js';
 import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkChoice, setPersona } from '../core/wizards/joinGroupState.js';
+import { rulesDocFromAnswer } from './circleRules.js';
 
 /**
  * Build a `onderling-invite://` URI for an EXISTING circle so the admin can show it as a QR.
@@ -108,8 +109,7 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
   let rules = null;
   try {
     const res = await callSkill('pinboard', 'getGroupRules', { groupId: circleId });
-    const doc = res?.doc ?? res?.rules?.source?.rules ?? null;
-    rules = doc && typeof doc === 'object' ? doc : null;
+    rules = rulesDocFromAnswer(res);
   } catch { rules = null; }
   const invite = {
     groupId: circleId, code, expiresAt,

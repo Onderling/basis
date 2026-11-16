@@ -25,4 +25,22 @@ describe('the lists block on the circle screen', () => {
     el.querySelector('.circle-screen__list-entry .circle-screen__row-act').click();
     expect(onAction).toHaveBeenCalledWith({ kind: 'row-op', op: { app: 'lists', opId: 'markListItemDone', args: { circleId: 'k1', item: 'e1', list: 'l1' } } });
   });
+
+  it('a list with an add act gets a field: a typed line goes on that list through the lists op', () => {
+    const el = document.createElement('div'); document.body.appendChild(el);
+    const onAction = vi.fn();
+    const add = { kind: 'op', app: 'lists', opId: 'addToList', args: { circleId: 'k1', list: 'l2' }, textArg: 'text', labelKey: 'circle.container.add', placeholderKey: 'circle.lists.add_prompt' };
+    const withAdd = { ...block, content: { lists: [block.content.lists[0], { ...block.content.lists[1], add }] } };
+    renderCircleScreen(el, { blocks: [withAdd], t, onAction });
+    const forms = el.querySelectorAll('.circle-screen__list-add');
+    expect(forms.length, 'only the list that carries an add act').toBe(1);
+    const input = forms[0].querySelector('input');
+    expect(input.placeholder).toBe('circle.lists.add_prompt');
+    forms[0].querySelector('button').click();
+    expect(onAction, 'an empty line adds nothing').not.toHaveBeenCalled();
+    input.value = 'zeep';
+    forms[0].querySelector('button').click();
+    expect(onAction).toHaveBeenCalledWith({ kind: 'row-op', op: { app: 'lists', opId: 'addToList', args: { circleId: 'k1', list: 'l2', text: 'zeep' } } });
+    expect(input.value, 'the field empties once sent').toBe('');
+  });
 });

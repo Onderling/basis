@@ -23,10 +23,3 @@ describe('the chat bubble time follows the household clock, not the browser', ()
     expect(timeWords(Date.UTC(2026, 9, 8, 23, 22), { tz: 'UTC' })).toBe('23:22');
   });
 });
-
-describe('the nl author chip is Dutch', () => {
-  it('chatFilter.authors.agents is not the English word', () => {
-    const nl = JSON.parse(read('../../src/locales/circle.nl.json'));
-    expect(nl.chatFilter.authors.agents.text).toBe('Bots');
-  });
-});

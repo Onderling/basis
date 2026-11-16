@@ -12,6 +12,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { primeCircleSecurity, knownCircleIds } from '../../src/v2/circleSecurityPriming.js';
+import { createCircleSenderAuthorization } from '../../src/v2/circleSenderAuthorization.js';
 
 /** An agent that answers the two substrate reads and records what was asked of it. */
 function fakeAgent({ circles = ['circle', 'koor'], members = {}, failMembersFor = [] } = {}) {
@@ -61,7 +62,9 @@ describe('the floor is the substrate, not what you looked at', () => {
 });
 
 describe('ordering and degradation', () => {
-  it('installs identities BEFORE feeding rosters', async () => {
+  it('reads rosters BEFORE installing identities', async () => {
+    // an identity makes traffic to the circle's address OPEN; reading the roster first means anything that opens meets
+    // a roster (or, for a circle whose read failed, the refusal of a known circle address with no roster)
     const order = [];
     const agent = fakeAgent();
     agent.installCircleIdentities = async () => { order.push('identities'); };
@@ -71,10 +74,26 @@ describe('ordering and degradation', () => {
       return inner(app, op, args);
     };
     await primeCircleSecurity({ agent });
-    // a circle with a roster and no identity is deafer than one with neither: nothing sent to its
-    // address can even be opened
-    expect(order[0]).toBe('identities');
-    expect(order).toContain('roster');
+    expect(order.indexOf('identities')).toBeGreaterThan(order.lastIndexOf('roster'));
+  });
+
+  it('a circle whose roster read FAILS ends up REFUSING its traffic, not open', async () => {
+    const auth = createCircleSenderAuthorization();
+    const agent = fakeAgent({ circles: ['ok', 'broken'], members: { ok: [{ pubKey: 'anna', circleAddress: 'anna-in-ok', circleAddressProof: 'p' }] } });
+    agent.circleAddressFor = (cid) => `ours-in-${cid}`;
+    // the real authorizer behind the two seams the primer uses
+    agent.installCircleIdentities = async (ids) => { for (const cid of ids) auth.noteCircleAddress(cid, `ours-in-${cid}`); };
+    agent.recordCircleSenders = async ({ circleId, members: m }) => {
+      auth.recordCircleRoster({ circleId, ownAddress: `ours-in-${circleId}`, members: m });
+    };
+    const inner = agent.callSkill;
+    agent.callSkill = async (app, op, args) => {
+      if (op === 'listGroupMembers' && args.groupId === 'broken') throw new Error('substrate unavailable');
+      return inner(app, op, args);
+    };
+    await primeCircleSecurity({ agent });
+    expect(auth.authorizeSender({ senderKey: 'anybody', ownAddress: 'ours-in-broken' }).allow, 'the failed circle refuses').toBe(false);
+    expect(auth.authorizeSender({ senderKey: 'anna-in-ok', ownAddress: 'ours-in-ok' }).allow, 'the read circle checks members').toBe(true);
   });
 
   it('one unreadable circle does not stop the others, and is REPORTED', async () => {

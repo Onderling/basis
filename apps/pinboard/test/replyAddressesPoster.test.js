@@ -32,4 +32,25 @@ describe('respondToItem addresses the poster by the circle\'s roster', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(r.toPubKey).toBe(MEL);
   });
+
+  it('a poster whose roster row has NO circle address: refused with its reason, nothing on the wire, never the person key', async () => {
+    const id = await AgentIdentity.generate(new VaultMemory());
+    const tx = new InternalTransport(new InternalBus(), id.pubKey);
+    const sent = [];
+    const bundle = await createNeighbourhoodAgent({
+      identity: id, transport: tx,
+      offeringMatch: { group: 'circle-b', localActor: ME, peers: [] },
+      members: [{ webid: ME, role: 'admin', pubKey: ME }],
+      reliableSend: async (to, wire, opts) => { sent.push({ to, opts }); return { held: false, delivered: true }; },
+    });
+    await bundle.offeringMatch.start();
+    await bundle.itemStore.addItems([
+      { type: 'membership-redemption', text: 'joined', visibility: 'household', source: { groupId: 'circle-b', redeemedBy: MEL, signingPublicKey: MEL } },
+    ], { actor: ME });
+    const [post] = await bundle.itemStore.addItems([{ type: 'request', text: 'een ladder?', visibility: 'household', source: { groupId: 'circle-b', from: MEL } }], { actor: MEL });
+    const call = (op, args) => bundle.agent.skills.get(op).handler({ parts: [DataPart(args)], from: ME, agent: bundle.agent, envelope: null });
+    const r = await call('respondToItem', { itemId: post.id, body: 'ik heb er een' });
+    expect(r?.error, JSON.stringify(r)).toBe('no-circle-address');
+    expect(sent, 'nothing left: not on the person key, not as a circle send to a person key').toEqual([]);
+  });
 });

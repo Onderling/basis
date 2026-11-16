@@ -20,11 +20,13 @@ Rule for anyone ruling on absence: before "not built" or "needs design", read th
 | Page | Area | State |
 |---|---|---|
 | [tasks-and-dispatch.md](tasks-and-dispatch.md) | tasks, chores, claims, subtasks, approval, mandates, skill dispatch | first draft 2026-10-23 |
-| circles-and-pinboard | circles, membership, governance, posts, requests | owed |
+| [news-and-read-state.md](news-and-read-state.md) | what is new for the person (circle tiles, Today's news, contact badges), read state across their devices | started 2026-11-09 |
+| [governance.md](governance.md) | who decides: decision classes, the doors, the receiver gate, the drawn sample, reports, the caretaker | started 2026-11-13 |
+| [circles-and-pinboard.md](circles-and-pinboard.md) | circles, membership, posts, requests | started 2026-11-14 (membership and its key) |
 | calendar | appointments, rsvp, week overview | owed |
-| lists | plain lines, sendable lists | owed |
+| [lists.md](lists.md) | a circle's lists (its Lists tab), entries, boards, the lists block | started 2026-11-14 |
 | household-bot | the bot in a circle: add/done, nudges, digests | owed |
 | nearby | rooms, levels, connection points, LAN/BLE | owed |
-| contacts-and-personas | contacts, trust, personas, disclosure, Mij | owed |
+| [contacts-and-personas.md](contacts-and-personas.md) | contacts, trust, personas, disclosure, Mij, message requests, blocking | started 2026-11-12 |
 | feedback | the feedback app (its own repo; one row here) | owed |
 | relay-and-box | relay, the always-on box, companion, delivery ladder | owed |

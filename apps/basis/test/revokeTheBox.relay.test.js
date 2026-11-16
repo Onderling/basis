@@ -90,7 +90,9 @@ describe('the box is revoked while it holds the address', () => {
   const webVaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
   const webRegistry = createMemoryBackend();
   const webLog = new EventLog({ initial: [], muted: [] });
-  const webKeeps = { ...webVaults, registryBackend: webRegistry, deviceLog: webLog, pinboardPersistDb: { path: path.join(webDir, 'pinboard-state.json') } };
+  // …and the circles' own stores (`householdPersistDb`, as the web shell keeps them: circleApp's cc-household-state),
+  // where each circle's roster trail lives since the trail moved into the circle's own store.
+  const webKeeps = { ...webVaults, registryBackend: webRegistry, deviceLog: webLog, pinboardPersistDb: { path: path.join(webDir, 'pinboard-state.json') }, householdPersistDb: { path: path.join(webDir, 'household-items.json') } };
   const beaRef = {};
   const productionBinding = (ref) => rosterBindingVerifier((app, op, args) => ref.node.agent.callSkill(app, op, args));
   /** The web app, booted on its own vaults, on the relay, in its circle — what a shell does on connect: prime,
@@ -130,6 +132,9 @@ describe('the box is revoked while it holds the address', () => {
 
     phrase = (await web.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(phrase?.split(/\s+/).length).toBe(24);
+    // the feedback persona: anyone may write to it first (its own policy, set where the person sets it; it reaches the
+    // box with the profile at the enrolment). Without it a tester's first word is a message request the maker accepts.
+    expect(await web.agent.setFirstMessages('open')).toBe('open');
     const offer = await web.agent.callSkill('household', 'buildEnrollOffer', { relayUrl });
     expect(offer.ok, JSON.stringify(offer)).toBe(true);
     const once = run(['--data-dir', dataDir, '--enrol'], { env, stdin: `${offer.uri}\n${phrase}\n` });
@@ -138,6 +143,8 @@ describe('the box is revoked while it holds the address', () => {
     expect(boxDeviceIdPrefix, `the ceremony did not say which device it made:\n${once.out.slice(-600)}`).toBeTruthy();
     box = await startBox(dataDir, env);
     expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'enroll-offer') ?? null, { timeout: 60_000, step: 500 }), 'the box never consumed the offer').toBeTruthy();
+    // the box has the person's profile (the feedback persona's policy among it) once its catch-up has landed
+    expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'profile-facts-landed') ?? null, { timeout: 30_000, step: 500 }), 'the box never got the person\'s profile facts').toBeTruthy();
     // ONE ADDRESS PER PERSONA PER CIRCLE: the box presents the person's one address in Thuis; the web app learns the BOX in
     // its device map (the box introduced itself at the web app's device address), and Bea's row keeps one address.
     const webOwn = web.agent.circleAddressFor(CIRCLE);

@@ -7,9 +7,9 @@
  *
  *   - `makeHandleGroupRedeemRequest` (ADMIN side) — verifies a
  *     joiner's membership code via `pinboard.verifyMembershipCodeForPeer`
- *     + replies with `group-redeem-response`.  On success, fires
- *     `propagateMeshIntros` so newly-consenting members see each
- *     other's addresses.  The reply also carries the ADMIN's OWN
+ *     + replies with `group-redeem-response`.  On success, hands the
+ *     circle the newcomer's proven per-circle address and the newcomer
+ *     the circle's (`propagateCircleAddresses`).  The reply also carries the ADMIN's OWN
  *     per-circle address + proof — see `ownProvenCircleAddress`.
  *
  *   - `makeHandleGroupRedeemResponse` (JOINER side) — looks up the
@@ -21,7 +21,6 @@
  * @param {object} args
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
  * @param {(addr: string, payload: object) => Promise<*>}                  args.sendPeer
- * @param {(args: {groupId: string, newPeerAddr: string, newPeerDisplay?: string, newPeerShared?: boolean}) => Promise<*>} [args.propagateMeshIntros]
  * @param {(args: {circleId: string, newMemberWebid: string}) => Promise<*>} [args.propagateCircleAddresses]
  *   B2 — hand the circle the newcomer's PROVEN per-circle address, and the newcomer the circle's.
  *   The admin is the only party that can reach both sides at this moment; see
@@ -32,6 +31,8 @@
  * @param {{info?, warn?, error?}}                                         [args.logger]
  * @returns {(fromAddr: string, payload: object) => Promise<void>}
  */
+
+import { inviteRefusalOf } from '../../v2/inviteRefusals.js';
 /**
  * The admin's own display name IN THIS CIRCLE, read the way every screen reads it: their row on the
  * roster, found by the per-circle address they answer on. No profile store is consulted directly, so this
@@ -53,13 +54,16 @@ export async function ownDisplayInCircle(groupId, { callSkill, circleAddressFor 
 
 export function makeHandleGroupRedeemRequest({
   ownDisplayFor = null,
-  callSkill, sendPeer, propagateMeshIntros, propagateCircleAddresses, publishEvent,
+  callSkill, sendPeer, propagateCircleAddresses, publishEvent,
   circleAddressFor, signCircleAddress, logger = console,
   // After a member is ADMITTED: the pair roster promotes its co-member to admin (`pairRoster.js`); best-effort.
   onAdmitted = null,
   // The sender's CANONICAL key (the device-local identity link: a per-circle address → the person's chat key). A code
   // bound to one person is checked against this, resolved here from the verified sender — never read from the body.
   identityOf = null,
+  // The agent's invite-exchange registrations (`agent.inviteExchange`): the one reply to a well-formed request (its answer
+  // when it proved its code, else its refusal) may go back on the person key (the send gate's person-key allowlist).
+  inviteExchange = null,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -96,8 +100,12 @@ export function makeHandleGroupRedeemRequest({
         // grant only; it is not written into the redemption, the roster or the join statement.
         ...(typeof podWebId === 'string' && podWebId ? { podWebId } : {}),
       });
+      // a device holding no code for this circle is not where the invite lives: silence, so the sibling that holds the
+      // code answers (the joiner takes the first reply; this one would have overtaken it)
+      if (result?.error === 'no-code-here') { logger.info?.(`[group-redeem] no code for ${String(groupId).slice(0, 12)}… on this device: left to the device that holds it`); return; }
       if (result?.error) {
-        reply = { error: result.error };
+        // a CODE from the closed set crosses the wire, never the substrate's own text (inviteRefusals.js)
+        reply = { error: inviteRefusalOf(result.error) };
       } else {
         reply = { ok: true, codeId: result.codeId, validUntil: result.validUntil };
         // Per-circle addressing RIDES BACK (2026-07-30). Until now it was one-directional: the joiner
@@ -127,9 +135,17 @@ export function makeHandleGroupRedeemRequest({
         if (result.joinStatement?.body && result.joinStatement?.sig) reply.joinStatement = result.joinStatement;
       }
     } catch (err) {
-      reply = { error: err?.message ?? String(err) };
+      // the exception stays on this device (its text can carry internals); the joiner hears the catch-all code
+      logger.warn?.('[group-redeem] the admitting step threw', err?.message ?? err);
+      reply = { error: 'join-refused' };
     }
     try {
+      // the one reply on the person key: the answer when the request proved its code, else the refusal (the request was
+      // well-formed: garbage is turned away above and earns nothing)
+      try {
+        if (reply.ok) inviteExchange?.answerProvenRequest?.(fromAddr);
+        else inviteExchange?.refuseParsedRequest?.(fromAddr);
+      } catch { /* the gate then records 'none' */ }
       await sendPeer(fromAddr, {
         type:    'p2p-chat',
         subtype: 'group-redeem-response',
@@ -156,14 +172,6 @@ export function makeHandleGroupRedeemRequest({
       if (reply.ok && typeof onAdmitted === 'function') {
         Promise.resolve(onAdmitted({ circleId: groupId, newMemberWebid: fromAddr }))
           .catch((err) => logger.warn?.('[pair-roster] post-admit step failed', err?.message ?? err));
-      }
-      if (reply.ok && typeof propagateMeshIntros === 'function') {
-        propagateMeshIntros({
-          groupId,
-          newPeerAddr:    fromAddr,
-          newPeerDisplay: peerDisplay,
-          newPeerShared:  !!shareCard,
-        }).catch((err) => logger.warn?.('[mesh-intro] propagation failed', err));
       }
     } catch (err) {
       logger.error?.('[peer] group-redeem-response send failed', err);
@@ -230,6 +238,9 @@ export function makeSendGroupRedeemRequest({
   // circle, and only to the admin the request goes to: their pod's read grant has to name it.
   podWebId = null,
   sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = 30_000, logger = console,
+  // The agent's invite-exchange registrations (`agent.inviteExchange`): the request to the invite's address may leave on
+  // the person key for this redeem's lifetime (the send gate's person-key allowlist), released on answer/timeout/error.
+  inviteExchange = null,
 } = {}) {
   if (typeof sendPeer !== 'function') {
     throw new Error('makeSendGroupRedeemRequest: sendPeer required');
@@ -294,6 +305,8 @@ export function makeSendGroupRedeemRequest({
       try { const w = await podWebId(); ownPodWebId = (typeof w === 'string' && /^https?:\/\//.test(w)) ? w : null; } catch { ownPodWebId = null; }
     }
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    let release = () => {};
+    try { release = inviteExchange?.expectFromInviter?.(adminPeerAddr) ?? release; } catch { /* the gate then records 'none' */ }
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pendingMap.delete(requestId);
@@ -301,6 +314,8 @@ export function makeSendGroupRedeemRequest({
       }, timeoutMs);
       pendingMap.set(requestId, { resolve, reject, timer });
     });
+    // the exchange is open while the redeem is: its answer, its timeout and its error all close it
+    promise.then(release, release);
     try {
       const request = {
         type:    'p2p-chat',
@@ -330,6 +345,7 @@ export function makeSendGroupRedeemRequest({
         try { clearTimeout(entry.timer); } catch { /* defensive */ }
         pendingMap.delete(requestId);
       }
+      release();
       logger.warn?.('[group-redeem] send failed', adminPeerAddr, err);
       throw new Error(`Failed to reach admin over NKN: ${err?.message ?? err}`);
     }
@@ -360,6 +376,8 @@ export function makeHandleGroupRedeemResponse({
       try { clearTimeout(entry.timer); } catch { /* defensive */ }
     }
     pendingMap.delete(requestId);
-    entry.resolve(payload);
+    // the reply's VERIFIED sender rides along: a reply is matched by its request id alone, so what it says about the
+    // admin (their per-circle address and its proof) is taken only when the admin sent it (joinGroupState)
+    entry.resolve({ ...payload, repliedBy: typeof _fromAddr === 'string' && _fromAddr ? _fromAddr : null });
   };
 }

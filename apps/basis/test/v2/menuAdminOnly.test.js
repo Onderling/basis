@@ -20,7 +20,8 @@ const ADMIN_ONLY = ['invite'];
 // admin changed (the app shows the incoming document there and asks them to apply it), and the Admin panel is
 // the roster every member may read — its controls are decided per viewer, its ops refuse a non-admin
 // server-side. Greying these locked members out of both (found by the browser tail, 2026-10-08).
-const MEMBER_OPEN = ['settings', 'admin'];
+// Decisions too (2026-11-14): it is where a member casts a vote.
+const MEMBER_OPEN = ['settings', 'admin', 'governance'];
 
 describe('the ⋯ menu — admin-only entries', () => {
   for (const [shell, project] of [['web', (o) => circleActions(basisManifest, { platform: 'web', ...o })], ['mobile', (o) => circleActionsMobile(basisManifest, o)]]) {

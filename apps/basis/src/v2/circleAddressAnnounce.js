@@ -337,6 +337,17 @@ export async function propagateCircleAddressesAfterJoin({
   try { await bindCircleAddressKeysFor({ agent, circleId }); }
   catch { /* best-effort — the fan below still tries */ }
 
+  // THE NEWCOMER IS ALIVE: they just redeemed. (The redeem arrived from their PERSONA's own key, not from their per-circle
+  // address, which has not answered anything yet: so this is a belief about that address, and a sound one at this
+  // moment: the person is online and their device is binding it now.) Before this moment the circle's own fans (the join's membership
+  // broadcast, the create statement re-told to a late recipient, a key event) went to their per-circle address while it
+  // was not yet answering, each timed out, and the give-up counter wrote the address off after a few; this fan to them
+  // was then refused outright ('peer-unreachable') and the newcomer never learned the other members' addresses. A
+  // presence signal (the secure agent's own seam) clears that count for every address of theirs and re-sends what was
+  // held for them. Bound above, so their per-circle address is one of those addresses.
+  try { await agent.presenceSignal?.(newMemberWebid); }
+  catch { /* best-effort — the fan below still tries */ }
+
   let members = [];
   try {
     const res = await agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
@@ -470,7 +481,7 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
       // unsealed circle (or a producer living elsewhere) no-ops.
       if (typeof grantSealedAudience === 'function') {
         for (const one of proven) {
-          try { await grantSealedAudience(circleId, one.circleAddress); }
+          try { await grantSealedAudience(circleId, one.circleAddress, one.memberWebid ?? null); }
           catch (err) { logger?.warn?.('[circle-address] sealed-audience grant failed', err?.message ?? err); }
         }
       }

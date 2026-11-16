@@ -25,6 +25,9 @@ export async function deleteAsync(path) { files.delete(String(path)); }
 
 /** Test seam: forget everything between suites. */
 export function __reset() { files.clear(); }
+/** Test seam: what this phone's disk holds, and putting it back (a restart of the phone in Node). */
+export function __dump() { return [...files.entries()]; }
+export function __load(entries) { for (const [k, v] of entries ?? []) files.set(k, v); }
 
 export default {
   documentDirectory, EncodingType, makeDirectoryAsync,

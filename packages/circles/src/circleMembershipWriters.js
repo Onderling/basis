@@ -1,6 +1,8 @@
 import { hasHumanRules } from './circleRulesDoc.js';
+import { addressHolderIn } from './circleAddress.js';
 import { personKeyAnnouncement, MEMBER_PROPS_FIELDS } from '@onderling/core';
 import { releaseUnchanged } from '@onderling/agent-registry';
+
 /**
  * Key-coupled membership WRITERS — pure-body lift out of pinboard's `buildSkills` (the §8c migration, slice-b).
  * These persist a circle's membership STATE transitions as typed `store.addItems([{type}])` items
@@ -23,10 +25,21 @@ import { releaseUnchanged } from '@onderling/agent-registry';
  *
  * Pure DI: imports NOTHING — every collaborator (store, members, metrics, simulateSync, notifier, the key hook,
  * and the validation helpers `codeRedeemableNow` · `inviteRedemptionVerdict` · `verifyCircleLink` ·
- * `withHandleClaim` · `collectCircleHandles` · `findHandleCollision` · `isCircleAdmin`, plus the
+ * `withHandleClaim` · `isCircleAdmin`, plus the
  * `INVITE_LIMIT_REACHED` constant) is passed in. Byte-identical to the pre-lift skill bodies; the caller's
  * test suite is the safety net.
  */
+
+/**
+ * One address, one member in a circle: a proven address another member's row already holds stays theirs, so a joiner
+ * presenting it records none (the join itself goes on). An unreadable trail does not block the join's address.
+ */
+async function addressFreeFor(store, groupId, address, member) {
+  let rows = [];
+  try { rows = (await store.listOpen({ type: 'membership-redemption' })).filter((i) => i?.source?.groupId === groupId); } catch { rows = []; }
+  const holder = addressHolderIn(rows, address);
+  return !holder || holder === member;
+}
 
 /**
  * redeemMembershipCode(deps, {a, from})
@@ -58,6 +71,12 @@ function boundElsewhere(codeItem, redeemer) {
  * The pod WebID a joiner said their pod session signs in as, for the read grant on a pod-backed circle. It goes to the
  * grant ONLY: never into the redemption item, the roster or the spine — those reach every member, the WebID does not.
  */
+/** The hash of a membership statement as the spine appender returned it (null when nothing was appended). */
+function statementHashOf(st) {
+  const h = st?.body?.hash ?? st?.hash ?? null;
+  return typeof h === 'string' && h ? h : null;
+}
+
 function podAgentOf(a) {
   const w = a?.podWebId;
   return (typeof w === 'string' && /^https?:\/\/\S+$/.test(w.trim())) ? w.trim() : null;
@@ -150,7 +169,8 @@ export async function redeemMembershipCode({
   // THIS join (Decision B — the signing proof). Deny-by-default: an unproven or forged
   // address is DROPPED — the join still succeeds, just WITHOUT the cross-circle linkage.
   const verifiedCircleAddress = (a.circleAddress
-    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, memberRef: from, proof: a.circleAddressProof })
+    && await addressFreeFor(store, a.groupId, a.circleAddress, from))
     ? a.circleAddress : null;
   const [item] = await store.addItems([{
     type:       'membership-redemption',
@@ -212,7 +232,6 @@ export async function redeemMembershipCode({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: from, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a) });
   // ALSO record this JOIN on the circle's membership spine — the durable, per-author SIGNED log the roster
   // folds deterministically (identical on every device, no wall-clock). This is a same-device redeem, so the
   // acting device IS the joiner: the injected emitter signs `join` with the joiner's own identity (author =
@@ -221,8 +240,11 @@ export async function redeemMembershipCode({
   // The join's authorization rides the SIGNED payload: the redemption row it stands on. The fold admits a
   // self-authored join only when that row exists (deny-favouring: a not-yet-arrived row defers, never forges).
   const ownKey = personKeyAnnouncement(typeof currentPersonKey === 'function' ? currentPersonKey() : null);
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
+  const ownJoin = await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
     redemptionRef: item.id,
+    // WHEN, by this device's clock (self-declared, signed): the Decisions screen counts the joins since a proposal from it,
+    // as a shown hint only; nothing decides on it
+    at: now,
     // The handle the joiner presented, so every device that folds this join can name them — the redemption
     // row above carries it too, but only the admitting device ever holds that row. Self-asserted, like the
     // circle address; uniqueness within the circle is enforced at redemption, before this is emitted.
@@ -234,6 +256,10 @@ export async function redeemMembershipCode({
     // join; every later version is announced root-revealed (the person-key statement).
     ...(ownKey ? { personKey: ownKey } : {}),
   } });
+  // MEMBERSHIP FIRST, THE KEY FOLLOWS: the grant comes after the join stands on the lane, and names it as the admission
+  // it follows, so a recompute after a lost race can ask whether an exit came AFTER it (memberStatus). A grant that fails
+  // here is re-driven by the roster seed at the next producer start (the join is there, the key is not yet).
+  await grantKey({ webId: from, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a), admittedBy: statementHashOf(ownJoin) });
   return {
     redemptionId: item.id,
     groupId:      a.groupId,
@@ -255,7 +281,7 @@ export async function redeemMembershipCode({
 export async function verifyMembershipCodeForPeer({
   store, members, metrics, simulateSync, grantKey, emitSpine,
   codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
-  withHandleClaim, collectCircleHandles, findHandleCollision, deriveSealingKey = null,
+  withHandleClaim, deriveSealingKey = null, botNamesIn = null,
 }, { a, from } = {}) {
   if (typeof a.groupId !== 'string' || !a.groupId)
     return { error: 'groupId required' };
@@ -266,6 +292,10 @@ export async function verifyMembershipCodeForPeer({
 
   const all = await store.listOpen({ type: 'membership-code' });
   const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
+  // NOT WHERE THE INVITE LIVES. A person's devices share one address, so a peer redeem reaches all of them, and the
+  // joiner takes the first reply. A device holding no code for this circle at all (a sibling that never minted one) says
+  // so, and the handler stays silent: its "invalid code" would otherwise overtake the answer of the device that holds it.
+  if (forGroup.length === 0) return { error: 'no-code-here' };
   const now = Date.now();
   const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
   if (!valid) return { error: 'invalid-or-expired-code' };
@@ -294,17 +324,13 @@ export async function verifyMembershipCodeForPeer({
   // (mirrors redeemMembershipCode): a presented per-circle address is recorded ONLY when
   // the joiner proved control of the key behind it. Deny-by-default; unproven ⇒ dropped.
   const verifiedCircleAddress = (a.circleAddress
-    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+    && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, memberRef: a.requesterWebid, proof: a.circleAddressProof })
+    && await addressFreeFor(store, a.groupId, a.circleAddress, a.requesterWebid))
     ? a.circleAddress : null;
 
-  // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
-  // handles within a single circle), enforced HERE on the admin/host side —
-  // the authority that owns the circle roster. The joiner's chosen handle
-  // rides the redeem as `peerDisplay`; reject the join if another member of
-  // THIS circle already holds it (case-folded, so `Jan`/`jan` collide),
-  // rather than silently admitting a duplicate. The joiner re-presenting
-  // their OWN handle (a re-send) is not a collision — excluded by
-  // `requesterWebid`. Absent `peerDisplay` = no handle claimed → skip.
+  // The joiner's name rides the redeem as `peerDisplay`. Two people may share a name in a circle (Frits
+  // 2026-11-06: the name is for people; uniqueness stays on the key, and the members list tells two equal
+  // names apart with a small number), so the redeem refuses no name.
   // Signing pubKey for the peer path — the joiner's authenticated identity
   // is `requesterWebid`, which the admin-side basis handler
   // (`makeHandleGroupRedeemRequest`) sets from the AUTHENTICATED NKN
@@ -340,14 +366,18 @@ export async function verifyMembershipCodeForPeer({
     };
   }
 
-  // SERIALISED per (circle, handle) — the uniqueness check and the redemption write are separated by
-  // awaits, so two joiners redeeming the same invite and both claiming `@jan` each read a roster with
-  // no `jan` and each wrote one (story 2.1: three concurrent claims produced three members named jan).
-  // The lock is per (circle, handle), so unrelated joins still run concurrently.
+  // SERIALISED per (circle, name), so the bot-name check below and the write cannot interleave with a second
+  // joiner of the same name; unrelated joins still run concurrently.
   const claimed = await withHandleClaim(store, a.groupId, a.peerDisplay, async () => {
-    if (typeof a.peerDisplay === 'string' && a.peerDisplay) {
-      const takenHandles = await collectCircleHandles({ store, members, groupId: a.groupId });
-      if (findHandleCollision({ candidate: a.peerDisplay, claimantWebid: a.requesterWebid, taken: takenHandles })) {
+    // A BOT'S NAME IS ITS OWN (a bot is addressed by its name in chat). People may share a name, but a joiner named
+    // like a CURRENT bot of this circle (case-blind) is refused here, where the roster is: the roster fold checks a
+    // member's later `member-props` but not a join's name, so this is the front door. `botNamesIn` is the host's
+    // read of the folded roster's function members; absent, nothing is refused.
+    if (typeof a.peerDisplay === 'string' && a.peerDisplay.trim() && typeof botNamesIn === 'function') {
+      const want = a.peerDisplay.trim().toLowerCase();
+      let bots = [];
+      try { bots = (await botNamesIn(a.groupId)) ?? []; } catch { bots = []; }
+      if (bots.some((b) => b && b.webid !== a.requesterWebid && typeof b.handle === 'string' && b.handle.trim().toLowerCase() === want)) {
         return { error: 'handle-taken', reason: 'handle-taken' };
       }
     }
@@ -404,7 +434,6 @@ export async function verifyMembershipCodeForPeer({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a) });
   // ALSO record this JOIN on the circle's membership spine (as `redeemMembershipCode` does). This is the
   // ADMIN's device confirming a REMOTE joiner, who is not here to sign — so the ADMIN signs `join` with their
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority
@@ -412,6 +441,9 @@ export async function verifyMembershipCodeForPeer({
   const joinerKey = personKeyAnnouncement(a.personKey);
   const joinStatement = await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
     redemptionRef: item.id,
+    // WHEN, by this device's clock (self-declared, signed): the Decisions screen counts the joins since a proposal from it,
+    // as a shown hint only; nothing decides on it
+    at: now,
     // A FUNCTION PROFILE, stated by THIS admin: only for a code the admin minted for a bot, and only when the
     // redeemer says it runs one. The fold reads it from this admin-signed join; a claim on an ordinary code says nothing.
     ...(valid?.source?.forFunction === true && a.profileKind === 'function' ? { kind: 'function' } : {}),
@@ -426,6 +458,8 @@ export async function verifyMembershipCodeForPeer({
     // The joiner's FIRST person key, forwarded from the redeem request the same way — recorded verbatim.
     ...(joinerKey ? { personKey: joinerKey } : {}),
   } });
+  // MEMBERSHIP FIRST, THE KEY FOLLOWS (as in the self redeem): the grant names the join it follows.
+  await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics, podAgent: podAgentOf(a), admittedBy: statementHashOf(joinStatement) });
   return {
     redemptionId: item.id,
     codeId:       valid.id,
@@ -570,7 +604,9 @@ export async function removeMember({
     //
     // Best-effort, and REPORTED: a removal must complete even when the notice cannot be delivered, but
     // the caller is told which happened rather than being left to assume the good case.
-    try { told = !!(await emitSpine?.({ kind: 'evict', circleId: _groupId, subject: memberWebid, actor: from })); }
+    // the decision rides the statement: the proposal that decided it and the settings version held (the receiver gate)
+    const decided = { ...(typeof a.proposalId === 'string' && a.proposalId ? { proposalId: a.proposalId } : {}), ...(Number.isFinite(Number.parseInt(a.policyVersion, 10)) ? { policyVersion: Number.parseInt(a.policyVersion, 10) } : {}) };
+    try { told = !!(await emitSpine?.({ kind: 'evict', circleId: _groupId, subject: memberWebid, ...(Object.keys(decided).length ? { payload: decided } : {}), actor: from })); }
     catch { told = false; }
 
     // Now close it: rotate the key + drop them from the MemberMap, so the fan-out stops and what comes

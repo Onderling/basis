@@ -2,6 +2,16 @@
 /**
  * lint-agent-count — the basis agent constructs exactly the listed in-process agents, and the list only SHRINKS.
  *
+ * THE TARGET (docs/decisions.md 2026-10-23, "One agent per person"): TWO agents in the bundle — the peer façade on the
+ * wire and the host — with one gate truth and the host key as the one token issuer. The baseline below is TODAY, not
+ * the design: every name in it beyond the host is a standalone-app leftover still to fold onto the host. The split
+ * between façade and host is not a security wall (one process, bundle code trusted as a whole); the boundary is the
+ * façade's gate — see docs/architecture.md, the Agent home, "Where the security boundary is".
+ *
+ * It also pins the AGREEMENT with the doc: the marked sentence in docs/architecture.md
+ * (`<!-- lint-agent-count: in-process = a, b -->`) must name exactly ADOPTED_BASELINE, so folding an agent changes the
+ * doc in the same PR.
+ *
  * Beside its one wire-facing agent, the basis agent runs in-process agents on one bus (host, household, tasks,
  * pinboard, folio). "One agent per service-context" says they should become one; until they are folded, no new one
  * may appear. Every in-process agent is reachable only once it is adopted (`adoptInProcess(...)`), so the adoptions
@@ -57,10 +67,29 @@ export function agentCountProblems(text, adoptedBaseline = ADOPTED_BASELINE, con
   return out;
 }
 
+const DOC = 'docs/architecture.md';
+
+/** The agents the doc's marked sentence names, or null when the marker is missing. */
+export function docNamedAgents(docText) {
+  const m = String(docText).match(/<!--\s*lint-agent-count:\s*in-process\s*=\s*([^>]*?)\s*-->/);
+  return m ? m[1].split(',').map((x) => x.trim()).filter(Boolean) : null;
+}
+
+/** Differences between the doc's marked sentence and the baseline, as messages. */
+export function docAgreementProblems(docText, adoptedBaseline = ADOPTED_BASELINE) {
+  const named = docNamedAgents(docText);
+  if (!named) return [`${DOC} has no "<!-- lint-agent-count: in-process = … -->" marker — the Agent home must name the in-process agents`];
+  const out = [];
+  for (const a of adoptedBaseline) if (!named.includes(a)) out.push(`${DOC} does not name ${a} — the Agent home's agents paragraph is stale`);
+  for (const a of named) if (!adoptedBaseline.includes(a)) out.push(`${DOC} names ${a}, which is no longer adopted — update the Agent home's agents paragraph`);
+  return out;
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const problems = agentCountProblems(readFileSync(path.join(ROOT, FILE), 'utf8'));
+  const problems = agentCountProblems(readFileSync(path.join(ROOT, FILE), 'utf8'))
+    .concat(docAgreementProblems(readFileSync(path.join(ROOT, DOC), 'utf8')));
   if (problems.length) {
-    console.error(`lint-agent-count (${FILE}):`);
+    console.error(`lint-agent-count (${FILE}, ${DOC}):`);
     for (const p of problems) console.error(`  • ${p}`);
     process.exit(1);
   }

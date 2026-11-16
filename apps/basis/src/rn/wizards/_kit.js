@@ -107,7 +107,6 @@ export function HandleField({ t, value, onChange, suggestions = [], label = null
         value={value}
         onChangeText={onChange}
         placeholder={t('circle.join.wizard.handle.placeholder')}
-        monospace
         hint={hint}
         testID={testID}
       />
@@ -202,6 +201,44 @@ export function Checkbox({ label, checked, onToggle, testID }) {
       </View>
       <Text style={styles.checkLabel}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+/** A fold: a line that opens the rest (the web `<details>`). Open or shut is the caller's state. */
+export function Fold({ label, open, onToggle, children, testID }) {
+  const styles = makeStyles(useWizardPalette());
+  return (
+    <View style={styles.fieldRow}>
+      <TouchableOpacity onPress={() => onToggle?.(!open)} accessibilityRole="button"
+        accessibilityState={{ expanded: !!open }} testID={testID}>
+        <Text style={styles.foldLabel}>{`${open ? '▾' : '▸'} ${label}`}</Text>
+      </TouchableOpacity>
+      {open ? children : null}
+    </View>
+  );
+}
+
+/** The step's one line, larger than an intro: what will happen when the step's button is pressed. */
+export function Lead({ children, testID }) {
+  const styles = makeStyles(useWizardPalette());
+  return <Text style={styles.joinAsLine} testID={testID}>{children}</Text>;
+}
+
+/** A plain sentence under a choice. */
+export function Hint({ children }) {
+  const styles = makeStyles(useWizardPalette());
+  return <Text style={styles.fieldHint}>{children}</Text>;
+}
+
+/** A small bordered button inside a step (the chip's look), for an act that is not the step's own. */
+export function SmallButton({ label, onPress, testID }) {
+  const styles = makeStyles(useWizardPalette());
+  return (
+    <View style={styles.chipsRow}>
+      <TouchableOpacity onPress={onPress} style={styles.chip} accessibilityRole="button" testID={testID}>
+        <Text style={styles.chipText}>{label}</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -378,6 +415,8 @@ function makeStyles(p) {
   fieldRow:    { gap: 6, marginTop: 4 },
   fieldLabel:  { fontSize: 12, color: p.inkMuted, fontWeight: '600' },
   fieldHint:   { fontSize: 11, color: p.inkSoft, lineHeight: 15, marginTop: 2 },
+  foldLabel:   { fontSize: 13, color: p.accent, paddingVertical: 6 },
+  joinAsLine:  { fontSize: 15, color: p.ink, lineHeight: 21, marginBottom: 8 },
   fieldInput: {
     borderWidth: 1, borderColor: p.hair, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 8, fontSize: 14,

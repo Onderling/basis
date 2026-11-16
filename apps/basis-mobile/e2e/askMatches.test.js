@@ -6,10 +6,8 @@
 // under its own ask with the offering he released. Ask opens the contact thread with him; Skip hides him on this
 // phone. Each step leaves a screenshot. Runs against the RELEASE APK; deletes the app, so emulator only.
 
-const { spawn } = require('node:child_process');
-const path = require('node:path');
-const readline = require('node:readline');
-const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
+const { launch, isVisible, soon, tapSoon, firstBoot, emulatorOnly } = require('./support/ui');
+const { startPeer, joinByInvite } = require('./support/peer');
 
 const OFFERING = 'boormachine uitlenen';
 // The match row's buttons, found inside the inline match list (a regex testID does not match on Android); the words are
@@ -20,56 +18,21 @@ const SKIP = by.text('Skip').withAncestor(INLINE);
 let peer = null;
 let ready = null;
 
-/** Start the second person and wait for its invite. */
-function startPeer() {
-  peer = spawn(process.execPath, [path.join(__dirname, 'support/relayPeer.mjs'), '--circle', 'Vraag Kring', '--offering', OFFERING],
-    { cwd: path.join(__dirname, '..'), stdio: ['pipe', 'pipe', 'inherit'] });
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('relayPeer: no invite within 120 s')), 120_000);
-    readline.createInterface({ input: peer.stdout }).on('line', (line) => {
-      let msg = null;
-      try { msg = JSON.parse(line); } catch { return; }   // the agent's own logging shares stdout
-      if (msg.step === 'error') { clearTimeout(timer); reject(new Error(`relayPeer: ${msg.error}`)); }
-      if (msg.step === 'ready') { clearTimeout(timer); resolve(msg); }
-    });
-    peer.on('exit', (code) => { clearTimeout(timer); reject(new Error(`relayPeer exited (${code})`)); });
-  });
-}
-
 describe('an ask on the phone shows who offers it — a real second person over the relay', () => {
   beforeAll(async () => {
     emulatorOnly('askMatches');
-    ready = await startPeer();
+    peer = await startPeer(['--circle', 'Vraag Kring', '--offering', OFFERING]);
+    ready = peer.ready;
     await launch({ fresh: true });
     await firstBoot();
   });
 
   afterAll(async () => {
-    try { peer?.stdin.end(); peer?.kill('SIGTERM'); } catch { /* already gone */ }
+    peer?.stop();
   });
 
   it("the phone joins Bram's circle from his invite link", async () => {
-    await device.openURL({ url: ready.invite });
-    // The wizard SLIDES in: a tap mid-slide lands nowhere and the box stays unticked (screenshot 2026-10-22). Settle,
-    // tick, press Next — and tick again only while the next step has not come (a tick that took would be undone).
-    const step = async (box, next) => {
-      await soon(by.id(box), 60_000);
-      for (let i = 0; i < 3; i += 1) {
-        await new Promise((r) => setTimeout(r, 1500));
-        await element(by.id(box)).tap();
-        await tapSoon(by.id('join-next'));
-        if (await firstOf([by.id(next)], 6_000) === 0) return;
-      }
-      throw new Error(`the join wizard did not move past ${box}`);
-    };
-    await step('join-rules-accept', 'join-privacy-accept');
-    await step('join-privacy-accept', 'wizard-handle');
-    if (await isVisible(by.id('wizard-handle'))) await element(by.id('wizard-handle')).replaceText('anna');
-    await device.takeScreenshot('ask-01-join');
-    await tapSoon(by.id('join-submit'));
-    // the joined circle on the launcher
-    await tapSoon(by.id('circle-tab-circles'), 60_000);
-    await soon(by.id(`circle-tile-${ready.circleId}`), 90_000);
+    await joinByInvite({ invite: ready.invite, circleId: ready.circleId, shot: 'ask-01-join' });
   });
 
   it('asks the board, and sees Bram under its own ask with the offering he released', async () => {

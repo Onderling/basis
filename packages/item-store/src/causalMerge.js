@@ -267,3 +267,42 @@ export function mergeFieldClocks(base, local, incoming, sets) {
   return out;
 }
 
+
+/**
+ * Merge an item's declared grow-only SETS as a union (the `set-union` policy): for each set, the members of both sides
+ * keyed by `key` (a member's time is the source's own, the same on every device), the floor `floor` taken at its
+ * maximum, and only members at or after the floor kept. Two devices adding at once both keep their members; a device
+ * that pruned less cannot bring back a member below the other's floor. Applied onto `base` (the content winner);
+ * returns `base` itself when nothing changes (no churn).
+ *
+ * @param {object} base      the row that won the content merge
+ * @param {object} local
+ * @param {object} incoming
+ * @param {Array<{field: string, key: string, at: string, floor: string}>} sets
+ * @returns {object}
+ */
+export function mergeSetUnion(base, local, incoming, sets) {
+  if (!Array.isArray(sets) || sets.length === 0 || !base) return base;
+  let out = base;
+  for (const { field, key, at, floor } of sets) {
+    const num = (v) => (Number.isFinite(v) ? v : 0);
+    const lo = Math.max(num(local?.[floor]), num(incoming?.[floor]), num(base?.[floor]));
+    const byKey = new Map();
+    for (const side of [local, incoming]) {
+      for (const m of Array.isArray(side?.[field]) ? side[field] : []) {
+        const k = m?.[key];
+        if (typeof k !== 'string' || !k) continue;
+        if (num(m?.[at]) < lo) continue;
+        if (!byKey.has(k)) byKey.set(k, m);
+      }
+    }
+    const merged = [...byKey.values()].sort((a, b) => num(a[at]) - num(b[at]) || String(a[key]).localeCompare(String(b[key])));
+    const same = Array.isArray(base[field]) && base[field].length === merged.length
+      && base[field].every((m, i) => m?.[key] === merged[i][key]) && num(base[floor]) === lo;
+    if (same) continue;
+    if (out === base) out = { ...base };
+    out[field] = merged;
+    out[floor] = lo;
+  }
+  return out;
+}

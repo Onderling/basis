@@ -69,13 +69,29 @@ describe('sealedMessageLog — sealed round-trip (p2 group-key via resolveCircle
     expect(items).toEqual([]);
   });
 
-  it('caps to max, keeping the freshest N', async () => {
+  it('caps to max, keeping the OLDEST N since the watermark (one page forward; the reader pages on)', async () => {
     const backend = new MemoryStorageBackend();
     const { seal, open } = resolveCircleStorage({ posture: 'p2', groupKey: generateGroupKey() });
     for (let i = 0; i < 5; i++) await writeSealedMessage(backend, seal, envOf({ msgId: `m${i}`, ts: 1000 + i, text: `t${i}` }));
     const { items, truncated } = await readSealedMessagesSince(backend, open, { circleId: CIRCLE, sinceTs: 0, max: 2 });
     expect(truncated).toBe(true);
-    expect(items.map((i) => i.msgId)).toEqual(['m3', 'm4']);
+    expect(items.map((i) => i.msgId)).toEqual(['m0', 'm1']);
+  });
+});
+
+describe('sealedMessageLog — a page costs a page of reads', () => {
+  it('opens only one page (plus one, to know more follow), not every row since the watermark', async () => {
+    const backend = new MemoryStorageBackend();
+    for (let i = 0; i < 1000; i++) await writeSealedMessage(backend, null, envOf({ msgId: `m${i}`, ts: 10_000 + i, text: `t${i}` }));
+    let gets = 0;
+    const counted = Object.create(backend);
+    counted.get = (ref) => { gets += 1; return backend.get(ref); };
+    counted.list = (prefix) => backend.list(prefix);
+    const { items, truncated } = await readSealedMessagesSince(counted, null, { circleId: CIRCLE, sinceTs: 0, max: 200 });
+    expect(truncated).toBe(true);
+    expect(items.map((i) => i.msgId).slice(0, 2)).toEqual(['m0', 'm1']);
+    expect(items).toHaveLength(200);
+    expect(gets, 'rows opened for one page').toBeLessThanOrEqual(201);
   });
 });
 

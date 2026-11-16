@@ -14,7 +14,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Image } from 'react-native';
 import { useTheme } from './themeContext.js';
-import { memberPersonaView, selfViewSplit, VIEWER_KINDS, revealPresetWords } from '@onderling-app/basis';
+import { memberPersonaView, selfViewSplit, VIEWER_KINDS, revealPresetWords, viewerChipLabel } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 
@@ -55,13 +55,13 @@ export default function CircleMemberCardScreen({
   const realNameVisible = (split.sees || []).some((a) => a.key === 'realName');
   const title = self
     ? t('circle.memberCard.self_title')
-    : ((realNameVisible && member.realName) ? member.realName : (member.handle ? `@${member.handle}` : (member.id || '')));
+    : ((realNameVisible && member.realName) ? member.realName : (member.handle ? member.handle : (member.id || '')));
   const lede = self ? t('circle.memberCard.self_lede') : t('circle.memberCard.persona_lede');
 
   const viewerChips = useMemo(() => ([
     ...roster
       .filter((m) => m && m.id && m.id !== myWebid)
-      .map((m) => ({ id: m.id, kind: 'member', label: m.handle ? `@${m.handle}` : (m.realName || m.id) })),
+      .map((m) => ({ id: m.id, kind: 'member', label: viewerChipLabel(m, t) })),
     { kind: 'stranger', label: t('circle.viewAs.stranger') },
     { kind: 'agent',    label: t('circle.viewAs.agent') },
   ]), [roster, myWebid]);

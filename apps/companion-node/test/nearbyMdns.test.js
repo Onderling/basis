@@ -67,22 +67,24 @@ describe('the disclosure default', () => {
     await n.stop();
   });
 
+  // The fixed ports sit BELOW Linux's ephemeral range (32768-60999): a port inside it can be held by another test's own
+  // socket at the same moment, and 'closed once the window ended' then read another process's port as ours (CI, 2026-11-14).
   // A device that announces nothing keeps no door open: the radio's TCP listener closes when the publish window ends
   // (the household tablet's firewall opens this port to the home LAN, so the port must be shut while unlisted).
   it('the data port is closed once a time-boxed announcement expires — and open while it lasts', async () => {
     const discovery = createLoopbackDiscovery();
-    const n = await startNearbyMdns({ identity: await identity(), opts: { publish: true, publishFor: 60, port: 45991 }, discovery });
-    expect(await reachable(45991), 'open while announcing').toBe(true);
+    const n = await startNearbyMdns({ identity: await identity(), opts: { publish: true, publishFor: 60, port: 29991 }, discovery });
+    expect(await reachable(29991), 'open while announcing').toBe(true);
     await wait(180);
     expect(n.transport.isAdvertising).toBe(false);
-    expect(await reachable(45991), 'closed once the window ended').toBe(false);
+    expect(await reachable(29991), 'closed once the window ended').toBe(false);
     await n.stop();
   });
 
   it('a browse-only node opens no data port at all', async () => {
     const discovery = createLoopbackDiscovery();
-    const n = await startNearbyMdns({ identity: await identity(), opts: { port: 45992 }, discovery });
-    expect(await reachable(45992)).toBe(false);
+    const n = await startNearbyMdns({ identity: await identity(), opts: { port: 29992 }, discovery });
+    expect(await reachable(29992)).toBe(false);
     await n.stop();
   });
 
@@ -116,10 +118,10 @@ describe('the peer source the nearby surface subscribes to', () => {
     let seen = false;
     for (let i = 0; i < 60 && !seen; i++) {
       await wait(25);
-      seen = rows.at(-1)?.some((p) => p.pubKey === phoneish.transport.address);
+      seen = rows.at(-1)?.some((p) => p.pubKey === phoneish.transport.lanAddress);
     }
     expect(seen).toBe(true);
-    expect(rows.at(-1).find((p) => p.pubKey === phoneish.transport.address).source).toBe('mdns');
+    expect(rows.at(-1).find((p) => p.pubKey === phoneish.transport.lanAddress).source).toBe('mdns');
 
     unsubscribe();
     await laptop.stop();

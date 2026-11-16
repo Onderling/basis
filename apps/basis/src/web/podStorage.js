@@ -288,7 +288,7 @@ export function createPodWriter(session, opts = {}) {
       if (containerUrl === podRoot) return { ok: true, status: 200, url: containerUrl, created: false };
       // Check if it exists.
       try {
-        const head = await session.fetch(containerUrl, { method: 'HEAD' });
+        const head = await session.fetch(containerUrl, { method: 'HEAD', cache: 'no-cache' });
         if (head.ok) return { ok: true, status: head.status, url: containerUrl, created: false };
       } catch { /* fall through to create */ }
       // Recurse up first.
@@ -337,7 +337,9 @@ export function createPodWriter(session, opts = {}) {
     async read(app, resource) {
       const url = podUrl(podRoot, app, resource);
       try {
-        const res = await session.fetch(url);
+        // ask the pod, never a cached copy: a browser's HTTP cache (and the phone's OkHttp disk cache) can answer a plain
+        // GET with an old body after another member changed the resource (the policy's pod tier reads through here)
+        const res = await session.fetch(url, { cache: 'no-cache' });
         if (!res.ok) return { ok: false, url, body: null, status: res.status };
         const body = await res.text();
         return { ok: true, url, body, status: res.status };

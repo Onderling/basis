@@ -22,7 +22,7 @@
  *                         recordRemoteRedemption mirror).
  *   - peer bridge        : the real inbound router (handlers/peerRouter) + the
  *                         real group-redeem request/response handlers
- *                         (handlers/groupRedeem) + mesh intros (handlers/meshIntros).
+ *                         (handlers/groupRedeem) + the circle-address hand-over (v2/circleAddressAnnounce).
  *
  * The ONE test-only seam: the browser shell wires the inbound peer router inside
  * `realAgent.connectPeerTransport({ nknLib, onPeerMessage })`. We don't call that
@@ -50,7 +50,8 @@ import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 // address nobody bound. See `registerCirclePresence` in circleApp.js / agentBundle.js.
 import { registerCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
-import { createCirclePodProducer, createCircleControlAgentRouter } from '../../src/v2/circlePodProducer.js';
+import { runKeyAudienceCheck } from '../../src/v2/keyAudienceCheck.js';
+import { createCirclePodProducer, createCircleControlAgentRouter, memberStatusReader } from '../../src/v2/circlePodProducer.js';
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
 import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
@@ -71,24 +72,30 @@ import {
   makeSendGroupRedeemRequest,
   makeHandleGroupRedeemResponse,
 } from '../../src/core/handlers/groupRedeem.js';
-import { makePropagateMeshIntros, makeHandleCirclePeerIntro } from '../../src/core/handlers/meshIntros.js';
 // B2 — the exact per-circle address announcing wiring both shells use.
 import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
-import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
+import { carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
-import { makeItemsPeerHandler, ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
+import { makeItemsPeerHandler, ITEMS_BROADCAST, ITEMS_CATCHUP_SUBTYPES } from '../../src/v2/itemsRail.js';
+import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { rosterBindingVerifier, makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
+import { narrowReportStatements } from '../../src/v2/reportLane.js';
 import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
 
 import {
   initialState as createGroupInitialState,
+  chooseKind as createGroupChooseKind,
   finalSubmit as createGroupFinalSubmit,
+  loadFounderHandle,
+  setStoragePolicy as createGroupSetStorage,
 } from '../../src/core/wizards/createGroupState.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
 
@@ -140,8 +147,17 @@ const LIVE_NODES = new Set();
  * makes — so an address-revoke fanned to it lands; two walks had wired that by hand. The full suite
  * stayed green: the equilibrium tests keep the minimal composition, which has no rail.)
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true, podWebId = null } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true, podWebId = null, centralPod = null } = {}) {
   const routerRef = { fn: null };
+  // A CENTRAL POD (opt-in, `makeCentralPod()`): the shared custody module both shells compose
+  // (`createCirclePodCustody`), over ONE pod every node of the walk is handed, with the posture the walk names.
+  // The shells hand the same three seams: the send path's data move, the pod write, the pod chat read-back.
+  const podCustody = centralPod ? createCirclePodCustody({
+    ensureCirclePod: async (cid) => ({ podClient: centralPod.clientFor(label), circleRootUri: `${centralPod.root}circles/${cid}` }),
+    policyFor: async () => ({ pod: centralPod.pod ?? 'personal', storagePosture: centralPod.storagePosture ?? 'p0' }),
+    sealStrategyFor: async () => null,
+  }) : null;
+  const podAgentOpts = podCustody ? { pinboardCircleDataMove: podCustody.circleSendDataMove, pinboardPodWrite: podCustody.circlePodWrite } : {};
   // The device log the lane rides. Handed to the factory below exactly as both shells hand theirs.
   const deviceLog = itemsLane ? new EventLog({ initial: [], muted: [] }) : null;
   const received = [];
@@ -159,7 +175,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // circle (`sealCircleViaProducer`) registers a producer here, so the REAL `removeMember` op routes into
   // the producer's control agent, which fans the rotation key-event through the injected sink.
   const circlePods = new Map();
-  const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
+  // as both shells build it: every join's key change re-asks the member's status (the agent is bound before any join)
+  const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null, {
+    memberStatusOf: memberStatusReader((...a) => agent.callSkill(...a)),
+    audienceCheck: (gid, prod) => runKeyAudienceCheck({ circleId: gid, producer: prod, callSkill: (...a) => agent.callSkill(...a) }),
+  });
 
   // The peer → kringen index the shells keep (`circleGroupsIndex`): which circles this device shares with a peer —
   // what the DM seal reads a contact's root-revealed key from, and what the pair roster's route needs.
@@ -182,6 +202,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // walk that needs the opt-in path says so (`agentOpts: { allowAddressFallback: true }`); with the harness defaulting it
     // ON, a walk proved the opt-in path and hid every case where the production default does not deliver.
     allowAddressFallback: false,
+    // the central pod's send seams (empty without one)
+    ...podAgentOpts,
     // Per-test agent options, threaded straight into the production factory. The one this exists
     // for today is `allowAddressFallback: false` — the per-user "rather undeliverable than routed
     // over my one global key" setting. A test that claims to prove per-circle addressing works
@@ -197,9 +219,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
 
   const pendingMap = new Map();
-  const propagateMeshIntros = makePropagateMeshIntros({ callSkill, sendPeer, logger: QUIET });
   // The circle chat's device log — what the chat rail below lands each verified statement on (the shells' wiring).
-  const chatEventLog = new EventLog({ initial: [], muted: [] });
+  // ONE LOG, as every shell has: where a node has a device log, its receivers (chat, governance, reports) land on that
+  // same log (web: circleApp hands one `eventLog` as the agent's deviceLog AND to its receive rails; the phone and the
+  // box the same). A separate log here made the agent's own readers of those lanes blind on this harness only.
+  const chatEventLog = agentOpts.deviceLog ?? deviceLog ?? new EventLog({ initial: [], muted: [] });
   // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
   // key↔ref binding) and lands as the ONE render entry. The harness's LEGACY pairing records no
   // circleAddress roster rows, so the DEFAULT binding here resolves through the live in-process node
@@ -258,6 +282,24 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const returned = [];               // hidden contacts a landed turn brought back (the shells' `onReturned`), in order
   // the pair roster (L105), composed as both shells do — the redeem sender is built below, late-bound
   const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
+  // The post-join step EVERY join runs, as both shells compose it (web `circleOnJoined`, mobile `onCircleJoined`): register
+  // this device's per-circle address, bind the others', PULL the circle's lanes, then announce. One function, handed to the
+  // pair roster below AND to `joinExistingCircle`'s wizard join. Without it on the wizard join, this device's per-circle
+  // address was never on the bus, so the admin's membership fan to it was held unreachable and a co-member never learned a
+  // later joiner; the harness's mesh introductions hid that (no shell sends them).
+  const onJoined = async ({ circleId }) => {
+    const r = await makeCircleReachable({
+      agent, circleId,
+      // the presence half as the shells run it: this device's per-circle address (and the person address) bound on
+      // its transport, so a message to it over the pair roster can land — `bindCircleAddresses`, for this node
+      registerCirclePresence: () => pairSeams.bindSelf?.(circleId),
+      pullLanes: (cid) => pairSeams.membershipCatchUp?.requestCircle(cid, { callSkill: (a, o, g) => callSkill(a, o, g) }),
+    });
+    // …and ANNOUNCE (the shells' presence step does: prime, then announce) — this device's address with its ceremony
+    // commitment, which is what lets the other side fold this person's rotations
+    try { await announceOwnCircleAddress({ agent, circleId, logger: QUIET }); } catch { /* the next boot re-announces */ }
+    return r;
+  };
   const pairRoster = createPairRoster({
     selfWebid: pubKey,
     selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,   // as the shells compose it
@@ -265,21 +307,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
     signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
-    // the post-join step as the shells run it: register, bind, and PULL the circle's lanes (the join statement that
-    // carries this device's own key, the founder's create) — the catch-up is built below, late-bound
-    onJoined: async ({ circleId }) => {
-      const r = await makeCircleReachable({
-        agent, circleId,
-        // the presence half as the shells run it: this device's per-circle address (and the person address) bound on
-        // its transport, so a message to it over the pair roster can land — `bindCircleAddresses`, for this node
-        registerCirclePresence: () => pairSeams.bindSelf?.(circleId),
-        pullLanes: (cid) => pairSeams.membershipCatchUp?.requestCircle(cid, { callSkill: (a, o, g) => callSkill(a, o, g) }),
-      });
-      // …and ANNOUNCE (the shells' presence step does: prime, then announce) — this device's address with its ceremony
-      // commitment, which is what lets the other side fold this person's rotations
-      try { await announceOwnCircleAddress({ agent, circleId, logger: QUIET }); } catch { /* the next boot re-announces */ }
-      return r;
-    },
+    // the post-join step as the shells run it (above): register, bind, PULL the circle's lanes, announce
+    onJoined,
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid, logger: QUIET }),
     // the handle this person joins under, as the shells read it (their own whoAmI handle), not the node's label
@@ -297,6 +326,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         // a hidden contact who writes again comes back (L106), composed as the shells do: the book says who is
         // hidden; the landing unhides the row. Recorded too, so a walk can assert the marker's moment.
+        isKept: (id) => agent.isKeptContact?.(id) ?? false,   // as the shells compose it: receipts only to kept contacts
         isHidden: async (contactId) => ((await agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true),
         onReturned: async (contactId) => { await agent.callSkill('pinboard', 'setContactHidden', { webid: contactId, hidden: false }); returned.push(contactId); },
         // the first message carries my card; an arriving card goes into the book — as the shells compose it
@@ -305,6 +335,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,
         authFor: agent.linkedTurnAuth ?? null,          // a turn to a linked bot carries this device's statement, as the shells compose it
+        messageRequests: agent.messageRequests ?? null,   // a stranger's first message is a request, as the shells compose it
         localActor: pubKey,
         fanToOwnDevices: agent.contactTurnFan,
         // the pair roster (L105), composed as both shells do. A walk of the CARD-ONLY path (the chain pull after a
@@ -325,6 +356,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // (`circleLanes.js`), so a walk can pull a circle's conversation from a member by address the way
   // the enrol/restore consume does (`contentPulls`).
   const chatCatchUp = makeFrontierReplay({ rail: chatRail, sendToPeer: sendPeer, subtypes: CHAT_CATCHUP_SUBTYPES });
+  // the pod chat read-back the lane table builds (`circleLanes.catchUps.podChat`), on a central-pod node only
+  const podChatCatchUp = podCustody ? makePodChatCatchUp({ rail: chatRail, podReadSince: podCustody.circlePodReadSince, dataMoveFor: podCustody.circleSendDataMove, eventLog: chatEventLog }) : null;
   // The membership lane's catch-up pair (registered below when the node has the rail), exposed on the node so a
   // walk can run the pull a fresh joiner makes (`requestCircle`) instead of replaying the admin's spine by hand.
   const membershipCatchUp = agent.membershipRail
@@ -340,14 +373,22 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   }
   pairSeams.bindSelf = (circleId) => bindCircleAddresses([nodeRef.current], circleId);
   const nodeRef = { current: null };
+  const carryToSiblings = typeof agent.siblingCarry?.carry === 'function' ? (p, o) => agent.siblingCarry.carry(p, o) : null;
   const handlers = {
-    [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
+    // as every shell composes it (`circleLanes.js`): a statement that landed from a member, or passed without being
+    // kept, goes on to my other devices by the one sibling carry (a no-op on a one-device person)
+    [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({
+      rail: chatRail,
+      onPassed: (circleId, statement, fromPeerAddr) => carryLandedStatement({ carry: carryToSiblings, subtype: CHAT_STATEMENT_BROADCAST, circleId, statement, fromPeerAddr, msgId: statement?.body?.payload?.msgId ?? statement?.body?.subject ?? null }),
+      onLanded: (circleId, entry, fromPeerAddr, statement) => carryLandedStatement({ carry: carryToSiblings, subtype: CHAT_STATEMENT_BROADCAST, circleId, statement, fromPeerAddr, msgId: entry?.id ?? null }),
+    }),
     [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
     [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
     [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,
-    // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
+    // ADMIN side: verify the joiner's code + reply, then hand over circle addresses (no mesh intros: no shell sends them).
     'group-redeem-request': makeHandleGroupRedeemRequest({
-      callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
+      callSkill, sendPeer, logger: QUIET,
+      inviteExchange: agent.inviteExchange ?? null,   // as both shells: the one answer to a proven request
       onAdmitted: (a) => pairRoster.onAdmitted(a),
       // a code bound to one person is theirs from any of their addresses (the canonical chat key), as the shells pass it
       identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
@@ -362,8 +403,6 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     }),
     // JOINER side: resolve the pending redeem promise.
     'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap, logger: QUIET }),
-    // Both sides: record a mesh-introduced peer into the local roster.
-    'circle-peer-intro': makeHandleCirclePeerIntro({ callSkill, logger: QUIET }),
     // B2 receive half — record an announced per-circle address, then refresh the binding + the
     // authorize snapshot from one roster read.
     'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET }),
@@ -392,7 +431,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Wave C tail A — the REAL governance/report ingest handlers (the exact wiring the shells
     // use): a fanned vote/report lands in THIS node's EventLog, so a headless two-agent run can
     // assert cross-device replication over a genuine transport (not a simulated fan).
-    'circle-governance-broadcast': (() => {
+    ...(() => {
       // Verify-before-land, exactly as the shells: the rail off THIS node's real per-circle signer +
       // the roster's circleAddress rows for foreign bindings.
       // The key↔ref binding source: the default roster-row lookup, or a test-supplied resolver. This
@@ -400,13 +439,22 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       // binding for this path lands with the membership rider) — a repro that fans signed governance
       // supplies the binding explicitly rather than weakening the verify.
       const govRail = makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined });
-      return makeCircleGovernancePeerHandler({
-        eventLog: chatEventLog,
-        rail: govRail,
-        // The rules-update rider's receive half, exactly as the shells: a landed statement may carry
-        // a new rules doc — fold it into this node's local rules head (cheap pre-scan; vote churn no-ops).
-        onChange: (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); },
+      // The rules-update rider's receive half, exactly as the shells: a landed statement may carry
+      // a new rules doc — fold it into this node's local rules head (cheap pre-scan; vote churn no-ops).
+      const onChange = (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); };
+      // …and the governance CATCH-UP pair the shells compose (circleLanes.js `gov`): a member who joins after a statement
+      // was made (an admin's policy update before the invite) asks for it, and this node serves it. Without it a joiner
+      // never received a policy signed before it joined (found 2026-11-13 by the phone's '+' walk: lists stayed off).
+      // Reports are served only to their readers, as the shells narrow them.
+      const govCatchUp = makeGovernanceCatchUp({
+        rail: govRail, sendToPeer: sendPeer, onChange,
+        narrowServe: (statements, who) => narrowReportStatements(statements, who, { callSkill: (...a) => agent.callSkill(...a) }),
       });
+      return {
+        'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog: chatEventLog, rail: govRail, onChange }),
+        [govCatchUp.subtypes.request]: govCatchUp.onRequest,
+        [govCatchUp.subtypes.batch]:   govCatchUp.onBatch,
+      };
     })(),
     // a report is a signed statement on the same governance rail (this node's log, the same binding source)
     'circle-report-broadcast':     makeCircleReportPeerHandler({ rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }) }),
@@ -415,6 +463,20 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // the statement and causally merges the item snapshot into the circle's store head, which is what
     // makes an item written on A appear in B's store.
     ...(agent.itemsRail ? { [ITEMS_BROADCAST]: makeItemsPeerHandler({ rail: agent.itemsRail }) } : {}),
+    // …and its catch-up, as the shells compose it (circleLanes.js `task`): a member who joins after a list, chore or
+    // appointment was made pulls it from here. The person's own scope is never served on a circle's catch-up.
+    ...(agent.itemsRail ? (() => {
+      const cu = makeFrontierReplay({
+        rail: agent.itemsRail, sendToPeer: sendPeer, subtypes: ITEMS_CATCHUP_SUBTYPES,
+        statementsFor: (circleId) => agent.itemsRail.catchUpStatements(circleId),
+        mayServe: (_fromPeerAddr, circleId) => circleId !== OWN_DEVICES_SCOPE,
+      });
+      return {
+        [cu.subtypes.request]: cu.onRequest,
+        [cu.subtypes.batch]:   cu.onBatch,
+        ...(cu.onOffer ? { [cu.subtypes.offer]: cu.onOffer } : {}),
+      };
+    })() : {}),
     // …and the person's own scope's catch-up between their devices, as the lane table registers it.
     ...(agent.ownStoreSync ? {
       [agent.ownStoreSync.subtypes.request]: agent.ownStoreSync.onRequest,
@@ -478,6 +540,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
     pendingMap,
+    inviteExchange: agent.inviteExchange ?? null,   // as both shells: the request to the invite's address
     currentPersonKey: () => agent.personKey?.() ?? null,   // as both shells: the first person key rides the join
     circleAddressFor: agent.circleAddressFor,
     // …and prove it (web ≡ mobile ≡ harness): a fresh per-circle address is signed with its own key.
@@ -501,7 +564,12 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, onJoined,
+    // the inbound subtypes this node answers (a fitness test compares them with the lane table the shells compose)
+    handlerSubtypes: Object.keys(handlers),
+    // this device's presence in a circle: its per-circle address bound on its transport (the shells' `registerCirclePresence`)
+    registerPresence: (cid) => pairSeams.bindSelf?.(cid),
+    keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, podChatCatchUp, podCustody, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
   // a re-key moved this persona's circle addresses: register them as the shells do
   agent.onCircleRootMoved?.(async ({ circleIds }) => { await bindCircleAddresses([node], circleIds); });
@@ -717,15 +785,31 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
  * The single-admin creator step, split out so ONE circle can then take MULTIPLE joiners (the sealed-circle
  * three-member case) instead of `pairCircle` minting a fresh circle per pair.
  */
-export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test' } = {}) {
+export async function createCircle(admin, { groupId = 'peer-circle', name = 'Peer Circle', purpose = 'node pairing test', handle = null, kind = 'household', storage = null, groupPodUri = null } = {}) {
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
-  const state = createGroupInitialState();
+  // the kind, picked as the wizard's first step asks it (a new circle has none until someone picks one)
+  let state = createGroupChooseKind(createGroupInitialState(), kind, null);
   state.groupId = groupId;
   state.name = name;
   state.purpose = purpose;
-  const { result: created, state: outState } = await createGroupFinalSubmit({ state, callSkill: adminCallSkill });
+  // the storage radio (a pod choice: 'shared' is the one shared circle pod), as the wizard's storage step sets it
+  if (typeof storage === 'string' && storage) state = createGroupSetStorage(state, storage);
+  // …and the pod address the person types beside a shared choice (the wizard's pod field)
+  if (typeof groupPodUri === 'string' && groupPodUri) state.groupPodUri = groupPodUri;
+  // the founder's handle, as both shells' create wizard asks it when the profile has none (loadFounderHandle): a walk
+  // that names its founder gets a founder the members see by name, not "Unknown"
+  if (typeof handle === 'string' && handle) {
+    state = { ...state, ...(await loadFounderHandle({ callSkill: adminCallSkill })), handle };
+  }
+  const { result: created, state: outState, named } = await createGroupFinalSubmit({ state, callSkill: adminCallSkill });
   if (!created) throw new Error(`createGroupV2 failed: ${outState?.submitError ?? 'unknown'}`);
-  return { created, groupId };
+  await named;
+  // the founder's presence in the new circle, as both shells register it once the launcher reloads after a create
+  // (web: the create wizard's onDispatched → registerCirclePresence; mobile: the launcher's load). Without it the
+  // founder's per-circle address is not on the bus and its membership fan cannot leave as the circle.
+  await admin.registerPresence?.(groupId);
+  // the wizard's final state too: a phone founder persists its policy from it (the create modal's persistPolicy)
+  return { created, groupId, state: outState };
 }
 
 /**
@@ -752,6 +836,8 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
     // joiner silently skipped the registry record the restore/enroll paths read.
     circleAddressFor: (cid) => joiner.agent.circleAddressFor?.(cid) ?? null,
     signCircleLink: (src, dst, addr) => joiner.agent.signCircleLink?.(src, dst, addr) ?? null,
+    // the host's post-join step, as both shells hand it to the wizard (register, bind, pull, announce)
+    onJoined: joiner.onJoined,
   });
   return { invite, joined, groupId };
 }
@@ -783,6 +869,10 @@ export function memberOpener(node, groupId) {
 
 // Hold-forward on: a key-event/content send to an offline member is HELD (not lost), then flushed on reconnect.
 const SEALED_SEND = { hold: true, firstSendTimeoutMs: 0, retryDelays: [] };
+/** A member's address IN the circle, as the shells fan circle traffic (to the member's per-circle address, scoped to the
+ *  circle): never their person key, which a circle refuses for in-circle traffic. Falls back to the person key only for a
+ *  node that has no per-circle address for the circle at all. */
+const memberCircleAddress = (n, groupId) => n.agent.circleAddressFor?.(groupId) ?? n.pubKey;
 
 /** Emit a key-event THROUGH THE LANE (sign + chain + append on the emitter's device log), refresh the
  *  emitter's store from the lane projection, and fan the STATEMENT to each recipient node over the real
@@ -792,7 +882,7 @@ async function emitAndFanKeyEvent(from, toNodes, groupId, event) {
   if (!statement) throw new Error('emitAndFanKeyEvent: the key lane refused to sign (no circle signer?)');
   await projectKeyEventsIntoStore({ rail: from.agent.keyRail, store: from.keyEventStore, circleId: groupId });
   await Promise.all(toNodes.map((n) =>
-    from.agent.sendPeerMessage(n.pubKey, { subtype: KEY_STATEMENT_BROADCAST, circleId: groupId, event: statement }, SEALED_SEND)));
+    from.agent.sendPeerMessage(memberCircleAddress(n, groupId), { subtype: KEY_STATEMENT_BROADCAST, circleId: groupId, event: statement }, { ...SEALED_SEND, circleId: groupId })));
   return statement;
 }
 
@@ -817,7 +907,7 @@ export async function postSealed({ admin, members = [], groupId, text }) {
   if (!groupKey) throw new Error('postSealed: the admin holds no current group key to seal with');
   const env = sealForAudience(text, { groupKey }, { audience: 'circle' });
   await Promise.all(members.map((n) =>
-    admin.agent.sendPeerMessage(n.pubKey, { type: 'sealed-content', subtype: 'sealed-content', groupId, env }, SEALED_SEND)));
+    admin.agent.sendPeerMessage(memberCircleAddress(n, groupId), { type: 'sealed-content', subtype: 'sealed-content', groupId, env }, { ...SEALED_SEND, circleId: groupId })));
   return env;
 }
 
@@ -829,6 +919,25 @@ export async function postSealed({ admin, members = [], groupId, text }) {
 // change then flows through the production path: the admin's pinboard `removeMember` op → the control-agent
 // router → the producer's control agent → `emitKeyEvent` → the sink → the fan. No harness stand-in on the
 // remove path; the sink records the admin's own copy + fans the rotation to the remaining members over the bus.
+
+/**
+ * ONE pod a whole walk shares — the central pod of a central-pod circle (an in-memory backend every node's client
+ * reads and writes). `pod` is the posture the custody resolves (`personal` = the pod-only data move), so a walk can
+ * measure "one shared pod, nothing fanned" before a posture names it.
+ */
+export function makeCentralPod({ pod = 'personal', storagePosture = 'p0' } = {}) {
+  const backend = createMemoryBackend();
+  const root = 'pseudo-pod://central/';
+  const clients = new Map();
+  const clientFor = (who) => {
+    if (!clients.has(who)) {
+      const pseudoPod = createPseudoPod({ backend, mode: 'standalone', deviceId: 'central' });
+      clients.set(who, new PodClient({ podRoot: root, auth: { getAuthHeaders: async () => ({}) }, pseudoPod }));
+    }
+    return clients.get(who);
+  };
+  return { backend, root, pod, storagePosture, clientFor };
+}
 
 /** A node-shaped in-memory pod client (createPseudoPod + PodClient), the node analogue of the web host's
  *  `makeCirclePodClient` — an ephemeral per-circle pseudo-pod, no OIDC/CSS. */
@@ -869,6 +978,8 @@ export async function sealCircleViaProducer({ admin, members = [], groupId }) {
   const producer = await createCirclePodProducer({
     circleId: groupId, storagePosture: 'p2', vault: new VaultMemory(),
     generateKeypair: podGenerateKeypair, makePodClient: makeNodePodClient,
+    // the admin's own per-circle sealing key pair, as both shells hand it (the agent's derivation)
+    sealingKeyPair: admin.agent.circleSealingKeyPairFor(groupId),
     keyEventLog,
   });
   admin.circlePods.set(groupId, producer);
@@ -951,4 +1062,28 @@ export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now
   const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, card });
   if (!res) return { error: 'no-circle-signer' };
   return node.agent.callSkill('pinboard', 'broadcastCircleChatStatement', { groupId, event: res.statement, msgId, ts });
+}
+
+
+/**
+ * A test's own message to a circle MEMBER, sent the way the product sends circle traffic: to the member's per-circle
+ * address in that circle, the circle named, so the send gate scopes it to the circle (never the person key to a
+ * member who is not a contact). For warm-ups and test chats inside a paired circle.
+ */
+export async function sendInCircle(from, to, circleId, payload, opts = {}) {
+  const address = to.agent.circleAddressFor(circleId);
+  return from.agent.sendPeerMessage(address, payload, { ...opts, circleId });
+}
+
+
+/**
+ * The person on `node` adds `other`'s card through the real door (the card `other` shares, `addContactFromQr`), as a
+ * person does before writing someone directly: the person key speaks to a contact it kept. `payload` overrides the
+ * card (a card read from a box's stdout).
+ */
+export async function addCardOf(node, other, { payload = null } = {}) {
+  const card = payload ?? (await other.agent.callSkill('pinboard', 'getContactShareQr', {}))?.payload;
+  const r = await node.agent.callSkill('pinboard', 'addContactFromQr', { payload: card });
+  if (r?.error) throw new Error(`addCardOf: ${r.error}`);
+  return r;
 }

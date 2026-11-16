@@ -29,20 +29,17 @@
 // admin becoming someone who has to be trusted about the address: a carrier who alters the address
 // invalidates the proof, and a carrier who invents one cannot sign it.
 //
-// ── What the proof does NOT bind, stated rather than implied ────────────────────────────────────
-// It binds {circle, address}. It does NOT bind `memberWebid` — so a carrier can still assert that a
-// (genuinely proven) address belongs to a DIFFERENT member of the same circle, which would send that
-// member's messages to the wrong co-member. Two reasons it is left this way, both deliberate:
-//
-//   • Binding the webid into the signed message would change `circleLinkMessage`, i.e. the join
-//     proof's wire format, for every existing peer.
-//   • Signing a per-circle address with the CANONICAL key (the other obvious binding) would mint
-//     transferable, cryptographic evidence that one person holds both — which is precisely the
-//     linkage per-circle addressing exists to prevent. The roster's plaintext claim is a claim to
-//     the circle; a signature is proof to the world.
-//
-// The residual trust is therefore the same trust the roster already places in whoever admitted the
-// member, and no more. Recorded in `plans/DECISIONS-FOR-REVIEW.md` (2026-08-02).
+// ── What the proof binds ────────────────────────────────────────────────────────────────────────
+// It binds {circle, address, MEMBER}: the member's identity in this circle (the persona's key), signed by the key behind
+// the address. Until 2026-11-14 it bound {circle, address} only, by a deliberate choice (2026-08-02): naming the
+// member's key in a signature would be proof, to anyone, that address and person are one. Two facts reversed it (Frits,
+// 2026-11-14, ledger L919): every membership statement already signs the member's ref with the per-circle key (that
+// linkage existed inside the circle since the lane went circle-scoped), and an unbound proof was REPLAYABLE: a member
+// could put a copy of another member's address and proof on their own roster row, so the roster showed it as theirs
+// and a device bound it to them as a person. The persona is the unit of linkability: one persona is recognisable
+// across its circles; who wants it otherwise uses a persona per circle. A verifier takes the member from the ROW it
+// writes or reads (never from a field that travels with the proof), so a carrier who re-attributes a proven address
+// to another member breaks the proof.
 import { verifyCeremonyCommitmentDeclaration } from './ceremonyCommitment.js';
 import { signCircleLink, signCircleLinkFromSeed, verifyCircleLink } from './circleLink.js';
 import { deriveCircleAddress } from './circleAddress.js';
@@ -126,7 +123,7 @@ export function ownCircleAddressAnnouncement({
   try {
     const circleAddress = circleAddressFor(circleId);
     if (typeof circleAddress !== 'string' || !circleAddress) return null;
-    const circleAddressProof = signCircleAddress(circleId, circleAddress);
+    const circleAddressProof = signCircleAddress(circleId, circleAddress, memberWebid);
     if (typeof circleAddressProof !== 'string' || !circleAddressProof) return null;
     // The ceremony commitment rides when the host can declare one (it knows its owner root's public key)
     // and sign the declaration with this circle's key. A host that cannot announces the address alone.
@@ -164,7 +161,7 @@ export function ownCircleAddressAnnouncementFromSeed({
   try {
     const address = circleAddress ?? deriveCircleAddress(derivationSeed, circleId);
     if (typeof address !== 'string' || !address) return null;
-    const proof = signCircleLinkFromSeed(derivationSeed, circleId, circleId, address);
+    const proof = signCircleLinkFromSeed(derivationSeed, circleId, circleId, address, memberWebid);
     return circleAddressAnnouncement({
       circleId, memberWebid, circleAddress: address, circleAddressProof: proof,
     });
@@ -191,9 +188,10 @@ export function verifyCircleAddressAnnouncement(announcement, expectedCircleId =
   if (!a.circleId || !a.memberWebid || !a.circleAddress || !a.circleAddressProof) return null;
   if (expectedCircleId != null && a.circleId !== expectedCircleId) return null;
   const proven = verifyCircleLink({
-    groupId: a.circleId,
-    address: a.circleAddress,
-    proof:   a.circleAddressProof,
+    groupId:   a.circleId,
+    address:   a.circleAddress,
+    memberRef: a.memberWebid,
+    proof:     a.circleAddressProof,
   });
   if (!proven) return null;
   // A declared commitment must be signed by the very key the address proves; a bad one voids the whole

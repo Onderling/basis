@@ -55,7 +55,7 @@ import {
   defineSkill, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
-  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain,
+  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain, memberStatusFrom,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
@@ -87,7 +87,7 @@ import {
 } from '@onderling/circles';
 import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
-import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
+import { validateHandle, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
 import { resolveMemberAddress, makeFallbackReporter, ADDRESS_VIA } from '../lib/memberAddress.js';
 import { kindWakes, assigneesOf } from '@onderling/item-store';
@@ -108,7 +108,7 @@ const _reportAddressFallback = makeFallbackReporter(undefined, {
 import { getPrivacyNotice } from '../lib/privacyNotice.js';
 import { categoryFor, TAXONOMY } from '../lib/offeringsMatch.js';
 import { findNearDuplicate } from '../lib/dupCheck.js';
-import { deriveRoster } from '../lib/deriveRoster.js';
+import { deriveRoster, proveLinksAhead } from '../lib/deriveRoster.js';
 // B4 — who has LEFT or been REMOVED from ONE circle. The rule lives in one place so the roster
 // projection, the fan-out roster and the legacy MemberMap fallback cannot disagree about who is in.
 // B5 — how many people ONE invite may admit: circle ceiling → per-invite choice → system cap,
@@ -286,45 +286,6 @@ async function _findLatestGroupRules(store, groupId) {
   return latest;
 }
 
-/**
- * Collect the handles already TAKEN by members of ONE circle — the roster the
- * per-circle handle-uniqueness rule (Phase 4 Wave B) is enforced against.
- *
- * Reads BOTH authorities the handle can live in, so a collision is caught
- * regardless of which path recorded the incumbent:
- *   - the durable, signed `membership-redemption` trail (`source.peerDisplay` —
- *     the handle a peer-joiner claimed, recorded admin-side on
- *     `verifyMembershipCodeForPeer`), filtered to `groupId` so a handle held in
- *     ANOTHER circle never counts (cross-circle reuse stays allowed);
- *   - the in-circle `MemberMap` display cache (`handle`) — same-circle by
- *     construction (one MemberMap per circle), so no group filter is needed.
- *
- * Returns `[{ webid, handle }]` so the caller can exclude the claimant's own
- * row (re-claiming your current handle is not a collision). Both reads are
- * best-effort — a missing store/roster yields fewer entries, never a throw.
- *
- * @param {object} o
- * @param {{listOpen: Function}} [o.store]
- * @param {{list: Function}} [o.members]
- * @param {string|null} [o.groupId]
- * @returns {Promise<Array<{webid: string, handle: string}>>}
- */
-async function collectCircleHandles({ store, groupId } = {}) {
-  const taken = [];
-  if (store && typeof store.listOpen === 'function') {
-    try {
-      const reds = await store.listOpen({ type: 'membership-redemption' });
-      for (const it of reds ?? []) {
-        const src = it?.source ?? {};
-        if (groupId && src.groupId !== groupId) continue;
-        if (src.redeemedBy && src.peerDisplay) {
-          taken.push({ webid: src.redeemedBy, handle: src.peerDisplay });
-        }
-      }
-    } catch { /* trail read is best-effort — the MemberMap pass still runs */ }
-  }
-  return taken;
-}
 
 /**
  * How much clock difference a REDEEM tolerates past a code's expiry.
@@ -444,12 +405,12 @@ async function _findLatestActiveCode(store, groupId) {
 // Household sealed-pod membership hooks. Best-effort + gated: no-op without a control-agent (instances
 // that don't run a sealed pod) or without the joiner's sealing public key. A failure here never breaks
 // the membership audit — key management is recoverable, the redemption record is the source of truth.
-async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null }) {
+async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', groupId, metrics, podAgent = null, admittedBy = null }) {
   if (!controlAgent || !sealingPublicKey || !webId) return;
   // Forward groupId so a per-circle control-agent ROUTER can route the grant to the right
   // circle's producer (basis runs one pinboard agent + N per-circle control agents). A
   // single (non-routing) control agent simply ignores the extra field.
-  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}) }); }
+  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId, ...(podAgent ? { podAgent } : {}), ...(admittedBy ? { admittedBy } : {}) }); }
   catch { metrics?.record?.('control-agent-grant-failed'); }
 }
 async function revokePodAccess(controlAgent, { webId, force = false, policy = 'graceful', groupId, metrics }) {
@@ -713,6 +674,36 @@ async function getGroupRulesCore(scope, a, ctx) {
     if (tsB > tsA || (tsB === tsA && it.id > latest.id)) latest = it;
   }
   return { rules: latest };
+}
+
+/**
+ * IS THIS MEMBER STILL IN, AFTER THE ADMISSION A KEY CHANGE FOLLOWS? The question every join's key grant asks again on
+ * each recompute (a grant recomputed after a lost race must not put back someone removed meanwhile). Read from the SAME
+ * fold as the invite verdict (projectCircleRoster: the roster plus each subject's last exit), placed in the membership
+ * lane's own CAUSAL order (causalPlace over the statements the fold was given: an ancestry path in the deps-DAG, the same
+ * on every device that has folded both; never a clock, never the fold's depth tiebreak):
+ *   'out'  — their last exit (a leave or an eviction) comes AFTER `after`;
+ *   'in'   — `after` is folded and no exit of theirs follows it (none at all, or the last one is before it);
+ * `after` absent: the member's last folded join (the roster seed, a repeated redeem, a device's owner).
+ * 'in' needs the named statement to be a join of THIS subject AND the subject on the folded roster (memberStatusFrom).
+ * A member with no join at all (a founder, a seeded member) is 'in'; once removed the answer is null, not 'out' (no
+ * admission to place the exit after): safe, the key change is not made. PRIVATE: no peer may ask it ('is X still in'
+ * answered to a peer would be a disclosure about a third person).
+ *   null   — it cannot be placed: `after` is not folded on this device yet, the exit is not held, or the exit and the
+ *            admission are CONCURRENT (neither saw the other). The caller treats null as "cannot say": nothing written.
+ */
+async function memberStatusCore(scope, a) {
+  const groupId = a?.groupId ?? scope.groupId;
+  const webid = typeof a?.webid === 'string' && a.webid ? a.webid : null;
+  const asked = typeof a?.after === 'string' && a.after ? a.after : null;
+  if (!groupId || !webid) return { status: null, reason: 'args' };
+  let folded = null; let statements = [];
+  const rows = await projectCircleRoster({
+    store: scope.store, groupId, circleSignerFor: scope.circleSignerFor, membershipRead: scope.membershipRead,
+    selfSigner: scope.selfSigner ?? null, observeFold: (f, s) => { folded = f; statements = Array.isArray(s) ? s : []; },
+  });
+  if (!Array.isArray(rows) || !folded) return { status: null, reason: 'no-fold' };
+  return memberStatusFrom({ folded, statements, webid, after: asked });
 }
 
 async function listGroupMembersCore(scope, a, ctx) {
@@ -1054,7 +1045,9 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
   // hold this circle — and the honest answer to that is nothing, for every caller.
   if (forGroup.length === 0 && founderWebids.size === 0) return null;
 
-  return deriveRoster({
+  // the link proofs the fold will check, checked first with the thread given back between them (the fold is synchronous)
+  await proveLinksAhead({ redemptions: forGroup, founderWebids: [...founderWebids], founderFacts });
+  const rosterArgs = {
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     founderKinds,
@@ -1074,9 +1067,28 @@ export async function projectCircleRoster({ store, groupId, circleSignerFor, mem
     onFolded: (folded) => {
       if (typeof membershipRead?.compact === 'function' && Array.isArray(folded?.superseded) && folded.superseded.length) membershipRead.compact(groupId, folded.superseded).catch(() => {});
       // a caller that needs more of the fold than the rows (the invite verdict: each subject's last exit)
-      if (typeof observeFold === 'function') { try { observeFold(folded); } catch { /* a reader never breaks the read */ } }
+      if (typeof observeFold === 'function') { try { observeFold(folded, spineStatements); } catch { /* a reader never breaks the read */ } }
     },
-  });
+  };
+  // THE GOVERNED GATE (the circle's "who decides" at the receiver): the host says first whether this circle needs one
+  // at all (no rule in its settings chain ever asked a vote for a removal or a role change: no gate, one fold, as
+  // before). Where it does, the roster is folded once WITHOUT the gate (the members a proposal's tally counts), then
+  // with it: a removal or role change that skipped the vote never takes effect. A property on the reader, like
+  // `compact`, so nothing between here and the fold learns a new name.
+  let gateBuilder = null;
+  if (typeof membershipRead?.governedGateFor === 'function') {
+    try { gateBuilder = await membershipRead.governedGateFor(groupId); } catch { gateBuilder = null; }
+  }
+  if (typeof gateBuilder === 'function') {
+    const firstPass = deriveRoster(Object.assign({}, rosterArgs, { onFolded: null }));
+    let governedGate = null;
+    try { governedGate = await gateBuilder(firstPass); } catch { governedGate = null; }
+    // the circle's rule is KNOWN to need a vote here: a gate that could not be built holds every governed change back
+    // (fail closed) until the next read can judge it; a person's own acts never ask it
+    if (typeof governedGate !== 'function') governedGate = () => false;
+    return deriveRoster(Object.assign({}, rosterArgs, { governedGate }));
+  }
+  return deriveRoster(rosterArgs);
 }
 
 async function respondToItemCore(scope, a, ctx) {
@@ -1103,6 +1115,7 @@ async function respondToItemCore(scope, a, ctx) {
   let toStableId = null;
   // A post read from its circle's own store names its poster by webid only (no carrier stamped a sender key on it):
   // the poster's key is on the circle's roster, which is where a co-member's address is known.
+  let sendTo = null;   // where the answer travels, when it is not `toPubKey` (a circle post: the poster's circle address)
   const circleOfPost = post.source?.groupId
     ?? (Array.isArray(post.source?.targets) ? post.source.targets.find((t) => t?.kind === 'group' && typeof t.groupId === 'string')?.groupId : null)
     ?? null;
@@ -1113,13 +1126,20 @@ async function respondToItemCore(scope, a, ctx) {
   const asSelf = (circleOfPost && ctx.from && ctx.from === scope.localActor && typeof scope.localActorIn === 'function')
     ? scope.localActorIn(circleOfPost) : ctx.from;
   const sendAs = asSelf && asSelf !== ctx.from ? asSelf : null;
-  if (!toPubKey && toWebid && circleOfPost) {
+  if (toWebid && circleOfPost) {
     try {
       const roster = (await listGroupMembersCore(scope, { groupId: circleOfPost }, { from: asSelf }))?.members ?? [];
       const row = roster.find((m) => m && m.webid === toWebid);
-      toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
+      // the answer goes to the poster's address IN this circle (the circle's traffic), never their person key; the
+      // person key stays what the shell opens the thread under
+      sendTo = row?.circleAddress ?? null;
+      if (!toPubKey) toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
     } catch { /* not on the roster: no address, and no guess */ }
   }
+  // A circle post whose poster has NO address in that circle yet (no announce reached this device): refused here, with
+  // its reason, rather than sent to their person key (the person path) or as circle traffic to a person key (which their
+  // circle refuses: "delivered", never applied). The shell says why; their next announce makes the answer possible.
+  if (circleOfPost && toWebid && !sendTo) return { error: 'no-circle-address' };
   // the contact book only for a post that names no circle — a circle post's poster is known by its roster
   if (toWebid && !circleOfPost) {
     const peer = await bundle?.contacts?.get?.(toWebid);
@@ -1139,11 +1159,13 @@ async function respondToItemCore(scope, a, ctx) {
   const r = await chat.send({
     toStableId,
     toWebid,
-    toPubKey,
+    toPubKey: sendTo ?? toPubKey,
     threadId,
     body:     a.body,
     subtype:  'chat-message',
     ...(sendAs ? { sendAs } : {}),
+    // an answer to a CIRCLE post is that circle's traffic (its self, its points), never the person path
+    ...(circleOfPost ? { circleId: circleOfPost } : {}),
   });
   if (!r.ok) return { error: r.reason };
 
@@ -1195,6 +1217,7 @@ export const PINBOARD_CORES = Object.freeze({
   getHolidayMode:   getHolidayModeCore,
   getGroupRules:    getGroupRulesCore,
   listGroupMembers: listGroupMembersCore,
+  memberStatus: memberStatusCore,
   respondToItem:    respondToItemCore,
   signOutOfPod:     signOutOfPodCore,
   addContact:       addContactCore,
@@ -1541,6 +1564,50 @@ export function buildSkills({
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid) ?? null;
   };
+
+  /**
+   * A card into the book, exactly as a scanned or pasted card goes in: the one add both `addContactFromQr` and a message
+   * request's accept use. `a.payload` is the `onderling-contact://` card; `a.persona` / `a.revealPreset` as the op's.
+   */
+  async function addFromCard(a) {
+      const card = decodeContactCard(a.payload.slice('onderling-contact://'.length));
+      if (!card?.webid) return { error: 'malformed-card' };
+      const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
+        ? card.trustOffer : 'bekend';
+      const m = await bundle.contacts.addContact({
+        webid:       card.webid,
+        pubKey:      card.pubKey      ?? null,
+        stableId:    card.stableId    ?? null,
+        handle:      card.handle      ?? null,
+        displayName: card.displayName ?? null,
+        avatarUrl:   card.avatarUrl   ?? null,
+        // 2026-05-27 — preserve the NKN peer address embedded in the
+        // QR card so the chat-shell can DM straight after add.
+        ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
+        // The card's relays become the contact's POINTS — where a message to them goes first.
+        ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
+        // A node's card says where its agenda links are served (a household's companion): kept, so a bot builds the link
+        // from the contact it holds.
+        ...(typeof card.serves === 'string' && /^https?:\/\//.test(card.serves) ? { serves: card.serves } : {}),
+        // a card that says it is a bot (display only — what a person's app signs to is decided by their own admission)
+        ...(card.bot === true ? { bot: true } : {}),
+        // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
+        // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
+        // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable
+        // from one that was. Only the explicit backfill may write `default`, and only where it can prove it.
+        ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
+        // the level chosen in the add sheet; absent when nobody was asked (a card arriving with a message)
+        ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
+        // the shared link's one-time token, when the card came from a link (L806): the first turn to them carries it
+        ...(typeof a.linkToken === 'string' && /^[A-Za-z0-9_-]{16,}$/.test(a.linkToken) ? { linkToken: a.linkToken } : {}),
+        trustLevel,
+      });
+      metrics?.record?.('contact-added-from-qr');
+      // The card's person key: the first one is taken on the card's word (the same trust as its profile key — the
+      // person handed it over); a later card must chain from the version already known.
+      const pk = card.personKey ? await adoptContactPersonKey(card.webid, card.personKey, card.personKeyLinks) : null;
+      return { contact: m, ...(pk ? { personKey: pk } : {}) };
+  }
 
   return [
     /**
@@ -2109,51 +2176,22 @@ export function buildSkills({
     // ── Pinboard V1 Phase 6 (2026-05-06) — handle / displayName / reveal ─────
 
     /**
-     * setMyHandle({handle})  — validate + upsert into MemberMap.
+     * setMyHandle({handle})  — validate + store the caller's name in circles on their own profile.
      *
-     * Normalises (lowercases, strips leading `@`).  Does NOT broadcast
-     * to other group members; pod-side propagation is the app's
-     * concern (Phase 4 cache writes the MemberMap snapshot, the pod's
-     * group-config blob is rebuilt on admin's next save).
+     * The name is for people (any letters, spaces, capitals; `validateHandle`) and is kept as typed. Two people may
+     * share a name in a circle (Frits 2026-11-06): uniqueness stays on the key, and the members list tells two
+     * equal names apart with a small number (`normalizeCircleMembers`). A bot's name stays its own: the roster fold
+     * refuses a person's statement that takes a bot's name.
      */
     defineSkill('setMyHandle', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const v = validateHandle(a.handle ?? '');
       if (!v.ok) return { error: 'invalid-handle', reason: v.reason };
-      // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
-      // handles within a single circle). Reject if ANOTHER member of this circle
-      // already holds the handle (case-folded, so `Jan`/`jan` collide). The
-      // claimant re-setting their OWN current handle is not a collision (excluded
-      // by webid). Cross-circle reuse still passes: `collectCircleHandles`
-      // filters the trail to this `groupId`, and the MemberMap is circle-local.
-      // SERIALISED per (circle, handle): the check and the write are separated by awaits, so two members
-      // renaming to the same handle at once would both read a free handle and both write it (story 2.1).
-      return withHandleClaim(store, groupId, v.handle, async () => {
-        const taken = await collectCircleHandles({ store, groupId });
-        // …and every FOLDED roster's handles (2026-09-21): a member's later `member-props` rename lives on the lane, not
-        // in this device's cache, so the trail + cache alone would let two members claim one handle. The handle is the
-        // person's, one across their circles (`member-props` goes to every circle they are in), so every circle counts.
-        // The fold is the rule that binds (it refuses the statement on every device); this read says so up front.
-        try {
-          const mine = new Set();
-          for (const it of (await store.listOpen({ type: 'membership-redemption' })) ?? []) { if (it?.source?.redeemedBy === from && typeof it?.source?.groupId === 'string') mine.add(it.source.groupId); }
-          if (groupId) mine.add(groupId);
-          for (const gid of mine) {
-            try {
-              const r = await listGroupMembersCore(scope, { groupId: gid }, { from });
-              for (const m of r?.members ?? []) if (m?.webid && m.handle) taken.push({ webid: m.webid, handle: m.handle });
-            } catch { /* this circle's fold still refuses a collision */ }
-          }
-        } catch { /* the fold still refuses a collision */ }
-        if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
-          return { error: 'invalid-handle', reason: 'handle-taken' };
-        }
-        const updated = await selfProfile?.set?.(from, { handle: v.handle });
-        if (!updated) return { error: 'not-a-self-here' };
-        return { handle: v.handle, _sync: simulateSync() };
-      });
+      const updated = await selfProfile?.set?.(from, { handle: v.handle });
+      if (!updated) return { error: 'not-a-self-here' };
+      return { handle: v.handle, _sync: simulateSync() };
     }, {
-      description: 'Set the calling actor\'s handle (lowercase, 3–32 chars).',
+      description: 'Set the calling actor\'s name in circles (any letters, spaces and capitals, 1 to 40 characters).',
       visibility:  'authenticated',
     }),
 
@@ -2571,7 +2609,14 @@ export function buildSkills({
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
         codeRedeemableNow, inviteRedemptionVerdict: verdictWithRoster(), INVITE_LIMIT_REACHED, verifyCircleLink,
-        withHandleClaim, collectCircleHandles, findHandleCollision,
+        withHandleClaim,
+        // the circle's current bots, from the folded roster (provenKind: the admitting admin's word, never a member's
+        // own claim): a joiner may not take a bot's name
+        botNamesIn: async (gid) => {
+          const r = await listGroupMembersCore(scope, { groupId: gid }, { from });
+          return (r?.members ?? []).filter((m) => m?.provenKind === 'function' && typeof m.handle === 'string')
+            .map((m) => ({ webid: m.webid, handle: m.handle }));
+        },
       }, { a: dataArgs(parts), from });
     }, {
       description: 'Admin-side peer validator: confirms a joiner-presented code + records redemption.',
@@ -2605,9 +2650,10 @@ export function buildSkills({
       // Unproven ⇒ dropped, and the joiner keeps reaching the admin the old way.
       const verifiedAdminCircleAddress = (a.confirmedByCircleAddress
         && verifyCircleLink({
-          groupId: a.groupId,
-          address: a.confirmedByCircleAddress,
-          proof:   a.confirmedByCircleAddressProof,
+          groupId:   a.groupId,
+          address:   a.confirmedByCircleAddress,
+          memberRef: a.confirmedBy,   // the proof names the admin who confirmed: the row's own `confirmedBy`
+          proof:     a.confirmedByCircleAddressProof,
         }))
         ? a.confirmedByCircleAddress : null;
       // The joiner's OWN per-circle address (wave 1 batch 5) — the row this skill writes is the row the
@@ -2617,7 +2663,7 @@ export function buildSkills({
       // path — it is the joiner's own device, but an unproven address must not enter a roster row here
       // any more than anywhere else (one rule, many enforcement points).
       const verifiedOwnCircleAddress = (a.circleAddress
-        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, memberRef: from, proof: a.circleAddressProof }))
         ? a.circleAddress : null;
       const [item] = await store.addItems([{
         type:       'membership-redemption',
@@ -2793,51 +2839,6 @@ export function buildSkills({
     }),
 
     /**
-     * recordPeerIntro({groupId, peerAddr, peerDisplay?})
-     *   — (2026-05-24). Joiner-side mirror for a mesh
-     *   introduction.  Admin propagates each consenting member's
-     *   address; the receiver calls this skill to write a local
-     *   `membership-redemption` item with `channel: 'intro'`.
-     *   listGroupRoster's existing filter picks it up so the
-     *   recipient can fan-out posts directly to the introduced
-     *   peer (mesh topology) instead of relaying via admin.
-     *
-     *   Idempotent — skips when an intro for the same peer
-     *   already exists for the group.
-     */
-    defineSkill('recordPeerIntro', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId)
-        return { error: 'groupId required' };
-      if (typeof a.peerAddr !== 'string' || !a.peerAddr)
-        return { error: 'peerAddr required' };
-      if (a.peerAddr === from) return { ok: true, skipped: 'self' };
-      const all = await store.listOpen({ type: 'membership-redemption' });
-      const dup = all.find(i =>
-        i?.source?.groupId === a.groupId
-          && i?.source?.redeemedBy === a.peerAddr
-          && i?.source?.channel === 'intro',
-      );
-      if (dup) return { ok: true, skipped: 'duplicate' };
-      const [item] = await store.addItems([{
-        type:       'membership-redemption',
-        text:       `${a.peerAddr} introduced for ${a.groupId}`,
-        source:     {
-          groupId:     a.groupId,
-          redeemedBy:  a.peerAddr,
-          peerDisplay: typeof a.peerDisplay === 'string' ? a.peerDisplay : null,
-          channel:     'intro',
-          introducedAt: Date.now(),
-        },
-        visibility: 'household',
-      }], { actor: from });
-      return { ok: true, introId: item.id, _sync: simulateSync() };
-    }, {
-      description: 'Joiner-side mirror: record a mesh introduction for another circle member.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * recordCircleAddressAnnouncement({groupId, memberWebid?, circleAddress, circleAddressProof})
      *   — the RECEIVE half of per-circle address announcing (B2, 2026-08-02).
      *
@@ -2858,7 +2859,7 @@ export function buildSkills({
      *   that already exists — a stranger cannot announce themselves into a circle. The LOCAL path
      *   (the peer bridge, which substitutes the authenticated envelope sender, and the admin
      *   relaying a member's announcement on) may name a member and may create their row: that is
-     *   the same carrier position `recordPeerIntro` already occupies.
+     *   the join-time relay of a proven address, which only the local side can carry.
      *
      *   It PATCHES the durable trail rather than appending a second row, because
      *   `deriveRoster` merges trail rows first-non-null-wins: a second row carrying a NEW address
@@ -3295,6 +3296,11 @@ export function buildSkills({
      *   — return the members of a group as MemberMap entries.
      *   `groupId` defaults to the bundle's current group.
      */
+    wire('memberStatus', {
+      description: 'Is a member still in, after the admission a key change follows? in / out / null (cannot place), in the membership lane\'s causal order.',
+      visibility:  'private',
+    }),
+
     wire('listGroupMembers', {
       description: 'List the members of a group. To a member peer: identity + keys + address + role + handle + their own release only (allowlist); a non-member peer is refused; the local shell gets the full view. circleAddress when known).',
       visibility:  'authenticated',
@@ -3687,7 +3693,7 @@ export function buildSkills({
       // no emitter / a failed emit still writes the head (store-local degrade, unchanged).
       let statement = null;
       if (typeof rulesUpdateEmit === 'function') {
-        try { statement = await rulesUpdateEmit({ groupId: a.groupId, rules: a.rules, version: newVersion }); }
+        try { statement = await rulesUpdateEmit({ groupId: a.groupId, rules: a.rules, version: newVersion, ...(typeof a.proposalId === 'string' && a.proposalId ? { proposalId: a.proposalId } : {}), ...(Number.isFinite(Number.parseInt(a.policyVersion, 10)) ? { policyVersion: Number.parseInt(a.policyVersion, 10) } : {}) }); }
         catch { statement = null; /* the fan is best-effort — catch-up reconciles */ }
       }
       const [item] = await store.addItems([{
@@ -3905,7 +3911,8 @@ export function buildSkills({
       if (typeof emitSpine !== 'function') return { error: 'spine-unavailable' };
       const res = await emitSpine({
         kind: 'role', circleId: _groupId, subject: a.memberWebid,
-        payload: { role: a.role }, actor: from,
+        // the decision rides the statement: the proposal that decided it and the settings version held (the receiver gate)
+        payload: { role: a.role, ...(typeof a.proposalId === 'string' && a.proposalId ? { proposalId: a.proposalId } : {}), ...(Number.isFinite(Number.parseInt(a.policyVersion, 10)) ? { policyVersion: Number.parseInt(a.policyVersion, 10) } : {}) }, actor: from,
       });
       if (!res) return { error: 'not-signed' };   // no per-circle signer → nothing lands unsigned
       // handed to the person's main device to sign (`held`: it is offline) — not applied yet, and the screen says so
@@ -4015,41 +4022,7 @@ export function buildSkills({
         return { error: 'invalid-payload' };
       }
       if (!bundle?.contacts) return { error: 'no-contacts' };
-      const card = decodeContactCard(a.payload.slice('onderling-contact://'.length));
-      if (!card?.webid) return { error: 'malformed-card' };
-      const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
-        ? card.trustOffer : 'bekend';
-      const m = await bundle.contacts.addContact({
-        webid:       card.webid,
-        pubKey:      card.pubKey      ?? null,
-        stableId:    card.stableId    ?? null,
-        handle:      card.handle      ?? null,
-        displayName: card.displayName ?? null,
-        avatarUrl:   card.avatarUrl   ?? null,
-        // 2026-05-27 — preserve the NKN peer address embedded in the
-        // QR card so the chat-shell can DM straight after add.
-        ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
-        // The card's relays become the contact's POINTS — where a message to them goes first.
-        ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
-        // A node's card says where its agenda links are served (a household's companion): kept, so a bot builds the link
-        // from the contact it holds.
-        ...(typeof card.serves === 'string' && /^https?:\/\//.test(card.serves) ? { serves: card.serves } : {}),
-        // a card that says it is a bot (display only — what a person's app signs to is decided by their own admission)
-        ...(card.bot === true ? { bot: true } : {}),
-        // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
-        // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
-        // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable
-        // from one that was. Only the explicit backfill may write `default`, and only where it can prove it.
-        ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
-        // the level chosen in the add sheet; absent when nobody was asked (a card arriving with a message)
-        ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
-        trustLevel,
-      });
-      metrics?.record?.('contact-added-from-qr');
-      // The card's person key: the first one is taken on the card's word (the same trust as its profile key — the
-      // person handed it over); a later card must chain from the version already known.
-      const pk = card.personKey ? await adoptContactPersonKey(card.webid, card.personKey, card.personKeyLinks) : null;
-      return { contact: m, ...(pk ? { personKey: pk } : {}) };
+      return addFromCard(a);
     }, {
       description: 'Add a contact from a onderling-contact:// QR/URL payload. `persona` records which of your personas they were added through — what they see of you.',
       visibility:  'authenticated',
@@ -4230,6 +4203,153 @@ export function buildSkills({
     }, {
       description: 'Hide a contact from Contacten (the row stays; their next message brings them back), or show them again.',
       visibility:  'authenticated',
+    }),
+
+    // ── Requests: first messages from people not chosen (lib/MessageRequests.js) ──
+    /** listMessageRequests({persona?, state?}) — this self's requests, newest last turn first. */
+    defineSkill('listMessageRequests', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { requests: [] };
+      const state = a.state === 'open' || a.state === 'ignored' ? a.state : null;
+      return { requests: await bundle.messageRequests.list({ persona: a.persona ?? null, state }) };
+    }, {
+      description: 'List first messages from people you did not choose, waiting for your answer (open and ignored).',
+      visibility:  'authenticated',
+    }),
+
+    /** holdMessageRequest({from, messageId, ts, text?, card?, file?, persona?, memberName?, refused?}) — the door's write: a
+     *  turn from someone not known (`memberName`: a co-member never answered, held without a card; `refused`: the door's
+     *  fallback after a refusal, held anyway). */
+    defineSkill('holdMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { held: false, reason: 'no-contacts' };
+      try {
+        return await bundle.messageRequests.hold({
+          from: a.from, messageId: a.messageId, ts: a.ts, text: typeof a.text === 'string' ? a.text : '',
+          card: typeof a.card === 'string' ? a.card : null, file: a.file === true, persona: a.persona ?? null,
+          ...(typeof a.memberName === 'string' && a.memberName.trim() ? { member: { name: a.memberName } } : {}),
+          ...(typeof a.refused === 'string' && a.refused ? { refused: a.refused } : {}),
+        });
+      } catch (err) {
+        return { held: false, reason: 'invalid', error: err?.message ?? String(err) };
+      }
+    }, {
+      description: 'Hold a turn from someone not known to this self as a message request (the contact channel\'s door; self only).',
+      visibility:  'private',
+    }),
+
+    /**
+     * acceptMessageRequest({from, persona?, revealPreset?}) — the person accepts: the held card goes into the book exactly as a
+     * scanned card does, the request goes, and the held turns come back for the caller to put on the thread (the
+     * contact channel's, which pinboard does not hold: `acceptMessageRequest` in basis's src/v2 does both).
+     */
+    defineSkill('acceptMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests || !bundle?.contacts) return { error: 'no-contacts' };
+      const persona = typeof a.persona === 'string' && a.persona.trim() ? a.persona.trim() : null;
+      const request = await bundle.messageRequests.get(a.from, { persona });
+      if (!request) return { error: 'no-such-request' };
+      // A REQUEST WITHOUT A CARD. From a member of one of this self's circles (named as in the circle): Accept IS the
+      // choice (Frits 2026-11-14), so they go into the book now, by their identity and their circle name, as an answer
+      // would have put them there; their next message lands in the thread. From a stranger (a turn held after a
+      // refusal, no card): nothing to put in the book, as before; the held turns go onto the thread.
+      const asMember = !request.card && request.member === true;
+      const added = request.card
+        ? await addFromCard({ payload: request.card, persona, revealPreset: a.revealPreset })
+        : asMember
+          ? { contact: await bundle.contacts.addContact({
+            webid: a.from,
+            ...(request.name ? { displayName: request.name } : {}),
+            ...(persona ? { persona } : {}),
+            ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
+            trustLevel: 'bekend',
+          }) }
+          : { contact: null };
+      if (added?.error) return added;
+      await bundle.messageRequests.remove(a.from, { persona });
+      metrics?.record?.('message-request-accepted');
+      return { ...added, turns: request.turns };
+    }, {
+      description: 'Accept a message request: the sender becomes a contact; the held messages are returned for their thread.',
+      visibility:  'authenticated',
+    }),
+
+    /** removeMessageRequest({from, persona?}) — the request goes without becoming a contact (the block act). */
+    defineSkill('removeMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { error: 'no-contacts' };
+      return (await bundle.messageRequests.remove(a.from, { persona: a.persona ?? null })) ? { removed: a.from } : { error: 'no-such-request' };
+    }, {
+      description: 'Remove a message request without accepting it (the block act from Contacten).',
+      visibility:  'authenticated',
+    }),
+
+    /** ignoreMessageRequest({from, persona?}) — kept, marked; later turns still land; still acceptable. */
+    defineSkill('ignoreMessageRequest', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.messageRequests) return { error: 'no-contacts' };
+      const request = await bundle.messageRequests.ignore(a.from, { persona: a.persona ?? null });
+      return request ? { request } : { error: 'no-such-request' };
+    }, {
+      description: 'Ignore a request: it stays, marked, and can still be accepted. The sender sees nothing different.',
+      visibility:  'authenticated',
+    }),
+
+    // ── Shared contact links: each let on for its first opener only (lib/SharedCards.js) ──
+    /** mintSharedCard({persona?}) — a new link for the persona shared as (the share screen, once per showing). */
+    defineSkill('mintSharedCard', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { error: 'no-contacts' };
+      const minted = await bundle.sharedCards.mint({ persona: a.persona ?? null });
+      return minted ?? { error: 'no-self' };
+    }, {
+      description: 'Make a new contact link for the persona shared as: its first opener reaches you; anyone after is a request.',
+      visibility:  'authenticated',
+    }),
+
+    /** listSharedCards({persona?}) — this persona's live links, newest first, each not used yet or used (when). */
+    defineSkill('listSharedCards', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { links: [] };
+      return { links: await bundle.sharedCards.list({ persona: a.persona ?? null }) };
+    }, {
+      description: 'List the contact links you shared that still live: not used yet, or used on which day.',
+      visibility:  'authenticated',
+    }),
+
+    /** withdrawSharedCard({token, persona?}) — the link goes; whoever opens it later lands in requests. */
+    defineSkill('withdrawSharedCard', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { error: 'no-contacts' };
+      return (await bundle.sharedCards.withdraw(a.token, { persona: a.persona ?? null })) ? { withdrawn: true } : { error: 'no-such-link' };
+    }, {
+      description: 'Withdraw a contact link you shared: whoever opens it later lands in requests.',
+      visibility:  'authenticated',
+    }),
+
+    /** clearContactLinkToken({webid}) — the opener's side: the token left with the first turn; the row drops it. */
+    defineSkill('clearContactLinkToken', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.contacts) return { error: 'no-contacts' };
+      if (typeof a.webid !== 'string' || !a.webid) return { error: 'webid-required' };
+      try { await bundle.contacts.clearLinkToken(a.webid); return { cleared: true }; } catch (err) { return { error: err?.message ?? String(err) }; }
+    }, {
+      description: 'Drop the shared link token a contact row kept, once the first turn to them carried it (self only).',
+      visibility:  'private',
+    }),
+
+    /** useSharedCard({token, by, persona?}) — the door's write: a first turn carrying a link's token. */
+    defineSkill('useSharedCard', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.sharedCards) return { ok: false, reason: 'no-contacts' };
+      try {
+        return await bundle.sharedCards.use({ token: a.token, by: a.by, persona: a.persona ?? null, card: typeof a.card === 'string' ? a.card : null });
+      } catch (err) {
+        return { ok: false, reason: 'invalid', error: err?.message ?? String(err) };
+      }
+    }, {
+      description: 'Let on the first opener of a contact link this self shared (the contact channel\'s door; self only).',
+      visibility:  'private',
     }),
 
     /** setContactPersona({webid, persona, revealPreset?, personaAt?}) — what a contact sees of you (L125). */

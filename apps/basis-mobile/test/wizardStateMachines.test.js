@@ -64,11 +64,11 @@ describe('Bundle F P2 — joinGroup state machine', () => {
     expect(s.inviteParseError).toBeTruthy();
   });
 
-  it('isValidHandle accepts shape-conformant strings', () => {
-    expect(joinGroupState.isValidHandle('alice')).toBe(true);
-    expect(joinGroupState.isValidHandle('UPPER')).toBe(false);
-    expect(joinGroupState.isValidHandle('-leading-dash')).toBe(false);
-    expect(joinGroupState.isValidHandle('trailing-dash-')).toBe(false);
+  it('isValidName takes a name as people write it', () => {
+    expect(joinGroupState.isValidName('alice')).toBe(true);
+    expect(joinGroupState.isValidName('Alice van Dijk')).toBe(true);
+    expect(joinGroupState.isValidName('   ')).toBe(false);
+    expect(joinGroupState.isValidName('x'.repeat(41))).toBe(false);
   });
 });
 

@@ -20,7 +20,11 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(HERE, rel), 'utf8');
 const WEB    = read('../../web/v2/circleApp.js');
-const MOBILE = read('../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js');
+// The phone mounts through its composition in src/core (phoneAppOps.js), which the launcher calls with its platform
+// seams; the mobile source is the launcher plus that file, the latter only when the launcher calls it.
+const LAUNCHER = read('../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js');
+const PHONE_OPS = read('../../../basis-mobile/src/core/phoneAppOps.js');
+const MOBILE = /mountPhoneAppOps\(/.test(LAUNCHER) ? `${LAUNCHER}\n${PHONE_OPS}` : LAUNCHER;
 const AGENT  = read('../../src/core/agent/realAgent.js');
 
 describe("basis's ops are mounted on the waist by every shell", () => {
@@ -40,6 +44,9 @@ describe("basis's ops are mounted on the waist by every shell", () => {
   it('the mobile shell mounts the table it has always assembled', () => {
     expect(MOBILE).toMatch(/import \{ buildMobileLocalBuiltins \}/);
     expect(MOBILE).toMatch(/mountAppOps\('basis',/);
+    // …through the one phone composition, which the launcher calls (the Node phone calls the same)
+    expect(LAUNCHER, 'the launcher mounts through src/core/phoneAppOps.js').toMatch(/mountPhoneAppOps\(/);
+    expect(PHONE_OPS, 'the phone composition imports no screen or React Native code').not.toMatch(/from 'react-native'|from 'react'|\/screens\//);
   });
 
   it('both shells pass a file picker, and neither invents a second handler table', () => {

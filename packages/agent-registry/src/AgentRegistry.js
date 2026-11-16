@@ -26,6 +26,7 @@ import { normalizeExposure } from './skillExposure.js';
 // whose a profile is: the member kinds a roster row can say (one list, the kernel's)
 export const PROFILE_KINDS = MEMBER_KINDS;
 
+
 /**
  * ONE MUTATION AT A TIME per (pseudo-pod, resource). The registry is one resource holding every entry, each mutation a
  * read → change one entry → write the whole body; the pseudo-pod does not compare-and-swap, so two mutations in flight

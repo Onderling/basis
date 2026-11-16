@@ -23,8 +23,6 @@ const deps = (spine, forFunction) => ({
   INVITE_LIMIT_REACHED: 'invite-limit-reached',
   verifyCircleLink: () => false,
   withHandleClaim: async (_s, _g, _h, fn) => fn(),
-  collectCircleHandles: async () => [],
-  findHandleCollision: () => false,
 });
 const admit = async ({ forFunction, profileKind }) => {
   const spine = [];

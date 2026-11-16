@@ -13,7 +13,7 @@ const t = (k) => (k === 'circle.reply.who_someone' ? 'iemand' : k);
 describe('the admin page and the reveal ladder', () => {
   it('an unreleased member with a handle shows the handle, never their raw display name', () => {
     const raw = { webid: KEY, handle: 'ada', displayName: 'Ada Lovelace' };
-    expect(rosterRowShown(raw, { viewerId: 'me', policy: 'pairwise', t })).toBe('@ada');
+    expect(rosterRowShown(raw, { viewerId: 'me', policy: 'pairwise', t })).toBe('ada');
     // the old read, for contrast — this is what the admin page painted
     expect(memberShown(raw, t)).toBe('Ada Lovelace');
   });

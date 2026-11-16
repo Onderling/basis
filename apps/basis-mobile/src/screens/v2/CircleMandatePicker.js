@@ -30,6 +30,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 import {
   grantKindOptions,
   memberLabel,
@@ -58,6 +59,7 @@ export default function CircleMandatePicker({
   onConfirm,
   onCancel,
 }) {
+  const sheetCap = useSheetCap(0.85);   // the card's cap in window pixels (sheetCap.js)
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // Selectable roster + the grouped WAARVOOR options — the SHARED pure projections.
@@ -101,7 +103,7 @@ export default function CircleMandatePicker({
     <Modal transparent visible={!!visible} animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel} testID="mandate-backdrop">
         {/* Inner Pressable swallows taps so the sheet doesn't dismiss. */}
-        <Pressable style={styles.sheet} onPress={() => {}} testID="mandate-sheet">
+        <Pressable style={[styles.sheet, sheetCap]} onPress={() => {}} testID="mandate-sheet">
           <View style={styles.header}>
             <Text style={styles.title}>{t('circle.mandate.heading')}</Text>
             <Pressable onPress={onCancel} hitSlop={8} testID="mandate-cancel">
@@ -112,7 +114,7 @@ export default function CircleMandatePicker({
 
           {notice ? <Text style={styles.notice} testID="mandate-notice">{notice}</Text> : null}
 
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          <ScrollView style={[styles.body, SHEET_SCROLL]} contentContainerStyle={styles.bodyContent}>
             {/* Existing mandates (legibility). */}
             {legibility.length > 0 ? (
               <View style={styles.legibility} testID="mandate-legibility">
@@ -248,7 +250,7 @@ export default function CircleMandatePicker({
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  sheet:     { backgroundColor: theme.color.card, borderRadius: theme.radius?.lg ?? 12, padding: 18, width: '100%', maxWidth: 440, maxHeight: '85%' },
+  sheet:     { backgroundColor: theme.color.card, borderRadius: theme.radius?.lg ?? 12, padding: 18, width: '100%', maxWidth: 440 },
   header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title:     { fontSize: 18, fontWeight: '600', color: theme.color.ink, flexShrink: 1 },
   cancel:    { color: theme.color.inkSoft, fontSize: 15 },

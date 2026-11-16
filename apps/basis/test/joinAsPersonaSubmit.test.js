@@ -37,6 +37,19 @@ describe('finalSubmit as a persona', () => {
     expect(calls.find((c) => c.op === 'setProfileCircleMembership').args).toMatchObject({ id: 'p-0123456789ab', circleId: 'g1' });
   });
 
+  it("with no name typed the persona's own name is the name, and the membership is still recorded under it", async () => {
+    // what the join wizard's "As a new persona" leaves: the handle empty on purpose (the persona's name is the name).
+    // The record not written meant the next start did not know the circle was the persona's: no socket of its own on
+    // the circle's relay, so every line waited (found by the phone's personas walk).
+    const { callSkill, calls } = harness();
+    const s = initialState(); decodeInvite(invite, s);
+    s.personas = [{ id: 'p-0123456789ab', name: 'Werk' }];
+    setPersona(s, 'p-0123456789ab');
+    s.handle = '';
+    await finalSubmit({ state: s, callSkill, circleAddressFor: () => 'addr-of-persona' });
+    expect(calls.find((c) => c.op === 'setProfileCircleMembership')?.args).toMatchObject({ id: 'p-0123456789ab', circleId: 'g1', handle: 'Werk', address: 'addr-of-persona' });
+  });
+
   it('a join that fails gives the circle back to the default', async () => {
     const { callSkill, calls } = harness({ redeemFails: true });
     await finalSubmit({ state: stateFor('p-0123456789ab'), callSkill, circleAddressFor: () => 'addr' });

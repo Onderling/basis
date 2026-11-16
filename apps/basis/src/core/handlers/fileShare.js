@@ -44,11 +44,11 @@ export async function buildFileShareEnvelope({ file, peerAddr, sealFor, sentAt =
 }
 
 export function makeHandleFileShare({
-  deliverToThread, publishEvent, notePeer, identityOf, openFor = null, logger = console,
+  deliverToThread, publishEvent, notePeer, identityOf, openFor = null, isKnownSender = null, logger = console,
 } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleFileShare: deliverToThread required');
 
-  return async function handleFileShare(fromAddr, payload) {
+  return async function handleFileShare(fromAddr, payload, ctx = {}) {
     let f = payload?.file;
     let sealedTo = null;
     if (payload?.sealed && typeof payload.sealed === 'object') {
@@ -69,6 +69,13 @@ export function makeHandleFileShare({
     // the turn persisted into a thread no list could reach — the peer graph learns peers at SEND time,
     // so a receiver who never dialled this sender had no contact row to open the thread from.
     const contactId = contactIdFor(identityOf, fromAddr);
+    // A FILE FROM SOMEONE THE PERSON DID NOT CHOOSE is refused (a first message is a request, and a request holds no
+    // files): no row, no thread turn, no notice. `isKnownSender` is the contact channel's `knownSender`; absent, as before.
+    if (typeof isKnownSender === 'function') {
+      let known = false;
+      try { known = (await isKnownSender(contactId, fromAddr, ctx?.to ?? null)) === true; } catch { known = false; }
+      if (!known) { logger.info?.('[peer] a file from someone not known: refused (a request holds no files)'); return; }
+    }
     try { notePeer?.(contactId); } catch { /* a row is a convenience; the thread persists regardless */ }
     try {
       deliverToThread({

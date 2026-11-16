@@ -273,6 +273,21 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
         return out.reverse();
       },
       /**
+       * The last `n` turns of one thread as rows, oldest first (`{who, text, ts}`): what a screen paints of the thread
+       * (the "+"), the same projection `recent` hands the model as lines. Nothing with memory off.
+       */
+      turns(threadId, n = memoryTurns) {
+        if (!threadId || modeOf(threadId) === 'off') return [];
+        const out = [];
+        for (const e of eventLog.query({})) {   // most recent first
+          const p = e?.payload;
+          if (e?.type !== ASSISTANT_TURN_KIND || p?.threadId !== threadId || typeof p.text !== 'string') continue;
+          out.push({ who: p.who, text: p.text, ts: e.ts });
+          if (out.length >= n) break;
+        }
+        return out.reverse();
+      },
+      /**
        * Forget one person's thread: every turn of it on this device, now (`/vergeet`). The log's own purge, scoped to the
        * thread — no one else's turns, no circle's lines. Returns how many turns went.
        */

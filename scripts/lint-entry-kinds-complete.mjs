@@ -44,9 +44,23 @@ export function parseRows(src) {
     const parts = []; let depth = 0, cur = '';
     for (const ch of args) { if (ch === '(' || ch === '{' || ch === '[') depth++; if (ch === ')' || ch === '}' || ch === ']') depth--; if (ch === ',' && depth === 0) { parts.push(cur.trim()); cur = ''; } else cur += ch; }
     if (cur.trim()) parts.push(cur.trim());
-    rows[kind] = parts.length >= 5 ? parts.slice(4).join(',').trim() : null;
+    // the fifth argument is the binding; the sixth is `mirrored` (true | false), read by `parseMirrored`
+    rows[kind] = parts.length >= 5 ? parts[4] : null;
   }
   return rows;
+}
+
+/** Each row's `mirrored` argument (the sixth K argument: 'true' | 'false'), or null when the row declares none. */
+export function parseMirrored(src) {
+  const table = src.match(/export const ENTRY_KINDS = Object\.freeze\(\{([\s\S]*?)\n\}\);/)?.[1] ?? '';
+  const out = {};
+  for (const m of table.matchAll(/^\s*(?:'([^']+)'|([A-Za-z_$][\w$-]*))\s*:\s*K\(([^\n]*)\)\s*,?\s*(?:\/\/.*)?$/gm)) {
+    const parts = []; let depth = 0, cur = '';
+    for (const ch of m[3]) { if (ch === '(' || ch === '{' || ch === '[') depth++; if (ch === ')' || ch === '}' || ch === ']') depth--; if (ch === ',' && depth === 0) { parts.push(cur.trim()); cur = ''; } else cur += ch; }
+    if (cur.trim()) parts.push(cur.trim());
+    out[m[1] ?? m[2]] = parts.length >= 6 ? parts[5] : null;
+  }
+  return out;
 }
 
 export function parseUnknown(src) {
@@ -65,8 +79,12 @@ export function parseManifestLanes(files, read) {
   return out;
 }
 
-export function audit({ rows, unknown, vocab, manifestLanes }) {
+export function audit({ rows, unknown, vocab, manifestLanes, mirrored = null }) {
   const problems = [];
+  // what the person's own history mirror keeps is declared on every kind (docs/decisions.md 2026-11-13)
+  if (mirrored) for (const [kind, v] of Object.entries(mirrored)) {
+    if (v !== 'true' && v !== 'false') problems.push(`'${kind}': declares no \`mirrored\` (true | false): whether the person's own history mirror keeps it`);
+  }
   const check = (kind, binding) => {
     if (binding == null) { problems.push(`'${kind}': no binding — the four cells (${CELLS.join(' · ')}) are missing`); return; }
     if (/^LOCAL_BINDING$/.test(binding)) return;
@@ -87,7 +105,7 @@ export function audit({ rows, unknown, vocab, manifestLanes }) {
   };
   for (const [kind, binding] of Object.entries(rows)) check(kind, binding);
   if (unknown == null) problems.push('UNKNOWN_KIND: not found');
-  else if (!/LOCAL_BINDING\s*$/.test(unknown)) problems.push(`UNKNOWN_KIND: must be the local binding (accepts none — an undeclared kind is refused by construction), got: ${unknown}`);
+  else if (!/LOCAL_BINDING(\s*,\s*(true|false))?\s*$/.test(unknown)) problems.push(`UNKNOWN_KIND: must be the local binding (accepts none — an undeclared kind is refused by construction), got: ${unknown}`);
   for (const l of manifestLanes) {
     if (!l.lane) { problems.push(`${l.file}: appends to ${l.laneConst}, which that manifest does not define`); continue; }
     if (!(l.lane in rows)) { problems.push(`${l.file}: appends to lane '${l.lane}', which is not a declared ENTRY_KINDS row`); continue; }
@@ -102,12 +120,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
   const src = read(KINDS_FILE);
   const vocab = Object.fromEntries(Object.values(VOCAB_OF).map((n) => [n, parseVocab(src, n)]));
   const manifests = execSync(`git ls-files '${MANIFEST_GLOB}'`, { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
-  const problems = audit({ rows: parseRows(src), unknown: parseUnknown(src), vocab, manifestLanes: parseManifestLanes(manifests, read) });
+  const problems = audit({ rows: parseRows(src), unknown: parseUnknown(src), vocab, manifestLanes: parseManifestLanes(manifests, read), mirrored: parseMirrored(src) });
   if (problems.length) {
     console.error(`\n✗ lint:entry-kinds-complete — ${problems.length} problem(s):\n`);
     for (const p of problems) console.error(`   - ${p}`);
     console.error('\n   Every entry kind declares who signs it, what it is about, which verifier accepts it and whether own');
-    console.error('   devices carry it; the unknown kind refuses; a manifest appends only to declared, accepted lanes.\n');
+    console.error('   devices carry it, and whether the person\'s own history mirror keeps it; the unknown kind refuses; a manifest\n');
+    console.error('   appends only to declared, accepted lanes.\n');
     process.exit(1);
   }
   const n = Object.keys(parseRows(src)).length;

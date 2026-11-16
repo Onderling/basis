@@ -27,13 +27,15 @@ import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput } from 'react-native';
 import { featureActionLabelKey } from '@onderling-app/basis';
-import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
+import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, newsKindIcons } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
+import FaceView from './FaceView.js';
 import { t } from '../../core/localisation.js';
 import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
+import { typedRowOp } from '../../../../basis/src/v2/rowPrimary.js';
 import { nounHeading } from '../../../../basis/src/v2/nounNames.js';
 
 // An embed `ref` may be a full URN (urn:dec:item:T2) while a rendered row
@@ -134,6 +136,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       else body = renderItems(block, styles, onAction);
       break;
     case 'rules':        body = renderRules(block, styles); break;
+    case 'forYou':       body = renderForYou(block, onAction, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
     case 'awaiting':      body = renderAwaiting(block, onAction, styles); break;
     case 'onboarding':   body = <OnboardingCards block={block} onAction={onAction} styles={styles} />; break;
@@ -226,6 +229,42 @@ function renderAwaiting(block, onAction, styles) {
   );
 }
 
+// "Nieuw voor jou" (web parity: circleScreen.js renderForYou): what came in for the person, a tap to its source and a
+// ✕ to set it aside (both mark it read on all their devices), "Alles gelezen" at the foot. Rows come whole from the
+// shared projection; this only paints.
+function renderForYou(block, onAction, styles) {
+  const items = block.content?.items ?? [];
+  return (
+    <View testID="for-you">
+      <Text style={styles.blockTitle}>{t('circle.forYou.title')}</Text>
+      {items.map((row) => (
+        <Pressable key={row.id} style={[styles.noticeRow, styles.forYouRow]} testID={`for-you-${row.kind}`}
+          disabled={typeof onAction !== 'function'}
+          onPress={() => onAction?.({ kind: 'for-you-open', row })}>
+          <Text style={[styles.noticeText, styles.forYouText]} numberOfLines={1}>
+            {`${row.icon ?? ''} ${row.text}`}{row.late ? `  ${t('circle.forYou.late')}` : ''}
+          </Text>
+          {row.self ? (
+            // the persona the row is for, when the device holds more than one: its face (web parity)
+            <View accessibilityLabel={row.self.name ?? t('circle.switcher.you')} testID={`for-you-self-${row.self.id}`}>
+              <FaceView row={{ name: row.self.name ?? t('circle.switcher.you') }} size={22} />
+            </View>
+          ) : null}
+          <Pressable hitSlop={8} accessibilityLabel={t('circle.forYou.dismiss')} testID={`for-you-dismiss-${row.id}`}
+            onPress={() => onAction?.({ kind: 'for-you-read', rows: [row] })}>
+            <Text style={styles.forYouDismiss}>✕</Text>
+          </Pressable>
+        </Pressable>
+      ))}
+      {items.length > 0 && typeof onAction === 'function' ? (
+        <Pressable testID="for-you-all" onPress={() => onAction({ kind: 'for-you-read', rows: items })}>
+          <Text style={styles.forYouAll}>{t('circle.forYou.all_read')}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 function renderCirclesUnread(block, onAction, styles) {
   const items = block.content?.items ?? [];
   return (
@@ -235,7 +274,8 @@ function renderCirclesUnread(block, onAction, styles) {
         <Pressable key={row.circleId} style={styles.noticeRow} testID={`circles-unread-${row.circleId}`}
           disabled={typeof onAction !== 'function'}
           onPress={() => onAction?.({ kind: 'open-circle', circleId: row.circleId })}>
-          <Text style={styles.noticeText}>{row.name ?? row.circleId} · {t('circle.screen.unread_count', { count: row.unread })}</Text>
+          {/* what is new there, by kind (the item-kind vocabulary's icons), web parity */}
+          <Text style={styles.noticeText}>{[row.name ?? row.circleId, newsKindIcons(row.kinds), t('circle.screen.unread_count', { count: row.unread })].filter(Boolean).join(' · ')}</Text>
         </Pressable>
       ))}
     </View>
@@ -319,6 +359,28 @@ function PrimaryButton({ item, noun, onAction, styles }) {
     <Pressable style={styles.rowAct} onPress={go} accessibilityRole="button" testID={`row-act-${item.id}`}>
       <Text style={styles.rowActText}>{t(p.labelKey)}</Text>
     </Pressable>
+  );
+}
+
+// A list's add field: a typed line goes on that list through the act the block carries (`typedRowOp`, shared).
+// Web twin: circleScreen.js `addField`.
+function ListAddField({ list, onAction, styles }) {
+  const [text, setText] = useState('');
+  if (typeof onAction !== 'function') return null;
+  const send = () => {
+    const go = typedRowOp(list.add, text);
+    if (!go) return;
+    onAction(go);
+    setText('');
+  };
+  return (
+    <View style={styles.listAdd} testID={`list-add-${list.id}`}>
+      <TextInput style={styles.listAddInput} value={text} onChangeText={setText} onSubmitEditing={send} returnKeyType="done"
+        placeholder={t(list.add.placeholderKey ?? 'circle.lists.add_prompt')} testID={`list-add-input-${list.id}`} />
+      <Pressable style={styles.rowAct} onPress={send} accessibilityRole="button" testID={`list-add-send-${list.id}`}>
+        <Text style={styles.rowActText}>{t(list.add.labelKey ?? 'circle.container.add')}</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -459,6 +521,7 @@ function renderLists(block, styles, onAction = null) {
               <PrimaryButton item={e} noun="list-item" onAction={onAction} styles={styles} />
             </View>
           ))}
+          {l.add ? <ListAddField list={l} onAction={onAction} styles={styles} /> : null}
         </View>
       ))}
     </View>
@@ -610,6 +673,10 @@ const makeStyles = (theme) => StyleSheet.create({
   noticeSender:        { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
   noticeSenderCompact: { fontSize: 10, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 1 },
   noticeText:          { fontSize: 14, color: theme.color.ink },
+  forYouRow:           { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  forYouText:          { flex: 1 },
+  forYouDismiss:       { fontSize: 14, color: theme.color.inkSoft, paddingHorizontal: 6 },
+  forYouAll:           { fontSize: 13, color: theme.color.accent, marginTop: 6 },
   noticeTextCompact:   { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
   // a row is a CARD: the words, and ONE button (the action its noun declares)
@@ -627,6 +694,8 @@ const makeStyles = (theme) => StyleSheet.create({
   groupHead:           { fontSize: 13, color: theme.color.inkSoft, paddingVertical: 4 },
   agendaMoment:        { fontSize: 13, color: theme.color.inkSoft },
   // a row's own act ("Change"): a quiet text button — the page's one accent is the "+"
+  listAdd:             { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 10 },
+  listAddInput:        { flex: 1, fontSize: 14, paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, color: theme.color.ink, backgroundColor: theme.color.paper },
   rowAct:              { paddingVertical: 4, paddingHorizontal: 6, marginLeft: 'auto' },
   rowActText:          { fontSize: 13, color: theme.color.inkSoft },
   taskRowCompact:      { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 6 },

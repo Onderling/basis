@@ -40,17 +40,14 @@ const TAB_DEFS = [
   { id: 'conversation', feature: 'chat',            labelKey: 'circle.tabs.conversation' },
   { id: 'noticeboard',  feature: 'noticeboard',     labelKey: 'circle.tabs.noticeboard'  },
   { id: 'tasks',        feature: 'tasks',           labelKey: 'circle.tabs.tasks'        },
-  { id: 'lists',        feature: 'lists',           labelKey: 'circle.tabs.lists',        built: false },
+  { id: 'lists',        feature: 'lists',           labelKey: 'circle.tabs.lists'        },
   { id: 'notes',        feature: 'notes',           labelKey: 'circle.tabs.notes',        built: false },
   { id: 'calendar',     feature: 'calendar',        labelKey: 'circle.tabs.calendar',     built: false },
   { id: 'members',      feature: 'memberDirectory', labelKey: 'circle.tabs.members'      },
 ];
 
 /** Features whose surface is not built on either shell (their tab definition says `built: false`). */
-/** Features whose surface is a BLOCK of the circle's screen, not a tab: on where the circle's recipe carries that block. */
-export const BLOCK_SURFACED = Object.freeze(new Set(['lists']));
-
-const SURFACELESS = new Set(TAB_DEFS.filter((d) => d.built === false && !BLOCK_SURFACED.has(d.feature)).map((d) => d.feature));
+const SURFACELESS = new Set(TAB_DEFS.filter((d) => d.built === false).map((d) => d.feature));
 
 /** Does this feature have somewhere to show what it holds? A feature that does not is not offered — not as a tab, not
  *  as a settings toggle, not as an entry in the composer's "+". */

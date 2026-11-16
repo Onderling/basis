@@ -19,10 +19,14 @@ describe('the phone create wizard: the short path', () => {
     expect(src).toMatch(/setStep\(prevCreateStep\(state\)\)/);
     expect(src).toMatch(/state\.step === REVIEW_STEP/);
   });
-  it('the kind, persona, purpose and tags sit behind the one fold', () => {
+  it('the kind and the purpose are asked on the first step; who sees whose name, the persona and the tags sit behind the fold', () => {
     const fold = src.indexOf('testID="create-group-advanced"');
     expect(fold).toBeGreaterThan(0);
-    for (const marker of ["label={t('circle.kindPicker')}", "label={t('circle.wizard.create.reveal_label')}", "label={t('circle.wizard.create.persona.label')}", "label={t('circle.wizard.create.purpose')}", "label={t('circle.wizard.create.tags')}"]) {
+    for (const marker of ["label={t('circle.kindPicker')}", "label={t('circle.wizard.create.purpose')}"]) {
+      expect(src.indexOf(marker), marker).toBeGreaterThan(0);
+      expect(src.indexOf(marker), marker).toBeLessThan(fold);
+    }
+    for (const marker of ["label={t('circle.wizard.create.reveal_label')}", "label={t('circle.wizard.create.persona.label')}", "label={t('circle.wizard.create.tags')}"]) {
       expect(src.indexOf(marker), marker).toBeGreaterThan(fold);
     }
     expect(src.indexOf('testID="create-group-name"')).toBeLessThan(fold);

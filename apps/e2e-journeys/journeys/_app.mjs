@@ -244,6 +244,20 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
 export { sendCircleChat };
 
 /**
+ * A DECLARED TEST SEAM AROUND THE SEND GATE: hand `payload` to the node's secure agent as a raw wire send, skipping the
+ * agent's own gate (`peerSend`: the roster, the circle scope, the person key's allowlist). Only for a test that measures
+ * what a RECEIVER does with a shape our own gate would never let leave (a forged old envelope, a stranger who names no
+ * circle and holds no card): an attacker's client has no gate, so the receiver's refusal must be tested without ours.
+ * The reason is required and printed, so every use says why it bypasses on purpose. Never for a send a product path makes.
+ */
+export async function sendBypassingTheGate(node, to, payload, { reason } = {}) {
+  if (typeof reason !== 'string' || !reason.trim()) throw new Error('sendBypassingTheGate: a reason is required');
+  const peer = node?.agent?.peer;
+  if (!peer || typeof peer.sendTo !== 'function') throw new Error('sendBypassingTheGate: the node has no secure agent');
+  return peer.sendTo(to, payload);
+}
+
+/**
  * Take a device DARK — inbound envelopes are dropped on the floor, exactly as they are for a phone
  * that is off. Returns the function that brings it back. Deliberately NOT a socket close: a real
  * absence outlasts the relay's hold window, so what must carry the backlog is the catch-up, and a

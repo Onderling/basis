@@ -46,6 +46,12 @@ export const APPENDERS = {
   governance:        { file: 'apps/basis/src/v2/governanceAppWiring.js', needle: 'GOVERNANCE_LANE' },
   report:            { pending: 'the "Report a problem" panel rode the feedback surface, cut from basis 2026-09-05 (feedback is an external bot); the bug-report door returns as a basis affordance — plans/PLAN-bots-and-channels.md §3 step 8, REMAINING-WORK ledger L87' },
   'delivery-state':  { file: 'apps/basis/src/v2/chatRail.js', needle: "'delivery-state'" },
+  'item-changed':    { file: 'apps/basis/src/bulkOps.js', needle: "'item-changed'" },
+  notification:      { file: 'apps/basis/src/core/handlers/circlePost.js', needle: "type: 'notification'" },
+  // the landing of a row someone else wrote: written at the items rail's applied hook in the shared agent
+  'item-landed':     { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'landingEntryFor' },
+  'nearby-line':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: LINE_KIND' },
+  'nearby-card':     { file: 'apps/basis/src/v2/nearbyKept.js', needle: 'type: CARD_KIND' },
   'intention-done':  { file: 'apps/basis/src/v2/intentionRunner.js', needle: 'INTENTION_DONE_KIND' },
   'key-event':       { file: 'apps/basis/src/v2/keyRail.js', needle: 'KEY_LANE' },
   membership:        { file: 'apps/basis/src/v2/membershipRail.js', needle: 'MEMBERSHIP_LANE' },

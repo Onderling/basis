@@ -35,13 +35,41 @@ export const rowIsSelfs = (self) => (n) => (self?.isDefault
   ? n?.createdBy == null || n.createdBy === 'me' || n.createdBy === self.key
   : n?.createdBy === self?.key);
 
+/** The list keys an answer may carry its rows under, and the keys a single row may come under. */
+const LIST_KEYS = Object.freeze(['items', 'notes', 'events', 'results']);
+const ROW_KEYS = Object.freeze(['event', 'item', 'note', 'result']);
+/** What an answer may say beside its rows: the list's own name (the same for every self; a count would not be). */
+const META_KEYS = Object.freeze(['ok', '_sync', 'title']);
+const isRow = (v) => v != null && typeof v === 'object' && !Array.isArray(v) && ('createdBy' in v || 'id' in v);
+
 /**
- * A route's answer cut to the ticked self, when the route answers every self (`EVERY_SELF_ROUTES`); else as it came.
- * @param {string} app @param {any} result  the op's result (`{items}`) @param {{key, isDefault}} self
+ * A route's answer cut to the ticked self, when the route answers every self (`EVERY_SELF_ROUTES`); any other route's as
+ * it came. DEFAULT-DENY, as the own lists' view is (`ownStoreAsSelf`): a list in any known shape is filtered (a bare array,
+ * or under `items`/`notes`/`events`/`results`); a single row (bare, or under `event`/`item`/`note`/`result`) is checked,
+ * and another self's reads as absent; a refusal passes as it is; a shape it does not know (words made over every self's
+ * rows, a count) is REFUSED, never passed uncut.
+ * @param {string} app @param {any} result  the op's result @param {{key, isDefault}} self
  */
 export function cutToSelf(app, result, self) {
-  if (!EVERY_SELF_ROUTES.has(app) || !Array.isArray(result?.items)) return result;
-  return { ...result, items: result.items.filter(rowIsSelfs(self)) };
+  if (!EVERY_SELF_ROUTES.has(app) || result == null) return result;
+  if (typeof result === 'object' && result.ok === false) return result;
+  const mine = rowIsSelfs(self);
+  const absent = { ok: false, code: 'not-found', error: 'not-found' };
+  if (Array.isArray(result)) return result.filter(mine);
+  if (typeof result !== 'object') return { ok: false, code: 'refused-shape', error: 'refused-shape' };
+  const lists = LIST_KEYS.filter((k) => Array.isArray(result[k]));
+  const rows = ROW_KEYS.filter((k) => isRow(result[k]));
+  const rest = Object.keys(result).filter((k) => !lists.includes(k) && !rows.includes(k) && !META_KEYS.includes(k));
+  if (lists.length || rows.length) {
+    // what else the answer says beside its rows is words over every self: refused with the shape
+    if (rest.length) return { ok: false, code: 'refused-shape', error: 'refused-shape' };
+    if (rows.some((k) => !mine(result[k]))) return absent;
+    const out = { ...result };
+    for (const k of lists) out[k] = result[k].filter(mine);
+    return out;
+  }
+  if (isRow(result)) return mine(result) ? result : absent;
+  return { ok: false, code: 'refused-shape', error: 'refused-shape' };
 }
 
 export function loadOwnItems({ call, self = { key: null, isDefault: true } } = {}) {

@@ -93,3 +93,35 @@ describe('a read the MODEL picks is cut to the ticked self too (the same rule as
     }
   });
 });
+
+describe('the cut DENIES by default, on every read of the routes that answer every self', () => {
+  it('each read op of the own agenda and the own notes, run as another self through the real agent, never carries the general self\'s words', async () => {
+    const { VaultMemory } = await import('@onderling/vault');
+    const { ownPlaceCatalogue } = await import('../../src/assistant/plusDoor.js');
+    const { cutToSelf, EVERY_SELF_ROUTES } = await import('../../src/assistant/ownItems.js');
+    const { verbKind } = await import('@onderling/app-manifest');
+    const a = await boot(memoryDataSource(), { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() });
+    const p = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
+    const werk = a.persona(p.id).chatId.pubKey;
+    const ev = await a.callSkill('calendar', 'addEvent', { circleId: OWN, title: 'tandarts', when: `${tomorrow()}T10:00:00.000Z` });
+    const note = await a.callSkill('household', NOTE_ADD, { circleId: OWN, body: 'de sleutel ligt bij de buren' });
+    const evId = ev?.itemId ?? ev?.id ?? ev?.event?.id ?? null;
+    const noteId = note?.result?.id ?? note?.id ?? note?.itemId ?? null;
+    const { catalogue, manifestsByOrigin } = ownPlaceCatalogue({});
+    const reads = [...catalogue.opsById.values()].filter((e) => EVERY_SELF_ROUTES.has(e.appOrigin)
+      && verbKind(manifestsByOrigin[e.appOrigin], e.op.verb ?? e.op.__generic?.atom) === 'read');
+    expect(reads.length).toBeGreaterThan(3);
+    const self = { key: werk, isDefault: false };
+    for (const e of reads) {
+      const args = { circleId: OWN, id: e.appOrigin === 'calendar' ? evId : noteId, query: 'tandarts sleutel', q: 'tandarts' };
+      const raw = await a.callSkill(e.appOrigin, e.op.id, args, { actAs: werk });
+      const cut = JSON.stringify(cutToSelf(e.appOrigin, raw, self) ?? null);
+      expect(cut, `${e.appOrigin}.${e.op.id}`).not.toMatch(/tandarts|sleutel/);
+    }
+    // ...and it does not deny too much: the self that made them still reads its own agenda and notes through the cut
+    const me = { key: a.identity?.chat?.pubKey ?? null, isDefault: true };
+    const own = (app, op) => a.callSkill(app, op, { circleId: OWN }).then((r) => JSON.stringify(cutToSelf(app, r, me)));
+    expect(await own('calendar', 'listEvents')).toContain('tandarts');
+    expect(await own('household', encodeGenericOpId('household', 'list', 'note'))).toContain('sleutel');
+  });
+});

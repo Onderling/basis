@@ -4,7 +4,7 @@
  * own row, Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
  * Pure render.
  */
-import { PLUS_ACTS, plusLabel, plusCardLabel } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, plusCardLabel, plusMomentNeedsTime } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
@@ -156,13 +156,22 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     form.className = 'circle-vandaag-plus__form';
     form.dataset.act = act.id;
     const inputs = {};
+    // a day was said but no time: the form asks for the time on that day, and Save waits for it (never a time filled in)
+    const askTimeOn = plusMomentNeedsTime(act, values);
     for (const f of act.fields) {
       const label = document.createElement('label');
       label.textContent = f.labelKey ? tr(f.labelKey) : f.name;
       const input = document.createElement('input');
       input.type = f.kind === 'datetime' ? 'datetime-local' : 'text';
       input.name = f.name;
-      if (values?.[f.name] != null) input.value = values[f.name];
+      if (f.kind === 'datetime' && askTimeOn) {
+        // the picker opens on the day that was said; the field stays empty until a time is chosen
+        Object.assign(input, { min: `${askTimeOn}T00:00`, max: `${askTimeOn}T23:59`, required: true });
+        const ask = document.createElement('span');
+        ask.className = 'circle-vandaag-plus__ask-time';
+        ask.textContent = ` ${tr('circle.vandaag.plus_which_time', { day: askTimeOn })}`;
+        label.appendChild(ask);
+      } else if (values?.[f.name] != null) input.value = values[f.name];
       input.className = `circle-vandaag-plus__${f.name}`;
       label.appendChild(input);
       form.appendChild(label);

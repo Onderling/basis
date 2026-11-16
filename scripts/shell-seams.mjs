@@ -290,7 +290,9 @@ export const SEAMS = Object.freeze([
   // THE "+" LINE talks to the person's own agent only: an own act, or a referral to the circle where it lives — opened,
   // never acted on (`plusLineOutcome`, with each circle's availability from `circleAvailabilityFor`). A shell reading the
   // line any other way is how the sheet would come to act in a circle.
-  { id: 'plus-line-outcome', pattern: /plusLineOutcome\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // (the shared "+" door, `createPlusDoor`, reads the line through `plusLineOutcome` itself: a shell that composes the door
+  // composes this seam; the phone moves to the door in its own change, then this pattern names the door alone)
+  { id: 'plus-line-outcome', pattern: /plusLineOutcome\(|createPlusDoor\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
   // THE "+" IS ONE KEPT CONVERSATION: each read of its line is one exchange in the person's own thread (`exchange` on
   // `createPlusThread`: the line heard, the read run, what it answered kept as the bot's own turn entries). A shell that
   // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already
@@ -300,7 +302,7 @@ export const SEAMS = Object.freeze([
   // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself
   // says something else in the thread.
-  { id: 'plus-own-lists', pattern: /plusLineOutcome\([^)]*own:\s*\{\s*lists:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
+  { id: 'plus-own-lists', pattern: /plusLineOutcome\([^)]*own:\s*\{\s*lists:|createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
   { id: 'plus-done-line', pattern: /plusDoneLine\(/, shells: ['web', 'mobile'], why: 'the "+" thread says what a line did in one wording, a list\'s read with done and not done' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.

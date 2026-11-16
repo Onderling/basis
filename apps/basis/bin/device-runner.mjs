@@ -122,7 +122,7 @@ import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
-import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { createDoorCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 
 import { EventLog } from '../src/eventLog.js';

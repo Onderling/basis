@@ -18,33 +18,20 @@ import { inScope } from '@onderling/app-manifest';
 /**
  * @param {{opsById?:Map<string,{op:object,appOrigin:string}>, commandMenu?:Array}} catalogue
  * @param {string[]} [apps]  allowed app origins; falsy → DEFAULT_CIRCLE_ORIGINS
+ * @param {{place?: 'own'|'circle'|'contact'}} [o]  the PLACE asked for: only the ops declared to be offered there (the
+ *   op's `scopes`, read through `@onderling/app-manifest`'s `inScope`); absent → every op, as before. The person's own
+ *   "+" asks for `own`.
  * @returns {object} a scoped catalogue (or the original if it has no opsById)
  */
-export function scopeCatalogueToApps(catalogue, apps) {
+export function scopeCatalogueToApps(catalogue, apps, { place } = {}) {
   if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function') return catalogue;
   const allow = new Set(Array.isArray(apps) && apps.length ? apps : DEFAULT_CIRCLE_ORIGINS);
   const opsById = new Map();
-  for (const [k, entry] of catalogue.opsById) if (allow.has(entry && entry.appOrigin)) opsById.set(k, entry);
+  for (const [k, entry] of catalogue.opsById) if (allow.has(entry && entry.appOrigin) && inScope(entry?.op, place)) opsById.set(k, entry);
+  const kept = new Set([...opsById.values()].map((e) => `${e?.appOrigin}:${e?.op?.id}`));
   const commandMenu = Array.isArray(catalogue.commandMenu)
-    ? catalogue.commandMenu.filter((e) => allow.has(e && e.appOrigin))
+    ? catalogue.commandMenu.filter((e) => allow.has(e && e.appOrigin) && (!place || kept.has(`${e?.appOrigin}:${e?.opId}`)))
     : catalogue.commandMenu;
   return { ...catalogue, opsById, commandMenu };
 }
 
-/**
- * A catalogue narrowed to one PLACE (`own`, `circle`, `contact`): only the ops declared to be offered there (the op's
- * `scopes`, read through `@onderling/app-manifest`'s `inScope`). The person's own "+" asks for `own`, so its model
- * sees, and its "/" list offers, only the acts that live in their own things.
- * @param {{opsById?:Map<string,{op:object,appOrigin:string}>, commandMenu?:Array}} catalogue
- * @param {'own'|'circle'|'contact'} place
- */
-export function scopeCatalogueToPlace(catalogue, place) {
-  if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function' || !place) return catalogue;
-  const opsById = new Map();
-  for (const [k, entry] of catalogue.opsById) if (inScope(entry?.op, place)) opsById.set(k, entry);
-  const kept = new Set([...opsById.values()].map((e) => `${e?.appOrigin}:${e?.op?.id}`));
-  const commandMenu = Array.isArray(catalogue.commandMenu)
-    ? catalogue.commandMenu.filter((e) => kept.has(`${e?.appOrigin}:${e?.opId}`))
-    : catalogue.commandMenu;
-  return { ...catalogue, opsById, commandMenu };
-}

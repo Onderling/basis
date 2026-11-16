@@ -19,7 +19,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, expandAdds } fro
 import { botPromptLines } from '../../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows } from '../../src/v2/botOpMap.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../../src/v2/householdBotStore.js';
-import { createDoorCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { createDoorCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { createTelegramRunner } from '../../src/telegram/runner.js';
 import { listsGateRules } from '../../src/v2/circleGate.js';
 import { initLocalisation, t } from '../../src/localisation.js';

@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
 import { createTelegramRunner } from '../src/telegram/runner.js';
-import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { createDoorCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { householdBotApps } from '../src/v2/householdTemplate.js';
 import { scopeCatalogueToRole } from '../src/v2/botOpMap.js';
 import { commandForBareOffer } from '../src/v2/doorOffers.js';

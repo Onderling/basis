@@ -11,7 +11,7 @@ import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { sealExport, openExport } from '../src/v2/householdExportSeal.js';
 import { screenColumnFor, SCREEN_ADMIN_OPS } from '../src/v2/screenActing.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { createScreenView, screenAddressFor } from '../src/v2/screenView.js';
 import { buildToolDescriptors } from '../src/v2/interpretCommand.js';
 

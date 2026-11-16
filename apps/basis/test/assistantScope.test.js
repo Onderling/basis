@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
 import { createTelegramRunner } from '../src/telegram/runner.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { ASSISTANT_APPS, ASSISTANT_APPS_PARAM_KEY, assistantAppsFrom } from '../src/v2/assistantApps.js';
 import { basisParamRegistry } from '../src/v2/paramsService.js';

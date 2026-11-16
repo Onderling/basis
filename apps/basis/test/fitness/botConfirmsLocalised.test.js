@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { HOUSEHOLD_TEMPLATE } from '../../src/v2/householdTemplate.js';
 
 const NL = JSON.parse(readFileSync(new URL('../../src/locales/circle.nl.json', import.meta.url), 'utf8'));

@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
 import { createMockHouseholdAgent, mockHouseholdManifest } from '../src/core/agent/mockAgent.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
-import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { createDoorCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { EventLog } from '../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';

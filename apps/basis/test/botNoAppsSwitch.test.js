@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { resolveDispatch } from '../src/router.js';
 import { parseInput } from '../src/parser.js';
 import { botOffers } from '../src/v2/botOpMap.js';

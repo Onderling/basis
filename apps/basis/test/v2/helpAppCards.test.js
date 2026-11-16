@@ -7,6 +7,7 @@ import { answerHelp } from '../../src/v2/help/helpAnswer.js';
 import { helpDeck } from '../../src/v2/help/kaartjes.js';
 import { APP_HOWTO_CARDS } from '../../src/v2/help/appCards.js';
 import { plusLineOutcome } from '../../src/v2/vandaagPlus.js';
+import { catalogueManifests } from '../../src/v2/manifestSources.js';
 
 describe('the app\'s how-to cards', () => {
   it('no card id is in both decks (the site copy stays the site\'s)', () => {
@@ -27,6 +28,22 @@ describe('the app\'s how-to cards', () => {
       ['hoe maak ik een lijst', 'app.lijst', 'nl'], ['how do I make a list', 'app.lijst', 'en'],
     ];
     for (const [q, id, lang] of cases) expect(answerHelp(q, { lang })?.source?.cardId, q).toBe(id);
+  });
+  it('every "+" line a card quotes is in that language\'s text AND read by the "+" (a card never teaches a dead line)', () => {
+    const byOrigin = Object.fromEntries(catalogueManifests().filter((m) => m?.app).map((m) => [m.app, m]));
+    for (const k of APP_HOWTO_CARDS) {
+      for (const [lang, lines] of Object.entries(k.plusLines ?? {})) {
+        // a circle named like the card's examples, holding the list the card adds to
+        const circleName = lang === 'nl' ? 'Thuis' : 'Home';
+        const listName = lang === 'nl' ? 'Boodschappen' : 'Shopping';
+        const circles = [{ id: 'c1', name: circleName, lists: [{ name: listName, kind: 'list' }], manifestsByOrigin: { lists: byOrigin.lists, tasks: byOrigin.tasks } }];
+        for (const line of lines) {
+          expect(k[lang], `${k.id} ${lang} quotes "${line}"`).toContain(`"${line}"`);
+          const o = plusLineOutcome(line, { circles, own: { lists: [] } });
+          expect(o?.command?.opId ?? o?.actId ?? null, `${k.id} ${lang}: "${line}" is read`).toBeTruthy();
+        }
+      }
+    }
   });
   it('the "+" answers them in its thread (a how-to line is looked up in the cards)', () => {
     const o = plusLineOutcome('hoe nodig ik iemand uit', { circles: [], lang: 'nl' });

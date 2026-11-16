@@ -50,6 +50,10 @@ describe('relay queue retention', () => {
     const appTtl = constantIn('../../secure-agent/src/createSecureAgent.js', ...APP_TTL);
     expect(appTtl).toBe(constantIn('../src/server.js', ...RELAY_TTL));
   });
+  it("AGREES with how long the sender remembers which relays took a swept message (a give-up from one of them is not a 'did not arrive' while another still holds it)", () => {
+    const remembered = constantIn('../../secure-agent/src/createSecureAgent.js', /SWEPT_COPIES_TTL_MS\s*=\s*([^;\n]+)/, 'SWEPT_COPIES_TTL_MS');
+    expect(remembered).toBe(constantIn('../src/server.js', ...RELAY_TTL));
+  });
   it('a linked person\'s turn held for the whole hold still verifies at the bot — its statement window covers the hold', () => {
     // The bot accepts a linked turn only while its device statement is inside a window; a turn the sender's device or
     // the relay held while the bot was away arrives late by up to the hold. Two layers, one fact: the window must cover

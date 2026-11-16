@@ -224,6 +224,14 @@ function isApplicationError(err) {
 const YOUNG_ADDRESS_WINDOW_MS = param({ key: 'secureAgent.youngAddressWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 const YOUNG_ADDRESS_RETRY_MS = param({ key: 'secureAgent.youngAddressRetryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: Object.freeze([2_000, 5_000, 10_000]) });
 /** How many stale envelopes one bucket (a circle) may hold while its sender check is refreshed; the oldest goes first. */
+/** How long this device remembers WHICH relays took a message the sweep sent on several (`relayGaveUp`): as long as a
+ *  relay may hold it (the relay's queue TTL; queueRetentionMatchesTheApp pins the two together). */
+const SWEPT_COPIES_TTL_MS = param({ key: 'secureAgent.sweptCopiesTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
+/** How many such messages it remembers at once; the oldest goes first (then a give-up for it is reported as before). */
+const SWEPT_COPIES_MAX = param({ key: 'secureAgent.sweptCopiesMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1024 });
+/** How many peers the record of 'which relay they last spoke to us on' keeps (`relaySweep` tries that relay first); the one
+ *  heard from longest ago goes first. 1024: a few hundred contacts' addresses; a peer dropped is simply swept in order again. */
+const HEARD_ON_MAX = param({ key: 'secureAgent.heardOnMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1024 });
 /** An address never seen alive gets at most ONE wire attempt per this interval; a send in between joins its hold with
  *  no wire attempt and no wait. 60 s: a send to a dead address costs a full handshake wait (seconds, ~15 s on a phone),
  *  so a never-answering roster address costs at most one such wait a minute however often the device sends, while a
@@ -992,6 +1000,43 @@ export async function createSecureAgent(opts = {}) {
   let primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
   /** address → consecutive failed delivery attempts. Cleared by a success or a presence signal. */
   const deliveryFailures = new Map();
+  /** peer address → the transport an envelope from it last arrived on (where that peer is). Overwritten per peer. */
+  const heardOn = new Map();
+  /**
+   * A message the sweep sent on more than one relay: msgId → { relays: Set<transport>, at }. A relay's give-up for it is
+   * a 'did not arrive' only when EVERY relay that took it has given up; one of several giving up says only that the
+   * person was not on that relay. Cleared by a delivery receipt (`removeHeld`) and after the relay's queue TTL.
+   */
+  const sweptCopies = new Map();
+  const sweptCopiesTtlMs = Number.isFinite(opts.sweptCopiesTtlMs) ? opts.sweptCopiesTtlMs : SWEPT_COPIES_TTL_MS;
+  const sweptCopiesMax = Number.isFinite(opts.sweptCopiesMax) ? opts.sweptCopiesMax : SWEPT_COPIES_MAX;
+  function noteSweptCopies(msgId, relays) {
+    const now = Date.now();
+    for (const [id, rec] of sweptCopies) { if (now - rec.at < sweptCopiesTtlMs) break; sweptCopies.delete(id); }
+    sweptCopies.delete(msgId);
+    sweptCopies.set(msgId, { relays, at: now });
+    while (sweptCopiesMax > 0 && sweptCopies.size > sweptCopiesMax) sweptCopies.delete(sweptCopies.keys().next().value);
+  }
+  /** One relay gave up on a message we sent (`onUndelivered` from its socket): reported unless another relay still holds it. */
+  function relayGaveUp(tx, info) {
+    const id = info?.msgId ?? null;
+    const rec = id != null ? sweptCopies.get(id) : null;
+    if (rec && tx) {
+      rec.relays.delete(tx);
+      if (rec.relays.size > 0) {
+        if (typeof console !== 'undefined') console.info(`[secure-agent] one relay gave up on ${String(id).slice(0, 12)}… (${info?.reason ?? 'unknown'}); ${rec.relays.size} other relay(s) still hold it — not reported`);
+        return;
+      }
+      sweptCopies.delete(id);
+    }
+    try { onUndelivered?.(info); } catch { /* a consumer that throws must not take the socket down */ }
+  }
+  const heardOnMax = Number.isFinite(opts.heardOnMax) ? opts.heardOnMax : HEARD_ON_MAX;
+  function noteHeardOn(addr, tx) {
+    heardOn.delete(addr);
+    heardOn.set(addr, tx);
+    while (heardOnMax > 0 && heardOn.size > heardOnMax) heardOn.delete(heardOn.keys().next().value);
+  }
   /** Addresses that have shown a sign of life at least once (an answer, a presence signal, an inbound envelope). Only
    *  these can be judged DEAD: a failure against an address never seen alive (a newcomer's fresh per-circle address,
    *  not registered yet) says 'not yet', so it holds and is not counted. Kept across a restart with the holds. */
@@ -1245,6 +1290,7 @@ export async function createSecureAgent(opts = {}) {
    */
   function removeHeld({ addr, msgId } = {}) {
     if (typeof addr !== 'string' || !addr || typeof msgId !== 'string' || !msgId) return 0;
+    sweptCopies.delete(msgId);   // it arrived: no relay's give-up for it is a 'did not arrive'
     let removed = 0;
     for (const a2 of addressesOfIdentity(addr)) {
       const q = pendingHold.get(a2);
@@ -1672,6 +1718,8 @@ export async function createSecureAgent(opts = {}) {
     // Bilateral fix: when B receives A's HI, B auto-sends HI back.
     // Now A also knows B's pubKey + can encrypt OW.
     tx.on('envelope', async (env) => {
+      // the socket a peer last spoke to us on is where they are: the relay sweep tries it first (`relaySweep`)
+      if (typeof env?._from === 'string' && env._from) noteHeardOn(env._from, tx);
       // 2026-05-27 (DM cross-device debug) — log every inbound
       // envelope so we can see HI / chat-message deliveries on the
       // other phone's Metro log.  Top-level type + subtype identify
@@ -1966,12 +2014,14 @@ export async function createSecureAgent(opts = {}) {
     relayState.status = 'connecting';
     relayState.url    = relayUrl;
     try {
+      const box = {};
       const tx = new RelayTransport({
         identity,
         relayUrl,
         primaryDevice: () => primaryDevice() === true,
-        onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
+        onUndelivered: (info) => relayGaveUp(box.tx, info),
       });
+      box.tx = tx;
       makeReceiveHandler(tx);
       // A send made before this socket opened was HELD — nothing could carry it, and no peer event
       // would ever flush it (presence flushes are per peer, on THEIR inbound). The socket opening is the
@@ -2185,12 +2235,14 @@ export async function createSecureAgent(opts = {}) {
       if (awaitReady) await waitForSocket(have, relayReadyTimeoutMs);
       return relayEntry(url, have, false);
     }
+    const box = {};
     const tx = new RelayTransport({
       identity,
       relayUrl: url,
       primaryDevice: () => primaryDevice() === true,
-      onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
+      onUndelivered: (info) => relayGaveUp(box.tx, info),
     });
+    box.tx = tx;
     makeReceiveHandler(tx);                 // the secure receive wiring — same as the primary
     await tx.connect();                     // requests the socket; never blocks boot (see connectRelay)
     routing.addTransport(name, tx);
@@ -2211,7 +2263,7 @@ export async function createSecureAgent(opts = {}) {
       identity: socketIdentity,
       relayUrl: url,
       primaryDevice: () => false,
-      onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
+      onUndelivered: (info) => relayGaveUp(null, info),
     });
     makeReceiveHandler(tx);                 // inbound for the persona lands in this one agent
     // what the persona could not send while it had no socket goes out now, on this socket (`resendHeld` keeps a
@@ -2249,13 +2301,29 @@ export async function createSecureAgent(opts = {}) {
    *
    * So the send tries them, rather than picking one and hoping. See `_sendWithFailover`.
    */
-  function relaySweep() {
+  /**
+   * The relays a message that names no route is tried on, in order: the one the peer last spoke to us on first (where
+   * they are), then the primary, then the others as added. Without the first, a relay that holds the handshake already
+   * takes the message for a peer who is not on it (the handshake cache is shared between relays).
+   */
+  /** The transport this peer last spoke to us on: by the address sent to, else any address of the same peer (they may
+   *  speak from their canonical key and be sent to at a per-circle alias, or the other way round). Null: not heard. */
+  function heardFrom(addr) {
+    if (!addr) return null;
+    const direct = heardOn.get(addr);
+    if (direct) return direct;
+    for (const a of addressesOfIdentity(addr)) { const tx = heardOn.get(a); if (tx) return tx; }
+    return null;
+  }
+  function relaySweep(addr = null) {
     const out = [];
     if (relayTransport) out.push({ name: 'relay', transport: relayTransport });
     for (const [name, tx] of extraTransports) {
       if (name.startsWith(RELAY_NAME_PREFIX)) out.push({ name, transport: tx });
     }
-    return out.filter(({ transport }) => (typeof transport?.canReach !== 'function' || transport.canReach() !== false));
+    const theirs = heardFrom(addr);
+    const ordered = theirs ? [...out.filter((e) => e.transport === theirs), ...out.filter((e) => e.transport !== theirs)] : out;
+    return ordered.filter(({ transport }) => (typeof transport?.canReach !== 'function' || transport.canReach() !== false));
   }
 
   function listRelays({ identity: who = null } = {}) {
@@ -2721,15 +2789,17 @@ export async function createSecureAgent(opts = {}) {
     // DM between them went nowhere. Measured 2026-09-10: `{delivered: false, held: true}`, held on a
     // device that was connected to the right relay the whole time.
     //
-    // The sender cannot know which relay the recipient is on, so this TRIES them, primary first, and
-    // stops at the first that reports delivered. Not a fan: one delivery, no duplicate, and no envelope
-    // handed to a relay after the message has already arrived somewhere. A wrong relay costs one send
+    // The ORDER (`relaySweep`): the relay the peer last spoke to us on first, then the primary, then the others as added
+    // (a contact card does not carry the person's relays yet; what they last used is what this device knows).
+    // Every relay is tried ONCE (a relay's taking a message says nothing about the peer, and where they last spoke may no
+    // longer be theirs), never the primary again after the sweep; a relay they are not on keeps a copy until its TTL, and
+    // its give-up is not reported while another relay still holds one (`relayGaveUp`). A wrong relay costs one send
     // timeout, which is why the ordering will matter once a contact card carries the person's own relays
     // — then the first attempt is usually the right one and this becomes the fallback it should be.
     //
     // Only when NOTHING names a route: a scope with points is a route that is known, and it is used.
     const routeNamed = Array.isArray(opts?.scope?.points) && opts.scope.points.length > 0;
-    const sweep = routeNamed ? [] : relaySweep();
+    const sweep = routeNamed ? [] : relaySweep(addr);
     if (sweep.length > 1) {
       // ONE AT A TIME, and briefly.
       //
@@ -2743,6 +2813,8 @@ export async function createSecureAgent(opts = {}) {
       // Duplicates are handled where they arrive — the chat inbox dedupes on `msgId` (LRU, cap 256) and
       // the hold queue keys on `id:<msgId>` — so a message that does reach two relays lands once.
       let lastResult = null;
+      let went = null;
+      const tookIt = new Set();
       for (let k = 0; k < sweep.length; k++) {
         const { name, transport } = sweep[k];
         const last = k === sweep.length - 1;
@@ -2754,8 +2826,26 @@ export async function createSecureAgent(opts = {}) {
           if (isApplicationError(err)) throw err;   // a refusal is a refusal on every relay
           lastErr = err; continue;
         }
-        if (res?.delivered) { routeTaken(opts, transport, name); return res; }
-        lastResult = res ?? lastResult;
+        // WENT OUT: a relay's one-way send answers nothing when the envelope left (it throws when it did not), so a send
+        // that did not throw and does not say `delivered: false` or `held` was taken. Reading only `delivered` never saw
+        // a success: it sent on every relay whose handshake passed and then on the primary AGAIN, which kept a copy for
+        // someone not on it and later said 'did not arrive' about a message that had arrived.
+        if (res == null || (res.delivered !== false && res.held !== true)) {
+          // a relay takes a message for anyone (and the handshake cache is shared between relays, so its handshake proves
+          // nothing), and the relay the peer last spoke on may no longer be theirs: every relay is tried once, the heard
+          // one first; never the primary again after the sweep
+          went ??= { res, transport, name };
+          tookIt.add(transport);
+          continue;
+        }
+        lastResult = res;
+      }
+      if (went) {
+        // which relays hold a copy: a give-up from one of them is not a 'did not arrive' while another still holds it
+        const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+        if (msgId != null && tookIt.size > 1) noteSweptCopies(msgId, tookIt);
+        routeTaken(opts, went.transport, went.name);
+        return went.res;
       }
       // Nobody acked: the peer is offline, or on a relay this device does not hold. The hold-forward
       // queue already has it — once, by message id — so reporting that is more honest than falling

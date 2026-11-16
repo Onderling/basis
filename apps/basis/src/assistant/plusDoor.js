@@ -42,11 +42,14 @@ export function plusNoModelAnswer({ t }) {
 
 /**
  * The line at the top of the conversation: which route answers, and whether it is confidential (`ownRouteOf`).
- * @param {{set: boolean, confidential: boolean, host: string|null}} route  @param {{t: Function}} o
+ * @param {{set: boolean, kind: string, confidential: boolean, host: string|null}} route  @param {{t: Function}} o
  */
 export function plusRouteLine(route, { t }) {
   if (!route?.set) return t('circle.vandaag.plus_route_none');
-  return route.confidential ? t('circle.vandaag.plus_route_confidential') : t('circle.vandaag.plus_route_plain', { host: route.host ?? '' });
+  if (route.kind === 'confidential') return t('circle.vandaag.plus_route_confidential');
+  // a model the person runs themselves: the most private route, never called "not confidential"
+  if (route.kind === 'local') return t('circle.vandaag.plus_route_local', { host: route.host ?? '' });
+  return t('circle.vandaag.plus_route_plain', { host: route.host ?? '' });
 }
 
 /**

@@ -30,7 +30,7 @@ describe('no own model', () => {
   it('the way to the setting is in both languages, from the screens\' own labels', () => {
     for (const bundle of [nl, en]) {
       for (const k of ['circle.vandaag.plus_no_model', 'circle.vandaag.plus_model_unreachable', 'circle.vandaag.plus_route_none',
-        'circle.vandaag.plus_route_confidential', 'circle.vandaag.plus_route_plain',
+        'circle.vandaag.plus_route_confidential', 'circle.vandaag.plus_route_plain', 'circle.vandaag.plus_route_local',
         'circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title']) {
         expect(textOf(bundle, k), k).toBeTruthy();
       }
@@ -48,13 +48,34 @@ it('the own model could not be reached: it says so, not "could not read"', async
 });
 
 describe('the route line at the top of the conversation', () => {
-  it('none set; a confidential route the guard accepts; a plain route named by its host', () => {
+  it('three kinds: none set; a model the person runs (local, named by its host); confidential; a plain cloud route', () => {
     expect(plusRouteLine(ownRouteOf(null), { t })).toContain('plus_route_none');
-    expect(plusRouteLine(ownRouteOf({ preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434' }), { t })).toMatch(/plus_route_plain.*127\.0\.0\.1/);
+    expect(plusRouteLine(ownRouteOf({ preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434' }), { t })).toMatch(/plus_route_local.*127\.0\.0\.1/);
     expect(plusRouteLine(ownRouteOf({ preset: 'confidential-proxy', llmBaseUrl: 'http://127.0.0.1:8080' }), { t })).toContain('plus_route_confidential');
+    expect(plusRouteLine(ownRouteOf({ preset: 'openai-compatible', llmBaseUrl: 'https://api.example.org/v1' }), { t })).toMatch(/plus_route_plain.*api\.example\.org/);
   });
-  it('a "confidential" preset the guard refuses is never called confidential', () => {
+  it('a "confidential" preset the guard refuses is never called confidential (it is no route)', () => {
     const r = ownRouteOf({ preset: 'confidential-proxy', llmBaseUrl: 'https://example.org' });
     expect(plusRouteLine(r, { t })).not.toContain('plus_route_confidential');
+  });
+  it('ONE rule: the line\'s "confidential" is the runtime\'s (the one the help bot words), for every preset', async () => {
+    const { buildUserLlmRuntime } = await import('../../src/v2/userLlmRuntime.js');
+    const { CIRCLE_LLM_ROUTE_PRESETS } = await import('../../src/v2/circleLlmRoutes.js');
+    const urls = ['http://127.0.0.1:11434', 'https://example.org/v1'];
+    for (const preset of Object.keys(CIRCLE_LLM_ROUTE_PRESETS)) {
+      for (const llmBaseUrl of urls) {
+        for (const attestation of [false, true]) {
+          const cfg = { preset, llmBaseUrl, attestation };
+          let runtime = null;
+          try { runtime = buildUserLlmRuntime(cfg, { env: {} }); } catch { runtime = null; }
+          const route = ownRouteOf(cfg);
+          expect(route.confidential, `${preset} ${llmBaseUrl} attested=${attestation}`).toBe(Boolean(route.set && runtime?.confidential));
+        }
+      }
+    }
+  });
+  it('a remote confidential route whose attestation the person asserts with the flag is called confidential, as the help bot calls it', () => {
+    const r = ownRouteOf({ preset: 'confidential-proxy', llmBaseUrl: 'https://enclave.example.org/v1', attestation: true });
+    expect(plusRouteLine(r, { t })).toContain('plus_route_confidential');
   });
 });

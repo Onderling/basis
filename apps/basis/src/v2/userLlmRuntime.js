@@ -134,14 +134,24 @@ export function ownModelOf(userCfg) {
 
 /**
  * What the person's OWN route is, for saying it plainly (the line at the top of the "+" conversation): whether one is
- * set (a model the "+" can ask), whether it is CONFIDENTIAL (a confidential preset the route guard accepts; a refused one
- * is no route at all), and the host it goes to.
+ * set (a model the "+" can ask), its KIND, and the host it goes to. ONE rule for confidentiality: the runtime's own
+ * answer (`buildUserLlmRuntime(...).confidential`, the one the help bot words), never a second reading of the preset.
+ *   local         the preset's mode is local: a model the person runs themselves (named by its host)
+ *   confidential  the runtime calls the route confidential (a confidential preset the route guard accepts; a remote one
+ *                 counts when the person asserts its attestation with the setting's flag, as the help bot counts it)
+ *   cloud         any other route: not confidential
+ * A route the guard refuses is no route at all.
  * @param {object|null} userCfg  the saved setting
- * @returns {{set: boolean, confidential: boolean, host: string|null}}
+ * @returns {{set: boolean, kind: 'none'|'local'|'confidential'|'cloud', confidential: boolean, host: string|null}}
  */
 export function ownRouteOf(userCfg) {
-  const set = ownModelOf(userCfg) != null;
+  const none = { set: false, kind: 'none', confidential: false, host: null };
+  if (ownModelOf(userCfg) == null) return none;
+  let runtime;
+  try { runtime = buildUserLlmRuntime(userCfg, { env: {} }); } catch { return none; }
   let host = null;
   try { host = userCfg?.llmBaseUrl ? new URL(userCfg.llmBaseUrl).host : null; } catch { host = null; }
-  return { set, confidential: set && userCfg?.preset === 'confidential-proxy' && validateUserLlmConfig(userCfg) == null, host: set ? host : null };
+  const confidential = runtime.confidential === true;
+  const kind = confidential ? 'confidential' : runtime.mode === 'local' ? 'local' : 'cloud';
+  return { set: true, kind, confidential, host };
 }

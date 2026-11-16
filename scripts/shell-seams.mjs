@@ -296,7 +296,9 @@ export const SEAMS = Object.freeze([
   // `createPlusThread`: the line heard, the read run, what it answered kept as the bot's own turn entries). A shell that
   // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already
   // keeps the same turns through `botThreads` (the Telegram thread), so it is not a shell of this seam.
-  { id: 'plus-kept-thread', pattern: /plusThread(Now\(\))?\.exchange\(/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
+  // (since the shared "+" door, the door keeps each exchange in the conversation of the self it is read as: a shell composes
+  // the door with the device's bot threads)
+  { id: 'plus-kept-thread', pattern: /createPlusDoor\(\{[^}]*threads:/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
   // THE "+" READS THE TICKED SELF'S OWN LISTS FIRST (`plusLineOutcome`'s `own`, read AS that self), and answers what a
   // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself

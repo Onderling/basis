@@ -4746,12 +4746,16 @@ function showVandaagPlus({ edit = null } = {}) {
   // an own row is changed as the self that made it (the row says which); something new as the ticked self
   let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
-  const call = async (op) => {
-    // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-    const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
-    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+  // a self's key: the general self's chat key, a persona's webid (what its rows are made by)
+  const selfKeyOf = (id) => (!id || id === 'default' ? (circleHouseholdAgent?.identity?.chat?.pubKey ?? null) : (_selfSet.held.find((p) => p.id === id)?.webid ?? null));
+  // a call AS one self (the waist's actAs): it rides that self's own lane; the default needs no saying
+  const callAs = (id) => (app, opId, args) => {
+    const actAs = id && id !== 'default' ? (_selfSet.held.find((p) => p.id === id)?.webid ?? null) : null;
+    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(app, opId, args, { actAs }) : rawCallSkill(app, opId, args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // made AS the ticked self
+  const call = async (op) => callAs(asSelf)(op.app, op.opId, op.args);
   // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
   // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
   const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
@@ -4774,15 +4778,15 @@ function showVandaagPlus({ edit = null } = {}) {
     paint();
     return { error, done };
   };
-  // the person's own "+" door, composed for this open: their own model as it is set now, this thread, these circles
+  // the person's own "+" door, composed for this open: their own model as it is set now, these circles; the conversation
+  // follows the self the "+" writes as (its thread, its memory, what it reads, its Forget: `selfKeyOf`, `readAs`)
   let _door = null;
   const plusDoorNow = () => {
-    const th = plusThreadNow();
-    if (!_door || _door.threadId !== th.threadId) {
-      _door = createPlusDoor({ llm: th.threadId ? circleOwnModel() : null, threads: th.threads, threadId: th.threadId,
+    if (!_door) {
+      const th = plusThreadNow();
+      _door = createPlusDoor({ llm: selfKeyOf('default') ? circleOwnModel() : null, threads: th.threads, selfKeyOf, readAs: callAs,
         householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
         circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId) => runInCircle(command, circleId) });
-      _door.threadId = th.threadId;
     }
     return _door;
   };
@@ -4791,10 +4795,10 @@ function showVandaagPlus({ edit = null } = {}) {
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
-    turns: plusThreadNow().turns(),
+    turns: asSelf ? plusDoorNow().turns({ asSelf }) : [],
     suggestFor: (typed) => plusSuggest(suggestionPool, typed),
     // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
-    onForget: async () => { await plusDoorNow().forget(); paint(); },
+    onForget: async () => { await plusDoorNow().forget({ asSelf }); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
@@ -4830,6 +4834,8 @@ function showVandaagPlus({ edit = null } = {}) {
       // the ONE "+" door (shared with the phone): help, then the plain reading, then the person's own model through the
       // assistant engine; the line and what it answered are kept in the thread
       const r = await plusDoorNow().read(text, { asSelf });
+      // several selves ticked and none picked: the sheet shows the choice (it does already); nothing was read
+      if (r?.askSelf) { error = null; paint(); return; }
       if (r?.card) { circleCard = r.card; error = null; }
       else if (r?.actId) { actId = r.actId; values = { ...values, ...(r.values ?? {}) }; error = null; }
       else if (r?.done) { done = r.done; error = null; }
@@ -4840,7 +4846,7 @@ function showVandaagPlus({ edit = null } = {}) {
       const card = circleCard; circleCard = null;
       if (!card) return;
       // the pick on the card: no new line, the run's answer kept (the same shared exchange)
-      await plusThreadNow().exchange(null, async () => { await runInCircle(card.command, circleId); return { error, done }; }, { t });
+      await plusDoorNow().exchange({ asSelf }, async () => { await runInCircle(card.command, circleId); return { error, done }; });
       paint();
     },
     onCircleCancel: () => { circleCard = null; error = null; paint(); },

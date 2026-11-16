@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createPlusDoor, availableOnly, ownPlaceApps } from '../../src/assistant/plusDoor.js';
+import { encodeGenericOpId } from '@onderling/app-manifest';
 import { listsManifest as LISTS } from '../../../lists/manifest.js';
 import { EventLog } from '../../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
@@ -168,7 +169,7 @@ describe('a noun people write is PROPOSED in the own place, never written by the
     const { encodeGenericOpId } = await import('@onderling/app-manifest');
     const { d, callSkill } = door({ interpret: async () => ({ opId: encodeGenericOpId('household', 'add', 'note'), args: { body: 'de sleutel ligt bij de buren' } }) });
     const r = await d.read('kun je onthouden waar de sleutel is? bij de buren');
-    expect(r).toEqual({ actId: 'household.note', values: { body: 'de sleutel ligt bij de buren' } });
+    expect(r).toEqual({ actId: 'household.note', values: { body: 'de sleutel ligt bij de buren' }, asSelf: 'default' });
     expect(callSkill).not.toHaveBeenCalled();
   });
 });
@@ -201,4 +202,61 @@ describe('the assistant reads the person\'s own things, as the ticked self (jour
     await d.read('waar ligt de sleutel?', { asSelf: 'werk' });
     expect(context).not.toContain('sleutel');
   });
+});
+
+describe('the conversation follows the ticked self (D8), or a set of selves with a primary (D9)', () => {
+  const selfKeyOf = (id) => ({ default: 'me-key', werk: 'werk-key', thuis: 'thuis-key' })[id] ?? null;
+  const notesOf = { 'me-key': 'de sleutel ligt bij de buren', 'werk-key': 'het wachtwoord van de printer' };
+  const readAs = (asSelf) => async (app) => (app === 'household'
+    ? { items: Object.entries(notesOf).map(([by, body], i) => ({ id: `n${i}`, body, createdBy: by })) }
+    : { items: [] });
+  const make = (interpret, threads = threadsOf()) => ({ threads, ...door({ interpret, threads, readAs, selfKeyOf, threadId: undefined }) });
+
+  it('each self has its own thread: what was said as Werk is not the general self\'s memory', async () => {
+    const histories = [];
+    const { d } = make(async (_t, o) => { histories.push((o.history ?? []).map((m) => m.content).join(' ')); return { reply: 'ok' }; });
+    await d.read('iets over werk', { asSelf: 'werk' });
+    await d.read('en nu?', { asSelf: 'default' });
+    expect(histories[1]).not.toContain('iets over werk');
+    await d.read('en verder?', { asSelf: 'werk' });
+    expect(histories[2]).toContain('iets over werk');
+  });
+  it('several selves ticked and none picked: the "+" asks which one; nothing reaches a model', async () => {
+    const interpret = vi.fn(async () => ({ reply: 'x' }));
+    const { d } = make(interpret);
+    const r = await d.read('wat kan je?', { selves: ['default', 'werk'] });
+    expect(r.askSelf).toBe(true);
+    expect(interpret).not.toHaveBeenCalled();
+  });
+  it('combined: the set\'s rows are read (union), the thread is the SET\'s, and a proposal is made as the primary', async () => {
+    let context = null;
+    const { d, threads } = make(async (_t, o) => { context = JSON.stringify(o.context ?? []); return { opId: encodeGenericOpId('household', 'add', 'note'), args: { body: 'iets' } }; });
+    const r = await d.read('onthoud iets, de sleutel en de printer', { selves: ['werk', 'default'], asSelf: 'default' });
+    expect(context).toContain('sleutel');
+    expect(context).toContain('printer');
+    expect(r).toMatchObject({ actId: 'household.note', asSelf: 'default' });
+    const combined = d.threadIdFor(['default', 'werk']);
+    expect(combined).toBe(d.threadIdFor(['werk', 'default']));
+    expect(combined).not.toBe(d.threadIdFor(['default']));
+    expect(combined).toMatch(/combined/);
+    expect(threads.memory.recent(combined).length).toBeGreaterThan(0);
+    expect(threads.memory.recent(d.threadIdFor(['default']))).toEqual([]);
+  });
+  it('Forget empties only the conversation it is asked for', async () => {
+    const { d, threads } = make(async () => ({ reply: 'ok' }));
+    await d.read('een', { asSelf: 'werk' });
+    await d.read('twee', { asSelf: 'default' });
+    await d.forget({ selves: ['werk'] });
+    expect(threads.memory.recent(d.threadIdFor(['werk']))).toEqual([]);
+    expect(threads.memory.recent(d.threadIdFor(['default'])).length).toBeGreaterThan(0);
+  });
+});
+
+it('the pick on the which-circle card is kept in the conversation of the self it was made as', async () => {
+  const threads = threadsOf();
+  const selfKeyOf = (id) => ({ default: 'me-key', werk: 'werk-key' })[id];
+  const { d } = door({ threads, selfKeyOf, threadId: undefined });
+  await d.exchange({ asSelf: 'werk' }, async () => ({ done: 'melk staat op Projecten' }));
+  expect(threads.memory.recent(d.threadIdFor(['werk'])).join(' ')).toContain('melk staat op Projecten');
+  expect(threads.memory.recent(d.threadIdFor(['default']))).toEqual([]);
 });

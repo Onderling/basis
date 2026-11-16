@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { answerHelp, likelyHelpTopics } from '../../src/v2/help/helpAnswer.js';
 import { helpTopicChips, parseHelpAction, HELP_ALL_ACTION } from '../../src/v2/helpChat.js';
-import { helpDeck } from '../../src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../src/v2/help/helpCards.js';   // every reader's deck: the site's cards + the app's
 
 // Walk row 81: Help, asked "hoe maak ik een kring?" and "is dit veilig?" in an app set to English, answered each time
 // with ~30 English topic buttons. The matcher knew both questions, in Dutch: it only looked in the app's language. A

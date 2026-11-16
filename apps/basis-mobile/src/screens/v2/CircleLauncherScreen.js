@@ -177,7 +177,7 @@ import {
 // #38 — the DEDICATED help-answer LLM path (shared with web): a freeform layer-2 ask is ANSWERED, grounded
 // in the kaartjes, instead of routed through the tool-selection prompt (→ null → fallback).
 import { answerHelpViaLlm } from '../../../../basis/src/v2/help/helpLlm.js';
-import { helpDeck } from '../../../../basis/src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../../../basis/src/v2/help/helpCards.js';   // the site's cards + the app's how-to cards
 // OBJ-2 membership — reuse the classic RN join wizard + the camera scanner + the shared invite glue.
 import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWizardModal.js';
 import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';

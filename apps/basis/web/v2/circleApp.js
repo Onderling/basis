@@ -311,7 +311,7 @@ import { routeHelpMessage, helpTopicChips, resolveHelpTopic, parseHelpAction, he
 // #38 — the DEDICATED help-answer LLM path: a freeform layer-2 ask is ANSWERED (grounded in the kaartjes),
 // not routed through the tool-selection prompt (which maps a help question to no op → null → fallback).
 import { answerHelpViaLlm } from '../../src/v2/help/helpLlm.js';
-import { helpDeck } from '../../src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../src/v2/help/helpCards.js';   // the site's cards + the app's how-to cards
 import { resolveCircleLlm } from '../../src/v2/llmPicker.js';
 // Task #13 Phase 2 — the onboarding "Ja, help me" handoff opens the RICH 5-step create wizard.
 import { renderCreateGroupWizard } from '../../src/web/wizards/createGroupWizard.js';

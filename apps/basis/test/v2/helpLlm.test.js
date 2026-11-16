@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { answerHelpViaLlm, HELP_ANSWER_SYSTEM } from '../../src/v2/help/helpLlm.js';
 import { rankHelpCards } from '../../src/v2/help/helpAnswer.js';
 import { helpLlmLabelKeys } from '../../src/v2/helpChat.js';
-import { helpDeck } from '../../src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../src/v2/help/helpCards.js';   // every reader's deck: the site's cards + the app's
 
 // A fake @onderling/llm-client: records the last invoke() request and returns a scripted reply.
 function fakeClient(reply, sink = {}) {

@@ -288,8 +288,9 @@ import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
+import { createPlusDoor } from '../../../../basis/src/v2/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
@@ -2213,6 +2214,12 @@ export default function CircleLauncherScreen({
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plusOpen]);
+  // the person's own "+" door (web twin: circleApp.js plusDoorNow): their own model as set now, this thread, these
+  // circles; composed per read (the conversation lives in the thread, so nothing is lost between reads)
+  const plusDoorNow = () => createPlusDoor({
+    llm: plusThread?.threadId ? ownModelOf(userLlmCfg) : null, memory: plusThread?.memory ?? null, threadId: plusThread?.threadId ?? null,
+    t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
+  });
   // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
   const plusRecorded = async (line, run) => {
     const r = plusThread ? await plusThread.exchange(line, run, { t }) : await run();
@@ -2250,15 +2257,13 @@ export default function CircleLauncherScreen({
         turns={plusTurns}
         onForget={plusThread ? () => { plusThread.forget(); setPlusTurnsTick((n) => n + 1); } : null}
         suggestFor={(typed) => plusSuggest(plusPool, typed)}
-        onRead={(line, asSelf) => plusRecorded(line, async () => {
-          const list = await plusCircles();
-          const o = plusLineOutcome(line, { circles: list, own: { lists: await plusOwnListsOf(asSelf) }, lang: lang() });
-          // help ("help", "?", a how-to question a help card knows): answered in the thread (web twin)
-          if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
-          if (o?.kind === 'circle' && o.atOnce) return plusRunInCircle(o.command, o.circleId, asSelf);
-          if (o?.kind === 'circle') return { card: { line, to: o.to, command: o.command } };
-          return (o?.kind === 'own' ? o : null) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') };
-        })}
+        onRead={async (line, asSelf) => {
+          // the ONE "+" door (shared with web): help, then the plain reading, then the person's own model through the
+          // assistant engine; it keeps the line and what it answered in the thread
+          const r = await plusDoorNow().read(line, { asSelf });
+          setPlusTurnsTick((n) => n + 1);
+          return r;
+        }}
         onCircleRun={(card, circleId, asSelf) => plusRecorded(null, () => plusRunInCircle(card?.command, circleId, asSelf))}
         shareTargets={plusShareList}
         onShare={plusEdit ? async (actId, contact) => {

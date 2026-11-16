@@ -131,3 +131,17 @@ export function ownModelOf(userCfg) {
   try { return ownModelClient({ userCfg, providers: buildUserLlmRuntime(userCfg, { env: {} }).llmProviders }); } catch { return null; }
 }
 
+
+/**
+ * What the person's OWN route is, for saying it plainly (the line at the top of the "+" conversation): whether one is
+ * set (a model the "+" can ask), whether it is CONFIDENTIAL (a confidential preset the route guard accepts; a refused one
+ * is no route at all), and the host it goes to.
+ * @param {object|null} userCfg  the saved setting
+ * @returns {{set: boolean, confidential: boolean, host: string|null}}
+ */
+export function ownRouteOf(userCfg) {
+  const set = ownModelOf(userCfg) != null;
+  let host = null;
+  try { host = userCfg?.llmBaseUrl ? new URL(userCfg.llmBaseUrl).host : null; } catch { host = null; }
+  return { set, confidential: set && userCfg?.preset === 'confidential-proxy' && validateUserLlmConfig(userCfg) == null, host: set ? host : null };
+}

@@ -1578,6 +1578,26 @@
       "text": "Dat kon ik niet lezen.",
       "doc": "The free line could not be read: the person fills the fields."
     },
+    "plus_no_model": {
+      "text": "Er is geen eigen model ingesteld. Zonder model werken de vaste woorden (zoals \"zet melk op Boodschappen\" of \"notitie: ...\"), de knoppen hieronder en \"help\". Een model instellen: {{path}}.",
+      "doc": "The \"+\" with NO own model set, for a line the plain reading did not take: no model is set, what works without one, and the way to the setting ({{path}}: the screens' own labels joined by arrows)."
+    },
+    "plus_model_unreachable": {
+      "text": "Je eigen model is nu niet bereikbaar. Probeer het straks opnieuw; de vaste woorden en de knoppen werken wel.",
+      "doc": "The \"+\": the person's own model is set but could not be reached for this line."
+    },
+    "plus_route_none": {
+      "text": "Geen eigen model ingesteld: de vaste woorden en de knoppen werken.",
+      "doc": "The line at the top of the \"+\" conversation when no own model is set."
+    },
+    "plus_route_confidential": {
+      "text": "Je eigen model antwoordt, vertrouwelijk.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is confidential (a confidential preset the route guard accepts)."
+    },
+    "plus_route_plain": {
+      "text": "Je eigen model antwoordt via {{host}}. Dat is niet vertrouwelijk.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is NOT confidential; {{host}} is where it goes."
+    },
     "plus_forget": {
       "text": "Vergeet dit gesprek",
       "doc": "The \"+\" sheet: empty the kept conversation with the assistant now (what it made stays)."

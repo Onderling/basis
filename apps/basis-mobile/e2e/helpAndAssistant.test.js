@@ -12,14 +12,6 @@ describe('Help from Settings, the assistant from Me, on the phone', () => {
     await firstBoot();
   });
 
-  it('Me → Assistant opens the "+" conversation', async () => {
-    await tapSoon(by.id('circle-tab-mij'));
-    await tapSoon(by.id('profile-assistant'), 30_000);
-    await soon(by.id('vandaag-plus-line'), 20_000);
-    await device.takeScreenshot('help-01-assistant');
-    await tapSoon(by.id('vandaag-plus-close'));
-  });
-
   it('Settings → Help opens the Help circle', async () => {
     await backToLauncher();
     await tapSoon(by.id('circle-tab-mij'));

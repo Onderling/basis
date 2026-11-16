@@ -7,9 +7,9 @@ import { validateManifest } from '@onderling/app-manifest';
 import { meActionsFor, meActionsMobile } from '../../src/v2/meActionProjection.js';
 
 describe("Me's actions come from the manifest", () => {
-  it('the basis manifest declares share-contact, scan and the assistant, and stays valid', () => {
+  it('the basis manifest declares share-contact and scan, and stays valid', () => {
     expect((validateManifest(basisManifest).errors ?? []).filter((e) => String(e.path).startsWith('/meActions'))).toEqual([]);
-    expect(meActionsFor(basisManifest).map((a) => a.id)).toEqual(['share-contact', 'scan', 'assistant']);
+    expect(meActionsFor(basisManifest).map((a) => a.id)).toEqual(['share-contact', 'scan']);
     expect(meActionsMobile(basisManifest)).toEqual(meActionsFor(basisManifest));
   });
   it('share-contact goes to the existing share view; scan IS the scanQr op (one door with /scan-qr)', () => {
@@ -17,7 +17,7 @@ describe("Me's actions come from the manifest", () => {
     expect(share.target).toEqual({ kind: 'nav', to: 'shareContact' });
     expect(scan.target).toEqual({ kind: 'op', opId: 'scanQr' });
   });
-  it('the assistant opens the person\'s ongoing conversation (the "+" sheet), a view no op backs', () => {
-    expect(meActionsFor(basisManifest).find((a) => a.id === 'assistant')?.target).toEqual({ kind: 'nav', to: 'assistant' });
+  it('the "+" is not a Me action: its button is the one way into the conversation (Frits 2026-11-16)', () => {
+    expect(meActionsFor(basisManifest).some((a) => a.id === 'assistant' || a.target?.to === 'assistant')).toBe(false);
   });
 });

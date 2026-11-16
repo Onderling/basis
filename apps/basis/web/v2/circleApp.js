@@ -4688,8 +4688,6 @@ let _pendingPinOpen = null;
 function runMeAction(id) {
   if (id === 'share-contact') { showShareMyContact(); return; }
   if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
-  // the person's ongoing conversation with the assistant: the "+" sheet
-  if (id === 'assistant') { showVandaagPlus(); }
 }
 
 /** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */

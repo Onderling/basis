@@ -9,17 +9,15 @@ import { test, expect } from '@playwright/test';
 
 test.setTimeout(90_000);
 
-test('Settings → Help opens the Help circle; Me → Assistant opens the "+" conversation', async ({ page }) => {
+test('Settings → Help opens the Help circle; Me has no second door to the "+"', async ({ page }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
-  // Me → Assistant: the "+" sheet opens (its line is there to type in)
+  // Me has no Assistant door: the "+" button is the one way into the conversation (Frits 2026-11-16)
   await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__assistant').click();
-  await expect(page.locator('.circle-vandaag-plus__line'), 'the assistant conversation opened').toBeVisible({ timeout: 10_000 });
-  await page.locator('.circle-vandaag-plus__close').click();
+  await expect(page.locator('.cc-profile__assistant')).toHaveCount(0);
 
   // Settings → Help: the Help circle opens (its conversation, where the bot answers)
   await page.locator('[data-tab="mij"]').first().click();

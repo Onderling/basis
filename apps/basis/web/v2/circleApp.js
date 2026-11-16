@@ -4863,6 +4863,8 @@ function showVandaagPlus({ edit = null } = {}) {
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
       // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
       if (!editId) actionFrequency.bump(OWN_USAGE_SCOPE, id);
+      // a form the "+" opened from a line: the conversation says it was saved
+      if (!editId) await plusDoorNow().settled({ asSelf }, { saved: true, actId: id }).catch(() => null);
       // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
       const follow = editId ? null : plusFollowUp(_screensBook, id);
       if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
@@ -4882,7 +4884,8 @@ function showVandaagPlus({ edit = null } = {}) {
       if (r?.ok === false) { error = r.error ?? t('circle.vandaag.plus_failed', { error: '' }); paint(); return; }
       close(); _showVandaag();
     } : null,
-    onClose: () => close(),
+    // closing with a form the "+" opened from a line still unsaved: refused, nothing stored, and the conversation says so
+    onClose: () => { if (actId && !editId) plusDoorNow().settled({ asSelf }, { saved: false }).catch(() => null); close(); },
   });
   paint();
   refreshPins().catch(() => {});

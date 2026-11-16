@@ -25,9 +25,10 @@ import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
-import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine } from '../v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
+import { circleGateRules } from '../v2/circleGate.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
 
 /**
@@ -213,8 +214,14 @@ export function createPlusDoor({
   // What this turn came to: set by the engine's sinks while the turn runs (the lane runs one turn at a time).
   let outcome = null;
   let currentLine = '';
+  // The deterministic gate reads only what this door offers: a household rule that builds a circle's op ("zet X …" as a
+  // list entry or a task) is no reading here, so the line goes on to the model, never to "I could not read that"
+  const offeredHere = (c) => Boolean(c?.opId) && (DOOR_OP_IDS.has(c.opId)
+    || acts.some((a) => a.opId === c.opId && (!c.appOrigin || c.appOrigin === a.appOrigin)) || Boolean(entryOf(c.opId)));
+  const gateRules = circleGateRules(lang).map((r) => (typeof r.command !== 'function' ? r
+    : { ...r, command: (text, ctx) => { const c = r.command(text, ctx); return offeredHere(c) ? c : null; } }));
   const engine = createAssistantEngine({
-    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false,
+    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules,
     // what the model may read for a line: the person's own things only, and only the ticked self's (or the set's)
     ...(typeof readAs === 'function'
       ? { loadItems: async (ctx) => {
@@ -317,6 +324,25 @@ export function createPlusDoor({
       const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, t });
       if (memory && thread && said) memory.remember(thread, 'assistant', said);
       return r;
+    },
+    /**
+     * The form the "+" opened is settled: saved, or closed without saving. Said in THIS conversation only when its last
+     * turn is that form (the act's label, what `read` kept when it opened); so a refused proposal is said once, and a
+     * form the "+" did not open from a line says nothing. Read from the thread, not from the door: the phone composes a
+     * door per call. Returns what was said, or null.
+     * @param {{asSelf?: string|null, selves?: string[]|null}} opts
+     * @param {{saved: boolean, actId?: string|null}} how
+     */
+    async settled(opts = {}, { saved = false, actId = null } = {}) {
+      const thread = threadIdFor(setOf(opts).set);
+      if (!memory || !thread || typeof memory.turns !== 'function') return null;
+      const last = memory.turns(thread, 1).at(-1);
+      if (last?.who !== 'assistant') return null;
+      const act = PLUS_ACTS.find((a) => (actId ? a.id === actId : true) && plusLabel(t, a) === last.text);
+      if (!act) return null;
+      const said = t(saved ? 'circle.vandaag.plus_act_saved' : 'circle.vandaag.plus_act_not_saved', { act: plusLabel(t, act) });
+      memory.remember(thread, 'assistant', said);
+      return said;
     },
     catalogue: cat,
     threadIdFor,

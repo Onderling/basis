@@ -378,6 +378,7 @@
     "calendar": ["appointment", "appointments", "agenda", "calendar", "dentist", "doctor", "birthday", "party", "invite", "invitation", "come", "coming", "move", "reschedule", "cancel", "plan", "planned"],
     "tasks": ["who does", "who is doing", "does", "doing", "task", "tasks", "chore", "chores", "open", "still open", "i'll take", "i'll do", "my chores", "must", "finished", "claim"]
   },
+  "_refers": { "doc": "Words that point back at something said before (\"zet DAT morgen in mijn agenda\"), and the words around them in such a request (`around`). A line the \"+\" would read as an appointment by its day alone, holding a pointing word and nothing else but `around` words, is not read by the fixed phrases: only the person's own model, which has the previous turns, knows what it points at. \"onthoud dat de vuilnis dinsdag buiten gaat\" still reads (it says what). Articles that also point (\"het\", \"die\") are left out of `words`.", "words": ["that", "this", "it", "those", "these"], "around": ["put", "add", "plan", "in", "on", "into", "to", "my", "the", "calendar", "agenda", "diary", "also", "just"] },
   "_help": {
     "doc": "Whole lines that ask the assistant for help (\"help\", \"?\"): it answers with what it can do. Read whole, case and trailing punctuation aside; a person may write either language. `questions`: how a line OPENS when it asks how something works (\"hoe …\"): only such a line is looked up in the help cards (their matcher alone hits ordinary lines on a keyword).",
     "words": [

@@ -303,6 +303,9 @@ export const SEAMS = Object.freeze([
   // out, says something else about where the person's words go. The box's door has its own route line.
   { id: 'plus-route-line', pattern: /plusRouteLine\(/, shells: ['web', 'mobile'], why: 'the "+" names the route that answers and whether it is confidential' },
   { id: 'plus-kept-thread', pattern: /createPlusDoor\(\{[^}]*threads:/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
+  // A FORM THE "+" OPENED IS SETTLED IN THE CONVERSATION (`settled` on the door): saved, or closed without saving (a
+  // refused proposal: nothing stored, and the thread says so). Both sheets call it from Save and from closing.
+  { id: 'plus-form-settled', pattern: /\.settled\(/, shells: ['web', 'mobile'], why: 'a form the "+" opened from a line is said in the conversation once it is saved or closed unsaved' },
   // THE "+" READS THE TICKED SELF'S OWN LISTS FIRST (`plusLineOutcome`'s `own`, read AS that self), and answers what a
   // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself

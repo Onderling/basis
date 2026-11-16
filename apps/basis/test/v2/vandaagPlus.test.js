@@ -121,6 +121,15 @@ describe('Vandaag — the free line at the top of the sheet', () => {
     expect(plusRead('ooit eens iets')).toBe(null);
     expect(plusRead('  ')).toBe(null);
   });
+  it('a line that only POINTS back ("zet dat morgen om 10 in mijn agenda") is not read: only a model with the turns knows what', () => {
+    expect(plusRead('zet dat morgen om 10 in mijn agenda')).toBe(null);
+    expect(plusRead('put that in my calendar tomorrow at 10')).toBe(null);
+    // an article that also points opens an ordinary title; an act word still names its act
+    expect(plusRead('het etentje morgen om 7')?.values?.title).toBe('het etentje');
+    expect(plusRead('afspraak morgen 14:00 dat ding')?.actId).toBe('calendar.calendar-event');
+    // "dat" joining a clause that says what: still read (the line says something of its own)
+    expect(plusRead('onthoud dat de vuilnis dinsdag buiten gaat')).not.toBe(null);
+  });
   it('a day without a time keeps the day and fills in NO time: the form asks for it (no 09:00 nobody said)', () => {
     const a = plusRead('afspraak morgen tandarts');
     expect(a.actId).toBe('calendar.calendar-event');

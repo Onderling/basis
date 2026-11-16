@@ -205,6 +205,77 @@ describe('the assistant reads the person\'s own things, as the ticked self (jour
     await d.read('waar ligt de sleutel?', { asSelf: 'werk' });
     expect(context).not.toContain('sleutel');
   });
+
+  // a read the model picks before an act: run as the self, handed back to it once, and the act it then picks opens filled
+  it('a read the model picks first is looked at as the self and handed back once; the act it then picks opens filled', async () => {
+    const asked = [];
+    // only the peek's read answers 'controle': retrieval never asks searchEvents, so the second ask can only have it from the peek
+    const readAs = vi.fn((asSelf) => async (app, opId, args) => (opId === 'searchEvents'
+      ? { items: [{ id: 'e9', title: 'controle bij de tandarts', when: '2026-11-20T10:00' }] }
+      : ownRoutes(asSelf)(app, opId, args)));
+    const interpret = vi.fn(async (_text, o) => {
+      asked.push(JSON.stringify(o.context ?? []));
+      return interpret.mock.calls.length === 1
+        ? { opId: 'searchEvents', args: { query: 'tandarts' } }
+        : { opId: 'addEvent', args: { title: 'tandarts nabellen', when: '2026-11-18T09:00' } };
+    });
+    const { d, callSkill } = door({ interpret, readAs, selfOf });
+    const r = await d.read('bel de tandarts terug na mijn afspraak');
+    expect(interpret).toHaveBeenCalledTimes(2);
+    expect(asked[0]).not.toContain('controle');
+    expect(asked[1], 'the second ask carries what the peek saw').toContain('controle');
+    expect(readAs.mock.calls.every(([s]) => s === null || s === 'default'), 'read as the ticked self').toBe(true);
+    expect(r.actId).toBe('calendar.calendar-event');
+    expect(r.values).toMatchObject({ title: 'tandarts nabellen' });
+    expect(callSkill).not.toHaveBeenCalled();
+  });
+  it('the peek as another self sees only that self\'s rows', async () => {
+    const asked = [];
+    const interpret = vi.fn(async (_text, o) => {
+      asked.push(JSON.stringify(o.context ?? []));
+      return interpret.mock.calls.length === 1 ? { opId: 'listEvents', args: {} } : { reply: 'Je hebt niets gepland.' };
+    });
+    const { d } = door({ interpret, readAs: ownRoutes, selfOf });
+    await d.read('wat heb ik gepland?', { asSelf: 'werk' });
+    expect(interpret, 'the read was handed back').toHaveBeenCalledTimes(2);
+    expect(asked.join(' ')).not.toContain('tandarts');
+  });
+});
+
+describe('a follow-up uses the previous turn, and a refusal stores nothing and is said (journey 4)', () => {
+  const ownRoutes = () => async (app) => (app === 'household'
+    ? { items: [{ id: 'n1', type: 'note', body: 'de sleutel ligt bij de buren', createdBy: 'me-key' }] }
+    : { items: [] });
+  const selfOf = () => ({ key: 'me-key', isDefault: true });
+  // the stand-in model: answers the question from the note; the follow-up "dat" is read from the previous turns
+  const standIn = async (text, o) => {
+    if (/waar ligt/.test(text)) return { reply: 'Bij de buren.' };
+    const before = (o.history ?? []).map((m) => m.content).join(' ');
+    if (/agenda/.test(text) && /sleutel/.test(before)) return { opId: 'addEvent', args: { title: 'sleutel ophalen bij de buren', when: '2026-11-17T10:00' } };
+    return { reply: 'Wat bedoel je?' };
+  };
+
+  it('"zet dat morgen om 10 in mijn agenda" proposes an appointment naming the key; closing it stores nothing and the thread says so', async () => {
+    const threads = threadsOf();
+    const { d, callSkill } = door({ interpret: standIn, threads, readAs: ownRoutes, selfOf });
+    expect((await d.read('waar ligt de sleutel?')).done).toBe('Bij de buren.');
+    const r = await d.read('zet dat morgen om 10 in mijn agenda');
+    expect(r.actId).toBe('calendar.calendar-event');
+    expect(r.values.title).toContain('sleutel');
+    const said = await d.settled({}, { saved: false });
+    expect(said).toContain('circle.vandaag.plus_act_not_saved');
+    expect(d.turns({}).at(-1)).toMatchObject({ who: 'assistant', text: said });
+    expect(callSkill).not.toHaveBeenCalled();
+  });
+  it('saved: the thread says it was saved; settling twice, or with no form the "+" opened, says nothing', async () => {
+    const { d } = door({ interpret: standIn, readAs: ownRoutes, selfOf });
+    expect(await d.settled({}, { saved: false }), 'no form opened yet').toBeNull();
+    await d.read('waar ligt de sleutel?');
+    expect(await d.settled({}, { saved: false }), 'the last turn is an answer, not a form').toBeNull();
+    await d.read('zet dat morgen om 10 in mijn agenda');
+    expect(await d.settled({}, { saved: true, actId: 'calendar.calendar-event' })).toContain('circle.vandaag.plus_act_saved');
+    expect(await d.settled({}, { saved: false }), 'already settled').toBeNull();
+  });
 });
 
 describe('the conversation follows the ticked self, or a set of selves with a primary', () => {

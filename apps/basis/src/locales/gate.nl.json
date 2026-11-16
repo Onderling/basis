@@ -394,6 +394,26 @@
     "calendar": ["afspraak", "afspraken", "agenda", "tandarts", "dokter", "verjaardag", "feest", "uitnodiging", "kom", "komen", "verzet", "verplaats", "afzeggen", "plannen", "gepland"],
     "tasks": ["wie doet", "doet", "doen", "taak", "taken", "klusje", "klusjes", "open", "nog open", "ik pak", "ik doe", "mijn klusjes", "moet", "afgerond", "opgepakt"]
   },
+  "_help": {
+    "doc": "Whole lines that ask the assistant for help (\"help\", \"?\"): it answers with what it can do. Read whole, case and trailing punctuation aside; a person may write either language. `questions`: how a line OPENS when it asks how something works (\"hoe …\"): only such a line is looked up in the help cards (their matcher alone hits ordinary lines on a keyword).",
+    "words": [
+      "hulp",
+      "help",
+      "?",
+      "wat kan je",
+      "wat kun je",
+      "wat kan ik hier",
+      "hoe werkt dit"
+    ],
+    "questions": [
+      "hoe ",
+      "wat is ",
+      "wat zijn ",
+      "waarom ",
+      "waar kan ik ",
+      "waar vind ik "
+    ]
+  },
   "_trailing": {
     "doc": "Single words that, AFTER an item, mean it is done (\"afwas klaar\"). Dutch speakers code-switch, so English ones may be here too.",
     "complete": [

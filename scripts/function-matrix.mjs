@@ -154,8 +154,9 @@ export const FUNCTIONS = Object.freeze([
   } },
   { id: 'connected-screens', name: 'Connected screens', cells: {
     web: { file: 'apps/basis/test-browser/screen-connect-box.spec.js', test: 'the screen in a browser' },
-    mobile: null,   // REQUIRED: the phone approves a screen's code. WAITS ON L686 (Frits): the pairing start is being rebuilt
-    // (the app mints a link with a throwaway address, or the screen shows its own key); a walk today would pin the old flow
+    // the phone in Node (the mobile composition) pastes the screen's throwaway offer into its own bot thread, picks the
+    // screen's code from three there, and the screen acts as the person over the relay (the camera scan is the phone session's)
+    mobile: { file: 'apps/basis-mobile/test/screenConnectPhone.mobile.relay.test.js', test: "the phone pastes the screen's offer, picks its code in its own bot thread, and the screen acts as the person" },
     box: { file: 'apps/basis/test/screenConnect.relay.test.js', test: '/scherm → a link' },
   } },
 ]);

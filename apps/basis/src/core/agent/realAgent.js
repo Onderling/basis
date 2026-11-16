@@ -9753,6 +9753,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     surfaceTokenEntry: async (tokenId) => { await surfaceGrantsReady; return surfaceGrants.activeEntryOf(tokenId); },
     /** Resolves once the durable surface registry has loaded (grants are refused until then). */
     surfaceGrantsReady: () => surfaceGrantsReady,
+    /** The circle's VERIFIED membership statement bodies (the Decisions view counts the joins since a proposal from them). */
+    membershipBodies: async (circleId) => { try { return (await membershipRail?.readVerifiedBodies?.(circleId))?.bodies ?? []; } catch { return []; } },
     llmProviders,
     // host-injected claim router; called after every successful
     // claimTask.  Hosts wire `makeAfterClaimHook` here once the agent +

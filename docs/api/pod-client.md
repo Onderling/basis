@@ -1175,27 +1175,6 @@ removal (that version's key never entered their chain).
 
 ## `src/sealing/keyResourceWrite.js`
 
-### `KeyReadTornError`
-
-**Kind:** class · **Import:** `KeyReadTornError` from `'@onderling/pod-client/sealing'`
-
-```js
-class KeyReadTornError extends Error
-new KeyReadTornError(attempts)
-```
-
-Thrown when the read under a key-file change never agreed with itself: the change was NOT written (never built on one read).
-
-### `readKeyForWrite`
-
-**Kind:** function · **Import:** `readKeyForWrite` from `'@onderling/pod-client/sealing'`
-
-```js
-readKeyForWrite(keyStore)
-```
-
-The read a key-file change builds on: the store's trusted read when it has one (a pod), else its plain read.
-
 ### `KeyWriteContendedError`
 
 **Kind:** class · **Import:** `KeyWriteContendedError` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
@@ -1252,7 +1231,7 @@ ensure the keypair, publish the sealing public key, and build the roster entry.
 **Kind:** function · **Import:** `createPodKeyStore` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
 
 ```js
-createPodKeyStore({ podClient, uri, agreeAttempts = KEY_READ_AGREE_ATTEMPTS } = {})
+createPodKeyStore({ podClient, uri } = {})
 ```
 
 Back the control-agent's `keyStore` with a pod resource holding the current group-key resource.

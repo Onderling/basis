@@ -8,6 +8,7 @@
  * attachments and the "+" offers no file entry (NO unsealed fallback). The bucket being per session means a circle
  * file's BYTES do not reach another device yet; the pointer does.
  */
+import { onPolicyPostureChange } from '../../../basis/src/v2/circlePolicyStore.js';
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../basis/src/v2/circleMediaGateway.js';
 import { getCircleSealStrategy, getCircleActorWebId } from './circlePods.js';
 import { resolveSealedThumbUri } from './mijHost.js';
@@ -15,6 +16,8 @@ import { resolveSealedThumbUri } from './mijHost.js';
 /** The session's one media bucket — the circles' compositions and the person's own (the launcher's self media). */
 export const circleMediaBucket = makeDevMediaBucket();
 const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
+// a policy write that changes the circle's pod or posture: the composition built from the old one goes (web parity)
+onPolicyPostureChange((circleId) => { circleMediaCompositions.delete(circleId); });
 // One circle's picture opener, bound lazily (web parity: circleApp's `circlePictureResolver`). A roster row's picture
 // is sealed to ITS circle, a contact's to the pair circle — so a paint site names the circle and gets the opener here.
 // Cached per circle so a FaceView's `resolvePicture` keeps its identity across renders.

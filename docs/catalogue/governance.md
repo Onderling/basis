@@ -60,7 +60,12 @@ kernel's roster fold; every shell composes the same binding).
   `membershipEmit` and the rules emitter, whichever path wrote it); an author's own later settings change draws its
   line through their own hash chain (`membershipUpTo`, `authorChainCut.js`), so what they signed before it keeps its
   stamp. Never asked for a person's own acts (leaving, stepping down, the caretaker's acknowledgement). Admissions
-  (`join`) are not gated: the policy has no admission class yet.
+  (`join`) are not gated: the policy has no admission class yet. So, plainly: an admin who may admit alone can admit
+  accounts and win a members' vote with them. A vote counts the roster as it is now (only the votes of members on it),
+  and an open decision says how many of today's members joined since it was made (from the joins' signed times, which
+  the joining device sets: a hint, not a gate). Freezing a vote on the members of its moment was tried and not adopted:
+  the log cannot prove the order of a join and a proposal (docs/decisions.md, 2026-11-15). Governed admissions come
+  after the alpha.
   An author's stamps bind only that author: an admin who never stamps above an older settings version keeps being
   judged by it after ANOTHER admin tightened (no device can tell them from an honest admin who was offline); it is
   signed, attributable and shown. Two admins' settings at one version merge "who decides" strictest-first per act

@@ -16,7 +16,7 @@ import { selfRefIn } from './selfRef.js';
 import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
 import { autoEnacts } from './circlePolicy.js';
 import { foldGovernance } from './governanceLog.js';
-import { buildGovernanceView } from './governanceView.js';
+import { buildGovernanceView, joinsSince } from './governanceView.js';
 
 /**
  * @param {object} deps
@@ -36,6 +36,9 @@ export function makeCircleGovernance({
   callSkill, appendGovernanceEvent, getPolicy, getMembers,
   localActorRef, setPolicy = null, rotateKey = null, newProposalId, now = () => 0,
   readGovernanceState,
+  // the circle's verified membership statement bodies: the Decisions view says how many members joined since a proposal
+  // (a shown hint, never a gate); absent → no line
+  readMembershipBodies = null,
   // the WHOLE removal (`removeCircleMember`: the substrate op, then unbind the member's circle address and re-record the
   // authorize snapshot), when the wiring has this device's agent; else the bare pinboard op
   removeMember = null,
@@ -103,7 +106,12 @@ export function makeCircleGovernance({
     }
     const me = (ctx.members || []).find((m) => m && m.ref === actorIn(circleId)) || null;
     const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
-    const base = buildGovernanceView({ fold, viewer: me, labelForSubject });
+    let membershipBodies = null;
+    if (typeof readMembershipBodies === 'function') {
+      try { const r = await readMembershipBodies(circleId); membershipBodies = Array.isArray(r) ? r : (Array.isArray(r?.bodies) ? r.bodies : null); } catch { membershipBodies = null; }
+    }
+    const joinedSinceOf = membershipBodies ? (p) => joinsSince(membershipBodies, p.proposedAt, ctx.members) : null;
+    const base = buildGovernanceView({ fold, viewer: me, labelForSubject, joinedSinceOf });
     // L3: surface the disputed authors (equivocators) so the shell can prompt "review & remove".
     const disputed = [...ctx.disputed].map((ref) => ({ ref, label: labelForSubject ? labelForSubject(ref, 'removeMember') : ref }));
     return { ...base, disputed, hasDisputed: disputed.length > 0 };

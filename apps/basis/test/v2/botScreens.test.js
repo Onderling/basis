@@ -130,12 +130,14 @@ describe('a person connects a screen to the bot', () => {
     const ctx = setup(); const { screens, grants, told } = ctx;
     const n = nonceOf(await start(ctx));
     const offered = await screens.offer({ from: 'VIEW1', viewPubKey: 'VIEW1', nonce: n });
-    expect(offered).toMatchObject({ ok: true, pending: true, person: 'telegram:1', code: await screenCode('VIEW1', n) });
+    expect(offered).toMatchObject({ ok: true, pending: true, person: 'telegram:1' });
+    expect(offered.code, 'the real code is never handed back (a caller could mark it on the screen)').toBeUndefined();
     expect(grants, 'nothing is granted before the person says yes').toEqual([]);
     expect(ctx.asked).toHaveLength(1);
     expect(ctx.asked[0].codes).toHaveLength(3);
-    expect(ctx.asked[0].codes).toContain(offered.code);
-    const ok = await screens.confirm('telegram:1', offered.code, { isPrivate: true });
+    const offeredCode = await screenCode('VIEW1', n);   // what the screen shows
+    expect(ctx.asked[0].codes).toContain(offeredCode);
+    const ok = await screens.confirm('telegram:1', offeredCode, { isPrivate: true });
     expect(ok).toMatchObject({ ok: true, person: 'telegram:1' });
     expect(grants[0]).toMatchObject({ viewPubKey: 'VIEW1', actingAs: 'telegram:1', ops: ['lists.addToList', 'assistant.assistant-overview'], nonce: n });
     expect(told).toEqual([{ person: 'telegram:1', key: 'circle.bot.screen_connected', params: { n: 2 } }]);
@@ -241,7 +243,8 @@ describe('the paste route (/koppel-scherm)', () => {
     expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' })).toMatchObject({ ok: false, reason: 'not-admitted' });
     ctx.admitted.add('telegram:1');
     const r = await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9', label: 'laptop' });
-    expect(r).toMatchObject({ ok: true, pending: true, code: await screenCode('P', 'n9') });
+    expect(r).toMatchObject({ ok: true, pending: true });
+    expect(r.code, 'the real code is never handed back').toBeUndefined();
     expect(ctx.grants).toEqual([]);
     expect(await ctx.screens.confirm('telegram:1', 'ja', { isPrivate: true })).toMatchObject({ declined: true });
     await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' });

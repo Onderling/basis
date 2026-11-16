@@ -21,7 +21,7 @@ export {
   keyIdOf, collapseKeyEvents, MAX_KEYS_PER_VERSION,                   // the ONE collapse rule the store and the fold share
 } from './keyEventsLog.js';
 export { createControlAgent, MemberUnknownError } from './controlAgent.js';
-export { changeKeyResource, KeyWriteContendedError, KeyReadTornError, readKeyForWrite } from './keyResourceWrite.js';
+export { changeKeyResource, KeyWriteContendedError } from './keyResourceWrite.js';
 export { createCanonicalShare } from './canonicalShare.js';   // objective L — revocable canonical cross-circle share
 export {
   createResourceKeyGrant, openGrantedResource, resourceScope,

@@ -95,11 +95,24 @@ export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
   const { catalogue: placed, manifestsByOrigin } = composeAssistantCatalogue({
     apps: apps ?? ownPlaceApps(catalogueManifests({ householdManifest })), householdManifest, place: 'own',
   });
-  const out = { catalogue: proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin), manifestsByOrigin };
+  const offered = proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin);
+  // no app's circle-bot background in the own place: the place's own lines say what it is (`OWN_PLACE_LINES`)
+  const out = { catalogue: { ...offered, systemPromptFor: () => null }, manifestsByOrigin };
   byManifest.set(key, out);
   return out;
 }
 const OWN_PLACE_CACHE = new WeakMap();
+
+/**
+ * What the model is told about the place it answers in (LLM-facing; the circle door's twin is `CIRCLE_LINES`): the
+ * person's OWN place, never a household or a group. An app's own background (`systemPrompt`, household's: "a small
+ * group of people share a household …") is NOT given here: it describes that app's circle bot, and the own place's
+ * model answered "what can I do here" with the household's examples (walk on the phone, 2026-11-16).
+ */
+export const OWN_PLACE_LINES = Object.freeze([
+  "This is the person's OWN place: a private conversation with their own assistant. Nobody else reads it; there is no household, group or circle here.",
+  "What can be done here is what the tools offer: the person's own notes, own appointments and own lists. Asked what you can do, name those, in the person's words, and nothing a household or a circle does.",
+]);
 const NO_MANIFEST = Object.freeze({});
 
 /**
@@ -221,7 +234,7 @@ export function createPlusDoor({
   const gateRules = circleGateRules(lang).map((r) => (typeof r.command !== 'function' ? r
     : { ...r, command: (text, ctx) => { const c = r.command(text, ctx); return offeredHere(c) ? c : null; } }));
   const engine = createAssistantEngine({
-    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules,
+    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules, promptLines: [...OWN_PLACE_LINES],
     // what the model may read for a line: the person's own things only, and only the ticked self's (or the set's)
     ...(typeof readAs === 'function'
       ? { loadItems: async (ctx) => {

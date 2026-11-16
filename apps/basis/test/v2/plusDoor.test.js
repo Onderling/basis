@@ -16,6 +16,7 @@ import { EventLog } from '../../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { mergeManifests } from '../../src/manifestMerge.js';
+import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 
 const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
 const threadsOf = () => createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
@@ -420,4 +421,17 @@ it('the door\'s catalogue is composed once per household manifest and app list, 
   expect(b.catalogue).toBe(a.catalogue);
   const other = ownPlaceCatalogue({ apps: ['household'] });
   expect(other.catalogue).not.toBe(a.catalogue);
+});
+
+describe('the model is told it is the person\'s OWN place, never a household (journey 1)', () => {
+  // the real interpreter, a model that records what it was told: the prompt is the place's, not an app's household bot
+  it('"wat kan ik hier doen?" reaches the model with the own place\'s background and none of the household bot\'s', async () => {
+    let system = '';
+    const llm = { invoke: async (req) => { system = req.system; return { replyText: 'Je eigen notities, afspraken en lijsten.' }; } };
+    const { d } = door({ llm, interpret: interpretToCommand });
+    const r = await d.read('wat kan ik hier doen?');
+    expect(r.done).toBe('Je eigen notities, afspraken en lijsten.');
+    expect(system, 'the own place says what it is').toMatch(/OWN place/);
+    expect(system, 'no household bot background').not.toMatch(/Household background|share a household/);
+  });
 });

@@ -74,7 +74,7 @@ describe('the assistant prompt — stable first, then what changes every turn', 
     });
     const marker = at(system, TURN_MARKER);
     const language = at(system, 'The member wrote in: nl');
-    const items = at(system, 'Relevant items already in this circle');
+    const items = at(system, 'Relevant items already here');
     const date = at(system, /It is now 2026-09-2[78] \d{2}:\d{2}, \w+day \(local time\)/);
     // the real local time, not the date alone (given only a date, the model once invented a clock time)
     expect(marker).toBeLessThan(language);
@@ -89,7 +89,7 @@ describe('the assistant prompt — one budget', () => {
     const llm = { invoke: async (req) => { system = `${req.system}\n\n${req.messages.at(-1).content}`; return { toolCall: null, replyText: 'ok' }; } };
     const context = Array.from({ length: 40 }, (_, i) => `kaas nummer ${i} — een tamelijk lange omschrijving van dit item`);
     await interpretToCommand('hoe zit het met de kaas', { catalogue, llm, context });
-    const block = system.slice(system.indexOf('Relevant items already in this circle'));
+    const block = system.slice(system.indexOf('Relevant items already here'));
     const listed = block.split('\n').filter((l) => l.startsWith('- kaas nummer'));
     expect(listed.join('\n').length).toBeLessThanOrEqual(2000);
     expect(listed.length).toBeLessThan(40);

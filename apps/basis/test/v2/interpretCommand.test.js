@@ -111,7 +111,7 @@ describe('interpretToCommand', () => {
       { meaning: 'buy bread' },
       { entry: { label: 'take out bins' }, score: 0.8 },
     ] });
-    expect(seenSystem).toMatch(/Relevant items already in this circle/);
+    expect(seenSystem).toMatch(/Relevant items already here/);
     expect(seenSystem).toMatch(/wash the dishes/);
     expect(seenSystem).toMatch(/buy bread/);
     expect(seenSystem).toMatch(/take out bins/);

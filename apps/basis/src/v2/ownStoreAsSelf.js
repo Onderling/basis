@@ -45,12 +45,15 @@ export function ownStoreAsSelf(store, mine) {
       return store.delete(id, ...rest);
     },
   };
+  // UNLISTED IS NOTHING: a store method outside the five throws by name; any other property (a data field that may hold
+  // rows, a map, a cache, a symbol, `then`) reads as undefined, never the store's
   return new Proxy(methods, {
     get(target, prop) {
-      if (Object.prototype.hasOwnProperty.call(target, prop)) return target[prop];
-      const v = Reflect.get(store, prop, store);
-      if (typeof v === 'function') return () => { throw new OwnViewRefused('unlisted-method', String(prop)); };
-      return v;
+      if (typeof prop === 'string' && Object.prototype.hasOwnProperty.call(target, prop)) return target[prop];
+      if (typeof prop === 'string' && prop !== 'then' && typeof Reflect.get(store, prop, store) === 'function') {
+        return () => { throw new OwnViewRefused('unlisted-method', prop); };
+      }
+      return undefined;
     },
   });
 }

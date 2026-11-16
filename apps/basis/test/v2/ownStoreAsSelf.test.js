@@ -51,4 +51,12 @@ describe('the own store as the general self, against a row made as Werk', () => 
       expect(() => view[m]({}), m).toThrow(expect.objectContaining({ code: 'unlisted-method' }));
     }
   });
+
+  it('a data property of the store reads as nothing through the view (a field that may hold rows does not leak)', async () => {
+    const { store, view } = await setUp();
+    store.rowsCache = new Map([['x', { createdBy: WERK }]]);
+    expect(view.rowsCache).toBeUndefined();
+    expect(view.then, 'not a thenable').toBeUndefined();
+    expect(view[Symbol.iterator]).toBeUndefined();
+  });
 });

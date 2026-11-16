@@ -7527,7 +7527,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * `mayGive: false` — an op whose own door gate already decided who may give a chore (reassigning is the admin's, or
    * every member's under the flat roles): the add's rule of who may name whom is not asked again.
    */
-  async function choreHolderFor(assignee, ctx, { mayGive = true } = {}) {
+  async function choreHolderFor(assignee, ctx, { mayGive = true, circleId = null } = {}) {
     const tr = translatorFor(ctx?.lang);
     const caller = actorOf(ctx);
     // in a circle: its roster is who may be named, and assigning follows the standard role table (no household setting)
@@ -7539,7 +7539,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const p = personIn(book, assignee, caller);
     if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
     if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: String(assignee).trim() }) };
-    const who = p.self ? (caller ?? 'me') : p.id;
+    // "mij": the asker, else this device's self in that circle (rowAuthor.js) — never the local 'me' on a row in a circle
+    const who = p.self ? (caller ?? rowAuthor(inCircle ?? resolveCircleId({ circleId }))) : p.id;
+    if (!who) return { ok: false, code: 'no-self', error: tr('circle.lists.no_self') };
     const whoName = p.self ? null : p.name;
     const allowed = !mayGive || assignAllowed({
       policy: inCircle ? 'roles' : paramsService.register.valueOf(ASSIGN_POLICY_KEY),
@@ -7550,10 +7552,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       const byRole = inCircle || assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
       return { ok: false, error: tr('circle.tasks.assign_refused'), refusal: byRole ? refuse('op-rule', 'cannot-reassign') : refuse('door-settings', 'setting:assign') };
     }
-    if (who !== 'me' && roles[who] !== undefined && !policy.canClaim(who)) {
+    if (!p.self && roles[who] !== undefined && !policy.canClaim(who)) {
       return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? String(assignee).trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
     }
-    return { ok: true, who, whoName };
+    return { ok: true, who, whoName, self: !!p.self };
   }
 
   /**
@@ -7566,10 +7568,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     const caller = actorOf(ctx);
     let who = null;
     let whoName = null;
+    let whoSelf = false;
     if (typeof assignee === 'string' && assignee.trim()) {
-      const given = await choreHolderFor(assignee, ctx);
+      const given = await choreHolderFor(assignee, ctx, { circleId: rest.circleId ?? null });
       if (!given.ok) return given;
       ({ who, whoName } = given);
+      whoSelf = given.self;
     }
     let made = await callSkill('lists', opId, rest, ctx);
     if (!made?.ok || !made.itemId) return made;
@@ -7587,7 +7591,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (iso) {
         const store = householdService.stores.getStore(circleId);
         const item = await store.get(made.itemId);
-        if (item) await store.put({ ...item, dueAt: iso }, { by: caller ?? 'me' });
+        if (item) await store.put({ ...item, dueAt: iso }, { by: caller ?? rowAuthor(circleId) ?? undefined });
       }
     }
     if (who) {
@@ -7598,7 +7602,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The chore, who holds it and its day — the reply names the one who got it only where names may be seen; to
     // someone else it says it was given. One line, worded where every reply is (`replyLine`).
     const dueAt = typeof due === 'string' && due.trim() ? (parseCalendarDate(due.trim()) ?? null) : null;
-    const holder = !who ? null : (who === caller || who === 'me') ? 'self' : (whoName ? 'named' : 'given');
+    const holder = !who ? null : (whoSelf || who === caller) ? 'self' : (whoName ? 'named' : 'given');
     const chore = { title: made.entry ?? rest.text ?? null, holder, ...(holder === 'named' ? { name: whoName } : {}), ...(dueAt ? { dueAt } : {}) };
     if (!chore.title) return made;
     const done = { ...made, chore };
@@ -7705,11 +7709,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // reply says who got it as the asker may see them (`readerNamer`: themself, a name, or only that it was given).
     let givenTo = null;
     if (appOrigin === 'tasks' && opId === 'reassignTask' && opts.tasksCircleId && typeof args?.newAssignee === 'string' && args.newAssignee.trim()) {
-      const given = await choreHolderFor(args.newAssignee, ctx, { mayGive: false });
+      const given = await choreHolderFor(args.newAssignee, ctx, { mayGive: false, circleId: args?.circleId ?? null });
       if (!given.ok) return given;
       args = { ...args, newAssignee: given.who };
       const caller = actorOf(ctx);
-      const seen = (given.who === 'me' || (caller && given.who === caller)) ? { you: true } : (await readerNamer(caller, doorCircleOf(ctx)))(given.who);
+      const seen = (given.self || (caller && given.who === caller)) ? { you: true } : (await readerNamer(caller, doorCircleOf(ctx)))(given.who);
       givenTo = seen.you ? { holder: 'self' } : seen.name ? { holder: 'named', name: seen.name } : { holder: 'given' };
     }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
@@ -7725,7 +7729,8 @@ export async function createRealHouseholdAgent(opts = {}) {
           circleId: resolveCircleId(args),
           // made by the PERSON at the door (as chores and appointments are, `actorOf`), never by the device: a note on a
           // household bot was "made by the bot" for everyone, and whose it was could not be judged
-          by:       actorOf(ctx) ?? chatId?.pubKey,
+          // with no door person: in a circle, that circle's self (rowAuthor.js: a persona's circle never gets the general key)
+          by:       actorOf(ctx) ?? (resolveCircleId(args) && resolveCircleId(args) !== OWN_DEVICES_SCOPE ? rowAuthor(resolveCircleId(args)) : null) ?? chatId?.pubKey,
         };
         // A person's OWN item (no circle): the own scope named as the circle reaches their own store — carried to their
         // other devices, never to a circle's members — through the same generic atoms; never a household circle store

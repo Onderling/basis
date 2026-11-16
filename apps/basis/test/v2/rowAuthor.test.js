@@ -83,13 +83,15 @@ describe('who SERVED a snapshot is never who wrote the row', () => {
     const { stores, calendar } = setup();
     await calendar.addEvent({ circleId: 'household', title: 'Tandarts', startsAt: when });
     const [appt] = (await rows(stores, 'household')).filter((r) => r.type === 'calendar-event');
-    // the sibling device speaks as the same self in that circle; whoever served the snapshot does not count
-    expect(landingEntryFor({ circleId: 'household', item: appt, self: 'self-h', authorRef: 'server-ref' })).toBeNull();
+    // the sibling device speaks as the same self in that circle; the row's own maker decides, not who served it
+    expect(landingEntryFor({ circleId: 'household', item: appt, self: 'self-h' })).toBeNull();
     // someone else holding it: news, from its maker
     expect(landingEntryFor({ circleId: 'household', item: appt, self: 'self-x' })).toMatchObject({ actor: 'self-h' });
   });
   it('a row stamped "me" (an old row) names nobody, whoever served it: no author, no news', () => {
     const old = { id: 'e1', type: 'calendar-event', createdBy: LOCAL_ME };
+    expect(landingEntryFor({ circleId: 'c1', item: old })).toBeNull();
+    // and a caller that still hands the snapshot's author along is not heard
     expect(landingEntryFor({ circleId: 'c1', item: old, authorRef: 'addr-b' })).toBeNull();
   });
 });

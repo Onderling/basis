@@ -2193,8 +2193,9 @@ export default function CircleLauncherScreen({
   // chat retention class, never carried), one thread per person — web twin: circleApp.js `plusThreadNow`
   const plusSelf = bundle?.agent?.identity?.chat?.pubKey ?? null;
   const plusThread = useMemo(() => (eventLog?.append ? createPlusThread({ threads: createBotThreads({ eventLog, store: memoryThreadStore() }), threadId: plusThreadId(plusSelf) }) : null), [eventLog, plusSelf]);
-  const [plusTurnsTick, setPlusTurnsTick] = useState(0);
-  const plusTurns = useMemo(() => plusThread?.turns() ?? [], [plusThread, plusTurnsTick, plusOpen]);
+  // a turn kept or forgotten paints the sheet again (it asks the door for the conversation on render)
+  const [, setPlusTurnsTick] = useState(0);
+  // the conversation the sheet shows is the self's it is written as: asked of the door by the sheet (`turns(asSelf)`)
   // the circles the "+" line is read against (what each offers, its lists): the read uses them, and so does the pool of
   // suggestions, read when the sheet opens — a suggestion is a line the "+" reads here (web twin: circleApp.js plusCircles)
   const plusCircles = async () => {
@@ -2216,16 +2217,12 @@ export default function CircleLauncherScreen({
   }, [plusOpen]);
   // the person's own "+" door (web twin: circleApp.js plusDoorNow): their own model as set now, this thread, these
   // circles; composed per read (the conversation lives in the thread, so nothing is lost between reads)
+  // a self's key: the general self's chat key, a persona's webid (what its rows are made by)
+  const plusSelfKeyOf = (id) => (!id || id === 'default' ? plusSelf : (heldSelves.find((p) => p.id === id)?.webid ?? null));
   const plusDoorNow = () => createPlusDoor({
-    llm: plusThread?.threadId ? ownModelOf(userLlmCfg) : null, threads: plusThread?.threads ?? null, threadId: plusThread?.threadId ?? null,
+    llm: plusSelf ? ownModelOf(userLlmCfg) : null, threads: plusThread?.threads ?? null, selfKeyOf: plusSelfKeyOf, readAs: plusAsSelf,
     householdManifest: bundle?.agent?.manifest, t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
   });
-  // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
-  const plusRecorded = async (line, run) => {
-    const r = plusThread ? await plusThread.exchange(line, run, { t }) : await run();
-    setPlusTurnsTick((n) => n + 1);
-    return r;
-  };
 
   // THE "+" SHEET, on every tab (the person's own entry): its line, their own acts, their Me actions — one element the tab
   // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
@@ -2254,9 +2251,9 @@ export default function CircleLauncherScreen({
         // the free line: an own act; or, for something that lives in a circle, that circle's act: run at once where the
         // circle is clear, else the card asks which (plusLineOutcome); the own model reads only what the plain reading
         // missed (their settings' route only; none set = no model). Web twin: circleApp.js
-        turns={plusTurns}
+        turns={(asSelf) => plusDoorNow().turns({ asSelf })}
         // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat (web twin)
-        onForget={plusThread ? async () => { await plusDoorNow().forget(); setPlusTurnsTick((n) => n + 1); } : null}
+        onForget={plusThread ? async (asSelf) => { await plusDoorNow().forget({ asSelf }); setPlusTurnsTick((n) => n + 1); } : null}
         suggestFor={(typed) => plusSuggest(plusPool, typed)}
         onRead={async (line, asSelf) => {
           // the ONE "+" door (shared with web): help, then the plain reading, then the person's own model through the
@@ -2265,7 +2262,7 @@ export default function CircleLauncherScreen({
           setPlusTurnsTick((n) => n + 1);
           return r;
         }}
-        onCircleRun={(card, circleId, asSelf) => plusRecorded(null, () => plusRunInCircle(card?.command, circleId, asSelf))}
+        onCircleRun={async (card, circleId, asSelf) => { const r = await plusDoorNow().exchange({ asSelf }, () => plusRunInCircle(card?.command, circleId, asSelf)); setPlusTurnsTick((n) => n + 1); return r; }}
         shareTargets={plusShareList}
         onShare={plusEdit ? async (actId, contact) => {
           const op = plusShareOp(actId, { id: plusEdit.id, with: contact });

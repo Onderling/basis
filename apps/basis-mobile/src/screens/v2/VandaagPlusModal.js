@@ -42,6 +42,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [asSelf, setAsSelf] = useState(writeAsSelf);
+  // the conversation of the self this is written as (`turns(asSelf)`, the shared door's): none before a self is picked
+  const shownTurns = typeof turns === 'function' ? (asSelf ? turns(asSelf) : []) : turns;
   const [line, setLine] = useState('');
   const [card, setCard] = useState(null);
   const [done, setDone] = useState(null);
@@ -97,13 +99,13 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
             const piece = {
-              'plus-thread': () => (!edit && Array.isArray(turns) && turns.length ? (
+              'plus-thread': () => (!edit && Array.isArray(shownTurns) && shownTurns.length ? (
             <View testID="vandaag-plus-thread" accessibilityLabel={t('circle.vandaag.plus_thread')}>
-              {turns.map((turn, i) => (
+              {shownTurns.map((turn, i) => (
                 <Text key={`${turn.ts ?? i}-${i}`} testID={`vandaag-plus-turn-${turn.who === 'you' ? 'you' : 'assistant'}`}
                   style={[styles.turn, turn.who === 'you' ? styles.turnYou : null]}>{turn.text}</Text>
               ))}
-              {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={onForget} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
+              {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={() => onForget(asSelf)} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
             </View>
           ) : null),
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>

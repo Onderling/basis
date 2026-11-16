@@ -191,7 +191,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
-import { createPlusDoor } from '../../src/assistant/plusDoor.js';
+import { createPlusDoor, conversationSelf } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
@@ -4778,15 +4778,15 @@ function showVandaagPlus({ edit = null } = {}) {
     paint();
     return { error, done };
   };
-  // the person's own "+" door, composed for this open: their own model as it is set now, this thread, these circles
+  // the person's own "+" door, composed for this open: their own model as it is set now, these circles; the conversation
+  // follows the self the "+" writes as (its thread, its memory, what it reads, its Forget: `selfKeyOf`, `readAs`)
   let _door = null;
   const plusDoorNow = () => {
-    const th = plusThreadNow();
-    if (!_door || _door.threadId !== th.threadId) {
-      _door = createPlusDoor({ llm: th.threadId ? circleOwnModel() : null, threads: th.threads, threadId: th.threadId,
-        householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(), readAs: callAs,
+    if (!_door) {
+      const th = plusThreadNow();
+      _door = createPlusDoor({ llm: selfKeyOf('default') ? circleOwnModel() : null, threads: th.threads, selfKeyOf, readAs: callAs,
+        householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
         circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId) => runInCircle(command, circleId) });
-      _door.threadId = th.threadId;
     }
     return _door;
   };
@@ -4796,10 +4796,10 @@ function showVandaagPlus({ edit = null } = {}) {
   const paint = () => renderVandaagPlus(card, {
     lang: currentLang(),
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
-    turns: plusThreadNow().turns(),
+    turns: conversationSelf(asSelf, selves.length) ? plusDoorNow().turns({ asSelf: conversationSelf(asSelf, selves.length) }) : [],
     suggestFor: (typed) => plusSuggest(suggestionPool, typed),
     // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
-    onForget: async () => { await plusDoorNow().forget(); paint(); },
+    onForget: async () => { await plusDoorNow().forget({ asSelf: conversationSelf(asSelf, selves.length) }); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
@@ -4835,6 +4835,8 @@ function showVandaagPlus({ edit = null } = {}) {
       // the ONE "+" door (shared with the phone): help, then the plain reading, then the person's own model through the
       // assistant engine; the line and what it answered are kept in the thread
       const r = await plusDoorNow().read(text, { asSelf });
+      // several selves ticked and none picked: the sheet shows the choice (it does already); nothing was read
+      if (r?.askSelf) { error = null; paint(); return; }
       if (r?.card) { circleCard = r.card; error = null; }
       else if (r?.actId) { actId = r.actId; values = { ...values, ...(r.values ?? {}) }; error = null; }
       else if (r?.done) { done = r.done; error = null; }
@@ -4845,7 +4847,7 @@ function showVandaagPlus({ edit = null } = {}) {
       const card = circleCard; circleCard = null;
       if (!card) return;
       // the pick on the card: no new line, the run's answer kept (the same shared exchange)
-      await plusThreadNow().exchange(null, async () => { await runInCircle(card.command, circleId); return { error, done }; }, { t });
+      await plusDoorNow().exchange({ asSelf }, async () => { await runInCircle(card.command, circleId); return { error, done }; });
       paint();
     },
     onCircleCancel: () => { circleCard = null; error = null; paint(); },

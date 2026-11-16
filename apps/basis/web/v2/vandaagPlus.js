@@ -4,11 +4,11 @@
  * own row, Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
  * Pure render.
  */
-import { PLUS_ACTS, plusLabel, plusCardLabel, plusMomentNeedsTime } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, plusCardLabel, plusMomentNeedsTime, plusAskTime } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
-export function renderVandaagPlus(container, { t, routeLine = null, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
+export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does
   shareTargets = null, onShare,
   // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
@@ -176,7 +176,7 @@ export function renderVandaagPlus(container, { t, routeLine = null, actId = null
         Object.assign(input, { min: `${askTimeOn}T00:00`, max: `${askTimeOn}T23:59`, required: true });
         const ask = document.createElement('span');
         ask.className = 'circle-vandaag-plus__ask-time';
-        ask.textContent = ` ${tr('circle.vandaag.plus_which_time', { day: askTimeOn })}`;
+        ask.textContent = ` ${plusAskTime(act, values, { t: tr, lang })}`;
         label.appendChild(ask);
       } else if (values?.[f.name] != null) input.value = values[f.name];
       input.className = `circle-vandaag-plus__${f.name}`;

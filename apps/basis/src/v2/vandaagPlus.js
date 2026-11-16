@@ -205,6 +205,22 @@ export function plusMomentNeedsTime(act, values = {}) {
 }
 
 /**
+ * The question the sheet asks when a day was read but no time: the DAY in the person's words ("dinsdag 17 nov."), never
+ * the stored form (2026-11-17). Null when there is nothing to ask. Both sheets show this one sentence.
+ * @param {object} act @param {Record<string,string>} values
+ * @param {{t: Function, lang?: string|null}} o
+ * @returns {string|null}
+ */
+export function plusAskTime(act, values = {}, { t, lang = 'nl' } = {}) {
+  const day = plusMomentNeedsTime(act, values);
+  if (!day || typeof t !== 'function') return null;
+  const [y, m, d] = day.slice(0, 10).split('-').map(Number);
+  const words = new Intl.DateTimeFormat(String(lang ?? 'nl').startsWith('en') ? 'en-GB' : 'nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'short' })
+    .format(new Date(Date.UTC(y, m - 1, d)));
+  return t('circle.vandaag.plus_which_time', { day: words });
+}
+
+/**
  * THE FREE LINE at the top of the "+" sheet: what was typed, read by the same bounded readers the circle chat uses —
  * the manifests' gate rules, then the day-and-time reader and the noun's own word ("notitie: …", "afspraak morgen
  * 14:00 …"). Only the sheet's own acts may be chosen; a reading that names anything else is no reading (the fields stay

@@ -89,6 +89,20 @@ describe('the own lane is per self', () => {
     expect(forwards.filter((f) => phoneDefault.has(f.from) && boxWerk.has(f.to)), 'default → Werk').toEqual([]);
     expect(forwards.filter((f) => phoneWerk.has(f.from) && boxDefault.has(f.to)), 'Werk → default').toEqual([]);
 
+    // AN OWN LIST MADE AS WERK reaches the device that holds Werk (the lists op, as Werk, on both ends): the own lane
+    // carries every own row of the self that wrote it, a list as any other
+    const listMade = await phone.agent.callSkill('lists', 'createList', { circleId: 'own-devices', text: 'Werkprojecten' }, { actAs: W.chatId.pubKey });
+    expect(listMade?.ok, JSON.stringify(listMade)).toBe(true);
+    await phone.agent.ownStoreSync?.requestFromSiblings?.();
+    await box.agent.ownStoreSync?.requestFromSiblings?.();
+    const werkList = await until(async () => {
+      const r = await box.agent.callSkill('lists', 'listLists', { circleId: 'own-devices' }, { actAs: BW.chatId.pubKey });
+      return (r?.items ?? []).find((l) => l.label === 'Werkprojecten') ?? null;
+    }, { timeout: 30_000, step: 300 });
+    expect(werkList, "Werk's own list reached the device that holds Werk, read there as Werk").toBeTruthy();
+    const asDefault = await box.agent.callSkill('lists', 'listLists', { circleId: 'own-devices' });
+    expect((asDefault?.items ?? []).map((l) => l.label), 'and is not read there as the general self').not.toContain('Werkprojecten');
+
     // THE PHONE IS LOST: the box revokes it by the id it knows it by (its Werk wire id) — every self of it goes
     const r = await box.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: phoneWerkWire });
     expect(r?.ok, JSON.stringify(r)).toBe(true);

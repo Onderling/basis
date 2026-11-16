@@ -115,6 +115,11 @@ describe('the "+" reads the ticked self\'s own lists first', () => {
       .toMatchObject({ atOnce: true, circleId: OWN, command: { opId: 'listEntries', args: { list: 'Boodschappen' } } });
   });
 
+  it('a done entry is taken off an own list by saying so: "haal melk van mijn boodschappen"', () => {
+    expect(plusLineOutcome('haal melk van mijn boodschappen', { circles: [], own: own([SHOP]) }))
+      .toMatchObject({ atOnce: true, circleId: OWN, command: { opId: 'removeFromList', args: { list: 'Boodschappen', circleId: OWN } } });
+  });
+
   it('the own Agenda is not read as a list', () => {
     expect(plusLineOutcome('wat staat er op de agenda', { circles: [], own: own([{ name: 'Agenda', kind: 'list', defaultChild: 'calendar-event' }]) })).toBeNull();
   });

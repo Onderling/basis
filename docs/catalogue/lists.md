@@ -14,7 +14,8 @@ still to be described.
 - Make a list from the circle's "+" (`/new-list`), wherever lists are on.
 - Put a lists block on a screen of their own (a page's recipe); a block whose circle has lists off says so in one line.
 - Keep lists of their OWN from the "+" thread: "nieuwe lijst Vakantie" makes one, "zet melk op mijn boodschappen" adds
-  to it, "wat staat er op mijn boodschappen" answers with its entries, the done ones marked. The line is read against
+  to it, "wat staat er op mijn boodschappen" answers with its entries, the done ones marked. A done entry stays, marked,
+  until it is taken off: "haal melk van mijn boodschappen". The line is read against
   the own lists first; a name that is both theirs and a circle's asks which, with 'mine' first. An own list belongs to
   the self ticked in the "+" when it was made: it is carried to that self's devices only, and shown only with that self
   ticked.

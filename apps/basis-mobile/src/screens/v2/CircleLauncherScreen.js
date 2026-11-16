@@ -2215,22 +2215,12 @@ export default function CircleLauncherScreen({
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plusOpen]);
-  // the person's own "+" door (web twin: circleApp.js plusDoorNow): composed ONCE per own model, language and thread (its
-  // catalogue merge and availability are not redone per read or render); the helpers it calls change per render, so it
-  // reaches them through a ref and always calls the current ones
-  const plusLive = useRef({});
-  plusLive.current = { plusAsSelf, plusCircles, plusOwnListsOf, plusRunInCircle };
-  const plusLang = lang();
-  const plusDoor = useMemo(() => createPlusDoor({
+  // the person's own "+" door (web twin: circleApp.js plusDoorNow): their own model as set now, this thread, these
+  // circles; composed per read (the conversation lives in the thread, so nothing is lost between reads)
+  const plusDoorNow = () => createPlusDoor({
     llm: plusThread?.threadId ? ownModelOf(userLlmCfg) : null, threads: plusThread?.threads ?? null, threadId: plusThread?.threadId ?? null,
-    householdManifest: bundle?.agent?.manifest, t, lang: plusLang,
-    readAs: (asSelf) => plusLive.current.plusAsSelf(asSelf),
-    circles: () => plusLive.current.plusCircles(),
-    ownListsOf: (asSelf) => plusLive.current.plusOwnListsOf(asSelf),
-    runInCircle: (command, circleId, asSelf) => plusLive.current.plusRunInCircle(command, circleId, asSelf),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [plusThread, userLlmCfg, plusLang, bundle?.agent]);
-  const plusDoorNow = () => plusDoor;
+    householdManifest: bundle?.agent?.manifest, t, lang: lang(), readAs: plusAsSelf, circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
+  });
   // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
   const plusRecorded = async (line, run) => {
     const r = plusThread ? await plusThread.exchange(line, run, { t }) : await run();

@@ -293,6 +293,12 @@ export const SEAMS = Object.freeze([
   // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already
   // keeps the same turns through `botThreads` (the Telegram thread), so it is not a shell of this seam.
   { id: 'plus-kept-thread', pattern: /plusThread(Now\(\))?\.exchange\(/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
+  // THE "+" READS THE TICKED SELF'S OWN LISTS FIRST (`plusLineOutcome`'s `own`, read AS that self), and answers what a
+  // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
+  // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself
+  // says something else in the thread.
+  { id: 'plus-own-lists', pattern: /plusLineOutcome\([^)]*own:\s*\{\s*lists:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
+  { id: 'plus-done-line', pattern: /plusDoneLine\(/, shells: ['web', 'mobile'], why: 'the "+" thread says what a line did in one wording, a list\'s read with done and not done' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
   { id: 'ask-matches', pattern: /askMatchChoices\(/, shells: ['web', 'mobile'], why: 'matches under my own ask come from released offerings only, and only the asker sees them' },

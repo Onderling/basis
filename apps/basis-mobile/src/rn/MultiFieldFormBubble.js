@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 14, fontWeight: '700', color: theme.color.ink },
   fieldRow: { gap: 4 },
   fieldLabel: { fontSize: 12, color: theme.color.inkSoft },
-  fieldInput: {
+  fieldInput: { color: theme.color.ink,
     borderWidth: 1, borderColor: theme.color.line, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 6, fontSize: 14,
     backgroundColor: theme.color.card,

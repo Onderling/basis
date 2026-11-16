@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12,
     padding: 12, paddingBottom: 24,
   },
-  input: {
+  input: { color: theme.color.ink,
     borderWidth: 1, borderColor: theme.color.line, borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 16,
     fontFamily: 'monospace',

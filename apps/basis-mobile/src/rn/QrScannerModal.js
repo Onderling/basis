@@ -155,5 +155,5 @@ const styles = StyleSheet.create({
   pasteToggle:   { paddingVertical: 12, alignItems: 'center' },
   pasteToggleText: { color: theme.color.accentInk, fontSize: 13 },
   pasteBlock:    { marginTop: 12 },
-  pasteInput:    { minHeight: 80, borderWidth: 1, borderColor: theme.color.line, borderRadius: 4, padding: 12, fontSize: 13, textAlignVertical: 'top' },
+  pasteInput:    { color: theme.color.ink, minHeight: 80, borderWidth: 1, borderColor: theme.color.line, borderRadius: 4, padding: 12, fontSize: 13, textAlignVertical: 'top' },
 });

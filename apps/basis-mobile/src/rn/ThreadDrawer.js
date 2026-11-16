@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     borderTopColor: theme.color.line,
     gap: 8,
   },
-  createInput: {
+  createInput: { color: theme.color.ink,
     flex: 1, borderWidth: 1, borderColor: theme.color.line,
     borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8,
     fontSize: 14,

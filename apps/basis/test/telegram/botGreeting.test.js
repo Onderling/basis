@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { createTelegramRunner } from '../../src/telegram/runner.js';
 import { listsGateRules } from '../../src/v2/circleGate.js';
 import { templateLists, HOUSEHOLD_TEMPLATE } from '../../src/v2/householdTemplate.js';

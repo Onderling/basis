@@ -11,7 +11,7 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { assistantManifest } from '../src/v2/assistantManifest.js';
 import { createScreenStepUp, SCREEN_STEP_UP_TTL_MS } from '../src/v2/screenStepUp.js';
 import { screenColumnFor, screenActsAs, BOT_SCREEN_NEVER } from '../src/v2/screenActing.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 
 const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
 const ADMIN = 'telegram:9';

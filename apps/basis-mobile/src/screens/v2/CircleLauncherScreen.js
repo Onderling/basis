@@ -288,7 +288,7 @@ import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
-import { createPlusDoor } from '../../../../basis/src/v2/plusDoor.js';
+import { createPlusDoor } from '../../../../basis/src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
 import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
@@ -2217,8 +2217,8 @@ export default function CircleLauncherScreen({
   // the person's own "+" door (web twin: circleApp.js plusDoorNow): their own model as set now, this thread, these
   // circles; composed per read (the conversation lives in the thread, so nothing is lost between reads)
   const plusDoorNow = () => createPlusDoor({
-    llm: plusThread?.threadId ? ownModelOf(userLlmCfg) : null, memory: plusThread?.memory ?? null, threadId: plusThread?.threadId ?? null,
-    t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
+    llm: plusThread?.threadId ? ownModelOf(userLlmCfg) : null, threads: plusThread?.threads ?? null, threadId: plusThread?.threadId ?? null,
+    householdManifest: bundle?.agent?.manifest, t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
   });
   // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
   const plusRecorded = async (line, run) => {
@@ -2255,7 +2255,8 @@ export default function CircleLauncherScreen({
         // circle is clear, else the card asks which (plusLineOutcome); the own model reads only what the plain reading
         // missed (their settings' route only; none set = no model). Web twin: circleApp.js
         turns={plusTurns}
-        onForget={plusThread ? () => { plusThread.forget(); setPlusTurnsTick((n) => n + 1); } : null}
+        // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat (web twin)
+        onForget={plusThread ? async () => { await plusDoorNow().forget(); setPlusTurnsTick((n) => n + 1); } : null}
         suggestFor={(typed) => plusSuggest(plusPool, typed)}
         onRead={async (line, asSelf) => {
           // the ONE "+" door (shared with web): help, then the plain reading, then the person's own model through the

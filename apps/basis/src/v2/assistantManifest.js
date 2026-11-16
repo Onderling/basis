@@ -30,6 +30,8 @@ export const assistantManifest = {
   operations: [
     {
       id:     'assistant-memory', visibility: 'authenticated',
+      // the person's own "+" thread is a door too: its memory, forgetting it and its language are these ops (own place)
+      scopes: ['own'],
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-memory',
@@ -46,6 +48,8 @@ export const assistantManifest = {
       // did — a list line, an appointment, a setting — is the household's and stays. Their act, from their own private
       // chat only (never a group, never a screen), and slash only: the model is never handed a tool that deletes.
       id:     'assistant-forget', visibility: 'authenticated',
+      // the person's own "+" thread is a door too: its memory, forgetting it and its language are these ops (own place)
+      scopes: ['own'],
       verb:   'forget-conversation',
       writes: { scope: 'device' },
       params: [],
@@ -171,6 +175,8 @@ export const assistantManifest = {
 
     {
       id:     'assistant-language', visibility: 'authenticated',
+      // the person's own "+" thread is a door too: its memory, forgetting it and its language are these ops (own place)
+      scopes: ['own'],
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-language',

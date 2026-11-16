@@ -191,7 +191,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
-import { createPlusDoor } from '../../src/v2/plusDoor.js';
+import { createPlusDoor } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
@@ -4779,7 +4779,8 @@ function showVandaagPlus({ edit = null } = {}) {
   const plusDoorNow = () => {
     const th = plusThreadNow();
     if (!_door || _door.threadId !== th.threadId) {
-      _door = createPlusDoor({ llm: th.threadId ? circleOwnModel() : null, memory: th.memory, threadId: th.threadId, t, lang: currentLang(),
+      _door = createPlusDoor({ llm: th.threadId ? circleOwnModel() : null, threads: th.threads, threadId: th.threadId,
+        householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
         circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId) => runInCircle(command, circleId) });
       _door.threadId = th.threadId;
     }
@@ -4792,7 +4793,8 @@ function showVandaagPlus({ edit = null } = {}) {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
     turns: plusThreadNow().turns(),
     suggestFor: (typed) => plusSuggest(suggestionPool, typed),
-    onForget: () => { plusThreadNow().forget(); paint(); },
+    // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
+    onForget: async () => { await plusDoorNow().forget(); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),

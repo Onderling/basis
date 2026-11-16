@@ -22,7 +22,7 @@
  */
 import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';

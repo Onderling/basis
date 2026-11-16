@@ -5,7 +5,7 @@
  * map is red here until someone words it for a person — the manifest's hint is for the model, not for `/help`.
  */
 import { describe, it, expect } from 'vitest';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { scopeCatalogueToRole } from '../../src/v2/botOpMap.js';
 import { screenColumnFor } from '../../src/v2/screenActing.js';
 import nl from '../../src/locales/circle.nl.json' with { type: 'json' };

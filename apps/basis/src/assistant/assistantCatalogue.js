@@ -28,11 +28,13 @@ import { scopeCatalogueToRole, botOffers } from '../v2/botOpMap.js';
  * @param {unknown} [a.apps]               the app list (the parameter's value); unset or empty → the default
  * @param {object}  [a.householdManifest]  the household manifest the door's agent carries (`agent.manifest`)
  * @param {boolean} [a.slim]               a household bot: only the ops on the bot's map (`botOpMap.js`)
+ * @param {'own'|'circle'|'contact'} [a.place]  the place the door is (the person's own "+": `own`): only the ops declared
+ *                                         to be offered there (the op's `scopes`); absent → every op, as before
  * @param {boolean} [a.withoutDoorOps]     a circle the bot joined: the door's own ops (a person's settings, the admin's
  *                                         ops) are not composed — they belong to a person's own door, never a circle
  * @returns {{catalogue: object, manifestsByOrigin: Object<string, object>, apps: string[]}}
  */
-export function composeAssistantCatalogue({ apps, householdManifest, slim = false, withoutDoorOps = false } = {}) {
+export function composeAssistantCatalogue({ apps, householdManifest, slim = false, withoutDoorOps = false, place } = {}) {
   const list = assistantAppsFrom(apps);
   const all = catalogueManifests({ householdManifest });
   const ordered = [...all.filter((m) => m.app === 'household'), ...all.filter((m) => m.app !== 'household')];
@@ -49,7 +51,7 @@ export function composeAssistantCatalogue({ apps, householdManifest, slim = fals
   // ops the bot offers share it, never for an op it drops (the tasks app's own `/invite` beside the door's).
   const merged = (slim ? inScope.map((m) => ({ ...m, operations: (m.operations ?? []).filter((op) => botOffers(m.app, op, null)) })) : inScope)
     .map((manifest) => ({ manifest }));
-  const scoped = scopeCatalogueToApps(mergeManifests(merged), [...list, ...notesOnly.map((m) => m.app), ...doorOwn.map((m) => m.app)]);
+  const scoped = scopeCatalogueToApps(mergeManifests(merged), [...list, ...notesOnly.map((m) => m.app), ...doorOwn.map((m) => m.app)], { place });
   // A household bot (`slim`): exactly the bot's map (`botOpMap.js`) — nothing else of the apps is composed.
   const catalogue = slim ? scopeCatalogueToRole(scoped, null) : scoped;
   const manifestsByOrigin = Object.fromEntries(inScope.map((m) => [m.app, m]));

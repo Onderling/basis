@@ -304,7 +304,7 @@ describe('a door dispatches only what it offers', () => {
 
 describe('the box\'s own catalogue: no op without a button can be tapped', () => {
   it('every surface-less op the box composes (the owner-only ones among them) is refused as a typed tap', async () => {
-    const { composeAssistantCatalogue } = await import('../../src/telegram/assistantCatalogue.js');
+    const { composeAssistantCatalogue } = await import('../../src/assistant/assistantCatalogue.js');
     const { householdManifest } = await import('../../../household/manifest.js');
     const { catalogue, manifestsByOrigin } = composeAssistantCatalogue({ apps: ['household', 'lists'], householdManifest });
     const hidden = [...catalogue.opsById.entries()].filter(([, e]) => !((e.op ?? e)?.surfaces?.ui?.control === 'button')).map(([id]) => id);

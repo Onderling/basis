@@ -297,6 +297,21 @@ export const DEFAULT_CIRCLE_POLICY = {
 };
 
 /**
+ * The OWN PLACE's policy: the person's own "+" is no circle, so no circle's feature switches apply there. A feature is on
+ * in the own place when the door composes the app named for it (own lists: `lists`); every other feature, a circle's
+ * own (house rules, the member directory), stays off. Read by `opAvailability`'s feature rung, which the own place asks
+ * like every surface: the rung is answered, never skipped.
+ * @param {string[]} apps   the app origins the own door composes
+ */
+export function ownPlacePolicy(apps = []) {
+  const composed = new Set(Array.isArray(apps) ? apps : []);
+  return {
+    ...DEFAULT_CIRCLE_POLICY,
+    features: Object.fromEntries(CIRCLE_FEATURES.map((f) => [f, composed.has(f)])),
+  };
+}
+
+/**
  * return whether a feature is enabled on a (possibly partial)
  * policy.  Defensive: treats missing/non-policy input as the default
  * (so a circle whose `features` field hasn't been written yet still

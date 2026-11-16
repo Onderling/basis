@@ -8,7 +8,7 @@
  * `WELCOME_LEAVES` with the reason (it is part of a line already said, a follow-up step, an admin tool, …). Never both.
  */
 import { describe, it, expect } from 'vitest';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { scopeCatalogueToRole } from '../../src/v2/botOpMap.js';
 import { WELCOME_SAYS, WELCOME_LEAVES } from '../../src/v2/botWelcome.js';
 

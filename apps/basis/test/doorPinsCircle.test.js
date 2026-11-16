@@ -16,7 +16,7 @@ import { InMemoryBridge } from '@onderling/chat-agent';
 import { VaultNodeFs } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows } from '../src/v2/botOpMap.js';
 

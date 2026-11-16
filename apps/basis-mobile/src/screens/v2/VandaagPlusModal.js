@@ -59,6 +59,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
+  // closing tells the host which self and which form were open: a form the "+" opened from a line, closed unsaved, is
+  // refused, and the host has the conversation say so (the shared door's `settled`)
+  const closeSheet = () => onClose?.({ asSelf, actId, editing: Boolean(edit?.act) });
   const save = async () => {
     setBusy(true);
     const said = await onSave?.(act.id, values, asSelf);
@@ -98,7 +101,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     if (r?.error) setError(r.error); else { setDone(r?.done ?? null); setError(null); }
   };
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="slide" onRequestClose={closeSheet}>
       <View style={styles.backdrop}>
         <View style={styles.card} testID="vandaag-plus">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
@@ -213,7 +216,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {done ? <Text style={styles.label} testID="vandaag-plus-done">{done}</Text> : null}
           {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
           {/* the way out, not one of the acts */}
-          <Btn variant="ghost" onPress={onClose} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
+          <Btn variant="ghost" onPress={closeSheet} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
         </View>
       </View>
     </Modal>

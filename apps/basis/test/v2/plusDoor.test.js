@@ -333,3 +333,12 @@ describe('a combined conversation reads across its set', () => {
     await expect(d.idle({ asSelf: 'werk' })).resolves.not.toThrow?.();
   });
 });
+
+it('the door\'s catalogue is composed once per household manifest and app list, not per door', async () => {
+  const { ownPlaceCatalogue } = await import('../../src/assistant/plusDoor.js');
+  const a = ownPlaceCatalogue({});
+  const b = ownPlaceCatalogue({});
+  expect(b.catalogue).toBe(a.catalogue);
+  const other = ownPlaceCatalogue({ apps: ['household'] });
+  expect(other.catalogue).not.toBe(a.catalogue);
+});

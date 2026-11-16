@@ -60,11 +60,22 @@ export function ownPlaceApps(manifests = catalogueManifests()) {
  * @returns {{catalogue: object, manifestsByOrigin: object}}
  */
 export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
+  // composed ONCE per household manifest and app list (merging, availability): a door is cheap to compose per read, as
+  // the shells do, because this part is not redone; the manifests are fixed for the life of the app
+  const byManifest = OWN_PLACE_CACHE.get(householdManifest ?? NO_MANIFEST) ?? new Map();
+  OWN_PLACE_CACHE.set(householdManifest ?? NO_MANIFEST, byManifest);
+  const key = Array.isArray(apps) ? [...apps].sort().join(',') : '';
+  const hit = byManifest.get(key);
+  if (hit) return hit;
   const { catalogue: placed, manifestsByOrigin } = composeAssistantCatalogue({
     apps: apps ?? ownPlaceApps(catalogueManifests({ householdManifest })), householdManifest, place: 'own',
   });
-  return { catalogue: proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin), manifestsByOrigin };
+  const out = { catalogue: proposable(availableOnly(placed, manifestsByOrigin, ownPlacePolicy(Object.keys(manifestsByOrigin))), manifestsByOrigin), manifestsByOrigin };
+  byManifest.set(key, out);
+  return out;
 }
+const OWN_PLACE_CACHE = new WeakMap();
+const NO_MANIFEST = Object.freeze({});
 
 /**
  * A noun PEOPLE write (`writtenBy: 'people'`, the own note) gives no model a tool to write it: its generic writes carry no

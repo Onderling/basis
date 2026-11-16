@@ -29,6 +29,11 @@ Target the physical phone (`c53828f5`) instead:
 npm run detox:test:attached
 ```
 
+Walks that delete the app (`emulatorOnly` in `support/ui.js`) run on an emulator, or on an agreed TEST phone the run
+names: `E2E_WIPE_OK=<serial> npx detox test -c android.attached.release --device-name <serial> …`. Two locks
+(`support/wipeOk.js`): the serial must be on its agreed list (today only the test Samsung) AND be named; a personal
+phone is refused whatever a run says.
+
 ## What's covered
 
 | Test | Pins |

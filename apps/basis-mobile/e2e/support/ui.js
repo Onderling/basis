@@ -1,6 +1,7 @@
 /* global device, element, by, expect */
 // The phone walks' shared moves: launch, poll for a screen, tap through the moment one RN modal closes as the next
 // opens, and the first boot of a fresh install. One copy, so a fix to a flake lands in every walk.
+const { mayWipe } = require('./wipeOk');
 
 async function launch({ fresh = false } = {}) {
   // The app's network timers never let RN idle; launch with synchronization off (see circleDefault.test.js).
@@ -62,10 +63,11 @@ async function backToLauncher(tries = 4) {
   }
 }
 
-/** A walk that deletes the app must never run on a person's phone. */
+/** A walk that deletes the app must never run on a person's phone: an emulator, or an agreed test device the run names
+ *  in E2E_WIPE_OK (wipeOk.js: two locks; the Fairphone is refused whatever a run says). */
 function emulatorOnly(name) {
-  if (!String(device.id ?? '').startsWith('emulator-')) {
-    throw new Error(`${name} refuses to run on ${device.id}: it deletes the app — emulator only`);
+  if (!mayWipe(device.id)) {
+    throw new Error(`${name} refuses to run on ${device.id}: it deletes the app — an emulator, or an agreed test device named in E2E_WIPE_OK`);
   }
 }
 

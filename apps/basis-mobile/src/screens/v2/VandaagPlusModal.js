@@ -9,6 +9,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
+import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel } from '../../../../basis/src/v2/vandaagPlus.js';
@@ -42,8 +43,10 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [asSelf, setAsSelf] = useState(writeAsSelf);
-  // the conversation of the self this is written as (`turns(asSelf)`, the shared door's): none before a self is picked
-  const shownTurns = typeof turns === 'function' ? (asSelf ? turns(asSelf) : []) : turns;
+  // the conversation of the self this is written as (`turns(asSelf)`, the shared door's). With one self or none ticked it
+  // is the general self's (as the door reads it); with several, none until the sheet's question is answered
+  const turnsSelf = conversationSelf(asSelf, Array.isArray(selves) ? selves.length : 0);
+  const shownTurns = typeof turns === 'function' ? (turnsSelf ? turns(turnsSelf) : []) : turns;
   const [line, setLine] = useState('');
   const [card, setCard] = useState(null);
   const [done, setDone] = useState(null);
@@ -105,7 +108,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                 <Text key={`${turn.ts ?? i}-${i}`} testID={`vandaag-plus-turn-${turn.who === 'you' ? 'you' : 'assistant'}`}
                   style={[styles.turn, turn.who === 'you' ? styles.turnYou : null]}>{turn.text}</Text>
               ))}
-              {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={() => onForget(asSelf)} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
+              {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={() => onForget(turnsSelf)} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
             </View>
           ) : null),
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>

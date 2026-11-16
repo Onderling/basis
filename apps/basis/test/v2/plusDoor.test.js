@@ -260,3 +260,11 @@ it('the pick on the which-circle card is kept in the conversation of the self it
   expect(threads.memory.recent(d.threadIdFor(['werk'])).join(' ')).toContain('melk staat op Projecten');
   expect(threads.memory.recent(d.threadIdFor(['default']))).toEqual([]);
 });
+
+it('whose conversation the sheet shows: the self written as; the general self with one or none ticked; nobody before the question', async () => {
+  const { conversationSelf } = await import('../../src/assistant/plusDoor.js');
+  expect(conversationSelf('werk', 2)).toBe('werk');
+  expect(conversationSelf(null, 0)).toBe('default');
+  expect(conversationSelf(null, 1)).toBe('default');
+  expect(conversationSelf(null, 2)).toBe(null);
+});

@@ -191,7 +191,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
-import { createPlusDoor } from '../../src/assistant/plusDoor.js';
+import { createPlusDoor, conversationSelf } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
@@ -4795,10 +4795,10 @@ function showVandaagPlus({ edit = null } = {}) {
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
-    turns: asSelf ? plusDoorNow().turns({ asSelf }) : [],
+    turns: conversationSelf(asSelf, selves.length) ? plusDoorNow().turns({ asSelf: conversationSelf(asSelf, selves.length) }) : [],
     suggestFor: (typed) => plusSuggest(suggestionPool, typed),
     // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
-    onForget: async () => { await plusDoorNow().forget({ asSelf }); paint(); },
+    onForget: async () => { await plusDoorNow().forget({ asSelf: conversationSelf(asSelf, selves.length) }); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),

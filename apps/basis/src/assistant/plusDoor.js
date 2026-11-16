@@ -30,6 +30,16 @@ import { interpretToCommand } from '../v2/interpretCommand.js';
 import { loadOwnItems } from './ownItems.js';
 
 /**
+ * Whose conversation the sheet shows: the self it is written as; with one self or none ticked, the general self's (as the
+ * door reads a line then); with several ticked and none picked, nobody's until the sheet's question is answered.
+ * @param {string|null} asSelf  @param {number} tickedCount  how many selves are ticked in the header
+ * @returns {string|null}
+ */
+export function conversationSelf(asSelf, tickedCount = 0) {
+  return asSelf ?? (tickedCount > 1 ? null : 'default');
+}
+
+/**
  * The apps the own "+" composes: every app that declares something for the own place (an op's or a noun's `scopes`).
  * Derived from the declarations, so an app that adds an own act appears in the "+" with no Basis code.
  * @param {object[]} manifests

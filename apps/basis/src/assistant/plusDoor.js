@@ -118,7 +118,7 @@ export function createPlusDoor({
   // a self's key (`selfKeyOf`), and whether it is the general self: what the reader cuts notes by
   const selfOf = selfOfIn ?? ((id) => ({ key: typeof selfKeyOf === 'function' ? selfKeyOf(id ?? 'default') : null, isDefault: (id ?? 'default') === 'default' }));
   /**
-   * The conversation's thread (D8, D9): ONE self's own thread (`own:<key>`, the id the "+" always had), or, for a SET of
+   * The conversation's thread: ONE self's own thread (`own:<key>`, the id the "+" always had), or, for a SET of
    * selves read together, the combined conversation's own thread, keyed on the set (whoever is primary): never mixed
    * with a single self's. Without `selfKeyOf` the door has the one thread it was given.
    * @param {string[]} selves
@@ -149,10 +149,10 @@ export function createPlusDoor({
   let outcome = null;
   const engine = createAssistantEngine({
     catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false,
-    // what the model may read for a line: the ticked self's own things only (D1: own things only; D8: that self's)
+    // what the model may read for a line: the person's own things only, and only the ticked self's (or the set's)
     ...(typeof readAs === 'function'
       ? { loadItems: async (ctx) => {
-        // one self, or the SET read together (D9): the union of each self's own things, each read as that self
+        // one self, or the SET read together: the union of each self's own things, each read as that self
         const set = Array.isArray(ctx?.selves) && ctx.selves.length ? ctx.selves : [ctx?.asSelf ?? null];
         const seen = new Set();
         const rows = (await Promise.all(set.map((id) => loadOwnItems({ call: readAs(id), self: selfOf(id) })()))).flat();

@@ -195,7 +195,7 @@ describe('the assistant reads the person\'s own things, as the ticked self (jour
     expect(context).toContain('sleutel ligt bij de buren');
     expect(callSkill).not.toHaveBeenCalled();
   });
-  it('another self ticked: the general self\'s note never reaches the model (D8)', async () => {
+  it('another self ticked: the general self\'s note never reaches the model (the conversation follows the self)', async () => {
     let context = null;
     const interpret = async (_text, o) => { context = JSON.stringify(o.context ?? []); return { reply: 'Weet ik niet.' }; };
     const { d } = door({ interpret, readAs: ownRoutes, selfOf });
@@ -204,7 +204,7 @@ describe('the assistant reads the person\'s own things, as the ticked self (jour
   });
 });
 
-describe('the conversation follows the ticked self (D8), or a set of selves with a primary (D9)', () => {
+describe('the conversation follows the ticked self, or a set of selves with a primary', () => {
   const selfKeyOf = (id) => ({ default: 'me-key', werk: 'werk-key', thuis: 'thuis-key' })[id] ?? null;
   const notesOf = { 'me-key': 'de sleutel ligt bij de buren', 'werk-key': 'het wachtwoord van de printer' };
   const readAs = (asSelf) => async (app) => (app === 'household'

@@ -14,6 +14,7 @@ import { createOwnDevicesStore } from '../../src/v2/ownDevicesStore.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 import { plusLineOutcome, plusCircleOp, plusCardLabel, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { catalogueManifests } from '../../src/v2/manifestSources.js';
+import { listsGateRules } from '../../src/v2/circleGate.js';
 
 const OWN = OWN_DEVICES_SCOPE;
 const boot = async (ds, extra = {}) => createRealHouseholdAgent({ seedHousehold: false, ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }), ...extra });
@@ -141,5 +142,14 @@ describe('the thread answers a read of a list', () => {
       .toBe('circle.vandaag.plus_list_items{"name":"Boodschappen","items":"✓ melk, brood"}');
     expect(plusDoneLine({ ok: true, title: 'Boodschappen', items: [] }, { opId: 'listEntries', t })).toBe('circle.vandaag.plus_list_empty{"name":"Boodschappen"}');
     expect(plusDoneLine({ ok: false, error: 'x' }, { opId: 'listEntries', t })).toBeNull();
+  });
+});
+
+describe("the box has no '+': 'mijn boodschappen' in a DM is its household's list", () => {
+  it("a household bot reads 'mijn' as a filler word before the list's name: nothing new, the household's list", () => {
+    const rules = listsGateRules(null, [{ name: 'Boodschappen', kind: 'shopping' }]);
+    const cmd = rules.map((r) => (r.test('zet melk op mijn boodschappen') ? r.command('zet melk op mijn boodschappen') : null)).find(Boolean);
+    expect(cmd).toMatchObject({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk' } });
+    expect(cmd.args.circleId, 'no own scope: the bot acts in its household').toBeUndefined();
   });
 });

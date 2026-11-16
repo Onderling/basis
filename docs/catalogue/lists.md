@@ -1,8 +1,9 @@
 # Lists
 
 A circle's lists: plain lines (shopping, packing, chores), each list a container of entries, kept in the circle's own
-store and carried to its members like every other item. This page was started 2026-11-14 with the Lists tab; parts of
-the area (sendable lists, a person's own lists in the assistant thread) are still to be described.
+store and carried to its members like every other item. A person also has lists of their OWN, in their own store,
+reached from the assistant thread (the "+"). This page was started 2026-11-14 with the Lists tab; sendable lists are
+still to be described.
 
 ## What a person can do
 
@@ -12,6 +13,11 @@ the area (sendable lists, a person's own lists in the assistant thread) are stil
   remove and restore entries and lists, and edit an entry's words.
 - Make a list from the circle's "+" (`/new-list`), wherever lists are on.
 - Put a lists block on a screen of their own (a page's recipe); a block whose circle has lists off says so in one line.
+- Keep lists of their OWN from the "+" thread: "nieuwe lijst Vakantie" makes one, "zet melk op mijn boodschappen" adds
+  to it, "wat staat er op mijn boodschappen" answers with its entries, the done ones marked. The line is read against
+  the own lists first; a name that is both theirs and a circle's asks which, with 'mine' first. An own list belongs to
+  the self ticked in the "+" when it was made: it is carried to that self's devices only, and shown only with that self
+  ticked.
 
 ## Where
 
@@ -23,6 +29,10 @@ the area (sendable lists, a person's own lists in the assistant thread) are stil
   store; writes go through the ops.
 - The "+": `apps/basis/src/v2/attachEntries.js` offers making a list wherever the feature has a surface (the tab).
 - The block: `apps/basis/src/v2/circleRecipeBlocks.js` (`materializeLists`), only where a recipe carries it.
+- Own lists: the same ops with the own scope named as the circle, over the person's own store as one self
+  (`ownListsCall`, `ownStoreAsSelf` in `apps/basis/src/core/agent/realAgent.js`); the "+" reads them first
+  (`plusLineOutcome`'s `own`, `plusOwnLists`, `plusDoneLine` in `apps/basis/src/v2/vandaagPlus.js`), both shells
+  through the shared functions (`plus-own-lists`, `plus-done-line` in `scripts/shell-seams.mjs`).
 
 <!-- catalogue-ops
 lists: createList addToList listLists markListItemDone makeChore entryReminders shopVisit listEntries listDone removeFromList removeList restoreList restoreEntry editEntry
@@ -35,6 +45,9 @@ lists: createList addToList listLists markListItemDone makeChore entryReminders 
   screen in the tab.
 - `apps/basis/test/v2/listsBlock.test.js` — the lists block: what it reads, its one act per entry, the off line.
 - `apps/basis/test/v2/offeredFeatures.test.js` — a feature with no surface is neither a toggle nor in the "+".
+- `apps/basis/test/v2/ownListsPlus.test.js` — own lists land in the own store and nowhere else; a door and a persona's
+  lane are refused; a list made as a persona is read only with that persona; the "+" reads own lists first, asks when a
+  circle holds the same name, makes an own list; the thread's answer to a read.
 
 ## Decided, not built
 
@@ -44,8 +57,9 @@ lists: createList addToList listLists markListItemDone makeChore entryReminders 
 
 ## Open rows
 
-- The person's own lists in the assistant thread ("+"): a second step after the tab.
+- Own lists on Me (a block), and sharing or moving an own list into a circle: open ideas for Frits, not built.
 
 ## Decisions that bind this area
 
-- None recorded in `docs/decisions.md` yet; the tab follows the ledger row's ruling (the settings switch is the tab).
+- `docs/decisions.md` 2026-11-16: a person's own lists live in their own store, are the self's that made them, and are
+  reached from the "+" thread. The tab follows the ledger row's ruling (the settings switch is the tab).

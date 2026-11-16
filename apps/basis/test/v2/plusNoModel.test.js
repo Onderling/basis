@@ -30,7 +30,7 @@ describe('no own model', () => {
   it('the way to the setting is in both languages, from the screens\' own labels', () => {
     for (const bundle of [nl, en]) {
       for (const k of ['circle.vandaag.plus_no_model', 'circle.vandaag.plus_model_unreachable', 'circle.vandaag.plus_route_none',
-        'circle.vandaag.plus_route_confidential', 'circle.vandaag.plus_route_plain', 'circle.vandaag.plus_route_local',
+        'circle.vandaag.plus_route_confidential', 'circle.vandaag.plus_route_plain', 'circle.vandaag.plus_route_local', 'circle.vandaag.plus_route_confidential_asserted',
         'circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title']) {
         expect(textOf(bundle, k), k).toBeTruthy();
       }
@@ -74,8 +74,11 @@ describe('the route line at the top of the conversation', () => {
       }
     }
   });
-  it('a remote confidential route whose attestation the person asserts with the flag is called confidential, as the help bot calls it', () => {
+  it('a REMOTE confidential route whose attestation is only the person\'s flag says so: the app has not checked it', () => {
     const r = ownRouteOf({ preset: 'confidential-proxy', llmBaseUrl: 'https://enclave.example.org/v1', attestation: true });
-    expect(plusRouteLine(r, { t })).toContain('plus_route_confidential');
+    const line = plusRouteLine(r, { t });
+    expect(line).toMatch(/plus_route_confidential_asserted.*enclave\.example\.org/);
+    // the proxy on the person's own machine verifies the enclave itself: plainly confidential
+    expect(plusRouteLine(ownRouteOf({ preset: 'confidential-proxy', llmBaseUrl: 'http://127.0.0.1:8080' }), { t })).toBe('circle.vandaag.plus_route_confidential');
   });
 });

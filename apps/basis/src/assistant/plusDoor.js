@@ -47,6 +47,8 @@ export function plusNoModelAnswer({ t }) {
 export function plusRouteLine(route, { t }) {
   if (!route?.set) return t('circle.vandaag.plus_route_none');
   if (route.kind === 'confidential') return t('circle.vandaag.plus_route_confidential');
+  // confidential only by the person's own word (a remote route, its attestation the setting's flag): never claimed as checked
+  if (route.kind === 'confidential-asserted') return t('circle.vandaag.plus_route_confidential_asserted', { host: route.host ?? '' });
   // a model the person runs themselves: the most private route, never called "not confidential"
   if (route.kind === 'local') return t('circle.vandaag.plus_route_local', { host: route.host ?? '' });
   return t('circle.vandaag.plus_route_plain', { host: route.host ?? '' });

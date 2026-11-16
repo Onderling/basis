@@ -1595,6 +1595,10 @@
       "text": "Your own model answers, on {{host}}: a model you run yourself.",
       "doc": "The line at the top of the \"+\" conversation: the own route is a LOCAL model the person runs themselves (the Local preset); {{host}} is where it runs."
     },
+    "plus_route_confidential_asserted": {
+      "text": "Your own model answers via {{host}}. You marked that route as attested; this app has not checked it.",
+      "doc": "The line at the top of the \"+\" conversation: a REMOTE confidential route accepted only because the person set its attestation flag; the app has not checked the enclave, so it never claims confidentiality as checked. {{host}} is where it goes."
+    },
     "plus_route_plain": {
       "text": "Your own model answers via {{host}}. That is not confidential.",
       "doc": "The line at the top of the \"+\" conversation: the own route is NOT confidential; {{host}} is where it goes."

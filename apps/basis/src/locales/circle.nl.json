@@ -1598,6 +1598,10 @@
       "text": "Je eigen model antwoordt, op {{host}}: een model dat je zelf draait.",
       "doc": "The line at the top of the \"+\" conversation: the own route is a LOCAL model the person runs themselves (the Local preset); {{host}} is where it runs."
     },
+    "plus_route_confidential_asserted": {
+      "text": "Je eigen model antwoordt via {{host}}. Je hebt aangegeven dat die enclave attested is; deze app heeft dat niet gecontroleerd.",
+      "doc": "The line at the top of the \"+\" conversation: a REMOTE confidential route accepted only because the person set its attestation flag; the app has not checked the enclave, so it never claims confidentiality as checked. {{host}} is where it goes."
+    },
     "plus_route_plain": {
       "text": "Je eigen model antwoordt via {{host}}. Dat is niet vertrouwelijk.",
       "doc": "The line at the top of the \"+\" conversation: the own route is NOT confidential; {{host}} is where it goes."

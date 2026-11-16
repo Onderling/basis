@@ -182,3 +182,54 @@ describe('the limitation, recorded as a test rather than a comment', () => {
     expect(run().code).toBe(0);
   });
 });
+
+// Closed rows may move to a monthly archive beside the ledger (REMAINING-WORK-archive/REMAINING-WORK-<YYYY-MM>.md), so
+// the open list stays short to read. The ids must stay unique across both, and only a closed row may leave.
+describe('the archive of closed rows', () => {
+  const archive = (month, body) => {
+    mkdirSync(join(root, 'REMAINING-WORK-archive'), { recursive: true });
+    write(`REMAINING-WORK-archive/REMAINING-WORK-${month}.md`, body);
+  };
+
+  it('a cross-reference to an archived row still resolves', () => {
+    write('REMAINING-WORK.md', `${ledger('1. **[L2] Open one.**')}\n\nSee the old fix [ledger L1].\n`);
+    archive('2026-10', '1. **[L1] ✅ CLOSED (merged #10) — the old fix.**\n');
+    baseline();
+    expect(run().code).toBe(0);
+  });
+
+  it('fails when an id is both Open and archived', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L1] Open one.**'));
+    archive('2026-10', '1. **[L1] ✅ CLOSED — the same id.**\n');
+    baseline();
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/L1 is both Open and archived/);
+  });
+
+  it('fails when an OPEN row is moved into the archive (it would vanish from the list Frits reads)', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L2] Open one.**'));
+    archive('2026-10', '1. **[L1] Should we rename the thing?**\n');
+    baseline();
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/Archived row L1.*not closed/s);
+  });
+
+  it('fails when one id is archived twice', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L3] Open one.**'));
+    archive('2026-10', '1. **[L1] ✅ CLOSED — first.**\n');
+    archive('2026-11', '1. **[L1] ✅ CLOSED — again.**\n');
+    baseline();
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toMatch(/L1 is archived twice/);
+  });
+
+  it('--next mints above every id, the archive included, with the asked parity', () => {
+    write('REMAINING-WORK.md', ledger('1. **[L4] Open one.**'));
+    archive('2026-10', '1. **[L9] ✅ CLOSED — the highest id lives in the archive.**\n');
+    expect(run(['--next', 'odd']).out.trim()).toBe('L11');
+    expect(run(['--next', 'even']).out.trim()).toBe('L10');
+  });
+});

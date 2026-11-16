@@ -29,6 +29,10 @@
 //
 // Usage: node scripts/lint-ledger.mjs            (or: npm run lint:ledger)
 //        node scripts/lint-ledger.mjs --update   rewrite the baseline from what is on disk now
+//        node scripts/lint-ledger.mjs --next odd|even   the next free id of that parity (archive included)
+//
+// CLOSED rows may move to REMAINING-WORK-archive/REMAINING-WORK-<YYYY-MM>.md (gitignored, one file per month): their
+// ids stay reserved, cross-references to them resolve, and an archived row that is not closed fails.
 
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -113,8 +117,31 @@ for (const n of openIds) {
   }
 }
 
+// ── the archive: CLOSED rows moved out of the ledger, one file per month ──────
+// `REMAINING-WORK-archive/REMAINING-WORK-<YYYY-MM>.md`, beside the ledger and gitignored like it. The open list stays
+// short to read; the ids stay unique across both, a cross-reference to an archived row still resolves, and only a closed
+// row may leave (an open question moved into the archive would vanish from the one list Frits reads).
+const ARCHIVE_DIR = join(ROOT, 'REMAINING-WORK-archive');
+const archiveFiles = existsSync(ARCHIVE_DIR)
+  ? readdirSync(ARCHIVE_DIR).filter((f) => /^REMAINING-WORK-\d{4}-\d{2}\.md$/.test(f)).sort()
+  : [];
+const archivedIds = new Set();
+for (const f of archiveFiles) {
+  for (const line of readFileSync(join(ARCHIVE_DIR, f), 'utf8').split('\n')) {
+    if (!/^\s*(?:\d+\.|[-*])\s+\S/.test(line)) continue;
+    const [n] = idsIn(line);
+    if (n === undefined) continue;
+    if (archivedIds.has(n)) errors.push(`L${n} is archived twice (found again in ${f}).`);
+    archivedIds.add(n);
+    if (!/✅|✔|\bCLOSED\b/.test(line)) errors.push(`Archived row L${n} (${f}) is not closed: only a closed (✅ CLOSED) row leaves the ledger.`);
+  }
+}
+for (const n of openIds) {
+  if (archivedIds.has(n)) errors.push(`L${n} is both Open and archived: an id names one row.`);
+}
+
 // ── 3. cross-references resolve, and to the right state ──────────────────────
-const allIds = new Set([...openIds, ...answeredIds]);
+const allIds = new Set([...openIds, ...answeredIds, ...archivedIds]);
 const REF = /ledger\s+L(\d+)/gi;
 for (const m of src.matchAll(REF)) {
   const n = Number(m[1]);
@@ -200,6 +227,19 @@ for (const rel of scanned) {
 
 const prior = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : { markerSites: [], highWaterMark: 0 };
 const highWater = Math.max(prior.highWaterMark || 0, ...allIds, 0);
+
+// `--next odd|even`: the next free id of that parity (Fable mints odd, Opus even), above every id the ledger, its
+// answered list, its archive and the baseline have ever held. This replaces grepping the ledger by hand, which cannot
+// see the archive.
+const NEXT = process.argv.indexOf('--next');
+if (NEXT !== -1) {
+  const parity = process.argv[NEXT + 1];
+  if (parity !== 'odd' && parity !== 'even') { console.error('usage: lint-ledger.mjs --next odd|even'); process.exit(2); }
+  let n = highWater + 1;
+  if ((n % 2 === 1) !== (parity === 'odd')) n += 1;
+  console.log(`L${n}`);
+  process.exit(0);
+}
 
 if (UPDATE) {
   writeFileSync(BASELINE, `${JSON.stringify({

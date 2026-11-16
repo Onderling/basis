@@ -238,7 +238,7 @@ import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDis
 // the shared confirm gate at the dispatch waist (mobile presenter: Alert.alert, destructive style).
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../basis/src/v2/userLlmDefault.js';
-import { buildUserLlmRuntime, validateUserLlmConfig, ownModelOf } from '../../../../basis/src/v2/userLlmRuntime.js';
+import { buildUserLlmRuntime, validateUserLlmConfig, ownModelOf, ownRouteOf } from '../../../../basis/src/v2/userLlmRuntime.js';
 import { t, lang } from '../../core/localisation.js';
 import {
   makeCirclePolicyStoreRN, makeMemberOverrideStoreRN, makeAvailabilityStoreRN,
@@ -288,7 +288,7 @@ import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
-import { createPlusDoor } from '../../../../basis/src/assistant/plusDoor.js';
+import { createPlusDoor, plusRouteLine } from '../../../../basis/src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
 import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
@@ -2253,6 +2253,7 @@ export default function CircleLauncherScreen({
         // circle is clear, else the card asks which (plusLineOutcome); the own model reads only what the plain reading
         // missed (their settings' route only; none set = no model). Web twin: circleApp.js
         turns={(asSelf) => plusDoorNow().turns({ asSelf })}
+        routeLine={plusRouteLine(ownRouteOf(userLlmCfg), { t })}
         // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat (web twin)
         onForget={plusThread ? async (asSelf) => { await plusDoorNow().forget({ asSelf }); setPlusTurnsTick((n) => n + 1); } : null}
         suggestFor={(typed) => plusSuggest(plusPool, typed)}

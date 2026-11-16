@@ -35,6 +35,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the kept conversation with the assistant (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to
   // empty it — web twin: vandaagPlus.js `plus-thread`
   turns = [], onForget = null,
+  // the line naming the route that answers (`plusRouteLine`, shared): painted above the conversation
+  routeLine = null,
   // what can be typed here: `suggestFor(line)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
   suggestFor = null }) {
   const theme = useTheme();
@@ -100,6 +102,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
       <View style={styles.backdrop}>
         <View style={styles.card} testID="vandaag-plus">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
+          {/* which route answers this conversation, and whether it is confidential (web twin: circle-vandaag-plus__route) */}
+          {!edit && routeLine ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
             const piece = {
@@ -222,6 +226,7 @@ const makeStyles = (theme) => StyleSheet.create({
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 4 },
   field: { gap: 4, marginBottom: 8 },
   label: { fontSize: 13, color: theme.color.inkSoft },
+  route: { fontSize: 13, color: theme.color.inkSoft, marginBottom: 6 },
   // a turn of the kept conversation: the assistant's on the left, the person's own to the right
   turn: { fontSize: 14, color: theme.color.ink, marginVertical: 2, alignSelf: 'flex-start' },
   turnYou: { alignSelf: 'flex-end', color: theme.color.inkSoft },

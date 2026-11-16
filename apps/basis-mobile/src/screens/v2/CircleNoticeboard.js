@@ -10,7 +10,7 @@
  */
 import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, TextInput, StyleSheet, Image, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image, Modal } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { pickAndEncodeImage } from '../../v2/attachmentPicker.js';
@@ -29,6 +29,7 @@ import { getCirclePodFetch } from '../../core/circlePods.js';
 // Sealed media (2026-07-11): Uint8Array → base64 data-URL for the full-image viewer (reuse the
 // RN media-card helper — no second encoder).
 import { bytesToStdB64 } from '../../core/mediaCardModel.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const INTENTS = NOTICEBOARD_INTENTS;
 
@@ -251,7 +252,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
         ))}
       </View>
       <View style={styles.composerRow}>
-        <TextInput
+        <ThemedTextInput
           style={styles.input} value={text} onChangeText={setText}
           placeholder={t(`circle.noticeboard.placeholder.${intent}`)} placeholderTextColor={theme.color.inkSoft}
           onSubmitEditing={submitPost} testID="nb-input"
@@ -276,7 +277,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       {intent === 'lend' && (
         <View style={styles.dueRow}>
           <Text style={styles.dueLabel}>{t('circle.noticeboard.due')}</Text>
-          <TextInput style={styles.dueInput} value={dueText} onChangeText={setDueText} placeholder="YYYY-MM-DD" placeholderTextColor={theme.color.inkSoft} autoCapitalize="none" testID="nb-due" />
+          <ThemedTextInput style={styles.dueInput} value={dueText} onChangeText={setDueText} placeholder="YYYY-MM-DD" placeholderTextColor={theme.color.inkSoft} autoCapitalize="none" testID="nb-due" />
         </View>
       )}
       </>)}
@@ -350,13 +351,13 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
           )}
           {replyingTo === p.id && (
             <View style={styles.replyRow}>
-              <TextInput style={styles.replyInput} value={replyText} onChangeText={setReplyText} placeholder={t('circle.noticeboard.respond_prompt')} placeholderTextColor={theme.color.inkSoft} onSubmitEditing={() => submitReply(p)} testID={`nb-reply-${p.id}`} autoFocus />
+              <ThemedTextInput style={styles.replyInput} value={replyText} onChangeText={setReplyText} placeholder={t('circle.noticeboard.respond_prompt')} placeholderTextColor={theme.color.inkSoft} onSubmitEditing={() => submitReply(p)} testID={`nb-reply-${p.id}`} autoFocus />
               <Pressable style={styles.post} onPress={() => submitReply(p)}><Text style={styles.postText}>{t('circle.contacts.send')}</Text></Pressable>
             </View>
           )}
           {assigningTo === p.id && (
             <View style={styles.replyRow}>
-              <TextInput style={styles.replyInput} value={assignText} onChangeText={setAssignText} placeholder={t('circle.noticeboard.assign_prompt')} placeholderTextColor={theme.color.inkSoft} autoCapitalize="none" onSubmitEditing={() => submitAssign(p)} testID={`nb-assign-${p.id}`} autoFocus />
+              <ThemedTextInput style={styles.replyInput} value={assignText} onChangeText={setAssignText} placeholder={t('circle.noticeboard.assign_prompt')} placeholderTextColor={theme.color.inkSoft} autoCapitalize="none" onSubmitEditing={() => submitAssign(p)} testID={`nb-assign-${p.id}`} autoFocus />
               <Pressable style={styles.post} onPress={() => submitAssign(p)}><Text style={styles.postText}>{t('circle.noticeboard.action.assign')}</Text></Pressable>
             </View>
           )}

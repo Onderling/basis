@@ -25,7 +25,7 @@
 import { blockEmptyLine, blockOpensWhole } from '../../../../basis/src/v2/blockTitle.js';
 import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { featureActionLabelKey } from '@onderling-app/basis';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType, newsKindIcons } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
@@ -37,6 +37,7 @@ import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
 import { typedRowOp } from '../../../../basis/src/v2/rowPrimary.js';
 import { nounHeading } from '../../../../basis/src/v2/nounNames.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // An embed `ref` may be a full URN (urn:dec:item:T2) while a rendered row
 // carries only the local id (T2).  Match the raw ref OR its local-id tail so a
@@ -375,7 +376,7 @@ function ListAddField({ list, onAction, styles }) {
   };
   return (
     <View style={styles.listAdd} testID={`list-add-${list.id}`}>
-      <TextInput style={styles.listAddInput} value={text} onChangeText={setText} onSubmitEditing={send} returnKeyType="done"
+      <ThemedTextInput style={styles.listAddInput} value={text} onChangeText={setText} onSubmitEditing={send} returnKeyType="done"
         placeholder={t(list.add.placeholderKey ?? 'circle.lists.add_prompt')} testID={`list-add-input-${list.id}`} />
       <Pressable style={styles.rowAct} onPress={send} accessibilityRole="button" testID={`list-add-send-${list.id}`}>
         <Text style={styles.rowActText}>{t(list.add.labelKey ?? 'circle.container.add')}</Text>
@@ -414,7 +415,7 @@ function OnboardingCards({ block, onAction, styles }) {
           {c.id === 'handle' ? (
             <View>
               <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_handle_hint')}</Text>
-              <TextInput style={styles.onbInput} value={handle} onChangeText={setHandle} placeholder={t('circle.vandaag.onboarding_handle_ph')}
+              <ThemedTextInput style={styles.onbInput} value={handle} onChangeText={setHandle} placeholder={t('circle.vandaag.onboarding_handle_ph')}
                 accessibilityLabel={t('circle.vandaag.onboarding_handle_title')} testID="onb-handle" />
               <OnbBtn labelKey="circle.vandaag.onboarding_handle_save" a={{ kind: 'set-handle', value: handle }} testID="onb-handle-save" />
             </View>

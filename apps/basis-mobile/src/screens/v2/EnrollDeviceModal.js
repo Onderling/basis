@@ -7,7 +7,7 @@
  * record, reopen, re-announce).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet, Share } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet, Share } from 'react-native';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
@@ -15,6 +15,7 @@ import { useTheme } from './themeContext.js';
 import { currentRelayUrl } from './RelayQuestionModal.js';
 import { t } from '../../core/localisation.js';
 import { openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../../../basis/src/v2/enrollOffer.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
@@ -128,7 +129,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
           ) : view?.status === 'awaiting-input' && view.form ? (
             <View>
               <Text style={styles.body}>{t('circle.enroll.body')}</Text>
-              <TextInput
+              <ThemedTextInput
                 style={styles.input}
                 placeholder={t('circle.enroll.offer_paste_label')}
                 placeholderTextColor={theme.color.inkSoft}
@@ -141,7 +142,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
               />
               {offerInvalid ? <Text style={styles.offerErr}>{t('circle.enroll.offer_paste_invalid')}</Text> : null}
               {view.form.params.filter((param) => param.name !== ENROL_PERSONAS_PARAM && param.name !== ENROL_GENERAL_PARAM).map((param) => (
-                <TextInput
+                <ThemedTextInput
                   key={param.name}
                   style={[styles.input, param.kind === 'secret' && styles.secret]}
                   placeholder={t(`circle.enroll.${param.name}_placeholder`, { defaultValue: param.name })}

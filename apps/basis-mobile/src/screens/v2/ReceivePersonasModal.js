@@ -7,10 +7,11 @@
  * only paints.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { personasHereRows } from '../../../../basis/src/v2/personasHere.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
   const theme = useTheme();
@@ -85,7 +86,7 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
           {removing ? (
             <View testID="personas-here-removing">
               <Text style={styles.body}>{t(removing.remove.warnKey, { name: removing.nameKey ? t(removing.nameKey) : removing.name })}</Text>
-              <TextInput
+              <ThemedTextInput
                 style={[styles.input, styles.secret]}
                 placeholder={t('circle.receive_personas.phrase_placeholder')}
                 placeholderTextColor={theme.color.inkSoft}
@@ -142,7 +143,7 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
                 </Pressable>
               ))}
               {listed.length ? <Text style={styles.body}>{t('circle.receive_personas.seal_only')}</Text> : null}
-              <TextInput
+              <ThemedTextInput
                 style={[styles.input, styles.secret]}
                 placeholder={t('circle.receive_personas.phrase_placeholder')}
                 placeholderTextColor={theme.color.inkSoft}

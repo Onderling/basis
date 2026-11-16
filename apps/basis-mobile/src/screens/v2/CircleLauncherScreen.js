@@ -33,7 +33,7 @@ import { pushContactReply, subscribeContactReplies } from '../../core/contactRep
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Constants from 'expo-constants';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
 import { useTheme } from './themeContext.js';
 import DeliveryChip from '../../rn/DeliveryChip.js';
 import { FAB, FAB_CLEARANCE, HEADER_AVATAR } from './fab.js';
@@ -177,7 +177,7 @@ import {
 // #38 — the DEDICATED help-answer LLM path (shared with web): a freeform layer-2 ask is ANSWERED, grounded
 // in the kaartjes, instead of routed through the tool-selection prompt (→ null → fallback).
 import { answerHelpViaLlm } from '../../../../basis/src/v2/help/helpLlm.js';
-import { helpDeck } from '../../../../basis/src/v2/help/kaartjes.js';
+import { helpCardsDeck as helpDeck } from '../../../../basis/src/v2/help/helpCards.js';   // the site's cards + the app's how-to cards
 // OBJ-2 membership — reuse the classic RN join wizard + the camera scanner + the shared invite glue.
 import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWizardModal.js';
 import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';
@@ -329,6 +329,7 @@ import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-cir
 import { launcherListPaint } from './launcherListPaint.js';
 import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
 // Unset → no provider → the LLM branch
@@ -1951,8 +1952,6 @@ export default function CircleLauncherScreen({
   // the one scanner above — one door with `/scan-qr`.
   const onMeAction = (id) => {
     if (id === 'share-contact') { setView('shareContact'); return; }
-    // the person's ongoing conversation with the assistant: the "+" sheet (web parity)
-    if (id === 'assistant') { setPlusEdit(null); setPlusOpen(true); return; }
     if (id === 'scan') {
       // ONE door: the op opens the scanner through its seam. If it refuses, say so — opening the scanner anyway would be
       // a second door to the same act.
@@ -5219,7 +5218,7 @@ function CircleDetail({
               <Text style={styles.composerAttachText}>+</Text>
             </Pressable>
           ) : null}
-          <TextInput
+          <ThemedTextInput
             style={styles.composerInput}
             value={composerText}
             onChangeText={setComposerText}
@@ -5713,7 +5712,7 @@ function AddRelayForm({ styles, onAdd, addError }) {
     <View style={styles.row} testID="point-add">
       <Text style={styles.rowName}>{t('circle.nearbyScreen.point_add_title')}</Text>
       <Text style={styles.rowMeta}>{t('circle.nearbyScreen.point_add_hint')}</Text>
-      <TextInput
+      <ThemedTextInput
         style={styles.nearbyInput}
         value={value}
         onChangeText={setValue}
@@ -6087,7 +6086,7 @@ function NearbyScreen({
             {answering && answeringAsk?.text ? (
               <Text style={styles.rowMeta} testID="nearby-answering-to">{t('circle.nearbyScreen.answering_to', { text: answeringAsk.text })}</Text>
             ) : null}
-            <TextInput
+            <ThemedTextInput
               style={styles.nearbyInput}
               value={draft}
               onChangeText={setDraft}
@@ -6272,7 +6271,7 @@ function NearbyScreen({
       {allows.card ? (
         <View style={styles.nearbyAsks} testID="nearby-card-form">
           <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.card_title')}</Text>
-          <TextInput
+          <ThemedTextInput
             style={styles.nearbyInput}
             value={cardLabel}
             onChangeText={setCardLabel}
@@ -6280,7 +6279,7 @@ function NearbyScreen({
             placeholder={t('circle.nearbyScreen.card_label')}
             testID="nearby-card-label"
           />
-          <TextInput
+          <ThemedTextInput
             style={styles.nearbyInput}
             value={cardLine}
             onChangeText={setCardLine}
@@ -6341,7 +6340,7 @@ function NearbyScreen({
             <Text key={m.id} style={styles.rowMeta} testID={`nearby-chat-${m.id}`}>{m.text}</Text>
           ))}
           <View style={styles.nearbyComposer}>
-            <TextInput
+            <ThemedTextInput
               style={styles.nearbyInput}
               value={chatDraft}
               onChangeText={setChatDraft}

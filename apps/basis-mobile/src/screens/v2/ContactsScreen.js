@@ -8,7 +8,7 @@
  * (and the thread screen) is platform code.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../../core/localisation.js';
@@ -26,6 +26,7 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';   // never the key on screen
 import { contactPointAdopter } from './RelayQuestionModal.js';
 import { HEADER_AVATAR_SIDE_CLEARANCE } from './fab.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
@@ -203,7 +204,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
 
       {addOpen && (
         <View style={styles.addRow}>
-          <TextInput
+          <ThemedTextInput
             style={styles.addInput}
             value={addText}
             onChangeText={setAddText}

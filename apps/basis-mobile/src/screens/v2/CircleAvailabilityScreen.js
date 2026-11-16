@@ -12,11 +12,12 @@
  * time falls back to the model default rather than blocking each keystroke).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, Switch, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 import { t } from '../../core/localisation.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function CircleAvailabilityScreen({ store, onBack }) {
   const theme = useTheme();
@@ -70,7 +71,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.rowLabel}>{t('circle.availability.holiday_until')}</Text>
-          <TextInput
+          <ThemedTextInput
             style={styles.input}
             value={h.until || ''}
             onChangeText={(v) => setHoliday({ until: v || null })}
@@ -89,7 +90,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.rowLabel}>{t('circle.availability.from')}</Text>
-          <TextInput
+          <ThemedTextInput
             style={styles.input}
             value={q.from || ''}
             onChangeText={(v) => setQuiet({ from: v })}
@@ -102,7 +103,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.rowLabel}>{t('circle.availability.to')}</Text>
-          <TextInput
+          <ThemedTextInput
             style={styles.input}
             value={q.to || ''}
             onChangeText={(v) => setQuiet({ to: v })}

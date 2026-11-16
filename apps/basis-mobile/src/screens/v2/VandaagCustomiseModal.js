@@ -4,12 +4,13 @@
  * is (`customiseOp`) and repaints. Nothing here changes the book itself. Web twin: web/v2/vandaagCustomise.js.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagCustomiseModal({ visible, model, onAct, onClose }) {
   const theme = useTheme();
@@ -108,7 +109,7 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
               </>),
                 'customise-page': () => (<>
             <Text style={styles.heading}>{t('circle.vandaag.page_title')}</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} testID="customise-page-name" />
+            <ThemedTextInput style={styles.input} value={name} onChangeText={setName} testID="customise-page-name" />
             <View style={styles.row}>
               <ActBtn label={t('circle.vandaag.rename_page')} act="rename-page" args={{ pageId: model.pageId, name }} />
               <ActBtn label={t('circle.vandaag.add_page')} act="add-page" args={{ name: t('circle.vandaag.new_page_name') }} />
@@ -135,7 +136,7 @@ function LabelsField({ control, styles, onApply, testID }) {
   const [text, setText] = useState(control.value);
   useEffect(() => { setText(control.value); }, [control.value]);
   return (
-    <TextInput style={[styles.input, { marginTop: 6 }]} value={text} onChangeText={setText}
+    <ThemedTextInput style={[styles.input, { marginTop: 6 }]} value={text} onChangeText={setText}
       placeholder={t('circle.vandaag.labels_placeholder')} accessibilityLabel={t('circle.vandaag.labels_title')}
       autoCapitalize="none" onEndEditing={() => { if (text !== control.value) onApply(text); }} testID={testID} />
   );

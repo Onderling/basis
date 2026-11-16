@@ -6,13 +6,14 @@
  * Enroll keeps its own painter: its persona picker is ceremony-specific UI, not a flow form.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { ceremonyOutcomeText, ceremonyFinished } from '../../../../basis/src/v2/ceremonyOutcome.js';
 import { ceremonyChoices, makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
@@ -70,7 +71,7 @@ export default function CeremonyFlowModal({ visible, deviceId, callSkill, onClos
           {view?.status === 'awaiting-input' ? (
             <View>
               <Text style={styles.body}>{t(`circle.${keyPrefix}.body`)}</Text>
-              <TextInput
+              <ThemedTextInput
                 style={styles.input}
                 placeholder={t(placeholderKey)}
                 placeholderTextColor={theme.color.inkSoft}

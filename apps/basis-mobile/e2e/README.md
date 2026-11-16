@@ -23,11 +23,16 @@ pnpm exec detox test --configuration android.emu.debug
 # or: npm run detox:test
 ```
 
-Target the physical phone (`c53828f5`) instead:
+Target an attached phone instead, named by its adb serial:
 
 ```sh
-npm run detox:test:attached
+DETOX_ADB_NAME=<serial> npm run detox:test:attached
 ```
+
+Walks that delete the app (`emulatorOnly` in `support/ui.js`) run on an emulator, or on an agreed TEST phone the run
+names: `E2E_WIPE_OK=<serial> npx detox test -c android.attached.release --device-name <serial> …`. Two locks
+(`support/wipeOk.js`): the serial must be on its agreed list (today only the test Samsung) AND be named; a personal
+phone is refused whatever a run says.
 
 ## What's covered
 

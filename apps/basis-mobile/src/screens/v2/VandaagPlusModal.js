@@ -6,12 +6,13 @@
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel, plusMomentNeedsTime } from '../../../../basis/src/v2/vandaagPlus.js';
+import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does → null, or the line
@@ -109,7 +110,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
-              <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
+              <ThemedTextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
                 placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
@@ -146,7 +147,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                   {f.kind === 'datetime' && plusMomentNeedsTime(act, values) ? (
                     <Text style={styles.label} testID="vandaag-plus-ask-time">{t('circle.vandaag.plus_which_time', { day: plusMomentNeedsTime(act, values) })}</Text>
                   ) : null}
-                  <TextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
+                  <ThemedTextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
                     onChangeText={(v) => setValues((cur) => ({ ...cur, [f.name]: v }))} />
                 </View>
               ))}

@@ -16,7 +16,7 @@ Original estimate: ~1 day.  Actual: ~4× that, blocked.
 
 ## End state — UPDATED 2026-05-26 evening: SHIPPED ✅
 
-**5/5 Detox tests green on both physical phone (c53828f5) AND
+**5/5 Detox tests green on both a physical phone AND
 emulator (Medium_Phone_API_36).**  Full suite ~70 seconds.
 
 The blocker after the release-build switch turned out to be the

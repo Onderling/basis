@@ -4794,6 +4794,7 @@ function showVandaagPlus({ edit = null } = {}) {
   let shareTargets = null;
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
+    lang: currentLang(),
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
     turns: plusThreadNow().turns(),
     suggestFor: (typed) => plusSuggest(suggestionPool, typed),

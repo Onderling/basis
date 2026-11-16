@@ -29,3 +29,13 @@ describe('the own "+" catalogue comes from the declarations', () => {
     expect(tools.filter((t) => onlyCircle.includes(t))).toEqual([]);
   });
 });
+
+describe('a noun\'s generic ops carry the noun\'s places', () => {
+  it('the own note\'s list and add are offered in the own scope', async () => {
+    const { synthesizeGenericOps } = await import('../../src/genericOpSynth.js');
+    const household = catalogueManifests().find((m) => m.app === 'household');
+    const ops = synthesizeGenericOps(household).filter((op) => op.__generic?.noun === 'note');
+    expect(ops.length).toBeGreaterThan(0);
+    for (const op of ops) expect(opScopes(op)).toEqual(['circle', 'own']);
+  });
+});

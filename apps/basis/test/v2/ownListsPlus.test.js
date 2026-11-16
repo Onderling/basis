@@ -116,6 +116,13 @@ describe('the "+" reads the ticked self\'s own lists first', () => {
     expect(plusLineOutcome('maak een lijst Boodschappen', { circles: [circle('c1', 'Thuis', []), circle('c-help', 'Help', [])] })?.kind).not.toBe('circle');
   });
 
+  it('the Help circle is never a place the "+" offers for a person\'s things', () => {
+    // two circles hold Boodschappen; the Help circle (where the Onderling bot answers) is one of them on paper only
+    const r = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', [SHOP]), circle('cc-help', 'Help', [SHOP])], own: own([]) });
+    expect(r).toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c1' });
+    expect((r?.to ?? []).map((t) => t.circleId)).not.toContain('cc-help');
+  });
+
   it('no own list of that name: the circles read it as before', () => {
     const r = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', [SHOP])], own: own([]) });
     expect(r).toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c1' });

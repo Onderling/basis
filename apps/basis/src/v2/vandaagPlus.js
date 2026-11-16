@@ -13,6 +13,7 @@ import { renderGate } from '@onderling/app-manifest';
 import { listsGateRules, circleListsFor } from './circleGate.js';
 import { GATE_WORDS, helpWords, helpQuestionOpeners } from './gateWords.js';
 import { answerHelp } from './help/helpAnswer.js';
+import { HELP_CIRCLE_ID } from './helpCircle.js';
 import { replyLine } from './replyLine.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
@@ -265,7 +266,8 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
   if (ownAct) return { kind: 'own', ...ownAct };
   const text = word(line);
   if (!text) return null;
-  const all = Array.isArray(circles) ? circles : [];
+  // the Help circle is where the Onderling bot answers, never a place for a person's things: the "+" never offers it
+  const all = (Array.isArray(circles) ? circles : []).filter((c) => c?.id !== HELP_CIRCLE_ID);
   // "<circle>: …" names the circle: the rest is read there only
   const m = /^([^:]{1,60}):\s*(.+)$/u.exec(text);
   const named = m ? all.filter((c) => c?.name && String(c.name).trim().toLowerCase() === m[1].trim().toLowerCase()) : [];

@@ -150,6 +150,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `handleTaskRequest` | function | [`core.md`](core.md#handletaskrequest) |
 | `hashHex` | function | [`core.md`](core.md#hashhex) |
 | `hasRoleBundle` | function | [`core.md`](core.md#hasrolebundle) |
+| `hmacBase64Url` | function | [`core.md`](core.md#hmacbase64url) |
 | `ImagePart` | function | [`core.md`](core.md#imagepart) |
 | `IN_PROCESS_SENDER` | constant | [`core.md`](core.md#in_process_sender) |
 | `IndexedDBSource` | class | [`core.md`](core.md#indexeddbsource) |

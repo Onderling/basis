@@ -10,6 +10,7 @@
 // value because it stays load-bearing for `resolveCircleLlm` (local|cloud|off selection).
 
 import { CIRCLE_LLM_ROUTE_PRESETS } from './circleLlmRoutes.js';
+import { hmacBase64Url } from '@onderling/core';
 
 const VALID_MODES   = ['off', 'local', 'cloud'];
 const VALID_PRESETS = Object.keys(CIRCLE_LLM_ROUTE_PRESETS);   // off · local-ollama · confidential-proxy · openai-compatible
@@ -47,6 +48,9 @@ export function normalizeUserLlmDefault(raw) {
     embedModel:   str(raw.embedModel),
     apiKey:       str(raw.apiKey),
     attestation:  bool(raw.attestation),
+    // this device's secret for the prompt-cache salt (one per person per conversation, `hmacBase64Url`); kept with the
+    // setting, beside its key; made once a route is set
+    ...(str(raw.cacheSecret) ? { cacheSecret: str(raw.cacheSecret) } : {}),
   };
 }
 
@@ -62,17 +66,31 @@ export function createUserLlmDefaultStore({ load, save } = {}) {
     return normalizeUserLlmDefault(raw);
   };
   return {
-    get: read,
+    // a route saved before the cache secret existed gets one on its first read, kept from then on
+    async get() {
+      const cur = await read();
+      const next = withCacheSecret(cur);
+      if (next !== cur && save) { try { await save(next); } catch { /* best-effort persist */ } }
+      return next;
+    },
     async set(patch) {
       const current = await read();
       const merged = typeof patch === 'string'
         ? { ...current, preset: presetForLegacyMode(patch), mode: patch }
         : { ...current, ...patch };
-      const next = normalizeUserLlmDefault(merged);
+      const next = withCacheSecret(normalizeUserLlmDefault(merged));
       if (save) { try { await save(next); } catch { /* best-effort persist */ } }
       return next;
     },
   };
+}
+
+/** A route that is set gets its cache secret once (32 random bytes, base64url); one already there is kept. */
+function withCacheSecret(cfg) {
+  if (!cfg || cfg.preset === 'off' || !cfg.preset || cfg.cacheSecret) return cfg;
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  return { ...cfg, cacheSecret: hmacBase64Url([...bytes].join(','), 'cache-secret') };
 }
 
 const STORAGE_KEY = 'cc.userLlmDefault';

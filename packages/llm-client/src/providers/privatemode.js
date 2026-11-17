@@ -95,8 +95,9 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
 }
 
 /**
- * Privatemode's prompt cache is off unless a request carries a `cache_salt` (≥256 bits, kept private); requests with the
- * same salt share a cache. One cache per PERSON, not per box: a cache shared by the household would let one person learn,
+ * Privatemode's prompt cache is ON per API KEY even with no `cache_salt` (measured 2026-11-17, four calls on one key: the
+ * second unsalted call had 4,352 of 4,598 prompt tokens cached); a salt (≥256 bits, kept private) SPLITS that cache:
+ * requests with the same salt share one, a fresh salt starts cold. One cache per PERSON, not per key: a cache shared by the household would let one person learn,
  * by how fast an answer comes, whether another sent the same words. So the salt is derived from the box's secret and the
  * request's `cacheKey` (the person's thread) — HMAC-SHA256: neither the secret nor whose it is can be read off it.
  * A request without a key gets the box's own salt.

@@ -63,7 +63,7 @@ export {
   addressPossessionMessage, signAddressPossession, signAddressPossessionFromSeed,
   circleAddressSigner, verifyAddressPossession,
 } from './identity/addressPossession.js';
-export { hashHex } from './hashHex.js';
+export { hashHex, hmacBase64Url } from './hashHex.js';
 // The reusable per-author hash-chain + fork-proof primitive. Governance and membership BIND it with
 // their own body-serialization rather than each reimplementing the chaining/fork detection.
 export {

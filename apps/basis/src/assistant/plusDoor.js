@@ -25,10 +25,11 @@ import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
-import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel, plusSuggest } from '../v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel, plusSuggest, NO_OWN_LIST } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
-import { circleGateRules } from '../v2/circleGate.js';
+import { listsGateRules } from '../v2/circleGate.js';
+import { renderGate } from '@onderling/app-manifest';
 import { createComposerCommands } from '../v2/composerCommands.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
 
@@ -232,8 +233,22 @@ export function createPlusDoor({
   // list entry or a task) is no reading here, so the line goes on to the model, never to "I could not read that"
   const offeredHere = (c) => Boolean(c?.opId) && (DOOR_OP_IDS.has(c.opId)
     || acts.some((a) => a.opId === c.opId && (!c.appOrigin || c.appOrigin === a.appOrigin)) || Boolean(entryOf(c.opId)));
-  const gateRules = circleGateRules(lang).map((r) => (typeof r.command !== 'function' ? r
-    : { ...r, command: (text, ctx) => { const c = r.command(text, ctx); return offeredHere(c) ? c : null; } }));
+  // THE OWN GATE, generated from what this door offers: the lists table over the self's own lists (its phrases for the
+  // own note too: "onthoud dat …", "welke weetjes zijn er") and the door's manifests' phrases asked for the OWN place
+  // (`renderGate`, `place: 'own'`: "wat heb ik gepland"), every language. A command for an op offered here goes through
+  // `answer`, with or without a model; nothing else. The engine has no gate of its own: the plain reading and this one
+  // are the gate, so "the gate took it" means one thing.
+  const manifestGate = renderGate(Object.values(manifestsByOrigin ?? {}).filter(Boolean), { place: 'own' });
+  const ownGate = async (text, asSelf) => {
+    const lists = (await ownListsOf(asSelf) ?? []).filter((l) => l?.name && l.defaultChild !== 'calendar-event');
+    const rules = [...listsGateRules(null, lists.length ? lists : [{ name: NO_OWN_LIST }], { greeting: false }), ...manifestGate];
+    for (const r of rules) {
+      let c = null;
+      try { c = r.command(text); } catch { c = null; }
+      if (offeredHere(c)) return { opId: c.opId, args: c.args ?? {} };
+    }
+    return null;
+  };
   // EVERY op offered to the model, or named by a "/" line, has an outcome here (one handler: "/" and the model cannot
   // drift apart), and none reaches a store from the model: a door op runs (it sets this conversation), an own act
   // opens its form filled (Save is the yes), a read runs as the self and is answered, any other own write is a card
@@ -270,7 +285,7 @@ export function createPlusDoor({
   const commands = createComposerCommands({ kind: 'own', catalogue: cat });
 
   const engine = createAssistantEngine({
-    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules, promptLines: [...OWN_PLACE_LINES],
+    catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules: [], promptLines: [...OWN_PLACE_LINES],
     // a line about one family gets that family's tools (the own note's too); no family is kept regardless here
     narrowing: {
       keep: [], own: true,
@@ -330,6 +345,14 @@ export function createPlusDoor({
     if (o?.kind === 'own') return o.actId ? { actId: o.actId, values: o.values ?? {}, asSelf } : o;
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere, and the
     // "+" says what works without one and where to set one)
+    // the own gate: a phrase for an op offered here acts with no model call, with or without a model set
+    const gated = await ownGate(text, asSelf);
+    if (gated) {
+      outcome = null;
+      currentLine = text;
+      await answer(gated, { asSelf, selves: set, id: threadIdFor(set) });
+      return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
+    }
     if (!llm) return { done: plusNoModelAnswer({ t }) };
     outcome = null;
     currentLine = text;

@@ -5,7 +5,7 @@
  * builds, the tools it hands over, the forms, the thread, the stores.
  *
  *   1. A question: an answer in words, from a model told it is the person's OWN place (no household background).
- *   2. Remember this: a filled note form; nothing is stored until Save; after Save it is on Today.
+ *   2. Remember this: a filled note form (a phrase: no model call); nothing is stored until Save; after Save it is on Today.
  *   3. Ask it back: the answer comes from the note (its words reach the model), and nothing changes.
  *   4. A follow-up: "zet dat morgen om 10 in mijn agenda" reaches the model WITH the previous turn; the proposal names
  *      the key; the person closes it: nothing stored, and the thread says so.
@@ -20,7 +20,7 @@ test.setTimeout(120_000);
 // the stand-in model: one answer per line, matched on the newest member message
 const SCRIPT = [
   { when: 'wat kan je voor me doen', replyText: 'Ik houd je eigen notities, afspraken en lijsten bij.' },
-  { when: 'onthoud dat de sleutel', toolCall: { id: '__generic__:household:add:note', args: { body: 'de sleutel ligt bij de buren' } } },
+  { when: 'onthoud dat de sleutel', toolCall: { id: '__generic__:household:add:note', args: { body: 'de sleutel bij de buren ligt' } } },
   { when: 'waar ligt de sleutel', replyText: 'Bij de buren.' },
   { when: 'zet dat morgen om 10', toolCall: { id: 'addEvent', args: { title: 'sleutel ophalen bij de buren' } } },
 ];
@@ -51,10 +51,13 @@ test('the "+" story with a model: a question, remember, ask it back, a follow-up
   expect(first.system, 'the own place says what it is').toMatch(/OWN place/);
   expect(first.system, 'no household bot background').not.toMatch(/Household background|share a household/);
 
-  // 2. remember this: the note form opens filled; nothing is stored until Save; after Save it is on Today
+  // 2. remember this: the note form opens filled with the person's own words (the own gate's phrase, no model call);
+  // nothing is stored until Save; after Save it is on Today
+  const beforeNote = (await asked(page)).length;
   await say(page, 'onthoud dat de sleutel bij de buren ligt');
-  await expect(page.locator('.circle-vandaag-plus__body')).toHaveValue('de sleutel ligt bij de buren');
-  const noteRow = page.locator('.circle-screen__items-row').filter({ hasText: 'de sleutel ligt bij de buren' });
+  expect((await asked(page)).length, '"onthoud dat" is a phrase: no model call').toBe(beforeNote);
+  await expect(page.locator('.circle-vandaag-plus__body')).toHaveValue('de sleutel bij de buren ligt');
+  const noteRow = page.locator('.circle-screen__items-row').filter({ hasText: 'de sleutel bij de buren ligt' });
   await expect(noteRow, 'nothing stored before Save').toHaveCount(0);
   await page.locator('.circle-vandaag-plus__save').click();
   await expect(noteRow, 'the note is on Today after Save').toBeVisible({ timeout: 20_000 });
@@ -63,7 +66,7 @@ test('the "+" story with a model: a question, remember, ask it back, a follow-up
   await openPlus(page);
   await say(page, 'waar ligt de sleutel?');
   await expect(lastAnswer(page)).toHaveText('Bij de buren.');
-  expect(JSON.stringify((await asked(page)).at(-1).messages), 'the note reached the model').toContain('de sleutel ligt bij de buren');
+  expect(JSON.stringify((await asked(page)).at(-1).messages), 'the note reached the model').toContain('de sleutel bij de buren ligt');
   await expect(noteRow).toHaveCount(1);
 
   // 4. a follow-up: the model gets the previous turn; its proposal names the key; closing it stores nothing, and says so

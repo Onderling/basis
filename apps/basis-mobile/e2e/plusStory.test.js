@@ -109,7 +109,8 @@ describe('the "+" story on the phone, with a stand-in model', () => {
     await device.takeScreenshot('plus-story-09-route');
     const before = model.requests.length;
     await say('wat kan je voor me doen?');
-    await soon(by.text('Ik houd je eigen notities, afspraken en lijsten bij.'), 20_000);
+    // the answer shows twice (the thread and the sheet's answer line): match it in the thread
+    await soon(by.text('Ik houd je eigen notities, afspraken en lijsten bij.').withAncestor(by.id('vandaag-plus-thread')), 20_000);
     if (model.requests.length !== before + 1) throw new Error(`expected one model call, got ${model.requests.length - before}`);
     const sys = String(model.requests.at(-1).system ?? '');
     if (!/OWN place/.test(sys)) throw new Error('the model was not told it is the own place');
@@ -128,7 +129,8 @@ describe('the "+" story on the phone, with a stand-in model', () => {
     await soon(by.text('de sleutel bij de buren ligt'), 20_000);
     await openPlus();
     await say('waar ligt de sleutel?');
-    await soon(by.text('Bij de buren.'), 20_000);
+    // the answer shows twice (the thread and the sheet's answer line): match it in the thread
+    await soon(by.text('Bij de buren.').withAncestor(by.id('vandaag-plus-thread')), 20_000);
     if (!JSON.stringify(model.requests.at(-1).messages).includes('de sleutel bij de buren ligt')) throw new Error('the note did not reach the model');
     await device.takeScreenshot('plus-story-03-ask-back');
   });

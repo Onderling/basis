@@ -657,6 +657,10 @@
       }
     },
     "delivery": {
+      "waiting_for_connection": {
+        "text": "Not sent yet: waiting for a connection",
+        "doc": "A message still sending after a while: it waits on this device until there is a connection, and goes by itself."
+      },
       "maybe_received": {
         "text": "Sent · maybe received",
         "doc": "It left this device. Whether it arrived is unknown unless the other person chose to confirm."

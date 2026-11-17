@@ -158,6 +158,8 @@ export { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureActionLabelKey, featureTabI
 // read at bubble render time so users can see fan-out status + retry
 // failed sends.
 export { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+// the map a shell makes: the substrate's plus the 'waiting for a connection' words after a while
+export { createAppDeliveryMap } from './v2/deliveryState.js';
 // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out) for web + mobile.
 export { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 // Phase 3 — the shared circle label→candidate lookup (live fetch + base), web + mobile.

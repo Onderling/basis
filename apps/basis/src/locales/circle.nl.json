@@ -657,6 +657,10 @@
       }
     },
     "delivery": {
+      "waiting_for_connection": {
+        "text": "Nog niet verzonden: wacht op een verbinding",
+        "doc": "A message still sending after a while: it waits on this device until there is a connection, and goes by itself."
+      },
       "maybe_received": {
         "text": "Verzonden · misschien ontvangen",
         "doc": "Het is van dit apparaat vertrokken. Of het is aangekomen weten we niet, tenzij de ander dat zelf laat weten."

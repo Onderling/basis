@@ -23,7 +23,7 @@ const SCRIPT = [
   { when: 'zet dat morgen om 10', toolCall: { id: 'addEvent', args: { title: 'sleutel ophalen bij de buren' } } },
 ];
 const PHONE_PORT = 11434;
-const LAPTOP_PORT = 8090;
+const LAPTOP_PORT = 8091;   // 8090 is Fable's real-model stand-in
 
 let model;
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -21,7 +21,7 @@ function newestLine(messages) {
  * @param {{port?: number}} [o]
  * @returns {Promise<{port: number, requests: Array<{system: string|null, messages: Array, tools: string[]}>, close: () => Promise<void>}>}
  */
-async function startStandInModel(script, { port = 8090 } = {}) {
+async function startStandInModel(script, { port = 8091 } = {}) {
   const requests = [];
   const server = http.createServer((req, res) => {
     let body = '';

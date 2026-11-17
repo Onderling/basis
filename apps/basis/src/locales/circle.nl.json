@@ -3584,10 +3584,6 @@
       "text": "Kringen die hier open staan",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."
     },
-    "invites_empty": {
-      "text": "Er wordt hier geen kring aangeboden.",
-      "doc": "Empty state for the invite list."
-    },
     "action_join_published": {
       "text": "Meedoen",
       "doc": "The one action on a broadcast invite. A real join, running the full gate."
@@ -3660,10 +3656,6 @@
       "text": "Getoond aan {{sent}} van {{peers}} in de buurt",
       "doc": "Result after publishing a card — the real reach, not \"saved\"."
     },
-    "chat_title": {
-      "text": "Gesprek hier",
-      "doc": "Heading of the room chat."
-    },
     "chat_empty": {
       "text": "Nog niemand heeft iets gezegd.",
       "doc": "Chat empty state — only shown once you have JOINED."
@@ -3687,10 +3679,6 @@
     "asks_title": {
       "text": "Hier gevraagd",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."
-    },
-    "asks_empty": {
-      "text": "Nog niemand heeft iets gevraagd.",
-      "doc": "Shown when the room carries no live asks."
     },
     "ask_resonant": {
       "text": "Dit past bij jou: {{reason}}",

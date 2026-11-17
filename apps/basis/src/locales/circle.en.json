@@ -3579,10 +3579,6 @@
       "text": "Circles open here",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."
     },
-    "invites_empty": {
-      "text": "No circle is being advertised here.",
-      "doc": "Empty state for the invite list."
-    },
     "action_join_published": {
       "text": "Join",
       "doc": "The one action on a broadcast invite. A real join, running the full gate."
@@ -3655,10 +3651,6 @@
       "text": "Shown to {{sent}} of {{peers}} nearby",
       "doc": "Result after publishing a card — the real reach, not \"saved\"."
     },
-    "chat_title": {
-      "text": "Room chat",
-      "doc": "Heading of the room chat."
-    },
     "chat_empty": {
       "text": "Nobody has said anything yet.",
       "doc": "Chat empty state — only shown once you have JOINED."
@@ -3682,10 +3674,6 @@
     "asks_title": {
       "text": "Asked here",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."
-    },
-    "asks_empty": {
-      "text": "Nobody has asked anything yet.",
-      "doc": "Shown when the room carries no live asks."
     },
     "ask_resonant": {
       "text": "This matches you: {{reason}}",

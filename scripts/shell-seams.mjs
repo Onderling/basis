@@ -312,6 +312,8 @@ export const SEAMS = Object.freeze([
   // THE "+" HAS A "/" LIST: on a "/" word the sheet offers its door's own commands (`suggest` on the door: the same acts its
   // buttons and its model have), and a "/" line goes through the door's one handler. Both sheets ask the door.
   { id: 'plus-slash-list', pattern: /plusDoorNow\(\)\.suggest\(/, shells: ['web', 'mobile'], why: 'typing "/" in the "+" offers the door\'s own commands, and picking one opens the same form' },
+  // A SLOW MODEL IS SAID: a read hands the door the sheet's "even geduld" (`onSlow`), painted while the person waits.
+  { id: 'plus-slow', pattern: /plusDoorNow\(\)\.read\([^)]*onSlow/, shells: ['web', 'mobile'], why: 'a model that is slow and retrying is said while the person waits, never a silent sheet' },
   // THE "+" READS THE TICKED SELF'S OWN LISTS FIRST (`plusLineOutcome`'s `own`, read AS that self), and answers what a
   // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself

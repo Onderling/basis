@@ -85,7 +85,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const read = async () => {
     setDone(null);
     // the ticked self goes with the line: the person's own lists are read and written as that self
-    const r = await onRead?.(line, asSelf);
+    // a slow model is said while the person waits ("even geduld"); its answer replaces it (web twin: circleApp.js)
+    const r = await onRead?.(line, asSelf, { onSlow: () => { setDone(t('circle.bot.slow')); setError(null); } });
     setCard(r?.card && Array.isArray(r.card.to) && r.card.to.length ? r.card : null);
     if (r?.card) setError(null);
     else if (r && 'done' in r) { setDone(r.done ?? null); setError(null); }

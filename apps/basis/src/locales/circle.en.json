@@ -1826,6 +1826,10 @@
     "plus_make_list_ask": {
       "text": "There is no list '{{list}}' yet. Make it?",
       "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
+    },
+    "plus_card_not_done": {
+      "text": "'{{line}}': not done. Nothing was stored.",
+      "doc": "The \"+\" conversation: a card (which place, or make a list) was answered with Cancel; the line was not done and nothing was stored."
     }
   },
   "screens": {

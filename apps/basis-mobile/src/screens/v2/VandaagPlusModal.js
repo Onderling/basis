@@ -26,6 +26,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the line read to an act more than one circle holds: the card asks which; a pick → `onCircleRun(card, circleId)`, which
   // runs it as the person and answers `{done}` (what it did) or `{error}`; nothing runs before a pick
   onCircleRun = null,
+  // the card's no (Cancel): `onCircleCancel(card, asSelf)`, so the conversation says the line was not done
+  onCircleCancel = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
   // an act that makes nothing (feedback): the host runs it at once — the sheet only hands it over
@@ -222,7 +224,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                 <Btn key={r.circleId} label={plusCardWords(card, { t }).labelFor(r)}
                   onPress={() => runIn(r.circleId)} disabled={busy} testID={`vandaag-plus-card-in-${r.circleId}`} style={styles.btnAt} />
               ))}
-              <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => setCard(null)} testID="vandaag-plus-card-no" style={styles.btnAt} />
+              <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => { const c = card; setCard(null); onCircleCancel?.(c, asSelf); }} testID="vandaag-plus-card-no" style={styles.btnAt} />
             </View>
           ) : null}
           {/* an answer or error the thread already holds is not said twice (shared rule; web twin: the same call) */}

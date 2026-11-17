@@ -193,7 +193,7 @@ import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createPlusDoor, conversationSelf, plusRouteLine } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusCardCommands, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
@@ -4879,10 +4879,12 @@ function showVandaagPlus({ edit = null } = {}) {
       const card = circleCard; circleCard = null;
       if (!card) return;
       // the pick on the card: no new line, the run's answer kept (the same shared exchange)
-      await plusDoorNow().exchange({ asSelf }, async () => { await runInCircle(card.command, circleId); return { error, done }; });
+      // what the card carries, in order (the make-a-list card: the list, then the item on it); the first failure stops it
+      await plusDoorNow().exchange({ asSelf }, async () => { for (const c of plusCardCommands(card)) { const r = await runInCircle(c, circleId); if (r?.error) break; } return { error, done }; });
       paint();
     },
-    onCircleCancel: () => { circleCard = null; error = null; paint(); },
+    // the card's no: the line was not done, said in the conversation (as a closed form is)
+    onCircleCancel: async () => { const card = circleCard; circleCard = null; error = null; await plusDoorNow().cardRefused({ asSelf }, card); paint(); },
     onSave: async (id, filled) => {
       values = filled;
       const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);

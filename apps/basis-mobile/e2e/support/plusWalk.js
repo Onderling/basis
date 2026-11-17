@@ -72,10 +72,15 @@ async function setOwnModel(phonePort) {
   if (saved !== 0) throw new Error(saved === 1 ? 'the own model setting was refused' : 'the own model setting never said it was saved');
 }
 
-/** A second self, made as a person makes one: Mij → the dashed "new" card → a name → Make. */
+/**
+ * A second self, made as a person makes one: the header's switcher → Edit on the general self → the About-me panel →
+ * the dashed "new" card → a name → Make; then the panel closes.
+ */
 async function makeSelf(name) {
-  await backToLauncher();   // out of the settings screen setOwnModel leaves open: the tab bar shows again
-  await tapSoon(by.id('circle-tab-mij'));
+  await backToLauncher();   // out of the settings screen setOwnModel leaves open: the header shows again
+  await tapSoon(by.id('header-avatar'), 20_000);
+  await tapSoon(by.id('persona-switcher-edit-default'), 10_000);
+  await soon(by.id('circle-aboutme-panel'), 15_000);
   await waitFor(element(by.id('mij-new-persona'))).toBeVisible().whileElement(by.id('mij-scroll')).scroll(400, 'down');
   await pause(800);
   await element(by.id('mij-new-persona')).tap();
@@ -85,6 +90,8 @@ async function makeSelf(name) {
   await tapSoon(by.id('mij-new-persona-create'));
   // the form closes once the self is made (a refusal leaves it open)
   await waitFor(element(by.id('mij-new-persona-name'))).not.toExist().withTimeout(15_000);
+  await device.takeScreenshot(`plus-walk-made-${name}`);
+  await tapSoon(by.id('circle-aboutme-panel-close'));
 }
 
 /**

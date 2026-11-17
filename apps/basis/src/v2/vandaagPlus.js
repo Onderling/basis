@@ -228,6 +228,21 @@ export function plusAskTime(act, values = {}, { t, lang = 'nl' } = {}) {
  * @param {string} line
  * @returns {{actId: string, values: Record<string, string>}|null}
  */
+/**
+ * What a reminder of one's own is ABOUT ("herinner me morgen om 9 uur aan de vuilnis" → "de vuilnis"), read by the
+ * phrase table's own reminder rule (the household assistant's `remindMe` for "me"), or null when the line is no reminder.
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function reminderThing(text) {
+  for (const rule of listsGateRules(null, [{ name: NO_OWN_LIST }], { greeting: false })) {
+    let cmd = null;
+    try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+    if (cmd?.opId === 'remindMe' && cmd.args?.who === 'me' && cmd.args?.item) return String(cmd.args.item);
+  }
+  return null;
+}
+
 export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
   const text = word(line);
   if (!text) return null;
@@ -277,6 +292,12 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
   if (timed(act)) {
     if (moment?.day) { const f = act.fields.find((x) => x.kind === 'datetime'); values[f.name] = pickerMoment(moment.day, moment.time); words = moment.rest ?? ''; }
     for (const w of wordsFor(act, byOrigin)) words = words.replace(new RegExp(`^${w}\\b[:\\s]*`, 'i'), '');
+  }
+  // "herinner me morgen om 9 uur aan de vuilnis": the reminder's own words are the title ("de vuilnis"), read by the
+  // SAME rule the household assistant reads a reminder with (its {text} slot), never "herinner me aan de vuilnis"
+  if (timed(act)) {
+    const thing = reminderThing(text);
+    if (thing) words = thing;
   }
   // "ik moet …", "I need to …": how the line opens, not what it makes (an appointment's title)
   if (timed(act)) {
@@ -404,6 +425,9 @@ function ownListsReading(text, own) {
     const command = { appOrigin: 'lists', opId: cmd.opId, args: { ...(cmd.args ?? {}) } };
     if (cmd.opId === 'createList') return { command, makes: true };
     if (names.has(command.args.list)) return { command, makes: false };
+    // "melk is gedaan": a tick names the item, not the list; the lists find it (`list` is optional on the op), so it
+    // reads to the person's own lists when they have any
+    if (command.opId === 'markListItemDone' && !command.args.list && command.args.item && lists.length) return { command, makes: false };
   }
   return null;
 }

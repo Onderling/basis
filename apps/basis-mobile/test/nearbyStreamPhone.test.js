@@ -64,7 +64,7 @@ describe('the phone\'s Conversation stream and tab counts', () => {
     expect(body).toMatch(/const \{ tabs, defaultTab, chatOff, askOff \} = nearbyTabs\(model\)/);
     const part = body.slice(body.indexOf("'nearby-ask-off': () =>"), body.indexOf("'nearby-ask-field': () =>"));
     expect(part).toMatch(/testID="nearby-ask-off"/);
-    expect(part).toMatch(/circle\.nearbyScreen\.chat_hidden_line/);
+    expect(part).toMatch(/circle\.nearbyScreen\.ask_hidden_line/);
     expect(part).toMatch(/unquiet: \(\) => onSetQuiet\?\.\(false\)/);
     expect(part).not.toMatch(/nearby-ask-compose/);
     expect(SRC).toMatch(/key: 'card_shown'[^\n]*key: r\.notice \?\? 'ask_expired'/);

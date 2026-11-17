@@ -6145,7 +6145,7 @@ function NearbyScreen({
       const act = { unquiet: () => onSetQuiet?.(false), 'radio-on': () => onSetRadio?.('on') }[askOff?.act];
       return (
         <View style={styles.nearbyAsks} testID="nearby-ask-off">
-          <Text style={styles.muted}>{t('circle.nearbyScreen.chat_hidden_line')}</Text>
+          <Text style={styles.muted}>{t('circle.nearbyScreen.ask_hidden_line')}</Text>
           {act ? (
             <Pressable onPress={act} accessibilityRole="button" testID="nearby-ask-visible" style={styles.nearbyAction}>
               <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_hidden_action')}</Text>

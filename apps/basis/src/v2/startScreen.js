@@ -22,6 +22,18 @@ export const LAST_TAB_STORAGE_KEY = 'cc.lastTab';
 const TABS = new Set(['screens', 'circles', 'contacten', 'mij']);
 
 /**
+ * Whether the start screen may still be applied once the agent is there. A person who moved during the cold start
+ * keeps their place: a tab tapped (even the one already showing, so the view alone cannot tell), a circle opened, the
+ * "Make a circle" wizard opened, or any view other than the list. The shell reads these at the moment it applies the
+ * start, not from the render that began it.
+ * @param {{tapped?: boolean, view?: string, selected?: object|null, creating?: boolean}} now
+ * @returns {boolean}
+ */
+export function startScreenStillApplies({ tapped = false, view = 'list', selected = null, creating = false } = {}) {
+  return !tapped && view === 'list' && !selected && !creating;
+}
+
+/**
  * The tab the app opens on.
  * @param {string|null|undefined} choice   the setting's value
  * @param {string|null|undefined} lastTab  the last tab used on this device

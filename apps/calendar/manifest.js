@@ -104,6 +104,8 @@ export const calendarManifest = {
       appliesTo: { type: 'calendar-event' },
       params: [
         { name: 'days', kind: 'number', required: false },
+        // one local day (YYYY-MM-DD) instead of the coming `days`: "wat heb ik morgen gepland?"
+        { name: 'day', kind: 'string', required: false },
       ],
       surfaces: {
         // the own "+" reads it from a phrase ("wat heb ik gepland"); its words are placed `in: own` (gate.<lang>.json), so

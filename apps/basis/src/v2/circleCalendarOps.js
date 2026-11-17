@@ -131,7 +131,13 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       const days = Number(args?.days) > 0 ? Number(args.days) : 7;
       const now = Date.now();
-      const open = eventsInWindow(await answeredEventsOf(circleId), { since: now, until: now + days * 86_400_000 });
+      // one local day asked for ("wat heb ik morgen gepland?"): that day, start to end; else the coming `days`
+      const day = typeof args?.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.day) ? args.day : null;
+      const [y, m, d] = day ? day.split('-').map(Number) : [];
+      const window = day
+        ? { since: new Date(y, m - 1, d).getTime(), until: new Date(y, m - 1, d + 1).getTime() }
+        : { since: now, until: now + days * 86_400_000 };
+      const open = eventsInWindow(await answeredEventsOf(circleId), window);
       // the list's own name above its appointments, as any list read says which list it is
       const agenda = await agendaOf(circleId);
       // who it names and who answered (the household's people, by id): a door's reader sees them as names, under the

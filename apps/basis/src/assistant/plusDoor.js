@@ -30,6 +30,7 @@ import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread
 import { interpretToCommand } from '../v2/interpretCommand.js';
 import { listsGateRules } from '../v2/circleGate.js';
 import { renderGate } from '@onderling/app-manifest';
+import { readDayAndTime } from '../forms/parseDate.js';
 import { createComposerCommands } from '../v2/composerCommands.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
 
@@ -242,12 +243,22 @@ export function createPlusDoor({
   const ownGate = async (text, asSelf) => {
     const lists = (await ownListsOf(asSelf) ?? []).filter((l) => l?.name && l.defaultChild !== 'calendar-event');
     const rules = [...listsGateRules(null, lists.length ? lists : [{ name: NO_OWN_LIST }], { greeting: false }), ...manifestGate];
-    for (const r of rules) {
-      let c = null;
-      try { c = r.command(text); } catch { c = null; }
-      if (offeredHere(c)) return { opId: c.opId, args: c.args ?? {} };
-    }
-    return null;
+    const first = (line) => {
+      for (const r of rules) {
+        let c = null;
+        try { c = r.command(line); } catch { c = null; }
+        if (offeredHere(c)) return c;
+      }
+      return null;
+    };
+    const c = first(text);
+    if (c) return { opId: c.opId, args: c.args ?? {} };
+    // a day said in the line ("wat heb ik MORGEN gepland?"): read without it, and a read that takes a day gets it
+    const said = readDayAndTime(text);
+    if (!said?.day || said.time || !said.rest) return null;
+    const d = first(said.rest);
+    const takesDay = (entryOf(d?.opId)?.op?.params ?? []).some((p) => p?.name === 'day');
+    return d && takesDay ? { opId: d.opId, args: { ...(d.args ?? {}), day: said.day } } : null;
   };
   // EVERY op offered to the model, or named by a "/" line, has an outcome here (one handler: "/" and the model cannot
   // drift apart), and none reaches a store from the model: a door op runs (it sets this conversation), an own act

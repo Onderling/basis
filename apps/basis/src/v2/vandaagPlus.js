@@ -357,6 +357,8 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
       return {
         kind: 'circle', atOnce: false, circleId: null, to: [ownTo], makeList: asks.list,
         command: { appOrigin: 'lists', opId: 'createList', args: { text: asks.list, circleId: OWN_DEVICES_SCOPE } },
+        // the yes also puts the item on it: a person who said "zet melk op boodschappen" expects melk there (Fable)
+        followUp: { appOrigin: 'lists', opId: 'addToList', args: { list: asks.list, text: asks.item, circleId: OWN_DEVICES_SCOPE } },
       };
     }
   }
@@ -401,6 +403,16 @@ const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeF
  * @param {string} text
  * @returns {{list: string, item: string}|null}
  */
+/**
+ * The commands a "+" card's yes runs, in order: its command, then its follow-up when it has one (the make-a-list card:
+ * make the list, then put the item on it). Both sheets run exactly these, stopping at the first that fails.
+ * @param {{command?: object, followUp?: object}} card
+ * @returns {object[]}
+ */
+export function plusCardCommands(card) {
+  return [card?.command, card?.followUp].filter(Boolean);
+}
+
 export function unknownListReading(text) {
   const words = String(text ?? '').trim().replace(/[.!?]+$/u, '').split(/\s+/u).filter(Boolean);
   for (let n = 1; n <= Math.min(3, words.length - 1); n += 1) {
@@ -471,6 +483,20 @@ export function plusCardWords(card, { t } = {}) {
  * (`replyLine`); for a read of one list (`listEntries`), its entries, the done ones marked, or that it is empty.
  * @param {object} result @param {{opId: string, args?: object, t: Function}} o
  */
+/**
+ * Whether the sheet shows an answer (or an error) on its own line below the thread. Every answer the door gives is kept
+ * as the assistant's turn, so once the thread shows it the line below would say it twice (the walk, 2026-11-17): the
+ * line is for an answer the thread does not hold yet (no thread, or not its last assistant turn).
+ * @param {string|null} said  the answer or error line
+ * @param {Array<{who: string, text: string}>} [turns]  the thread as the sheet shows it, oldest first
+ */
+export function plusAnswerLineShown(said, turns = []) {
+  if (!said) return false;
+  const answers = (Array.isArray(turns) ? turns : []).filter((x) => x?.who !== 'you');
+  const last = answers.length ? answers[answers.length - 1] : null;
+  return !(last && String(last.text ?? '').trim() === String(said).trim());
+}
+
 export function plusDoneLine(result, { opId, args = {}, t } = {}) {
   const said = replyLine(result, { opId, args, t });
   // ANY read that answers items (a list's entries, the own agenda's appointments, …) is said by its name and its lines,

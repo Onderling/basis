@@ -36,7 +36,7 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
-import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
@@ -160,7 +160,7 @@ export default function App() {
   // The mute membrane's circle↔person index — one per agent lifetime; the roster feed fills it
   // (householdRosterPairing reads `agent._circleGroupsIndex`), the receive path consumes it.
   const circleGroupsIndexRef = useRef(makeCircleGroupsIndex());
-  if (!deliveryStateMapRef.current) deliveryStateMapRef.current = createDeliveryStateMap();
+  if (!deliveryStateMapRef.current) deliveryStateMapRef.current = createAppDeliveryMap();
   const deliverySettingsStoreRef = useRef(null);
   // The agent reads `allowFallback` LIVE through this cache (batch 4): a sync read, because the send
   // path cannot await AsyncStorage per message. Primed from the store at mount; kept fresh by the

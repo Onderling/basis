@@ -16,7 +16,8 @@
  *     subtype (`RECEIPT_MESSAGE`) and the inbound validator (`receiveReceipt`).
  */
 
-import { DELIVERY } from '@onderling/kring-host/deliveryState';
+import { DELIVERY, createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 export {
   DELIVERY, DELIVERY_TERMINAL, DELIVERY_ORDER,
@@ -47,7 +48,34 @@ export const DELIVERY_REASON_LABELS = Object.freeze({
   'peer-unreachable': 'circle.chat.delivery.peer_unreachable',
   // a turn held for an address this device could not tie to anyone (the send gate), and given up at its time limit
   'unknown-address': 'circle.chat.delivery.unknown_address',
+  // still sending after a while, for no reason anyone named (`createAppDeliveryMap`): waiting, not failed
+  'waiting-for-connection': 'circle.chat.delivery.waiting_for_connection',
 });
+
+/** How long a message may say "sending" before it says it is waiting for a connection. */
+export const PENDING_SAYS_WAITING_MS = param({ key: 'delivery.pendingSaysWaitingMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+
+/**
+ * The app's delivery map: the substrate's, plus one duty. A message still `pending` after `PENDING_SAYS_WAITING_MS`, with no
+ * reason of its own, gets the reason `waiting-for-connection`, so its chip says "Not sent yet: waiting for a connection"
+ * instead of "sending" for ever. The map tells its watchers, so every screen repaints; the state moving on drops the
+ * reason (the substrate's rule), so the words clear themselves. Both shells make their map here.
+ * @param {{ setTimer?: Function, clearTimer?: Function }} [o]
+ */
+export function createAppDeliveryMap({ setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (h) => clearTimeout(h) } = {}) {
+  const map = createDeliveryStateMap();
+  const timers = new Map();
+  map.subscribe((id, state) => {
+    if (state === DELIVERY.PENDING) {
+      if (timers.has(id)) return;
+      timers.set(id, setTimer(() => {
+        timers.delete(id);
+        if (map.get(id) === DELIVERY.PENDING && !map.reasonOf(id)) map.set(id, DELIVERY.PENDING, { reason: 'waiting-for-connection' });
+      }, PENDING_SAYS_WAITING_MS));
+    } else if (timers.has(id)) { clearTimer(timers.get(id)); timers.delete(id); }
+  });
+  return map;
+}
 
 /**
  * What the state becomes after an attempt to send.

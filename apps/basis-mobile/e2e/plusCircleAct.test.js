@@ -70,7 +70,9 @@ describe('the "+" on the phone acts in the one circle that holds the list', () =
       await tapSoon(by.id('vandaag-plus-read'));
       await new Promise((r) => setTimeout(r, 3000));
       await device.takeScreenshot(`plus-02-read-${i}`);   // what the sheet said to this read, whichever branch
-      did = await isVisible(by.id('vandaag-plus-done'));
+      // the act ran when no card asks and the thread answered (the answer is said once, in the thread); Bram's own
+      // store below is the proof that it landed
+      did = !(await isVisible(by.id('vandaag-plus-card'))) && (await isVisible(by.id('vandaag-plus-thread')));
       if (!did) {
         if (await isVisible(by.id('vandaag-plus-card'))) { cards += 1; await tapSoon(by.id('vandaag-plus-card-no')); }
         await tapSoon(by.id('vandaag-plus-close'));
@@ -95,14 +97,13 @@ describe('the "+" on the phone acts in the one circle that holds the list', () =
   it('a line the word rule does not know, with no model set, gets a plain answer, never silence', async () => {
     await typeLine('flubber quaxel');
     await tapSoon(by.id('vandaag-plus-read'));
-    // the answer shows under the line (and is kept as the assistant's turn above it): no model is set, and where to
-    // set one, in the screens' own labels
-    await soon(by.id('vandaag-plus-done'), 20_000);
-    // the exact answer, from the same locale file and the same labels the app joins (English on the test phone)
+    // the answer: no model is set, and where to set one, in the screens' own labels
+    // the exact answer, from the same locale file and the same labels the app joins (English on the test phone), said
+    // once: in the thread, as the assistant's turn (the sheet no longer repeats it on a line below)
     const en = require('../../basis/src/locales/circle.en.json');
     const txt = (v) => (typeof v === 'string' ? v : v.text);
     const path = [en.tab.mij, en.settings_home.title, en.settings_home.appearance, en.userLlm.title].map(txt).join(' \u2192 ');
-    await expect(element(by.id('vandaag-plus-done'))).toHaveText(txt(en.vandaag.plus_no_model).replace('{{path}}', path));
+    await soon(by.text(txt(en.vandaag.plus_no_model).replace('{{path}}', path)).withAncestor(by.id('vandaag-plus-thread')), 20_000);
     await device.takeScreenshot('plus-04-unread');
   });
 

@@ -80,6 +80,8 @@ import {
   shareableAddress,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows, taskStatusShown,
+  // the /transports line (the mode by its label; shared with web)
+  transportsStatusLine,
   // per-circle bottom tabs from policy.features (v2 §1).
   buildCircleTabs, DEFAULT_CIRCLE_TAB,
   // D1 (§5A) — quickActions row: feature↔tab mapping + frequency counter.
@@ -94,7 +96,7 @@ import {
   // the in-app banner over the same rows (the shared driver; this screen only paints it)
   createBannerDriver, notifyPolicyKey,
   // δ.2 — per-message delivery state for optimistic circle chat sends.
-  createDeliveryStateMap,
+  createAppDeliveryMap,
   // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out).
   circleChatMessageEvent, broadcastCircleFanOut,
   // Phase 3 — the shared circle label→candidate lookup (base items + app-qualified live fetch).
@@ -290,7 +292,7 @@ import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
 import { createPlusDoor, plusRouteLine } from '../../../../basis/src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusCardCommands, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
@@ -2291,7 +2293,18 @@ export default function CircleLauncherScreen({
           setPlusTurnsTick((n) => n + 1);
           return r;
         }}
-        onCircleRun={async (card, circleId, asSelf) => { const r = await plusDoorNow().exchange({ asSelf }, () => plusRunInCircle(card?.command, circleId, asSelf)); setPlusTurnsTick((n) => n + 1); return r; }}
+        // what the card carries, in order (the make-a-list card: the list, then the item on it); the first failure stops it
+        onCircleRun={async (card, circleId, asSelf) => {
+          const r = await plusDoorNow().exchange({ asSelf }, async () => {
+            let last = null;
+            for (const c of plusCardCommands(card)) { last = await plusRunInCircle(c, circleId, asSelf); if (last?.error) break; }
+            return last;
+          });
+          setPlusTurnsTick((n) => n + 1);
+          return r;
+        }}
+        // the card's no: the line was not done, said in the conversation (web twin: onCircleCancel)
+        onCircleCancel={async (card, asSelf) => { await plusDoorNow().cardRefused({ asSelf }, card); setPlusTurnsTick((n) => n + 1); }}
         shareTargets={plusShareList}
         onShare={plusEdit ? async (actId, contact) => {
           const op = plusShareOp(actId, { id: plusEdit.id, with: contact });
@@ -3454,7 +3467,7 @@ function CircleDetail({
   // Prefer the SHARED map from App.js — inbound receipts land there. The local fallback keeps older
   // callers/tests working, but a private map here means receipts advance a state no bubble reads.
   if (deliveryStateMapRef.current == null) {
-    deliveryStateMapRef.current = deliveryStateMap ?? createDeliveryStateMap();
+    deliveryStateMapRef.current = deliveryStateMap ?? createAppDeliveryMap();
   }
   const [deliveryTick, setDeliveryTick] = useState(0);
   // …and REDRAW when something else writes to that map. The send path bumps the tick itself (it owns the
@@ -4602,17 +4615,15 @@ function CircleDetail({
         const mode = builtin.args?.mode;
         if (['nkn', 'relay', 'both'].includes(String(mode))) {
           await onCircleControl('transport-mode', builtin.args);
-          appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_set', { mode }) });
+          appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_set', { mode: t(`circle.settings.transportMode_opt.${mode}`) }) });
         } else {
           appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_bad', { mode: mode ?? '—' }) });
         }
         return;
       }
       if (builtin.opId === 'transports') {
-        const ts = circleTransport || {};
-        appendCircleMessage({ actor: 'bot', text: t('circle.settings.transports_status', {
-          mode: ts.mode ?? 'nkn', relay: ts.relayUrl || t('circle.settings.transports_none'),
-        }) });
+        // the mode by its label, never the value 'relay' (shared with web)
+        appendCircleMessage({ actor: 'bot', text: transportsStatusLine(circleTransport || {}, t) });
         return;
       }
       if (builtin.opId === 'security-status') {
@@ -5258,6 +5269,7 @@ function CircleDetail({
           ) : null}
           <ThemedTextInput
             style={styles.composerInput}
+            autoCapitalize="none"
             value={composerText}
             onChangeText={setComposerText}
             placeholder={t('circle.view.composer_placeholder')}

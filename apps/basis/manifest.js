@@ -522,8 +522,8 @@ export const basisManifest = {
      * cross-peer transport.  Frits 2026-05-23: "users must be able to
      * choose either relay or nkn when connecting through internet."
      *
-     *   /set-relay <ws://ip:port>   persist + connect to a relay
-     *   /set-relay --clear          disconnect + clear persisted URL
+     *   /connection-point <ws://ip:port>   persist + connect to a relay
+     *   /connection-point --clear          disconnect + clear persisted URL
      */
     {
       id:    'set-relay', visibility: 'private',
@@ -535,7 +535,8 @@ export const basisManifest = {
         { name: 'clear', kind: 'boolean', required: false },
       ],
       surfaces: {
-        slash: { command: '/set-relay', body: 'flags' },
+        // the typed name says what a person reads (a connection point); the op id stays
+        slash: { command: '/connection-point', body: 'flags' },
         chat:  { reply: 'text', hint: 'set the relay URL (or --clear to drop it)' },
         // Objective D / Surface 4 — first LIVE consumer of openPagePanel's
         // simple-form path (web `pagePanel.js`).  The docked side-panel auto-builds

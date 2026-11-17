@@ -657,6 +657,10 @@
       }
     },
     "delivery": {
+      "waiting_for_connection": {
+        "text": "Nog niet verzonden: wacht op een verbinding",
+        "doc": "A message still sending after a while: it waits on this device until there is a connection, and goes by itself."
+      },
       "maybe_received": {
         "text": "Verzonden · nog niet bevestigd",
         "doc": "Het is van dit apparaat vertrokken. Of het is aangekomen weten we niet, tenzij de ander dat zelf laat weten."
@@ -1591,7 +1595,7 @@
       "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
-      "text": "Dat kon ik niet lezen.",
+      "text": "Dat kon ik niet lezen. Typ \"help\" om te zien wat ik kan, of vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."
     },
     "plus_no_model": {
@@ -1837,6 +1841,10 @@
     "plus_make_list_ask": {
       "text": "Een lijst '{{list}}' bestaat nog niet. Maken?",
       "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
+    },
+    "plus_card_not_done": {
+      "text": "'{{line}}': niet gedaan. Er is niets opgeslagen.",
+      "doc": "The \"+\" conversation: a card (which place, or make a list) was answered with Cancel; the line was not done and nothing was stored."
     }
   },
   "screens": {
@@ -2569,7 +2577,7 @@
       "doc": "G17 — /transport-mode built-in confirmation bubble."
     },
     "transport_bad": {
-      "text": "Onbekend transport: {{mode}} (gebruik nkn, relay of both)",
+      "text": "Onbekend transport: {{mode}} (gebruik nkn, verbindingspunt of beide)",
       "doc": "G17 — /transport-mode built-in bad-mode bubble."
     },
     "transports_status": {

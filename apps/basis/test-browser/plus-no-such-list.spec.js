@@ -34,3 +34,27 @@ test('a list nobody holds: the "+" asks to make it; the yes makes an own list, n
   await expect(card).toHaveCount(0);
   expect(errs).toEqual([]);
 });
+
+test('the yes puts the item on the new list too; a no is said and makes nothing', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('.circle-vandaag__plus').click();
+  const line = page.locator('.circle-vandaag-plus__line');
+  const card = page.locator('.circle-vandaag-plus__card');
+  const last = () => page.locator('.circle-vandaag-plus__turn--assistant').last();
+  // a no: said in the thread, nothing made
+  await line.fill('zet brood op vakantie');
+  await line.press('Enter');
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await card.locator('.circle-vandaag-plus__card-no').click();
+  await expect(last()).toContainText(/niet gedaan|not done/, { timeout: 15_000 });
+  // a yes: the list AND the item on it
+  await line.fill('zet melk op boodschappen');
+  await line.press('Enter');
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await card.locator('.circle-vandaag-plus__card-in').first().click();
+  await expect(card).toHaveCount(0);
+  await line.fill('wat staat er op boodschappen');
+  await line.press('Enter');
+  await expect(last()).toContainText(/melk/, { timeout: 15_000 });
+});

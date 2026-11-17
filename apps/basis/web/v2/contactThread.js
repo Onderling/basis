@@ -387,6 +387,7 @@ export function renderContactThread(container, {
   suggestEl.className = 'cc-cthread__suggest';
   suggestEl.hidden = true;
   const input = document.createElement('input');
+  input.setAttribute('autocapitalize', 'none');   // a phone's browser: what was typed stays as typed
   input.type = 'text';
   input.className = 'cc-cthread__input';
   input.placeholder = inputHint || tr('circle.contacts.composer', { name });

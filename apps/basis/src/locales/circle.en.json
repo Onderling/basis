@@ -657,6 +657,10 @@
       }
     },
     "delivery": {
+      "waiting_for_connection": {
+        "text": "Not sent yet: waiting for a connection",
+        "doc": "A message still sending after a while: it waits on this device until there is a connection, and goes by itself."
+      },
       "maybe_received": {
         "text": "Sent · not confirmed yet",
         "doc": "It left this device. Whether it arrived is unknown unless the other person chose to confirm."
@@ -1588,7 +1592,7 @@
       "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
-      "text": "I could not read that.",
+      "text": "I could not read that. Type \"help\" to see what I can do, or fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."
     },
     "plus_no_model": {
@@ -1834,6 +1838,10 @@
     "plus_make_list_ask": {
       "text": "There is no list '{{list}}' yet. Make it?",
       "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
+    },
+    "plus_card_not_done": {
+      "text": "'{{line}}': not done. Nothing was stored.",
+      "doc": "The \"+\" conversation: a card (which place, or make a list) was answered with Cancel; the line was not done and nothing was stored."
     }
   },
   "screens": {
@@ -2564,7 +2572,7 @@
       "doc": "G17 — /transport-mode built-in confirmation bubble."
     },
     "transport_bad": {
-      "text": "Unknown transport: {{mode}} (use nkn, relay or both)",
+      "text": "Unknown transport: {{mode}} (use nkn, connection-point or both)",
       "doc": "G17 — /transport-mode built-in bad-mode bubble."
     },
     "transports_status": {

@@ -466,6 +466,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         ) : null}
         <ThemedTextInput
           style={styles.input}
+          autoCapitalize="none"
           value={input}
           onChangeText={setInput}
           placeholder={t('circle.contacts.composer', { name })}

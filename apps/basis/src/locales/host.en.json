@@ -325,7 +325,7 @@
       "doc": "/set-relay called but agent.relay isn't exposed (test workspace or old build)."
     },
     "url_required": {
-      "text": "Connection point address required. Try /set-relay ws://your-host:port or /set-relay --clear",
+      "text": "Connection point address required. Try /connection-point ws://your-host:port or /connection-point --clear",
       "doc": "/set-relay called without --url or --clear."
     },
     "bad_url": {
@@ -549,7 +549,7 @@
       "doc": "/transport-mode or /transports called but agent.setTransportMode isn't exposed."
     },
     "bad_mode": {
-      "text": "Bad mode \"{{mode}}\". Pick nkn, relay, or both.",
+      "text": "Bad mode \"{{mode}}\". Pick nkn, connection-point or both.",
       "doc": "/transport-mode called with an invalid arg."
     },
     "mode_set": {

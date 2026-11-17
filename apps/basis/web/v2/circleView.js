@@ -500,6 +500,7 @@ export function renderCircleView(container, {
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'circle-view__composer-input';
+    input.setAttribute('autocapitalize', 'none');   // a phone's browser: what was typed stays as typed (a command, a list item)
     input.placeholder = composerPlaceholder ?? tr('circle.view.composer_placeholder');
     input.setAttribute('aria-label', tr('circle.view.composer_placeholder'));
     if (composerPrefill) { input.value = composerPrefill; setTimeout(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 0); }

@@ -12,7 +12,7 @@ import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t, lang } from '../../core/localisation.js';
-import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime } from '../../../../basis/src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../../../basis/src/v2/vandaagPlus.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
@@ -123,7 +123,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
               <ThemedTextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
-                placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
+                placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} autoCapitalize="none" testID="vandaag-plus-line" />
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
             </View>
@@ -214,8 +214,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => setCard(null)} testID="vandaag-plus-card-no" style={styles.btnAt} />
             </View>
           ) : null}
-          {done ? <Text style={styles.label} testID="vandaag-plus-done">{done}</Text> : null}
-          {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
+          {/* an answer or error the thread already holds is not said twice (shared rule; web twin: the same call) */}
+          {plusAnswerLineShown(done, shownTurns) ? <Text style={styles.label} testID="vandaag-plus-done">{done}</Text> : null}
+          {plusAnswerLineShown(error, shownTurns) ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
           {/* the way out, not one of the acts */}
           <Btn variant="ghost" onPress={closeSheet} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
         </View>

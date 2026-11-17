@@ -5257,6 +5257,7 @@ function CircleDetail({
           ) : null}
           <ThemedTextInput
             style={styles.composerInput}
+            autoCapitalize="none"
             value={composerText}
             onChangeText={setComposerText}
             placeholder={t('circle.view.composer_placeholder')}

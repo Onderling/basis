@@ -1917,3 +1917,71 @@ one act is the duplication the manifest exists to prevent.
 
 A projection asked without a scope offers every op, as before; the "+" asks for `own`. Code:
 `packages/app-manifest/src/scopes.js`, `validate.js` (`checkPlaces`). Ledger: L668.
+
+---
+
+## 2026-11-17 — The Solid pod is no longer a pillar: a store keeps sealed bytes, the agent is the door, and the pod's roles are replaced in stages after the alpha (Frits; Fable wrote it up; a second opinion by a fresh reader)
+
+**Status:** decided; nothing is built or removed by this entry. Amends 2026-07-14 (identity: "the registry canonical on
+the pod") and narrows 2026-11-13 (no "central pod" circle type).
+
+**Context:** the pod began as a centrepiece: the place that is always there and where a person and others keep things.
+Since then the always-on companion took "always there" (and it can act, which a store cannot), circles moved to fanning
+out and syncing, and the pod server we use is kept up by a small group, with defects we had to work around (2026-11-15).
+What kept the pod attractive was reuse of a person's data by other apps, with grants. That does not work through a pod
+here: what Basis stores is sealed, so an outside app that reaches the pod reads nothing; it needs something that can
+answer on the owner's say, which is an agent. Frits: "maybe the pods were more like an inspiration than a vital
+component."
+
+**Decision:**
+
+1. **Everything works without a pod** (2026-05-14, 2026-08-21) is now the direction, not only the floor. The Solid
+   server stops being something the product depends on or is built toward. The system stays compatible with pods:
+   a pod remains a supported way to keep things, reached through the same surfaces as any other storage method.
+2. **A store keeps; it never decides.** A blind store, a place that holds sealed bytes and can do nothing else, stays
+   as a role: a backup must not require trusting a hosted, always-on device with keys.
+3. **Permission is checked by the person's agent, never by a store.** One permission language: the grants enforced
+   where every interface hands over its op, and capabilities for a single resource. No second set of access rules kept
+   at the store.
+4. **Other apps come through the agent.** The picture for reuse: an app built for our runtime, without online access
+   of its own, reaches a bot or companion that represents a persona, and through it circles and other bots. No
+   unsealed corner on a Solid pod for outside apps.
+5. **What stands at the edge for a person carries, it does not hold.** An outward-facing, always-on node passes sealed
+   things on and checks a grant before it does; the owner's own device seals the answer to the one who asked. It is
+   never handed a key. In a person's words: a personal relay.
+6. **The pod is the example, with three habits left behind.** A replacement may copy what the pod taught us:
+   addressing by function, the same store with or without a server, write locally and write through, a conditional
+   write, a change signal. It does not copy: a global name (the WebID) as the subject of a grant; access rules kept and
+   enforced by the store; readable names and listings that show the shape of what is kept.
+7. **Per role one surface, and two implementations from the first day.** Each role the pod had gets a stable surface
+   between the app and what serves it. A store contract is what the pod AND one carrier without a pod can both do; the
+   pod stays behind it as one implementation among others.
+8. **Nothing is shed before the alpha.** Shared-pod circles stay as they are, offered only to a person who connected a
+   pod; their replacement is some shared storage, so the idea does not change. "Syncing through a pod" is not part of
+   the alpha's promise: it works for who has a pod. The welcome keeps naming the pod beside the backup file as a way to
+   carry on elsewhere, for as long as that is what exists.
+9. **Measure before building:** a new device catching up from a phone (bytes, time, battery); what a host can tell
+   from a week of one person's history mirror; a circle of thirty with photos, full fan-out against one write.
+
+**Carried to the replacement (open, not dropped):** what identifies a person at a store and whether it links their
+personas; what a store must guarantee when a read overlaps a write, and on compare-and-swap, as a conformance test for
+any backend; freshness (a store, or whoever can write to it, can serve an old sealed registry from before a device was
+revoked: a seal proves content, not that it is the latest); a store credential that can be replaced, so a revoked
+device does not keep it; what a hosted store still sees (account, sizes, the rhythm of writes); how a box or a bot takes
+part where a circle's content sits at a store; where a person keeps their recovery file.
+
+**Alternatives / why:** *Keep the pod as a home and repair it* (a pod per persona, another server): it pays twice for
+access, once in keys and once in the store's rules, and only the keys bind; the second way for content to reach a
+member stays the half that gets less testing. *Remove the pod now:* about thirty apps and packages import the pod
+packages, the sealing of circle content (the envelope and the group keys) lives in the pod client, and pod-backed
+mirrors and circles are in use; a removal
+before the alpha buys nothing. *One structure in the pod's place:* its roles differ (keeping, a second device, a
+circle's shared store, grants to another person, bytes, files edited with other tools, reuse by other apps), and so do
+their replacements. *A node that asks for keys when someone knocks:* receiving a key is holding it; a breached node
+keeps what it was handed.
+
+**Consequences:** the Pod home in `docs/architecture.md` is rewritten when the first store contract lands, not before.
+The sealing of circle content moves out of the pod client before any pod package changes its place. The pod-specific defects found so far (a
+read that overlaps a write, a shared-pod post that shows only on opening the circle, the key file races, the sign-in on
+a box) are kept as a list of what a replacement must not repeat. No new pod feature without asking. Ledger: L995
+(L943 answered; L939, L941, L938 carried).

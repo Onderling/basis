@@ -1510,6 +1510,10 @@
       "text": "Vul dit eerst in.",
       "doc": "Vandaag → '+': something needed is empty."
     },
+    "plus_read_failed": {
+      "text": "Kon het niet lezen: {{error}}",
+      "doc": "The \"+\": a READ it ran (a list, the agenda, notes) failed; {{error}} is the read's own reason. Never \"could not save\": nothing was being saved."
+    },
     "plus_failed": {
       "text": "Niet bewaard: {{error}}",
       "doc": "Vandaag → '+': the save failed; the reason follows."

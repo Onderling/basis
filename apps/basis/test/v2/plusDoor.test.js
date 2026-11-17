@@ -588,3 +588,15 @@ describe('a said day goes with the agenda read ("wat heb ik morgen gepland?")', 
     expect(read?.args?.day, 'the day that was said').toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
+
+describe('a read that fails says it could not read, never "could not save" (item 11)', () => {
+  it('"wat staat er op mijn vakantielijst?" with no such list: the read\'s own reason, as a read', async () => {
+    const readAs = () => async (app, op) => (op === 'listEntries' ? { ok: false, error: 'No list called "vakantie" here.' } : { items: [] });
+    const interpret = vi.fn(async () => ({ opId: 'listEntries', args: { list: 'vakantie' } }));
+    const { d } = door({ interpret, readAs, selfOf: () => ({ key: 'me', isDefault: true }) });
+    const r = await d.read('wat staat er op mijn vakantielijst?');
+    expect(r.error).toContain('circle.vandaag.plus_read_failed');
+    expect(r.error).toContain('No list called');
+    expect(r.error).not.toContain('plus_failed');
+  });
+});

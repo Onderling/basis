@@ -92,6 +92,9 @@ describe('nearbyTabs', () => {
   it('the hidden line in both languages', () => {
     expect(text(circleNl, 'circle.nearbyScreen.chat_hidden_line')).toBe('Je bent verborgen. Word zichtbaar om mee te praten.');
     expect(text(circleEn, 'circle.nearbyScreen.chat_hidden_line')).toBe('You are hidden. Become visible to join the conversation.');
+    // Questions has its own words (Fable, on #1368): the chat line keeps "om mee te praten"
+    expect(text(circleNl, 'circle.nearbyScreen.ask_hidden_line')).toBe('Je bent verborgen. Word zichtbaar om iets te vragen.');
+    expect(text(circleEn, 'circle.nearbyScreen.ask_hidden_line')).toBe('You are hidden. Become visible to ask something.');
     expect(text(circleNl, 'circle.nearbyScreen.chat_hidden_action')).toBe('Word zichtbaar');
     expect(text(circleEn, 'circle.nearbyScreen.chat_hidden_action')).toBe('Become visible');
   });

@@ -3600,6 +3600,10 @@
       "text": "Je bent verborgen. Word zichtbaar om mee te praten.",
       "doc": "The Conversation tab while the person is hidden from the room: no stream, this line and the way to become visible."
     },
+    "ask_hidden_line": {
+      "text": "Je bent verborgen. Word zichtbaar om iets te vragen.",
+      "doc": "The Questions tab while the person is hidden from the room: no ask box, this line and the way to become visible."
+    },
     "chat_hidden_action": {
       "text": "Word zichtbaar",
       "doc": "Button under the hidden line: the existing act that ends being hidden (leave \"even stil\", or the radio back on)."

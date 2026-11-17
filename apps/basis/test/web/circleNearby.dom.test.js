@@ -667,7 +667,7 @@ describe('hidden: Questions shows no ask composer (nearbyAskOff)', () => {
     expect(el.querySelector('[data-section="nearby-ask-field"]')).toBeNull();
     expect(el.querySelector('.circle-nearby__ask-compose')).toBeNull();
     const off = el.querySelector('[data-section="nearby-ask-off"]');
-    expect(off.querySelector('.circle-nearby__ask-off-line').textContent).toBe('circle.nearbyScreen.chat_hidden_line');
+    expect(off.querySelector('.circle-nearby__ask-off-line').textContent).toBe('circle.nearbyScreen.ask_hidden_line');
     off.querySelector('.circle-nearby__ask-visible').click();
     expect(onSetQuiet).toHaveBeenCalledWith(false);
   });

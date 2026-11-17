@@ -274,7 +274,7 @@ export function renderCircleNearby(container, {
     el.className = 'circle-nearby__ask-off';
     const line = document.createElement('div');
     line.className = 'circle-nearby__ask-off-line';
-    line.textContent = tr('circle.nearbyScreen.chat_hidden_line');
+    line.textContent = tr('circle.nearbyScreen.ask_hidden_line');
     el.appendChild(line);
     const act = { unquiet: typeof onSetQuiet === 'function' ? () => onSetQuiet(false) : null,
       'radio-on': typeof onSetRadio === 'function' ? () => onSetRadio('on') : null }[askOff?.act];

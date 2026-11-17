@@ -4602,7 +4602,7 @@ function CircleDetail({
         const mode = builtin.args?.mode;
         if (['nkn', 'relay', 'both'].includes(String(mode))) {
           await onCircleControl('transport-mode', builtin.args);
-          appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_set', { mode }) });
+          appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_set', { mode: t(`circle.settings.transportMode_opt.${mode}`) }) });
         } else {
           appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_bad', { mode: mode ?? '—' }) });
         }

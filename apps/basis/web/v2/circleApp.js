@@ -8369,7 +8369,7 @@ function showCircle(id, circle, policy) {
             const mode = builtin.args?.mode;
             const r = applyTransportMode(mode);
             circleNote(r?.ok
-              ? t('circle.settings.transport_set', { mode: r.mode })
+              ? t('circle.settings.transport_set', { mode: t(`circle.settings.transportMode_opt.${r.mode}`) })
               : t('circle.settings.transport_bad', { mode: mode ?? '—' }));
             return;
           }

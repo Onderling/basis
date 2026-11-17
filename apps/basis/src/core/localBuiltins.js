@@ -18,6 +18,7 @@
  */
 
 import { feedbackTarget, feedbackDraft, feedbackScreenId } from '../v2/feedbackContact.js';
+import { readTransportMode } from '../v2/circleSettingsControls.js';
 import { seedContactCard } from '../v2/seededContact.js';
 import { PERSON_WEEK_OP, personWeekCard } from '../v2/personWeekOverview.js';
 import { buildFileShareEnvelope } from './handlers/fileShare.js';
@@ -1361,9 +1362,11 @@ async function transportMode(args, { agent, t }) {
   if (typeof agent?.callSkill !== 'function') {
     return { ok: false, error: t('transport.no_substrate') };
   }
-  const mode = String(args?.mode ?? '').trim();
-  if (!['nkn', 'relay', 'both'].includes(mode)) {
-    return { ok: false, error: t('transport.bad_mode', { mode }) };
+  // the mode by the words a person reads (`readTransportMode`: verbindingspunt, beide, nkn) or its value
+  const said = String(args?.mode ?? '').trim();
+  const mode = readTransportMode(said);
+  if (!mode) {
+    return { ok: false, error: t('transport.bad_mode', { mode: said }) };
   }
   try {
     // The register is the one home (device-params consolidation): the kind-gated write persists it

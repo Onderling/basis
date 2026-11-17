@@ -4,8 +4,8 @@
  * "verbindingspunt" / "connection point". This reads every text in the app's locale files (`apps/basis/src/locales/`,
  * both languages, every file: the circle texts, the host's replies, …) and fails on "relay" in one.
  *
- * Declared exceptions, and why: a word the person TYPES is not a word we show them, so it stays as typed until the
- * command itself is renamed: the `/set-relay` command, and the transport modes a person types (`nkn`, `relay`, `both`).
+ * No exceptions for what a person types either: the command is `/connection-point` (the op id `set-relay` is never
+ * shown) and the transport modes read "nkn · verbindingspunt · beide" (`readTransportMode`).
  *
  *   node scripts/lint-no-relay-word.mjs
  */
@@ -16,9 +16,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LOCALES = 'apps/basis/src/locales';
 
-/** What may say "relay" because the person types it (a command's name, the typed transport modes) or never sees it (a
- *  placeholder's name, `{{relay}}`, which the text fills in). */
-const TYPED = [/\/set-relay\b/gi, /\bnkn,\s*relay,?\s*(?:or|of)\s*both\b/gi, /\{\{\s*relay\s*\}\}/gi];
+/** What may say "relay" because the person never sees it: a placeholder's name, `{{relay}}`, which the text fills in. */
+const TYPED = [/\{\{\s*relay\s*\}\}/gi];
 
 /** The keys of one locale tree whose text a person reads and that says "relay" (outside the typed words). */
 export function relayTexts(tree, path = '') {

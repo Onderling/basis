@@ -12,13 +12,15 @@
  * Pure JS — no I/O, no DOM. Deterministic for tests.
  */
 
+import { readTransportMode } from './circleSettingsControls.js';
+
 /**
  * The slash commands the composer dispatches as circle/transport built-ins (NOT to the bot).
  * Names match the `surfaces.slash.command` (sans leading `/`) on the basis manifest ops.
  * @type {ReadonlyArray<string>}
  */
 export const CIRCLE_BUILTIN_COMMANDS = Object.freeze([
-  'settings', 'set-relay', 'transport-mode', 'transports',
+  'settings', 'connection-point', 'transport-mode', 'transports',
   // 2026-08-02 — `/security-status` joins the classifier so the WEB composer can reach it. The handler has
   // always existed (`localBuiltins.js`), and mobile mounts the whole builtins table; web hand-rolls a
   // subset and so had no route to it. It reports what the boundary is actually enforcing — how many
@@ -55,11 +57,11 @@ export function parseCircleBuiltin(line) {
   switch (command) {
     case 'settings':
       return { command, opId: 'settings', args: parseSettingsArgs(body) };
-    case 'set-relay':
+    case 'connection-point':
       if (/^--clear\b/i.test(body) || body.toLowerCase() === 'clear') return { command, opId: 'set-relay', args: { clear: true } };
       return { command, opId: 'set-relay', args: body ? { url: body.split(/\s+/)[0] } : {} };
     case 'transport-mode':
-      return { command, opId: 'transport-mode', args: body ? { mode: body.split(/\s+/)[0].toLowerCase() } : {} };
+      return { command, opId: 'transport-mode', args: body ? { mode: readTransportMode(body.split(/\s+/)[0]) ?? body.split(/\s+/)[0].toLowerCase() } : {} };
     case 'transports':
       return { command, opId: 'transports', args: {} };
     case 'security-status':

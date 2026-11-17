@@ -6,18 +6,18 @@ import { parseCircleBuiltin, CIRCLE_BUILTIN_COMMANDS } from '../../src/v2/circle
 import manifest from '../../manifest.js';
 
 describe('G17 — composer built-in classifier', () => {
-  it('/set-relay <url> fires the set-relay op with the url', () => {
-    expect(parseCircleBuiltin('/set-relay wss://relay.example')).toEqual({
-      command: 'set-relay', opId: 'set-relay', args: { url: 'wss://relay.example' },
+  it('/connection-point <url> fires the set-relay op with the url', () => {
+    expect(parseCircleBuiltin('/connection-point wss://relay.example')).toEqual({
+      command: 'connection-point', opId: 'set-relay', args: { url: 'wss://relay.example' },
     });
   });
-  it('/set-relay --clear fires the set-relay op with clear', () => {
-    expect(parseCircleBuiltin('/set-relay --clear')).toEqual({
-      command: 'set-relay', opId: 'set-relay', args: { clear: true },
+  it('/connection-point --clear fires the set-relay op with clear', () => {
+    expect(parseCircleBuiltin('/connection-point --clear')).toEqual({
+      command: 'connection-point', opId: 'set-relay', args: { clear: true },
     });
   });
-  it('bare /set-relay fires the op with no args (opens the panel/form)', () => {
-    expect(parseCircleBuiltin('/set-relay')).toEqual({ command: 'set-relay', opId: 'set-relay', args: {} });
+  it('bare /connection-point fires the op with no args (opens the panel/form)', () => {
+    expect(parseCircleBuiltin('/connection-point')).toEqual({ command: 'connection-point', opId: 'set-relay', args: {} });
   });
 
   it('/transport-mode <mode> fires the transport-mode op', () => {
@@ -61,5 +61,22 @@ describe('G17 — composer built-in classifier', () => {
       expect(declared.has(command), `/${command} is classified as a built-in but not declared in the manifest`)
         .toBe(true);
     }
+  });
+});
+
+// A person reads and types the transport modes by their words: "verbindingspunt" / "connection-point", "beide" / "both",
+// "nkn". The op still receives the mode values (nkn · relay · both).
+import { readTransportMode } from '../../src/v2/circleSettingsControls.js';
+describe('the transport modes by their words', () => {
+  it('each word reads as its mode; anything else is not one', () => {
+    expect(readTransportMode('NKN')).toBe('nkn');
+    expect(readTransportMode('verbindingspunt')).toBe('relay');
+    expect(readTransportMode('connection-point')).toBe('relay');
+    expect(readTransportMode('beide')).toBe('both');
+    expect(readTransportMode('both')).toBe('both');
+    expect(readTransportMode('fiets')).toBeNull();
+  });
+  it('/transport-mode verbindingspunt fires the op with the mode value', () => {
+    expect(parseCircleBuiltin('/transport-mode verbindingspunt')).toEqual({ command: 'transport-mode', opId: 'transport-mode', args: { mode: 'relay' } });
   });
 });

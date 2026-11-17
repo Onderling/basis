@@ -119,8 +119,7 @@ describe('a line that puts something on a list NOBODY holds asks to make that li
     expect(words.question).toBe("Een lijst 'boodschappen' bestaat nog niet. Maken?");
   });
 
-  // Fable's walk (item 12): a line naming a list nobody holds was read as a circle's TASK by a looser phrase. The ask to
-  // make the list settles it: never a circle's task by a guess (the earlier 'no reading' fix, #1328, is superseded).
+  // A line naming a list nobody holds asks to make the list: never a circle's task by a guess.
   it('"zet zonnebrand en slippers op vakantie" in a circle without that list: asks to make the list, never a circle task', () => {
     const r = plusLineOutcome('zet zonnebrand en slippers op vakantie', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [])], own: { lists: [] } });
     expect(r, JSON.stringify(r)).toMatchObject({ makeList: 'vakantie', atOnce: false, command: { opId: 'createList' } });

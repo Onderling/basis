@@ -48,6 +48,17 @@ describe('the phone\'s Conversation stream and tab counts', () => {
     expect(offPart).toMatch(/'radio-on': \(\) => onSetRadio\?\.\('on'\)/);
   });
 
+  it('the "you here" row is the shared nearbyMineSummary (never "in the conversation" while hidden), not its own chips', () => {
+    const body = nearbyScreenBody();
+    expect(body).toMatch(/nearbyMineSummary\(model\)/);
+    expect(body).not.toMatch(/allows\.chat \? t\('circle\.nearbyScreen\.mine_chat_on'\)/);
+  });
+
+  it('a refusal while hidden is said: the host shows the controller\'s notice for an ask and for a line', () => {
+    expect(SRC).toMatch(/key: r\.notice \?\? 'ask_expired'/);
+    expect(SRC).toMatch(/const r = await screen\.say\(text\);\s*\n\s*if \(r\?\.notice\) setNotice\(\{ key: r\.notice \}\)/);
+  });
+
   it('each tab label carries its count from the shared nearbyTabNews', () => {
     const body = nearbyScreenBody();
     expect(body).toMatch(/nearbyTabNews\(model, /);

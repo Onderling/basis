@@ -265,7 +265,7 @@ describe('a follow-up uses the previous turn, and a refusal stores nothing and i
     expect(r.values.title).toContain('sleutel');
     const said = await d.settled({}, { saved: false });
     expect(said).toContain('circle.vandaag.plus_act_not_saved');
-    expect(d.turns({}).at(-1)).toMatchObject({ who: 'assistant', text: said });
+    expect(d.turns({}).at(-1)).toMatchObject({ who: 'system', text: said });
     expect(callSkill).not.toHaveBeenCalled();
   });
   it('saved: the thread says it was saved; settling twice, or with no form the "+" opened, says nothing', async () => {
@@ -515,5 +515,24 @@ describe('a budget on the request the "+" sends its model (Frits: do not let the
     const note = seen[3].tools.map((x) => x.id ?? x.name);
     expect(note, 'a note line gets the note').toContain('__generic__:household:add:note');
     expect(note, 'a note line gets no agenda tools').not.toContain('cancelEvent');
+  });
+});
+
+describe('whose words a turn is: the model\'s reply is the assistant\'s, an act or a read is the system speaking', () => {
+  it('a read\'s answer is kept as the system\'s turn and reaches the model as a result, never as its own words', async () => {
+    const histories = [];
+    const readAs = () => async (app, op) => (op === 'listEvents' ? { ok: true, title: 'Agenda', items: [{ id: 'e1', label: 'tandarts' }] } : { items: [] });
+    const interpret = vi.fn(async (text, o) => {
+      histories.push(o.history ?? []);
+      return /gepland/.test(text) ? { opId: 'listEvents', args: {} } : { reply: 'Graag gedaan.' };
+    });
+    const { d } = door({ interpret, readAs, selfOf: () => ({ key: 'me', isDefault: true }) });
+    await d.read('wat heb ik gepland?');
+    await d.read('dank je');
+    const turns = d.turns({});
+    expect(turns.find((x) => /tandarts/.test(x.text))?.who, 'the read is the system speaking').toBe('system');
+    expect(turns.at(-1)).toMatchObject({ who: 'assistant', text: 'Graag gedaan.' });
+    const said = histories.at(-1).filter((m) => /tandarts/.test(m.content));
+    expect(said.every((m) => m.role !== 'assistant'), 'the model never reads the read as its own words').toBe(true);
   });
 });

@@ -289,7 +289,8 @@ export function createPlusDoor({
       ? { peek: async (cmd, ctx) => { const e = entryOf(cmd?.opId); return e && reads(e) ? readForTurn(ctx, e, cmd.args) : null; } }
       : {}),
     dispatch: (input, ctx) => answer(input, ctx),
-    onNoMatch: (_text, _ctx, opts) => { outcome = typeof opts?.reply === 'string' && opts.reply ? { done: opts.reply } : unread(); },
+    // the model's own words (`model`): the only outcome kept as the assistant's turn; everything else is the system speaking
+    onNoMatch: (_text, _ctx, opts) => { outcome = typeof opts?.reply === 'string' && opts.reply ? { done: opts.reply, model: true } : unread(); },
     // the own model is set but could not be reached: say that, never "I could not read that"
     onLlmUnavailable: () => { outcome = { error: t('circle.vandaag.plus_model_unreachable') }; },
     onUnhandled: () => { outcome = unread(); },
@@ -340,7 +341,9 @@ export function createPlusDoor({
       if (memory && thread) {
         memory.remember(thread, 'you', String(line ?? '').trim());
         const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.card ?? null, ownActId: r?.actId ?? null, t });
-        if (said) memory.remember(thread, 'assistant', said);
+        // only the model's reply is the assistant's words; a read, an act, a card, help or an error is the system speaking
+        // (the household bot's rule, `aroundTurn`): the model then reads it as a result, never as something it said
+        if (said) memory.remember(thread, r?.model ? 'assistant' : 'system', said);
       }
       return r;
     },
@@ -352,7 +355,7 @@ export function createPlusDoor({
       const r = await run();
       const thread = threadIdFor(setOf(opts).set);
       const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, t });
-      if (memory && thread && said) memory.remember(thread, 'assistant', said);
+      if (memory && thread && said) memory.remember(thread, 'system', said);
       return r;
     },
     /**
@@ -367,13 +370,14 @@ export function createPlusDoor({
       const thread = threadIdFor(setOf(opts).set);
       if (!memory || !thread || typeof memory.turns !== 'function') return null;
       const last = memory.turns(thread, 1).at(-1);
-      if (last?.who !== 'assistant') return null;
+      // the form's label, kept when it opened (the system speaking); a later line of the person's means it was left
+      if (!last || last.who === 'you') return null;
       const act = PLUS_ACTS.find((a) => plusLabel(t, a) === last.text);
       if (!act) return null;
       // another act saved by its button while this form was open: THIS form was not saved (said now, not at a later close)
       const kept = saved && (!actId || actId === act.id);
       const said = t(kept ? 'circle.vandaag.plus_act_saved' : 'circle.vandaag.plus_act_not_saved', { act: plusLabel(t, act) });
-      memory.remember(thread, 'assistant', said);
+      memory.remember(thread, 'system', said);
       return said;
     },
     /**

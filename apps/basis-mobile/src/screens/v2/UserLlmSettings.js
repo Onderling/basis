@@ -48,6 +48,7 @@ export default function UserLlmSettings({ current = {}, onSave, validate }) {
         placeholder={placeholder}
         placeholderTextColor={theme.color.inkSoft}
         autoCapitalize="none" autoCorrect={false} secureTextEntry={secure}
+        testID={`user-llm-${key}`}
       />
     </View>
   );

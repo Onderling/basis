@@ -9,6 +9,7 @@
 
 import { LlmClient } from '@onderling/llm-client';
 import { ollamaProvider } from '@onderling/llm-client/providers/ollama';
+import { reasoningBodyFor } from '@onderling/llm-client/providers/reasoning';
 
 /**
  * @param {object} [cfg]
@@ -25,7 +26,9 @@ export function buildCircleLlmProviders({ localBaseUrl = null, model, audit, clo
   // aborts mid-flight and the bot drops to "basic mode". Pass-through; the app sets a
   // generous default + an env override.
   const mk = (baseUrl, m, key) => new LlmClient({
-    provider: ollamaProvider({ baseUrl: normalizeBase(baseUrl), ...(m ? { model: m } : {}), ...(key ? { apiKey: key } : {}), ...(timeoutMs != null ? { timeoutMs } : {}) }),
+    provider: ollamaProvider({ baseUrl: normalizeBase(baseUrl), ...(m ? { model: m } : {}), ...(key ? { apiKey: key } : {}), ...(timeoutMs != null ? { timeoutMs } : {}),
+      // the model family's low-reasoning switch, whatever the endpoint (GLM with nothing sent reasons at max)
+      ...(reasoningBodyFor(m) ? { bodyFor: () => reasoningBodyFor(m) } : {}) }),
     ...(typeof audit === 'function' ? { audit } : {}),
   });
   const providers = {};

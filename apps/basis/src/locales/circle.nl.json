@@ -765,12 +765,12 @@
       "doc": "tasks tab — status-badge: iemand doet de taak."
     },
     "claimed_by": {
-      "text": "geclaimd door {{who}}",
-      "doc": "tasks tab — status van een geclaimde taak met wie hem doet: één naam, meerdere met komma's, of 'jou'."
+      "text": "opgepakt door {{who}}",
+      "doc": "tasks tab — status van een opgepakte taak met wie hem doet: één naam, meerdere met komma's, of 'jou'."
     },
     "you": {
       "text": "jou",
-      "doc": "tasks tab — de kijker zelf als wie de taak doet, in 'geclaimd door {{who}}'."
+      "doc": "tasks tab — de kijker zelf als wie de taak doet, in 'opgepakt door {{who}}'."
     },
     "submitted": {
       "text": "ingediend",

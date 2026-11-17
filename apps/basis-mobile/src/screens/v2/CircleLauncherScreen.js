@@ -290,7 +290,7 @@ import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
 import { createPlusDoor, plusRouteLine } from '../../../../basis/src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
@@ -2261,7 +2261,8 @@ export default function CircleLauncherScreen({
         routeLine={plusRouteLine(ownRouteOf(userLlmCfg), { t })}
         // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat (web twin)
         onForget={plusThread ? async (asSelf) => { await plusDoorNow().forget({ asSelf }); setPlusTurnsTick((n) => n + 1); } : null}
-        suggestFor={(typed) => plusSuggest(plusPool, typed)}
+        // under the line: on "/" the door's commands (the "/" list), else the lines it reads here (web twin: circleApp.js)
+        suggestFor={(typed) => plusDoorNow().suggest(typed, { pool: plusPool })}
         onRead={async (line, asSelf) => {
           // the ONE "+" door (shared with web): help, then the plain reading, then the person's own model through the
           // assistant engine; it keeps the line and what it answered in the thread

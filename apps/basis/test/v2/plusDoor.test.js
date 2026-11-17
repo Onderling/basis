@@ -465,3 +465,31 @@ describe('the sheet shows the kept conversation, not the model\'s memory window'
     expect(d.turns({}).map((x) => x.text)).toEqual(['een', 'ok', 'twee', 'ok', 'drie', 'ok', 'vier', 'ok']);
   });
 });
+
+describe('the "/" list in the "+": the same acts the buttons and the model have (journey 6)', () => {
+  it('typing "/" offers the door\'s own commands, from the same catalogue the model gets; no device command, no circle op', () => {
+    const { d } = door({});
+    const all = d.suggest('/');
+    expect(all).toEqual(expect.arrayContaining(['/addappt', '/add-note', '/upcoming']));
+    expect(all).not.toContain('/whoami');
+    expect(d.suggest('/add')).toEqual(expect.arrayContaining(['/addappt', '/add-note']));
+    expect(d.suggest('/addappt tandarts'), 'arguments: the list closes').toEqual([]);
+    expect(d.suggest('zet melk', { pool: ['zet melk op Vakantie'] }), 'a line that is no command: the shell\'s pool').toEqual(['zet melk op Vakantie']);
+  });
+  it('picking an act opens the same form as its button, filled with what was typed; nothing reaches a model or a store', async () => {
+    const interpret = vi.fn(async () => ({ reply: 'x' }));
+    const { d, callSkill } = door({ interpret });
+    const r = await d.read('/addappt');
+    expect(r.actId).toBe('calendar.calendar-event');
+    expect(interpret).not.toHaveBeenCalled();
+    expect(callSkill).not.toHaveBeenCalled();
+  });
+  it('a read by its command runs as the self and is said; a "/" line that names nothing here is an ordinary line', async () => {
+    const readAs = () => async (app, op) => (op === 'listEvents' ? { ok: true, title: 'Agenda', items: [{ id: 'e1', label: 'tandarts' }] } : { items: [] });
+    const interpret = vi.fn(async () => ({ reply: 'gewoon een zin' }));
+    const { d } = door({ interpret, readAs, selfOf: () => ({ key: 'me', isDefault: true }) });
+    expect((await d.read('/upcoming')).done).toContain('tandarts');
+    expect(interpret).not.toHaveBeenCalled();
+    expect((await d.read('/ja of nee')).done).toBe('gewoon een zin');
+  });
+});

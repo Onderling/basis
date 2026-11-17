@@ -25,10 +25,11 @@ import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
-import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel } from '../v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel, plusSuggest } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
 import { circleGateRules } from '../v2/circleGate.js';
+import { createComposerCommands } from '../v2/composerCommands.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
 
 /**
@@ -233,6 +234,41 @@ export function createPlusDoor({
     || acts.some((a) => a.opId === c.opId && (!c.appOrigin || c.appOrigin === a.appOrigin)) || Boolean(entryOf(c.opId)));
   const gateRules = circleGateRules(lang).map((r) => (typeof r.command !== 'function' ? r
     : { ...r, command: (text, ctx) => { const c = r.command(text, ctx); return offeredHere(c) ? c : null; } }));
+  // EVERY op offered to the model, or named by a "/" line, has an outcome here (one handler: "/" and the model cannot
+  // drift apart), and none reaches a store from the model: a door op runs (it sets this conversation), an own act
+  // opens its form filled (Save is the yes), a read runs as the self and is answered, any other own write is a card
+  // naming the act and its list, run only on the person's pick as the self.
+  const answer = async (input, ctx) => {
+    const cmd = typeof input === 'object' && input ? input : null;
+    // the conversation's own settings (memory mode, language): the door's ops, run at once (they change no thing of
+    // the person's, only how this thread talks; forgetting it is slash only and never a model's tool)
+    if (cmd && DOOR_OP_IDS.has(cmd.opId)) { outcome = await runDoorOp(cmd.opId, cmd.args ?? {}, ctx?.id ?? threadId); return; }
+    // only the acts that MAKE something: a line is never read as "open a door" (feedback runs from its button)
+    const act = cmd && acts.find((a) => a.opId === cmd.opId && !actRunsAtOnce(a));
+    const e = cmd && !act ? entryOf(cmd.opId) : null;
+    if (e && reads(e) && typeof readAs === 'function') {
+      const r = await Promise.resolve(readForTurn(ctx, e, cmd.args)).catch((err) => ({ ok: false, error: err?.message ?? String(err) }));
+      outcome = r?.ok === false ? { error: t('circle.vandaag.plus_failed', { error: r.error ?? '' }) } : { done: plusDoneLine(r, { opId: e.op.id, args: cmd.args ?? {}, t }) || t('circle.vandaag.plus_line_unread') };
+      return;
+    }
+    if (e && !reads(e) && !actRunsAtOnce(acts.find((a) => a.opId === cmd.opId))) {
+      const { circleId: _c, ...args } = cmd.args ?? {};
+      outcome = { card: { line: currentLine, to: [{ circleId: OWN_DEVICES_SCOPE, name: '', own: true }], command: { appOrigin: e.appOrigin, opId: e.op.id, args } } };
+      return;
+    }
+    if (!act) { outcome = unread(); return; }
+    const values = {};
+    for (const f of act.fields) {
+      const v = cmd.args?.[f.name];
+      if (v != null && String(v).trim()) values[f.name] = String(v).trim();
+    }
+    outcome = { actId: act.id, values };
+  };
+
+  // the "/" list: the commands of THIS door's catalogue, the same acts its buttons and its model have (`own`: no device
+  // command, no circle op); a "/" line naming one goes through `answer`, a "/" line naming none is an ordinary line
+  const commands = createComposerCommands({ kind: 'own', catalogue: cat });
+
   const engine = createAssistantEngine({
     catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules, promptLines: [...OWN_PLACE_LINES],
     // what the model may read for a line: the person's own things only, and only the ticked self's (or the set's)
@@ -250,35 +286,7 @@ export function createPlusDoor({
     ...(typeof readAs === 'function'
       ? { peek: async (cmd, ctx) => { const e = entryOf(cmd?.opId); return e && reads(e) ? readForTurn(ctx, e, cmd.args) : null; } }
       : {}),
-    // EVERY op offered to the model has an outcome here, and none reaches a store from the model: a door op runs (it
-    // sets this conversation), an own act opens its form filled (Save is the yes), a read runs as the self and is
-    // answered, any other own write is a card naming the act and its list, run only on the person's pick as the self.
-    dispatch: async (input, ctx) => {
-      const cmd = typeof input === 'object' && input ? input : null;
-      // the conversation's own settings (memory mode, language): the door's ops, run at once (they change no thing of
-      // the person's, only how this thread talks; forgetting it is slash only and never a model's tool)
-      if (cmd && DOOR_OP_IDS.has(cmd.opId)) { outcome = await runDoorOp(cmd.opId, cmd.args ?? {}, ctx?.id ?? threadId); return; }
-      // only the acts that MAKE something: a line is never read as "open a door" (feedback runs from its button)
-      const act = cmd && acts.find((a) => a.opId === cmd.opId && !actRunsAtOnce(a));
-      const e = cmd && !act ? entryOf(cmd.opId) : null;
-      if (e && reads(e) && typeof readAs === 'function') {
-        const r = await Promise.resolve(readForTurn(ctx, e, cmd.args)).catch((err) => ({ ok: false, error: err?.message ?? String(err) }));
-        outcome = r?.ok === false ? { error: t('circle.vandaag.plus_failed', { error: r.error ?? '' }) } : { done: plusDoneLine(r, { opId: e.op.id, args: cmd.args ?? {}, t }) || t('circle.vandaag.plus_line_unread') };
-        return;
-      }
-      if (e && !reads(e) && !actRunsAtOnce(acts.find((a) => a.opId === cmd.opId))) {
-        const { circleId: _c, ...args } = cmd.args ?? {};
-        outcome = { card: { line: currentLine, to: [{ circleId: OWN_DEVICES_SCOPE, name: '', own: true }], command: { appOrigin: e.appOrigin, opId: e.op.id, args } } };
-        return;
-      }
-      if (!act) { outcome = unread(); return; }
-      const values = {};
-      for (const f of act.fields) {
-        const v = cmd.args?.[f.name];
-        if (v != null && String(v).trim()) values[f.name] = String(v).trim();
-      }
-      outcome = { actId: act.id, values };
-    },
+    dispatch: (input, ctx) => answer(input, ctx),
     onNoMatch: (_text, _ctx, opts) => { outcome = typeof opts?.reply === 'string' && opts.reply ? { done: opts.reply } : unread(); },
     // the own model is set but could not be reached: say that, never "I could not read that"
     onLlmUnavailable: () => { outcome = { error: t('circle.vandaag.plus_model_unreachable') }; },
@@ -299,6 +307,13 @@ export function createPlusDoor({
     // nothing is read and nothing reaches a model before it
     if (!primary) return { askSelf: true };
     const asSelf = primary;
+    const slash = text.startsWith('/') ? commands.parse(text) : null;
+    if (slash) {
+      outcome = null;
+      currentLine = text;
+      await answer({ opId: slash.opId, args: slash.args ?? {} }, { asSelf, selves: set, id: threadIdFor(set) });
+      return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
+    }
     const o = plusLineOutcome(text, { circles: await circles(), own: { lists: await ownListsOf(asSelf) }, lang });
     if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
@@ -358,6 +373,17 @@ export function createPlusDoor({
       const said = t(kept ? 'circle.vandaag.plus_act_saved' : 'circle.vandaag.plus_act_not_saved', { act: plusLabel(t, act) });
       memory.remember(thread, 'assistant', said);
       return said;
+    },
+    /**
+     * What to offer under the line while it is typed: on a "/" word, this door's commands (the "/" list); otherwise the
+     * shell's own suggestion pool (`plusSuggest`). Both sheets ask this one function.
+     * @param {string} typed
+     * @param {{pool?: string[]}} [o]
+     */
+    suggest(typed, { pool = [] } = {}) {
+      const v = String(typed ?? '');
+      // "/" alone answers "what can I do here": the whole list, not the composer's first twelve
+      return v.startsWith('/') ? commands.suggest(v, { limit: 40 }).map((e) => e.command) : plusSuggest(pool, v);
     },
     catalogue: cat,
     threadIdFor,

@@ -306,6 +306,9 @@ export const SEAMS = Object.freeze([
   // A FORM THE "+" OPENED IS SETTLED IN THE CONVERSATION (`settled` on the door): saved, or closed without saving (a
   // refused proposal: nothing stored, and the thread says so). Both sheets call it from Save and from closing.
   { id: 'plus-form-settled', pattern: /plusDoorNow\(\)\.settled\(/, shells: ['web', 'mobile'], why: 'a form the "+" opened from a line is said in the conversation once it is saved or closed unsaved' },
+  // THE "+" HAS A "/" LIST: on a "/" word the sheet offers its door's own commands (`suggest` on the door: the same acts its
+  // buttons and its model have), and a "/" line goes through the door's one handler. Both sheets ask the door.
+  { id: 'plus-slash-list', pattern: /plusDoorNow\(\)\.suggest\(/, shells: ['web', 'mobile'], why: 'typing "/" in the "+" offers the door\'s own commands, and picking one opens the same form' },
   // THE "+" READS THE TICKED SELF'S OWN LISTS FIRST (`plusLineOutcome`'s `own`, read AS that self), and answers what a
   // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself

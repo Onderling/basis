@@ -193,7 +193,7 @@ import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createPlusDoor, conversationSelf, plusRouteLine } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
@@ -4810,7 +4810,8 @@ function showVandaagPlus({ edit = null } = {}) {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
     routeLine: plusRouteLine(circleOwnRoute(), { t }),
     turns: conversationSelf(asSelf, selves.length) ? plusDoorNow().turns({ asSelf: conversationSelf(asSelf, selves.length) }) : [],
-    suggestFor: (typed) => plusSuggest(suggestionPool, typed),
+    // under the line: on "/" the door's commands (the "/" list), else the lines it reads here (the shared door; phone twin)
+    suggestFor: (typed) => plusDoorNow().suggest(typed, { pool: suggestionPool }),
     // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
     onForget: async () => { await plusDoorNow().forget({ asSelf: conversationSelf(asSelf, selves.length) }); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),

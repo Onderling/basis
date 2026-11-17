@@ -274,7 +274,8 @@ export function createPlusDoor({
     const e = cmd && !act ? entryOf(cmd.opId) : null;
     if (e && reads(e) && typeof readAs === 'function') {
       const r = await Promise.resolve(readForTurn(ctx, e, cmd.args)).catch((err) => ({ ok: false, error: err?.message ?? String(err) }));
-      outcome = r?.ok === false ? { error: t('circle.vandaag.plus_failed', { error: r.error ?? '' }) } : { done: plusDoneLine(r, { opId: e.op.id, args: cmd.args ?? {}, t }) || t('circle.vandaag.plus_line_unread') };
+      // a read that fails could not READ (never "could not save": nothing was being saved)
+      outcome = r?.ok === false ? { error: t('circle.vandaag.plus_read_failed', { error: r.error ?? '' }) } : { done: plusDoneLine(r, { opId: e.op.id, args: cmd.args ?? {}, t }) || t('circle.vandaag.plus_line_unread') };
       return;
     }
     if (e && !reads(e) && !actRunsAtOnce(acts.find((a) => a.opId === cmd.opId))) {

@@ -93,9 +93,11 @@ describe('createAssistantEngine', () => {
     const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {} });
     await e.ask('t', 'kun je nog wat melk toevoegen');
     expect(seen[0].system).toContain("Reply in the member's language; when you cannot tell, in Dutch.");
-    expect(seen[0].hints).toContain('The member wrote in: nl.');
+    expect(seen[0].hints).toContain('The member wrote in: nl. Reply in that language, also when earlier turns were in another.');
     expect(seen[0].system).toContain('voeg … toe');
-    expect(interpretHintsFor('add some milk to the list please')).toContain('The member wrote in: en.');
+    expect(interpretHintsFor('add some milk to the list please')).toContain('The member wrote in: en. Reply in that language, also when earlier turns were in another.');
+    // the newest line's language wins over the history's: said in the hint itself
+    expect(interpretHintsFor('what can you do for me?')[0]).toMatch(/wrote in: en\. Reply in that language, also when earlier turns were in another/);
     expect(interpretHintsFor('maii')).toEqual([]);
   });
   it('a thread\'s own hints reach the model below the language line; and it acts on the newest message only', async () => {
@@ -104,13 +106,13 @@ describe('createAssistantEngine', () => {
     const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {},
       threadHints: (id) => (id === 'member-thread' ? ['only the admin makes lists'] : []) });
     await e.ask('member-thread', 'maak een nieuwe lijst: cadeaus');
-    expect(seen[0].hints).toEqual(['The member wrote in: nl.', 'only the admin makes lists']);
+    expect(seen[0].hints).toEqual(['The member wrote in: nl. Reply in that language, also when earlier turns were in another.', 'only the admin makes lists']);
     expect(seen[0].system).toContain("act on the member's NEWEST message");
     // a short answer answers the bot's own last question; an offer is only of what a tool can do
     expect(seen[0].system).toContain("answers YOUR OWN last question");
     expect(seen[0].system).toContain("Offer only what a tool can do");
     await e.ask('other', 'maak een nieuwe lijst: cadeaus');
-    expect(seen[1].hints).toEqual(['The member wrote in: nl.']);
+    expect(seen[1].hints).toEqual(['The member wrote in: nl. Reply in that language, also when earlier turns were in another.']);
   });
   it('a door\'s expand reaches the dispatcher: one chosen add becomes the adds it stands for', async () => {
     const dispatched = [];

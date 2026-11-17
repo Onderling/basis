@@ -1587,6 +1587,10 @@
       "text": "{{act}}: not saved. Nothing was stored.",
       "doc": "The \"+\" conversation: the form the \"+\" opened from a line was closed without saving (a refused proposal); nothing was stored."
     },
+    "plus_read_none": {
+      "text": "Nothing found.",
+      "doc": "The \"+\": a read it ran (one the model picked) answered no items and carries no name to say it by."
+    },
     "plus_model_unreachable": {
       "text": "Your own model cannot be reached right now. Try again later; the fixed phrases and the buttons still work.",
       "doc": "The \"+\": the person's own model is set but could not be reached for this line."

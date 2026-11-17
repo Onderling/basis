@@ -288,7 +288,8 @@ export function replyInHint(lang) {
 /** This turn's hints, below the prompt's turn marker: what the member's line was written in, when that is clear. */
 export function interpretHintsFor(text) {
   const wrote = detectLang(text);
-  return wrote ? [`The member wrote in: ${wrote}.`] : [];
+  // the NEWEST line's language wins over the history's (a walk: an English question after Dutch turns got Dutch)
+  return wrote ? [`The member wrote in: ${wrote}. Reply in that language, also when earlier turns were in another.`] : [];
 }
 
 /**

@@ -306,7 +306,7 @@ import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../s
 import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
 import { renderIntroDeck } from './introDeck.js';
 import { renderFirstOpen } from './firstOpen.js';
-import { firstOpenThen } from '../../src/v2/firstOpen.js';
+import { firstOpenThen, addressCarriesAct } from '../../src/v2/firstOpen.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -1481,6 +1481,9 @@ let resolveSkill = null; // (opId, args) => Promise<object|null>
 // (`podAuth.handleRedirect`) strips `?code=…&state=…` on load (it treats `code` as an OIDC auth
 // code), which would wipe a boot parameter such as `?addbot` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
+// the fragment the app was opened with, before any handler scrubs a link from it (the first open reads it: a link is
+// the scan door, already answered)
+const _bootHash = (typeof window !== 'undefined' && window.location) ? window.location.hash : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
 // THE SHARED ACT STATE (actState.js): every act the person just took paints pending · done · failed through ONE strip,
 // whatever screen dispatched it — the waist is wrapped once where `rawCallSkill` is made (below, at agent boot). The
@@ -10295,7 +10298,12 @@ async function boot() {
   try { lastTab = window.localStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
   const start = startTabFor(circleHouseholdAgent?.getParamValue?.('home.startScreen'), lastTab);
   // THE FIRST OPEN on this device: three doors before anything else (src/v2/firstOpen.js); a door chosen, Today
-  if (!(await onboardingFlags.isFirstOpenSeen())) { showFirstOpen(); return; }
+  // A person who ARRIVED BY A LINK (a contact, an invitation, an enrol offer, an install, a bot) answered the scan door
+  // by opening it: the first open is over, and the link's own sheet goes on (firstOpen.js addressCarriesAct)
+  if (!(await onboardingFlags.isFirstOpenSeen())) {
+    if (addressCarriesAct({ hash: _bootHash, search: _bootSearch })) await onboardingFlags.markFirstOpenSeen();
+    else { showFirstOpen(); return; }
+  }
   if (start === 'screens') showScreens();
   else if (start === 'contacten') showContacts();
   else if (start === 'mij') showMij();

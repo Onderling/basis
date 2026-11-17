@@ -3580,6 +3580,18 @@
       "text": "Vragen",
       "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
     },
+    "tab_with_new": {
+      "text": "{{label}} · {{count}}",
+      "doc": "A Nearby tab's name with how many things arrived since the person last looked at that tab; only when there is at least one."
+    },
+    "stream_ask_from": {
+      "text": "Vraag van {{name}}",
+      "doc": "Head of a question card in the Conversation stream, so it reads as a question and not as a chat line."
+    },
+    "stream_invite_from": {
+      "text": "Kring aangeboden door {{name}}",
+      "doc": "Head of an offered-circle card in the Conversation stream."
+    },
     "invites_title": {
       "text": "Kringen die hier open staan",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."

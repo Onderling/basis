@@ -3575,6 +3575,18 @@
       "text": "Questions",
       "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
     },
+    "tab_with_new": {
+      "text": "{{label}} · {{count}}",
+      "doc": "A Nearby tab's name with how many things arrived since the person last looked at that tab; only when there is at least one."
+    },
+    "stream_ask_from": {
+      "text": "Question from {{name}}",
+      "doc": "Head of a question card in the Conversation stream, so it reads as a question and not as a chat line."
+    },
+    "stream_invite_from": {
+      "text": "Circle offered by {{name}}",
+      "doc": "Head of an offered-circle card in the Conversation stream."
+    },
     "invites_title": {
       "text": "Circles open here",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."

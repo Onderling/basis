@@ -552,3 +552,64 @@ describe('the two tabs (Conversation · Questions), painted from the shared list
     expect(mine.compareDocumentPosition(el.querySelector('.circle-nearby__tabs')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('the Conversation stream: questions and offered circles as cards between the chat lines (nearbyStream)', () => {
+  const tv = (k, v = {}) => (Object.keys(v).length ? `${k}(${Object.entries(v).map(([a, b]) => `${a}=${b}`).join(',')})` : k);
+  const room = () => model({
+    allows: { card: false, chat: true },
+    chat: [{ id: 'm1', text: 'hoi', who: 'Ans', at: 100 }, { id: 'm2', text: 'ja', who: 'Jij', at: 300, mine: true }],
+    asks: [{ ask: { id: 'a1', text: 'pomp?', expiresAt: Date.now() + 120_000 }, receivedAt: 200, who: 'Bob', resonant: true, reason: 'fietsen', actions: ['answer-ask', 'dismiss-ask'] }],
+    invites: [{ invite: { circleId: 'c1', circleName: 'Tuin', receivedAt: 400 }, who: 'Dirk', actions: ['join-published-circle'] }],
+  });
+  const streamOf = (el) => [...el.querySelector('[data-section="nearby-chat"]').children]
+    .filter((n) => n.matches('.circle-nearby__chat-line, .circle-nearby__stream-card'))
+    .map((n) => n.dataset.streamKind ?? 'line');
+
+  it('in arrival order, oldest first; each card boxed and headed with who, so it does not read as a chat line', () => {
+    const el = document.createElement('div');
+    renderCircleNearby(el, { model: room(), t: tv });
+    expect(streamOf(el)).toEqual(['line', 'ask', 'line', 'invite']);
+    const ask = el.querySelector('.circle-nearby__stream-card[data-stream-kind="ask"]');
+    expect(ask.querySelector('.circle-nearby__stream-head').textContent).toBe('circle.nearbyScreen.stream_ask_from(name=Bob)');
+    expect(ask.querySelector('.circle-nearby__ask-reason').textContent).toContain('fietsen');
+    expect(ask.querySelector('.circle-nearby__ask-clock').textContent).toContain('ask_expires_in');
+    const inv = el.querySelector('.circle-nearby__stream-card[data-stream-kind="invite"]');
+    expect(inv.querySelector('.circle-nearby__stream-head').textContent).toBe('circle.nearbyScreen.stream_invite_from(name=Dirk)');
+  });
+
+  it('Answer / Dismiss / Join on a card go through the same handlers as the Questions tab', () => {
+    const onAskAction = vi.fn(); const onInviteAction = vi.fn();
+    const el = document.createElement('div');
+    const m = room();
+    renderCircleNearby(el, { model: m, t, onAskAction, onInviteAction });
+    const card = el.querySelector('.circle-nearby__stream-card[data-stream-kind="ask"]');
+    card.querySelector('[data-action="answer-ask"]').click();
+    card.querySelector('[data-action="dismiss-ask"]').click();
+    expect(onAskAction.mock.calls).toEqual([['answer-ask', m.asks[0].ask], ['dismiss-ask', m.asks[0].ask]]);
+    el.querySelector('.circle-nearby__stream-card[data-stream-kind="invite"] [data-action="join-published-circle"]').click();
+    expect(onInviteAction).toHaveBeenCalledWith('join-published-circle', m.invites[0].invite);
+  });
+
+  it('the question and the circle stay in the Questions tab too', () => {
+    const el = render(room());
+    expect(el.querySelector('[data-section="nearby-asks"] .circle-nearby__ask[data-ask-id="a1"]')).not.toBeNull();
+    expect(el.querySelector('[data-section="nearby-invites"] .circle-nearby__invite[data-circle-id="c1"]')).not.toBeNull();
+  });
+
+  it('each tab counts what is new; the open tab is seen, opening the other one marks it seen', () => {
+    const el = document.createElement('div');
+    renderCircleNearby(el, { model: room(), t: tv });
+    const label = (id) => el.querySelector(`.circle-nearby__tab--${id}`).textContent;
+    // Conversation is open (in the chat): seen. Questions: the question and the circle are new.
+    expect(label('conversation')).toBe('circle.nearbyScreen.tab_conversation');
+    expect(label('questions')).toBe('circle.nearbyScreen.tab_with_new(label=circle.nearbyScreen.tab_questions,count=2)');
+    el.querySelector('.circle-nearby__tab--questions').click();
+    expect(label('questions')).toBe('circle.nearbyScreen.tab_questions');
+    // a new chat line arrives while Questions is open: Conversation counts it
+    const next = room();
+    next.chat.push({ id: 'm3', text: 'nog iets', who: 'Ans', at: 500 });
+    renderCircleNearby(el, { model: next, t: tv });
+    expect(label('conversation')).toBe('circle.nearbyScreen.tab_with_new(label=circle.nearbyScreen.tab_conversation,count=1)');
+    expect(label('questions')).toBe('circle.nearbyScreen.tab_questions');
+  });
+});

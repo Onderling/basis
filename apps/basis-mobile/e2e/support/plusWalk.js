@@ -22,7 +22,13 @@ async function say(line) {
   await pause(1500);
   await tapSoon(by.id('vandaag-plus-read'));
   // the same line may be in the thread already (an earlier journey asked it too): the first match is enough
-  await present(by.text(line).withAncestor(by.id('vandaag-plus-thread')));
+  try {
+    await present(by.text(line).withAncestor(by.id('vandaag-plus-thread')));
+  } catch (err) {
+    // what the sheet showed instead: a timeout without a picture sends the next reader guessing
+    try { await device.takeScreenshot(`plus-walk-not-in-thread-${Date.now()}`); } catch { /* the device may be gone */ }
+    throw new Error(`"${line}" never showed in the thread: ${err.message}`);
+  }
 }
 
 /** The texts of every element a matcher finds (none: []), read from the screen. */

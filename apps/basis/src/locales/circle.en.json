@@ -10790,6 +10790,10 @@
     "position": {
       "text": "{{at}} of {{of}}",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "reopen": {
+      "text": "Introduction",
+      "doc": "Settings' door back to the introduction's seven cards (Today's card is gone once the intro is seen)."
     }
   },
   "firstOpen": {

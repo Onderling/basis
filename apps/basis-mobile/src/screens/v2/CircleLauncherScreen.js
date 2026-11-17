@@ -2498,6 +2498,8 @@ export default function CircleLauncherScreen({
           onOpenDoor={(d) => {
             // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same; web parity)
             if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
+            // the introduction's seven cards again (the manifest's settings door), over Today where the deck is drawn
+            if (d?.target?.kind === 'nav' && d.target.to === 'intro') { setView('screens'); setIntroOpen(true); return; }
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
             Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))

@@ -5601,6 +5601,8 @@ function showSettingsHome() {
     onOpenDoor: (d) => {
       // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same)
       if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
+      // the introduction's seven cards again (the manifest's settings door; phone twin: setIntroOpen)
+      if (d?.target?.kind === 'nav' && d.target.to === 'intro') { openIntroDeck(); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })

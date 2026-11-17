@@ -1538,6 +1538,10 @@
       "text": "Zeg wat je wilt — \"notitie: melk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
+    "plus_own_confirm": {
+      "text": "“{{line}}”: {{act}}. Zal ik dat doen?",
+      "doc": "The \"+\" card when the act it read can only happen in the person's own place (an own list, nothing to choose): the line, the act named (circle.bot.help.ops.<app>.<op>), and a yes/no; nothing runs before Confirm."
+    },
     "plus_circle_ask": {
       "text": "“{{line}}”: in welke kring?",
       "doc": "The \"+\" line reads to an act more than one of the person's circles holds: the card asks which circle (one button per circle, and Cancel); nothing runs until one is chosen."

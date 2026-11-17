@@ -12,7 +12,7 @@ import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t, lang } from '../../core/localisation.js';
-import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel, plusMomentNeedsTime, plusAskTime } from '../../../../basis/src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime } from '../../../../basis/src/v2/vandaagPlus.js';
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
@@ -205,9 +205,10 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           })}
           {card ? (
             <View testID="vandaag-plus-card">
-              <Text style={styles.label}>{t('circle.vandaag.plus_circle_ask', { line: card.line ?? '' })}</Text>
+              {/* the shared wording: the own place confirms the act; a choice of places asks which (web twin: vandaagPlus.js) */}
+              <Text style={styles.label}>{plusCardWords(card, { t }).question}</Text>
               {card.to.map((r) => (
-                <Btn key={r.circleId} label={plusCardLabel(t, r)}
+                <Btn key={r.circleId} label={plusCardWords(card, { t }).labelFor(r)}
                   onPress={() => runIn(r.circleId)} disabled={busy} testID={`vandaag-plus-card-in-${r.circleId}`} style={styles.btnAt} />
               ))}
               <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => setCard(null)} testID="vandaag-plus-card-no" style={styles.btnAt} />

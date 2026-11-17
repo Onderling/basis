@@ -49,6 +49,12 @@ describe('nearbyStream — one stream, by arrival', () => {
     expect(nearbyStream({ ...room, chat: null })).toEqual([]);
   });
 
+  it('hidden from the room: no stream (the tab says so), and nothing in it counts as new', () => {
+    const hidden = { ...room, visibility: { publishing: false, levelChosen: true }, quiet: true };
+    expect(nearbyStream(hidden)).toEqual([]);
+    expect(nearbyTabNews(hidden, {}).counts.conversation).toBe(0);
+  });
+
   it('in the chat, nobody said anything, nothing asked: an empty stream', () => {
     expect(nearbyStream({ chat: [] })).toEqual([]);
     expect(nearbyStream(null)).toEqual([]);
@@ -91,6 +97,32 @@ describe('nearbyTabNews — what is new on each tab', () => {
   });
 });
 
+describe('one name per person: a line, a question and a circle name the sender as their row does', () => {
+  it('the rows built from the peers the room sees (pseudonym, display name, a face) name the cards and the lines', async () => {
+    const T0 = 1_700_000_000_000;
+    let pushPeers = null; let pushAsk = null; let pushInvite = null; let pushChat = null;
+    const screen = createNearbyScreen({
+      subscribeToPeers: (fn) => { pushPeers = fn; return () => {}; },
+      subscribeToAsks: (fn) => { pushAsk = fn; return () => {}; },
+      subscribeToInvites: (fn) => { pushInvite = fn; return () => {}; },
+      subscribeToChat: (fn) => { pushChat = fn; return () => {}; },
+      allows: { chat: true }, myRoomAddress: () => 'me', now: () => T0, t: (k) => k,
+    });
+    screen.open();
+    pushPeers([{ pubKey: 'ansAAAA11111', displayName: 'Ans', skills: [] }]);
+    pushChat({ id: 'm1', text: 'hoi', from: 'ansAAAA11111', receivedAt: T0 });
+    pushAsk({ id: 'ask-1', text: 'pomp?', tags: [], from: 'ansAAAA11111', createdAt: T0, expiresAt: T0 + 600_000 });
+    pushInvite({ uri: 'onderling-invite://x', circleId: 'c1', circleName: 'Tuin', expiresAt: T0 + 600_000, from: 'ansAAAA11111', receivedAt: T0 });
+    await new Promise((r) => setTimeout(r, 0));
+    const m = screen.model();
+    const shown = m.rows.find((r) => r.id === 'ansAAAA11111').pseudonym;
+    expect(shown).toBe('Ans');
+    expect(m.chat[0].who).toBe(shown);
+    expect(m.asks[0].who).toBe(shown);
+    expect(m.invites[0].who).toBe(shown);
+  });
+});
+
 describe('the controller gives each kind its arrival time and who', () => {
   const T0 = 1_700_000_000_000;
   const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -119,6 +151,7 @@ describe('the controller gives each kind its arrival time and who', () => {
     expect(m.chat[0].at).toBe(T0 + 3000);
     expect(m.asks[0]).toMatchObject({ receivedAt: T0 + 1000, who: 'peer-abcdef' });
     expect(m.invites[0]).toMatchObject({ who: 'peer-abcdef' });
-    expect(nearbyStream(m).map((i) => i.kind)).toEqual(['ask', 'invite', 'line']);
+    // (no discovering control here, so the room does not see this device; ordered as it would be once visible)
+    expect(nearbyStream(Object.assign({}, m, { visibility: { publishing: true } })).map((i) => i.kind)).toEqual(['ask', 'invite', 'line']);
   });
 });

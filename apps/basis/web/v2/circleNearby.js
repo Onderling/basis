@@ -58,6 +58,8 @@ export function renderCircleNearby(container, {
   onSay = null,
   onInviteAction = null,
   onShareCard = null,     // (answerFrom, event) — 'deel je kaart' on an answer to my ask; the press goes with it
+  onSetQuiet = null,      // (bool) — "even stil" for this once; the controller's setQuiet (a host with a radio control)
+  onSetRadio = null,      // ('on'|'off') — the persisted radio switch; the controller's setRadio
 } = {}) {
   const tr = translatorOr(t, 'circleNearby.js');
   container.innerHTML = '';
@@ -168,7 +170,7 @@ export function renderCircleNearby(container, {
     'nearby-peers': paintPeers,
     'nearby-invites': paintInvites,
   };
-  const { tabs, defaultTab } = nearbyTabs(safeModel);
+  const { tabs, defaultTab, chatOff } = nearbyTabs(safeModel);
   const kept = container.dataset.nearbyTab;
   let selected = tabs.some((x) => x.id === kept) ? kept : defaultTab;
   // What is new on each tab (`nearbyTabNews`). The seen-marks are paint state, on the container like the picked tab:
@@ -236,19 +238,31 @@ export function renderCircleNearby(container, {
   // ── Section painters (each returns one element; `nearbyTabs` decides whether it is called) ─────────────
 
   function paintChatOff() {
-    // Not in the room chat: say so in one line, with the way in (the same allow as in "you here").
+    // No stream (`nearbyChatOff`): hidden from the room, or not in the chat. One line, and the existing act that ends
+    // it — leaving "even stil", the radio back on, or the chat allow. No button when this host cannot carry the act.
     const el = document.createElement('div');
     el.className = 'circle-nearby__chat-off';
+    el.dataset.reason = chatOff?.reason ?? '';
+    const hidden = chatOff?.reason === 'hidden';
     const line = document.createElement('div');
     line.className = 'circle-nearby__chat-off-line';
-    line.textContent = tr('circle.nearbyScreen.allow_chat_off');
+    line.textContent = tr(hidden ? 'circle.nearbyScreen.chat_hidden_line' : 'circle.nearbyScreen.allow_chat_off');
     el.appendChild(line);
-    const join = document.createElement('button');
-    join.type = 'button';
-    join.className = 'cc-btn cc-btn--quiet circle-nearby__chat-join';
-    join.textContent = tr('circle.nearbyScreen.allow_chat');
-    join.addEventListener('click', () => { if (typeof onToggleAllow === 'function') onToggleAllow('chat', true); });
-    el.appendChild(join);
+    const ACTS = {
+      join: typeof onToggleAllow === 'function' ? () => onToggleAllow('chat', true) : null,
+      unquiet: typeof onSetQuiet === 'function' ? () => onSetQuiet(false) : null,
+      'radio-on': typeof onSetRadio === 'function' ? () => onSetRadio('on') : null,
+    };
+    const act = ACTS[chatOff?.act];
+    if (act || !hidden) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `cc-btn cc-btn--quiet ${hidden ? 'circle-nearby__chat-visible' : 'circle-nearby__chat-join'}`;
+      btn.dataset.act = chatOff?.act ?? '';
+      btn.textContent = tr(hidden ? 'circle.nearbyScreen.chat_hidden_action' : 'circle.nearbyScreen.allow_chat');
+      btn.addEventListener('click', () => act?.());
+      el.appendChild(btn);
+    }
     return el;
   }
 

@@ -613,3 +613,36 @@ describe('the Conversation stream: questions and offered circles as cards betwee
     expect(label('questions')).toBe('circle.nearbyScreen.tab_questions');
   });
 });
+
+describe('hidden from the room: Conversation shows no stream, one line and the way to become visible', () => {
+  const hiddenRoom = (over = {}) => model({
+    allows: { card: false, chat: true },
+    chat: [{ id: 'm1', text: 'hoi', who: 'Ans', at: 100 }],
+    visibility: { publishing: false, levelChosen: true }, quiet: true, radioOff: false, ...over,
+  });
+
+  it('even stil: the hidden line, and its button leaves quiet (the controller\'s setQuiet)', () => {
+    const onSetQuiet = vi.fn();
+    const el = render(hiddenRoom(), { onSetQuiet });
+    expect(el.querySelector('[data-section="nearby-chat"]')).toBeNull();
+    const off = el.querySelector('[data-section="nearby-chat-off"]');
+    expect(off.dataset.reason).toBe('hidden');
+    expect(off.querySelector('.circle-nearby__chat-off-line').textContent).toBe('circle.nearbyScreen.chat_hidden_line');
+    off.querySelector('.circle-nearby__chat-visible').click();
+    expect(onSetQuiet).toHaveBeenCalledWith(false);
+    expect(el.querySelector('.circle-nearby__chat-input')).toBeNull();
+  });
+
+  it('the radio off: the button turns it back on', () => {
+    const onSetRadio = vi.fn();
+    const el = render(hiddenRoom({ visibility: { radioOff: true }, radioOff: true, quiet: false }), { onSetRadio });
+    el.querySelector('.circle-nearby__chat-visible').click();
+    expect(onSetRadio).toHaveBeenCalledWith('on');
+  });
+
+  it('a host that cannot carry the act shows the line without a dead button', () => {
+    const el = render(hiddenRoom());
+    expect(el.querySelector('.circle-nearby__chat-off-line')).not.toBeNull();
+    expect(el.querySelector('.circle-nearby__chat-visible')).toBeNull();
+  });
+});

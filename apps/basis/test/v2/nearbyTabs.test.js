@@ -53,6 +53,37 @@ describe('nearbyTabs', () => {
     expect(nearbyTabs(null).defaultTab).toBe('questions');
   });
 
+  it('hidden from the room: no stream, even in the chat; one line and the way to become visible', () => {
+    const quiet = { visibility: { publishing: false, levelChosen: true }, quiet: true, radioOff: false };
+    const out = nearbyTabs({ ...full, ...quiet });
+    expect(sectionsIn(out, 'conversation')).toEqual(['nearby-chat-off']);
+    expect(out.chatOff).toEqual({ reason: 'hidden', act: 'unquiet' });
+    expect(out.defaultTab).toBe('questions');
+    // the radio off: the way back is the radio switch
+    expect(nearbyTabs({ ...full, visibility: { radioOff: true }, radioOff: true }).chatOff).toEqual({ reason: 'hidden', act: 'radio-on' });
+    // no level chosen yet: hidden, and the way is the first-use question above, not a button here
+    expect(nearbyTabs({ ...full, visibility: { publishing: false, levelChosen: false } }).chatOff).toEqual({ reason: 'hidden', act: null });
+  });
+
+  it('visible, becoming visible, or announced against a wish (still visible): the stream is there', () => {
+    for (const visibility of [{ publishing: true }, { pending: true }, { degraded: true, publishing: true }]) {
+      const out = nearbyTabs({ ...full, visibility });
+      expect(sectionsIn(out, 'conversation'), JSON.stringify(visibility)).toEqual(['nearby-chat']);
+      expect(out.chatOff).toBe(null);
+    }
+  });
+
+  it('not in the chat (and not hidden): the join line', () => {
+    expect(nearbyTabs({ ...full, chat: null, visibility: { publishing: true } }).chatOff).toEqual({ reason: 'not-joined', act: 'join' });
+  });
+
+  it('the hidden line in both languages', () => {
+    expect(text(circleNl, 'circle.nearbyScreen.chat_hidden_line')).toBe('Je bent verborgen. Word zichtbaar om mee te praten.');
+    expect(text(circleEn, 'circle.nearbyScreen.chat_hidden_line')).toBe('You are hidden. Become visible to join the conversation.');
+    expect(text(circleNl, 'circle.nearbyScreen.chat_hidden_action')).toBe('Word zichtbaar');
+    expect(text(circleEn, 'circle.nearbyScreen.chat_hidden_action')).toBe('Become visible');
+  });
+
   it('every declared section is reachable: each tab paints its declared screen, and each id shows for some room', () => {
     const shown = new Set([...nearbyTabs(full).tabs, ...nearbyTabs({ chat: null }).tabs].flatMap((x) => x.sections));
     for (const tab of NEARBY_TABS) {

@@ -3584,6 +3584,14 @@
       "text": "{{label}} · {{count}}",
       "doc": "A Nearby tab's name with how many things arrived since the person last looked at that tab; only when there is at least one."
     },
+    "chat_hidden_line": {
+      "text": "Je bent verborgen. Word zichtbaar om mee te praten.",
+      "doc": "The Conversation tab while the person is hidden from the room: no stream, this line and the way to become visible."
+    },
+    "chat_hidden_action": {
+      "text": "Word zichtbaar",
+      "doc": "Button under the hidden line: the existing act that ends being hidden (leave \"even stil\", or the radio back on)."
+    },
     "stream_ask_from": {
       "text": "Vraag van {{name}}",
       "doc": "Head of a question card in the Conversation stream, so it reads as a question and not as a chat line."

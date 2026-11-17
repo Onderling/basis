@@ -10,7 +10,8 @@
  * subscriptions handed questions, a circle and chat lines, as a mesh would. The acts go through the controller's own
  * methods (`say`, `dismissAsk`), the same ones the app wires.
  *
- * Screenshots at phone width (390 px) for the notes: gesprek.png, vragen.png, empty-room.png under the test's output.
+ * Screenshots at phone width (390 px) for the notes: gesprek.png, vragen.png, verborgen.png (hidden: no stream, one
+ * line) and empty-room.png under the test's output.
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/nearby-tabs.spec.js
  */
@@ -33,9 +34,12 @@ const ready = async (page) => {
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 30_000 });
 };
 
-/** Compose Nearby in the app's root, in Dutch; `fill` says whether the room has people talking and asking. */
-async function openNearby(page, { fill }) {
-  return page.evaluate(async ([mods, full]) => {
+/** Compose Nearby in the app's root, in Dutch; `fill` says whether the room has people talking and asking, `chat`
+ *  whether the person is in the chat (default: when filled). The device is seen by the room through a stand-in for
+ *  the radio's discoverability control (a browser has none), which reports exactly the state it is asked for — so the
+ *  controller's own `setQuiet` really makes the person hidden. */
+async function openNearby(page, { fill, chat = fill }) {
+  return page.evaluate(async ([mods, full, inChat]) => {
     const [{ createNearbyScreen }, { renderCircleNearby }, { isAlphaTab }, loc] = await Promise.all(
       [mods.screen, mods.painter, mods.alpha, mods.loc].map((u) => import(u)));
     await loc.setLang('nl');
@@ -44,13 +48,20 @@ async function openNearby(page, { fill }) {
     root.removeAttribute('data-nearby-tab');
     let clock = Date.now() - 10 * 60_000;
     const push = {};
+    let report = null;
+    const control = {
+      set: (state) => { report = { requested: state, effective: state, degraded: false, shortfall: false, perTransport: [] }; return report; },
+      report: () => report,
+      subscribe: () => () => {},
+    };
     const screen = createNearbyScreen({
+      control,
       subscribeToPeers: (fn) => { push.peers = fn; return () => {}; },
       subscribeToAsks: (fn) => { push.ask = fn; return () => {}; },
       subscribeToInvites: (fn) => { push.invite = fn; return () => {}; },
       subscribeToChat: (fn) => { push.chat = fn; return () => {}; },
       askChannel: { broadcastKind: async () => ({ sent: 2, failed: 0, peers: 2 }) },
-      allows: { card: false, chat: full },
+      allows: { card: false, chat: inChat },
       myRoomAddress: () => 'me-room-addr',
       levelChosen: () => true,
       now: () => clock,
@@ -60,6 +71,7 @@ async function openNearby(page, { fill }) {
       model: screen.model(), t: loc.t,
       onAskAction: (action, ask) => { if (action === 'dismiss-ask') screen.dismissAsk(ask?.id); },
       onToggleAllow: () => {},
+      onSetQuiet: (v) => screen.setQuiet(v),
     });
     screen.subscribe(() => draw());
     screen.open();
@@ -81,7 +93,7 @@ async function openNearby(page, { fill }) {
     draw();
     window.__nearbyTest = { screen };
     return { webShowsNearbyTab: isAlphaTab('nearby') };
-  }, [MODS, fill]);
+  }, [MODS, fill, chat]);
 }
 
 const tabLabel = (page, id) => page.locator(`.circle-nearby__tab--${id}`).innerText();
@@ -103,9 +115,11 @@ test('Gesprek: one stream by arrival, cards for a question and a circle; Vragen 
   const kinds = await page.locator('[data-section="nearby-chat"] > .circle-nearby__chat-line, [data-section="nearby-chat"] > .circle-nearby__stream-card')
     .evaluateAll((els) => els.map((e) => e.dataset.streamKind ?? 'line'));
   expect(kinds).toEqual(['line', 'ask', 'line', 'invite', 'line']);
-  await expect(page.locator('.circle-nearby__stream-card[data-stream-kind="ask"] .circle-nearby__stream-head')).toHaveText(/^Vraag van /);
+  await expect(page.locator('.circle-nearby__stream-card[data-stream-kind="ask"] .circle-nearby__stream-head')).toHaveText('Vraag van Bob');
   await expect(page.locator('.circle-nearby__stream-card[data-stream-kind="ask"] .circle-nearby__ask-clock')).toHaveText(/nog \d+ min/);
-  await expect(page.locator('.circle-nearby__stream-card[data-stream-kind="invite"] .circle-nearby__stream-head')).toHaveText(/^Kring aangeboden door /);
+  await expect(page.locator('.circle-nearby__stream-card[data-stream-kind="invite"] .circle-nearby__stream-head')).toHaveText('Kring aangeboden door Dirk');
+  // one name per person: the line names Ans as her row does
+  await expect(page.locator('.circle-nearby__chat-line[data-message-id="m1"] .circle-nearby__chat-meta')).toContainText('Ans');
   // my own line says "you"; others' lines say who
   await expect(page.locator('.circle-nearby__chat-line[data-mine="true"] .circle-nearby__chat-meta')).toContainText('Jij');
   // Gesprek is open, so seen; Vragen holds the new question and the new circle
@@ -126,6 +140,26 @@ test('Gesprek: one stream by arrival, cards for a question and a circle; Vragen 
   await page.locator('.circle-nearby__stream-card[data-stream-kind="ask"] [data-action="dismiss-ask"]').click();
   await expect(page.locator('.circle-nearby__stream-card[data-stream-kind="ask"]')).toHaveCount(0);
   await expect(page.locator('.circle-nearby__ask[data-ask-id="ask-1"]')).toHaveCount(0);
+  expect(errs).toEqual([]);
+});
+
+test('hidden from the room ("even stil"): no stream and no field to talk in; one line, and becoming visible brings the stream back', async ({ page }, testInfo) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
+  await openNearby(page, { fill: true });
+  await expect(page.locator('[data-section="nearby-chat"]')).toBeVisible();
+  // go quiet through the controller's own act, as the state line's switch does
+  await page.evaluate(() => window.__nearbyTest.screen.setQuiet(true));
+  await page.locator('.circle-nearby__tab--conversation').click();
+  await expect(page.locator('.circle-nearby__visibility')).toHaveAttribute('data-visibility', 'hidden');
+  await expect(page.locator('[data-section="nearby-chat"]')).toHaveCount(0);
+  await expect(page.locator('.circle-nearby__chat-input')).toHaveCount(0);
+  await expect(page.locator('.circle-nearby__chat-off-line')).toHaveText('Je bent verborgen. Word zichtbaar om mee te praten.');
+  expect(await tabLabel(page, 'conversation'), 'nothing in a stream you cannot see counts as new').toBe('Gesprek');
+  await page.screenshot({ path: testInfo.outputPath('verborgen.png'), fullPage: true });
+  await page.locator('.circle-nearby__chat-visible').click();
+  await expect(page.locator('.circle-nearby__visibility')).toHaveAttribute('data-visibility', 'visible');
+  await expect(page.locator('[data-section="nearby-chat"]')).toBeVisible();
   expect(errs).toEqual([]);
 });
 

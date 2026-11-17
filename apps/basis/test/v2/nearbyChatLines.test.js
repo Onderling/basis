@@ -11,8 +11,8 @@ describe('nearbyChatLines', () => {
     const [l] = nearbyChatLines([{ id: 'a', text: 'hoi', from: 'me-addr', createdAt: at }], { me: 'me-addr', t });
     expect(l).toMatchObject({ id: 'a', text: 'hoi', who: 'circle.nearbyScreen.chat_you', when: timeWords(at), mine: true });
   });
-  it("another's line carries the label their row shows (a face)", () => {
-    const [l] = nearbyChatLines([{ id: 'b', text: 'ja', from: 'peerXYZ123', receivedAt: at }], { rows: [{ id: 'peerXYZ123', label: 'Ans' }], me: 'me-addr', t });
+  it("another's line carries the name their row shows (a face, else their own name)", () => {
+    const [l] = nearbyChatLines([{ id: 'b', text: 'ja', from: 'peerXYZ123', receivedAt: at }], { rows: [{ id: 'peerXYZ123', pseudonym: 'Ans' }], me: 'me-addr', t });
     expect(l).toMatchObject({ who: 'Ans', when: timeWords(at), mine: false });
   });
   it('without a row, the same peer-… the person rows use', () => {

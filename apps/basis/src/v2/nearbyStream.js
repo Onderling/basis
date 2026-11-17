@@ -11,10 +11,32 @@
  * My own questions are not cards in the stream: they cannot be answered by me, and they stay in Questions with who
  * heard them and their answers.
  *
- * Not in the room chat (`model.chat` is not an array): no stream — the tab says how to join instead.
+ * Not in the room chat, or hidden from the room (`nearbyChatOff`): no stream — the tab says why, and the way out.
  */
 
+import { nearbyVisibilityKey } from './nearbyScreen.js';
+
 const list = (v) => (Array.isArray(v) ? v : []);
+
+/** The visibility states in which the person is not seen by the room: they have no conversation there. A line said
+ *  while hidden would still go to everyone this device sees, from an address nobody here can see. */
+const HIDDEN = Object.freeze(['hidden', 'not_chosen', 'radio_off']);
+
+/**
+ * Why the Conversation tab shows no stream, or null when it does. Hidden comes first: joining the chat would not
+ * change that. `act` is the existing act that ends it — the radio switch when the radio is off, leaving "even stil"
+ * when quiet, none when no level was chosen yet (the first-use question above is the way) — and `join` (the chat
+ * allow) when the person is simply not in the chat.
+ * @param {object|null} model
+ * @returns {null | { reason: 'hidden', act: 'radio-on'|'unquiet'|null } | { reason: 'not-joined', act: 'join' }}
+ */
+export function nearbyChatOff(model) {
+  const m = model && typeof model === 'object' ? model : {};
+  if (HIDDEN.includes(nearbyVisibilityKey(m.visibility))) {
+    return { reason: 'hidden', act: m.radioOff === true || m.visibility?.radioOff === true ? 'radio-on' : m.quiet === true ? 'unquiet' : null };
+  }
+  return Array.isArray(m.chat) ? null : { reason: 'not-joined', act: 'join' };
+}
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 const askAt = (entry) => num(entry?.receivedAt);
@@ -26,7 +48,7 @@ const inviteAt = (entry) => num(entry?.invite?.receivedAt);
  */
 export function nearbyStream(model) {
   const m = model && typeof model === 'object' ? model : {};
-  if (!Array.isArray(m.chat)) return [];
+  if (nearbyChatOff(m)) return [];
   const items = [
     ...m.chat.map((line) => ({ kind: 'line', at: num(line?.at), key: `line:${line?.id ?? ''}`, line })),
     ...list(m.asks).map((entry) => ({ kind: 'ask', at: askAt(entry), key: `ask:${entry?.ask?.id ?? ''}`, entry })),

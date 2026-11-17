@@ -78,7 +78,7 @@ export const NEARBY_INVITE_LABELS = Object.freeze({
  * face, else the same `peer-…` the person rows show, so a reader can match a line to a row); when: the clock time.
  * Both shells paint exactly these fields.
  * @param {Array<{id: string, text: string, from?: string|null, createdAt?: number, receivedAt?: number}>} messages
- * @param {{rows?: Array<{id: string, label?: string}>, me?: string|null, t: Function}} o
+ * @param {{rows?: Array<{id: string, pseudonym?: string}>, me?: string|null, t: Function}} o
  * @returns {Array<{id: string, text: string, who: string, when: string, mine: boolean}>}
  */
 export function nearbyChatLines(messages = [], { rows = [], me = null, t } = {}) {
@@ -93,16 +93,17 @@ export function nearbyChatLines(messages = [], { rows = [], me = null, t } = {})
 }
 
 /**
- * How the room names someone by their room address: the label their row shows (a face), else the same `peer-…` the
- * person rows use, else "someone". One rule for a chat line, a question and an offered circle.
- * @param {{rows?: Array<{id: string, label?: string}>, t: Function}} o
+ * How the room names someone by their room address: the name their row shows (a face, else their own name), else the
+ * same `peer-…` the person rows use, else "someone". One rule for a chat line, a question and an offered circle.
+ * @param {{rows?: Array<{id: string, pseudonym?: string}>, t: Function}} o
  * @returns {(from: string|null|undefined) => string}
  */
 export function nearbyWho({ rows = [], t } = {}) {
   const byId = new Map((Array.isArray(rows) ? rows : []).map((r) => [r?.id, r]));
   return (from) => {
     const row = from ? byId.get(from) : null;
-    return row?.label || pickPeerLabel({ pubKey: from ?? '' }) || t(SOMEONE_LABEL_KEY);
+    // `pseudonym` is the name the row shows (a face, else the peer's own name, else `peer-…`, `buildNearbyModel`)
+    return row?.pseudonym || pickPeerLabel({ pubKey: from ?? '' }) || t(SOMEONE_LABEL_KEY);
   };
 }
 

@@ -10798,6 +10798,28 @@
     "position": {
       "text": "{{at}} of {{of}}",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "reopen": {
+      "text": "Introduction",
+      "doc": "Settings' door back to the introduction's seven cards (Today's card is gone once the intro is seen)."
+    }
+  },
+  "firstOpen": {
+    "lead": {
+      "text": "Did someone give you a code? Scan it. New here? Read the introduction first.",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
+    },
+    "scan": {
+      "text": "Scan",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
+    },
+    "intro": {
+      "text": "Introduction",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
+    },
+    "continue": {
+      "text": "Just continue",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
   }
 }

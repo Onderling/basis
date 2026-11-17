@@ -325,6 +325,7 @@ import { splitBySight, SIGHT } from '../../../../basis/src/v2/circleSight.js';
 import { makeSyncSelection } from '../../../../basis/src/v2/syncSelection.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import IntroDeckModal from './IntroDeckModal.js';   // the introduction's seven cards (web twin: web/v2/introDeck.js)
+import { firstOpenThen } from '../../../../basis/src/v2/firstOpen.js';   // the first open's doors (web twin: showFirstOpen)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
 import { bindCircleGovernance, openPolicyProposals, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
@@ -527,6 +528,9 @@ export default function CircleLauncherScreen({
   // sheet the person sees, then cleared (`onContactLinkDone`).
   contactLink = null,
   onContactLinkDone = null,
+  // THE FIRST OPEN's door the welcome chose (basis/src/v2/firstOpen.js), run once the launcher is up, then cleared
+  firstOpenDoor = null,
+  onFirstOpenDoorDone = null,
   // cluster J — the OidcSessionRN ref (App.js:187), the Solid session the pod writer authenticates with.
   sessionRef = null,
   // cluster J — podAuth (lifted from the hidden ChatScreen) so the "Me" screen can drive pod sign-in.
@@ -1968,6 +1972,17 @@ export default function CircleLauncherScreen({
     }
   };
 
+  // THE FIRST OPEN's door, once the app is up: the one scanner (the scanQr op, as Me's Scan) or the introduction's cards
+  // over Today (marked seen as "Lees meer" does); "just continue" asks for nothing (web twin: showFirstOpen)
+  useEffect(() => {
+    if (!firstOpenDoor || !bundle?.callSkill) return;
+    const then = firstOpenThen(firstOpenDoor);
+    onFirstOpenDoorDone?.();
+    if (then === 'scan') onMeAction('scan');
+    else if (then === 'intro') { setView('screens'); onboardingFlags.markIntroSeen().then(() => setIntroOpen(true)); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstOpenDoor, bundle]);
+
   // OBJ-2 — show THIS circle's membership QR (admin-gated by the substrate). Carries the same fields a
   // web-built invite does (invariant 2): the freedom template (join-time consent), the pod disclosure +
   // its url (J-NP3, rule 1), the admin's NKN address (B2) and the RELAY endpoint (the invite-carries-
@@ -2483,6 +2498,8 @@ export default function CircleLauncherScreen({
           onOpenDoor={(d) => {
             // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same; web parity)
             if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
+            // the introduction's seven cards again (the manifest's settings door), over Today where the deck is drawn
+            if (d?.target?.kind === 'nav' && d.target.to === 'intro') { setView('screens'); setIntroOpen(true); return; }
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
             Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))

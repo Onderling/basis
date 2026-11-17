@@ -52,3 +52,14 @@ test('a click outside the card leaves the introduction too, and Today is painted
   await expect(page.locator('.circle-intro')).toHaveCount(0);
   await expect(introCard(page), 'Today painted again: the card has gone').toHaveCount(0);
 });
+
+test('once seen, the introduction opens again from Settings (its door beside Help)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await introCard(page).locator('.circle-screen__onb-btn--ghost').click();   // "Begrepen": the card is gone for good
+  await expect(introCard(page)).toHaveCount(0);
+  await page.locator('[data-tab="mij"]').first().click();
+  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-settings__door-row--intro').click();
+  await expect(page.locator('.circle-intro')).toHaveAttribute('data-card', 'welcome');
+});

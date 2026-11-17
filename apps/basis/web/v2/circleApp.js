@@ -305,6 +305,8 @@ import { buildOnboardingTemplate, loadOnboardingTemplate } from '../../src/v2/on
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../src/v2/onboardingChat.js';
 import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
 import { renderIntroDeck } from './introDeck.js';
+import { renderFirstOpen } from './firstOpen.js';
+import { firstOpenThen, addressCarriesAct } from '../../src/v2/firstOpen.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -1479,6 +1481,9 @@ let resolveSkill = null; // (opId, args) => Promise<object|null>
 // (`podAuth.handleRedirect`) strips `?code=…&state=…` on load (it treats `code` as an OIDC auth
 // code), which would wipe a boot parameter such as `?addbot` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
+// the fragment the app was opened with, before any handler scrubs a link from it (the first open reads it: a link is
+// the scan door, already answered)
+const _bootHash = (typeof window !== 'undefined' && window.location) ? window.location.hash : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
 // THE SHARED ACT STATE (actState.js): every act the person just took paints pending · done · failed through ONE strip,
 // whatever screen dispatched it — the waist is wrapped once where `rawCallSkill` is made (below, at agent boot). The
@@ -5577,10 +5582,28 @@ async function showMyData(opts) {
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
 // THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared)
+// THE FIRST OPEN (src/v2/firstOpen.js): the three doors on a screen of their own; any door ends it on this device, then
+// Today, then what the door asks for: the one scanner (the scanQr op, as Me's "Scan") or the introduction's cards
+function showFirstOpen() {
+  hideTabBar();
+  renderFirstOpen(rootEl, {
+    t,
+    onDoor: async (door) => {
+      await onboardingFlags.markFirstOpenSeen();
+      await showScreens();
+      const then = firstOpenThen(door);
+      if (then === 'scan') Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {});
+      else if (then === 'intro') { await onboardingFlags.markIntroSeen(); openIntroDeck(); }
+    },
+  });
+}
+
 // THE INTRODUCTION (Today's "Nieuw bij Basis?" → "Lees meer"): the seven cards in the shared overlay; leaving it shows
 // Today again (the card is gone: the intro was marked seen before the deck opened)
 function openIntroDeck() {
-  mountMyDataWizard(({ container, onClose }) => renderIntroDeck({ container, t, onClose: () => { onClose(); _showVandaag(); } }));
+  // every way out (its buttons, a click outside the card) paints Today again: the repaint the flag write sets off is not
+  // reliably there in time (the click-outside spec was flaky under a full-suite load, 2026-11-17)
+  mountMyDataWizard(({ container, onClose }) => renderIntroDeck({ container, t, onClose }), { afterClose: () => _showVandaag() });
 }
 
 function openHelpDoor() {
@@ -5599,6 +5622,8 @@ function showSettingsHome() {
     onOpenDoor: (d) => {
       // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same)
       if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
+      // the introduction's seven cards again (the manifest's settings door; phone twin: setIntroOpen)
+      if (d?.target?.kind === 'nav' && d.target.to === 'intro') { openIntroDeck(); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
@@ -5621,7 +5646,9 @@ function showSettingsCircleChooser() {
 // mount one of the existing wizard renderers (restore, recovery file, …)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
-function mountMyDataWizard(renderWizard, extra = {}) {
+function mountMyDataWizard(renderWizard, extraIn = {}) {
+  // `afterClose`: what follows EVERY way out (the wizard's own button, a click outside), for a host that repaints behind it
+  const { afterClose = null, ...extra } = extraIn ?? {};
   const overlay = document.createElement('div');
   overlay.className = 'cc-mydata-modal';
   const card = document.createElement('div');
@@ -5636,7 +5663,7 @@ function mountMyDataWizard(renderWizard, extra = {}) {
     close();
   });
   document.body.appendChild(overlay);
-  function close() { try { overlay.remove(); } catch { /* defensive */ } }
+  function close() { try { overlay.remove(); } catch { /* defensive */ } if (typeof afterClose === 'function') afterClose(); }
   try {
     // Thin adapter: hand the shared renderer this shell's DOM + rawCallSkill; `extra` lets a wizard that
     // needs more (the join wizard wants `args`/`sendPeerRedeem`) get it without a bespoke mount fn.
@@ -10291,6 +10318,13 @@ async function boot() {
   let lastTab = null;
   try { lastTab = window.localStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
   const start = startTabFor(circleHouseholdAgent?.getParamValue?.('home.startScreen'), lastTab);
+  // THE FIRST OPEN on this device: three doors before anything else (src/v2/firstOpen.js); a door chosen, Today
+  // A person who ARRIVED BY A LINK (a contact, an invitation, an enrol offer, an install, a bot) answered the scan door
+  // by opening it: the first open is over, and the link's own sheet goes on (firstOpen.js addressCarriesAct)
+  if (!(await onboardingFlags.isFirstOpenSeen())) {
+    if (addressCarriesAct({ hash: _bootHash, search: _bootSearch })) await onboardingFlags.markFirstOpenSeen();
+    else { showFirstOpen(); return; }
+  }
   if (start === 'screens') showScreens();
   else if (start === 'contacten') showContacts();
   else if (start === 'mij') showMij();

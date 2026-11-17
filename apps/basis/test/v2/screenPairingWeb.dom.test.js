@@ -24,10 +24,20 @@ function form() {
     screenPairing: pairing, onPaired: vi.fn(),
   });
   const input = root.querySelector('.cc-mydata__connection-offer');
-  const paste = async (text) => { input.value = text; input.dispatchEvent(new Event('input')); await flush(); await flush(); };
   const note = () => root.querySelector('.cc-mydata__connection-note').textContent;
-  const confirm = async () => { root.querySelector('.cc-mydata__connection-confirm').click(); await flush(); await flush(); };
-  return { root, callSkill, paste, note, confirm };
+  // what the form shows: a step is done when this changes (its note, its ticks, a grant sent), never after N ticks
+  const shown = () => [note(), root.querySelector('.cc-mydata__connection-picker')?.hidden, callSkill.mock.calls.length,
+    root.querySelectorAll('.cc-mydata__connection-code').length].join('|');
+  const answered = async (act) => {
+    const before = shown();
+    act();
+    await vi.waitFor(() => { if (shown() === before) throw new Error('the form has not answered yet'); }, { timeout: 5_000, interval: 5 });
+    await flush();
+  };
+  const paste = (text) => answered(() => { input.value = text; input.dispatchEvent(new Event('input')); });
+  const confirm = () => answered(() => root.querySelector('.cc-mydata__connection-confirm').click());
+  const pick = (button) => answered(() => button.click());
+  return { root, callSkill, paste, note, confirm, pick };
 }
 
 describe('the web pairing form', () => {
@@ -47,17 +57,36 @@ describe('the web pairing form', () => {
     await f.paste(encodePairingOffer({ viewPubKey: 'SCREEN', nonce: 'n2' }));
     const real = await screenCode('SCREEN', 'n2');
     const wrong = [...f.root.querySelectorAll('.cc-mydata__connection-code')].find((b) => b.dataset.code !== real);
-    wrong.click(); await flush(); await flush();
+    await f.pick(wrong);
     expect(f.note()).toBe('circle.mydata.connection_offer_pairing-wrong-code');
     await f.confirm();
     expect(f.callSkill).not.toHaveBeenCalled();
+  });
+
+  // The pick is checked against a SHA-256 (crypto.subtle), which under a busy CI pool takes longer than a fixed couple
+  // of ticks: twice on 2026-11-17 the form was read while it still said "pick a code". The steps wait for what the form
+  // says, not for a number of ticks; this case slows the hash on purpose so a fixed wait shows up red.
+  it('a slow hash: the wrong pick still says so, the form is read when it has answered', async () => {
+    const digest = globalThis.crypto.subtle.digest.bind(globalThis.crypto.subtle);
+    const spy = vi.spyOn(globalThis.crypto.subtle, 'digest').mockImplementation(async (...a) => {
+      await new Promise((r) => { setTimeout(r, 30); });
+      return digest(...a);
+    });
+    try {
+      const f = form();
+      await f.paste(encodePairingOffer({ viewPubKey: 'SCREEN', nonce: 'n4' }));
+      const real = await screenCode('SCREEN', 'n4');
+      const wrong = [...f.root.querySelectorAll('.cc-mydata__connection-code')].find((b) => b.dataset.code !== real);
+      await f.pick(wrong);
+      expect(f.note()).toBe('circle.mydata.connection_offer_pairing-wrong-code');
+    } finally { spy.mockRestore(); }
   });
 
   it('the right pick shows the ticks, and one grant goes', async () => {
     const f = form();
     await f.paste(encodePairingOffer({ viewPubKey: 'SCREEN', nonce: 'n3', label: 'keuken' }));
     const real = await screenCode('SCREEN', 'n3');
-    f.root.querySelector(`.cc-mydata__connection-code[data-code="${real}"]`).click(); await flush(); await flush();
+    await f.pick(f.root.querySelector(`.cc-mydata__connection-code[data-code="${real}"]`));
     expect(f.root.querySelector('.cc-mydata__connection-picker').hidden).toBe(false);
     f.root.querySelector('.cc-mydata__connection-picker input[type=checkbox]').checked = true;
     await f.confirm();

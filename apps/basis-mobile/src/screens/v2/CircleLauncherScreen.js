@@ -1266,6 +1266,10 @@ export default function CircleLauncherScreen({
     try { book = await ensureVandaagBook({ store: userScreenStore, t }); } catch { /* the book as read stands */ }
     setScreensBook(book);
   }, [userScreenStore]);
+  // AFTER AN OWN ACT that changes what Today shows without writing a store (a device flag: the intro seen, the key card
+  // put away): the head is told, as screenHead.js asks, and repaints the shown page (web twin: _showVandaag, which
+  // invalidates on every paint that follows an act). Without it the card stayed until the next landing (walk 2026-11-17).
+  const repaintAfterOwnAct = () => { vandaagHead.current?.invalidate(); return refreshScreensBook(); };
   // every edit of the person's pages is a screen op (kept, logged, undoable); the book is re-read after it
   const runScreenOp = useCallback(async (opId, args) => {
     try { await bundle?.callSkill?.('basis', opId, args); }
@@ -2370,7 +2374,7 @@ export default function CircleLauncherScreen({
                   saveNameCard(a.value, { callSkill: bundle?.callSkill })
                     .then((r) => { Alert.alert(nameCardWords(r, t)); if (r.ok) refreshScreensBook(); });
                 }
-                else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
+                else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => repaintAfterOwnAct());
                 // "Lees meer": the introduction's seven cards (shared model, src/v2/introDeck.js; web twin: openIntroDeck)
                 else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => setIntroOpen(true));
                 // the key card: its explicit "Toon" reads the owner phrase and opens it; "Later" puts the card away
@@ -2380,7 +2384,7 @@ export default function CircleLauncherScreen({
                     setKeyPhrase(Array.isArray(w) ? w.join(' ') : String(w || ''));
                   });
                 }
-                else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => refreshScreensBook());
+                else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => repaintAfterOwnAct());
                 // the reach card: the connection points, where a relay is added (the relay question stays quiet after 'Later')
                 else if (a?.kind === 'open-points') setView('points');
                 else if (a?.kind === 'create-circle') setCreating(true);
@@ -2395,7 +2399,7 @@ export default function CircleLauncherScreen({
         <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook, { circles })}
           onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
           onClose={() => setCustomiseOpen(false)} />
-        <IntroDeckModal visible={introOpen} onClose={() => { setIntroOpen(false); refreshScreensBook(); }} />
+        <IntroDeckModal visible={introOpen} onClose={() => { setIntroOpen(false); repaintAfterOwnAct(); }} />
       </WithTabBar>
     );
   }

@@ -80,6 +80,8 @@ import {
   shareableAddress,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
+  // the /transports line (the mode by its label; shared with web)
+  transportsStatusLine,
   // per-circle bottom tabs from policy.features (v2 §1).
   buildCircleTabs, DEFAULT_CIRCLE_TAB,
   // D1 (§5A) — quickActions row: feature↔tab mapping + frequency counter.
@@ -4609,10 +4611,8 @@ function CircleDetail({
         return;
       }
       if (builtin.opId === 'transports') {
-        const ts = circleTransport || {};
-        appendCircleMessage({ actor: 'bot', text: t('circle.settings.transports_status', {
-          mode: ts.mode ?? 'nkn', relay: ts.relayUrl || t('circle.settings.transports_none'),
-        }) });
+        // the mode by its label, never the value 'relay' (shared with web)
+        appendCircleMessage({ actor: 'bot', text: transportsStatusLine(circleTransport || {}, t) });
         return;
       }
       if (builtin.opId === 'security-status') {

@@ -129,8 +129,14 @@ export function actionsForStreamRow(row, viewer = {}) {
   const chips = KIND_CHIPS[kindKey] ?? [];
   const ref = payload.ref ?? null;
   const rowId = row.id ?? null;
+  // A task someone holds offers its next step (Done, Snooze) to its holders only; another member sees who holds it
+  // and nothing to press. The op stays open to anyone (completing by chat, the bot's 'done'): this is what the row
+  // OFFERS, not a gate. A viewer not known yet is not a holder.
+  const holders = Array.isArray(row.holders) ? row.holders : [];
+  const notMine = row.status === 'claimed' && holders.length > 0 && !(viewer?.viewerWebid && holders.includes(viewer.viewerWebid));
   const out = [];
   for (const action of chips) {
+    if (notMine && (action === 'done' || action === 'snooze')) continue;
     const opId = ACTION_DEFS[action]?.opId ?? null;
     const state = opId && viewer?.availability?.of ? viewer.availability.of(opId)?.state : 'available';
     if (state === 'hidden') continue;

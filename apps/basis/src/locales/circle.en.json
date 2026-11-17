@@ -764,6 +764,14 @@
       "text": "claimed",
       "doc": "Taken (tasks) tab — status badge: someone is on it."
     },
+    "claimed_by": {
+      "text": "claimed by {{who}}",
+      "doc": "Tasks tab — status of a claimed task with who holds it: one name, several joined by commas, or 'you'."
+    },
+    "you": {
+      "text": "you",
+      "doc": "Tasks tab — the viewer as the holder of a claimed task, in 'claimed by {{who}}'."
+    },
     "submitted": {
       "text": "submitted",
       "doc": "Taken (tasks) tab — status badge: submitted for review."

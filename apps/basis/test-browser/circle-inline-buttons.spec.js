@@ -44,6 +44,12 @@ test('adding a task renders an inline Claim button on the bot reply, and it disp
   const blob = after.join(' | ').toLowerCase();
   expect(blob).not.toContain('item not found');
   expect(blob).not.toContain('couldn');
+
+  // The tasks tab says WHO holds it (the claimer is this person: "you" / "jou"), and offers its holder Done.
+  await page.locator('.circle-view__tab[data-tab="tasks"]').click();
+  const card = page.locator('.circle-view__task', { hasText: 's6abuy' }).first();
+  await expect(card.locator('.circle-view__task-status')).toHaveText(/^(claimed by you|geclaimd door jou)$/, { timeout: 10_000 });
+  await expect(card.locator('.circle-view__bubble-action[data-action="done"]')).toBeVisible();
 });
 
 

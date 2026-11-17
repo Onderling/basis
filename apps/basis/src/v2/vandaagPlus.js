@@ -333,6 +333,10 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
     if (!byList.length) return atOwn(mine.command);
     return { kind: 'circle', atOnce: false, circleId: null, to: [ownTo, ...byList.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }))], command: mine.command };
   }
+  // a line that addresses a list BY NAME ("zet zonnebrand op vakantie") that no circle and no own list holds is no
+  // circle's act by a looser reading (the tasks gate reads "zet X op …" as a task anywhere): nobody guesses a circle's
+  // task; the line goes on (the own gate, the person's model)
+  if (!byList.length && namesAList(rest)) return null;
   const readers = byList.length ? byList : read;
   if (!readers.length) {
     // nothing to do here: a line that ASKS how something works ("hoe …", gate words `_help.questions`) is looked up in the
@@ -361,6 +365,21 @@ const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeF
  * when it names one of them, or makes a list (`makes`). Their agenda is the calendar's, not a list here.
  * @returns {{command: {appOrigin: string, opId: string, args: object}, makes: boolean}|null}
  */
+/**
+ * Does the line address a list by its name ("zet X op <naam>")? The lists table itself says so, given each word of
+ * the line as a list name; whether anyone HOLDS that list is the caller's question.
+ */
+function namesAList(text) {
+  const words = [...new Set(String(text ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1))];
+  if (!words.length) return false;
+  for (const rule of listsGateRules(null, words.map((name) => ({ name })), { greeting: false })) {
+    let cmd = null;
+    try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+    if (cmd?.opId === 'addToList' && typeof cmd.args?.list === 'string' && words.includes(cmd.args.list.toLowerCase())) return true;
+  }
+  return false;
+}
+
 function ownListsReading(text, own) {
   const lists = (Array.isArray(own?.lists) ? own.lists : []).filter((l) => l?.name && l.defaultChild !== 'calendar-event');
   const names = new Set(lists.map((l) => l.name));

@@ -504,7 +504,8 @@ describe('a budget on the request the "+" sends its model (Frits: do not let the
     const llm = { invoke: async (r) => { seen.push(r); return { replyText: 'ok' }; } };
     const { d } = door({ llm, interpret: interpretToCommand });
     // every typical line: one family's tools; a line naming none gets the reads and the three make-acts (Fable's ruling)
-    for (const line of ['wat heb ik morgen gepland?', 'kun je de tandarts verzetten naar vrijdag?', 'wat staat er op mijn vakantielijst?', 'onthoud dat de sleutel bij de buren ligt', 'wat kan je voor me doen?', 'waar ligt de sleutel?']) {
+    // (an agenda line no phrase takes: "wat heb ik morgen gepland?" is the own gate's, no model call)
+    for (const line of ['welke afspraken heb ik morgen?', 'kun je de tandarts verzetten naar vrijdag?', 'wat staat er op mijn vakantielijst?', 'onthoud dat de sleutel bij de buren ligt', 'wat kan je voor me doen?', 'waar ligt de sleutel?']) {
       await d.read(line);
       expect(sizeOf(seen.at(-1)), line).toBeLessThan(BUDGET);
     }
@@ -571,5 +572,19 @@ describe('the own "+"\'s gate is generated from what it offers: phrases act with
     const { calendarManifest } = await import('../../../calendar/manifest.js');
     const [circleRule] = renderGate([calendarManifest], { locale: 'nl' });
     expect(circleRule.command('mijn agenda'), 'a circle reads no own-place phrase').toBeNull();
+  });
+});
+
+describe('a said day goes with the agenda read ("wat heb ik morgen gepland?")', () => {
+  it('the own gate takes the day out, reads that day as the self, with no model call', async () => {
+    const asked = [];
+    const readAs = () => async (app, op, args) => { asked.push({ op, args }); return { ok: true, title: 'Agenda', items: [{ id: 'e1', label: 'tandarts' }] }; };
+    const interpret = vi.fn(async () => ({ reply: 'x' }));
+    const { d } = door({ interpret, readAs, selfOf: () => ({ key: 'me', isDefault: true }) });
+    const r = await d.read('wat heb ik morgen gepland?');
+    expect(r.done).toContain('tandarts');
+    expect(interpret).not.toHaveBeenCalled();
+    const read = asked.find((a) => a.op === 'listEvents');
+    expect(read?.args?.day, 'the day that was said').toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

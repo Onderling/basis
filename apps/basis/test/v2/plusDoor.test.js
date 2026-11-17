@@ -621,3 +621,17 @@ describe('the own model that did not answer is said by its cause (refused, too s
     expect(r.error).toContain('circle.userLlm.title');
   });
 });
+
+describe('the read a person just saw is handed to the model for the turn after (the household bot\'s last read)', () => {
+  it('"wat heb ik gepland?", then "en morgen?": the model is told what was read; a turn later it is gone', async () => {
+    const hints = [];
+    const readAs = () => async (app, op) => (op === 'listEvents' ? { ok: true, title: 'Agenda', items: [{ id: 'e1', label: 'tandarts — wo 10:00' }] } : { items: [] });
+    const interpret = vi.fn(async (_text, o) => { hints.push(JSON.stringify(o.hints ?? [])); return { reply: 'ok' }; });
+    const { d } = door({ interpret, readAs, selfOf: () => ({ key: 'me', isDefault: true }), threadId: 'own:lastread-test' });
+    await d.read('wat heb ik gepland?');   // the own gate reads it: no model call
+    await d.read('en morgen?');
+    await d.read('dank je');
+    expect(hints[0], 'the turn after the read knows it').toContain('tandarts');
+    expect(hints[1], 'a turn later it is gone').not.toContain('tandarts');
+  });
+});

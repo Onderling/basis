@@ -18,6 +18,7 @@
  */
 import { createAssistantEngine } from '../v2/assistantEngine.js';
 import { modelDownClass } from '../v2/modelWatch.js';
+import { createLastReads } from '../v2/lastRead.js';
 import { composeAssistantCatalogue } from './assistantCatalogue.js';
 import { catalogueManifests } from '../v2/manifestSources.js';
 import { withAssistantOps } from '../v2/assistantOps.js';
@@ -122,6 +123,12 @@ export function ownPlaceCatalogue({ householdManifest, apps } = {}) {
   return out;
 }
 const OWN_PLACE_CACHE = new WeakMap();
+
+/**
+ * What a person just READ in their "+", for the one turn after it (the household bot's `createLastReads`): kept for the
+ * process, per thread, so the phone's door-per-call keeps it too; never written anywhere.
+ */
+const PLUS_LAST_READS = createLastReads();
 
 /**
  * What the model is told about the place it answers in (LLM-facing; the circle door's twin is `CIRCLE_LINES`): the
@@ -293,6 +300,11 @@ export function createPlusDoor({
       const r = await Promise.resolve(readForTurn(ctx, e, cmd.args)).catch((err) => ({ ok: false, error: err?.message ?? String(err) }));
       // a read that fails could not READ (never "could not save": nothing was being saved)
       outcome = r?.ok === false ? { error: t('circle.vandaag.plus_read_failed', { error: r.error ?? '' }) } : { done: plusDoneLine(r, { opId: e.op.id, args: cmd.args ?? {}, t }) || t('circle.vandaag.plus_line_unread') };
+      // what was read, for the model's next turn ("en morgen?" is about it); nothing kept where the thread keeps nothing
+      const thread = ctx?.id ?? threadId;
+      if (r?.ok !== false && thread && threads?.modeOf?.(thread) !== 'off') {
+        PLUS_LAST_READS.saw(thread, { title: r?.title ?? null, lines: (Array.isArray(r?.items) ? r.items : []).map((i) => i?.label ?? i?.text ?? i?.title ?? '') });
+      }
       return;
     }
     if (e && !reads(e) && !actRunsAtOnce(acts.find((a) => a.opId === cmd.opId))) {
@@ -316,6 +328,8 @@ export function createPlusDoor({
   const engine = createAssistantEngine({
     catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules: [], promptLines: [...OWN_PLACE_LINES],
     // a line about one family gets that family's tools (the own note's too); no family is kept regardless here
+    // the read of the turn before, if any (one turn only)
+    threadHints: (thread) => PLUS_LAST_READS.hintsFor(thread),
     narrowing: {
       keep: [], own: true,
       // a line naming no family: the reads and the acts that MAKE something, and the door's own ops (Fable's ruling)
@@ -394,6 +408,8 @@ export function createPlusDoor({
     async read(line, opts = {}) {
       const r = await read(line, opts);
       const thread = r?.askSelf ? null : threadIdFor(setOf(opts).set);
+      // a turn ended: the read it made lives one turn more, an older one goes
+      if (thread) PLUS_LAST_READS.turnEnded(thread);
       if (memory && thread) {
         memory.remember(thread, 'you', String(line ?? '').trim());
         const said = plusAnswerLine({ error: r?.error ?? null, done: r?.done ?? null, circleCard: r?.card ?? null, ownActId: r?.actId ?? null, t });

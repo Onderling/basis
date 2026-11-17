@@ -14,7 +14,9 @@
  *
  * ── Step E additions ─────────────────────────────────────────────────────────
  * Below the "you here" row the room is two tabs, Conversation and Questions; what each holds and in what order
- * is `nearbyTabs` (shared with the phone), and each part has its own painter below.
+ * is `nearbyTabs` (shared with the phone), and each part has its own painter below. Conversation paints the stream
+ * `nearbyStream` orders (chat lines, question cards, offered-circle cards); each tab's count of what is new is
+ * `nearbyTabNews`.
  *
  * Two things the row list alone could not say:
  *
@@ -34,6 +36,7 @@ import { ASK_MAX_TEXT } from '../../src/v2/nearbyAsks.js';
 import { CARD_MAX_LABEL, CARD_MAX_LINE, CHAT_MAX_TEXT } from '../../src/v2/nearbyRoom.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { nearbyTabs } from '../../src/v2/nearbyTabs.js';
+import { nearbyStream, nearbyTabNews } from '../../src/v2/nearbyStream.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -55,6 +58,8 @@ export function renderCircleNearby(container, {
   onSay = null,
   onInviteAction = null,
   onShareCard = null,     // (answerFrom, event) — 'deel je kaart' on an answer to my ask; the press goes with it
+  onSetQuiet = null,      // (bool) — "even stil" for this once; the controller's setQuiet (a host with a radio control)
+  onSetRadio = null,      // ('on'|'off') — the persisted radio switch; the controller's setRadio
 } = {}) {
   const tr = translatorOr(t, 'circleNearby.js');
   container.innerHTML = '';
@@ -165,9 +170,20 @@ export function renderCircleNearby(container, {
     'nearby-peers': paintPeers,
     'nearby-invites': paintInvites,
   };
-  const { tabs, defaultTab } = nearbyTabs(safeModel);
+  const { tabs, defaultTab, chatOff } = nearbyTabs(safeModel);
   const kept = container.dataset.nearbyTab;
   let selected = tabs.some((x) => x.id === kept) ? kept : defaultTab;
+  // What is new on each tab (`nearbyTabNews`). The seen-marks are paint state, on the container like the picked tab:
+  // the open tab is seen up to its latest arrival, so only the other tab counts up.
+  const seenKey = (id) => `nearbySeen${id[0].toUpperCase()}${id.slice(1)}`;
+  const seen = () => Object.fromEntries(tabs.map((x) => [x.id, Number(container.dataset[seenKey(x.id)]) || 0]));
+  const markSeen = (id) => {
+    const { latest } = nearbyTabNews(safeModel, seen());
+    container.dataset[seenKey(id)] = String(latest[id] ?? 0);
+  };
+  const tabLabel = (tab, counts) => (counts[tab.id] > 0
+    ? tr('circle.nearbyScreen.tab_with_new', { label: tr(tab.labelKey), count: counts[tab.id] })
+    : tr(tab.labelKey));
 
   const bar = document.createElement('div');
   bar.className = 'circle-nearby__tabs';
@@ -177,7 +193,12 @@ export function renderCircleNearby(container, {
   const panels = [];
   const select = (id) => {
     selected = id;
+    markSeen(id);
+    const { counts } = nearbyTabNews(safeModel, seen());
     for (const b of buttons) {
+      const tab = tabs.find((x) => x.id === b.dataset.tab);
+      b.textContent = tabLabel(tab, counts);
+      b.dataset.newCount = String(counts[tab.id] ?? 0);
       const on = b.dataset.tab === id;
       b.setAttribute('aria-selected', on ? 'true' : 'false');
       b.classList.toggle('is-selected', on);
@@ -217,23 +238,38 @@ export function renderCircleNearby(container, {
   // ── Section painters (each returns one element; `nearbyTabs` decides whether it is called) ─────────────
 
   function paintChatOff() {
-    // Not in the room chat: say so in one line, with the way in (the same allow as in "you here").
+    // No stream (`nearbyChatOff`): hidden from the room, or not in the chat. One line, and the existing act that ends
+    // it — leaving "even stil", the radio back on, or the chat allow. No button when this host cannot carry the act.
     const el = document.createElement('div');
     el.className = 'circle-nearby__chat-off';
+    el.dataset.reason = chatOff?.reason ?? '';
+    const hidden = chatOff?.reason === 'hidden';
     const line = document.createElement('div');
     line.className = 'circle-nearby__chat-off-line';
-    line.textContent = tr('circle.nearbyScreen.allow_chat_off');
+    line.textContent = tr(hidden ? 'circle.nearbyScreen.chat_hidden_line' : 'circle.nearbyScreen.allow_chat_off');
     el.appendChild(line);
-    const join = document.createElement('button');
-    join.type = 'button';
-    join.className = 'cc-btn cc-btn--quiet circle-nearby__chat-join';
-    join.textContent = tr('circle.nearbyScreen.allow_chat');
-    join.addEventListener('click', () => { if (typeof onToggleAllow === 'function') onToggleAllow('chat', true); });
-    el.appendChild(join);
+    const ACTS = {
+      join: typeof onToggleAllow === 'function' ? () => onToggleAllow('chat', true) : null,
+      unquiet: typeof onSetQuiet === 'function' ? () => onSetQuiet(false) : null,
+      'radio-on': typeof onSetRadio === 'function' ? () => onSetRadio('on') : null,
+    };
+    const act = ACTS[chatOff?.act];
+    if (act || !hidden) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `cc-btn cc-btn--quiet ${hidden ? 'circle-nearby__chat-visible' : 'circle-nearby__chat-join'}`;
+      btn.dataset.act = chatOff?.act ?? '';
+      btn.textContent = tr(hidden ? 'circle.nearbyScreen.chat_hidden_action' : 'circle.nearbyScreen.allow_chat');
+      btn.addEventListener('click', () => act?.());
+      el.appendChild(btn);
+    }
     return el;
   }
 
   function paintChat() {
+    // One stream in the order things arrived (`nearbyStream`): the room's chat lines, and between them a card for each
+    // question someone here asked and each circle offered here. A card is boxed and headed ("Vraag van …"), so it does
+    // not read as a chat line: only answering it shows you to the asker.
     const block = document.createElement('div');
     block.className = 'circle-nearby__chat';
 
@@ -243,13 +279,17 @@ export function renderCircleNearby(container, {
     eph.textContent = tr('circle.nearbyScreen.chat_ephemeral');
     block.appendChild(eph);
 
-    if (!chat.length) {
+    const stream = nearbyStream(safeModel);
+    if (!stream.length) {
       const empty = document.createElement('div');
       empty.className = 'circle-nearby__chat-empty';
       empty.textContent = tr('circle.nearbyScreen.chat_empty');
       block.appendChild(empty);
     } else {
-      for (const m of chat) {
+      for (const item of stream) {
+        if (item.kind === 'ask') { block.appendChild(askCard(item.entry, { inStream: true })); continue; }
+        if (item.kind === 'invite') { block.appendChild(inviteCard(item.entry, { inStream: true })); continue; }
+        const m = item.line;
         const line = document.createElement('div');
         line.className = 'circle-nearby__chat-line';
         line.dataset.messageId = m.id || '';
@@ -384,58 +424,68 @@ export function renderCircleNearby(container, {
     asksTitle.textContent = tr('circle.nearbyScreen.asks_title');
     asksBlock.appendChild(asksTitle);
 
-    for (const entry of asks) {
-      const el = document.createElement('div');
-      el.className = 'circle-nearby__ask';
-      if (entry.resonant) el.classList.add('is-resonant');
-      el.dataset.askId = entry.ask?.id || '';
-
-      const text = document.createElement('div');
-      text.className = 'circle-nearby__ask-text';
-      text.textContent = entry.ask?.text ?? '';
-      el.appendChild(text);
-
-      if (entry.resonant && entry.reason) {
-        const why = document.createElement('div');
-        why.className = 'circle-nearby__ask-reason';
-        // Names the SHARED tags only. My own unmatched drivers never appear here.
-        why.textContent = tr('circle.nearbyScreen.ask_resonant', { reason: entry.reason });
-        el.appendChild(why);
-      }
-
-      // Shown to me, sent nowhere: the reminder that replying is what reveals me.
-      const disclosure = document.createElement('div');
-      disclosure.className = 'circle-nearby__ask-disclosure';
-      disclosure.textContent = tr('circle.nearbyScreen.ask_disclosure');
-      el.appendChild(disclosure);
-      if (typeof entry.ask?.expiresAt === 'number') {
-        const clock = document.createElement('div');
-        clock.className = 'circle-nearby__ask-clock';
-        clock.textContent = tr('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) });
-        el.appendChild(clock);
-      }
-
-      const actionBar = document.createElement('div');
-      actionBar.className = 'circle-nearby__ask-actions';
-      for (const action of Array.isArray(entry.actions) ? entry.actions : []) {
-        const labelKey = NEARBY_ASK_LABELS[action];
-        if (!labelKey) continue;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `cc-btn cc-btn--quiet circle-nearby__ask-action circle-nearby__ask-action--${action}`;
-        btn.dataset.action = action;
-        btn.dataset.askId = entry.ask?.id || '';
-        btn.textContent = tr(labelKey);
-        btn.addEventListener('click', () => {
-          if (typeof onAskAction === 'function') onAskAction(action, entry.ask);
-        });
-        actionBar.appendChild(btn);
-      }
-      if (actionBar.childElementCount) el.appendChild(actionBar);
-
-      asksBlock.appendChild(el);
-    }
+    for (const entry of asks) asksBlock.appendChild(askCard(entry));
     return asksBlock;
+  }
+
+  /** Someone's question: in the Questions tab, and as a card in the Conversation stream (headed with who asked). */
+  function askCard(entry, { inStream = false } = {}) {
+    const el = document.createElement('div');
+    el.className = 'circle-nearby__ask';
+    if (entry.resonant) el.classList.add('is-resonant');
+    el.dataset.askId = entry.ask?.id || '';
+    if (inStream) {
+      el.classList.add('circle-nearby__stream-card');
+      el.dataset.streamKind = 'ask';
+      const headLine = document.createElement('div');
+      headLine.className = 'circle-nearby__stream-head';
+      headLine.textContent = tr('circle.nearbyScreen.stream_ask_from', { name: entry.who ?? '' });
+      el.appendChild(headLine);
+    }
+
+    const text = document.createElement('div');
+    text.className = 'circle-nearby__ask-text';
+    text.textContent = entry.ask?.text ?? '';
+    el.appendChild(text);
+
+    if (entry.resonant && entry.reason) {
+      const why = document.createElement('div');
+      why.className = 'circle-nearby__ask-reason';
+      // Names the SHARED tags only. My own unmatched drivers never appear here.
+      why.textContent = tr('circle.nearbyScreen.ask_resonant', { reason: entry.reason });
+      el.appendChild(why);
+    }
+
+    // Shown to me, sent nowhere: the reminder that replying is what reveals me.
+    const disclosure = document.createElement('div');
+    disclosure.className = 'circle-nearby__ask-disclosure';
+    disclosure.textContent = tr('circle.nearbyScreen.ask_disclosure');
+    el.appendChild(disclosure);
+    if (typeof entry.ask?.expiresAt === 'number') {
+      const clock = document.createElement('div');
+      clock.className = 'circle-nearby__ask-clock';
+      clock.textContent = tr('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) });
+      el.appendChild(clock);
+    }
+
+    const actionBar = document.createElement('div');
+    actionBar.className = 'circle-nearby__ask-actions';
+    for (const action of Array.isArray(entry.actions) ? entry.actions : []) {
+      const labelKey = NEARBY_ASK_LABELS[action];
+      if (!labelKey) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `cc-btn cc-btn--quiet circle-nearby__ask-action circle-nearby__ask-action--${action}`;
+      btn.dataset.action = action;
+      btn.dataset.askId = entry.ask?.id || '';
+      btn.textContent = tr(labelKey);
+      btn.addEventListener('click', () => {
+        if (typeof onAskAction === 'function') onAskAction(action, entry.ask);
+      });
+      actionBar.appendChild(btn);
+    }
+    if (actionBar.childElementCount) el.appendChild(actionBar);
+    return el;
   }
 
   function paintPeers() {
@@ -530,42 +580,52 @@ export function renderCircleNearby(container, {
     invitesTitle.textContent = tr('circle.nearbyScreen.invites_title');
     invitesBlock.appendChild(invitesTitle);
 
-    for (const entry of invites) {
-      const el = document.createElement('div');
-      el.className = 'circle-nearby__invite';
-      el.dataset.circleId = entry.invite?.circleId || '';
-
-      const name = document.createElement('div');
-      name.className = 'circle-nearby__invite-name';
-      name.textContent = entry.invite?.circleName || entry.invite?.circleId || '';
-      el.appendChild(name);
-
-      // On every invite: the carrier changed, the gate did not.
-      const note = document.createElement('div');
-      note.className = 'circle-nearby__invite-note';
-      note.textContent = tr('circle.nearbyScreen.join_is_a_join');
-      el.appendChild(note);
-
-      const actionBar = document.createElement('div');
-      actionBar.className = 'circle-nearby__invite-actions';
-      for (const action of Array.isArray(entry.actions) ? entry.actions : []) {
-        const labelKey = NEARBY_INVITE_LABELS[action];
-        if (!labelKey) continue;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `cc-btn cc-btn--quiet circle-nearby__invite-action circle-nearby__invite-action--${action}`;
-        btn.dataset.action = action;
-        btn.textContent = tr(labelKey);
-        btn.addEventListener('click', () => {
-          if (typeof onInviteAction === 'function') onInviteAction(action, entry.invite);
-        });
-        actionBar.appendChild(btn);
-      }
-      if (actionBar.childElementCount) el.appendChild(actionBar);
-
-      invitesBlock.appendChild(el);
-    }
+    for (const entry of invites) invitesBlock.appendChild(inviteCard(entry));
     return invitesBlock;
+  }
+
+  /** A circle offered here: in the Questions tab, and as a card in the Conversation stream (headed with who offers it). */
+  function inviteCard(entry, { inStream = false } = {}) {
+    const el = document.createElement('div');
+    el.className = 'circle-nearby__invite';
+    el.dataset.circleId = entry.invite?.circleId || '';
+    if (inStream) {
+      el.classList.add('circle-nearby__stream-card');
+      el.dataset.streamKind = 'invite';
+      const headLine = document.createElement('div');
+      headLine.className = 'circle-nearby__stream-head';
+      headLine.textContent = tr('circle.nearbyScreen.stream_invite_from', { name: entry.who ?? '' });
+      el.appendChild(headLine);
+    }
+
+    const name = document.createElement('div');
+    name.className = 'circle-nearby__invite-name';
+    name.textContent = entry.invite?.circleName || entry.invite?.circleId || '';
+    el.appendChild(name);
+
+    // On every invite: the carrier changed, the gate did not.
+    const note = document.createElement('div');
+    note.className = 'circle-nearby__invite-note';
+    note.textContent = tr('circle.nearbyScreen.join_is_a_join');
+    el.appendChild(note);
+
+    const actionBar = document.createElement('div');
+    actionBar.className = 'circle-nearby__invite-actions';
+    for (const action of Array.isArray(entry.actions) ? entry.actions : []) {
+      const labelKey = NEARBY_INVITE_LABELS[action];
+      if (!labelKey) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `cc-btn cc-btn--quiet circle-nearby__invite-action circle-nearby__invite-action--${action}`;
+      btn.dataset.action = action;
+      btn.textContent = tr(labelKey);
+      btn.addEventListener('click', () => {
+        if (typeof onInviteAction === 'function') onInviteAction(action, entry.invite);
+      });
+      actionBar.appendChild(btn);
+    }
+    if (actionBar.childElementCount) el.appendChild(actionBar);
+    return el;
   }
 
   function paintMine() {

@@ -658,7 +658,7 @@
     },
     "delivery": {
       "maybe_received": {
-        "text": "Verzonden · misschien ontvangen",
+        "text": "Verzonden · nog niet bevestigd",
         "doc": "Het is van dit apparaat vertrokken. Of het is aangekomen weten we niet, tenzij de ander dat zelf laat weten."
       },
       "stored": {

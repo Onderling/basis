@@ -471,6 +471,20 @@ export function plusCardWords(card, { t } = {}) {
  * (`replyLine`); for a read of one list (`listEntries`), its entries, the done ones marked, or that it is empty.
  * @param {object} result @param {{opId: string, args?: object, t: Function}} o
  */
+/**
+ * Whether the sheet shows an answer (or an error) on its own line below the thread. Every answer the door gives is kept
+ * as the assistant's turn, so once the thread shows it the line below would say it twice (the walk, 2026-11-17): the
+ * line is for an answer the thread does not hold yet (no thread, or not its last assistant turn).
+ * @param {string|null} said  the answer or error line
+ * @param {Array<{who: string, text: string}>} [turns]  the thread as the sheet shows it, oldest first
+ */
+export function plusAnswerLineShown(said, turns = []) {
+  if (!said) return false;
+  const answers = (Array.isArray(turns) ? turns : []).filter((x) => x?.who !== 'you');
+  const last = answers.length ? answers[answers.length - 1] : null;
+  return !(last && String(last.text ?? '').trim() === String(said).trim());
+}
+
 export function plusDoneLine(result, { opId, args = {}, t } = {}) {
   const said = replyLine(result, { opId, args, t });
   // ANY read that answers items (a list's entries, the own agenda's appointments, …) is said by its name and its lines,

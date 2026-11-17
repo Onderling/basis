@@ -1583,7 +1583,7 @@
       "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
-      "text": "Dat kon ik niet lezen.",
+      "text": "Dat kon ik niet lezen. Typ \"help\" om te zien wat ik kan, of vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."
     },
     "plus_no_model": {

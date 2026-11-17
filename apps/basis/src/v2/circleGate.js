@@ -203,8 +203,10 @@ const GATE_RULES = [
   // and a chore's tick is the chore's own verb underneath
   // "melk is gedaan", "melk gedaan": tick it; a question that ends the same way ("wat is er gedaan") is no item (the
   // gate's own question openers decide, `_help.questions`)
-  { id: 'lists.markListItemDone.stated', name: 'lists:markListItemDone(stated)', build: (m) => {
+  { id: 'lists.markListItemDone.stated', name: 'lists:markListItemDone(stated)', build: (m, text) => {
     const item = String(m.item ?? '').trim();
+    // a line that ends in "?" asks ("is dinner done?"), in any language
+    if (/\?\s*$/u.test(String(text ?? ''))) return null;
     // the openers' first words ("wat", "hoe", "waar", "what", …): a line that starts like a question is none
     const asks = new Set(helpQuestionOpeners().map((o) => o.trim().split(/\s+/u)[0].toLowerCase()));
     if (!item || asks.has(item.toLowerCase().split(/\s+/u)[0])) return null;

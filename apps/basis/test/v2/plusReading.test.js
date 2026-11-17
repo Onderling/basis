@@ -39,6 +39,11 @@ describe('the "+" reading, item 18', () => {
     for (const line of ['wat is er gedaan', 'wat heb ik gedaan']) {
       expect(plusLineOutcome(line, { circles: [], own })?.command?.opId, line).not.toBe('markListItemDone');
     }
+    // the English twin, on an English list
+    expect(plusLineOutcome('milk done', { circles: [], own: { lists: [{ name: 'Shopping' }] } })?.command).toMatchObject({ opId: 'markListItemDone', args: { item: 'milk' } });
+    for (const line of ['is dinner done?', 'what is done']) {
+      expect(plusLineOutcome(line, { circles: [], own: { lists: [{ name: 'Shopping' }] } })?.command?.opId, line).not.toBe('markListItemDone');
+    }
     // with no own list there is nothing to tick: the line is not read as one
     expect(plusLineOutcome('melk is gedaan', { circles: [], own: { lists: [] } })?.command?.opId).not.toBe('markListItemDone');
   });

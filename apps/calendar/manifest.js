@@ -106,7 +106,9 @@ export const calendarManifest = {
         { name: 'days', kind: 'number', required: false },
       ],
       surfaces: {
-        slash: { command: '/upcoming', body: 'flags' },
+        // the own "+" reads it from a phrase ("wat heb ik gepland"); its words are placed `in: own` (gate.<lang>.json), so
+        // a circle's bot matches none of them
+        slash: { command: '/upcoming', body: 'flags', match: { body: 'none' } },
         chat:  {
           reply: 'list',
           hint:  'list upcoming events',

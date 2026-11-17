@@ -81,5 +81,44 @@
     "not": [
       "maybe dentist"
     ]
+  },
+  "calendar.listEvents": {
+    "doc": "The person's own agenda, read in their own \"+\" (the coming week): only there (`in: own`), since in a circle's bot \"mijn agenda\" would read the circle's. Its examples are read in that place.",
+    "in": [
+      "own"
+    ],
+    "verbs": [
+      {
+        "words": "what have i planned",
+        "in": [
+          "own"
+        ]
+      },
+      {
+        "words": "what is in my calendar",
+        "in": [
+          "own"
+        ]
+      },
+      {
+        "words": "my calendar",
+        "in": [
+          "own"
+        ]
+      },
+      {
+        "words": "my agenda",
+        "in": [
+          "own"
+        ]
+      }
+    ],
+    "examples": [
+      "what have I planned?",
+      "my calendar"
+    ],
+    "not": [
+      "new appointment dentist"
+    ]
   }
 }

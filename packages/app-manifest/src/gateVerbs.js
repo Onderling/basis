@@ -16,9 +16,10 @@
  * @param {object} manifest
  * @param {object} op
  * @param {string|null} [locale]
+ * @param {string|null} [place]  the place asking ('own', 'circle', …): a verb declared `{words, in}` only there
  * @returns {Array<string[]>} each verb as its words
  */
-export function gateVerbsOf(manifest, op, locale = null) {
+export function gateVerbsOf(manifest, op, locale = null, place = null) {
   const words = manifest?.gateWords;
   if (words && typeof words === 'object') {
     const key = `${manifest.appId ?? manifest.app}.${op?.id}`;
@@ -26,7 +27,11 @@ export function gateVerbsOf(manifest, op, locale = null) {
     const out = [];
     for (const lang of langs) {
       for (const v of words[lang]?.[key]?.verbs ?? []) {
-        const tokens = String(v).trim().split(/\s+/).filter(Boolean);
+        // a verb is a phrase for every place, or `{words, in}`: only for the places it names ("mijn agenda" is the
+        // person's own agenda in their own "+", wrong in a circle's bot); asked for no place, a placed verb is not there
+        const phrase = typeof v === 'string' ? v : (v && typeof v === 'object' && place && Array.isArray(v.in) && v.in.includes(place) ? v.words : null);
+        if (typeof phrase !== 'string') continue;
+        const tokens = phrase.trim().split(/\s+/).filter(Boolean);
         // a word both languages use ("download") is in both files; it matches once
         if (tokens.length && !out.some((o) => o.join(' ').toLowerCase() === tokens.join(' ').toLowerCase())) out.push(tokens);
       }

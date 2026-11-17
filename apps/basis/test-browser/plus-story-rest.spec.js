@@ -20,7 +20,7 @@ import { bootCircle } from './helpers.js';
 test.setTimeout(180_000);
 
 const SCRIPT = [
-  { when: 'onthoud dat de sleutel', toolCall: { id: '__generic__:household:add:note', args: { body: 'de sleutel ligt bij de buren' } } },
+  { when: 'onthoud dat de sleutel', toolCall: { id: '__generic__:household:add:note', args: { body: 'de sleutel bij de buren ligt' } } },
   { when: 'waar ligt de sleutel', replyText: 'Weet ik niet.' },
   { when: 'wat kan je voor me doen', replyText: 'Je eigen notities, afspraken en lijsten.' },
 ];
@@ -74,7 +74,7 @@ test('the "+" story, the rest: whose model, a plain phrase, another self, it sta
   // the general self's note, through the conversation (journey 2's way)
   await say(page, 'onthoud dat de sleutel bij de buren ligt');
   await page.locator('.circle-vandaag-plus__save').click();
-  await expect(page.locator('.circle-screen__items-row').filter({ hasText: 'de sleutel ligt bij de buren' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.circle-screen__items-row').filter({ hasText: 'de sleutel bij de buren ligt' })).toBeVisible({ timeout: 20_000 });
 
   // 5. a plain phrase acts at once on the own list, and no model call is made
   await openPlus(page);
@@ -94,7 +94,7 @@ test('the "+" story, the rest: whose model, a plain phrase, another self, it sta
   await say(page, 'waar ligt de sleutel?');
   expect((await asked(page)).length, "Werk's line reached Werk's model").toBe(beforeWerk + 1);
   const asWerk = JSON.stringify((await asked(page)).at(-1));
-  expect(asWerk, "the general self's note is not handed to Werk's model").not.toContain('de sleutel ligt bij de buren');
+  expect(asWerk, "the general self's note is not handed to Werk's model").not.toContain('de sleutel bij de buren ligt');
   expect(asWerk, "the general self's turns are not handed to Werk's model").not.toContain('Vakantie');
   await page.locator('.circle-vandaag-plus__close').click();
   await only(page, 'default');

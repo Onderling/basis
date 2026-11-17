@@ -237,7 +237,8 @@ describe('the assistant reads the person\'s own things, as the ticked self (jour
       return interpret.mock.calls.length === 1 ? { opId: 'listEvents', args: {} } : { reply: 'Je hebt niets gepland.' };
     });
     const { d } = door({ interpret, readAs: ownRoutes, selfOf });
-    await d.read('wat heb ik gepland?', { asSelf: 'werk' });
+    // a line no phrase takes ("wat heb ik gepland" is the own gate's now): it reaches the model, which peeks
+    await d.read('welke afspraken staan er voor me?', { asSelf: 'werk' });
     expect(interpret, 'the read was handed back').toHaveBeenCalledTimes(2);
     expect(asked.join(' ')).not.toContain('tandarts');
   });
@@ -545,5 +546,30 @@ describe('whose words a turn is: the model\'s reply is the assistant\'s, an act 
     expect(turns.at(-1)).toMatchObject({ who: 'assistant', text: 'Graag gedaan.' });
     const said = histories.at(-1).filter((m) => /tandarts/.test(m.content));
     expect(said.every((m) => m.role !== 'assistant'), 'the model never reads the read as its own words').toBe(true);
+  });
+});
+
+describe('the own "+"\'s gate is generated from what it offers: phrases act with no model call (step A)', () => {
+  const agenda = () => async (app, op) => (op === 'listEvents' ? { ok: true, title: 'Agenda', items: [{ id: 'e1', label: 'tandarts' }] } : { items: [] });
+  it('"onthoud dat …" opens the filled note form, with a model or without one, and no model is asked', async () => {
+    const interpret = vi.fn(async () => ({ reply: 'x' }));
+    for (const llm of [{ invoke: async () => null }, null]) {
+      const { d } = door({ llm, interpret });
+      const r = await d.read('onthoud dat de sleutel bij de buren ligt');
+      expect(r.actId).toBe('household.note');
+      expect(r.values.body).toBe('de sleutel bij de buren ligt');
+    }
+    expect(interpret).not.toHaveBeenCalled();
+  });
+  it('"wat heb ik gepland?" reads the own agenda as the self and says it, with no model call; the same words are no circle\'s', async () => {
+    const interpret = vi.fn(async () => ({ reply: 'x' }));
+    const { d } = door({ interpret, readAs: agenda, selfOf: () => ({ key: 'me', isDefault: true }) });
+    expect((await d.read('wat heb ik gepland?')).done).toContain('tandarts');
+    expect((await d.read('mijn agenda')).done).toContain('tandarts');
+    expect(interpret).not.toHaveBeenCalled();
+    const { renderGate } = await import('@onderling/app-manifest');
+    const { calendarManifest } = await import('../../../calendar/manifest.js');
+    const [circleRule] = renderGate([calendarManifest], { locale: 'nl' });
+    expect(circleRule.command('mijn agenda'), 'a circle reads no own-place phrase').toBeNull();
   });
 });

@@ -52,7 +52,7 @@ export function renderSlash(manifest, opts = {}) {
   const matchers = [];
   for (const op of ops) {
     const m = op?.surfaces?.slash?.match;
-    const verbs = m ? gateVerbsOf(manifest, op, trailLocale) : [];
+    const verbs = m ? gateVerbsOf(manifest, op, trailLocale, (opts && typeof opts.place === 'string') ? opts.place : null) : [];
     if (!verbs.length) continue;
     const verbRes = verbs.map((tokens) => {
       const head   = tokens.map(escapeRe).join('\\s+');

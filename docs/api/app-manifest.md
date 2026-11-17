@@ -537,7 +537,7 @@ A cap not in the matrix (domain verb / not gated) → `'show'`. Pure; surfaces m
 **Kind:** function · **Import:** `gateVerbsOf` from `'@onderling/app-manifest'`
 
 ```js
-gateVerbsOf(manifest, op, locale = null)
+gateVerbsOf(manifest, op, locale = null, place = null)
 ```
 
 gateVerbs — the words an op's deterministic match starts with, per language.
@@ -559,6 +559,7 @@ for), every language's do, in the order the files were given. An op whose app ha
 - `manifest` `object`
 - `op` `object`
 - `[locale]` `string|null`
+- `[place]` `string|null` — the place asking ('own', 'circle', …): a verb declared `{words, in}` only there
 
 **Returns:** `Array<string[]>` — each verb as its words
 

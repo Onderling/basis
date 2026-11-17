@@ -352,7 +352,8 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
 
 /** The list ops a person's own lists answer in the "+" (what the phrase table reads to; a chore or a person is a circle's). */
 /** Stands in for the list words while a person has no own list (a control character: never typed). */
-const NO_OWN_LIST = '\u0000';
+/** The stand-in list word when a self has no own list yet: the lists table needs list words to compile; nobody types it. */
+export const NO_OWN_LIST = '\u0000';
 const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeFromList', 'markListItemDone']);
 
 /**

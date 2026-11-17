@@ -46,9 +46,11 @@ describe('FITNESS: the apps\' gate words', () => {
       });
 
       it(`${app} · ${lang}: each example is its own op in that language; no not-line is`, () => {
-        const { rules } = createGate([m], { locale: lang });
-        const take = (text) => { for (const r of rules) { const c = r.command(text); if (c) return c; } return null; };
+        // an entry placed `in` a place (the own "+") is read there; every other entry as before, in no place
+        const rulesIn = (place) => createGate([m], { locale: lang, ...(place ? { place } : {}) }).rules;
         for (const [id, e] of Object.entries(entries)) {
+          const rules = rulesIn(Array.isArray(e.in) ? e.in[0] : null);
+          const take = (text) => { for (const r of rules) { const c = r.command(text); if (c) return c; } return null; };
           const op = id.slice(app.length + 1);
           for (const ex of e.examples) expect(take(ex)?.opId, `${lang} "${ex}" should be ${op}`).toBe(op);
           for (const no of e.not ?? []) expect(take(no)?.opId, `${lang} "${no}" must not be ${op}`).not.toBe(op);

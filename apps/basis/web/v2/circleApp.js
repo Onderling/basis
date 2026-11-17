@@ -820,7 +820,7 @@ import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
 import { mergeCirclePolicy, mergeMemberOverride, settingsSaveNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
-import { settingsControlsFromManifest, transportsStatusLine } from '../../src/v2/circleSettingsControls.js';
+import { settingsControlsFromManifest, transportsStatusLine, TRANSPORT_MODES } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
 // dispatch as built-ins, not to the bot/LLM).
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
@@ -1725,7 +1725,7 @@ function readTransportMode() {
   return (v === 'nkn' || v === 'relay' || v === 'both') ? v : null;
 }
 function applyTransportMode(mode) {
-  if (!['nkn', 'relay', 'both'].includes(String(mode))) return { ok: false, error: 'bad_mode' };
+  if (!TRANSPORT_MODES.includes(String(mode))) return { ok: false, error: 'bad_mode' };
   // One home, one application point: the kind-gated write; realAgent's set-param hook applies it
   // to the live transport router. Fire-and-forget — the control re-reads the register.
   circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'transport.mode', value: mode })

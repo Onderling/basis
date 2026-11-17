@@ -25,6 +25,7 @@
 
 import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js';
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
+import { TRANSPORT_MODES } from '../../v2/circleSettingsControls.js';
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry, CapabilityToken,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
@@ -7949,7 +7950,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(args.value) }); } catch { /* the register still holds the value */ }
       }
       if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === 'transport.mode'
-          && ['nkn', 'relay', 'both'].includes(args?.value)) {
+          && TRANSPORT_MODES.includes(args?.value)) {
         try { sa.setTransportMode?.(args.value); } catch { /* the register still holds the value */ }
       }
       return paramsResult;
@@ -9730,7 +9731,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (the mode is advisory against that upgrade; an explicit set-param always applies live).
   try {
     const bootMode = paramsService.register.valueOf('transport.mode');
-    if (['nkn', 'relay', 'both'].includes(bootMode)
+    if (TRANSPORT_MODES.includes(bootMode)
         && bootMode !== paramsService.register.defaultOf?.('transport.mode')) {
       sa.setTransportMode?.(bootMode);
     }

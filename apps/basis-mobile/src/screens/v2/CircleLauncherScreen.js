@@ -23,6 +23,7 @@ import { createScreenHead } from '../../../../basis/src/v2/screenHead.js';
 import { createReadMarks } from '../../../../basis/src/v2/readMarks.js';
 import { watchCircleChanges } from '../../../../basis/src/v2/headCircleWatch.js';
 import { startTabFor, startScreenStillApplies, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
+import { TRANSPORT_MODES } from '../../../../basis/src/v2/circleSettingsControls.js';   // the one list of transport modes
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
@@ -654,7 +655,7 @@ export default function CircleLauncherScreen({
       loadCircleTransport();
       return { ok: !saveError && reconnect?.ok !== false, effective, error: saveError ?? reconnect?.error ?? null };
     }
-    if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
+    if (opId === 'transport-mode' && TRANSPORT_MODES.includes(String(args?.mode))) {
       // One home, one application point (web parity): the kind-gated write; realAgent's set-param
       // hook applies it to the live transport router.
       try { await bundle?.callSkill?.('params', 'set-param', { key: 'transport.mode', value: args.mode }); } catch { /* the control re-reads */ }
@@ -4622,7 +4623,7 @@ function CircleDetail({
       }
       if (builtin.opId === 'transport-mode') {
         const mode = builtin.args?.mode;
-        if (['nkn', 'relay', 'both'].includes(String(mode))) {
+        if (TRANSPORT_MODES.includes(String(mode))) {
           await onCircleControl('transport-mode', builtin.args);
           appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_set', { mode: t(`circle.settings.transportMode_opt.${mode}`) }) });
         } else {

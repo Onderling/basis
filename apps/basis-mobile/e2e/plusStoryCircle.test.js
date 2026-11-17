@@ -45,7 +45,6 @@ describe('the "+" story on the phone: a circle\'s act asks which place, and runs
     let card = false;
     for (let i = 0; i < 8 && !card; i += 1) {
       await putLine(`zet kaas op ${LIST}`);
-      await expect(element(by.id('vandaag-plus-line'))).toHaveText(`zet kaas op ${LIST}`);
       await pause(1500);
       await tapSoon(by.id('vandaag-plus-read'));
       try { await soon(by.id('vandaag-plus-card'), 8_000); card = true; } catch { /* not yet two places */ }

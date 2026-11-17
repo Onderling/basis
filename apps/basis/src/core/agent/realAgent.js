@@ -3366,7 +3366,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       subtypes: SPINE_POINT_SUBTYPES,
       // the point moved HERE from another device: that persona's circles catch up before signing
       onChanged: (mine, prev) => {
-        if (mine && prev?.deviceId && prev.deviceId !== deviceIdIn(pid)) Promise.resolve(closeSpineAfterMoveRef.current?.(pid)).catch(() => {});
+        // returned, so a claim here waits for it: the circles are closed before the claimer (a re-key) signs anything
+        if (mine && prev?.deviceId && prev.deviceId !== deviceIdIn(pid)) return Promise.resolve(closeSpineAfterMoveRef.current?.(pid)).catch(() => {});
+        return undefined;
       },
       // the point moved, wherever to: what waits for it goes to the device it now names
       onMoved: () => { Promise.resolve(resendSpineOutboxRef.current?.()).catch(() => {}); },

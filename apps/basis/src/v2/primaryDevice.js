@@ -83,11 +83,15 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
   }
   const isMine = () => !!claim && !!myDeviceId && claim.deviceId === myDeviceId;
   // `prev`: the claim this one replaced — a host can tell a device that BECAME the choice from one that always was
+  // returns what `onChanged` started (a promise or nothing), so a claim can wait for it: the point's move closes its
+  // circles until caught up, and a claimer that signs next (a re-key) must not sign before that has begun
   const changed = (was, prev = null) => {
     const now_ = isMine();
-    if (now_ !== was && typeof onChanged === 'function') { try { onChanged(now_, prev); } catch { /* re-registration is best-effort */ } }
+    let work = null;
+    if (now_ !== was && typeof onChanged === 'function') { try { work = onChanged(now_, prev); } catch { /* re-registration is best-effort */ } }
     // the claim names another device than before, whether or not this one is involved
     if ((prev?.deviceId ?? null) !== (claim?.deviceId ?? null) && typeof onMoved === 'function') { try { onMoved(claim, prev); } catch { /* best-effort */ } }
+    return Promise.resolve(work).catch(() => {});
   };
   const isSibling = async (fromAddr) => {
     let addrs = [];
@@ -110,7 +114,8 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
       const prev = claim;
       const next = { deviceId: myDeviceId, at: Math.max(now(), (claim?.at ?? 0) + 1) };
       await store(next);
-      changed(was, prev);
+      // what the move starts here (the point: its circles close until caught up) has run before the claimer goes on
+      await changed(was, prev);
       let attempted = 0;
       // the ONE sibling carry; a sibling that misses it follows by request
       try { attempted = (await carry(wire(next))).attempted; } catch { /* no siblings reachable now; they ask on connect */ }

@@ -1731,13 +1731,21 @@
       "text": "Got it",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
-    "onboarding_begin_title": {
-      "text": "Begin",
-      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
-    },
     "onboarding_begin_create": {
       "text": "Make a circle",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_strip_single": {
+      "text": "1 thing left to set up",
+      "doc": "Today's folded set-up strip, closed: its line when one card is left; a tap opens it."
+    },
+    "onboarding_strip_many": {
+      "text": "{{count}} things left to set up",
+      "doc": "Today's folded set-up strip, closed: its line when {{count}} cards are left; a tap opens it."
+    },
+    "onboarding_no_circle": {
+      "text": "You are not in a circle yet. On Circles you make one, or join with an invitation.",
+      "doc": "Today, for a person in no circle (the help circle does not count): the one line that points to Circles."
     },
     "onboarding_begin_join": {
       "text": "I have an invitation",

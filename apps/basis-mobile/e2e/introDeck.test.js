@@ -3,7 +3,7 @@
 // "Next" turns the page, the last card's button leaves for Today, and the card has gone from Today. Web twin:
 // apps/basis/test-browser/intro-deck.spec.js. Release APK, an emulator or an agreed test device (E2E_WIPE_OK).
 
-const { launch, soon, tapSoon, firstBoot, emulatorOnly } = require('./support/ui');
+const { launch, soon, tapSoon, firstBoot, emulatorOnly, openOnboardingStrip } = require('./support/ui');
 
 const CARDS = ['welcome', 'circles', 'contacts', 'plus', 'selves', 'nearby', 'keys'];
 
@@ -16,7 +16,8 @@ describe('the introduction on the phone', () => {
 
   it('"Read more" opens the seven cards in order; the last button leaves for Today and the card is gone', async () => {
     await tapSoon(by.id('circle-tab-screens'));
-    await soon(by.id('onb-intro-more'), 30_000);   // the onboarding strip is the top of Today
+    await openOnboardingStrip();   // the set-up cards sit in one closed strip at the top of Today
+    await soon(by.id('onb-intro-more'), 30_000);
     await tapSoon(by.id('onb-intro-more'));
     for (const [i, id] of CARDS.entries()) {
       await soon(by.id(`intro-deck-card-${id}`), 10_000);

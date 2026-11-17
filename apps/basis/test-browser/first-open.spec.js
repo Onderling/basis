@@ -6,6 +6,7 @@
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/first-open.spec.js
  */
 import { test, expect } from '@playwright/test';
+import { openOnboardingStrip } from './helpers.js';
 
 test.setTimeout(90_000);
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -23,6 +24,7 @@ test('a first open shows the three doors; "just continue" leads to Today, and th
   await door(page, 'continue').click();
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   // the reminder: Today's "New to Basis?" card stays until the intro is seen
+  await openOnboardingStrip(page);
   await expect(page.locator('.circle-screen__onb-card[data-card="intro"]')).toBeVisible();
   await page.reload();
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });

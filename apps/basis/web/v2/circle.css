@@ -1526,6 +1526,10 @@
 .circle-screen__group > summary { cursor: pointer; font-size: 13px; color: var(--ink-soft); padding: 4px 0; }
 .circle-screen__agenda-moment { flex: 0 0 auto; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 /* Vandaag's onboarding strip: a card per first step, gone once it is done */
+.circle-screen__onb-strip { display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; font-size: 14px; padding: 10px 12px; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); }
+.circle-screen__onb-strip::after { content: ' ▾'; color: var(--ink-soft); }
+.circle-screen__onb-strip[aria-expanded="true"]::after { content: ' ▴'; }
+.circle-screen__onb-nocircle { margin: 6px 0; font-size: 14px; color: var(--ink-soft); }
 .circle-screen__onb-card { padding: 10px 12px; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
 .circle-screen__onb-card h4 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
 .circle-screen__onb-card p { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
@@ -1644,3 +1648,13 @@
 .circle-first-open__title { margin: 0; }
 .circle-first-open__lead { margin: 0 0 8px; line-height: 1.5; }
 .circle-first-open__door { width: 100%; }
+
+/* THE ROOM CHAT: each line says who and when (nearbyChatLines), small and soft above the words */
+.circle-nearby__chat-meta { font-size: 12px; color: var(--ink-soft); }
+.circle-nearby__chat-line + .circle-nearby__chat-line { margin-top: 6px; }
+
+/* NEARBY'S TWO TABS (nearbyTabs): Conversation and Questions, the same underline tabs as a circle's own */
+.circle-nearby__tabs { display: flex; border-bottom: 1px solid var(--line); margin: 12px 0 10px; }
+.circle-nearby__tab { flex: 1; padding: 10px 6px; background: none; border: none; font: inherit; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.circle-nearby__tab.is-selected { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
+.circle-nearby__panel > * + * { margin-top: 12px; }

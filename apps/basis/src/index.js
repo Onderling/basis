@@ -158,6 +158,8 @@ export { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureActionLabelKey, featureTabI
 // read at bubble render time so users can see fan-out status + retry
 // failed sends.
 export { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+// the map a shell makes: the substrate's plus the 'waiting for a connection' words after a while
+export { createAppDeliveryMap } from './v2/deliveryState.js';
 // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out) for web + mobile.
 export { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 // Phase 3 — the shared circle label→candidate lookup (live fetch + base), web + mobile.
@@ -338,7 +340,7 @@ export {
 // Stream per-row actions + pinned compose.
 export { actionsForStreamRow, buildStreamComposeContext } from './v2/streamActions.js';
 // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
-export { buildTaskRows, taskItemToStreamRow, taskStatusOf } from './v2/taskRows.js';
+export { buildTaskRows, taskItemToStreamRow, taskStatusOf, taskStatusShown } from './v2/taskRows.js';
 // the /transports line both shells paint (the mode by its label, never the value 'relay')
 export { transportsStatusLine } from './v2/circleSettingsControls.js';
 // holiday-mode extension shortcuts + outgoing auto-reply.

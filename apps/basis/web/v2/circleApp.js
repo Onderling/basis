@@ -193,7 +193,7 @@ import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
 import { createPlusDoor, conversationSelf, plusRouteLine } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusCardCommands, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
@@ -354,7 +354,7 @@ import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
 // Sibling of the EventLog (which stays append-only); read at render
 // time by circleView to surface pending/failed icons.
-import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { createAppDeliveryMap } from '../../src/v2/deliveryState.js';
 // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out), web + mobile.
 import { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
@@ -1391,7 +1391,7 @@ const pullRosterForCircle = async ({ circleId }) => {
 // in-memory EventLog).  showCircle's onSend marks each locally-sent
 // msgId 'pending' → 'sent' | 'failed' as broadcastCircleMessage
 // resolves; the circle renderer reads it at render time.
-const deliveryStateMap = createDeliveryStateMap();
+const deliveryStateMap = createAppDeliveryMap();   // the substrate map + the 'waiting for a connection' words
 // …and REDRAW when a RECEIPT advances a message. `broadcastFanOut` announces its own transitions
 // (`onChange: rerender`), so the receipt was the one writer with nothing to announce it: it arrived, the
 // map advanced to `stored`, and the bubble kept saying "maybe received" until an unrelated render
@@ -4879,10 +4879,12 @@ function showVandaagPlus({ edit = null } = {}) {
       const card = circleCard; circleCard = null;
       if (!card) return;
       // the pick on the card: no new line, the run's answer kept (the same shared exchange)
-      await plusDoorNow().exchange({ asSelf }, async () => { await runInCircle(card.command, circleId); return { error, done }; });
+      // what the card carries, in order (the make-a-list card: the list, then the item on it); the first failure stops it
+      await plusDoorNow().exchange({ asSelf }, async () => { for (const c of plusCardCommands(card)) { const r = await runInCircle(c, circleId); if (r?.error) break; } return { error, done }; });
       paint();
     },
-    onCircleCancel: () => { circleCard = null; error = null; paint(); },
+    // the card's no: the line was not done, said in the conversation (as a closed form is)
+    onCircleCancel: async () => { const card = circleCard; circleCard = null; error = null; await plusDoorNow().cardRefused({ asSelf }, card); paint(); },
     onSave: async (id, filled) => {
       values = filled;
       const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);

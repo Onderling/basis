@@ -13,7 +13,8 @@
 //
 // Release APK, an emulator or an agreed test device (E2E_WIPE_OK): it deletes the app.
 
-const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
+const { launch, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
+const { present, openPlus, say, setOwnModel: setOwnModelOn } = require('./support/plusWalk');
 const { startStandInModel, reversePort } = require('./support/standInModel');
 
 const SCRIPT = [
@@ -24,60 +25,9 @@ const SCRIPT = [
 ];
 const PHONE_PORT = 11434;
 const LAPTOP_PORT = 8091;   // 8090 is Fable's real-model stand-in
+const setOwnModel = () => setOwnModelOn(PHONE_PORT);
 
 let model;
-const pause = (ms) => new Promise((r) => setTimeout(r, ms));
-/** In the thread at all (it may be below the fold) and the first of several matches: what a turn check means. */
-const present = (matcher, ms = 20_000) => waitFor(element(matcher).atIndex(0)).toExist().withTimeout(ms);
-
-async function openPlus() {
-  await tapSoon(by.id('circle-tab-screens'));
-  await tapSoon(by.id('vandaag-plus-open'), 30_000);
-  await soon(by.id('vandaag-plus'), 20_000);
-}
-
-/** Type a line and read it; resolves when the thread holds the line (its answer follows). */
-async function say(line) {
-  await element(by.id('vandaag-plus-line')).replaceText(line);
-  // the sheet must have TAKEN the line before Read (a tap that comes first goes nowhere: measured 2026-11-16)
-  await expect(element(by.id('vandaag-plus-line'))).toHaveText(line);
-  await pause(1500);
-  await tapSoon(by.id('vandaag-plus-read'));
-  // the same line may be in the thread already (journey 8 asked it too): the first match is enough
-  await present(by.text(line).withAncestor(by.id('vandaag-plus-thread')));
-}
-
-/** The own model, set as a person sets it: Mij → the gear → Weergave → the assistant section, preset Local. */
-async function setOwnModel() {
-  await tapSoon(by.id('circle-tab-mij'));
-  await tapSoon(by.id('profile-settings'), 15_000);
-  await tapSoon(by.id('settings-group-appearance'), 15_000);
-  await waitFor(element(by.id('user-llm-preset-local-ollama'))).toBeVisible()
-    .whileElement(by.id('circle-settings-group')).scroll(400, 'down');
-  // a tap right after a scroll can land nowhere (measured on the Samsung 2026-11-17: the preset stayed off): tap until the
-  // preset's fields are there
-  for (let i = 0; i < 3; i += 1) {
-    await pause(800);
-    await element(by.id('user-llm-preset-local-ollama')).tap();
-    if (await isVisible(by.id('user-llm-llmBaseUrl'))) break;
-    try { await waitFor(element(by.id('user-llm-llmBaseUrl'))).toExist().withTimeout(1500); break; } catch { /* tap again */ }
-  }
-  await waitFor(element(by.id('user-llm-llmBaseUrl'))).toBeVisible()
-    .whileElement(by.id('circle-settings-group')).scroll(200, 'down');
-  await element(by.id('user-llm-llmBaseUrl')).replaceText(`http://127.0.0.1:${PHONE_PORT}`);
-  await element(by.id('user-llm-llmModel')).replaceText('stand-in');
-  await waitFor(element(by.id('user-llm-save'))).toBeVisible()
-    .whileElement(by.id('circle-settings-group')).scroll(200, 'down');
-  // Save until the setting says it is saved (a tap can land nowhere, as the preset's did); a refusal is said, not retried
-  let saved = -1;
-  for (let i = 0; i < 3 && saved < 0; i += 1) {
-    await pause(800);
-    await element(by.id('user-llm-save')).tap();
-    saved = await firstOf([by.id('user-llm-msg-ok'), by.id('user-llm-msg-error')], 5000);
-  }
-  await device.takeScreenshot('plus-story-00-model-set');
-  if (saved !== 0) throw new Error(saved === 1 ? 'the own model setting was refused' : 'the own model setting never said it was saved');
-}
 
 describe('the "+" story on the phone, with a stand-in model', () => {
   beforeAll(async () => {

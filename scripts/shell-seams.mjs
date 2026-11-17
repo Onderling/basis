@@ -292,6 +292,9 @@ export const SEAMS = Object.freeze([
   // line any other way is how the sheet would come to act in a circle.
   // (the shared "+" door, `createPlusDoor`, reads the line through `plusLineOutcome` itself: a shell composes the door)
   { id: 'plus-line-outcome', pattern: /createPlusDoor\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // THE BOX AND THE "+": every `plus-*` seam names web and the phone only. The box (the always-on household device) does
+  // not compose the person's own "+": a declared exception until after the alpha (docs/catalogue/assistant.md,
+  // "Decided, not built"); its Telegram door runs the same engine over the household's things.
   // THE "+" IS ONE KEPT CONVERSATION: each read of its line is one exchange in the person's own thread (`exchange` on
   // `createPlusThread`: the line heard, the read run, what it answered kept as the bot's own turn entries). A shell that
   // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already

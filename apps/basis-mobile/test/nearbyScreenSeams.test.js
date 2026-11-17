@@ -70,14 +70,16 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
             'delivery_fallback_toggle_on', 'delivery_fallback_toggle_off',
             'delivery_fallback_hint', 'delivery_fallback_cost', 'delivery_fallback_enable']
           .map((k) => `circle.nearbyScreen.${k}`),
-        ...['asks_title', 'asks_empty', 'ask_resonant', 'ask_disclosure', 'ask_compose',
+        ...['asks_title', 'ask_resonant', 'ask_disclosure', 'ask_compose',
             'ask_placeholder', 'ask_send', 'ask_sent', 'ask_expired', 'answer_sent',
             // step G — cards + room chat
             'allow_card', 'allow_card_off', 'allow_chat', 'allow_chat_off',
             'card_title', 'card_label', 'card_line', 'card_visible_to', 'card_save', 'card_shown',
-            'chat_title', 'chat_empty', 'chat_ephemeral', 'chat_placeholder', 'chat_send',
+            'chat_empty', 'chat_ephemeral', 'chat_placeholder', 'chat_send',
             // step H — broadcast circle invites
-            'invites_title', 'invites_empty', 'join_is_a_join', 'invite_expired',
+            'invites_title', 'join_is_a_join', 'invite_expired',
+            // the two tabs
+            'tab_conversation', 'tab_questions',
             'publish_invite', 'publish_warning', 'publish_short', 'invite_published',
             // step I — connection points
             'points_title', 'points_intro', 'points_empty', 'point_adopt', 'point_carries',

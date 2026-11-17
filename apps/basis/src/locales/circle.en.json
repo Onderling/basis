@@ -657,8 +657,12 @@
       }
     },
     "delivery": {
+      "waiting_for_connection": {
+        "text": "Not sent yet: waiting for a connection",
+        "doc": "A message still sending after a while: it waits on this device until there is a connection, and goes by itself."
+      },
       "maybe_received": {
-        "text": "Sent · maybe received",
+        "text": "Sent · not confirmed yet",
         "doc": "It left this device. Whether it arrived is unknown unless the other person chose to confirm."
       },
       "stored": {
@@ -763,6 +767,14 @@
     "claimed": {
       "text": "claimed",
       "doc": "Taken (tasks) tab — status badge: someone is on it."
+    },
+    "claimed_by": {
+      "text": "claimed by {{who}}",
+      "doc": "Tasks tab — status of a claimed task with who holds it: one name, several joined by commas, or 'you'."
+    },
+    "you": {
+      "text": "you",
+      "doc": "Tasks tab — the viewer as the holder of a claimed task, in 'claimed by {{who}}'."
     },
     "submitted": {
       "text": "submitted",
@@ -1576,11 +1588,11 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_help": {
-      "text": "I can do this for you: {{acts}}. Or ask me how something works.",
+      "text": "I can do this for you: {{acts}}. Lists too: \"new list Shopping\", \"add milk to Shopping\". Or ask me how something works.",
       "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
-      "text": "I could not read that.",
+      "text": "I could not read that. Type \"help\" to see what I can do, or fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."
     },
     "plus_no_model": {
@@ -1731,13 +1743,21 @@
       "text": "Got it",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
-    "onboarding_begin_title": {
-      "text": "Begin",
-      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
-    },
     "onboarding_begin_create": {
       "text": "Make a circle",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_strip_single": {
+      "text": "1 thing left to set up",
+      "doc": "Today's folded set-up strip, closed: its line when one card is left; a tap opens it."
+    },
+    "onboarding_strip_many": {
+      "text": "{{count}} things left to set up",
+      "doc": "Today's folded set-up strip, closed: its line when {{count}} cards are left; a tap opens it."
+    },
+    "onboarding_no_circle": {
+      "text": "You are not in a circle yet. On Circles you make one, or join with an invitation.",
+      "doc": "Today, for a person in no circle (the help circle does not count): the one line that points to Circles."
     },
     "onboarding_begin_join": {
       "text": "I have an invitation",
@@ -1822,6 +1842,14 @@
     "plus_list_empty": {
       "text": "Nothing on {{name}}.",
       "doc": "The \"+\" thread's answer to a read of a list that has no entries."
+    },
+    "plus_make_list_ask": {
+      "text": "There is no list '{{list}}' yet. Make it?",
+      "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
+    },
+    "plus_card_not_done": {
+      "text": "'{{line}}': not done. Nothing was stored.",
+      "doc": "The \"+\" conversation: a card (which place, or make a list) was answered with Cancel; the line was not done and nothing was stored."
     }
   },
   "screens": {
@@ -3563,13 +3591,17 @@
       "text": "Keep it",
       "doc": "Cancel removal."
     },
+    "tab_conversation": {
+      "text": "Conversation",
+      "doc": "Nearby's first tab: the room chat (or, when not in it, one line and the way to join)."
+    },
+    "tab_questions": {
+      "text": "Questions",
+      "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
     "invites_title": {
       "text": "Circles open here",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."
-    },
-    "invites_empty": {
-      "text": "No circle is being advertised here.",
-      "doc": "Empty state for the invite list."
     },
     "action_join_published": {
       "text": "Join",
@@ -3643,13 +3675,13 @@
       "text": "Shown to {{sent}} of {{peers}} nearby",
       "doc": "Result after publishing a card — the real reach, not \"saved\"."
     },
-    "chat_title": {
-      "text": "Room chat",
-      "doc": "Heading of the room chat."
-    },
     "chat_empty": {
       "text": "Nobody has said anything yet.",
       "doc": "Chat empty state — only shown once you have JOINED."
+    },
+    "chat_you": {
+      "text": "You",
+      "doc": "Who said a line in the room chat, for your own lines (the others' lines carry the name or face the room shows)."
     },
     "chat_ephemeral": {
       "text": "Nothing here is kept. Leaving forgets it.",
@@ -3666,10 +3698,6 @@
     "asks_title": {
       "text": "Asked here",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."
-    },
-    "asks_empty": {
-      "text": "Nobody has asked anything yet.",
-      "doc": "Shown when the room carries no live asks."
     },
     "ask_resonant": {
       "text": "This matches you: {{reason}}",

@@ -657,8 +657,12 @@
       }
     },
     "delivery": {
+      "waiting_for_connection": {
+        "text": "Nog niet verzonden: wacht op een verbinding",
+        "doc": "Een bericht dat na een tijdje nog verstuurd wordt: het wacht op dit apparaat tot er een verbinding is, en gaat dan vanzelf."
+      },
       "maybe_received": {
-        "text": "Verzonden · misschien ontvangen",
+        "text": "Verzonden · nog niet bevestigd",
         "doc": "Het is van dit apparaat vertrokken. Of het is aangekomen weten we niet, tenzij de ander dat zelf laat weten."
       },
       "stored": {
@@ -763,6 +767,14 @@
     "claimed": {
       "text": "opgepakt",
       "doc": "tasks tab — status-badge: iemand doet de taak."
+    },
+    "claimed_by": {
+      "text": "opgepakt door {{who}}",
+      "doc": "tasks tab — status van een opgepakte taak met wie hem doet: één naam, meerdere met komma's, of 'jou'."
+    },
+    "you": {
+      "text": "jou",
+      "doc": "tasks tab — de kijker zelf als wie de taak doet, in 'opgepakt door {{who}}'."
     },
     "submitted": {
       "text": "ingediend",
@@ -1579,11 +1591,11 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_help": {
-      "text": "Dit kan ik voor je doen: {{acts}}. Of vraag hoe iets werkt.",
+      "text": "Dit kan ik voor je doen: {{acts}}. Lijstjes ook: \"nieuwe lijst Boodschappen\", \"zet melk op Boodschappen\". Of vraag hoe iets werkt.",
       "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
-      "text": "Dat kon ik niet lezen.",
+      "text": "Dat kon ik niet lezen. Typ \"help\" om te zien wat ik kan, of vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."
     },
     "plus_no_model": {
@@ -1734,13 +1746,21 @@
       "text": "Begrepen",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
-    "onboarding_begin_title": {
-      "text": "Begin",
-      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
-    },
     "onboarding_begin_create": {
       "text": "Maak een kring",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_strip_single": {
+      "text": "Nog 1 ding om in te stellen",
+      "doc": "Vandaag, de dichtgevouwen strook: de regel als er nog één kaart over is; een tik klapt hem open."
+    },
+    "onboarding_strip_many": {
+      "text": "Nog {{count}} dingen om in te stellen",
+      "doc": "Vandaag, de dichtgevouwen strook: de regel als er nog {{count}} kaarten over zijn; een tik klapt hem open."
+    },
+    "onboarding_no_circle": {
+      "text": "Je zit nog in geen kring. Bij Kringen maak je er een, of doe je mee met een uitnodiging.",
+      "doc": "Vandaag, voor wie nog in geen kring zit (de hulpkring telt niet): de ene regel die naar Kringen wijst."
     },
     "onboarding_begin_join": {
       "text": "Ik heb een uitnodiging",
@@ -1825,6 +1845,14 @@
     "plus_list_empty": {
       "text": "Er staat niets op {{name}}.",
       "doc": "The \"+\" thread's answer to a read of a list that has no entries."
+    },
+    "plus_make_list_ask": {
+      "text": "Een lijst '{{list}}' bestaat nog niet. Maken?",
+      "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
+    },
+    "plus_card_not_done": {
+      "text": "'{{line}}': niet gedaan. Er is niets opgeslagen.",
+      "doc": "The \"+\" conversation: a card (which place, or make a list) was answered with Cancel; the line was not done and nothing was stored."
     }
   },
   "screens": {
@@ -3568,13 +3596,17 @@
       "text": "Houden",
       "doc": "Cancel removal."
     },
+    "tab_conversation": {
+      "text": "Gesprek",
+      "doc": "Nearby's first tab: the room chat (or, when not in it, one line and the way to join)."
+    },
+    "tab_questions": {
+      "text": "Vragen",
+      "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
     "invites_title": {
       "text": "Kringen die hier open staan",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."
-    },
-    "invites_empty": {
-      "text": "Er wordt hier geen kring aangeboden.",
-      "doc": "Empty state for the invite list."
     },
     "action_join_published": {
       "text": "Meedoen",
@@ -3648,13 +3680,13 @@
       "text": "Getoond aan {{sent}} van {{peers}} in de buurt",
       "doc": "Result after publishing a card — the real reach, not \"saved\"."
     },
-    "chat_title": {
-      "text": "Gesprek hier",
-      "doc": "Heading of the room chat."
-    },
     "chat_empty": {
       "text": "Nog niemand heeft iets gezegd.",
       "doc": "Chat empty state — only shown once you have JOINED."
+    },
+    "chat_you": {
+      "text": "Jij",
+      "doc": "Who said a line in the room chat, for your own lines (the others' lines carry the name or face the room shows)."
     },
     "chat_ephemeral": {
       "text": "Hier wordt niets bewaard. Weggaan wist het.",
@@ -3671,10 +3703,6 @@
     "asks_title": {
       "text": "Hier gevraagd",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."
-    },
-    "asks_empty": {
-      "text": "Nog niemand heeft iets gevraagd.",
-      "doc": "Shown when the room carries no live asks."
     },
     "ask_resonant": {
       "text": "Dit past bij jou: {{reason}}",

@@ -40,6 +40,13 @@ export function circleSlug(name) {
  * Only the two REQUIRED fields are filled (Name, Circle id); every other step is accepted as it comes, so
  * this helper keeps working when a step gains a field and fails loudly if a step gains a required one.
  */
+/** Today's set-up cards sit in one closed strip (onboardingStrip.js): open it, once, before touching a card. */
+export async function openOnboardingStrip(page) {
+  const strip = page.locator('.circle-screen__onb-strip');
+  await strip.waitFor({ timeout: 30_000 });
+  if ((await strip.getAttribute('aria-expanded')) !== 'true') await strip.click();
+}
+
 export async function createCircleViaWizard(page, name, { handle = 'founder', kind = 'household' } = {}) {
   // the app opens on Vandaag (the home) since 2026-10-15: the create button lives on the circles list
   if (await page.locator('.circle-launcher__new').count() === 0) {

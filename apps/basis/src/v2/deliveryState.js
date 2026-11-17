@@ -67,7 +67,8 @@ export function createAppDeliveryMap({ setTimer = (fn, ms) => setTimeout(fn, ms)
   const timers = new Map();
   map.subscribe((id, state) => {
     if (state === DELIVERY.PENDING) {
-      if (timers.has(id)) return;
+      // a reason already says why it waits (its own, or the one the timer set and is now notifying): no timer
+      if (timers.has(id) || map.reasonOf(id)) return;
       timers.set(id, setTimer(() => {
         timers.delete(id);
         if (map.get(id) === DELIVERY.PENDING && !map.reasonOf(id)) map.set(id, DELIVERY.PENDING, { reason: 'waiting-for-connection' });

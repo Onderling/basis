@@ -33,6 +33,18 @@ describe('a pending message that waits too long', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('arms one timer per wait: the reason it sets, or a reason it was given, arms none', () => {
+    const armed = [];
+    const m = createAppDeliveryMap({ setTimer: (fn) => { armed.push(fn); return armed.length; }, clearTimer: () => {} });
+    m.set('a', 'pending');
+    expect(armed.length).toBe(1);
+    armed[0]();   // the wait is over: the reason is set, and the map tells its watchers (its own included)
+    expect(m.reasonOf('a')).toBe('waiting-for-connection');
+    expect(armed.length, 'its own notify arms no second timer').toBe(1);
+    m.set('b', 'pending', { reason: 'held' });
+    expect(armed.length, 'a message with its own reason waits for no timer').toBe(1);
+  });
+
   it('a message that went before the wait, or that waits for its own reason, keeps its words', () => {
     vi.useFakeTimers();
     try {

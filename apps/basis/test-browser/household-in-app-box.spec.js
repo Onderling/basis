@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../test/support/pairRealAgents.js';
 import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
-import { addBoxCard } from '../test/support/addBoxCard.js';
+import { addBoxCard, boxIsUp } from '../test/support/addBoxCard.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
@@ -37,7 +37,7 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
   child.stderr.on('data', (b) => { out += String(b); });
   let ann = null;
   try {
-    expect(await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 300 }), `the bot never came up:\n${out.slice(-1500)}`).toBe(true);
+    expect(await until(async () => (boxIsUp(out) ? true : null), { timeout: 90_000, step: 300 }), `the bot never came up:\n${out.slice(-1500)}`).toBe(true);
     const cardLink = /onderling-contact:\/\/[A-Za-z0-9_-]+/.exec(out)[0];
     const card = decodeContactCard(cardLink.replace('onderling-contact://', ''));
     ann = await bootRealAgentNode('ann', { contactChannel: true });

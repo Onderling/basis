@@ -64,5 +64,10 @@ describe('the "+" story on the phone: a circle\'s act asks which place, and runs
     await tapSoon(by.id(`vandaag-plus-card-in-${ready.circleId}`));
     await peerListsHold(peer, (ls) => ls.some((l) => l.list === LIST && l.entries.includes('kaas')));
     await device.takeScreenshot('plus-circle-03-picked');
+    // exactly ONCE: a slow write from an earlier read (before the card) would land late and show as a second kaas
+    await pause(10_000);
+    const after = await peerListsHold(peer, () => true, 1);
+    const kaas = (after.find((l) => l.list === LIST)?.entries ?? []).filter((e) => e === 'kaas').length;
+    if (kaas !== 1) throw new Error(`kaas is on Bram's list ${kaas} times, not once: ${JSON.stringify(after)}`);
   });
 });

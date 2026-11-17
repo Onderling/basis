@@ -1,4 +1,4 @@
-/* global device, element, by, waitFor */
+/* global device, element, by, waitFor, expect */
 // THE "+" STORY ON THE PHONE, THE REST: the journeys of the assistant thread that plusStory.test.js does not walk, with
 // the same stand-in model on this laptop (e2e/support/standInModel.js) set through the real settings screen. Web twin:
 // apps/basis/test-browser/plus-story-rest.spec.js (the circle's act is plusStoryCircle.test.js, it needs a second person).
@@ -111,6 +111,19 @@ describe('the "+" story on the phone, the rest, with a stand-in model', () => {
     if (/onthoud dat de sleutel|Vakantie/.test(historyOf(model.requests.at(-1)))) throw new Error('the forgotten turns were handed to the model');
     await present(by.text('Je eigen notities, afspraken en lijsten.').withAncestor(by.id('vandaag-plus-thread')));
     await device.takeScreenshot('plus-rest-10-forgotten');
+  });
+
+  it('a long conversation: the sheet opens with the line in view, and keeps it there after each turn', async () => {
+    for (let i = 1; i <= 6; i += 1) {
+      await say(`blauwe olifant nummer ${i}`);
+      await pause(1500);
+      await expect(element(by.id('vandaag-plus-line'))).toBeVisible();
+    }
+    await tapSoon(by.id('vandaag-plus-close'));
+    await openPlus();
+    await pause(1000);
+    await device.takeScreenshot('plus-rest-long-thread-open');
+    await expect(element(by.id('vandaag-plus-line'))).toBeVisible();
   });
 
   it('6. the "/" list: the same acts as the buttons, and picking one opens the same form, with no model call', async () => {

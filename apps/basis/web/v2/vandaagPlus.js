@@ -297,5 +297,13 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
   close.textContent = tr('circle.vandaag.done');
   close.addEventListener('click', () => onClose?.());
   container.appendChild(close);
+  // the line in view when the sheet opens and after each turn (it is painted again then): a long thread above it must
+  // not leave the person looking at old turns with the line below the fold (phone twin: VandaagPlusModal's scrollTo).
+  // Guarded: a layout-less DOM (tests) has no scrollIntoView, and the sheet may not be attached yet on this frame.
+  const lineEl = container.querySelector('.circle-vandaag-plus__line');
+  if (lineEl && !editing && typeof lineEl.scrollIntoView === 'function') {
+    const bring = () => { try { lineEl.scrollIntoView({ block: 'nearest' }); } catch { /* layout-less DOM */ } };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(bring); else bring();
+  }
   return container;
 }

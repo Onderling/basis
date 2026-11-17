@@ -86,7 +86,7 @@ export default function UserLlmSettings({ current = {}, onSave, validate }) {
         </View>
       )}
 
-      {msg ? <Text style={[styles.msg, msg.error ? styles.msgError : styles.msgOk]}>{msg.text}</Text> : null}
+      {msg ? <Text style={[styles.msg, msg.error ? styles.msgError : styles.msgOk]} testID={msg.error ? 'user-llm-msg-error' : 'user-llm-msg-ok'}>{msg.text}</Text> : null}
 
       <Pressable style={[styles.save, busy && styles.saveBusy]} onPress={onSavePress} disabled={busy} testID="user-llm-save">
         <Text style={styles.saveText}>{t('circle.userLlm.save')}</Text>

@@ -65,9 +65,15 @@ async function setOwnModel() {
   await element(by.id('user-llm-llmModel')).replaceText('stand-in');
   await waitFor(element(by.id('user-llm-save'))).toBeVisible()
     .whileElement(by.id('circle-settings-group')).scroll(200, 'down');
-  await element(by.id('user-llm-save')).tap();
-  await pause(1500);
+  // Save until the setting says it is saved (a tap can land nowhere, as the preset's did); a refusal is said, not retried
+  let saved = -1;
+  for (let i = 0; i < 3 && saved < 0; i += 1) {
+    await pause(800);
+    await element(by.id('user-llm-save')).tap();
+    saved = await firstOf([by.id('user-llm-msg-ok'), by.id('user-llm-msg-error')], 5000);
+  }
   await device.takeScreenshot('plus-story-00-model-set');
+  if (saved !== 0) throw new Error(saved === 1 ? 'the own model setting was refused' : 'the own model setting never said it was saved');
 }
 
 describe('the "+" story on the phone, with a stand-in model', () => {

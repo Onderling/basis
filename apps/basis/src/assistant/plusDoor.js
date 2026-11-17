@@ -352,7 +352,7 @@ export function createPlusDoor({
     if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
     if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf) : null) ?? unread();
-    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command } };
+    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, ...(o.makeList ? { makeList: o.makeList } : {}) } };
     // an own act's form, filled as the primary self (the form may change it)
     if (o?.kind === 'own') return o.actId ? { actId: o.actId, values: o.values ?? {}, asSelf } : o;
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere, and the

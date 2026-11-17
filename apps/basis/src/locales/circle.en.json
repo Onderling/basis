@@ -1822,6 +1822,10 @@
     "plus_list_empty": {
       "text": "Nothing on {{name}}.",
       "doc": "The \"+\" thread's answer to a read of a list that has no entries."
+    },
+    "plus_make_list_ask": {
+      "text": "There is no list '{{list}}' yet. Make it?",
+      "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
     }
   },
   "screens": {

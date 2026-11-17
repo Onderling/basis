@@ -25,6 +25,9 @@
  * for display — the Taken tab shows the true state, never the mapped kind.
  */
 
+import { memberLabelFor } from './circleStream.js';
+import { SOMEONE_LABEL_KEY } from './personLabel.js';
+
 /** task lifecycle state → the stream-row kind whose chips match the next action. */
 const STATE_TO_KIND = { open: 'chore', claimed: 'reminder' };
 
@@ -50,6 +53,8 @@ export function taskItemToStreamRow(item, { circleId = null } = {}) {
   const text    = it.text ?? it.title ?? it.label ?? '';
   const status  = taskStatusOf(it);
   const assignee = it.assignee ?? null;
+  // everyone who holds it: co-ownership keeps `assignees[]`, the singular `assignee` mirrors its first
+  const holders = [...new Set([...(Array.isArray(it.assignees) ? it.assignees : []), assignee].filter((h) => typeof h === 'string' && h))];
   const addedBy = it.addedBy ?? it.master ?? it.creator ?? it.author ?? null;
   const kind    = STATE_TO_KIND[String(status).toLowerCase()] ?? 'task';
   return {
@@ -62,9 +67,31 @@ export function taskItemToStreamRow(item, { circleId = null } = {}) {
     // Display fields (the true state, not the mapped chip-kind).
     status,
     assignee,
+    holders,
     text,
     event: { type: kind, payload: { kind, text, ref: taskId, taskId, addedBy, status, assignee } },
   };
+}
+
+/**
+ * The status a tasks tab row shows. A claimed task says who holds it ("claimed by Bram"; the viewer's own claim is
+ * "you"), each holder named from the circle's roster through the reveal ladder (`memberLabelFor`), and one the roster
+ * cannot place is "someone", never a key. Any other state, or a claim without a holder, is the plain status word.
+ * Both shells paint this string as it is.
+ *
+ * @param {object} row  a row from `taskItemToStreamRow`
+ * @param {{members?: object[], viewerId?: string|null, policy?: 'open'|'pairwise', t: Function}} opts
+ *   `members` are NORMALISED roster rows (`normalizeCircleMembers`)
+ * @returns {string}
+ */
+export function taskStatusShown(row, { members = [], viewerId = null, policy = 'pairwise', t } = {}) {
+  const status = row?.status ?? 'open';
+  const holders = Array.isArray(row?.holders) ? row.holders : [];
+  if (status !== 'claimed' || holders.length === 0) return t(`circle.taskStatus.${status}`, { defaultValue: status });
+  const who = holders.map((h) => (viewerId && h === viewerId
+    ? t('circle.taskStatus.you')
+    : (memberLabelFor(h, { members, viewerId, policy }) ?? t(SOMEONE_LABEL_KEY))));
+  return t('circle.taskStatus.claimed_by', { who: who.join(', ') });
 }
 
 /**

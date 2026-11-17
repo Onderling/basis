@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { blockTitle, blockEmptyLine } from '../../src/v2/blockTitle.js';
+import { blockTitle, blockEmptyLine, blockHidden } from '../../src/v2/blockTitle.js';
 import { initLocalisation, t as tr } from '../../src/localisation.js';
 
 describe("a block's title and empty line (Vandaag polish)", () => {
@@ -46,5 +46,19 @@ describe("a row's maker tag", () => {
     const t = (k) => k;
     expect(whereTag({ own: true, label: 'broodje pindakaas eten' }, t)).toBe('');
     expect(whereTag({ circleName: 'Huishouden' }, t)).toBe('Huishouden');
+  });
+});
+
+// Today says "you are in no circle" ONCE (the onboarding block's line, 2026-11-17): the circles-with-news block, which
+// looked at no circle at all, paints nothing then; and the onboarding block with nothing left paints nothing.
+describe('a block that paints nothing', () => {
+  it('the circles with news when the person sees no circle; not when it looked at circles that are quiet', () => {
+    expect(blockHidden({ type: 'circlesUnread', status: 'empty', content: { items: [], quiet: [] } })).toBe(true);
+    expect(blockHidden({ type: 'circlesUnread', status: 'empty', content: { items: [], quiet: ['Huis'] } })).toBe(false);
+    expect(blockHidden({ type: 'circlesUnread', status: 'ok', content: { items: [{}] } })).toBe(false);
+  });
+  it('the onboarding block with nothing left; another empty block keeps its line', () => {
+    expect(blockHidden({ type: 'onboarding', status: 'empty' })).toBe(true);
+    expect(blockHidden({ type: 'tasks', status: 'empty' })).toBe(false);
   });
 });

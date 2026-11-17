@@ -39,12 +39,26 @@ export const SCREEN_FILES = Object.freeze({
     web: ['apps/basis/web/v2/vandaagPlus.js'],
     mobile: ['apps/basis-mobile/src/screens/v2/VandaagPlusModal.js'],
   },
+  // Nearby's two tabs: the shells ask `nearbyTabs(model)` (which reads both declared lists and drops the empty parts)
+  // instead of `sectionsOf` directly — `via` names that call.
+  nearbyConversation: {
+    web: ['apps/basis/web/v2/circleNearby.js'],
+    mobile: ['apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js'],
+    via: 'nearbyTabs',
+  },
+  nearbyQuestions: {
+    web: ['apps/basis/web/v2/circleNearby.js'],
+    mobile: ['apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js'],
+    via: 'nearbyTabs',
+  },
 });
 
-/** What one shell's text lacks for a screen: the `sectionsOf` call, or a declared section id. */
-export function missingIn(text, screen, ids) {
+/** What one shell's text lacks for a screen: the `sectionsOf` call (or the shared function `via` that reads the list
+ *  for it), or a declared section id. */
+export function missingIn(text, screen, ids, via = null) {
   const out = [];
-  if (!new RegExp(`sectionsOf\\(\\s*['"]${screen}['"]\\s*\\)`).test(text)) out.push(`sectionsOf('${screen}')`);
+  if (via) { if (!new RegExp(`\\b${via}\\(`).test(text)) out.push(`${via}(`); }
+  else if (!new RegExp(`sectionsOf\\(\\s*['"]${screen}['"]\\s*\\)`).test(text)) out.push(`sectionsOf('${screen}')`);
   for (const id of ids) if (!new RegExp(`['"]${id}['"]`).test(text)) out.push(id);
   return out;
 }
@@ -57,7 +71,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     if (!files) { problems.push(`${screen}: declared, but no files say where each shell paints it (SCREEN_FILES)`); continue; }
     for (const shell of ['web', 'mobile']) {
       const text = (files[shell] ?? []).map((f) => readFileSync(path.join(ROOT, f), 'utf8')).join('\n');
-      for (const m of missingIn(text, screen, sections.map((s) => s.id))) problems.push(`${screen} · ${shell}: lacks ${m}`);
+      for (const m of missingIn(text, screen, sections.map((s) => s.id), files.via ?? null)) problems.push(`${screen} · ${shell}: lacks ${m}`);
     }
   }
   if (problems.length) {

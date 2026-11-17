@@ -152,8 +152,13 @@ describe('Verbergen / Tonen in the thread header (L106)', () => {
     const el = renderContactThread(document.createElement('div'), { name: 'Wilfred', t, hidden: false, onToggleHidden });
     const btn = el.querySelector('.cc-cthread__hide');
     expect(btn.textContent).toBe('circle.contacts.hide');
-    expect(el.querySelector('.cc-cthread__hide-note').textContent, 'what hiding is and is not, said where the control is').toBe('circle.contacts.hide_note');
+    // what hiding is and is not: no standing line; said when Hide is tapped, as what the tap will do
+    expect(el.querySelector('.cc-cthread__hide-note')).toBeNull();
+    const asked = vi.fn(() => true);
+    globalThis.confirm = asked;
     btn.click();
+    expect(asked).toHaveBeenCalledWith('circle.contacts.hide_note');
+    delete globalThis.confirm;
     expect(onToggleHidden).toHaveBeenCalledWith(true);
   });
   it('a hidden contact gets Tonen; the tap asks to show', () => {

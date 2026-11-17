@@ -16,6 +16,8 @@ export const HELP_CIRCLE_PROVISIONED_KEY = 'cc.helpCircleProvisioned';
 export const ONBOARDING_DONE_KEY = 'cc.onboardingDone';
 /** Vandaag's onboarding strip: the "Nieuw bij Basis?" card was seen (read or put away) on this device. */
 export const INTRO_CARD_SEEN_KEY = 'cc.introCardSeen';
+/** The first open's three doors were answered on this device (one chosen): the screen does not come back. */
+export const FIRST_OPEN_SEEN_KEY = 'cc.firstOpenSeen';
 /** The recovery phrase was written down (or photographed) on this device — the key card is done. */
 export const KEY_SAVED_KEY = 'cc.mnemonicAck';
 /** The key card was put away with "Later" until this moment (epoch ms, as a string). */
@@ -41,6 +43,8 @@ export function createOnboardingFlags(io = {}) {
     markOnboardingDone: () => write(ONBOARDING_DONE_KEY),
     isIntroSeen: () => read(INTRO_CARD_SEEN_KEY),
     markIntroSeen: () => write(INTRO_CARD_SEEN_KEY),
+    isFirstOpenSeen: () => read(FIRST_OPEN_SEEN_KEY),
+    markFirstOpenSeen: () => write(FIRST_OPEN_SEEN_KEY),
     isKeySaved: () => read(KEY_SAVED_KEY),
     markKeySaved: () => write(KEY_SAVED_KEY),
     keySnoozedUntil: async () => {

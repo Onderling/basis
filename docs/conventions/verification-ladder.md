@@ -24,6 +24,15 @@ before the next is started.
 **The rule in one line:** rungs 0–2 before the PR, rung 3 gates the merge, rung 4 gates the *release*,
 rung 5 says whether rung 4 passed on the bytes about to ship.
 
+**One by-hand step before a release: the walks that need the public network.** Every browser in the suite is launched
+hermetic (no host but this machine), so a walk that rides the public NKN network (`walk-transports.spec.js`: which
+transport carries, the relay going away or dying mid-conversation) is skipped in CI and in a plain local run. Before a
+release, the person releasing runs it once with the network open, and the result goes in the release notes:
+
+```
+cd apps/basis && PEER_TEST_PUBLIC_NETWORK=1 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay walk-transports
+```
+
 ### The merge back, since branch protection (2026-09-23)
 
 `development` and `live` both carry branch protection: eighteen required checks, and **no direct pushes**. The

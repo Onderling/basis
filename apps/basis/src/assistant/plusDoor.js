@@ -369,7 +369,7 @@ export function createPlusDoor({
     if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
     if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf) : null) ?? unread();
-    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command } };
+    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };
     // an own act's form, filled as the primary self (the form may change it)
     if (o?.kind === 'own') return o.actId ? { actId: o.actId, values: o.values ?? {}, asSelf } : o;
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere, and the
@@ -422,7 +422,19 @@ export function createPlusDoor({
      * @param {{asSelf?: string|null, selves?: string[]|null}} opts
      * @param {{saved: boolean, actId?: string|null}} how
      */
-    async settled(opts = {}, { saved = false, actId = null } = {}) {
+    /**
+     * A card's "no" (Cancel): the line was not done and nothing was stored, said in THIS
+     * conversation, as a closed form is. Returns what was said, or null without a thread.
+     * @param {{asSelf?: string|null, selves?: string[]|null}} opts @param {{line?: string}} card
+     */
+    async cardRefused(opts = {}, card = null) {
+      const thread = threadIdFor(setOf(opts).set);
+      if (!memory || !thread) return null;
+      const said = t('circle.vandaag.plus_card_not_done', { line: card?.line ?? '' });
+      memory.remember(thread, 'system', said);
+      return said;
+    },
+        async settled(opts = {}, { saved = false, actId = null } = {}) {
       const thread = threadIdFor(setOf(opts).set);
       if (!memory || !thread || typeof memory.turns !== 'function') return null;
       const last = memory.turns(thread, 1).at(-1);

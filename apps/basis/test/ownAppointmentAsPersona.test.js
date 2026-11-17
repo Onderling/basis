@@ -30,7 +30,7 @@ describe("an own appointment made AS a persona (the waist's actAs)", () => {
     const held = [{ id: 'default', webid: a.identity?.chat?.pubKey ?? 'me' }, { id: made.id, webid: werk }];
     const [block] = await materializeScreen({
       screen: { id: 's', name: 'Vandaag', circleFilter: null, blocks: [{ id: 'g', type: 'items', config: { noun: 'calendar-event' } }] },
-      hostOps: { callSkill: (app, o, g) => a.callSkill(app, o, g), circles: [], selfSet: { on: ['default', made.id], held } },
+      hostOps: { callSkill: (app, o, g, c) => a.callSkill(app, o, g, c), circles: [], selfSet: { on: ['default', made.id], held } },
     });
     const makerOf = (title) => block.content.items.find((r) => (r.title ?? r.label) === title)?.maker;
     expect(makerOf('overleg'), 'Vandaag names Werk as its maker').toBe(made.id);

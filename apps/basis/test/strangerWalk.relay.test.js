@@ -49,7 +49,9 @@ async function attempt(node, addr, skillId, opts = {}, args = {}) {
 }
 
 describe('a stranger on the wire', () => {
-  let relay; let dataDir; let child; let out = ''; let stranger; let person;
+  // `forger`: a second stranger key for the forged-token case. The per-sender limiter (a burst of 30, then one a second)
+  // is spent by the first case's calls; a call judged 'rate-limited' says nothing about the token
+  let relay; let dataDir; let child; let out = ''; let stranger; let forger; let person;
 
   beforeAll(async () => {
     relay = await startJourneyRelay();
@@ -67,13 +69,14 @@ describe('a stranger on the wire', () => {
     const up = await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 });
     expect(up, `the runner never came up:\n${out.slice(-1500)}`).toBe(true);
     stranger = await bootRealAgentNode('stranger', { contactChannel: true });
+    forger = await bootRealAgentNode('forger', { contactChannel: true });
     person = await bootRealAgentNode('person');
-    await connectNodesOverRelay([stranger, person], { relayUrl: relay.url });
+    await connectNodesOverRelay([stranger, forger, person], { relayUrl: relay.url });
   }, 180_000);
 
   afterAll(async () => {
     try { child?.kill('SIGTERM'); } catch { /* gone */ }
-    await teardown(stranger, person);
+    await teardown(stranger, forger, person);
     try { await relay?.close?.(); } catch { /* */ }
     try { rmSync(dataDir, { recursive: true, force: true }); } catch { /* */ }
   });
@@ -108,8 +111,8 @@ describe('a stranger on the wire', () => {
       console.info('[stranger walk] the bot box takes no token op: the forged-token case runs in the core engine test');
       return;
     }
-    const forged = { id: 'forged', issuer: stranger.pubKey, subject: stranger.pubKey, agentId: card.peerAddr, skill: tokenOp, expiresAt: Date.now() + 60_000, sig: 'AAAA' };
-    const r = await attempt(stranger, card.peerAddr, tokenOp, { token: forged });
+    const forged = { id: 'forged', issuer: forger.pubKey, subject: forger.pubKey, agentId: card.peerAddr, skill: tokenOp, expiresAt: Date.now() + 60_000, sig: 'AAAA' };
+    const r = await attempt(forger, card.peerAddr, tokenOp, { token: forged });
     expect(r.outcome, JSON.stringify(r)).toBe('refused');
     expect(r.reason).toMatch(/[Tt]oken/);
     expect(r.reason).not.toMatch(/requires tier|Unknown skill/);

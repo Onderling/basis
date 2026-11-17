@@ -398,6 +398,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
               placeholder={t('circle.mij.new_persona_ph')}
               placeholderTextColor={theme.color.inkSoft}
               onChangeText={(v) => setPersonaForm((f) => ({ ...(f ?? {}), name: v }))}
+              testID="mij-new-persona-name"
             />
             {/* what you offer — also as this persona? Off by default: a work persona must not silently 'offer' your gardening */}
             <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: personaForm.takeOfferings === true }}
@@ -406,7 +407,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
               <Text style={styles.value}>{`${personaForm.takeOfferings === true ? '☑' : '☐'} ${t('circle.mij.new_persona_offerings', { name: (personaForm.name ?? '').trim() || t('circle.mij.new_persona_offerings_unnamed') })}`}</Text>
             </Pressable>
             <View style={styles.formActions}>
-              <Pressable style={styles.btnPrimary} accessibilityRole="button" onPress={onCreatePersona}>
+              <Pressable style={styles.btnPrimary} accessibilityRole="button" onPress={onCreatePersona} testID="mij-new-persona-create">
                 <Text style={styles.btnPrimaryText}>{t('circle.mij.new_persona_create')}</Text>
               </Pressable>
               <Pressable style={styles.btnGhost} accessibilityRole="button" onPress={() => setPersonaForm(null)}>
@@ -415,7 +416,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
             </View>
           </View>
         ) : (
-          <Pressable style={styles.addDashed} accessibilityRole="button" onPress={() => setPersonaForm({ name: '' })}>
+          <Pressable style={styles.addDashed} accessibilityRole="button" onPress={() => setPersonaForm({ name: '' })} testID="mij-new-persona">
             <Text style={styles.addDashedText}>{t('circle.mij.new_persona')}</Text>
           </Pressable>
         )}

@@ -46,7 +46,7 @@ test('"zet melk op de boodschappen" in the "+" lands on the one circle that has 
   await page.locator('.circle-vandaag-plus__line').fill('zet melk op de boodschappen');
   await page.locator('.circle-vandaag-plus__line').press('Enter');
   await expect(page.locator('.circle-vandaag-plus__card'), 'one circle holds the list: no card, it runs').toHaveCount(0);
-  await expect(page.locator('.circle-vandaag-plus__done'), 'the sheet says what it did').toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.circle-vandaag-plus__turn--assistant').last(), 'the thread says what it did').toBeVisible({ timeout: 15_000 });
 
   // the circle's own read: melk is on its Boodschappen
   const entries = await page.evaluate((cid) => window.onderlingCall('lists', 'listEntries', { circleId: cid, list: 'Boodschappen' }), circleId);

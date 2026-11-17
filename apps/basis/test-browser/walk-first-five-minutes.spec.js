@@ -6,6 +6,7 @@
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8788 npx playwright test --project=relay test-browser/walk-first-five-minutes.spec.js
  */
 import { test, expect } from '@playwright/test';
+import { openOnboardingStrip } from './helpers.js';
 import { bootPeer, teardown, gotoCircles, createCircle, openCircleMatching, toChat, getInvite, joinFromInvite, sendChat, waitForBubble, log, sendDirectMessage, waitForContactMessageDetailed } from './peerHarness.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
@@ -33,6 +34,7 @@ test('a stranger\'s first five minutes: onboarding, a handle, a note, their card
 
     // STEP 1 — the app opens on Vandaag with the first steps
     await expect(page.locator('.circle-vandaag__head'), 'the app opens on Vandaag').toBeVisible({ timeout: 30_000 });
+    await openOnboardingStrip(page);   // the set-up cards sit in one closed strip
     await expect(page.locator('.circle-screen__onb-card[data-card="handle"]'), 'the first step asks for a name').toBeVisible({ timeout: 20_000 });
     log('STEP1 the onboarding strip', 'PASS', 'Vandaag with the first steps');
 

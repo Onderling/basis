@@ -219,8 +219,8 @@ describe('asks in the room (step F)', () => {
   it('the compose button is always available, even in an empty room', () => {
     const onCompose = vi.fn();
     const el = render(model({ asks: [] }), { onCompose });
-    expect(el.querySelector('.circle-nearby__asks-empty').textContent)
-      .toBe('circle.nearbyScreen.asks_empty');
+    expect(el.querySelector('.circle-nearby__asks'), 'no asks: the part is not painted').toBeNull();
+    expect(el.textContent).not.toContain('asks_empty');
     el.querySelector('.circle-nearby__ask-compose').click();
     expect(onCompose).toHaveBeenCalled();
   });
@@ -449,10 +449,10 @@ describe('circles advertised in the room (step H)', () => {
     expect(actions).toEqual(['join-published-circle']);
   });
 
-  it('an empty room says so', () => {
+  it('no circle offered: the part is not painted at all, no "nothing here" line', () => {
     const el = render(model({ invites: [] }));
-    expect(el.querySelector('.circle-nearby__invites-empty').textContent)
-      .toBe('circle.nearbyScreen.invites_empty');
+    expect(el.querySelector('.circle-nearby__invites')).toBeNull();
+    expect(el.textContent).not.toContain('invites_empty');
   });
 
   it('no untranslated strings in the invite block', () => {
@@ -502,5 +502,53 @@ describe('the first-use question', () => {
   });
   it('is absent when the shell does not ask', () => {
     expect(render(model()).querySelector('.circle-nearby__first-use')).toBe(null);
+  });
+});
+
+describe('the two tabs (Conversation · Questions), painted from the shared list', () => {
+  const panel = (el, tab) => el.querySelector(`.circle-nearby__panel--${tab}`);
+  const sections = (el, tab) => [...panel(el, tab).children].map((n) => n.dataset.section);
+
+  it('a full room: the chat in Conversation; the ask field, my asks, the room\'s asks, who is here, circles in Questions', () => {
+    const el = render(model({
+      allows: { card: false, chat: true }, chat: [{ id: 'm1', text: 'hoi' }],
+      myAsks: [{ ask: { id: 'a0' }, heard: 1, answers: [] }],
+      asks: [{ ask: { id: 'a1', text: 'fiets?' }, actions: [] }],
+      rows: [row()],
+      invites: [{ invite: { circleId: 'c1', circleName: 'C' }, actions: [] }],
+    }));
+    expect([...el.querySelectorAll('.circle-nearby__tab')].map((b) => b.textContent))
+      .toEqual(['circle.nearbyScreen.tab_conversation', 'circle.nearbyScreen.tab_questions']);
+    expect(sections(el, 'conversation')).toEqual(['nearby-chat']);
+    expect(sections(el, 'questions')).toEqual(['nearby-ask-field', 'nearby-my-asks', 'nearby-asks', 'nearby-peers', 'nearby-invites']);
+  });
+
+  it('in the chat: opens on Conversation; clicking Questions shows that one, and a redraw keeps it', () => {
+    const el = document.createElement('div');
+    const m = model({ allows: { card: false, chat: true }, chat: [] });
+    renderCircleNearby(el, { model: m, t });
+    expect(panel(el, 'conversation').hidden).toBe(false);
+    expect(panel(el, 'questions').hidden).toBe(true);
+    el.querySelector('.circle-nearby__tab--questions').click();
+    expect(panel(el, 'questions').hidden).toBe(false);
+    expect(el.querySelector('.circle-nearby__tab--questions').getAttribute('aria-selected')).toBe('true');
+    renderCircleNearby(el, { model: m, t });
+    expect(panel(el, 'questions').hidden, 'the person\'s pick survives a redraw').toBe(false);
+  });
+
+  it('not in the chat: opens on Questions; Conversation says so in one line, with the way to join', () => {
+    const onToggleAllow = vi.fn();
+    const el = render(model({ chat: null }), { onToggleAllow });
+    expect(panel(el, 'questions').hidden).toBe(false);
+    expect(sections(el, 'conversation')).toEqual(['nearby-chat-off']);
+    expect(el.querySelector('.circle-nearby__chat-off-line').textContent).toBe('circle.nearbyScreen.allow_chat_off');
+    el.querySelector('.circle-nearby__chat-join').click();
+    expect(onToggleAllow).toHaveBeenCalledWith('chat', true);
+  });
+
+  it('the "you here" row stays above the tabs', () => {
+    const el = render(model());
+    const mine = el.querySelector('.circle-nearby__mine');
+    expect(mine.compareDocumentPosition(el.querySelector('.circle-nearby__tabs')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

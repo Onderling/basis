@@ -133,3 +133,16 @@ describe('where a "+" turn goes', () => {
     expect(entryKind('assistant-turn').syncPolicy).toBe('none');
   });
 });
+
+describe('the sheet does not say an answer twice (the walk, 2026-11-17)', () => {
+  it('an answer the thread already holds as its last assistant turn gets no line of its own', async () => {
+    const { plusAnswerLineShown } = await import('../../src/v2/vandaagPlus.js');
+    const turns = [{ who: 'you', text: 'wat kan je' }, { who: 'assistant', text: 'Je eigen notities.' }];
+    expect(plusAnswerLineShown('Je eigen notities.', turns)).toBe(false);
+    // an answer the thread does not hold yet (no thread, or another last turn) is said on its line
+    expect(plusAnswerLineShown('Je eigen notities.', [])).toBe(true);
+    expect(plusAnswerLineShown('Opgeslagen.', turns)).toBe(true);
+    // nothing to say: no line
+    expect(plusAnswerLineShown(null, turns)).toBe(false);
+  });
+});

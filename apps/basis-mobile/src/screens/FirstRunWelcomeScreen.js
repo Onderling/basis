@@ -26,6 +26,7 @@ import { theme } from './v2/theme.js';
 // t(), en+nl (`circle.firstRun.*`). The no-pod line reuses `circle.mydata.pod_local_consequence`:
 // the same fact My-data states, worded once (the C4b copy), so welcome and settings cannot drift.
 import { t } from '../core/localisation.js';
+import { FIRST_OPEN_DOORS, FIRST_OPEN_WORDS } from '../../../basis/src/v2/firstOpen.js';
 
 /** What the welcome says, in order — Vandaag's onboarding lines, then what a circle holds. */
 export const WELCOME_LINES = Object.freeze([
@@ -35,7 +36,10 @@ export const WELCOME_LINES = Object.freeze([
   'circle.firstRun.bullet_items',
 ]);
 
-export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
+/** Each door's testID: "just continue" keeps the old Start's, so the walks' first boot is unchanged. */
+const DOOR_TEST_IDS = Object.freeze({ scan: 'first-run-scan', intro: 'first-run-intro', continue: 'first-run-start' });
+
+export default function FirstRunWelcomeScreen({ onStart, onDoor, onRestore } = {}) {
   // 5.9b-followup (2026-05-30): boot-time restore now has a real entry
   // path (MnemonicEntryScreen) gated through App.js — when the host
   // wires `onRestore`, we route there directly.  The deferred-feature
@@ -60,14 +64,21 @@ export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
       {/* The no-pod truth, stated up front in the SAME words My-data uses (one key, two doors). */}
       <Text style={styles.lede}>{t('circle.mydata.pod_local_consequence')}</Text>
 
-      <Pressable
-        style={[styles.cta, styles.ctaPrimary]}
-        onPress={onStart}
-        testID="first-run-start"
-        accessibilityRole="button"
-      >
-        <Text style={styles.ctaPrimaryText}>{t('circle.firstRun.start')}</Text>
-      </Pressable>
+      {/* THE FIRST OPEN's three doors (shared: basis/src/v2/firstOpen.js; web twin: web/v2/firstOpen.js): scan a code,
+          the introduction, or just continue. The host boots, then runs what the door asks for. "Just continue" keeps the
+          old Start's testID, so every walk that starts here still does. */}
+      <Text style={styles.lede}>{t(FIRST_OPEN_WORDS.leadKey)}</Text>
+      {FIRST_OPEN_DOORS.map((door) => (
+        <Pressable
+          key={door.id}
+          style={[styles.cta, door.primary ? styles.ctaPrimary : styles.ctaSecondary]}
+          onPress={() => (typeof onDoor === 'function' ? onDoor(door.id) : onStart?.())}
+          testID={DOOR_TEST_IDS[door.id]}
+          accessibilityRole="button"
+        >
+          <Text style={door.primary ? styles.ctaPrimaryText : styles.ctaSecondaryText}>{t(door.labelKey)}</Text>
+        </Pressable>
+      ))}
 
       <Pressable
         style={[styles.cta, styles.ctaSecondary]}

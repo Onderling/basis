@@ -55,7 +55,8 @@ test("a member who joined: the '+' runs \"zet melk op de boodschappen\" in the c
     await B.page.locator('.circle-vandaag__plus').click();
     await B.page.locator('.circle-vandaag-plus__line').fill('zet melk op de boodschappen');
     await B.page.locator('.circle-vandaag-plus__line').press('Enter');
-    await expect(B.page.locator('.circle-vandaag-plus__done'), "the member's '+' says what it did").toBeVisible({ timeout: 20_000 });
+    // the answer is said once, in the thread (plusAnswerLineShown): the '+' turn, not a separate done line
+    await expect(B.page.locator('.circle-vandaag-plus__turn--assistant').last(), "the member's '+' says what it did").toBeVisible({ timeout: 20_000 });
     log('STEP3 the member\'s "+" ran it', 'PASS', '');
     // the kept conversation shows both voices: the person's own line and what the '+' answered
     await expect(B.page.locator('.circle-vandaag-plus__turn--you', { hasText: 'zet melk op de boodschappen' }), "the member's own line is kept and shown").toBeVisible({ timeout: 10_000 });

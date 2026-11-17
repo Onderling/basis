@@ -26,7 +26,7 @@ import { mockTasksManifest, mockPinboardManifest, mockFolioManifest } from '../c
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { CIRCLE_GATE_TRAIL, DEFAULT_GATE_LOCALE } from './circleGateLexicon.js';
 import { readDayAndTime } from '../forms/parseDate.js';
-import { compileGateWords, GATE_WORDS } from './gateWords.js';
+import { compileGateWords, GATE_WORDS, helpQuestionOpeners } from './gateWords.js';
 import { compilePhrase } from './gatePhrases.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
 
@@ -201,7 +201,17 @@ const GATE_RULES = [
   { id: 'assistant.weekOverview.day', name: 'assistant:weekOverview(day)', build: (m) => (m.day ? { opId: 'weekOverview', args: { day: m.day }, appOrigin: 'assistant' } : null) },
   // mostly a reply to the bot's own reminder, so it works without a model; the waist finds the one item (or asks),
   // and a chore's tick is the chore's own verb underneath
-  { id: 'lists.markListItemDone.stated', name: 'lists:markListItemDone(stated)', build: (m) => ({ opId: 'markListItemDone', args: { item: m.item } }) },
+  // "melk is gedaan", "melk gedaan": tick it; a question that ends the same way ("wat is er gedaan") is no item (the
+  // gate's own question openers decide, `_help.questions`)
+  { id: 'lists.markListItemDone.stated', name: 'lists:markListItemDone(stated)', build: (m, text) => {
+    const item = String(m.item ?? '').trim();
+    // a line that ends in "?" asks ("is dinner done?"), in any language
+    if (/\?\s*$/u.test(String(text ?? ''))) return null;
+    // the openers' first words ("wat", "hoe", "waar", "what", …): a line that starts like a question is none
+    const asks = new Set(helpQuestionOpeners().map((o) => o.trim().split(/\s+/u)[0].toLowerCase()));
+    if (!item || asks.has(item.toLowerCase().split(/\s+/u)[0])) return null;
+    return { opId: 'markListItemDone', args: { item } };
+  } },
   // a person's own switch for what the bot writes first: every time, model or no model
   { id: 'assistant.reminders.off', name: 'assistant:reminders(off)', build: () => ({ opId: 'assistant-reminders', args: { mode: 'off' }, appOrigin: 'assistant' }) },
   { id: 'assistant.reminders.on', name: 'assistant:reminders(on)', build: () => ({ opId: 'assistant-reminders', args: { mode: 'on' }, appOrigin: 'assistant' }) },

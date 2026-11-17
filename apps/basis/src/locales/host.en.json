@@ -321,27 +321,27 @@
   },
   "relay": {
     "no_substrate": {
-      "text": "Relay support not wired in this build.",
+      "text": "Connection points are not supported in this build.",
       "doc": "/set-relay called but agent.relay isn't exposed (test workspace or old build)."
     },
     "url_required": {
-      "text": "Relay URL required. Try /set-relay ws://your-host:port or /set-relay --clear",
+      "text": "Connection point address required. Try /connection-point ws://your-host:port or /connection-point --clear",
       "doc": "/set-relay called without --url or --clear."
     },
     "bad_url": {
-      "text": "Bad relay URL. Must start with ws:// or wss://",
+      "text": "Bad connection point address. Must start with ws:// or wss://",
       "doc": "/set-relay called with a URL that doesn't have a websocket scheme."
     },
     "cleared": {
-      "text": "✓ Relay cleared. NKN remains active.",
+      "text": "✓ Connection point cleared. NKN remains active.",
       "doc": "/set-relay --clear succeeded."
     },
     "connected": {
-      "text": "✓ Relay connected: {{url}} (address: {{address}})",
+      "text": "✓ Connection point connected: {{url}} (address: {{address}})",
       "doc": "/set-relay succeeded."
     },
     "connect_failed": {
-      "text": "Relay connect failed: {{reason}}",
+      "text": "Connecting to the connection point failed: {{reason}}",
       "doc": "/set-relay caught an exception from sa.relay.connect()."
     }
   },
@@ -549,7 +549,7 @@
       "doc": "/transport-mode or /transports called but agent.setTransportMode isn't exposed."
     },
     "bad_mode": {
-      "text": "Bad mode \"{{mode}}\". Pick nkn, relay, or both.",
+      "text": "Bad mode \"{{mode}}\". Pick nkn, connection-point or both.",
       "doc": "/transport-mode called with an invalid arg."
     },
     "mode_set": {
@@ -826,7 +826,7 @@
     },
     "offer_line": {
       "text": "Your message goes to the maker's Feedback assistant, on a device of the maker's own. Your contact card goes with it, so the maker can answer you.",
-      "doc": "Under the offer: who receives what \u2014 the message and the person's contact card, to the maker's Feedback assistant. Said before the add, never after."
+      "doc": "Under the offer: who receives what — the message and the person's contact card, to the maker's Feedback assistant. Said before the add, never after."
     },
     "no_contact": {
       "text": "This version of the app has no feedback contact. Tell whoever gave you the app — that is exactly the kind of thing we want to know.",

@@ -82,6 +82,9 @@ describe('a reply that claims a result', () => {
     expect(claimsResult('Ik heb melk toegevoegd.')).toBe(true);
     expect(claimsResult('Melk is toegevoegd. Ik kan nog meer doen als je wilt.')).toBe(true);
     expect(claimsResult('Done, I added it. I can add more?')).toBe(true);
+    // an ability word later in the sentence does not hide a done act (Fable's review): only an opening that IS one counts
+    expect(claimsResult('Ik heb melk toegevoegd en zal je eraan herinneren.')).toBe(true);
+    expect(claimsResult("I added milk, I'll remind you.")).toBe(true);
   });
 });
 

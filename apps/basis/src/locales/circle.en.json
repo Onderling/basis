@@ -3591,13 +3591,17 @@
       "text": "Keep it",
       "doc": "Cancel removal."
     },
+    "tab_conversation": {
+      "text": "Conversation",
+      "doc": "Nearby's first tab: the room chat (or, when not in it, one line and the way to join)."
+    },
+    "tab_questions": {
+      "text": "Questions",
+      "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
     "invites_title": {
       "text": "Circles open here",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."
-    },
-    "invites_empty": {
-      "text": "No circle is being advertised here.",
-      "doc": "Empty state for the invite list."
     },
     "action_join_published": {
       "text": "Join",
@@ -3671,10 +3675,6 @@
       "text": "Shown to {{sent}} of {{peers}} nearby",
       "doc": "Result after publishing a card — the real reach, not \"saved\"."
     },
-    "chat_title": {
-      "text": "Room chat",
-      "doc": "Heading of the room chat."
-    },
     "chat_empty": {
       "text": "Nobody has said anything yet.",
       "doc": "Chat empty state — only shown once you have JOINED."
@@ -3698,10 +3698,6 @@
     "asks_title": {
       "text": "Asked here",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."
-    },
-    "asks_empty": {
-      "text": "Nobody has asked anything yet.",
-      "doc": "Shown when the room carries no live asks."
     },
     "ask_resonant": {
       "text": "This matches you: {{reason}}",

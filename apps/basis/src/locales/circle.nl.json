@@ -3596,13 +3596,17 @@
       "text": "Houden",
       "doc": "Cancel removal."
     },
+    "tab_conversation": {
+      "text": "Gesprek",
+      "doc": "Nearby's first tab: the room chat (or, when not in it, one line and the way to join)."
+    },
+    "tab_questions": {
+      "text": "Vragen",
+      "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
     "invites_title": {
       "text": "Kringen die hier open staan",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."
-    },
-    "invites_empty": {
-      "text": "Er wordt hier geen kring aangeboden.",
-      "doc": "Empty state for the invite list."
     },
     "action_join_published": {
       "text": "Meedoen",
@@ -3676,10 +3680,6 @@
       "text": "Getoond aan {{sent}} van {{peers}} in de buurt",
       "doc": "Result after publishing a card — the real reach, not \"saved\"."
     },
-    "chat_title": {
-      "text": "Gesprek hier",
-      "doc": "Heading of the room chat."
-    },
     "chat_empty": {
       "text": "Nog niemand heeft iets gezegd.",
       "doc": "Chat empty state — only shown once you have JOINED."
@@ -3703,10 +3703,6 @@
     "asks_title": {
       "text": "Hier gevraagd",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."
-    },
-    "asks_empty": {
-      "text": "Nog niemand heeft iets gevraagd.",
-      "doc": "Shown when the room carries no live asks."
     },
     "ask_resonant": {
       "text": "Dit past bij jou: {{reason}}",

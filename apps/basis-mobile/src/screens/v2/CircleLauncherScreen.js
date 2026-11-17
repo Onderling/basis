@@ -29,6 +29,7 @@ import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyAsked, markNearbyAsked, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
 import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../basis/src/v2/nearbyLevel.js';
+import { nearbyTabs } from '../../../../basis/src/v2/nearbyTabs.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -6035,6 +6036,230 @@ function NearbyScreen({
   const [bannerOpen, setBannerOpen] = useState(false);
   // "You here" opens on the FIRST-ever open only. so the card/chat toggles are discovered once.
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
+  // Nearby's two tabs: what each holds and in what order, and which opens first, is `nearbyTabs` (shared with web);
+  // a part with nothing in it is not in its list. Which tab is selected is this screen's own state.
+  const { tabs, defaultTab } = nearbyTabs(model);
+  const [pickedTab, setPickedTab] = useState(null);
+  const selectedTab = tabs.some((x) => x.id === pickedTab) ? pickedTab : defaultTab;
+  // One painter per declared part; the root of each carries the part's id as its testID.
+  const SECTION_PAINTERS = {
+    'nearby-peers': () => (
+      <View testID="nearby-peers">
+        <View style={styles.list}>
+          {rows.map((row) => (
+            <View
+              key={row.id || row.pseudonym}
+              style={styles.row}
+              testID={`nearby-row-${row.id || row.pseudonym}`}
+            >
+              <Text style={styles.rowName}>{row.pseudonym}</Text>
+              {row.sharedSkills.length ? (
+                <Text style={styles.rowMeta}>{row.sharedSkills.join(', ')}</Text>
+              ) : null}
+              {row.proximity ? <Text style={styles.rowMeta}>{row.proximity}</Text> : null}
+              {/* Attached to the person, not a separate list — a face and a card are one thing. */}
+              {row.card?.line ? <Text style={styles.rowMeta}>{row.card.line}</Text> : null}
+              {row.card?.tags?.length ? <Text style={styles.rowMeta}>{row.card.tags.join(', ')}</Text> : null}
+              {/* Rule (b): a stranger you can see is still a stranger — say it, rather than letting the
+                  absence of an "open" button be the only hint. */}
+              {Array.isArray(row.actions) && row.actions.some((a) => NEARBY_ACTION_LABELS[a]) ? (
+                <View style={styles.nearbyActions}>
+                  {row.actions.filter((a) => NEARBY_ACTION_LABELS[a]).map((action) => (
+                    <Pressable
+                      key={action}
+                      onPress={() => { if (typeof onAction === 'function') onAction(action, row); }}
+                      accessibilityRole="button"
+                      testID={`nearby-action-${action}-${row.id || row.pseudonym}`}
+                      style={styles.nearbyAction}
+                    >
+                      <Text style={styles.nearbyActionText}>{t(NEARBY_ACTION_LABELS[action])}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ))}
+        </View>
+        {rows.some((row) => row.note === 'nearby-not-member') ? (
+          // Rule (b), said ONCE for the room rather than under every stranger: a person you can see is
+          // still a stranger.
+          <Text style={styles.muted} testID="nearby-note">{t('circle.nearbyScreen.not_member_note')}</Text>
+        ) : null}
+      </View>
+    ),
+    'nearby-ask-field': () => (
+      <View style={styles.nearbyAsks} testID="nearby-ask-field">
+        {composing || answering ? (
+          // Inline, not a modal: the room stays visible while you type. You are about to say something out
+          // loud in a place where you can see who is standing there.
+          <View style={styles.nearbyComposer} testID="nearby-ask-composer">
+            {answering && answeringAsk?.text ? (
+              <Text style={styles.rowMeta} testID="nearby-answering-to">{t('circle.nearbyScreen.answering_to', { text: answeringAsk.text })}</Text>
+            ) : null}
+            <ThemedTextInput
+              style={styles.nearbyInput}
+              value={draft}
+              onChangeText={setDraft}
+              maxLength={280}
+              placeholder={t(answering ? 'circle.nearbyScreen.answer_placeholder' : 'circle.nearbyScreen.ask_placeholder')}
+              testID="nearby-ask-input"
+              autoFocus
+            />
+            <Pressable
+              onPress={() => {
+                const text = draft.trim();
+                if (!text) return;
+                if (answering) onSubmitAnswer?.(text); else onSubmitAsk?.(text);
+              }}
+              accessibilityRole="button"
+              testID="nearby-ask-send"
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t(answering ? 'circle.nearbyScreen.answer_send' : 'circle.nearbyScreen.ask_send')}</Text>
+            </Pressable>
+            <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t('circle.confirm.cancel')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Btn variant="primary" onPress={onCompose} testID="nearby-ask-compose" label={t('circle.nearbyScreen.ask_compose')} />
+        )}
+        {notice ? (
+          <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
+            {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
+          </Text>
+        ) : null}
+      </View>
+    ),
+    'nearby-my-asks': () => (
+      <View style={styles.nearbyAsks} testID="nearby-my-asks">
+        {(model?.myAsks ?? []).map((e) => (
+          <View key={`mine-${e.ask?.id}`}>
+            <Text style={styles.rowMeta} testID={`nearby-my-ask-${e.ask?.id}`}>
+              {t('circle.nearbyScreen.my_ask_row', { heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)) })}
+            </Text>
+            {(e.answers ?? []).map((a) => {
+              const who = a.label ?? String(a.from ?? '').slice(0, 8);
+              return (
+                <View key={`ans-${a.from}`} style={styles.nearbyAsk} testID={`nearby-answer-${e.ask?.id}-${a.from}`}>
+                  <Text style={styles.rowName}>{t('circle.nearbyScreen.answer_row', { name: who, text: a.text ?? '' })}</Text>
+                  <Btn variant="quiet" onPress={(ev) => onShareCard?.(a.from, ev?.nativeEvent ?? null)} testID={`nearby-share-card-${a.from}`} label={t('circle.nearbyScreen.share_card_with', { name: who })} />
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    ),
+    'nearby-asks': () => (
+      <View style={styles.nearbyAsks} testID="nearby-asks">
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.asks_title')}</Text>
+        {asks.map((entry) => (
+          <View key={entry.ask?.id} style={styles.nearbyAsk} testID={`nearby-ask-${entry.ask?.id}`}>
+            <Text style={styles.rowName}>{entry.ask?.text}</Text>
+            {entry.resonant && entry.reason ? (
+              // Names the SHARED tags only; my unmatched drivers never appear here.
+              <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_resonant', { reason: entry.reason })}</Text>
+            ) : null}
+            {/* Shown to me, sent nowhere — the reminder that replying is what reveals me. */}
+            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_disclosure')}</Text>
+            {typeof entry.ask?.expiresAt === 'number' ? (
+              <Text style={styles.rowMeta} testID={`nearby-ask-clock-${entry.ask?.id}`}>
+                {t('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) })}
+              </Text>
+            ) : null}
+            {Array.isArray(entry.actions) && entry.actions.some((a) => NEARBY_ASK_LABELS[a]) ? (
+              <View style={styles.nearbyActions}>
+                {entry.actions.filter((a) => NEARBY_ASK_LABELS[a]).map((action) => (
+                  <Pressable
+                    key={action}
+                    onPress={() => { if (typeof onAskAction === 'function') onAskAction(action, entry.ask); }}
+                    accessibilityRole="button"
+                    testID={`nearby-ask-action-${action}-${entry.ask?.id}`}
+                    style={styles.nearbyAction}
+                  >
+                    <Text style={styles.nearbyActionText}>{t(NEARBY_ASK_LABELS[action])}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ))}
+      </View>
+    ),
+    'nearby-invites': () => (
+      <View style={styles.nearbyAsks} testID="nearby-invites">
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.invites_title')}</Text>
+        {invites.map((entry) => (
+          <View key={entry.invite?.circleId} style={styles.nearbyAsk} testID={`nearby-invite-${entry.invite?.circleId}`}>
+            <Text style={styles.rowName}>{entry.invite?.circleName || entry.invite?.circleId}</Text>
+            {/* On every invite: the carrier changed, the gate did not. */}
+            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.join_is_a_join')}</Text>
+            <View style={styles.nearbyActions}>
+              {(entry.actions ?? []).filter((a) => NEARBY_INVITE_LABELS[a]).map((action) => (
+                <Pressable
+                  key={action}
+                  onPress={() => onInviteAction?.(action, entry.invite)}
+                  accessibilityRole="button"
+                  testID={`nearby-invite-action-${action}-${entry.invite?.circleId}`}
+                  style={styles.nearbyAction}
+                >
+                  <Text style={styles.nearbyActionText}>{t(NEARBY_INVITE_LABELS[action])}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
+    ),
+    'nearby-chat': () => (
+        <View style={styles.nearbyAsks} testID="nearby-chat">
+          {/* No title: the tab names it. A chat window normally implies history; this one has none, so it says so. */}
+          <Text style={styles.muted}>{t('circle.nearbyScreen.chat_ephemeral')}</Text>
+          {chat.length === 0 ? (
+            <Text style={styles.muted}>{t('circle.nearbyScreen.chat_empty')}</Text>
+          ) : chat.map((m) => (
+            // who said it and when (shared `nearbyChatLines`), then the words
+            <View key={m.id} testID={`nearby-chat-${m.id}`} style={{ marginTop: 6 }}>
+              <Text style={styles.muted} testID={`nearby-chat-who-${m.id}`}>{[m.who, m.when].filter(Boolean).join(' · ')}</Text>
+              <Text style={styles.rowMeta}>{m.text}</Text>
+            </View>
+          ))}
+          <View style={styles.nearbyComposer}>
+            <ThemedTextInput
+              style={styles.nearbyInput}
+              value={chatDraft}
+              onChangeText={setChatDraft}
+              maxLength={500}
+              placeholder={t('circle.nearbyScreen.chat_placeholder')}
+              testID="nearby-chat-input"
+            />
+            <Pressable
+              onPress={() => {
+                const text = chatDraft.trim();
+                if (!text) return;
+                onSay?.(text);
+                setChatDraft('');
+              }}
+              accessibilityRole="button"
+              testID="nearby-chat-send"
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_send')}</Text>
+            </Pressable>
+          </View>
+        </View>
+    ),
+    'nearby-chat-off': () => (
+      // Not in the room chat: one line, and the way in (the same allow as under "you here").
+      <View style={styles.nearbyAsks} testID="nearby-chat-off">
+        <Text style={styles.muted}>{t('circle.nearbyScreen.allow_chat_off')}</Text>
+        <Pressable onPress={() => onToggleAllow?.('chat', true)} accessibilityRole="button" testID="nearby-chat-join" style={styles.nearbyAction}>
+          <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.allow_chat')}</Text>
+        </Pressable>
+      </View>
+    ),
+  };
   return (
     // ONE scroll column for the whole room (the walk of 2026-10-26: the peer list took the full height and the sections
     // below it sat at the bottom edge, unreachable): the peers are sized to their content and everything scrolls together.
@@ -6090,170 +6315,6 @@ function NearbyScreen({
       {/* The header line already says "nobody nearby" when the room is empty — the model swaps it
           in at zero peers — so there is no second empty-state line under it. */}
       <Text style={styles.muted}>{headerText}</Text>
-      {rows.length === 0 ? null : (
-        <View style={styles.list} testID="nearby-peers">
-          {rows.map((row) => (
-            <View
-              key={row.id || row.pseudonym}
-              style={styles.row}
-              testID={`nearby-row-${row.id || row.pseudonym}`}
-            >
-              <Text style={styles.rowName}>{row.pseudonym}</Text>
-              {row.sharedSkills.length ? (
-                <Text style={styles.rowMeta}>{row.sharedSkills.join(', ')}</Text>
-              ) : null}
-              {row.proximity ? <Text style={styles.rowMeta}>{row.proximity}</Text> : null}
-              {/* Attached to the person, not a separate list — a face and a card are one thing. */}
-              {row.card?.line ? <Text style={styles.rowMeta}>{row.card.line}</Text> : null}
-              {row.card?.tags?.length ? <Text style={styles.rowMeta}>{row.card.tags.join(', ')}</Text> : null}
-              {/* Rule (b): a stranger you can see is still a stranger — say it, rather than letting the
-                  absence of an "open" button be the only hint. */}
-              {Array.isArray(row.actions) && row.actions.some((a) => NEARBY_ACTION_LABELS[a]) ? (
-                <View style={styles.nearbyActions}>
-                  {row.actions.filter((a) => NEARBY_ACTION_LABELS[a]).map((action) => (
-                    <Pressable
-                      key={action}
-                      onPress={() => { if (typeof onAction === 'function') onAction(action, row); }}
-                      accessibilityRole="button"
-                      testID={`nearby-action-${action}-${row.id || row.pseudonym}`}
-                      style={styles.nearbyAction}
-                    >
-                      <Text style={styles.nearbyActionText}>{t(NEARBY_ACTION_LABELS[action])}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      )}
-      {/* Asks (step F). Every live ask shows, matching or not — filtering the room to what resonates
-          would make it a recommender, and would leak my own drivers into what I am able to see. */}
-      {rows.some((row) => row.note === 'nearby-not-member') ? (
-        // Rule (b), said ONCE for the room rather than under every stranger: a person you can see is
-        // still a stranger.
-        <Text style={styles.muted} testID="nearby-note">{t('circle.nearbyScreen.not_member_note')}</Text>
-      ) : null}
-      <View style={styles.nearbyAsks} testID="nearby-asks">
-        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.asks_title')}</Text>
-        {composing || answering ? (
-          // Inline, not a modal: the room stays visible while you type. You are about to say something out
-          // loud in a place where you can see who is standing there.
-          <View style={styles.nearbyComposer} testID="nearby-ask-composer">
-            {answering && answeringAsk?.text ? (
-              <Text style={styles.rowMeta} testID="nearby-answering-to">{t('circle.nearbyScreen.answering_to', { text: answeringAsk.text })}</Text>
-            ) : null}
-            <ThemedTextInput
-              style={styles.nearbyInput}
-              value={draft}
-              onChangeText={setDraft}
-              maxLength={280}
-              placeholder={t(answering ? 'circle.nearbyScreen.answer_placeholder' : 'circle.nearbyScreen.ask_placeholder')}
-              testID="nearby-ask-input"
-              autoFocus
-            />
-            <Pressable
-              onPress={() => {
-                const text = draft.trim();
-                if (!text) return;
-                if (answering) onSubmitAnswer?.(text); else onSubmitAsk?.(text);
-              }}
-              accessibilityRole="button"
-              testID="nearby-ask-send"
-              style={styles.nearbyAction}
-            >
-              <Text style={styles.nearbyActionText}>{t(answering ? 'circle.nearbyScreen.answer_send' : 'circle.nearbyScreen.ask_send')}</Text>
-            </Pressable>
-            <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
-              <Text style={styles.nearbyActionText}>{t('circle.confirm.cancel')}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Btn variant="primary" onPress={onCompose} testID="nearby-ask-compose" label={t('circle.nearbyScreen.ask_compose')} />
-        )}
-        {notice ? (
-          <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
-            {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
-          </Text>
-        ) : null}
-        {(model?.myAsks ?? []).map((e) => (
-          <View key={`mine-${e.ask?.id}`}>
-            <Text style={styles.rowMeta} testID={`nearby-my-ask-${e.ask?.id}`}>
-              {t('circle.nearbyScreen.my_ask_row', { heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)) })}
-            </Text>
-            {(e.answers ?? []).map((a) => {
-              const who = a.label ?? String(a.from ?? '').slice(0, 8);
-              return (
-                <View key={`ans-${a.from}`} style={styles.nearbyAsk} testID={`nearby-answer-${e.ask?.id}-${a.from}`}>
-                  <Text style={styles.rowName}>{t('circle.nearbyScreen.answer_row', { name: who, text: a.text ?? '' })}</Text>
-                  <Btn variant="quiet" onPress={(ev) => onShareCard?.(a.from, ev?.nativeEvent ?? null)} testID={`nearby-share-card-${a.from}`} label={t('circle.nearbyScreen.share_card_with', { name: who })} />
-                </View>
-              );
-            })}
-          </View>
-        ))}
-        {asks.length === 0 ? (
-          <Text style={styles.muted}>{t('circle.nearbyScreen.asks_empty')}</Text>
-        ) : asks.map((entry) => (
-          <View key={entry.ask?.id} style={styles.nearbyAsk} testID={`nearby-ask-${entry.ask?.id}`}>
-            <Text style={styles.rowName}>{entry.ask?.text}</Text>
-            {entry.resonant && entry.reason ? (
-              // Names the SHARED tags only; my unmatched drivers never appear here.
-              <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_resonant', { reason: entry.reason })}</Text>
-            ) : null}
-            {/* Shown to me, sent nowhere — the reminder that replying is what reveals me. */}
-            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_disclosure')}</Text>
-            {typeof entry.ask?.expiresAt === 'number' ? (
-              <Text style={styles.rowMeta} testID={`nearby-ask-clock-${entry.ask?.id}`}>
-                {t('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) })}
-              </Text>
-            ) : null}
-            {Array.isArray(entry.actions) && entry.actions.some((a) => NEARBY_ASK_LABELS[a]) ? (
-              <View style={styles.nearbyActions}>
-                {entry.actions.filter((a) => NEARBY_ASK_LABELS[a]).map((action) => (
-                  <Pressable
-                    key={action}
-                    onPress={() => { if (typeof onAskAction === 'function') onAskAction(action, entry.ask); }}
-                    accessibilityRole="button"
-                    testID={`nearby-ask-action-${action}-${entry.ask?.id}`}
-                    style={styles.nearbyAction}
-                  >
-                    <Text style={styles.nearbyActionText}>{t(NEARBY_ASK_LABELS[action])}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        ))}
-      </View>
-      {/* Circles being advertised here (step H). Its own block, not on peer rows: what matters is which
-          CIRCLE is open, not who is holding the door. */}
-      <View style={styles.nearbyAsks} testID="nearby-invites">
-        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.invites_title')}</Text>
-        {invites.length === 0 ? (
-          <Text style={styles.muted}>{t('circle.nearbyScreen.invites_empty')}</Text>
-        ) : invites.map((entry) => (
-          <View key={entry.invite?.circleId} style={styles.nearbyAsk} testID={`nearby-invite-${entry.invite?.circleId}`}>
-            <Text style={styles.rowName}>{entry.invite?.circleName || entry.invite?.circleId}</Text>
-            {/* On every invite: the carrier changed, the gate did not. */}
-            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.join_is_a_join')}</Text>
-            <View style={styles.nearbyActions}>
-              {(entry.actions ?? []).filter((a) => NEARBY_INVITE_LABELS[a]).map((action) => (
-                <Pressable
-                  key={action}
-                  onPress={() => onInviteAction?.(action, entry.invite)}
-                  accessibilityRole="button"
-                  testID={`nearby-invite-action-${action}-${entry.invite?.circleId}`}
-                  style={styles.nearbyAction}
-                >
-                  <Text style={styles.nearbyActionText}>{t(NEARBY_INVITE_LABELS[action])}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ))}
-      </View>
-
       {/* Your side, folded (sketch §2): the allows, the card, what others see — one row that opens. */}
       <Pressable onPress={() => setMineOpen((v) => !v)} accessibilityRole="button" testID="nearby-mine" style={styles.nearbyAsks}>
         <Text style={styles.ownProfileTitle}>
@@ -6385,46 +6446,24 @@ function NearbyScreen({
       </View>
       </>) : null}
 
-      {/* The room chat is its own pane (sketch §2). */}
-      {chat ? (
-        <View style={styles.nearbyAsks} testID="nearby-chat">
-          <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.chat_title')}</Text>
-          {/* A chat window normally implies history; this one has none, so it says so. */}
-          <Text style={styles.muted}>{t('circle.nearbyScreen.chat_ephemeral')}</Text>
-          {chat.length === 0 ? (
-            <Text style={styles.muted}>{t('circle.nearbyScreen.chat_empty')}</Text>
-          ) : chat.map((m) => (
-            // who said it and when (shared `nearbyChatLines`), then the words
-            <View key={m.id} testID={`nearby-chat-${m.id}`} style={{ marginTop: 6 }}>
-              <Text style={styles.muted} testID={`nearby-chat-who-${m.id}`}>{[m.who, m.when].filter(Boolean).join(' · ')}</Text>
-              <Text style={styles.rowMeta}>{m.text}</Text>
-            </View>
-          ))}
-          <View style={styles.nearbyComposer}>
-            <ThemedTextInput
-              style={styles.nearbyInput}
-              value={chatDraft}
-              onChangeText={setChatDraft}
-              maxLength={500}
-              placeholder={t('circle.nearbyScreen.chat_placeholder')}
-              testID="nearby-chat-input"
-            />
-            <Pressable
-              onPress={() => {
-                const text = chatDraft.trim();
-                if (!text) return;
-                onSay?.(text);
-                setChatDraft('');
-              }}
-              accessibilityRole="button"
-              testID="nearby-chat-send"
-              style={styles.nearbyAction}
-            >
-              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_send')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      {/* The two tabs: Conversation and Questions. */}
+      <View style={styles.circleTabs} accessibilityRole="tablist" testID="nearby-tabs">
+        {tabs.map((tab) => (
+          <Pressable
+            key={tab.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab.id === selectedTab }}
+            testID={`nearby-tab-${tab.id}`}
+            onPress={() => setPickedTab(tab.id)}
+            style={[styles.circleTab, tab.id === selectedTab && styles.circleTabActive]}
+          >
+            <Text style={[styles.circleTabText, tab.id === selectedTab && styles.circleTabTextActive]} numberOfLines={1}>{t(tab.labelKey)}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {(tabs.find((x) => x.id === selectedTab)?.sections ?? []).map((id) => (
+        <React.Fragment key={id}>{SECTION_PAINTERS[id]?.() ?? null}</React.Fragment>
+      ))}
 
     </ScrollView>
   );

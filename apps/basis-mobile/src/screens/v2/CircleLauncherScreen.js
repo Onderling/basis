@@ -79,7 +79,7 @@ import {
   // "Never share my global address" — the publication lock (web parity).
   shareableAddress,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
-  buildTaskRows,
+  buildTaskRows, taskStatusShown,
   // the /transports line (the mode by its label; shared with web)
   transportsStatusLine,
   // per-circle bottom tabs from policy.features (v2 §1).
@@ -5024,7 +5024,8 @@ function CircleDetail({
                     {row.text || t('circle.view.tasks_untitled')}
                   </Text>
                   <Text style={styles.taskStatus}>
-                    {t(`circle.taskStatus.${row.status || 'open'}`, { defaultValue: row.status || '' })}
+                    {/* a claimed task says who holds it, through the reveal ladder (shared with web: taskStatusShown) */}
+                    {taskStatusShown(row, { members: tabMembers ?? [], viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise', t })}
                   </Text>
                   <View style={styles.rowActions}>
                     {actionsForStreamRow(row, {

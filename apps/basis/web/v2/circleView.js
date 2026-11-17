@@ -36,6 +36,7 @@
  */
 
 import { actionsForStreamRow } from '../../src/v2/streamActions.js';
+import { taskStatusShown } from '../../src/v2/taskRows.js';
 import { chatComposerVisible } from '../../src/v2/circleTabs.js';
 import { alphaViewModes } from '../../src/v2/alphaSurface.js';
 import { deliveryPresentation } from '../../src/v2/deliverySettings.js';
@@ -378,6 +379,7 @@ export function renderCircleView(container, {
     renderTakenTab(body, {
       tasks: Array.isArray(tasks) ? tasks : [],
       tr, onAction, onAddTask, viewerWebid, viewerIsAdmin, availability,
+      members: Array.isArray(members) ? members : [], revealPolicy,
     });
   } else if (effectiveTab === 'lists') {
     listsTab?.render?.(body);
@@ -640,7 +642,7 @@ export function renderCircleView(container, {
  * The chips come from the SAME selector the chat stream uses (invariant #1/#3); the
  * host wires their taps (`onAction`) to the tasks agent + the mandate picker.
  */
-function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid = null, viewerIsAdmin = false, availability = null } = {}) {
+function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid = null, viewerIsAdmin = false, availability = null, members = [], revealPolicy = 'pairwise' } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'circle-view__taken';
 
@@ -677,7 +679,8 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
     const status = row.status ?? 'open';
     const statusEl = document.createElement('span');
     statusEl.className = `circle-view__task-status circle-view__task-status--${status}`;
-    statusEl.textContent = tr(`circle.taskStatus.${status}`, { defaultValue: status });
+    // a claimed task says who holds it, named through the reveal ladder (shared: taskStatusShown, mobile paints the same)
+    statusEl.textContent = taskStatusShown(row, { members, viewerId: viewerWebid, policy: revealPolicy, t: tr });
     card.appendChild(statusEl);
 
     // Lifecycle + owner-only mandate chips — the SAME selector the chat stream uses.

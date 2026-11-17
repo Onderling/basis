@@ -184,17 +184,21 @@
   "lists.markListItemDone.stated": {
     "doc": "Something is done, bought or fixed: tick it off (a chore is completed). Mostly a reply to the bot's own reminder.",
     "patterns": [
-      "(de|het)? {item} (is|zijn) (al)? (klaar|gedaan|gekocht|gemaakt|af)"
+      "(de|het)? {item} (is|zijn) (al)? (klaar|gedaan|gekocht|gemaakt|af)",
+      "(de|het)? {item} (gedaan|gekocht)"
     ],
     "examples": [
       "ramen is klaar",
       "De melk is gekocht!",
       "de lamp is gemaakt",
-      "de afwas is af"
+      "de afwas is af",
+      "melk gedaan"
     ],
     "not": [
       "is het eten klaar?",
-      "wanneer is de lamp klaar"
+      "wanneer is de lamp klaar",
+      "wat is er gedaan",
+      "wat heb ik gedaan"
     ]
   },
   "assistant.reminders.off": {
@@ -393,14 +397,130 @@
   },
   "_family": {
     "doc": "Cue words per tool family: which of the model's tools a line can concern. A family leaves the offered tools only when none of its words is in the line and another family's is; the lists always stay. Words, not phrases: a cue is found anywhere in the line.",
-    "lists": ["lijst", "lijstje", "boodschappen", "zet", "voeg", "erbij", "toevoegen", "halen", "gehaald", "gekocht", "op de", "van de lijst", "klusjes", "reparaties", "nodig", "meer", "staat er"],
-    "calendar": ["afspraak", "afspraken", "agenda", "tandarts", "dokter", "verjaardag", "feest", "uitnodiging", "kom", "komen", "verzet", "verplaats", "afzeggen", "plannen", "gepland"],
-    "tasks": ["wie doet", "doet", "doen", "taak", "taken", "klusje", "klusjes", "open", "nog open", "ik pak", "ik doe", "mijn klusjes", "moet", "afgerond", "opgepakt"]
+    "lists": [
+      "lijst",
+      "lijstje",
+      "boodschappen",
+      "zet",
+      "voeg",
+      "erbij",
+      "toevoegen",
+      "halen",
+      "gehaald",
+      "gekocht",
+      "op de",
+      "van de lijst",
+      "klusjes",
+      "reparaties",
+      "nodig",
+      "meer",
+      "staat er"
+    ],
+    "calendar": [
+      "afspraak",
+      "afspraken",
+      "agenda",
+      "tandarts",
+      "dokter",
+      "verjaardag",
+      "feest",
+      "uitnodiging",
+      "kom",
+      "komen",
+      "verzet",
+      "verplaats",
+      "afzeggen",
+      "plannen",
+      "gepland"
+    ],
+    "tasks": [
+      "wie doet",
+      "doet",
+      "doen",
+      "taak",
+      "taken",
+      "klusje",
+      "klusjes",
+      "open",
+      "nog open",
+      "ik pak",
+      "ik doe",
+      "mijn klusjes",
+      "moet",
+      "afgerond",
+      "opgepakt"
+    ]
   },
-  "_lead": { "doc": "How a person opens a line that says what they will do (\"IK MOET vrijdag naar de tandarts\"): not part of the thing's title. Stripped from the start of an appointment's title the \"+\" reads, longest first.", "words": ["ik moet nog", "ik moet", "ik ga", "we moeten", "we gaan", "wij moeten"] },
-  "_ownFamily": { "doc": "The own \"+\"'s extra tool families (beside `_family`), keyed on the app whose ops they keep: the own note (household's note ops). Asked only by the own door (`narrowCatalogueForLine(..., {own: true})`): in a circle the household app also carries the lists, so it is never a family there.", "household": ["notitie", "notities", "onthoud", "opschrijven", "noteer", "weet je nog"] },
-  "_rare": { "doc": "Acts a person rarely means (put a removed list or entry back, change an entry, remove a whole list): the own \"+\" offers these tools to its model only when the line names one of them, in `words` (whole words). `ops`: the op ids.", "ops": ["restoreList", "restoreEntry", "removeList", "editEntry"], "words": ["terug", "herstel", "herstellen", "prullenbak", "wijzig", "wijzigen", "verander", "veranderen", "pas aan", "hernoem", "verwijder de lijst", "hele lijst", "gooi de lijst"] },
-  "_refers": { "doc": "Words that point back at something said before (\"zet DAT morgen in mijn agenda\"), and the words around them in such a request (`around`). A line the \"+\" would read as an appointment by its day alone, holding a pointing word and nothing else but `around` words, is not read by the fixed phrases: only the person's own model, which has the previous turns, knows what it points at. \"onthoud dat de vuilnis dinsdag buiten gaat\" still reads (it says what). Articles that also point (\"het\", \"die\") are left out of `words`.", "words": ["dat", "dit", "daar", "datzelfde"], "around": ["zet", "doe", "plan", "in", "op", "mijn", "de", "agenda", "kalender", "ook", "maar", "even", "er"] },
+  "_lead": {
+    "doc": "How a person opens a line that says what they will do (\"IK MOET vrijdag naar de tandarts\"): not part of the thing's title. Stripped from the start of an appointment's title the \"+\" reads, longest first.",
+    "words": [
+      "ik moet nog",
+      "ik moet",
+      "ik ga",
+      "we moeten",
+      "we gaan",
+      "wij moeten"
+    ]
+  },
+  "_ownFamily": {
+    "doc": "The own \"+\"'s extra tool families (beside `_family`), keyed on the app whose ops they keep: the own note (household's note ops). Asked only by the own door (`narrowCatalogueForLine(..., {own: true})`): in a circle the household app also carries the lists, so it is never a family there.",
+    "household": [
+      "notitie",
+      "notities",
+      "onthoud",
+      "opschrijven",
+      "noteer",
+      "weet je nog"
+    ]
+  },
+  "_rare": {
+    "doc": "Acts a person rarely means (put a removed list or entry back, change an entry, remove a whole list): the own \"+\" offers these tools to its model only when the line names one of them, in `words` (whole words). `ops`: the op ids.",
+    "ops": [
+      "restoreList",
+      "restoreEntry",
+      "removeList",
+      "editEntry"
+    ],
+    "words": [
+      "terug",
+      "herstel",
+      "herstellen",
+      "prullenbak",
+      "wijzig",
+      "wijzigen",
+      "verander",
+      "veranderen",
+      "pas aan",
+      "hernoem",
+      "verwijder de lijst",
+      "hele lijst",
+      "gooi de lijst"
+    ]
+  },
+  "_refers": {
+    "doc": "Words that point back at something said before (\"zet DAT morgen in mijn agenda\"), and the words around them in such a request (`around`). A line the \"+\" would read as an appointment by its day alone, holding a pointing word and nothing else but `around` words, is not read by the fixed phrases: only the person's own model, which has the previous turns, knows what it points at. \"onthoud dat de vuilnis dinsdag buiten gaat\" still reads (it says what). Articles that also point (\"het\", \"die\") are left out of `words`.",
+    "words": [
+      "dat",
+      "dit",
+      "daar",
+      "datzelfde"
+    ],
+    "around": [
+      "zet",
+      "doe",
+      "plan",
+      "in",
+      "op",
+      "mijn",
+      "de",
+      "agenda",
+      "kalender",
+      "ook",
+      "maar",
+      "even",
+      "er"
+    ]
+  },
   "_help": {
     "doc": "Whole lines that ask the assistant for help (\"help\", \"?\"): it answers with what it can do. Read whole, case and trailing punctuation aside; a person may write either language. `questions`: how a line OPENS when it asks how something works (\"hoe …\"): only such a line is looked up in the help cards (their matcher alone hits ordinary lines on a keyword).",
     "words": [

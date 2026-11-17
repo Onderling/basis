@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { decodeGenericOpId } from '@onderling/app-manifest';
-import { PLUS_ACTS, plusActs, plusMomentNeedsTime, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusActs, plusMomentNeedsTime, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, actRunsAtOnce, plusCardWords } from '../../src/v2/vandaagPlus.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 // N CALENDAR days from now at this clock time — never `now + N × 24h`, which on a DST night lands on the wrong day
 const daysFromNow = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
@@ -183,3 +183,23 @@ describe('the "+" free line read by the person\'s OWN model', () => {
   });
 });
 
+
+describe('the "+" card in words: the own place asks to confirm the act, a choice of places asks which', () => {
+  const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
+  it('one choice, the own place: the act named, and Bevestigen; no "in which circle?"', () => {
+    // the help's name for the act (circle.bot.help.ops.<app>.<op>), as the locale has it
+    const t = (k, v) => (k === 'circle.bot.help.ops.lists.createList' ? 'een nieuwe lijst' : v ? `${k} ${JSON.stringify(v)}` : k);
+    const card = { line: 'maak een lijstje voor de vakantie', to: [{ circleId: 'own', name: '', own: true }], command: { appOrigin: 'lists', opId: 'createList', args: { text: 'vakantie' } } };
+    const w = plusCardWords(card, { t });
+    expect(w.question).toContain('circle.vandaag.plus_own_confirm');
+    expect(w.question).toContain('een nieuwe lijst');
+    expect(w.question).not.toContain('plus_circle_ask');
+    expect(w.labelFor(card.to[0])).toBe('circle.confirm.accept');
+  });
+  it('a choice of places: which circle, one button per place', () => {
+    const card = { line: 'zet kaas op Boodschappen', to: [{ circleId: 'own', own: true }, { circleId: 'c1', name: 'Thuis' }], command: { opId: 'addToList' } };
+    const w = plusCardWords(card, { t });
+    expect(w.question).toContain('circle.vandaag.plus_circle_ask');
+    expect(w.labelFor(card.to[1])).toContain('Thuis');
+  });
+});

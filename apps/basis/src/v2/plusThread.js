@@ -6,7 +6,7 @@
  * an appointment) is a store row and stays; the words are the conversation around it. One model both shells paint.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
-import { PLUS_ACTS, plusLabel } from './vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, plusCardWords } from './vandaagPlus.js';
 
 /** How many of the last turns the "+" sheet shows above its line. */
 export const PLUS_TURNS_SHOWN = param({ key: 'assistant.plusTurnsShown', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });
@@ -62,7 +62,8 @@ export function createPlusThread({ threads, threadId } = {}) {
 export function plusAnswerLine({ error = null, done = null, circleCard = null, ownActId = null, t } = {}) {
   if (error) return error;
   if (done) return done;
-  if (circleCard) return t('circle.vandaag.plus_circle_ask', { line: circleCard.line ?? '' });
+  // the card's own question (the own place confirms the act; a choice of places asks which): one wording, `plusCardWords`
+  if (circleCard) return plusCardWords(circleCard, { t }).question;
   const act = ownActId ? PLUS_ACTS.find((a) => a.id === ownActId) : null;
   return act ? plusLabel(t, act) : null;
 }

@@ -390,6 +390,25 @@ export function plusCardLabel(t, to) {
 }
 
 /**
+ * The "+" card in words, the one wording both sheets and the thread use: a card whose ONLY place is the person's own
+ * asks to confirm the act, named ("“maak een lijstje …”: een nieuwe lijst. Zal ik dat doen?", Bevestigen), since there
+ * is no circle to choose; a card with a choice of places asks which, one button per place.
+ * @param {{line?: string, to?: Array<object>, command?: {appOrigin?: string, opId?: string}}} card
+ * @param {{t: Function}} o
+ * @returns {{question: string, labelFor: (to: object) => string}}
+ */
+export function plusCardWords(card, { t } = {}) {
+  const to = Array.isArray(card?.to) ? card.to : [];
+  if (to.length === 1 && to[0]?.own) {
+    const key = `circle.bot.help.ops.${card?.command?.appOrigin ?? ''}.${card?.command?.opId ?? ''}`;
+    const named = t(key);
+    const act = named && named !== key ? named : (card?.command?.opId ?? '');
+    return { question: t('circle.vandaag.plus_own_confirm', { line: card?.line ?? '', act }), labelFor: () => t('circle.confirm.accept') };
+  }
+  return { question: t('circle.vandaag.plus_circle_ask', { line: card?.line ?? '' }), labelFor: (r) => plusCardLabel(t, r) };
+}
+
+/**
  * What the "+" thread answers after a circle or own act ran: the reply line every door words an act with
  * (`replyLine`); for a read of one list (`listEntries`), its entries, the done ones marked, or that it is empty.
  * @param {object} result @param {{opId: string, args?: object, t: Function}} o

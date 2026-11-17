@@ -4,7 +4,7 @@
  * own row, Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
  * Pure render.
  */
-import { PLUS_ACTS, plusLabel, plusCardLabel, plusMomentNeedsTime, plusAskTime } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, plusCardWords, plusMomentNeedsTime, plusAskTime } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
@@ -258,14 +258,16 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
     const box = document.createElement('div');
     box.className = 'circle-vandaag-plus__card';
     const q = document.createElement('p');
-    q.textContent = tr('circle.vandaag.plus_circle_ask', { line: circleCard.line ?? '' });
+    // the shared wording: the own place confirms the act; a choice of places asks which (phone twin: VandaagPlusModal)
+    const words = plusCardWords(circleCard, { t: tr });
+    q.textContent = words.question;
     box.appendChild(q);
     for (const r of circleCard.to) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__card-in';
       b.dataset.circleId = r.circleId;
-      b.textContent = plusCardLabel(tr, r);
+      b.textContent = words.labelFor(r);
       b.addEventListener('click', () => onCircleRun?.(r.circleId));
       box.appendChild(b);
     }

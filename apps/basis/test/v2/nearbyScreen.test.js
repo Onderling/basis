@@ -473,8 +473,11 @@ describe('acting on asks (step F)', () => {
   });
 
   it('with no channel, asking fails honestly instead of silently doing nothing', async () => {
-    const screen = createNearbyScreen({ now: () => T0, t: (k) => k });
+    // visible (a level chosen, a transport that announces), so the missing channel is the only reason to refuse
+    const control = createDiscoverabilityControl({ transports: () => ({ ble: mk(Discovering) }) });
+    const screen = createNearbyScreen({ control, levelChosen: () => true, now: () => T0, t: (k) => k });
     screen.open();
+    await settle();
     expect(await screen.askRoom({ text: 'hello' })).toMatchObject({ ok: false, reason: 'no-channel' });
   });
 });

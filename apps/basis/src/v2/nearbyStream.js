@@ -14,13 +14,9 @@
  * Not in the room chat, or hidden from the room (`nearbyChatOff`): no stream — the tab says why, and the way out.
  */
 
-import { nearbyVisibilityKey } from './nearbyScreen.js';
+import { nearbyIsHidden } from './nearbyScreen.js';
 
 const list = (v) => (Array.isArray(v) ? v : []);
-
-/** The visibility states in which the person is not seen by the room: they have no conversation there. A line said
- *  while hidden would still go to everyone this device sees, from an address nobody here can see. */
-const HIDDEN = Object.freeze(['hidden', 'not_chosen', 'radio_off']);
 
 /**
  * Why the Conversation tab shows no stream, or null when it does. Hidden comes first: joining the chat would not
@@ -32,7 +28,7 @@ const HIDDEN = Object.freeze(['hidden', 'not_chosen', 'radio_off']);
  */
 export function nearbyChatOff(model) {
   const m = model && typeof model === 'object' ? model : {};
-  if (HIDDEN.includes(nearbyVisibilityKey(m.visibility))) {
+  if (nearbyIsHidden(m.visibility)) {
     return { reason: 'hidden', act: m.radioOff === true || m.visibility?.radioOff === true ? 'radio-on' : m.quiet === true ? 'unquiet' : null };
   }
   return Array.isArray(m.chat) ? null : { reason: 'not-joined', act: 'join' };
@@ -89,4 +85,19 @@ export function nearbyTabNews(model, seen = {}) {
     latest[tab] = ats.reduce((mx, at) => Math.max(mx, at), since);
   }
   return { counts, latest };
+}
+
+/**
+ * What the "you here" row says the person shows the room, as locale keys: the card, the conversation — the latter only
+ * while they are in it AND seen (`nearbyChatOff`), so a hidden person is never told they are in the conversation.
+ * @param {object|null} model
+ * @returns {string[]}
+ */
+export function nearbyMineSummary(model) {
+  const m = model && typeof model === 'object' ? model : {};
+  const allows = m.allows ?? {};
+  const keys = [];
+  if (allows.card) keys.push('circle.nearbyScreen.mine_card_on');
+  if (allows.chat && !nearbyIsHidden(m.visibility)) keys.push('circle.nearbyScreen.mine_chat_on');
+  return keys.length ? keys : ['circle.nearbyScreen.mine_none'];
 }

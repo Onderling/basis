@@ -1738,13 +1738,21 @@
       "text": "Begrepen",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
-    "onboarding_begin_title": {
-      "text": "Begin",
-      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
-    },
     "onboarding_begin_create": {
       "text": "Maak een kring",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_strip_single": {
+      "text": "Nog 1 ding om in te stellen",
+      "doc": "Vandaag, de dichtgevouwen strook: de regel als er nog één kaart over is; een tik klapt hem open."
+    },
+    "onboarding_strip_many": {
+      "text": "Nog {{count}} dingen om in te stellen",
+      "doc": "Vandaag, de dichtgevouwen strook: de regel als er nog {{count}} kaarten over zijn; een tik klapt hem open."
+    },
+    "onboarding_no_circle": {
+      "text": "Je zit nog in geen kring. Bij Kringen maak je er een, of doe je mee met een uitnodiging.",
+      "doc": "Vandaag, voor wie nog in geen kring zit (de hulpkring telt niet): de ene regel die naar Kringen wijst."
     },
     "onboarding_begin_join": {
       "text": "Ik heb een uitnodiging",

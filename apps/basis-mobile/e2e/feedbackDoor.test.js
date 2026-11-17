@@ -7,7 +7,7 @@
 // Runs against an E2E release APK (`npm run detox:build:e2e`: the build carries the maker's card); deletes the app, so
 // emulator only.
 
-const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
+const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, emulatorOnly, openOnboardingStrip } = require('./support/ui');
 const { startPeer } = require('./support/peer');
 const MAKER = require('./support/makerCard.fixture.json');
 
@@ -39,6 +39,7 @@ describe('feedback from the phone: the door, the maker receives it, the answer c
     // a tap while the app is still starting is lost (the sheet never opens): tap until the field shows
     let open = false;
     for (let i = 0; i < 5 && !open; i += 1) {
+      if (!(await isVisible(by.id('onb-reach-add')))) await openOnboardingStrip();   // the set-up cards sit in one closed strip
       await tapSoon(by.id('onb-reach-add'), 30_000);
       open = (await firstOf([by.id('point-add-input')], 8_000)) === 0;
     }

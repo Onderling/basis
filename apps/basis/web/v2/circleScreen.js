@@ -36,6 +36,7 @@ import { dateLocaleOf } from '../../src/v2/whenWords.js';
 import { whereTag } from '../../src/v2/rowWhere.js';
 import { nounHeading } from '../../src/v2/nounNames.js';
 import { typedRowOp } from '../../src/v2/rowPrimary.js';
+import { onboardingStripLine } from '../../src/v2/onboardingStrip.js';
 
 /**
  * Render an array of materialized blocks into a container.
@@ -583,8 +584,40 @@ function openableOwn(li, item, noun, onAction) {
   li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
 }
 
-// THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
+// THE ONBOARDING STRIP, folded (onboardingStrip.js): one closed line that counts the set-up cards left; a tap opens
+// the cards, each with its own act through the host. Open or closed is this page's paint state, kept across repaints.
+let onbOpen = false;
 function renderOnboarding(section, block, tr, onAction) {
+  const cards = block.content?.cards ?? [];
+  let holder = section;
+  if (cards.length) {
+    const strip = document.createElement('button');
+    strip.type = 'button';
+    strip.className = 'circle-screen__onb-strip';
+    strip.setAttribute('aria-expanded', String(onbOpen));
+    strip.textContent = onboardingStripLine(cards.length, tr);
+    section.appendChild(strip);
+    holder = document.createElement('div');
+    holder.className = 'circle-screen__onb-cards';
+    holder.hidden = !onbOpen;
+    strip.addEventListener('click', () => {
+      onbOpen = !onbOpen;
+      holder.hidden = !onbOpen;
+      strip.setAttribute('aria-expanded', String(onbOpen));
+    });
+    section.appendChild(holder);
+  }
+  // in no circle: one line that points to Circles (both doors are there)
+  if (block.content?.noCircle) {
+    const p = document.createElement('p');
+    p.className = 'circle-screen__onb-nocircle';
+    p.textContent = tr('circle.vandaag.onboarding_no_circle');
+    section.appendChild(p);
+  }
+  paintOnboardingCards(holder, cards, tr, onAction);
+}
+
+function paintOnboardingCards(section, cards, tr, onAction) {
   const act = (a) => { if (typeof onAction === 'function') onAction(a); };
   const btn = (labelKey, a, cls = '') => {
     const b = document.createElement('button');
@@ -596,7 +629,7 @@ function renderOnboarding(section, block, tr, onAction) {
     b.addEventListener('click', () => act(a));
     return b;
   };
-  for (const c of block.content?.cards ?? []) {
+  for (const c of cards) {
     const card = document.createElement('div');
     card.className = 'circle-screen__onb-card';
     card.dataset.card = c.id;
@@ -644,9 +677,6 @@ function renderOnboarding(section, block, tr, onAction) {
       p.textContent = tr('circle.vandaag.onboarding_reach_hint');
       card.appendChild(p);
       card.appendChild(btn('circle.vandaag.onboarding_reach_add', { kind: 'open-points' }));
-    } else if (c.id === 'begin') {
-      card.appendChild(btn('circle.vandaag.onboarding_begin_create', { kind: 'create-circle' }));
-      card.appendChild(btn('circle.vandaag.onboarding_begin_join', { kind: 'join-circle' }));   // the pair in one style
     }
     section.appendChild(card);
   }

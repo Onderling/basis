@@ -5,6 +5,7 @@
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/intro-deck.spec.js
  */
 import { test, expect } from '@playwright/test';
+import { openOnboardingStrip } from './helpers.js';
 
 test.setTimeout(90_000);
 
@@ -16,6 +17,7 @@ test('"Read more" opens the seven cards in order; the last button leaves for Tod
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await openOnboardingStrip(page);
   await introCard(page).locator('.circle-screen__onb-btn').first().click();   // "Lees meer"
   const deck = page.locator('.circle-intro');
   for (const [i, id] of CARDS.entries()) {
@@ -34,6 +36,7 @@ test('"Read more" opens the seven cards in order; the last button leaves for Tod
 test('"Skip" leaves the introduction at once, and the card is gone from Today', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await openOnboardingStrip(page);
   await introCard(page).locator('.circle-screen__onb-btn').first().click();
   await page.locator('.circle-intro__next').click();
   await expect(page.locator('.circle-intro')).toHaveAttribute('data-card', 'circles');
@@ -45,6 +48,7 @@ test('"Skip" leaves the introduction at once, and the card is gone from Today', 
 test('a click outside the card leaves the introduction too, and Today is painted again without the card', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await openOnboardingStrip(page);
   await introCard(page).locator('.circle-screen__onb-btn').first().click();
   await expect(page.locator('.circle-intro')).toHaveAttribute('data-card', 'welcome');
   // the overlay itself, outside the card (its top-left corner)
@@ -56,6 +60,7 @@ test('a click outside the card leaves the introduction too, and Today is painted
 test('once seen, the introduction opens again from Settings (its door beside Help)', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await openOnboardingStrip(page);
   await introCard(page).locator('.circle-screen__onb-btn--ghost').click();   // "Begrepen": the card is gone for good
   await expect(introCard(page)).toHaveCount(0);
   await page.locator('[data-tab="mij"]').first().click();

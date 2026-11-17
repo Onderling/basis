@@ -193,11 +193,11 @@
           "doc": "Join wizard: present the address used in another circle ({{name}} = that circle)."
         },
         "hint": {
-          "text": "The relay cannot see that your circles belong together. Members who are in both circles can.",
+          "text": "The connection point cannot see that your circles belong together. Members who are in both circles can.",
           "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
         },
         "hint_same": {
-          "text": "The relay and the members of both circles see that this is the same person.",
+          "text": "The connection point and the members of both circles see that this is the same person.",
           "doc": "Join wizard: the sentence under the address choice when the same address as in another circle is chosen (the relay and members of both circles see one person)."
         }
       },
@@ -2475,7 +2475,7 @@
         "doc": "transport-mode option: the built-in NKN transport."
       },
       "relay": {
-        "text": "Relay (default)",
+        "text": "Connection point (default)",
         "doc": "transport-mode option: a WebSocket relay."
       },
       "both": {
@@ -2484,11 +2484,11 @@
       }
     },
     "relayEndpoint": {
-      "text": "Relay server",
+      "text": "Connection point",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
     "relayEndpoint_placeholder": {
-      "text": "wss://relay.example.org",
+      "text": "wss://point.example.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
     },
     "relayEndpoint_apply": {
@@ -2500,7 +2500,7 @@
       "doc": "Phase 4 §9 — relay endpoint clear button."
     },
     "relayAsk_title": {
-      "text": "Which relay do you use?",
+      "text": "Which connection point do you use?",
       "doc": "The relay question — asked at the first action that needs a relay when the device knows none (there is no default relay)."
     },
     "relayAsk_body": {
@@ -2516,7 +2516,7 @@
       "doc": "The relay question — not now; asked again at the next app start."
     },
     "relayAsk_invalid": {
-      "text": "That is not a relay address — it starts with wss:// or ws://.",
+      "text": "That is not a connection point address: it starts with wss:// or ws://.",
       "doc": "The relay question — the typed value is not a ws:// or wss:// URL."
     },
     "privateDm": {
@@ -2528,7 +2528,7 @@
       "doc": "Phase 4 §9 — private-chat toggle hint."
     },
     "privateDm_disabled": {
-      "text": "Needs a relay: pod-only circles can't set up a private channel between members.",
+      "text": "Needs a connection point: pod-only circles can't set up a private channel between members.",
       "doc": "Phase 4 §7 — shown when the private-chat toggle greys out under pod-only (no relay)."
     },
     "wakeNudges": {
@@ -2536,7 +2536,7 @@
       "doc": "offline delivery M1 — the wake-nudges device toggle (registers the push token on the relay; off by default)."
     },
     "wakeNudges_hint": {
-      "text": "Off by default. When on, the relay sends an empty wake signal through your platform's push service when a message is waiting. That service only learns that something is pending, and when — never from whom or what.",
+      "text": "Off by default. When on, the connection point sends an empty wake signal through your platform's push service when a message is waiting. That service only learns that something is pending, and when — never from whom or what.",
       "doc": "offline delivery M1 — states the metadata floor: what the push service learns."
     },
     "wakeNudges_disabled": {
@@ -2544,11 +2544,11 @@
       "doc": "offline delivery M1 — shown where the platform has no OS push path (web)."
     },
     "relay_applied": {
-      "text": "Relay set: {{url}}",
+      "text": "Connection point set: {{url}}",
       "doc": "G17 — /set-relay built-in confirmation bubble."
     },
     "relay_failed": {
-      "text": "Couldn't set relay: {{error}}",
+      "text": "Couldn't set the connection point: {{error}}",
       "doc": "G17 — /set-relay built-in failure bubble."
     },
     "transport_set": {
@@ -2560,7 +2560,7 @@
       "doc": "G17 — /transport-mode built-in bad-mode bubble."
     },
     "transports_status": {
-      "text": "Transport {{mode}} · relay {{relay}}",
+      "text": "Transport {{mode}} · connection point {{relay}}",
       "doc": "G17 — /transports built-in status bubble."
     },
     "transports_none": {
@@ -3464,7 +3464,7 @@
       "doc": "Turns the per-user fallback setting on."
     },
     "point_primary": {
-      "text": "Your relay — connected",
+      "text": "Your connection point — connected",
       "doc": "The device's OWN relay (the one in the setting), connected. Replaced point_active on 2026-09-08: a device is now on several relays at once, so 'the one in use' was no longer a fact."
     },
     "point_connected": {
@@ -3524,15 +3524,15 @@
       "doc": "Remove a connection point."
     },
     "point_add_title": {
-      "text": "Add a relay",
+      "text": "Add a connection point",
       "doc": "Heading of the add-a-relay field (2026-09-08). Adding one connects to it beside the relays you are already on — it does not replace your own."
     },
     "point_add_hint": {
-      "text": "Running a relay yourself, or did someone give you one? Enter its address. You stay on the relays you already use.",
+      "text": "Running a connection point yourself, or did someone give you one? Enter its address. You stay on the connection points you already use.",
       "doc": "Says what adding does, because the old model (one relay, swapped) is what people expect."
     },
     "point_add_placeholder": {
-      "text": "wss://relay.example.org",
+      "text": "wss://point.example.org",
       "doc": "Placeholder for the relay address field."
     },
     "point_add_button": {
@@ -3540,7 +3540,7 @@
       "doc": "Confirms the add-a-relay field."
     },
     "point_add_invalid": {
-      "text": "That is not a relay address. A relay starts with ws:// or wss://.",
+      "text": "That is not a connection point address. It starts with ws:// or wss://.",
       "doc": "Shown when the typed address is not a websocket endpoint."
     },
     "point_add_failed": {
@@ -3828,7 +3828,7 @@
       "doc": "Footer when no skills are published."
     },
     "delivery_fallback_note": {
-      "text": "With the fallback on, reaching someone whose per-circle address you don't have yet uses your main address, so a relay you both use can tell those circles belong to one person. The setting counts for all your circles at once.",
+      "text": "With the fallback on, reaching someone whose per-circle address you don't have yet uses your main address, so a connection point you both use can tell those circles belong to one person. The setting counts for all your circles at once.",
       "doc": "The consequence of turning the fallback on, stated where the setting is shown. The setting is one for all circles (per circle was judged too technical)."
     },
     "answer_placeholder": {
@@ -6754,19 +6754,19 @@
       "doc": "S5 — pod root URI."
     },
     "relay": {
-      "text": "Relay",
+      "text": "Connection point",
       "doc": "S5 — relay operator/url."
     },
     "relay_set": {
-      "text": "Relay server",
+      "text": "Connection point",
       "doc": "In-app relay URL setting (ws://|wss://); blank ⇒ the build-time env fallback."
     },
     "relay_open": {
-      "text": "Set relay server…",
+      "text": "Set the connection point…",
       "doc": "Entry button that opens the relay-URL editor in the docked side-panel (openPagePanel, set-relay surfaces.page)."
     },
     "relay_current": {
-      "text": "Relay: {{url}}",
+      "text": "Connection point: {{url}}",
       "doc": "Current in-app relay setting shown beside the open-panel button."
     },
     "relay_save": {
@@ -6782,7 +6782,7 @@
       "doc": "Relay saved + reconnected."
     },
     "relay_off": {
-      "text": "no relay",
+      "text": "no connection point",
       "doc": "Shown as {{url}} when the setting is cleared and there's no env fallback."
     },
     "relay_error": {
@@ -7034,7 +7034,7 @@
       "doc": "J-CS8 — button when the lock is on."
     },
     "notif_privacy": {
-      "text": "To wake your phone, your connection point (the relay you are connected to) keeps one wake code for this device. That lets it see that your circles belong to one device, and so that they are yours.",
+      "text": "To wake your phone, your connection point keeps one wake code for this device. That lets it see that your circles belong to one device, and so that they are yours.",
       "doc": "J-CS10 — the trade, stated where it is made. One device gets one push token from the OS, registered under each of its per-circle addresses; grouping by token groups the circles."
     },
     "notif_privacy_not": {
@@ -7042,7 +7042,7 @@
       "doc": "J-CS10 — what is NOT learned. A bare \"affects your privacy\" invites imagining something worse than the truth."
     },
     "notif_privacy_escape": {
-      "text": "If that matters to you, run your own relay or spread your circles over different relays. A relay only sees the circles that use it.",
+      "text": "If that matters to you, run your own connection point or spread your circles over different connection points. A connection point only sees the circles that use it.",
       "doc": "J-CS10 — name the escape rather than leaving a dead end (the companion node; relay diversity)."
     },
     "pod_local_consequence": {
@@ -7196,7 +7196,7 @@
       "doc": "Refusal (screen door): no key or nonce in the offer."
     },
     "connection_offer_pairing-other-relay": {
-      "text": "That screen waits on another relay than this device, so it cannot be connected from here.",
+      "text": "That screen waits on another connection point than this device, so it cannot be connected from here.",
       "doc": "Refusal (screen door): the offer's relay is not one this device is on (the grant could never reach it)."
     },
     "connection_offer_pairing-nonce-replayed": {
@@ -8376,7 +8376,7 @@
     "failed": "Claiming did not work.",
     "outcome_bad_claim": "That is not a claim line. Copy everything after 'Claim:' — the code, the @ and the address.",
     "outcome_no_device_key": "This device has no device key of its own yet. Open the app again and try once more.",
-    "outcome_unreachable": "The companion does not answer. Is it running and connected to the relay?",
+    "outcome_unreachable": "The companion does not answer. Is it running and connected to the connection point?",
     "outcome_already_owned": "This companion already has an owner.",
     "outcome_invalid_code": "The code is wrong or has expired. Take the newest line from the log (a new one every ten minutes).",
     "outcome_stale": "This device's clock is more than five minutes off the companion's. Set your device's time right and try again.",
@@ -8397,7 +8397,7 @@
     "failed": "Giving access did not work.",
     "outcome_not_owned": "This companion is not yours. Claim it first.",
     "outcome_no_device_key": "This device has no device key of its own yet. Reopen the app and try again.",
-    "outcome_unreachable": "The companion does not answer. Is it on and connected to the relay?",
+    "outcome_unreachable": "The companion does not answer. Is it on and connected to the connection point?",
     "outcome_forbidden": "The companion did not accept this device's signature.",
     "outcome_stale": "This device's clock is more than five minutes off from the companion's. Set your device's time and try again.",
     "outcome_unknown_family": "This companion cannot give that.",
@@ -8405,7 +8405,7 @@
     "outcome_bad_args": "Choose to whom, and tick what it may do.",
     "outcome_gate_off": "This companion runs without its access check, so it gives no access.",
     "outcome_not_bot_admin": "Only the bot's admin can give it your companion. Ask them to grant it from their app.",
-    "outcome_bot_unreachable": "The bot does not answer. Is it running and connected to the relay?",
+    "outcome_bot_unreachable": "The bot does not answer. Is it running and connected to the connection point?",
     "outcome_bot_refused": "The bot did not take your companion. Link your Basis app to it again (/koppel) and try once more.",
     "granted": "Access given to",
     "may": "may: {{what}}",
@@ -8843,15 +8843,15 @@
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_section": {
-        "text": "NKN relay",
+        "text": "NKN connection point",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_url": {
-        "text": "Relay URL",
+        "text": "Connection point address",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_hint": {
-        "text": "Override the automatically chosen NKN relay (advanced). ws:// or wss:// only.",
+        "text": "Override the automatically chosen NKN connection point (advanced). ws:// or wss:// only.",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "loading": {
@@ -10333,7 +10333,7 @@
         "doc": "A setting's label (projected from the parameter register)."
       },
       "relay_url": {
-        "text": "Relay server",
+        "text": "Connection point",
         "doc": "A setting's label (projected from the parameter register)."
       },
       "app_developer": {
@@ -10463,7 +10463,7 @@
         "doc": "A choice on the settings screen."
       },
       "relay": {
-        "text": "Relay",
+        "text": "Connection point",
         "doc": "A choice on the settings screen."
       },
       "both": {

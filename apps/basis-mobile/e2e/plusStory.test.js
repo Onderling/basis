@@ -7,7 +7,7 @@
 //   8. no model: the question says no model is set, what works, and where to set one;
 //   9. whose model: once set, the top of the thread names the own route by its host;
 //   1. a question: an answer in words, from a model told it is the person's OWN place (no household background);
-//   2. remember this: a filled note form; nothing stored until Save;
+//   2. remember this: a filled note form with the person's own words (a phrase, no model call); nothing stored until Save;
 //   3. ask it back: the note's words reach the model; the answer is said;
 //   4. a follow-up: the previous turn reaches the model; the proposal names the key; closing it stores nothing, said.
 //
@@ -18,7 +18,7 @@ const { startStandInModel, reversePort } = require('./support/standInModel');
 
 const SCRIPT = [
   { when: 'wat kan je voor me doen', replyText: 'Ik houd je eigen notities, afspraken en lijsten bij.' },
-  { when: 'onthoud dat de sleutel', toolCall: { id: '__generic__:household:add:note', args: { body: 'de sleutel ligt bij de buren' } } },
+  { when: 'onthoud dat de sleutel', toolCall: { id: '__generic__:household:add:note', args: { body: 'de sleutel bij de buren ligt' } } },
   { when: 'waar ligt de sleutel', replyText: 'Bij de buren.' },
   { when: 'zet dat morgen om 10', toolCall: { id: 'addEvent', args: { title: 'sleutel ophalen bij de buren' } } },
 ];
@@ -104,17 +104,19 @@ describe('the "+" story on the phone, with a stand-in model', () => {
     await device.takeScreenshot('plus-story-01-question');
   });
 
-  it('2 and 3. remember this, then ask it back: the note reaches the model', async () => {
+  it('2 and 3. remember this (a phrase: no model call), then ask it back: the note reaches the model', async () => {
+    const beforeNote = model.requests.length;
     await say('onthoud dat de sleutel bij de buren ligt');
+    if (model.requests.length !== beforeNote) throw new Error('"onthoud dat" is a phrase: no model should be asked');
     await soon(by.id('vandaag-plus-body'), 15_000);
-    await expect(element(by.id('vandaag-plus-body'))).toHaveText('de sleutel ligt bij de buren');
+    await expect(element(by.id('vandaag-plus-body'))).toHaveText('de sleutel bij de buren ligt');
     await device.takeScreenshot('plus-story-02-note-form');
     await tapSoon(by.id('vandaag-plus-save'));
-    await soon(by.text('de sleutel ligt bij de buren'), 20_000);
+    await soon(by.text('de sleutel bij de buren ligt'), 20_000);
     await openPlus();
     await say('waar ligt de sleutel?');
     await soon(by.text('Bij de buren.'), 20_000);
-    if (!JSON.stringify(model.requests.at(-1).messages).includes('de sleutel ligt bij de buren')) throw new Error('the note did not reach the model');
+    if (!JSON.stringify(model.requests.at(-1).messages).includes('de sleutel bij de buren ligt')) throw new Error('the note did not reach the model');
     await device.takeScreenshot('plus-story-03-ask-back');
   });
 

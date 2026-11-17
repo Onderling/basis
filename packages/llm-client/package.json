@@ -15,7 +15,8 @@
     "./providers/embeddings": "./src/providers/embeddings.js",
     "./providers/ollama-embed": "./src/providers/ollama-embed.js",
     "./providers/mockEmbeddings": "./src/providers/mockEmbeddings.js",
-    "./providers/privatemode": "./src/providers/privatemode.js"
+    "./providers/privatemode": "./src/providers/privatemode.js",
+    "./providers/reasoning": "./src/providers/reasoning.js"
   },
   "scripts": {
     "test": "vitest run",

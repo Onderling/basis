@@ -13,10 +13,10 @@ import { DAY_RE, TIME_RE } from './gatePhrases.js';
 const ALWAYS = 'lists';
 
 /** Per family, one matcher over every language's cue words (whole words; a cue may be several). */
-function familyMatchers(words = GATE_WORDS) {
+function familyMatchers(words = GATE_WORDS, key = '_family') {
   const cues = {};
   for (const entries of Object.values(words)) {
-    for (const [family, list] of Object.entries(entries?._family ?? {})) {
+    for (const [family, list] of Object.entries(entries?.[key] ?? {})) {
       if (!Array.isArray(list)) continue;   // the entry's `doc`
       (cues[family] ??= new Set());
       for (const w of list) cues[family].add(String(w).toLowerCase());
@@ -32,19 +32,28 @@ function familyMatchers(words = GATE_WORDS) {
   return out;
 }
 const MATCHERS = familyMatchers();
+/** The own "+"'s extra families (`_ownFamily`: the own note's cues, keyed on its app): a door asks for them by name. */
+const OWN_MATCHERS = familyMatchers(GATE_WORDS, '_ownFamily');
 
 /**
  * @param {{opsById: Map<string, {appOrigin?: string}>}} catalogue  the catalogue the turn would offer
  * @param {string} text  the member's line (lines collected into one turn: joined)
+ * @param {{keep?: string[], own?: boolean}} [o]  families never dropped (a circle: its lists); `own`: the own "+"'s
+ *        families too (its note), and nothing kept by default there
  * @returns {object} the same catalogue, or a copy without the families the line does not concern
  */
-export function narrowCatalogueForLine(catalogue, text) {
+export function narrowCatalogueForLine(catalogue, text, { keep = [ALWAYS], own = false } = {}) {
   if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function') return catalogue;
   const line = String(text ?? '');
-  const claimed = new Set(Object.entries(MATCHERS).filter(([, re]) => re.test(line)).map(([f]) => f));
+  // the own "+" also knows its note's family (`own`), and drops lists like any other family (`keep: []`)
+  const matchers = own ? { ...MATCHERS, ...OWN_MATCHERS } : MATCHERS;
+  // a family counts only where this catalogue has it: a line claiming only families the place lacks ("wat kan ik hier
+  // doen?" claims tasks; the own "+" has none) narrows nothing
+  const present = new Set([...catalogue.opsById.values()].map((e) => e && e.appOrigin));
+  const claimed = new Set(Object.entries(matchers).filter(([f, re]) => present.has(f) && re.test(line)).map(([f]) => f));
   if (claimed.size === 0) return catalogue;
-  const known = new Set(Object.keys(MATCHERS));
-  const drop = (family) => known.has(family) && family !== ALWAYS && !claimed.has(family);
+  const known = new Set(Object.keys(matchers));
+  const drop = (family) => known.has(family) && !keep.includes(family) && !claimed.has(family);
   const opsById = new Map();
   for (const [k, entry] of catalogue.opsById) if (!drop(entry && entry.appOrigin)) opsById.set(k, entry);
   if (opsById.size === catalogue.opsById.size) return catalogue;

@@ -86,6 +86,8 @@ const DEFAULT_THREAD = '__default__';
  * @param {(ctx: object) => any} [a.onSlow]  the model route is slow and retrying (the door tells the person to wait)
  * @param {(cmd: object) => object[]} [a.expand]  a door's rewrite of a chosen op into the ops it stands for (see `createCircleDispatch`)
  * @param {(threadId: string) => string[]} [a.threadHints]  a thread's own lines for the model (its role's)
+ * @param {{keep?: string[], own?: boolean}} [a.narrowing]  how a line narrows the tools (`narrowCatalogueForLine`'s options;
+ *        absent: a circle's, lists always kept)
  * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op without showing it (a read the
  *        model picks is handed back to it once, so the turn acts — see `createCircleDispatch`)
  * @param {(turn:{threadId:string, lines:string[], ctx:object, own:boolean}, run:() => Promise<any>) => Promise<any>} [a.around]
@@ -96,7 +98,7 @@ export function createAssistantEngine({
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
   recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, promptLines = null, catalogueFor = null, gateRules = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
-  collectMs = COLLECT_MS, claim = null, around = null, peek = null, threadHints = null, expand = null, onSlow = null,
+  collectMs = COLLECT_MS, claim = null, around = null, peek = null, narrowing = null, threadHints = null, expand = null, onSlow = null,
 } = {}) {
   if (!catalogue) throw new TypeError('createAssistantEngine: catalogue required');
   if (typeof dispatch !== 'function') throw new TypeError('createAssistantEngine: dispatch required');
@@ -123,7 +125,7 @@ export function createAssistantEngine({
     return interpretIn(text, {
       ...o,
       // only the tool families the line's words can concern (the lists always; every tool when no family claims it)
-      ...(o.catalogue ? { catalogue: narrowCatalogueForLine(o.catalogue, text) } : {}),
+      ...(o.catalogue ? { catalogue: narrowCatalogueForLine(o.catalogue, text, narrowing ?? undefined) } : {}),
       ...(fixed || own.length ? { hints: o.hints ?? [...langHints, ...own] } : {}),
       options: o.options ?? { temperature: ASSISTANT_TEMPERATURE },
       toolLang: o.toolLang ?? toolLang,

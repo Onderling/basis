@@ -493,3 +493,27 @@ describe('the "/" list in the "+": the same acts the buttons and the model have 
     expect((await d.read('/ja of nee')).done).toBe('gewoon een zin');
   });
 });
+
+describe('a budget on the request the "+" sends its model (Frits: do not let the prompt grow)', () => {
+  // the whole request (system, messages, tools) for typical lines, through the real interpreter
+  const BUDGET = 6000;
+  const sizeOf = (req) => req.system.length + JSON.stringify(req.messages).length + JSON.stringify(req.tools).length;
+  it(`a typical line's request stays under ${BUDGET} characters, and a line about one family gets that family's tools`, async () => {
+    const seen = [];
+    const llm = { invoke: async (r) => { seen.push(r); return { replyText: 'ok' }; } };
+    const { d } = door({ llm, interpret: interpretToCommand });
+    // the list family alone is eleven tools (~4.7k characters): its line gets a wider budget until the rare list acts
+    // (restore, edit, remove a whole list) are offered only when a line asks for them (open, BRIEF-plus-chat-route C)
+    const LIST_BUDGET = 7000;
+    for (const line of ['wat heb ik morgen gepland?', 'kun je de tandarts verzetten naar vrijdag?', 'wat staat er op mijn vakantielijst?', 'onthoud dat de sleutel bij de buren ligt']) {
+      await d.read(line);
+      expect(sizeOf(seen.at(-1)), line).toBeLessThan(/lijst/.test(line) ? LIST_BUDGET : BUDGET);
+    }
+    const agenda = seen[0].tools.map((x) => x.id ?? x.name);
+    expect(agenda, 'an agenda line gets the agenda').toContain('listEvents');
+    expect(agenda, 'an agenda line gets no list tools').not.toContain('restoreList');
+    const note = seen[3].tools.map((x) => x.id ?? x.name);
+    expect(note, 'a note line gets the note').toContain('__generic__:household:add:note');
+    expect(note, 'a note line gets no agenda tools').not.toContain('cancelEvent');
+  });
+});

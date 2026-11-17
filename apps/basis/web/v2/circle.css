@@ -1631,3 +1631,10 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .cc-banner[hidden] { display: none; }
+
+/* THE INTRODUCTION (introDeck.js): one card per screen in the shared overlay; the words carry it, nothing else */
+.circle-intro { display: flex; flex-direction: column; gap: 12px; max-width: 32rem; }
+.circle-intro__position { margin: 0; font-size: 0.85em; color: var(--ink-soft, inherit); }
+.circle-intro__title { margin: 0; }
+.circle-intro__body { margin: 0; line-height: 1.5; }
+.circle-intro__next, .circle-intro__skip { align-self: flex-start; }

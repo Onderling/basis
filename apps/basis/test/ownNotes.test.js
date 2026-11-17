@@ -157,7 +157,7 @@ describe("an own row made AS a persona is changed AS that persona (the sheet pas
     const held = [{ id: 'default', webid: a.identity?.chat?.pubKey ?? 'me' }, { id: made.id, webid: werk }];
     const [block] = await materializeScreen({
       screen: { id: 's', name: 'Vandaag', circleFilter: null, blocks: [{ id: 'n', type: 'notes', config: {} }] },
-      hostOps: { callSkill: (app, o, g) => a.callSkill(app, o, g), circles: [], selfSet: { on: ['default', made.id], held } },
+      hostOps: { callSkill: (app, o, g, c) => a.callSkill(app, o, g, c), circles: [], selfSet: { on: ['default', made.id], held } },
     });
     const row = block.content.items.find((r) => r.label === 'werkbriefje');
     expect(row?.maker, 'the row names the self that made it').toBe(made.id);

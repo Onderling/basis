@@ -45,15 +45,31 @@ describe('the own agenda and the own notes, read per self (default-deny)', () =>
     expect(words(await general('household', NOTE_LIST, { circleId: OWN })), 'Werk\'s note').not.toContain('printer');
     expect(words(await general('calendar', 'briefSummary', { circleId: OWN })), 'a summary as the general self').not.toContain('klantoverleg');
   });
-  it('a read naming the SET of selves (Today\'s block, both ticked) answers both, and only those', async () => {
+  it('a read whose CALL names the set of selves (Today\'s block, both ticked) answers both, and only those', async () => {
     const { a, werkId } = await setup();
-    const both = words(await a.callSkill('calendar', 'listEvents', { circleId: OWN, days: 7, selves: ['default', werkId] }));
+    const both = words(await a.callSkill('calendar', 'listEvents', { circleId: OWN, days: 7 }, { selves: ['default', werkId] }));
     expect(both).toContain('klantoverleg');
     expect(both).toContain('tandarts');
-    const notes = words(await a.callSkill('household', NOTE_LIST, { circleId: OWN, selves: ['default', werkId] }));
+    const notes = words(await a.callSkill('household', NOTE_LIST, { circleId: OWN }, { selves: ['default', werkId] }));
     expect(notes).toContain('printer');
     expect(notes).toContain('sleutel');
-    const onlyWerk = words(await a.callSkill('calendar', 'listEvents', { circleId: OWN, days: 7, selves: [werkId] }));
+    const onlyWerk = words(await a.callSkill('calendar', 'listEvents', { circleId: OWN, days: 7 }, { selves: [werkId] }));
     expect(onlyWerk).not.toContain('tandarts');
+  });
+  // Fable's review: a set in the ARGS can come from anyone (a model's pick, a typed line, a door) and is never followed
+  it('a set named in the args is ignored: as the general self, args naming Werk read nothing of Werk\'s', async () => {
+    const { a, werkId } = await setup();
+    expect(words(await a.callSkill('calendar', 'listEvents', { circleId: OWN, days: 7, selves: [werkId] }))).not.toContain('klantoverleg');
+    expect(words(await a.callSkill('household', NOTE_LIST, { circleId: OWN, selves: [werkId] }))).not.toContain('printer');
+    expect(words(await a.callSkill('calendar', 'briefSummary', { circleId: OWN, selves: [werkId] }))).not.toContain('klantoverleg');
+  });
+  it('the general self cannot change or cancel Werk\'s appointment, even by its id', async () => {
+    const { a, werk } = await setup();
+    const listed = await a.callSkill('calendar', 'listEvents', { circleId: OWN, days: 7 }, { actAs: werk });
+    const id = listed?.items?.find((e) => /klantoverleg/.test(JSON.stringify(e)))?.id;
+    expect(id, 'Werk\'s appointment id').toBeTruthy();
+    expect((await a.callSkill('calendar', 'cancelEvent', { circleId: OWN, id }))?.ok, 'cancel as the general self').not.toBe(true);
+    expect((await a.callSkill('calendar', 'updateEvent', { circleId: OWN, id, title: 'weg' }))?.ok, 'update as the general self').not.toBe(true);
+    expect(words(await a.callSkill('calendar', 'listEvents', { circleId: OWN, days: 7 }, { actAs: werk }))).toContain('klantoverleg');
   });
 });

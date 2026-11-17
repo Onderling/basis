@@ -2849,11 +2849,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     return 'default';
   };
   /**
-   * The selves an own READ is for: the set the call names (`selves`: Today's blocks read every ticked self), kept to the
-   * selves this device holds, else the one self the call is made as. Own rows of any other self are not there for it.
+   * The selves an own READ is for: the set the CALL names (`ctx.selves`: Today's blocks, a local call, read every ticked
+   * self), kept to the selves this device holds, else the one self the call is made as. Never a set in the ARGS: args
+   * come from a model's pick, a typed line or a door, and are not followed; a door's call is its person's only. Own rows
+   * of any other self are not there for it.
    */
-  const ownSelvesOf = (args, ctx) => {
-    const named = Array.isArray(args?.selves) ? args.selves.filter((id) => typeof id === 'string' && personas.has(id)) : [];
+  const ownSelvesOf = (ctx) => {
+    const local = !(typeof ctx?.caller === 'string' && ctx.caller);
+    const named = local && Array.isArray(ctx?.selves) ? ctx.selves.filter((id) => typeof id === 'string' && personas.has(id)) : [];
     return new Set(named.length ? named : [selfOfOwnItem({ createdBy: actorOf(ctx) })]);
   };
   /** The own lanes this device rides: its default's and each persona's it runs. */
@@ -7791,7 +7794,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
         // the own store AS the selves the call is for (`ownSelvesOf`): that noun's rows they made, nothing else (default-deny)
-        const ownSelves = ownSelvesOf(args, ctx);
+        const ownSelves = ownSelvesOf(ctx);
         const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall
           ? createGenericAtomHandlers(ownStoreAsSelf(await getOwnStore(), (row) => row?.type === g.noun && ownSelves.has(selfOfOwnItem(row))))
           : null;
@@ -8599,7 +8602,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       await ownCalendarReady;
       // the own agenda AS the selves the call is for (`ownSelvesOf`): their appointments only, default-deny
       // (`ownStoreAsSelf`); the own Agenda itself is every self's container. Made per call: the set differs per call.
-      const selves = ownSelvesOf(args, ctx);
+      const selves = ownSelvesOf(ctx);
       const agendaView = ownStoreAsSelf(ownCalendarStore, (row) => row?.defaultChild === 'calendar-event'
         || (row?.type === 'calendar-event' && selves.has(selfOfOwnItem(row))));
       const ops = makeCircleCalendarOps({

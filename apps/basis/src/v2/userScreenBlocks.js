@@ -434,11 +434,12 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
   let ownError = null;
   if (withOwn) {
     // my own (no circle), beside the circles': appointments from my own agenda, notes from my own store
-    // the own routes answer per self (default-deny): the block asks for every self that is ticked, else the caller's own
-    const forSelves = selfSet && Array.isArray(selfSet.on) && selfSet.on.length ? { selves: [...selfSet.on] } : {};
+    // the own routes answer per self (default-deny): the block asks, in the CALL (never the args), for every self that is
+    // ticked, else the caller's own
+    const forSelves = selfSet && Array.isArray(selfSet.on) && selfSet.on.length ? { selves: [...selfSet.on] } : undefined;
     const own = isAgenda
-      ? await callSkill('calendar', 'listEvents', { days: horizonDays, ...forSelves }).catch((err) => { ownError = String(err?.message ?? err); return null; })
-      : await callSkill('household', encodeGenericOpId('household', 'list', noun), { circleId: OWN_DEVICES_SCOPE, ...forSelves }).catch((err) => { ownError = String(err?.message ?? err); return null; });
+      ? await callSkill('calendar', 'listEvents', { days: horizonDays }, forSelves).catch((err) => { ownError = String(err?.message ?? err); return null; })
+      : await callSkill('household', encodeGenericOpId('household', 'list', noun), { circleId: OWN_DEVICES_SCOPE }, forSelves).catch((err) => { ownError = String(err?.message ?? err); return null; });
     // the self that made each own item (it is changed as that self, never another): its maker's webid among this
     // device's selves; no maker, or 'me' (an own appointment is made as 'me'), is the default's; a webid no self here
     // holds is a self not run on this device — null, so the row stays read-only

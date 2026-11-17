@@ -127,11 +127,13 @@ export function createActState({ now = () => Date.now(), setTimer = setTimeout, 
  */
 export function wrapCallSkillWithActState(callSkill, { store, manifestsByOrigin } = {}) {
   if (typeof callSkill !== 'function' || !store) return callSkill;
-  return async function callSkillWithActState(appOrigin, opId, args) {
-    if (!store.recentlyInteracted() || !isActOp(manifestsByOrigin, appOrigin, opId)) return callSkill(appOrigin, opId, args);
+  // the call's context (a self it is made as, the selves it reads for) is passed on, never dropped
+  return async function callSkillWithActState(appOrigin, opId, args, ctx) {
+    const call = () => (ctx === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, ctx));
+    if (!store.recentlyInteracted() || !isActOp(manifestsByOrigin, appOrigin, opId)) return call();
     const token = store.begin({ appOrigin, opId, args });
     let result;
-    try { result = await callSkill(appOrigin, opId, args); }
+    try { result = await call(); }
     catch (err) { store.end(token, { error: err }); throw err; }
     store.end(token, { result });
     return result;

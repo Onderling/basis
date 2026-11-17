@@ -14,7 +14,7 @@
 // Release APK, an emulator or an agreed test device (E2E_WIPE_OK): it deletes the app.
 
 const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
-const { pause, present, openPlus, say, textsOf, requestsReach, setOwnModel, makeSelf, onlySelf } = require('./support/plusWalk');
+const { pause, present, openPlus, putLine, say, textsOf, requestsReach, setOwnModel, makeSelf, onlySelf } = require('./support/plusWalk');
 const { startStandInModel, reversePort } = require('./support/standInModel');
 
 const SCRIPT = [
@@ -115,7 +115,7 @@ describe('the "+" story on the phone, the rest, with a stand-in model', () => {
 
   it('6. the "/" list: the same acts as the buttons, and picking one opens the same form, with no model call', async () => {
     const calls = model.requests.length;
-    await element(by.id('vandaag-plus-line')).replaceText('/');
+    await putLine('/');
     await present(by.id('vandaag-plus-suggestion'), 10_000);
     const offered = await textsOf(by.id('vandaag-plus-suggestion'));
     await device.takeScreenshot('plus-rest-06-slash');

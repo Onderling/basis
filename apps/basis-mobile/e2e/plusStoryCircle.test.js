@@ -10,7 +10,7 @@
 
 const { launch, soon, tapSoon, firstBoot, emulatorOnly } = require('./support/ui');
 const { startPeer, joinByInvite, peerListsHold, listsTabReached } = require('./support/peer');
-const { pause, present, openPlus, say } = require('./support/plusWalk');
+const { pause, present, openPlus, putLine, say } = require('./support/plusWalk');
 const { reversePort } = require('./support/standInModel');
 
 const LIST = 'Boodschappen';
@@ -44,7 +44,7 @@ describe('the "+" story on the phone: a circle\'s act asks which place, and runs
     // the circle's list has to be on the phone too, or the line has one place and runs at once: read until the card
     let card = false;
     for (let i = 0; i < 8 && !card; i += 1) {
-      await element(by.id('vandaag-plus-line')).replaceText(`zet kaas op ${LIST}`);
+      await putLine(`zet kaas op ${LIST}`);
       await expect(element(by.id('vandaag-plus-line'))).toHaveText(`zet kaas op ${LIST}`);
       await pause(1500);
       await tapSoon(by.id('vandaag-plus-read'));

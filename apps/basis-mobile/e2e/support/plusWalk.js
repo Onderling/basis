@@ -14,9 +14,20 @@ async function openPlus() {
   await soon(by.id('vandaag-plus'), 20_000);
 }
 
+/**
+ * Put a line in the "+" line so the SHEET has it, not only the native field: Detox's replaceText can set the field
+ * without onChangeText firing (the read then gets an empty line and says "I could not read that": measured on the
+ * Samsung 2026-11-17 and on the emulator 2026-11-14). The last character is TYPED, which fires a real change event.
+ */
+async function putLine(line) {
+  const field = element(by.id('vandaag-plus-line'));
+  await field.replaceText(line.slice(0, -1));
+  await field.typeText(line.slice(-1));
+}
+
 /** Type a line and read it; resolves when the thread holds the line (its answer follows). */
 async function say(line) {
-  await element(by.id('vandaag-plus-line')).replaceText(line);
+  await putLine(line);
   // the sheet must have TAKEN the line before Read (a tap that comes first goes nowhere: measured 2026-11-16)
   await expect(element(by.id('vandaag-plus-line'))).toHaveText(line);
   await pause(1500);
@@ -128,4 +139,4 @@ async function onlySelf(name, otherName) {
   await tapSoon(by.id('persona-switcher-close'));
 }
 
-module.exports = { pause, present, openPlus, say, textsOf, requestsReach, setOwnModel, makeSelf, onlySelf };
+module.exports = { pause, present, openPlus, putLine, say, textsOf, requestsReach, setOwnModel, makeSelf, onlySelf };

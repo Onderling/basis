@@ -22,8 +22,11 @@ test.setTimeout(420_000);
 // These walks ride the PUBLIC NKN network, which a CI runner reaches when it reaches it: on 2026-09-13
 // the fallback story passed once and failed three times on the same tree (RpcTimeoutError, connect-to-node
 // timeout), and a retry did not help. What they prove is real and they pass alone on a developer machine;
-// they are not a fact CI can assert, so CI does not. Run them by hand: `npx playwright test walk-transports`.
-test.skip(!!process.env.CI, 'rides the public NKN network — passes alone, not a CI fact');
+// they are not a fact CI can assert, so CI does not. And every browser here is launched HERMETIC (playwright.config.js:
+// no host but this machine), so without the public network the NKN step cannot pass anywhere, local runs included.
+// Run them by hand, before a release, with the network open (the ladder's by-hand step; result in the release notes):
+//   PEER_TEST_PUBLIC_NETWORK=1 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay walk-transports
+test.skip(process.env.PEER_TEST_PUBLIC_NETWORK !== '1', 'needs the public network (public NKN): PEER_TEST_PUBLIC_NETWORK=1, a by-hand step before a release');
 
 const surface = (page, items = []) => page.evaluate((its) => window.onderlingSurface?.(its), items);
 const call = (page, app, opId, args = {}) =>

@@ -304,6 +304,9 @@ import {
 import { buildOnboardingTemplate, loadOnboardingTemplate } from '../../src/v2/onboardingTemplate.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../src/v2/onboardingChat.js';
 import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
+import { renderIntroDeck } from './introDeck.js';
+import { renderFirstOpen } from './firstOpen.js';
+import { firstOpenThen, addressCarriesAct } from '../../src/v2/firstOpen.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -1478,6 +1481,9 @@ let resolveSkill = null; // (opId, args) => Promise<object|null>
 // (`podAuth.handleRedirect`) strips `?code=…&state=…` on load (it treats `code` as an OIDC auth
 // code), which would wipe a boot parameter such as `?addbot` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
+// the fragment the app was opened with, before any handler scrubs a link from it (the first open reads it: a link is
+// the scan door, already answered)
+const _bootHash = (typeof window !== 'undefined' && window.location) ? window.location.hash : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
 // THE SHARED ACT STATE (actState.js): every act the person just took paints pending · done · failed through ONE strip,
 // whatever screen dispatched it — the waist is wrapped once where `rawCallSkill` is made (below, at agent boot). The
@@ -3088,12 +3094,24 @@ async function refreshSelfSet() {
   try { book = await userScreenStore.get(); _screensBook = book; } catch { /* the book as held stands */ }
   _selfSet = { held, on: held.length ? activeSelves(book ?? {}, held) : ['default'] };
 }
+/** The header's person button just below the host's line when that line is in view, else at the top as before. */
+function placeHeaderAvatar() {
+  if (!_headerAvatarEl) return;
+  const bar = document.querySelector('.cc-host-frame');
+  const below = bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0;
+  _headerAvatarEl.style.top = `calc(${below}px + .5rem)`;
+}
 function paintHeaderAvatar() {
   if (!_headerAvatarEl) {
     _headerAvatarEl = document.createElement('div');
     _headerAvatarEl.style.cssText = 'position:fixed;top:.5rem;right:.75rem;z-index:50;';
     document.body.appendChild(_headerAvatarEl);
+    // placed against the APP, not the whole window: a hosted build paints the site's "back to …" line above the app
+    // (hostFrameBar.js), and the button sat half over it. Its top follows that line while the line is on screen.
+    window.addEventListener('scroll', placeHeaderAvatar, { passive: true });
+    window.addEventListener('resize', placeHeaderAvatar, { passive: true });
   }
+  placeHeaderAvatar();
   // with one self the avatar is the person's editor; with several it is the switcher
   const onOpen = _selfSet.held.length > 1 ? () => showPersonaSwitcher() : () => openAboutMePanel('default');
   renderHeaderAvatar(_headerAvatarEl, { avatar: _headerAvatar, pictureUrl: _headerAvatarUrl, t, onOpen });
@@ -4949,7 +4967,8 @@ function onScreenAction(action) {
       .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
-  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openHelpDoor()); }
+  // "Lees meer": the introduction's seven cards (src/v2/introDeck.js); closed or read through, Today again without the card
+  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openIntroDeck()); }
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
@@ -5559,6 +5578,30 @@ async function showMyData(opts) {
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
 // THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared)
+// THE FIRST OPEN (src/v2/firstOpen.js): the three doors on a screen of their own; any door ends it on this device, then
+// Today, then what the door asks for: the one scanner (the scanQr op, as Me's "Scan") or the introduction's cards
+function showFirstOpen() {
+  hideTabBar();
+  renderFirstOpen(rootEl, {
+    t,
+    onDoor: async (door) => {
+      await onboardingFlags.markFirstOpenSeen();
+      await showScreens();
+      const then = firstOpenThen(door);
+      if (then === 'scan') Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {});
+      else if (then === 'intro') { await onboardingFlags.markIntroSeen(); openIntroDeck(); }
+    },
+  });
+}
+
+// THE INTRODUCTION (Today's "Nieuw bij Basis?" → "Lees meer"): the seven cards in the shared overlay; leaving it shows
+// Today again (the card is gone: the intro was marked seen before the deck opened)
+function openIntroDeck() {
+  // every way out (its buttons, a click outside the card) paints Today again: the repaint the flag write sets off is not
+  // reliably there in time (the click-outside spec was flaky under a full-suite load, 2026-11-17)
+  mountMyDataWizard(({ container, onClose }) => renderIntroDeck({ container, t, onClose }), { afterClose: () => _showVandaag() });
+}
+
 function openHelpDoor() {
   const r = helpDoorTarget(circlesCache);
   if (r.kind === 'circle') { showDetail(r.circleId); return; }
@@ -5575,6 +5618,8 @@ function showSettingsHome() {
     onOpenDoor: (d) => {
       // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same)
       if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
+      // the introduction's seven cards again (the manifest's settings door; phone twin: setIntroOpen)
+      if (d?.target?.kind === 'nav' && d.target.to === 'intro') { openIntroDeck(); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
@@ -5597,7 +5642,9 @@ function showSettingsCircleChooser() {
 // mount one of the existing wizard renderers (restore, recovery file, …)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
-function mountMyDataWizard(renderWizard, extra = {}) {
+function mountMyDataWizard(renderWizard, extraIn = {}) {
+  // `afterClose`: what follows EVERY way out (the wizard's own button, a click outside), for a host that repaints behind it
+  const { afterClose = null, ...extra } = extraIn ?? {};
   const overlay = document.createElement('div');
   overlay.className = 'cc-mydata-modal';
   const card = document.createElement('div');
@@ -5612,7 +5659,7 @@ function mountMyDataWizard(renderWizard, extra = {}) {
     close();
   });
   document.body.appendChild(overlay);
-  function close() { try { overlay.remove(); } catch { /* defensive */ } }
+  function close() { try { overlay.remove(); } catch { /* defensive */ } if (typeof afterClose === 'function') afterClose(); }
   try {
     // Thin adapter: hand the shared renderer this shell's DOM + rawCallSkill; `extra` lets a wizard that
     // needs more (the join wizard wants `args`/`sendPeerRedeem`) get it without a bespoke mount fn.
@@ -9502,6 +9549,7 @@ async function boot() {
   mountPlusButton();   // after localisation: mounted before it, the button was named by its key
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
+  placeHeaderAvatar();   // the person button below the line just painted (it may already be on screen)
   renderCircleLauncher(rootEl, { loading: true, t });
 
   // register the web-push service worker (root-scoped /sw.js). Best-effort:
@@ -10266,6 +10314,13 @@ async function boot() {
   let lastTab = null;
   try { lastTab = window.localStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
   const start = startTabFor(circleHouseholdAgent?.getParamValue?.('home.startScreen'), lastTab);
+  // THE FIRST OPEN on this device: three doors before anything else (src/v2/firstOpen.js); a door chosen, Today
+  // A person who ARRIVED BY A LINK (a contact, an invitation, an enrol offer, an install, a bot) answered the scan door
+  // by opening it: the first open is over, and the link's own sheet goes on (firstOpen.js addressCarriesAct)
+  if (!(await onboardingFlags.isFirstOpenSeen())) {
+    if (addressCarriesAct({ hash: _bootHash, search: _bootSearch })) await onboardingFlags.markFirstOpenSeen();
+    else { showFirstOpen(); return; }
+  }
   if (start === 'screens') showScreens();
   else if (start === 'contacten') showContacts();
   else if (start === 'mij') showMij();

@@ -21,13 +21,13 @@ export default function DeliveryChip({ state, reason = null, rowId, onRetry = nu
   const styles = stylesFor(theme);
   return p.retryable ? (
     <Pressable
-      style={styles.retryable}
+      style={p.tone === 'warn' ? styles.retryable : styles.retryableNeutral}
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={`${testIDPrefix}-${p.state}-${rowId}`}
       onPress={() => { if (onRetry) onRetry(rowId); }}
     >
-      <Text style={styles.retryableText}>{line}</Text>
+      <Text style={p.tone === 'warn' ? styles.retryableText : styles.retryableNeutralText}>{line}</Text>
     </Pressable>
   ) : (
     <Text
@@ -49,6 +49,9 @@ function stylesFor(theme) {
       quiet:         { marginTop: 4, fontSize: 11, color: theme.color.inkSoft },
       retryable:     { marginTop: 4, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: theme.color.danger, backgroundColor: theme.color.dangerBg },
       retryableText: { fontSize: 11, color: theme.color.danger },
+      // a tap may help, but nothing went wrong ('maybe received': the shared tone is neutral): no warning colour
+      retryableNeutral:     { marginTop: 4, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: theme.color.line },
+      retryableNeutralText: { fontSize: 11, color: theme.color.inkSoft },
     });
     cache.set(theme, s);
   }

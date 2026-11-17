@@ -21,7 +21,9 @@
  *   • **Closing properly.** Leaving the screen must stop advertising, stop watching, and drop the peer
  *     list — in that order, and even if the caller never opened it.
  */
-import { buildNearbyModel, }             from './circleNearby.js';
+import { buildNearbyModel, pickPeerLabel } from './circleNearby.js';
+import { timeWords }                     from './whenWords.js';
+import { SOMEONE_LABEL_KEY }             from './personLabel.js';
 import { createProximitySession, nearbyActions } from './circleProximity.js';
 import { makeNearbySessionAdapter }      from './nearbyDiscoverability.js';
 import { createNetworkChangeWatcher }    from './networkChangeWatcher.js';
@@ -70,6 +72,25 @@ export const NEARBY_INVITE_LABELS = Object.freeze({
  * asking to be hidden outranks everything, and "this device cannot discover" is an explanation rather than
  * a warning. Returns null when there is nothing to say.
  */
+/**
+ * THE ROOM CHAT'S LINES AS A PERSON READS THEM: each line with who said it and when (Frits's own test: without them the
+ * chat was "very hard to read"). Who: "Jij" for one's own line; for another's, the label the room shows for them (their
+ * face, else the same `peer-…` the person rows show, so a reader can match a line to a row); when: the clock time.
+ * Both shells paint exactly these fields.
+ * @param {Array<{id: string, text: string, from?: string|null, createdAt?: number, receivedAt?: number}>} messages
+ * @param {{rows?: Array<{id: string, label?: string}>, me?: string|null, t: Function}} o
+ * @returns {Array<{id: string, text: string, who: string, when: string, mine: boolean}>}
+ */
+export function nearbyChatLines(messages = [], { rows = [], me = null, t } = {}) {
+  const byId = new Map((Array.isArray(rows) ? rows : []).map((r) => [r?.id, r]));
+  return (Array.isArray(messages) ? messages : []).map((m) => {
+    const mine = (me != null && m?.from === me) || (m?.createdAt != null && m?.receivedAt == null);
+    const row = m?.from ? byId.get(m.from) : null;
+    const who = mine ? t('circle.nearbyScreen.chat_you') : (row?.label || pickPeerLabel({ pubKey: m?.from ?? '' }) || t(SOMEONE_LABEL_KEY));
+    return { id: m?.id, text: m?.text ?? '', who, when: timeWords(m?.receivedAt ?? m?.createdAt), mine };
+  });
+}
+
 export function nearbyVisibilityKey(visibility) {
   if (!visibility) return null;
   if (visibility.radioOff)    return 'radio_off';
@@ -407,7 +428,8 @@ export function createNearbyScreen({
       allows,
       // Only present when I have joined the conversation. An empty array would read as "nobody has said
       // anything", which is a different fact from "I am not in this chat".
-      chat: allows.chat ? chat.list() : null,
+      // each line with who said it and when (`nearbyChatLines`), what both shells paint
+      chat: allows.chat ? nearbyChatLines(chat.list(), { rows: withCards, me: safeCall(myRoomAddress, null), t }) : null,
       visibility: visibility(),
       quiet,
       radioOff: radioIsOff(),

@@ -321,27 +321,27 @@
   },
   "relay": {
     "no_substrate": {
-      "text": "Relay-ondersteuning is niet aanwezig in deze build.",
+      "text": "Verbindingspunten worden in deze build niet ondersteund.",
       "doc": "/set-relay aangeroepen maar agent.relay ontbreekt."
     },
     "url_required": {
-      "text": "Relay-URL vereist. Probeer /set-relay ws://jouw-host:poort of /set-relay --clear",
+      "text": "Adres van het verbindingspunt vereist. Probeer /set-relay ws://jouw-host:poort of /set-relay --clear",
       "doc": "/set-relay zonder --url of --clear."
     },
     "bad_url": {
-      "text": "Ongeldige relay-URL. Moet beginnen met ws:// of wss://",
+      "text": "Ongeldig adres van een verbindingspunt. Moet beginnen met ws:// of wss://",
       "doc": "/set-relay met een ongeldig URL-schema."
     },
     "cleared": {
-      "text": "✓ Relay gewist. NKN blijft actief.",
+      "text": "✓ Verbindingspunt gewist. NKN blijft actief.",
       "doc": "/set-relay --clear is gelukt."
     },
     "connected": {
-      "text": "✓ Relay verbonden: {{url}} (adres: {{address}})",
+      "text": "✓ Verbindingspunt verbonden: {{url}} (adres: {{address}})",
       "doc": "/set-relay is gelukt."
     },
     "connect_failed": {
-      "text": "Relay-verbinding mislukt: {{reason}}",
+      "text": "Verbinden met het verbindingspunt mislukt: {{reason}}",
       "doc": "/set-relay ving een fout op van sa.relay.connect()."
     }
   },
@@ -826,7 +826,7 @@
     },
     "offer_line": {
       "text": "Je bericht gaat naar de Feedback-assistent van de maker, op een apparaat van de maker zelf. Je contactkaart gaat mee, zodat de maker je kan antwoorden.",
-      "doc": "Under the offer: who receives what \u2014 the message and the person's contact card, to the maker's Feedback assistant. Said before the add, never after."
+      "doc": "Under the offer: who receives what — the message and the person's contact card, to the maker's Feedback assistant. Said before the add, never after."
     },
     "no_contact": {
       "text": "Deze versie van de app heeft geen feedbackcontact. Meld het aan wie je de app gaf — dat is precies het soort ding dat we willen weten.",

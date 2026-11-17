@@ -503,7 +503,8 @@ export async function bootAgentBundle(opts = {}) {
   const nearbyRoomSelfRef = { current: () => null };
   // what the room is told about me, and what an ask in it is weighed against (nearbyIdentity.js) — one per bundle
   const nearbyIdentity = createNearbyIdentity({
-    callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
+    // the call's context (a self it is made as, the selves a block reads for) is passed on, never dropped
+    callSkill: (app, op, args, ctx) => (ctx === undefined ? agent.callSkill?.(app, op, args) : agent.callSkill?.(app, op, args, ctx)),
     relayUrl: () => resolveMobileRelayUrl(),
     shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
     nknAddress: () => agent?.peer?.address ?? null,

@@ -64,7 +64,7 @@ describe('the thread header offers it', () => {
     renderContactThread(container, { name: 'Anne', messages: [], t: (k) => k, hidden: false, onToggleHidden: vi.fn(), onOpenLens: vi.fn(), onDelete });
     const menu = container.querySelector('.cc-cthread__menu');
     expect(menu.hidden).toBe(true);
-    expect([...menu.children].map((c) => c.className)).toEqual(['cc-cthread__hide', 'cc-cthread__hide-note', 'cc-btn cc-btn--danger cc-cthread__delete']);
+    expect([...menu.children].map((c) => c.className)).toEqual(['cc-cthread__hide', 'cc-btn cc-btn--danger cc-cthread__delete']);
     container.querySelector('.cc-cthread__more').click();
     expect(menu.hidden).toBe(false);
     menu.querySelector('.cc-cthread__delete').click();

@@ -172,15 +172,19 @@
   "lists.markListItemDone.stated": {
     "doc": "Something is done, bought or fixed: tick it off (a chore is completed). Mostly a reply to the bot's own reminder.",
     "patterns": [
-      "(the)? {item} (is|are) (already)? (done|bought|fixed)"
+      "(the)? {item} (is|are) (already)? (done|bought|fixed)",
+      "(the)? {item} (done|bought)"
     ],
     "examples": [
       "the milk is bought",
-      "windows is done"
+      "windows is done",
+      "milk done"
     ],
     "not": [
       "is dinner done?",
-      "when is the lamp fixed"
+      "when is the lamp fixed",
+      "what is done",
+      "what have i done"
     ]
   },
   "assistant.reminders.off": {

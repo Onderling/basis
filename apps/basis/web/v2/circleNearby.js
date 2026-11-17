@@ -609,7 +609,15 @@ export function renderCircleNearby(container, {
         const line = document.createElement('div');
         line.className = 'circle-nearby__chat-line';
         line.dataset.messageId = m.id || '';
-        line.textContent = m.text;
+        if (m.mine) line.dataset.mine = 'true';
+        // who said it and when (shared `nearbyChatLines`), then the words
+        const meta = document.createElement('div');
+        meta.className = 'circle-nearby__chat-meta';
+        meta.textContent = [m.who, m.when].filter(Boolean).join(' · ');
+        const words = document.createElement('div');
+        words.className = 'circle-nearby__chat-text';
+        words.textContent = m.text;
+        line.append(meta, words);
         block.appendChild(line);
       }
     }

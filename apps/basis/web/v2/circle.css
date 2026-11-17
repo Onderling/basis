@@ -1644,3 +1644,7 @@
 .circle-first-open__title { margin: 0; }
 .circle-first-open__lead { margin: 0 0 8px; line-height: 1.5; }
 .circle-first-open__door { width: 100%; }
+
+/* THE ROOM CHAT: each line says who and when (nearbyChatLines), small and soft above the words */
+.circle-nearby__chat-meta { font-size: 12px; color: var(--ink-soft); }
+.circle-nearby__chat-line + .circle-nearby__chat-line { margin-top: 6px; }

@@ -10721,7 +10721,7 @@
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "welcome_body": {
-      "text": "Basis is een app van Onderling om dingen te regelen met de mensen om je heen: je huishouden, je straat, je club. Je gegevens staan op je eigen telefoon, niet bij ons.",
+      "text": "Basis is een app van Onderling om dingen te regelen met de mensen om je heen: je huishouden, je straat, je club. Je gegevens staan op je eigen apparaat, niet bij ons.",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "circles_title": {
@@ -10761,7 +10761,7 @@
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "nearby_body": {
-      "text": "Bij In de buurt zie je wie er dichtbij ook openstaat, alleen als jij en zij dat aanzetten. Je kunt een vraag stellen (\"wie heeft een boormachine?\"). Die gaat naar wie er openstaat; hun telefoon kijkt zelf of het past bij wat zij aanbieden, en jij hoort het alleen als zij antwoorden.",
+      "text": "Bij In de buurt zie je wie er dichtbij ook openstaat, alleen als jij en zij dat aanzetten. Je kunt een vraag stellen (\"wie heeft een boormachine?\"). Die gaat naar wie er openstaat; hun apparaat kijkt zelf of het past bij wat zij aanbieden, en jij hoort het alleen als zij antwoorden.",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "keys_title": {
@@ -10769,7 +10769,7 @@
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "keys_body": {
-      "text": "Je toegang hangt aan 24 woorden, je herstelzin. Schrijf ze op en bewaar ze ergens veilig: wie ze heeft, is jou. Zonder die woorden kun je niet terug als je telefoon kwijt is.",
+      "text": "Je toegang hangt aan 24 woorden, je herstelzin. Schrijf ze op en bewaar ze ergens veilig: wie ze heeft, is jou. Zonder die woorden kun je niet terug als je je apparaat kwijt bent.",
       "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
     },
     "next": {

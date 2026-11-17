@@ -27,7 +27,7 @@ export default function IntroDeckModal({ visible = false, onClose } = {}) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => onClose?.()}>
       <View style={styles.backdrop}>
-        <View style={[styles.card, sheetCap]} testID="intro-deck" accessibilityLabel={step.id}>
+        <View style={[styles.card, sheetCap]} testID="intro-deck">
           <ScrollView style={SHEET_SCROLL} contentContainerStyle={styles.body}>
             <Text style={styles.position} testID="intro-deck-position">{t('circle.introDeck.position', { at: step.position.at, of: step.position.of })}</Text>
             <Text style={styles.title} testID={`intro-deck-card-${step.id}`}>{t(step.titleKey)}</Text>

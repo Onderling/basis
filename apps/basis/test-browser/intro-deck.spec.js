@@ -41,3 +41,14 @@ test('"Skip" leaves the introduction at once, and the card is gone from Today', 
   await expect(page.locator('.circle-intro')).toHaveCount(0);
   await expect(introCard(page)).toHaveCount(0);
 });
+
+test('a click outside the card leaves the introduction too, and Today is painted again without the card', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await introCard(page).locator('.circle-screen__onb-btn').first().click();
+  await expect(page.locator('.circle-intro')).toHaveAttribute('data-card', 'welcome');
+  // the overlay itself, outside the card (its top-left corner)
+  await page.locator('.cc-mydata-modal').click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('.circle-intro')).toHaveCount(0);
+  await expect(introCard(page), 'Today painted again: the card has gone').toHaveCount(0);
+});

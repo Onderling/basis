@@ -5,8 +5,8 @@
  * buttons cannot drift between web and the phone.
  *
  * The words live in the locale files (`circle.introDeck.*`); this file only orders them and says which buttons a step
- * has. Reading the deck to its end or skipping it marks the intro seen on this device (`onboardingFlags.markIntroSeen`),
- * so Today's card goes away either way.
+ * has. The shells mark the intro seen on this device when the deck OPENS (`onboardingFlags.markIntroSeen`, as "Read
+ * more" did before), so Today's card goes once it is opened, however the deck is left.
  */
 
 /** The cards, in order: each id names its title and body keys (`circle.introDeck.<id>_title` / `_body`). */

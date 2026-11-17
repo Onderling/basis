@@ -60,7 +60,11 @@ const RELAY_SPECS = /(journeys|matrix|twopeer|two-relays|feedback-path-box|scree
  * wss/https a spec or the app's own defaults might dial. Chromium resolves every name except localhost/127.0.0.1 to
  * nothing, so such a dial fails at once (net::ERR_NAME_NOT_RESOLVED, loud in the console) instead of reaching
  * production or the internet. Local servers (the dev servers, the relay fixture) are untouched. */
-const HERMETIC_LAUNCH = { args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1'] };
+// `PEER_TEST_PUBLIC_NETWORK=1` opens the network for the walks that NEED the public one (walk-transports rides public
+// NKN): a by-hand step before a release (docs/conventions/verification-ladder.md), never CI, never the default.
+const HERMETIC_LAUNCH = process.env.PEER_TEST_PUBLIC_NETWORK === '1'
+  ? {}
+  : { args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1'] };
 
 export default defineConfig({
   testDir: './test-browser',

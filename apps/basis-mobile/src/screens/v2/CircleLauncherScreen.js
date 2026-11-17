@@ -6374,7 +6374,11 @@ function NearbyScreen({
           {chat.length === 0 ? (
             <Text style={styles.muted}>{t('circle.nearbyScreen.chat_empty')}</Text>
           ) : chat.map((m) => (
-            <Text key={m.id} style={styles.rowMeta} testID={`nearby-chat-${m.id}`}>{m.text}</Text>
+            // who said it and when (shared `nearbyChatLines`), then the words
+            <View key={m.id} testID={`nearby-chat-${m.id}`} style={{ marginTop: 6 }}>
+              <Text style={styles.muted} testID={`nearby-chat-who-${m.id}`}>{[m.who, m.when].filter(Boolean).join(' · ')}</Text>
+              <Text style={styles.rowMeta}>{m.text}</Text>
+            </View>
           ))}
           <View style={styles.nearbyComposer}>
             <ThemedTextInput

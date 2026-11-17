@@ -3651,6 +3651,10 @@
       "text": "Nobody has said anything yet.",
       "doc": "Chat empty state — only shown once you have JOINED."
     },
+    "chat_you": {
+      "text": "You",
+      "doc": "Who said a line in the room chat, for your own lines (the others' lines carry the name or face the room shows)."
+    },
     "chat_ephemeral": {
       "text": "Nothing here is kept. Leaving forgets it.",
       "doc": "Says the ephemerality out loud, since a chat window normally implies history."

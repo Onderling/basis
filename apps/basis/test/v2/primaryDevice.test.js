@@ -92,3 +92,24 @@ describe('landing a sibling\'s claim', () => {
     expect(claimSupersedes(null, { deviceId: 'a', at: 1 })).toBe(false);
   });
 });
+
+// The point catches up BEFORE it signs: a device that claims the point (a re-key run after revoking the old point)
+// must not go on until what the move starts (closing its circles until caught up) has begun. Fire-and-forget let the
+// re-key sign on an empty chain on a slow runner (a CI flake: the box held no statement and re-keyed anyway).
+describe('claiming waits for what the move starts', () => {
+  it('claim() resolves only after onChanged\'s work, when the claim made this device the one', async () => {
+    const order = [];
+    let release;
+    const choice = createPrimaryDeviceChoice({
+      vault: memVault(), myDeviceId: 'dev-box', siblings: async () => [],
+      sendToPeer: async () => ({ delivered: true }), now: () => 1000,
+      onChanged: (mine) => (mine ? new Promise((res) => { release = () => { order.push('gate closed'); res(); }; }) : undefined),
+    });
+    const claimed = choice.claim().then(() => order.push('claim returned'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(order, 'claim() must not return before the move\'s work').toEqual([]);
+    release();
+    await claimed;
+    expect(order).toEqual(['gate closed', 'claim returned']);
+  });
+});

@@ -354,7 +354,7 @@ import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
 // Sibling of the EventLog (which stays append-only); read at render
 // time by circleView to surface pending/failed icons.
-import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { createAppDeliveryMap } from '../../src/v2/deliveryState.js';
 // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out), web + mobile.
 import { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
@@ -1391,7 +1391,7 @@ const pullRosterForCircle = async ({ circleId }) => {
 // in-memory EventLog).  showCircle's onSend marks each locally-sent
 // msgId 'pending' → 'sent' | 'failed' as broadcastCircleMessage
 // resolves; the circle renderer reads it at render time.
-const deliveryStateMap = createDeliveryStateMap();
+const deliveryStateMap = createAppDeliveryMap();   // the substrate map + the 'waiting for a connection' words
 // …and REDRAW when a RECEIPT advances a message. `broadcastFanOut` announces its own transitions
 // (`onChange: rerender`), so the receipt was the one writer with nothing to announce it: it arrived, the
 // map advanced to `stored`, and the bubble kept saying "maybe received" until an unrelated render

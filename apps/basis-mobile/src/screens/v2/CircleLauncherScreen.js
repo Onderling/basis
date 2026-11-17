@@ -94,7 +94,7 @@ import {
   // the in-app banner over the same rows (the shared driver; this screen only paints it)
   createBannerDriver, notifyPolicyKey,
   // δ.2 — per-message delivery state for optimistic circle chat sends.
-  createDeliveryStateMap,
+  createAppDeliveryMap,
   // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out).
   circleChatMessageEvent, broadcastCircleFanOut,
   // Phase 3 — the shared circle label→candidate lookup (base items + app-qualified live fetch).
@@ -3465,7 +3465,7 @@ function CircleDetail({
   // Prefer the SHARED map from App.js — inbound receipts land there. The local fallback keeps older
   // callers/tests working, but a private map here means receipts advance a state no bubble reads.
   if (deliveryStateMapRef.current == null) {
-    deliveryStateMapRef.current = deliveryStateMap ?? createDeliveryStateMap();
+    deliveryStateMapRef.current = deliveryStateMap ?? createAppDeliveryMap();
   }
   const [deliveryTick, setDeliveryTick] = useState(0);
   // …and REDRAW when something else writes to that map. The send path bumps the tick itself (it owns the

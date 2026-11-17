@@ -22,7 +22,7 @@
  * Empty `blocks` array → top-level empty state ("admin hasn't set up
  * a screen yet").
  */
-import { blockEmptyLine, blockOpensWhole } from '../../../../basis/src/v2/blockTitle.js';
+import { blockEmptyLine, blockOpensWhole, blockHidden } from '../../../../basis/src/v2/blockTitle.js';
 import { onboardingStripLine } from '../../../../basis/src/v2/onboardingStrip.js';
 import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
@@ -111,8 +111,9 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       </View>
     );
   }
-  // the onboarding strip, all its cards done: nothing at all (not a line saying so)
-  if (block.type === 'onboarding' && block.status === 'empty') return null;
+  // a block that paints nothing at all (blockHidden, shared with web): the onboarding strip with nothing left; the
+  // circles with news when the person sees no circle (the onboarding line says that, once)
+  if (blockHidden(block)) return null;
   if (block.status === 'empty') {
     return (
       <View style={[...baseStyle, styles.blockEmpty]} testID={`screen-block-${block.blockId}`}>

@@ -23,7 +23,7 @@
  *   error   → red border + error message (per-block, page keeps rendering)
  */
 
-import { blockEmptyLine, blockOpensWhole } from '../../src/v2/blockTitle.js';
+import { blockEmptyLine, blockOpensWhole, blockHidden } from '../../src/v2/blockTitle.js';
 import { paintFace } from './faceView.js';
 import { labelShown } from '../../src/v2/personLabel.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
@@ -151,8 +151,9 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       + (block.error ? ` — ${block.error}` : '');
     return section;
   }
-  // the onboarding strip, all its cards done: nothing at all (not a line saying so)
-  if (block.type === 'onboarding' && block.status === 'empty') { section.hidden = true; return section; }
+  // a block that paints nothing at all (blockHidden, shared): the onboarding strip with nothing left; the circles with
+  // news when the person sees no circle (the onboarding line says that, once)
+  if (blockHidden(block)) { section.hidden = true; return section; }
   if (block.status === 'empty') {
     section.classList.add('circle-screen__block--empty');
     // one quiet line under the block's own title, in its own words — never its type (blockTitle.js, both shells)

@@ -635,3 +635,16 @@ describe('the read a person just saw is handed to the model for the turn after (
     expect(hints[1], 'a turn later it is gone').not.toContain('tandarts');
   });
 });
+
+describe('a slow model is said while the person waits ("even geduld")', () => {
+  it('the route reports it is slow and retrying: the door calls the sheet\'s onSlow for this read, then answers', async () => {
+    const interpret = vi.fn(async (_text, o) => { o.onSlow?.(); return { reply: 'Bij de buren.' }; });
+    const { d } = door({ interpret });
+    const slow = vi.fn();
+    const r = await d.read('waar ligt de sleutel?', { onSlow: slow });
+    expect(slow).toHaveBeenCalledTimes(1);
+    expect(r.done).toBe('Bij de buren.');
+    // a read without it: nothing to call, and no error
+    expect((await d.read('waar ligt de sleutel?')).done).toBe('Bij de buren.');
+  });
+});

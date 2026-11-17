@@ -6,7 +6,7 @@
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
@@ -104,6 +104,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     <Modal visible transparent animationType="slide" onRequestClose={closeSheet}>
       <View style={styles.backdrop}>
         <View style={styles.card} testID="vandaag-plus">
+          {/* the sheet scrolls: a long thread or the "/" list must never push the line and the first lines off the screen */}
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardBody} testID="vandaag-plus-scroll">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
           {/* which route answers this conversation, and whether it is confidential (web twin: circle-vandaag-plus__route) */}
           {!edit && routeLine ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
@@ -218,6 +220,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
           {/* the way out, not one of the acts */}
           <Btn variant="ghost" onPress={closeSheet} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -226,7 +229,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16, gap: 8 },
+  card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16, maxHeight: '92%' },
+  cardBody: { gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 4 },
   field: { gap: 4, marginBottom: 8 },
   label: { fontSize: 13, color: theme.color.inkSoft },

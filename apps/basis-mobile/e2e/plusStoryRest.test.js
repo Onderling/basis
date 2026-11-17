@@ -116,13 +116,18 @@ describe('the "+" story on the phone, the rest, with a stand-in model', () => {
   it('6. the "/" list: the same acts as the buttons, and picking one opens the same form, with no model call', async () => {
     const calls = model.requests.length;
     await element(by.id('vandaag-plus-line')).replaceText('/');
-    await soon(by.id('vandaag-plus-suggestion'), 10_000);
+    await present(by.id('vandaag-plus-suggestion'), 10_000);
     const offered = await textsOf(by.id('vandaag-plus-suggestion'));
     await device.takeScreenshot('plus-rest-06-slash');
     const appt = offered.find((s) => s.startsWith('/addappt'));
     if (!appt) throw new Error(`the appointment act is not offered: ${JSON.stringify(offered)}`);
     if (!offered.some((s) => s.startsWith('/add-note'))) throw new Error(`the note act is not offered: ${JSON.stringify(offered)}`);
     if (offered.some((s) => s.startsWith('/whoami'))) throw new Error('a device command is offered in the own "+"');
+    // the list is long: the sheet scrolls, and the line and the first acts stay reachable (they once fell off the top)
+    await waitFor(element(by.text(appt).withAncestor(by.id('vandaag-plus')))).toBeVisible()
+      .whileElement(by.id('vandaag-plus-scroll')).scroll(300, 'up');
+    await device.takeScreenshot('plus-rest-06-slash-top');
+    await pause(800);
     await element(by.text(appt).withAncestor(by.id('vandaag-plus'))).tap();
     await pause(1000);
     await tapSoon(by.id('vandaag-plus-read'));

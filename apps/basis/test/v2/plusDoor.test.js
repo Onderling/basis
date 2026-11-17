@@ -457,3 +457,11 @@ describe('a read the model picks is answered in words, also when it is empty (no
     expect(r.done).toContain('circle.vandaag.plus_list_empty');
   });
 });
+
+describe('the sheet shows the kept conversation, not the model\'s memory window', () => {
+  it('turns() gives the thread\'s shown length (PLUS_TURNS_SHOWN), more than the six turns a model is handed', async () => {
+    const { d } = door({ interpret: async () => ({ reply: 'ok' }) });
+    for (const line of ['een', 'twee', 'drie', 'vier']) await d.read(line);
+    expect(d.turns({}).map((x) => x.text)).toEqual(['een', 'ok', 'twee', 'ok', 'drie', 'ok', 'vier', 'ok']);
+  });
+});

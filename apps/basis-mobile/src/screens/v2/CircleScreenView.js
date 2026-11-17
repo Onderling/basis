@@ -23,6 +23,7 @@
  * a screen yet").
  */
 import { blockEmptyLine, blockOpensWhole } from '../../../../basis/src/v2/blockTitle.js';
+import { onboardingStripLine } from '../../../../basis/src/v2/onboardingStrip.js';
 import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
@@ -397,11 +398,14 @@ const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, c
   );
 });
 
-// THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
+// THE ONBOARDING STRIP, folded (onboardingStrip.js): one closed line that counts the set-up cards left; a tap opens
+// the cards, each with its own act through the host. A person in no circle reads one line pointing to Circles.
 // Web twin: circleScreen.js `renderOnboarding`.
 function OnboardingCards({ block, onAction, styles }) {
+  const cards = block.content?.cards ?? [];
+  const [open, setOpen] = useState(false);   // paint state: the strip starts closed
   // starts with the name already on the profile (the one the avatar's letters come from), as web's field does
-  const [handle, setHandle] = useState(() => (block.content?.cards ?? []).find((c) => c.id === 'handle')?.name ?? '');
+  const [handle, setHandle] = useState(() => cards.find((c) => c.id === 'handle')?.name ?? '');
   const act = (a) => { if (typeof onAction === 'function') onAction(a); };
   // the family (Btn): the strip's act is the screen's primary, the second choice quiet
   const OnbBtn = ({ labelKey, a, quiet = false, variant = null, testID }) => (
@@ -409,7 +413,14 @@ function OnboardingCards({ block, onAction, styles }) {
   );
   return (
     <View>
-      {(block.content?.cards ?? []).map((c) => (
+      {cards.length ? (
+        <Pressable style={styles.onbCard} accessibilityRole="button" accessibilityState={{ expanded: open }}
+          onPress={() => setOpen((o) => !o)} testID="onb-strip">
+          <Text style={styles.onbTitle}>{`${onboardingStripLine(cards.length, t)} ${open ? '▴' : '▾'}`}</Text>
+        </Pressable>
+      ) : null}
+      {block.content?.noCircle ? <Text style={styles.onbLine} testID="onb-no-circle">{t('circle.vandaag.onboarding_no_circle')}</Text> : null}
+      {(open ? cards : []).map((c) => (
         <View key={c.id} style={styles.onbCard} testID={`onb-card-${c.id}`}>
           <Text style={styles.onbTitle}>{t(`circle.vandaag.onboarding_${c.id}_title`)}</Text>
           {c.id === 'handle' ? (
@@ -434,7 +445,7 @@ function OnboardingCards({ block, onAction, styles }) {
               <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_reach_hint')}</Text>
               <OnbBtn labelKey="circle.vandaag.onboarding_reach_add" a={{ kind: 'open-points' }} testID="onb-reach-add" />
             </View>
-          ) : c.id === 'intro' ? (
+          ) : (
             <View>
               {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}
               <View style={styles.onbRow}>
@@ -442,11 +453,6 @@ function OnboardingCards({ block, onAction, styles }) {
                 {/* "Lees meer" is the card's one button; "Begrepen" a text link beside it */}
                 <OnbBtn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} variant="ghost" testID="onb-intro-seen" />
               </View>
-            </View>
-          ) : (
-            <View style={styles.onbRow}>
-              <OnbBtn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
-              <OnbBtn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} testID="onb-join" />
             </View>
           )}
         </View>

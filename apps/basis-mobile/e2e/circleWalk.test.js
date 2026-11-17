@@ -19,9 +19,10 @@ describe('a circle made on the phone, and its invite, settings and admin', () =>
     await firstBoot();
   });
 
-  it("Today's Make a circle opens the wizard there, and the wizard makes the circle", async () => {
-    await waitFor(element(by.id('onb-create'))).toBeVisible().withTimeout(30_000);
-    await element(by.id('onb-create')).tap();
+  // "Make a circle" left Today (Frits, 2026-11-17): it is on the Circles tab, where both doors are
+  it("Circles' Make a circle opens the wizard, and the wizard makes the circle", async () => {
+    await tapSoon(by.id('circle-tab-circles'), 30_000);
+    await tapSoon(by.id('launcher-new'), 30_000);
     await waitFor(element(by.id('create-group-wizard'))).toBeVisible().withTimeout(15_000);
     await device.takeScreenshot('walk-01-wizard');
     await element(by.id('wizard-radio-household')).tap();

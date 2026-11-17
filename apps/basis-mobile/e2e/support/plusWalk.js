@@ -2,7 +2,7 @@
 // The "+" walks' shared moves on the phone: open the sheet, say a line, set the person's own model through the real
 // settings screen, make a second self and tick exactly one. One copy, so a fix to a flake lands in every "+" walk
 // (plusStory, plusStoryRest, plusStoryCircle).
-const { isVisible, soon, tapSoon, firstOf } = require('./ui');
+const { isVisible, soon, tapSoon, firstOf, backToLauncher } = require('./ui');
 
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 /** In the thread at all (it may be below the fold) and the first of several matches: what a turn check means. */
@@ -74,6 +74,7 @@ async function setOwnModel(phonePort) {
 
 /** A second self, made as a person makes one: Mij → the dashed "new" card → a name → Make. */
 async function makeSelf(name) {
+  await backToLauncher();   // out of the settings screen setOwnModel leaves open: the tab bar shows again
   await tapSoon(by.id('circle-tab-mij'));
   await waitFor(element(by.id('mij-new-persona'))).toBeVisible().whileElement(by.id('mij-scroll')).scroll(400, 'down');
   await pause(800);

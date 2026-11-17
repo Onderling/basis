@@ -6017,7 +6017,7 @@ function NearbyScreen({
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   // Nearby's two tabs: what each holds and in what order, and which opens first, is `nearbyTabs` (shared with web);
   // a part with nothing in it is not in its list. Which tab is selected is this screen's own state.
-  const { tabs, defaultTab } = nearbyTabs(model);
+  const { tabs, defaultTab, chatOff } = nearbyTabs(model);
   const [pickedTab, setPickedTab] = useState(null);
   const selectedTab = tabs.some((x) => x.id === pickedTab) ? pickedTab : defaultTab;
   // What is new on each tab (`nearbyTabNews`, shared with web). The seen-marks are this screen's own state: the open
@@ -6256,15 +6256,22 @@ function NearbyScreen({
           </View>
         </View>
     ),
-    'nearby-chat-off': () => (
-      // Not in the room chat: one line, and the way in (the same allow as under "you here").
-      <View style={styles.nearbyAsks} testID="nearby-chat-off">
-        <Text style={styles.muted}>{t('circle.nearbyScreen.allow_chat_off')}</Text>
-        <Pressable onPress={() => onToggleAllow?.('chat', true)} accessibilityRole="button" testID="nearby-chat-join" style={styles.nearbyAction}>
-          <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.allow_chat')}</Text>
-        </Pressable>
-      </View>
-    ),
+    'nearby-chat-off': () => {
+      // No stream (`nearbyChatOff`, shared with web): hidden from the room, or not in the chat. One line, and the
+      // existing act that ends it — leaving "even stil", the radio back on, or the chat allow (the one under "you here").
+      const hidden = chatOff?.reason === 'hidden';
+      const act = { join: () => onToggleAllow?.('chat', true), unquiet: () => onSetQuiet?.(false), 'radio-on': () => onSetRadio?.('on') }[chatOff?.act];
+      return (
+        <View style={styles.nearbyAsks} testID="nearby-chat-off">
+          <Text style={styles.muted} testID={hidden ? 'nearby-chat-hidden' : undefined}>{t(hidden ? 'circle.nearbyScreen.chat_hidden_line' : 'circle.nearbyScreen.allow_chat_off')}</Text>
+          {act ? (
+            <Pressable onPress={act} accessibilityRole="button" testID={hidden ? 'nearby-chat-visible' : 'nearby-chat-join'} style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t(hidden ? 'circle.nearbyScreen.chat_hidden_action' : 'circle.nearbyScreen.allow_chat')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      );
+    },
   };
   return (
     // ONE scroll column for the whole room (the walk of 2026-10-26: the peer list took the full height and the sections

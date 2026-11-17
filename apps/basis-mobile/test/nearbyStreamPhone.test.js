@@ -38,6 +38,16 @@ describe('the phone\'s Conversation stream and tab counts', () => {
     expect((body.match(/onInviteAction\?\.\(action, entry\.invite\)/g) ?? []).length, 'one Join handler for both places').toBe(1);
   });
 
+  it('hidden from the room: the chat-off part says so and its button is the existing act (setQuiet / setRadio)', () => {
+    const body = nearbyScreenBody();
+    expect(body).toMatch(/const \{ tabs, defaultTab, chatOff \} = nearbyTabs\(model\)/);
+    const offPart = body.slice(body.indexOf("'nearby-chat-off': () =>"));
+    expect(offPart).toMatch(/circle\.nearbyScreen\.chat_hidden_line/);
+    expect(offPart).toMatch(/circle\.nearbyScreen\.chat_hidden_action/);
+    expect(offPart).toMatch(/unquiet: \(\) => onSetQuiet\?\.\(false\)/);
+    expect(offPart).toMatch(/'radio-on': \(\) => onSetRadio\?\.\('on'\)/);
+  });
+
   it('each tab label carries its count from the shared nearbyTabNews', () => {
     const body = nearbyScreenBody();
     expect(body).toMatch(/nearbyTabNews\(model, /);

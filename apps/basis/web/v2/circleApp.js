@@ -3095,10 +3095,6 @@ function placeHeaderAvatar() {
   const bar = document.querySelector('.cc-host-frame');
   const below = bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0;
   _headerAvatarEl.style.top = `calc(${below}px + .5rem)`;
-  // and at the APP COLUMN's right edge, not the window's: on a wide window the column is narrower than the window
-  const col = rootEl?.getBoundingClientRect?.();
-  const outside = col && col.width ? Math.max(0, Math.round(window.innerWidth - col.right)) : 0;
-  _headerAvatarEl.style.right = `calc(${outside}px + .75rem)`;
 }
 function paintHeaderAvatar() {
   if (!_headerAvatarEl) {

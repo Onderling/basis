@@ -32,14 +32,3 @@ for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 800 }]) 
     }, { message: 'the button is below the line', timeout: 5_000 }).toBe(true);
   });
 }
-
-test('on a wide window the person button sits at the app column\'s right edge, not the window\'s', async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 900 });
-  await page.goto('/');
-  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  const column = await page.locator('.circle-vandaag__head').boundingBox();
-  await expect.poll(async () => {
-    const b = await page.locator('.cc-header-avatar').first().boundingBox();
-    return b ? b.x + b.width <= column.x + column.width + 1 && b.x + b.width > column.x + column.width - 40 : false;
-  }, { message: 'the button\'s right edge is at the column\'s', timeout: 5_000 }).toBe(true);
-});

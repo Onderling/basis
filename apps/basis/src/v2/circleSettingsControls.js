@@ -44,6 +44,20 @@ export function readTransportMode(word) {
 }
 
 /**
+ * The `/transports` line both shells paint: the mode by its label (never the value 'relay') and the connection
+ * point by its address, or 'none'.
+ * @param {{mode?: string, relayUrl?: string|null}} ts  the device's transport state
+ * @param {(key: string, v?: object) => string} t
+ */
+export function transportsStatusLine(ts, t) {
+  const mode = TRANSPORT_MODES.includes(ts?.mode) ? ts.mode : 'nkn';
+  return t('circle.settings.transports_status', {
+    mode: t(`circle.settings.transportMode_opt.${mode}`),
+    relay: ts?.relayUrl || t('circle.settings.transports_none'),
+  });
+}
+
+/**
  * Fold the circle policy + device transport state into the ROUTE descriptor the predicates
  * read. `policy` supplies the pod/data-policy half (via C9); `transport` supplies the relay
  * half. A missing `transport` marks the route as `transportKnown:false` so predicates seam to

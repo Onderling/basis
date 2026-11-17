@@ -66,7 +66,7 @@ describe('G17 — composer built-in classifier', () => {
 
 // A person reads and types the transport modes by their words: "verbindingspunt" / "connection-point", "beide" / "both",
 // "nkn". The op still receives the mode values (nkn · relay · both).
-import { readTransportMode } from '../../src/v2/circleSettingsControls.js';
+import { readTransportMode, transportsStatusLine } from '../../src/v2/circleSettingsControls.js';
 describe('the transport modes by their words', () => {
   it('each word reads as its mode; anything else is not one', () => {
     expect(readTransportMode('NKN')).toBe('nkn');
@@ -78,5 +78,16 @@ describe('the transport modes by their words', () => {
   });
   it('/transport-mode verbindingspunt fires the op with the mode value', () => {
     expect(parseCircleBuiltin('/transport-mode verbindingspunt')).toEqual({ command: 'transport-mode', opId: 'transport-mode', args: { mode: 'relay' } });
+  });
+});
+
+// /transports says the mode by its label too: the value 'relay' never reaches the screen (both shells paint this line)
+describe('the /transports line', () => {
+  const t = (k, v) => (v ? `${k}|${JSON.stringify(v)}` : k);
+  it('names the mode by its label and the connection point by its address, or none', () => {
+    expect(transportsStatusLine({ mode: 'relay', relayUrl: 'wss://x' }, t))
+      .toBe('circle.settings.transports_status|{"mode":"circle.settings.transportMode_opt.relay","relay":"wss://x"}');
+    expect(transportsStatusLine({}, t))
+      .toBe('circle.settings.transports_status|{"mode":"circle.settings.transportMode_opt.nkn","relay":"circle.settings.transports_none"}');
   });
 });

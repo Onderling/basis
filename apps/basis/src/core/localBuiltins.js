@@ -1374,7 +1374,8 @@ async function transportMode(args, { agent, t }) {
     // write-only — nothing ever read it back at boot.
     const r = await agent.callSkill('params', 'set-param', { key: 'transport.mode', value: mode });
     if (r?.ok === false) return { ok: false, error: r.error ?? 'set-param refused' };
-    return { ok: true, message: t('transport.mode_set', { mode }) };
+    // said by its label (the one the settings control and the circle paths show), never the value: 'relay' is not a word a person reads
+    return { ok: true, message: t('transport.mode_set', { mode: t(`circle.settings.transportMode_opt.${mode}`) }) };
   } catch (err) {
     return { ok: false, error: err.message ?? String(err) };
   }

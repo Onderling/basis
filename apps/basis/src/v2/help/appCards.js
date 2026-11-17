@@ -50,7 +50,7 @@ export const APP_VARIANTS = Object.freeze({
   },
   'veilig.grenzen': {
     nl: 'Eerlijk is eerlijk: geen enkel systeem beschermt alles. De inhoud van berichten is versleuteld, maar wíe met wie contact heeft is bijvoorbeeld deels zichtbaar voor de verbindingspunten. En wat je eenmaal gedeeld hebt, staat op de apparaten van je kringgenoten: verwijderen kun je vragen, niet afdwingen. Zulke grenzen benoemen we liever zelf; op de pagina Grenzen op onderling.org staat precies wat wel en niet beschermd is.',
-    en: 'Honestly: no system protects everything. Message content is encrypted, but who contacts whom, for example, is partly visible to the connection points. And what you have shared lives on your circle members\' devices: you can request deletion, not enforce it. We prefer naming such boundaries ourselves; the page Boundaries on onderling.org states exactly what is and is not protected.',
+    en: 'Honestly: no system protects everything. Message content is encrypted, but who contacts whom, for example, is partly visible to the connection points. And what you have shared lives on your circle members\' devices: you can request deletion, not enforce it. We prefer naming such boundaries ourselves; the Limits page on onderling.org states exactly what is and is not protected.',
   },
   'veilig.dezevraag': {
     nl: 'Vragen aan mij worden op je eigen apparaat beantwoord, uit vaste, door mensen geschreven antwoorden, zonder taalmodel. Past er geen, dan vraag ik eerst of je je vraag wilt doorsturen naar het taalmodel van de kring; alleen met jouw ja gaat hij weg. Je vragen blijven in dit gesprek op je eigen apparaat.',

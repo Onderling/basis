@@ -502,12 +502,10 @@ describe('a budget on the request the "+" sends its model (Frits: do not let the
     const seen = [];
     const llm = { invoke: async (r) => { seen.push(r); return { replyText: 'ok' }; } };
     const { d } = door({ llm, interpret: interpretToCommand });
-    // the list family alone is eleven tools (~4.7k characters): its line gets a wider budget until the rare list acts
-    // (restore, edit, remove a whole list) are offered only when a line asks for them (open, BRIEF-plus-chat-route C)
-    const LIST_BUDGET = 7000;
-    for (const line of ['wat heb ik morgen gepland?', 'kun je de tandarts verzetten naar vrijdag?', 'wat staat er op mijn vakantielijst?', 'onthoud dat de sleutel bij de buren ligt']) {
+    // every typical line: one family's tools; a line naming none gets the reads and the three make-acts (Fable's ruling)
+    for (const line of ['wat heb ik morgen gepland?', 'kun je de tandarts verzetten naar vrijdag?', 'wat staat er op mijn vakantielijst?', 'onthoud dat de sleutel bij de buren ligt', 'wat kan je voor me doen?', 'waar ligt de sleutel?']) {
       await d.read(line);
-      expect(sizeOf(seen.at(-1)), line).toBeLessThan(/lijst/.test(line) ? LIST_BUDGET : BUDGET);
+      expect(sizeOf(seen.at(-1)), line).toBeLessThan(BUDGET);
     }
     const agenda = seen[0].tools.map((x) => x.id ?? x.name);
     expect(agenda, 'an agenda line gets the agenda').toContain('listEvents');
@@ -515,6 +513,19 @@ describe('a budget on the request the "+" sends its model (Frits: do not let the
     const note = seen[3].tools.map((x) => x.id ?? x.name);
     expect(note, 'a note line gets the note').toContain('__generic__:household:add:note');
     expect(note, 'a note line gets no agenda tools').not.toContain('cancelEvent');
+    const list = seen[2].tools.map((x) => x.id ?? x.name);
+    expect(list, 'a list line gets the everyday list acts').toEqual(expect.arrayContaining(['listEntries', 'addToList', 'markListItemDone']));
+    expect(list, 'the rare list acts only when the line names them').not.toContain('restoreList');
+    const open = seen[4].tools.map((x) => x.id ?? x.name);
+    expect(open, 'a line naming no family: the reads and the make-acts (the note and the appointment)').toEqual(expect.arrayContaining(['listEvents', 'listEntries', 'addEvent', '__generic__:household:add:note']));
+    expect(open, 'no change or removal on a line that names nothing').not.toContain('cancelEvent');
+  });
+  it('a line that names a rare list act gets it ("zet de vakantielijst terug")', async () => {
+    let req = null;
+    const llm = { invoke: async (r) => { req = r; return { replyText: 'ok' }; } };
+    const { d } = door({ llm, interpret: interpretToCommand });
+    await d.read('zet de vakantielijst terug uit de prullenbak');
+    expect(req.tools.map((x) => x.id ?? x.name)).toContain('restoreList');
   });
 });
 

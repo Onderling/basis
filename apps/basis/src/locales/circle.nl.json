@@ -659,7 +659,7 @@
     "delivery": {
       "waiting_for_connection": {
         "text": "Nog niet verzonden: wacht op een verbinding",
-        "doc": "A message still sending after a while: it waits on this device until there is a connection, and goes by itself."
+        "doc": "Een bericht dat na een tijdje nog verstuurd wordt: het wacht op dit apparaat tot er een verbinding is, en gaat dan vanzelf."
       },
       "maybe_received": {
         "text": "Verzonden · misschien ontvangen",

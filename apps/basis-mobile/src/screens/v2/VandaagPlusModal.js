@@ -5,7 +5,7 @@
  * host's (`onSave(actId, values, asSelf)` / `onRead(line, asSelf)` / `onRemove(actId)` → null, or the line to show). A moment
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
@@ -42,6 +42,13 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
+  // the sheet scrolls (a long thread, the "/" list): the line is brought into view whenever its place changes, so on
+  // open and after each turn the person sees the line, not old turns (web twin: scrollIntoView on the line)
+  const scrollRef = useRef(null);
+  const lineInView = (e) => {
+    const y = e?.nativeEvent?.layout?.y;
+    if (typeof y === 'number') scrollRef.current?.scrollTo({ y: Math.max(0, y - 160), animated: false });
+  };
   const [values, setValues] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -105,7 +112,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
       <View style={styles.backdrop}>
         <View style={styles.card} testID="vandaag-plus">
           {/* the sheet scrolls: a long thread or the "/" list must never push the line and the first lines off the screen */}
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardBody} testID="vandaag-plus-scroll">
+          <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardBody} testID="vandaag-plus-scroll">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
           {/* which route answers this conversation, and whether it is confidential (web twin: circle-vandaag-plus__route) */}
           {!edit && routeLine ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
@@ -199,7 +206,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             }[d.id]?.();
             if (!piece) return null;
             return (
-              <View key={d.id} testID={d.id}>
+              <View key={d.id} testID={d.id} onLayout={d.id === 'plus-line' ? lineInView : undefined}>
                 {d.titleKey ? <Text style={styles.label}>{t(d.titleKey)}</Text> : null}
                 {piece}
               </View>

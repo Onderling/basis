@@ -290,7 +290,7 @@ import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
 import { createPlusDoor, plusRouteLine } from '../../../../basis/src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusCardCommands, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
@@ -2291,7 +2291,18 @@ export default function CircleLauncherScreen({
           setPlusTurnsTick((n) => n + 1);
           return r;
         }}
-        onCircleRun={async (card, circleId, asSelf) => { const r = await plusDoorNow().exchange({ asSelf }, () => plusRunInCircle(card?.command, circleId, asSelf)); setPlusTurnsTick((n) => n + 1); return r; }}
+        // what the card carries, in order (the make-a-list card: the list, then the item on it); the first failure stops it
+        onCircleRun={async (card, circleId, asSelf) => {
+          const r = await plusDoorNow().exchange({ asSelf }, async () => {
+            let last = null;
+            for (const c of plusCardCommands(card)) { last = await plusRunInCircle(c, circleId, asSelf); if (last?.error) break; }
+            return last;
+          });
+          setPlusTurnsTick((n) => n + 1);
+          return r;
+        }}
+        // the card's no: the line was not done, said in the conversation (web twin: onCircleCancel)
+        onCircleCancel={async (card, asSelf) => { await plusDoorNow().cardRefused({ asSelf }, card); setPlusTurnsTick((n) => n + 1); }}
         shareTargets={plusShareList}
         onShare={plusEdit ? async (actId, contact) => {
           const op = plusShareOp(actId, { id: plusEdit.id, with: contact });

@@ -336,6 +336,8 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
       return {
         kind: 'circle', atOnce: false, circleId: null, to: [ownTo], makeList: asks.list,
         command: { appOrigin: 'lists', opId: 'createList', args: { text: asks.list, circleId: OWN_DEVICES_SCOPE } },
+        // the yes also puts the item on it: a person who said "zet melk op boodschappen" expects melk there (Fable)
+        followUp: { appOrigin: 'lists', opId: 'addToList', args: { list: asks.list, text: asks.item, circleId: OWN_DEVICES_SCOPE } },
       };
     }
   }
@@ -380,6 +382,16 @@ const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeF
  * @param {string} text
  * @returns {{list: string, item: string}|null}
  */
+/**
+ * The commands a "+" card's yes runs, in order: its command, then its follow-up when it has one (the make-a-list card:
+ * make the list, then put the item on it). Both sheets run exactly these, stopping at the first that fails.
+ * @param {{command?: object, followUp?: object}} card
+ * @returns {object[]}
+ */
+export function plusCardCommands(card) {
+  return [card?.command, card?.followUp].filter(Boolean);
+}
+
 export function unknownListReading(text) {
   const words = String(text ?? '').trim().replace(/[.!?]+$/u, '').split(/\s+/u).filter(Boolean);
   for (let n = 1; n <= Math.min(3, words.length - 1); n += 1) {

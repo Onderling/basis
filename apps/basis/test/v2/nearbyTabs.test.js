@@ -65,6 +65,18 @@ describe('nearbyTabs', () => {
     expect(nearbyTabs({ ...full, visibility: { publishing: false, levelChosen: false } }).chatOff).toEqual({ reason: 'hidden', act: null });
   });
 
+  it('hidden: Questions shows no ask composer, but the hidden line and the way to become visible (the same act)', () => {
+    const quiet = { visibility: { publishing: false, levelChosen: true }, quiet: true, radioOff: false };
+    const out = nearbyTabs({ ...full, ...quiet });
+    expect(sectionsIn(out, 'questions')).toEqual(['nearby-ask-off', 'nearby-my-asks', 'nearby-asks', 'nearby-peers', 'nearby-invites']);
+    expect(out.askOff).toEqual({ reason: 'hidden', act: 'unquiet' });
+    expect(nearbyTabs({ ...full, visibility: { radioOff: true }, radioOff: true }).askOff).toEqual({ reason: 'hidden', act: 'radio-on' });
+    // visible: the composer, and no askOff
+    const shown = nearbyTabs({ ...full, visibility: { publishing: true } });
+    expect(sectionsIn(shown, 'questions')[0]).toBe('nearby-ask-field');
+    expect(shown.askOff).toBe(null);
+  });
+
   it('visible, becoming visible, or announced against a wish (still visible): the stream is there', () => {
     for (const visibility of [{ publishing: true }, { pending: true }, { degraded: true, publishing: true }]) {
       const out = nearbyTabs({ ...full, visibility });
@@ -85,7 +97,8 @@ describe('nearbyTabs', () => {
   });
 
   it('every declared section is reachable: each tab paints its declared screen, and each id shows for some room', () => {
-    const shown = new Set([...nearbyTabs(full).tabs, ...nearbyTabs({ chat: null }).tabs].flatMap((x) => x.sections));
+    const hiddenRoom = { ...full, visibility: { publishing: false, levelChosen: true }, quiet: true };
+    const shown = new Set([...nearbyTabs(full).tabs, ...nearbyTabs({ chat: null }).tabs, ...nearbyTabs(hiddenRoom).tabs].flatMap((x) => x.sections));
     for (const tab of NEARBY_TABS) {
       expect(sectionsOf(tab.screen).length, tab.screen).toBeGreaterThan(0);
       for (const s of sectionsOf(tab.screen)) expect(shown.has(s.id), s.id).toBe(true);

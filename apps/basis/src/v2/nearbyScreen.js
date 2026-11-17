@@ -686,6 +686,8 @@ export function createNearbyScreen({
      * the room's much tighter expiry ceiling.
      */
     async publishInvite({ uri, circleId, circleName, expiresAt } = {}) {
+      // hidden from the room: offering a circle would tell it someone is here (`nearbyIsHidden`)
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'invite_hidden' };
       const built = prepareBroadcastInvite({
         uri, circleId, circleName, expiresAt,
         allows: publishAllows, from: safeCall(myRoomAddress, null), now,
@@ -717,6 +719,8 @@ export function createNearbyScreen({
     /** Publish my card to the room. Refused unless the card allow is on. */
     async showCard({ label, line, tags } = {}) {
       if (!allows.card) return { ok: false, reason: 'card-not-allowed' };
+      // hidden from the room: a card would tell it someone is here (`nearbyIsHidden`)
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'card_hidden' };
       // the room self's level `none`: the room is told nothing — no card, whatever was typed
       if (typeof roomLevel === 'function') {
         let level = null;

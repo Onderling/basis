@@ -4316,7 +4316,7 @@ function showNearby() {
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);
       // The real reach, like an ask — "shown to 3 of 5" rather than "saved".
-      notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' };
+      notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' };
       draw(nearbyScreen.model());
     },
     onPrefillCard: () => _nearbyIdentity?.cardPrefill?.() ?? Promise.resolve({}),

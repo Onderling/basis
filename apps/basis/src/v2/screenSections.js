@@ -73,6 +73,8 @@ export const SCREEN_SECTIONS = Object.freeze({
   // here, and circles offered here.
   nearbyQuestions: Object.freeze([
     Object.freeze({ id: 'nearby-ask-field', titleKey: null }),
+    // hidden from the room: in place of the ask field, one line and the way to become visible
+    Object.freeze({ id: 'nearby-ask-off',   titleKey: null }),
     Object.freeze({ id: 'nearby-my-asks',   titleKey: null }),
     Object.freeze({ id: 'nearby-asks',      titleKey: 'circle.nearbyScreen.asks_title' }),
     Object.freeze({ id: 'nearby-peers',     titleKey: null }),

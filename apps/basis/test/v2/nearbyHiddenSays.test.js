@@ -14,6 +14,9 @@ import circleEn from '../../src/locales/circle.en.json' with { type: 'json' };
 const text = (bundle, key) => key.split('.').slice(1).reduce((o, k) => o?.[k], bundle)?.text;
 const T0 = 1_700_000_000_000;
 const flush = () => new Promise((r) => setTimeout(r, 0));
+// a readable invite (what `buildCircleInviteUri` makes), so only being hidden can refuse it
+const URI = `onderling-invite://${globalThis.btoa(JSON.stringify({ kind: 'membershipCode', groupId: 'c1', code: 'CODE-1' }))
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 
 /** A discoverability control that reports exactly what it is asked (or, `degraded`, announces regardless). */
 function controlOf({ degraded = false } = {}) {
@@ -40,7 +43,8 @@ function room({ levelChosen = true, radioOff = false, degraded = false } = {}) {
     subscribeToAsks: (fn) => { pushAsk = fn; return () => {}; },
     askChannel: { broadcastKind, broadcast, sendAnswer },
     radio: { get: () => (radioOff ? 'off' : 'on'), set: () => {} },
-    allows: { chat: true, card: false },
+    allows: { chat: true, card: true },
+    invitePublish: { c1: true },
     levelChosen: () => levelChosen,
     myRoomAddress: () => 'me', now: () => T0, t: (k) => k,
   });
@@ -66,6 +70,22 @@ describe('hidden from the room: the controller sends nothing', () => {
       expect(r.screen.model().chat ?? []).toEqual([]);
     });
 
+    it(`${name}: showing my card goes to no peer, and the refusal says why`, async () => {
+      const r = build(name);
+      HIDDEN[name]?.(r);
+      const out = await r.screen.showCard({ label: 'Anna', line: 'fietsen' });
+      expect(r.broadcastKind).not.toHaveBeenCalled();
+      expect(out).toMatchObject({ ok: false, reason: 'hidden', notice: 'card_hidden' });
+    });
+
+    it(`${name}: offering a circle goes to no peer, and the refusal says why`, async () => {
+      const r = build(name);
+      HIDDEN[name]?.(r);
+      const out = await r.screen.publishInvite({ uri: URI, circleId: 'c1', circleName: 'Tuin', expiresAt: T0 + 60_000 });
+      expect(r.broadcastKind).not.toHaveBeenCalled();
+      expect(out).toMatchObject({ ok: false, reason: 'hidden', notice: 'invite_hidden' });
+    });
+
     it(`${name}: a question to the room goes to no peer, and the refusal says why`, async () => {
       const r = build(name);
       HIDDEN[name]?.(r);
@@ -76,10 +96,12 @@ describe('hidden from the room: the controller sends nothing', () => {
     });
   }
 
-  it('visible: the line and the question go out', async () => {
+  it('visible: the line, the card, the circle and the question go out', async () => {
     const r = room();
     expect((await r.screen.say('hoi')).ok).toBe(true);
-    expect(r.broadcastKind).toHaveBeenCalledTimes(1);
+    expect((await r.screen.showCard({ label: 'Anna', line: '' })).ok).toBe(true);
+    expect((await r.screen.publishInvite({ uri: URI, circleId: 'c1', circleName: 'Tuin', expiresAt: T0 + 60_000 })).ok).toBe(true);
+    expect(r.broadcastKind).toHaveBeenCalledTimes(3);
     expect((await r.screen.askRoom({ text: 'pomp?' })).ok).toBe(true);
     expect(r.broadcast).toHaveBeenCalledTimes(1);
   });
@@ -109,6 +131,13 @@ describe('hidden from the room: the controller sends nothing', () => {
     expect(r.broadcastKind).not.toHaveBeenCalled();
   });
 
+  it('the refusals of a card and a circle, in both languages, plain', () => {
+    expect(text(circleNl, 'circle.nearbyScreen.card_hidden')).toBe('Je bent verborgen. Je kaartje laat de ruimte weten dat je er bent: word eerst zichtbaar.');
+    expect(text(circleEn, 'circle.nearbyScreen.card_hidden')).toBe('You are hidden. Your card tells the room you are here: become visible first.');
+    expect(text(circleNl, 'circle.nearbyScreen.invite_hidden')).toBe('Je bent verborgen. Een kring aanbieden laat de ruimte weten dat je er bent: word eerst zichtbaar.');
+    expect(text(circleEn, 'circle.nearbyScreen.invite_hidden')).toBe('You are hidden. Offering a circle tells the room you are here: become visible first.');
+  });
+
   it('the refusal of a question, in both languages, plain', () => {
     expect(text(circleNl, 'circle.nearbyScreen.ask_hidden')).toBe('Je bent verborgen. Een vraag laat de ruimte weten dat je er bent: word eerst zichtbaar.');
     expect(text(circleEn, 'circle.nearbyScreen.ask_hidden')).toBe('You are hidden. A question tells the room you are here: become visible first.');
@@ -123,9 +152,10 @@ describe('the "you here" line does not say you are in the conversation while hid
     expect(nearbyMineSummary({ ...visible, allows: { chat: true, card: false } })).toEqual(['circle.nearbyScreen.mine_chat_on']);
   });
 
-  it('in the chat but hidden: not said; nothing shown is "nothing shown yet"', () => {
+  it('hidden: nothing is shown to the room, whatever is switched on — the card is not said either', () => {
     expect(nearbyMineSummary({ ...hidden, allows: { chat: true, card: false } })).toEqual(['circle.nearbyScreen.mine_none']);
-    expect(nearbyMineSummary({ ...hidden, allows: { chat: true, card: true } })).toEqual(['circle.nearbyScreen.mine_card_on']);
+    expect(nearbyMineSummary({ ...hidden, allows: { chat: true, card: true } })).toEqual(['circle.nearbyScreen.mine_none']);
+    expect(nearbyMineSummary({ ...hidden, allows: { chat: false, card: true } })).toEqual(['circle.nearbyScreen.mine_none']);
   });
 
   it('the card alone, or nothing', () => {

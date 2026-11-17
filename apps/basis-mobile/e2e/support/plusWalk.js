@@ -91,6 +91,9 @@ async function makeSelf(name) {
   await soon(by.id('mij-new-persona-name'), 10_000);
   await element(by.id('mij-new-persona-name')).replaceText(name);
   await expect(element(by.id('mij-new-persona-name'))).toHaveText(name);
+  // Make sits below the name, under the fold on a phone: scroll to it first
+  await waitFor(element(by.id('mij-new-persona-create'))).toBeVisible().whileElement(by.id('mij-scroll')).scroll(200, 'down');
+  await pause(800);
   await tapSoon(by.id('mij-new-persona-create'));
   // the form closes once the self is made (a refusal leaves it open)
   await waitFor(element(by.id('mij-new-persona-name'))).not.toExist().withTimeout(15_000);

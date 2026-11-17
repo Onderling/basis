@@ -50,4 +50,14 @@ describe('L55 — the joiner names the circle from the invite', () => {
     const rules = await callSkill(agent, 'getGroupRules', { groupId: 'g-xyz' });
     expect(rules?.rules?.text).toMatch(/mirrored from invite/);
   });
+
+  // The Fairphone, 2026-11-18: a circle joined before invites carried names showed on Today as
+  // "RULES FOR 4DA67C… (MIRRORED FROM INVITE)", a key inside a placeholder. The placeholder is not a name.
+  it('the placeholder of a nameless join is never read back as the circle\'s name', async () => {
+    const agent = await boot();
+    await callSkill(agent, 'recordRemoteRedemption', { groupId: 'g-old', code: 'CODE', confirmedBy: 'a', rules: { purpose: 'x' } });
+    const mine = await callSkill(agent, 'listMyCircles', {});
+    const name = mine?.names?.['g-old'] ?? mine?.names?.get?.('g-old') ?? null;
+    expect(name, 'no name rather than a key in a placeholder').toBeNull();
+  });
 });

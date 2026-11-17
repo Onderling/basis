@@ -43,9 +43,11 @@ describe('createUserLlmDefaultStore', () => {
   it('round-trips set → get through an injected IO', async () => {
     let saved = null;
     const store = createUserLlmDefaultStore({ load: () => saved, save: (v) => { saved = v; } });
-    expect(await store.set('cloud')).toEqual(full('cloud', 'openai-compatible'));
-    expect(saved).toEqual(full('cloud', 'openai-compatible'));
-    expect(await store.get()).toEqual(full('cloud', 'openai-compatible'));
+    // a route that is set gets its prompt-cache secret once, kept with it
+    const withSecret = { ...full('cloud', 'openai-compatible'), cacheSecret: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) };
+    expect(await store.set('cloud')).toEqual(withSecret);
+    expect(saved).toEqual(withSecret);
+    expect(await store.get()).toEqual({ ...withSecret, cacheSecret: saved.cacheSecret });
   });
 
   it('set normalises an invalid mode to off', async () => {
@@ -66,6 +68,6 @@ describe('createUserLlmDefaultStore', () => {
     await store.set('local');
     // a fresh store over the same storage reads it back
     const store2 = createUserLlmDefaultStore(localStorageUserLlmIo(storage));
-    expect(await store2.get()).toEqual(full('local', 'local-ollama'));
+    expect(await store2.get()).toEqual({ ...full('local', 'local-ollama'), cacheSecret: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/) });
   });
 });

@@ -70,6 +70,9 @@ export function buildUserLlmRuntime(userCfg, { env = {} } = {}) {
       [`${k}Model`]:   userCfg.llmModel || undefined,
       apiKey:          userCfg.apiKey || null,
       timeoutMs:       env.timeoutMs,
+      // the prompt-cache salt on every route that may be Privatemode behind an address (local: a proxy on a box; the
+      // confidential proxy); a plain OpenAI-compatible cloud can refuse a field it does not know
+      ...(userCfg.cacheSecret && userCfg.preset !== 'openai-compatible' ? { cacheSecret: userCfg.cacheSecret } : {}),
     });
   } else if (env.llmBaseUrl) {
     llmProviders = buildCircleLlmProviders({ localBaseUrl: env.llmBaseUrl, model: env.llmModel, apiKey: env.llmApiKey, timeoutMs: env.timeoutMs });

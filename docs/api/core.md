@@ -860,6 +860,25 @@ every platform — safe to use where independent replicas must agree without coo
 
 **Returns:** `string` — 64-char lowercase hex
 
+### `hmacBase64Url`
+
+**Kind:** function · **Import:** `hmacBase64Url` from `'@onderling/core'`
+
+```js
+hmacBase64Url(key, message)
+```
+
+HMAC-SHA-256 of a UTF-8 message under a UTF-8 key, as base64url without padding (no "/" or "+": safe in a request
+field that refuses them, as Privatemode's cache salt does). Same bytes on every platform. A secret derived per purpose:
+the caller puts the purpose in the message (`prompt-cache:<conversation>`).
+
+**Parameters**
+
+- `key` `string`
+- `message` `string`
+
+**Returns:** `string` — 43 characters
+
 ## `src/identity/AgentIdentity.js`
 
 ### `AgentIdentity`

@@ -13,7 +13,7 @@
 //
 // Release APK, an emulator or an agreed test device (E2E_WIPE_OK): it deletes the app.
 
-const { launch, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
+const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
 const { startStandInModel, reversePort } = require('./support/standInModel');
 
 const SCRIPT = [
@@ -51,7 +51,14 @@ async function setOwnModel() {
   await tapSoon(by.id('settings-group-appearance'), 15_000);
   await waitFor(element(by.id('user-llm-preset-local-ollama'))).toBeVisible()
     .whileElement(by.id('circle-settings-group')).scroll(400, 'down');
-  await element(by.id('user-llm-preset-local-ollama')).tap();
+  // a tap right after a scroll can land nowhere (measured on the Samsung 2026-11-17: the preset stayed off): tap until the
+  // preset's fields are there
+  for (let i = 0; i < 3; i += 1) {
+    await pause(800);
+    await element(by.id('user-llm-preset-local-ollama')).tap();
+    if (await isVisible(by.id('user-llm-llmBaseUrl'))) break;
+    try { await waitFor(element(by.id('user-llm-llmBaseUrl'))).toExist().withTimeout(1500); break; } catch { /* tap again */ }
+  }
   await waitFor(element(by.id('user-llm-llmBaseUrl'))).toBeVisible()
     .whileElement(by.id('circle-settings-group')).scroll(200, 'down');
   await element(by.id('user-llm-llmBaseUrl')).replaceText(`http://127.0.0.1:${PHONE_PORT}`);

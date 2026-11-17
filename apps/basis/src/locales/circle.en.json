@@ -658,7 +658,7 @@
     },
     "delivery": {
       "maybe_received": {
-        "text": "Sent · maybe received",
+        "text": "Sent · not confirmed yet",
         "doc": "It left this device. Whether it arrived is unknown unless the other person chose to confirm."
       },
       "stored": {

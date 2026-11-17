@@ -1936,8 +1936,8 @@ component."
 **Decision:**
 
 1. **Everything works without a pod** (2026-05-14, 2026-08-21) is now the direction, not only the floor. The Solid
-   server stops being something the product depends on or is built toward. It may stay as one adapter behind a store
-   contract.
+   server stops being something the product depends on or is built toward. The system stays compatible with pods:
+   a pod remains a supported way to keep things, reached through the same surfaces as any other storage method.
 2. **A store keeps; it never decides.** A blind store, a place that holds sealed bytes and can do nothing else, stays
    as a role: a backup must not require trusting a hosted, always-on device with keys.
 3. **Permission is checked by the person's agent, never by a store.** One permission language: the grants enforced
@@ -1955,10 +1955,11 @@ component."
    enforced by the store; readable names and listings that show the shape of what is kept.
 7. **Per role one surface, and two implementations from the first day.** Each role the pod had gets a stable surface
    between the app and what serves it. A store contract is what the pod AND one carrier without a pod can both do; the
-   pod adapter fits it or leaves.
+   pod stays behind it as one implementation among others.
 8. **Nothing is shed before the alpha.** Shared-pod circles stay as they are, offered only to a person who connected a
    pod; their replacement is some shared storage, so the idea does not change. "Syncing through a pod" is not part of
-   the alpha's promise: it works for who has a pod.
+   the alpha's promise: it works for who has a pod. The welcome keeps naming the pod beside the backup file as a way to
+   carry on elsewhere, for as long as that is what exists.
 9. **Measure before building:** a new device catching up from a phone (bytes, time, battery); what a host can tell
    from a week of one person's history mirror; a circle of thirty with photos, full fan-out against one write.
 

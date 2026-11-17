@@ -11,7 +11,7 @@ import { attachEntriesFor } from './attachEntries.js';
 import { catalogueManifests } from './manifestSources.js';
 import { renderGate } from '@onderling/app-manifest';
 import { listsGateRules, circleListsFor } from './circleGate.js';
-import { GATE_WORDS, helpWords, helpQuestionOpeners, referringWords, referringAround } from './gateWords.js';
+import { GATE_WORDS, helpWords, helpQuestionOpeners, referringWords, referringAround, leadWords } from './gateWords.js';
 import { answerHelp } from './help/helpAnswer.js';
 import { HELP_CIRCLE_ID } from './helpCircle.js';
 import { replyLine } from './replyLine.js';
@@ -277,6 +277,12 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
   if (timed(act)) {
     if (moment?.day) { const f = act.fields.find((x) => x.kind === 'datetime'); values[f.name] = pickerMoment(moment.day, moment.time); words = moment.rest ?? ''; }
     for (const w of wordsFor(act, byOrigin)) words = words.replace(new RegExp(`^${w}\\b[:\\s]*`, 'i'), '');
+  }
+  // "ik moet …", "I need to …": how the line opens, not what it makes (an appointment's title)
+  if (timed(act)) {
+    const low = word(words).toLowerCase();
+    const lead = leadWords().find((w) => low === w || low.startsWith(`${w} `));
+    if (lead) words = word(words).slice(lead.length);
   }
   const textField = act.fields.find((f) => f.kind !== 'datetime');
   if (textField && word(words)) values[textField.name] = word(words);

@@ -121,6 +121,13 @@ describe('Vandaag — the free line at the top of the sheet', () => {
     expect(plusRead('ooit eens iets')).toBe(null);
     expect(plusRead('  ')).toBe(null);
   });
+  it('a said appointment: the day and the time in words are read, and "ik moet" is no part of its title', () => {
+    const r = plusRead('ik moet vrijdag om half drie naar de tandarts');
+    expect(r?.actId).toBe('calendar.calendar-event');
+    expect(r.values.when).toMatch(/T14:30$/);
+    expect(r.values.title).toBe('naar de tandarts');
+    expect(plusRead('I need to see the dentist tomorrow at half past two')?.values?.title).toBe('see the dentist');
+  });
   it('a line that only POINTS back ("zet dat morgen om 10 in mijn agenda") is not read: only a model with the turns knows what', () => {
     expect(plusRead('zet dat morgen om 10 in mijn agenda')).toBe(null);
     expect(plusRead('put that in my calendar tomorrow at 10')).toBe(null);

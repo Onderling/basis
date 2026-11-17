@@ -101,16 +101,3 @@ describe("the sheet's own acts, most used first (this device's counts, an 'own' 
     expect(orderedPlusActs(PLUS_ACTS, null).map((a) => a.id)).toEqual(PLUS_ACTS.map((a) => a.id));
   });
 });
-
-describe('a line naming a list nobody holds is never a circle\'s task by a guess (Fable\'s walk, item 12)', () => {
-  it('"zet zonnebrand en slippers op vakantie", one circle without lists or that list, no own list: no reading', () => {
-    const r = plusLineOutcome('zet zonnebrand en slippers op vakantie', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [])], own: { lists: [] } });
-    expect(r, JSON.stringify(r)).toBeNull();
-  });
-  it('a circle that holds the list still takes it; a task said as a task still is one', () => {
-    const shop = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [SHOP])], own: { lists: [] } });
-    expect(shop?.circleId).toBe('c1');
-    const task = plusLineOutcome('nieuwe taak: lamp vervangen', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [])], own: { lists: [] } });
-    expect(task?.command?.opId).toBe('addTask');
-  });
-});

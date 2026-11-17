@@ -27,6 +27,8 @@ const LAPTOP_PORT = 8091;   // 8090 is Fable's real-model stand-in
 
 let model;
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+/** In the thread at all (it may be below the fold) and the first of several matches: what a turn check means. */
+const present = (matcher, ms = 20_000) => waitFor(element(matcher).atIndex(0)).toExist().withTimeout(ms);
 
 async function openPlus() {
   await tapSoon(by.id('circle-tab-screens'));
@@ -90,7 +92,7 @@ describe('the "+" story on the phone, with a stand-in model', () => {
     await openPlus();
     await soon(by.id('vandaag-plus-route'), 10_000);
     await say('wat kan je voor me doen?');
-    await soon(by.id('vandaag-plus-turn-assistant'), 15_000);
+    await present(by.id('vandaag-plus-turn-assistant'), 15_000);
     await device.takeScreenshot('plus-story-08-no-model');
     if (model.requests.length !== 0) throw new Error(`a model was asked without one being set: ${model.requests.length}`);
     await tapSoon(by.id('vandaag-plus-close'));
@@ -110,7 +112,7 @@ describe('the "+" story on the phone, with a stand-in model', () => {
     const before = model.requests.length;
     await say('wat kan je voor me doen?');
     // the answer shows twice (the thread and the sheet's answer line): match it in the thread
-    await soon(by.text('Ik houd je eigen notities, afspraken en lijsten bij.').withAncestor(by.id('vandaag-plus-thread')), 20_000);
+    await present(by.text('Ik houd je eigen notities, afspraken en lijsten bij.').withAncestor(by.id('vandaag-plus-thread')));
     if (model.requests.length !== before + 1) throw new Error(`expected one model call, got ${model.requests.length - before}`);
     const sys = String(model.requests.at(-1).system ?? '');
     if (!/OWN place/.test(sys)) throw new Error('the model was not told it is the own place');
@@ -130,7 +132,7 @@ describe('the "+" story on the phone, with a stand-in model', () => {
     await openPlus();
     await say('waar ligt de sleutel?');
     // the answer shows twice (the thread and the sheet's answer line): match it in the thread
-    await soon(by.text('Bij de buren.').withAncestor(by.id('vandaag-plus-thread')), 20_000);
+    await present(by.text('Bij de buren.').withAncestor(by.id('vandaag-plus-thread')));
     if (!JSON.stringify(model.requests.at(-1).messages).includes('de sleutel bij de buren ligt')) throw new Error('the note did not reach the model');
     await device.takeScreenshot('plus-story-03-ask-back');
   });
@@ -144,7 +146,7 @@ describe('the "+" story on the phone, with a stand-in model', () => {
     await tapSoon(by.id('vandaag-plus-close'));
     await openPlus();
     // the last assistant turn, read from the screen (its first words are the act's label, from the manifest)
-    await soon(by.id('vandaag-plus-turn-assistant'), 15_000);
+    await present(by.id('vandaag-plus-turn-assistant'), 15_000);
     const attrs = await element(by.id('vandaag-plus-turn-assistant')).getAttributes();
     const texts = (attrs.elements ?? [attrs]).map((a) => String(a.text ?? a.label ?? ''));
     if (!/niet bewaard|not saved/i.test(texts.at(-1) ?? '')) throw new Error(`the thread does not say the proposal was not saved: ${JSON.stringify(texts.slice(-2))}`);

@@ -179,11 +179,13 @@ export function renderContactThread(container, {
     hide.className = 'cc-cthread__hide';
     hide.dataset.hidden = String(hidden);
     hide.textContent = tr(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide');
-    hide.addEventListener('click', () => onToggleHidden(!hidden));
-    const note = document.createElement('div');
-    note.className = 'cc-cthread__hide-note';
-    note.textContent = tr('circle.contacts.hide_note');
-    menuItems.push(hide, note);
+    // what hiding is and is not, said when the person taps Hide, as what that tap will do (never standing text: read
+    // cold it sounded like a statement about this contact); showing again needs no explanation (phone twin: an Alert)
+    hide.addEventListener('click', () => {
+      if (!hidden && typeof globalThis.confirm === 'function' && !globalThis.confirm(tr('circle.contacts.hide_note'))) return;
+      onToggleHidden(!hidden);
+    });
+    menuItems.push(hide);
   }
   // DELETE (L114): hide + leave the pair circle, a relationship act. The shell asks first (the confirm is the undo).
   if (typeof hidden === 'boolean' && typeof onDelete === 'function') {

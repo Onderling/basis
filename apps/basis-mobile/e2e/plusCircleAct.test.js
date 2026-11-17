@@ -6,8 +6,8 @@
 // them, and the sheet says what it did. Bram's own store has melk on Boodschappen. Web twin:
 // apps/basis/test-browser/plus-circle-act.spec.js. Release APK, emulator only.
 
-const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, backToLauncher, emulatorOnly } = require('./support/ui');
-const { startPeer, joinByInvite } = require('./support/peer');
+const { launch, isVisible, soon, tapSoon, firstBoot, backToLauncher, emulatorOnly } = require('./support/ui');
+const { startPeer, joinByInvite, peerListsHold, listsTabReached } = require('./support/peer');
 
 const LIST = 'Boodschappen';
 const CIRCLE = 'Plus Kring';
@@ -32,17 +32,7 @@ async function typeLine(text) {
 }
 let ready = null;
 
-/** Bram's own lists, asked until `pred` holds (a write crosses the relay). */
-async function bramHolds(pred, tries = 20) {
-  let last = null;
-  for (let i = 0; i < tries; i += 1) {
-    peer.send({ do: 'lists-dump' });
-    last = (await peer.next('lists', () => true, 20_000)).lists;
-    if (pred(last)) return last;
-    await new Promise((r) => setTimeout(r, 3000));
-  }
-  throw new Error(`Bram never held it; his lists: ${JSON.stringify(last)}`);
-}
+const bramHolds = (pred) => peerListsHold(peer, pred);
 
 describe('the "+" on the phone acts in the one circle that holds the list', () => {
   beforeAll(async () => {
@@ -64,16 +54,7 @@ describe('the "+" on the phone acts in the one circle that holds the list', () =
   });
 
   it("the policy reached the phone: Bram's circle shows its Lists tab", async () => {
-    // PROVE THE HARNESS FIRST: lists came on by Bram's setting; until it is on the phone, no read can find the list
-    let tab = false;
-    for (let i = 0; i < 12 && !tab; i += 1) {
-      await tapSoon(by.id('circle-tab-circles'), 30_000);
-      await tapSoon(by.id(`circle-tile-${ready.circleId}`), 30_000);
-      tab = (await firstOf([by.id('circle-detail-tab-lists')], 6_000)) === 0;
-      await device.takeScreenshot(`plus-01b-tabs-${i}`);
-      if (!tab) { await device.pressBack(); await new Promise((r) => setTimeout(r, 5000)); }
-    }
-    if (!tab) throw new Error("Bram's lists setting never reached the phone: no Lists tab on his circle");
+    await listsTabReached(ready.circleId, 'plus-01b-tabs');
     await backToLauncher();   // out of the circle: the tab bar (Today, where the "+" is) shows again
   });
 

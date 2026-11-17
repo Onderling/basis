@@ -184,17 +184,21 @@
   "lists.markListItemDone.stated": {
     "doc": "Something is done, bought or fixed: tick it off (a chore is completed). Mostly a reply to the bot's own reminder.",
     "patterns": [
-      "(de|het)? {item} (is|zijn) (al)? (klaar|gedaan|gekocht|gemaakt|af)"
+      "(de|het)? {item} (is|zijn) (al)? (klaar|gedaan|gekocht|gemaakt|af)",
+      "(de|het)? {item} (gedaan|gekocht)"
     ],
     "examples": [
       "ramen is klaar",
       "De melk is gekocht!",
       "de lamp is gemaakt",
-      "de afwas is af"
+      "de afwas is af",
+      "melk gedaan"
     ],
     "not": [
       "is het eten klaar?",
-      "wanneer is de lamp klaar"
+      "wanneer is de lamp klaar",
+      "wat is er gedaan",
+      "wat heb ik gedaan"
     ]
   },
   "assistant.reminders.off": {

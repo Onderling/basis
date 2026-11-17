@@ -193,11 +193,11 @@
           "doc": "Join wizard: present the address used in another circle ({{name}} = that circle)."
         },
         "hint": {
-          "text": "De relay ziet niet dat je kringen bij elkaar horen. Leden die in beide kringen zitten wel.",
+          "text": "Het verbindingspunt ziet niet dat je kringen bij elkaar horen. Leden die in beide kringen zitten wel.",
           "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
         },
         "hint_same": {
-          "text": "De relay en de leden van beide kringen zien dat dit dezelfde persoon is.",
+          "text": "Het verbindingspunt en de leden van beide kringen zien dat dit dezelfde persoon is.",
           "doc": "Join wizard: the sentence under the address choice when the same address as in another circle is chosen (the relay and members of both circles see one person)."
         }
       },
@@ -658,7 +658,7 @@
     },
     "delivery": {
       "maybe_received": {
-        "text": "Verzonden · misschien ontvangen",
+        "text": "Verzonden · nog niet bevestigd",
         "doc": "Het is van dit apparaat vertrokken. Of het is aangekomen weten we niet, tenzij de ander dat zelf laat weten."
       },
       "stored": {
@@ -1579,7 +1579,7 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_help": {
-      "text": "Dit kan ik voor je doen: {{acts}}. Of vraag hoe iets werkt.",
+      "text": "Dit kan ik voor je doen: {{acts}}. Lijstjes ook: \"nieuwe lijst Boodschappen\", \"zet melk op Boodschappen\". Of vraag hoe iets werkt.",
       "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
@@ -1825,6 +1825,10 @@
     "plus_list_empty": {
       "text": "Er staat niets op {{name}}.",
       "doc": "The \"+\" thread's answer to a read of a list that has no entries."
+    },
+    "plus_make_list_ask": {
+      "text": "Een lijst '{{list}}' bestaat nog niet. Maken?",
+      "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
     }
   },
   "screens": {
@@ -2476,7 +2480,7 @@
         "doc": "transport-mode option: the built-in NKN transport."
       },
       "relay": {
-        "text": "Relay (standaard)",
+        "text": "Verbindingspunt (standaard)",
         "doc": "transport-mode option: a WebSocket relay."
       },
       "both": {
@@ -2485,11 +2489,11 @@
       }
     },
     "relayEndpoint": {
-      "text": "Relay-server",
+      "text": "Verbindingspunt",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
     "relayEndpoint_placeholder": {
-      "text": "wss://relay.voorbeeld.org",
+      "text": "wss://punt.voorbeeld.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
     },
     "relayEndpoint_apply": {
@@ -2501,11 +2505,11 @@
       "doc": "Phase 4 §9 — relay endpoint clear button."
     },
     "relayAsk_title": {
-      "text": "Welke relay gebruik je?",
+      "text": "Welk verbindingspunt gebruik je?",
       "doc": "The relay question — asked at the first action that needs a relay when the device knows none (there is no default relay)."
     },
     "relayAsk_body": {
-      "text": "Je kreeg hem van wie je uitnodigde, of van degene die je agent draait. Zonder relay bereiken je apparaten en contacten elkaar alleen rechtstreeks.",
+      "text": "Je kreeg het van wie je uitnodigde, of van degene die je agent draait. Zonder verbindingspunt bereiken je apparaten en contacten elkaar alleen rechtstreeks.",
       "doc": "The relay question — the body: where a person gets a relay, and what happens without one."
     },
     "relayAsk_save": {
@@ -2517,7 +2521,7 @@
       "doc": "The relay question — not now; asked again at the next app start."
     },
     "relayAsk_invalid": {
-      "text": "Dat is geen relay-adres — het begint met wss:// of ws://.",
+      "text": "Dat is geen adres van een verbindingspunt: het begint met wss:// of ws://.",
       "doc": "The relay question — the typed value is not a ws:// or wss:// URL."
     },
     "privateDm": {
@@ -2529,7 +2533,7 @@
       "doc": "Phase 4 §9 — private-chat toggle hint."
     },
     "privateDm_disabled": {
-      "text": "Vereist een relay: kringen met alleen een pod kunnen geen privékanaal tussen leden opzetten.",
+      "text": "Vereist een verbindingspunt: kringen met alleen een pod kunnen geen privékanaal tussen leden opzetten.",
       "doc": "Phase 4 §7 — shown when the private-chat toggle greys out under pod-only (no relay)."
     },
     "wakeNudges": {
@@ -2537,7 +2541,7 @@
       "doc": "offline delivery M1 — the wake-nudges device toggle (registers the push token on the relay; off by default)."
     },
     "wakeNudges_hint": {
-      "text": "Staat standaard uit. Aan: het relay stuurt een leeg weksignaal via de pushdienst van je platform zodra er een bericht klaarstaat. Die dienst ziet alleen dát er iets klaarstaat en wanneer — nooit van wie of wat.",
+      "text": "Staat standaard uit. Aan: het verbindingspunt stuurt een leeg weksignaal via de pushdienst van je platform zodra er een bericht klaarstaat. Die dienst ziet alleen dát er iets klaarstaat en wanneer — nooit van wie of wat.",
       "doc": "offline delivery M1 — states the metadata floor: what the push service learns."
     },
     "wakeNudges_disabled": {
@@ -2545,11 +2549,11 @@
       "doc": "offline delivery M1 — shown where the platform has no OS push path (web)."
     },
     "relay_applied": {
-      "text": "Relay ingesteld: {{url}}",
+      "text": "Verbindingspunt ingesteld: {{url}}",
       "doc": "G17 — /set-relay built-in confirmation bubble."
     },
     "relay_failed": {
-      "text": "Relay instellen mislukt: {{error}}",
+      "text": "Verbindingspunt instellen mislukt: {{error}}",
       "doc": "G17 — /set-relay built-in failure bubble."
     },
     "transport_set": {
@@ -2561,7 +2565,7 @@
       "doc": "G17 — /transport-mode built-in bad-mode bubble."
     },
     "transports_status": {
-      "text": "Transport {{mode}} · relay {{relay}}",
+      "text": "Transport {{mode}} · verbindingspunt {{relay}}",
       "doc": "G17 — /transports built-in status bubble."
     },
     "transports_none": {
@@ -3465,7 +3469,7 @@
       "doc": "Turns the per-user fallback setting on."
     },
     "point_primary": {
-      "text": "Jouw relay — verbonden",
+      "text": "Jouw verbindingspunt — verbonden",
       "doc": "The device's OWN relay (the one in the setting), connected. Replaced point_active on 2026-09-08: a device is now on several relays at once, so 'the one in use' was no longer a fact."
     },
     "point_connected": {
@@ -3525,15 +3529,15 @@
       "doc": "Remove a connection point."
     },
     "point_add_title": {
-      "text": "Relay toevoegen",
+      "text": "Verbindingspunt toevoegen",
       "doc": "Heading of the add-a-relay field (2026-09-08). Adding one connects to it beside the relays you are already on — it does not replace your own."
     },
     "point_add_hint": {
-      "text": "Draai je zelf een relay, of gaf iemand je er een? Vul het adres in. Je blijft ook op de relays die je al gebruikt.",
+      "text": "Draai je zelf een verbindingspunt, of gaf iemand je er een? Vul het adres in. Je blijft ook op de verbindingspunten die je al gebruikt.",
       "doc": "Says what adding does, because the old model (one relay, swapped) is what people expect."
     },
     "point_add_placeholder": {
-      "text": "wss://relay.voorbeeld.nl",
+      "text": "wss://punt.voorbeeld.nl",
       "doc": "Placeholder for the relay address field."
     },
     "point_add_button": {
@@ -3541,7 +3545,7 @@
       "doc": "Confirms the add-a-relay field."
     },
     "point_add_invalid": {
-      "text": "Dat is geen relay-adres. Een relay begint met ws:// of wss://.",
+      "text": "Dat is geen adres van een verbindingspunt. Het begint met ws:// of wss://.",
       "doc": "Shown when the typed address is not a websocket endpoint."
     },
     "point_add_failed": {
@@ -3655,6 +3659,10 @@
     "chat_empty": {
       "text": "Nog niemand heeft iets gezegd.",
       "doc": "Chat empty state — only shown once you have JOINED."
+    },
+    "chat_you": {
+      "text": "Jij",
+      "doc": "Who said a line in the room chat, for your own lines (the others' lines carry the name or face the room shows)."
     },
     "chat_ephemeral": {
       "text": "Hier wordt niets bewaard. Weggaan wist het.",
@@ -3825,7 +3833,7 @@
       "doc": "Empty-skills footer."
     },
     "delivery_fallback_note": {
-      "text": "Staat de terugval aan, dan gebruikt een bericht aan iemand van wie je het kring-adres nog niet hebt je hoofdadres. Een relay die jullie allebei gebruiken kan dan zien dat die kringen bij één persoon horen. De instelling geldt voor al je kringen tegelijk.",
+      "text": "Staat de terugval aan, dan gebruikt een bericht aan iemand van wie je het kring-adres nog niet hebt je hoofdadres. Een verbindingspunt dat jullie allebei gebruiken kan dan zien dat die kringen bij één persoon horen. De instelling geldt voor al je kringen tegelijk.",
       "doc": "The consequence of turning the fallback on, stated where the setting is shown. The setting is one for all circles (per circle was judged too technical)."
     },
     "answer_placeholder": {
@@ -6748,19 +6756,19 @@
       "doc": "S5 — pod root URI."
     },
     "relay": {
-      "text": "Relay",
+      "text": "Verbindingspunt",
       "doc": "S5 — relay operator/url."
     },
     "relay_set": {
-      "text": "Relayserver",
+      "text": "Verbindingspunt",
       "doc": "In-app relay URL setting (ws://|wss://); blank ⇒ the build-time env fallback."
     },
     "relay_open": {
-      "text": "Relayserver instellen…",
+      "text": "Verbindingspunt instellen…",
       "doc": "Entry button that opens the relay-URL editor in the docked side-panel (openPagePanel, set-relay surfaces.page)."
     },
     "relay_current": {
-      "text": "Relay: {{url}}",
+      "text": "Verbindingspunt: {{url}}",
       "doc": "Current in-app relay setting shown beside the open-panel button."
     },
     "relay_save": {
@@ -6776,7 +6784,7 @@
       "doc": "Relay saved + reconnected."
     },
     "relay_off": {
-      "text": "geen relay",
+      "text": "geen verbindingspunt",
       "doc": "Shown as {{url}} when the setting is cleared and there's no env fallback."
     },
     "relay_error": {
@@ -6788,7 +6796,7 @@
       "doc": "Mobile relay save confirmation (applies on next app open; mobile has no live reconnect yet)."
     },
     "relay_hint": {
-      "text": "Je kreeg hem van wie je uitnodigde, of van wie je agent draait. Leeg laten: geen relay, dan alleen rechtstreekse verbindingen.",
+      "text": "Je kreeg het van wie je uitnodigde, of van wie je agent draait. Leeg laten: geen verbindingspunt, dan alleen rechtstreekse verbindingen.",
       "doc": "Relay setting help text."
     },
     "privacy": {
@@ -7028,7 +7036,7 @@
       "doc": "J-CS8 — button when the lock is on."
     },
     "notif_privacy": {
-      "text": "Om je telefoon te wekken bewaart je verbindingspunt (de relay waarmee je verbonden bent) één wekcode voor dit apparaat. Daardoor kan het zien dat je kringen bij één apparaat horen, en dus dat ze van jou zijn.",
+      "text": "Om je telefoon te wekken bewaart je verbindingspunt één wekcode voor dit apparaat. Daardoor kan het zien dat je kringen bij één apparaat horen, en dus dat ze van jou zijn.",
       "doc": "J-CS10 — the trade, stated where it is made."
     },
     "notif_privacy_not": {
@@ -7036,7 +7044,7 @@
       "doc": "J-CS10 — what is NOT learned."
     },
     "notif_privacy_escape": {
-      "text": "Vind je dat bezwaarlijk, draai dan je eigen relay of verdeel je kringen over verschillende relays. Een relay ziet alleen de kringen die hem gebruiken.",
+      "text": "Vind je dat bezwaarlijk, draai dan je eigen verbindingspunt of verdeel je kringen over verschillende verbindingspunten. Een verbindingspunt ziet alleen de kringen die het gebruiken.",
       "doc": "J-CS10 — name the escape rather than leaving a dead end."
     },
     "pod_local_consequence": {
@@ -7190,7 +7198,7 @@
       "doc": "Refusal (screen door): no key or nonce in the offer."
     },
     "connection_offer_pairing-other-relay": {
-      "text": "Dat scherm wacht op een andere relay dan dit apparaat, dus het kan hier niet gekoppeld worden.",
+      "text": "Dat scherm wacht op een ander verbindingspunt dan dit apparaat, dus het kan hier niet gekoppeld worden.",
       "doc": "Refusal (screen door): the offer's relay is not one this device is on (the grant could never reach it)."
     },
     "connection_offer_pairing-nonce-replayed": {
@@ -8365,7 +8373,7 @@
     "failed": "Claimen lukte niet.",
     "outcome_bad_claim": "Dat is geen claim-regel. Kopieer alles na 'Claim:' — de code, de @ en het adres.",
     "outcome_no_device_key": "Dit apparaat heeft nog geen eigen apparaatsleutel. Open de app opnieuw en probeer het nog eens.",
-    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met de relay verbonden?",
+    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met het verbindingspunt verbonden?",
     "outcome_already_owned": "Deze companion heeft al een eigenaar.",
     "outcome_invalid_code": "De code klopt niet of is verlopen. Haal de nieuwste regel uit het log (elke tien minuten een nieuwe).",
     "outcome_stale": "De klok van dit apparaat loopt meer dan vijf minuten anders dan die van de companion. Zet de tijd van je apparaat goed en probeer het opnieuw.",
@@ -8386,7 +8394,7 @@
     "failed": "Toegang geven lukte niet.",
     "outcome_not_owned": "Deze companion staat niet op jouw naam. Claim hem eerst.",
     "outcome_no_device_key": "Dit apparaat heeft nog geen eigen apparaatsleutel. Open de app opnieuw en probeer het nog eens.",
-    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met de relay verbonden?",
+    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met het verbindingspunt verbonden?",
     "outcome_forbidden": "De companion nam de ondertekening van dit apparaat niet aan.",
     "outcome_stale": "De klok van dit apparaat loopt meer dan vijf minuten anders dan die van de companion. Zet de tijd van je apparaat goed en probeer het opnieuw.",
     "outcome_unknown_family": "Dat kan deze companion niet geven.",
@@ -8394,7 +8402,7 @@
     "outcome_bad_args": "Kies aan wie, en vink aan wat het mag.",
     "outcome_gate_off": "Deze companion draait zonder toegangscontrole en geeft dus geen toegang.",
     "outcome_not_bot_admin": "Alleen de beheerder van de bot kan hem je companion geven. Vraag die het vanuit zijn eigen app te doen.",
-    "outcome_bot_unreachable": "De bot antwoordt niet. Draait hij, en is hij met de relay verbonden?",
+    "outcome_bot_unreachable": "De bot antwoordt niet. Draait hij, en is hij met het verbindingspunt verbonden?",
     "outcome_bot_refused": "De bot nam je companion niet aan. Koppel je Basis-app opnieuw aan hem (/koppel) en probeer het nog eens.",
     "granted": "Toegang gegeven aan",
     "may": "mag: {{what}}",
@@ -8832,15 +8840,15 @@
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_section": {
-        "text": "NKN-relay",
+        "text": "NKN-verbindingspunt",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_url": {
-        "text": "Relay-adres",
+        "text": "Adres van het verbindingspunt",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_hint": {
-        "text": "Kies zelf een NKN-relay in plaats van de automatische (geavanceerd). Alleen ws:// of wss://.",
+        "text": "Kies zelf een NKN-verbindingspunt in plaats van het automatische (geavanceerd). Alleen ws:// of wss://.",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "loading": {
@@ -10322,7 +10330,7 @@
         "doc": "A setting's label (projected from the parameter register)."
       },
       "relay_url": {
-        "text": "Relay-server",
+        "text": "Verbindingspunt",
         "doc": "A setting's label (projected from the parameter register)."
       },
       "app_developer": {
@@ -10452,7 +10460,7 @@
         "doc": "A choice on the settings screen."
       },
       "relay": {
-        "text": "Relay",
+        "text": "Verbindingspunt",
         "doc": "A choice on the settings screen."
       },
       "both": {

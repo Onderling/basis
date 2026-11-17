@@ -17,6 +17,7 @@
  *   `{ error }` what went wrong or could not be read (a circle act run at once answers `{done}` or `{error}` too).
  */
 import { createAssistantEngine } from '../v2/assistantEngine.js';
+import { modelDownClass } from '../v2/modelWatch.js';
 import { composeAssistantCatalogue } from './assistantCatalogue.js';
 import { catalogueManifests } from '../v2/manifestSources.js';
 import { withAssistantOps } from '../v2/assistantOps.js';
@@ -40,8 +41,24 @@ import { loadOwnItems, cutToSelf } from './ownItems.js';
  * @param {{t: Function}} o
  */
 export function plusNoModelAnswer({ t }) {
-  const path = ['circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title'].map((k) => t(k)).join(' → ');
-  return t('circle.vandaag.plus_no_model', { path });
+  return t('circle.vandaag.plus_no_model', { path: ownModelSettingPath({ t }) });
+}
+
+/** The way to the person's own model setting, in the screens' own labels. */
+export function ownModelSettingPath({ t }) {
+  return ['circle.tab.mij', 'circle.settings_home.title', 'circle.settings_home.appearance', 'circle.userLlm.title'].map((k) => t(k)).join(' → ');
+}
+
+/**
+ * The own model did not answer, said by its cause (`modelDownClass`, the household bot's classes): refused (the
+ * person's own key or credit: where their setting is), too slow, or not reachable. Never "the admin knows".
+ * @param {object|null} info  what the engine hands `onLlmUnavailable`
+ */
+export function plusModelDownAnswer(info, { t }) {
+  const cls = modelDownClass(info) ?? 'unreachable';
+  if (cls === 'refused') return t('circle.vandaag.plus_model_refused', { path: ownModelSettingPath({ t }) });
+  if (cls === 'slow') return t('circle.vandaag.plus_model_slow');
+  return t('circle.vandaag.plus_model_unreachable');
 }
 
 /**
@@ -323,7 +340,7 @@ export function createPlusDoor({
     // the model's own words (`model`): the only outcome kept as the assistant's turn; everything else is the system speaking
     onNoMatch: (_text, _ctx, opts) => { outcome = typeof opts?.reply === 'string' && opts.reply ? { done: opts.reply, model: true } : unread(); },
     // the own model is set but could not be reached: say that, never "I could not read that"
-    onLlmUnavailable: () => { outcome = { error: t('circle.vandaag.plus_model_unreachable') }; },
+    onLlmUnavailable: (_text, _ctx, info) => { outcome = { error: plusModelDownAnswer(info, { t }) }; },
     onUnhandled: () => { outcome = unread(); },
   });
 

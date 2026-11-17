@@ -1602,6 +1602,14 @@
       "text": "Niets gevonden.",
       "doc": "The \"+\": a read it ran (one the model picked) answered no items and carries no name to say it by."
     },
+    "plus_model_refused": {
+      "text": "Je eigen model weigert de vraag (je sleutel of je tegoed?). Je instelling: {{path}}. De vaste woorden en de knoppen werken wel.",
+      "doc": "The \"+\": the person's OWN model refused the call (their key, their credit, a 4xx); {{path}} is the way to their model setting. Never \"the admin knows\": it is their own route."
+    },
+    "plus_model_slow": {
+      "text": "Je eigen model is nu te traag om op tijd te antwoorden. Probeer het zo nog eens; de vaste woorden en de knoppen werken wel.",
+      "doc": "The \"+\": the person's own model did not answer in time (a timeout, after the retries)."
+    },
     "plus_model_unreachable": {
       "text": "Je eigen model is nu niet bereikbaar. Probeer het straks opnieuw; de vaste woorden en de knoppen werken wel.",
       "doc": "The \"+\": the person's own model is set but could not be reached for this line."

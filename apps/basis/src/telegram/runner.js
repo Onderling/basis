@@ -31,7 +31,7 @@ import { replyFact, replyLines, isReadFamily } from '../v2/replyLine.js';
 import { createLastReads } from '../v2/lastRead.js';
 import { telegramPlain } from './telegramPlain.js';
 import { scrubSecrets } from '@onderling/logger';
-import { troubleCause, replyClass } from '../v2/modelWatch.js';
+import { modelDownClass } from '../v2/modelWatch.js';
 
 /** The line a person gets when the model did not answer, by cause class. */
 const MODEL_DOWN_LINE = { refused: 'circle.bot.model_refused', slow: 'circle.bot.model_slow', unreachable: 'circle.bot.model_down' };
@@ -361,7 +361,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // when the door can say it; else the old line. A model that does not answer is said by its cause, in plain words:
     // refused (the admin is told), too slow, or not reachable — never a status, never the key.
     onLlmUnavailable: async (_text, ctx, info) => {
-      const down = info?.reason === 'unreachable' ? MODEL_DOWN_LINE[replyClass(troubleCause(info?.error))] : null;
+      const cls = modelDownClass(info);
+      const down = cls ? MODEL_DOWN_LINE[cls] : null;
       const lines = await basicHelp(ctx.id, ctx.chatId);
       if (lines.length) return say(ctx.chatId, [tc(ctx.chatId)(down ?? 'circle.bot.basic_head'), ...(down ? [tc(ctx.chatId)('circle.bot.basic_head')] : []), ...lines].join('\n'));
       return say(ctx.chatId, tc(ctx.chatId)(down ?? 'circle.telegram.unknown'));

@@ -341,6 +341,8 @@ export {
 export { actionsForStreamRow, buildStreamComposeContext } from './v2/streamActions.js';
 // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
 export { buildTaskRows, taskItemToStreamRow, taskStatusOf } from './v2/taskRows.js';
+// the /transports line both shells paint (the mode by its label, never the value 'relay')
+export { transportsStatusLine } from './v2/circleSettingsControls.js';
 // holiday-mode extension shortcuts + outgoing auto-reply.
 export {
   extendHolidayDays, setHolidayUntil, buildHolidayAutoReply,

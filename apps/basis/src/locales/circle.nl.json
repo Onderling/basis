@@ -2569,7 +2569,7 @@
       "doc": "G17 — /transport-mode built-in confirmation bubble."
     },
     "transport_bad": {
-      "text": "Onbekend transport: {{mode}} (gebruik nkn, relay of both)",
+      "text": "Onbekend transport: {{mode}} (gebruik nkn, verbindingspunt of beide)",
       "doc": "G17 — /transport-mode built-in bad-mode bubble."
     },
     "transports_status": {

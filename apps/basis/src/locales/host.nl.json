@@ -325,7 +325,7 @@
       "doc": "/set-relay aangeroepen maar agent.relay ontbreekt."
     },
     "url_required": {
-      "text": "Adres van het verbindingspunt vereist. Probeer /set-relay ws://jouw-host:poort of /set-relay --clear",
+      "text": "Adres van het verbindingspunt vereist. Probeer /connection-point ws://jouw-host:poort of /connection-point --clear",
       "doc": "/set-relay zonder --url of --clear."
     },
     "bad_url": {
@@ -549,7 +549,7 @@
       "doc": "/transport-mode of /transports aangeroepen maar agent.setTransportMode ontbreekt."
     },
     "bad_mode": {
-      "text": "Ongeldige modus \"{{mode}}\". Kies nkn, relay of both.",
+      "text": "Ongeldige modus \"{{mode}}\". Kies nkn, verbindingspunt of beide.",
       "doc": "/transport-mode met een ongeldig argument."
     },
     "mode_set": {

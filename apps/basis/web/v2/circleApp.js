@@ -820,7 +820,7 @@ import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
 import { mergeCirclePolicy, mergeMemberOverride, settingsSaveNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
-import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
+import { settingsControlsFromManifest, transportsStatusLine } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
 // dispatch as built-ins, not to the bot/LLM).
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
@@ -8371,7 +8371,7 @@ function showCircle(id, circle, policy) {
             const mode = builtin.args?.mode;
             const r = applyTransportMode(mode);
             circleNote(r?.ok
-              ? t('circle.settings.transport_set', { mode: r.mode })
+              ? t('circle.settings.transport_set', { mode: t(`circle.settings.transportMode_opt.${r.mode}`) })
               : t('circle.settings.transport_bad', { mode: mode ?? '—' }));
             return;
           }
@@ -8390,11 +8390,8 @@ function showCircle(id, circle, policy) {
             return;
           }
           if (builtin.opId === 'transports') {
-            const ts = currentTransportState();
-            circleNote(t('circle.settings.transports_status', {
-              mode: ts.mode ?? 'nkn',
-              relay: ts.relayUrl || t('circle.settings.transports_none'),
-            }));
+            // the mode by its label, never the value 'relay' (shared with mobile)
+            circleNote(transportsStatusLine(currentTransportState(), t));
             return;
           }
         }

@@ -195,6 +195,16 @@ describe('/transport-mode', () => {
     expect(r.message).toMatch(/Transport mode set/);
   });
 
+  it('says the mode by its label, never the value "relay" (a person reads "connection point")', async () => {
+    const agent = makeAgent();
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
+    const r = await builtins['transport-mode']({ mode: 'verbindingspunt' });
+    expect(r.ok).toBe(true);
+    expect(agent.callSkill).toHaveBeenCalledWith('params', 'set-param', { key: 'transport.mode', value: 'relay' });
+    expect(r.message).not.toMatch(/relay/i);
+    expect(r.message).toMatch(/Connection point/);
+  });
+
   it('accepts the "both" mode', async () => {
     const agent = makeAgent();
     const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });

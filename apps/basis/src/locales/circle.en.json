@@ -2564,7 +2564,7 @@
       "doc": "G17 — /transport-mode built-in confirmation bubble."
     },
     "transport_bad": {
-      "text": "Unknown transport: {{mode}} (use nkn, relay or both)",
+      "text": "Unknown transport: {{mode}} (use nkn, connection-point or both)",
       "doc": "G17 — /transport-mode built-in bad-mode bubble."
     },
     "transports_status": {

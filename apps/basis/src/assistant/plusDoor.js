@@ -272,7 +272,11 @@ export function createPlusDoor({
   const engine = createAssistantEngine({
     catalogue: cat, lang, llm, interpret, collectMs: 0, dispatchSlash: false, gateRules, promptLines: [...OWN_PLACE_LINES],
     // a line about one family gets that family's tools (the own note's too); no family is kept regardless here
-    narrowing: { keep: [], own: true },
+    narrowing: {
+      keep: [], own: true,
+      // a line naming no family: the reads and the acts that MAKE something, and the door's own ops (Fable's ruling)
+      otherwise: (e) => DOOR_OP_IDS.has(e?.op?.id) || reads(e) || acts.some((a) => a.opId === e?.op?.id && !actRunsAtOnce(a)),
+    },
     // what the model may read for a line: the person's own things only, and only the ticked self's (or the set's)
     ...(typeof readAs === 'function'
       ? { loadItems: async (ctx) => {

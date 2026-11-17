@@ -9,7 +9,8 @@
  *   10. It stays: a reload keeps the thread; "Forget" empties it, and the model is no longer handed what was said.
  *   7.  A circle's act: a line two places can take (a circle's list and an own list of one name) gets a card naming
  *       both; nothing runs before the pick; after it, it is on the picked circle's list.
- * Journey 6 (the "/" list) is not built in the "+" yet.
+ *   6.  The "/" list: typing "/" offers the door's own commands; picking one opens the same form as its button, and
+ *       no model call is made.
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/plus-story-rest.spec.js
  */
@@ -154,5 +155,25 @@ test('the "+" story, a circle\'s act: two places hold the list, the card asks, n
   expect(await onCircle(), 'nothing on the circle before the pick').not.toContain('kaas');
   await card.locator(`.circle-vandaag-plus__card-in[data-circle-id="${circleId}"]`).click();
   await expect.poll(onCircle, { timeout: 15_000 }).toContain('kaas');
+  expect(errs).toEqual([]);
+});
+
+test('the "+" story, the "/" list: the same acts as the buttons, and picking one opens the same form', async ({ page }) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
+  await page.addInitScript((script) => { window.__onderlingTestModel = { script }; }, SCRIPT);
+  await page.goto('/');
+  await openPlus(page);
+  const calls = (await asked(page)).length;
+  await page.locator('.circle-vandaag-plus__line').fill('/');
+  const offered = page.locator('.circle-vandaag-plus__suggestion');
+  await expect(offered.filter({ hasText: '/addappt' }), 'the appointment act is offered').toHaveCount(1, { timeout: 10_000 });
+  await expect(offered.filter({ hasText: '/add-note' }), 'the note act is offered').toHaveCount(1);
+  await expect(offered.filter({ hasText: '/whoami' }), 'no device command in the own "+"').toHaveCount(0);
+  await offered.filter({ hasText: '/addappt' }).click();
+  await page.locator('.circle-vandaag-plus__line').press('Enter');
+  await expect(page.locator('.circle-vandaag-plus__title'), 'the appointment form, as its button opens it').toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.circle-vandaag-plus__when')).toBeVisible();
+  expect((await asked(page)).length, 'no model call for a "/" line').toBe(calls);
   expect(errs).toEqual([]);
 });

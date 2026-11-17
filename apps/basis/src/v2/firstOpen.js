@@ -1,0 +1,28 @@
+/**
+ * THE FIRST OPEN — three doors, the first time the app opens on a device: scan a code someone gave you, read the
+ * introduction, or just continue to Today (where "New to Basis?" stays as the reminder until the intro is seen). One
+ * model both shells paint: the phone on its welcome screen (before the first boot), web on a screen before Today.
+ *
+ * A door is a choice, not an act of its own: scan runs the one scanner (the `scanQr` op, as Me's "Scan" does), the
+ * introduction opens the seven cards (introDeck.js), continue shows Today. Choosing any door ends the first open on this
+ * device; nothing is asked twice.
+ */
+
+/** The doors, in the order they are shown; `continue` is the plain way on and comes last. */
+export const FIRST_OPEN_DOORS = Object.freeze([
+  Object.freeze({ id: 'scan', labelKey: 'circle.firstOpen.scan', primary: false }),
+  Object.freeze({ id: 'intro', labelKey: 'circle.firstOpen.intro', primary: true }),
+  Object.freeze({ id: 'continue', labelKey: 'circle.firstOpen.continue', primary: false }),
+]);
+
+/** The screen's words above the doors: the welcome's own title, then one line on what the doors are for. */
+export const FIRST_OPEN_WORDS = Object.freeze({ titleKey: 'circle.firstRun.title', leadKey: 'circle.firstOpen.lead' });
+
+/**
+ * What a host does once the app is on Today after a door: run the scanner, open the introduction, or nothing.
+ * @param {string} door
+ * @returns {'scan'|'intro'|null}
+ */
+export function firstOpenThen(door) {
+  return door === 'scan' || door === 'intro' ? door : null;
+}

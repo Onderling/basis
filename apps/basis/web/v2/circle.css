@@ -1638,3 +1638,9 @@
 .circle-intro__title { margin: 0; }
 .circle-intro__body { margin: 0; line-height: 1.5; }
 .circle-intro__next, .circle-intro__skip { align-self: flex-start; }
+
+/* THE FIRST OPEN (firstOpen.js): the welcome's title, one line, three doors stacked */
+.circle-first-open { display: flex; flex-direction: column; gap: 12px; max-width: 28rem; margin: 15vh auto 0; padding: 0 16px; }
+.circle-first-open__title { margin: 0; }
+.circle-first-open__lead { margin: 0 0 8px; line-height: 1.5; }
+.circle-first-open__door { width: 100%; }

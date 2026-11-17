@@ -305,6 +305,8 @@ import { buildOnboardingTemplate, loadOnboardingTemplate } from '../../src/v2/on
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../src/v2/onboardingChat.js';
 import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
 import { renderIntroDeck } from './introDeck.js';
+import { renderFirstOpen } from './firstOpen.js';
+import { firstOpenThen } from '../../src/v2/firstOpen.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -5561,6 +5563,22 @@ async function showMyData(opts) {
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
 // THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared)
+// THE FIRST OPEN (src/v2/firstOpen.js): the three doors on a screen of their own; any door ends it on this device, then
+// Today, then what the door asks for: the one scanner (the scanQr op, as Me's "Scan") or the introduction's cards
+function showFirstOpen() {
+  hideTabBar();
+  renderFirstOpen(rootEl, {
+    t,
+    onDoor: async (door) => {
+      await onboardingFlags.markFirstOpenSeen();
+      await showScreens();
+      const then = firstOpenThen(door);
+      if (then === 'scan') Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {});
+      else if (then === 'intro') { await onboardingFlags.markIntroSeen(); openIntroDeck(); }
+    },
+  });
+}
+
 // THE INTRODUCTION (Today's "Nieuw bij Basis?" → "Lees meer"): the seven cards in the shared overlay; leaving it shows
 // Today again (the card is gone: the intro was marked seen before the deck opened)
 function openIntroDeck() {
@@ -10274,6 +10292,8 @@ async function boot() {
   let lastTab = null;
   try { lastTab = window.localStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
   const start = startTabFor(circleHouseholdAgent?.getParamValue?.('home.startScreen'), lastTab);
+  // THE FIRST OPEN on this device: three doors before anything else (src/v2/firstOpen.js); a door chosen, Today
+  if (!(await onboardingFlags.isFirstOpenSeen())) { showFirstOpen(); return; }
   if (start === 'screens') showScreens();
   else if (start === 'contacten') showContacts();
   else if (start === 'mij') showMij();

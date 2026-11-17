@@ -352,8 +352,12 @@ export default function App() {
       .catch(() => setFirstRun('show'));
   }, []);
 
-  const dismissFirstRun = useCallback(() => {
+  // THE FIRST OPEN's door (basis/src/v2/firstOpen.js): which one was chosen on the welcome, run by the launcher once
+  // it is up (the scanner, the introduction); "just continue" asks for nothing more
+  const [firstOpenDoor, setFirstOpenDoor] = useState(null);
+  const dismissFirstRun = useCallback((door = 'continue') => {
     markWelcomeDismissed(AsyncStorage).catch(() => { /* non-fatal */ });
+    setFirstOpenDoor(typeof door === 'string' ? door : 'continue');
     setFirstRun('dismissed');
   }, []);
 
@@ -639,7 +643,7 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <StatusBar style="auto" />
-        <FirstRunWelcomeScreen onStart={dismissFirstRun} onRestore={startRestore} />
+        <FirstRunWelcomeScreen onDoor={dismissFirstRun} onRestore={startRestore} />
       </SafeAreaProvider>
     );
   }
@@ -699,6 +703,9 @@ export default function App() {
           // a contact card opened as a link, handed over by the hidden ChatScreen: the launcher opens its add sheet
           contactLink={contactLink}
           onContactLinkDone={onContactLinkDone}
+          // the first open's door, run once the launcher is up (the welcome chose it before the first boot)
+          firstOpenDoor={firstOpenDoor}
+          onFirstOpenDoorDone={() => setFirstOpenDoor(null)}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}

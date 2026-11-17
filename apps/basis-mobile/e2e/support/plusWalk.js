@@ -73,13 +73,17 @@ async function setOwnModel(phonePort) {
 }
 
 /**
- * A second self, made as a person makes one: the header's switcher → Edit on the general self → the About-me panel →
+ * A second self, made as a person makes one: the header's avatar (with more selves: the switcher → Edit on the general
+ * self) → the About-me panel →
  * the dashed "new" card → a name → Make; then the panel closes.
  */
 async function makeSelf(name) {
   await backToLauncher();   // out of the settings screen setOwnModel leaves open: the header shows again
   await tapSoon(by.id('header-avatar'), 20_000);
-  await tapSoon(by.id('persona-switcher-edit-default'), 10_000);
+  // with one self the avatar opens its About-me panel at once; with more it opens the switcher first
+  const at = await firstOf([by.id('circle-aboutme-panel'), by.id('persona-switcher-edit-default')], 15_000);
+  if (at === 1) await tapSoon(by.id('persona-switcher-edit-default'));
+  else if (at < 0) throw new Error('the header avatar opened neither the About-me panel nor the switcher');
   await soon(by.id('circle-aboutme-panel'), 15_000);
   await waitFor(element(by.id('mij-new-persona'))).toBeVisible().whileElement(by.id('mij-scroll')).scroll(400, 'down');
   await pause(800);

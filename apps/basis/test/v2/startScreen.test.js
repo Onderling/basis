@@ -4,7 +4,7 @@
  * register, painted on My data, written through set-param like every setting.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { startTabFor, START_SCREEN, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
+import { startTabFor, startScreenStillApplies, START_SCREEN, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderCircleMyData } from '../../web/v2/circleMyData.js';
 import { settingsGroupFor } from '../../src/v2/settingsHome.js';
 import { basisManifest as settingsManifest } from '../../manifest.js';
@@ -32,5 +32,21 @@ describe('the start screen', () => {
     expect(sel.value).toBe('circles');
     sel.value = 'last'; sel.dispatchEvent(new Event('change'));
     expect(onSetStartScreen).toHaveBeenCalledWith('last');
+  });
+});
+
+// The start screen applies once the agent is there, unless the person already moved during the cold start: a tap on
+// a tab (even Circles, the one already showing), an opened circle, or "Make a circle" (the emulator walk, 2026-11-13).
+describe('the start screen after a cold start', () => {
+  it('applies when the person has not moved', () => {
+    expect(startScreenStillApplies({ tapped: false, view: 'list', selected: null, creating: false })).toBe(true);
+  });
+  it('does not when the person tapped a tab, even the one already showing', () => {
+    expect(startScreenStillApplies({ tapped: true, view: 'list', selected: null, creating: false })).toBe(false);
+  });
+  it('does not when a circle is open, the wizard is open, or another view shows', () => {
+    expect(startScreenStillApplies({ tapped: false, view: 'list', selected: { id: 'c' }, creating: false })).toBe(false);
+    expect(startScreenStillApplies({ tapped: false, view: 'list', selected: null, creating: true })).toBe(false);
+    expect(startScreenStillApplies({ tapped: false, view: 'contacten', selected: null, creating: false })).toBe(false);
   });
 });

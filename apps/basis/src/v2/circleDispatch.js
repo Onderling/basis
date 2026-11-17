@@ -208,12 +208,29 @@ const NO_CLAIM_RETRY = 'Your last answer described a result without calling a to
 
 /** Does a model REPLY say something happened (a ✓, or a done-word)? Only a tool call does anything. */
 const CLAIM_WORDS = /\b(toegevoegd|afgevinkt|verwijderd|gewijzigd|aangepast|gezet op|added|removed|ticked|changed|done)\b/i;
+/** A sentence that says what CAN be done ("Ik kan …", "I can help with …, what's been done"): an ability, no claim. */
+const ABILITY_WORDS = /\b(kan|kun|kunt|kunnen|zal|can|could|will|i'll)\b/i;
+const BULLET = /^\s*(?:[-•*]|\d+[.)])\s/;
 export function claimsResult(text) {
   const s = String(text ?? '');
   if (s.includes('✓')) return true;
-  // A QUESTION may use a done-word without claiming anything ("Aan welke lijst moet het worden toegevoegd?"): only a
-  // sentence that is not a question claims.
-  return s.split(/(?<=[.!?])\s+|\n+/).some((part) => part.trim() && !/\?\s*$/.test(part.trim()) && CLAIM_WORDS.test(part));
+  // the reply's lines, a bulleted list joined to the line that introduces it ("Ik kan hier …:" and its items)
+  const units = [];
+  for (const line of s.split(/\n+/)) {
+    const prev = units.at(-1);
+    if (prev && BULLET.test(line) && (prev.intro || /:\s*$/.test(prev.text))) { prev.text += `\n${line}`; prev.intro = prev.intro ?? prev.text.split('\n')[0]; continue; }
+    units.push({ text: line, intro: null });
+  }
+  return units.some((u) => {
+    // a list under an intro that states an ability lists abilities ("wat er al afgevinkt is" is what the list shows)
+    if (u.intro && ABILITY_WORDS.test(u.intro)) return false;
+    // A QUESTION may use a done-word without claiming anything ("Aan welke lijst moet het worden toegevoegd?"), and so
+    // may a sentence that says what can be done: only another sentence with a done-word claims.
+    return u.text.split(/(?<=[.!?])\s+/).some((part) => {
+      const p = part.trim();
+      return p && !/\?\s*$/.test(p) && CLAIM_WORDS.test(p) && !ABILITY_WORDS.test(p);
+    });
+  });
 }
 
 /** What the model is told after a read it asked for. LLM-facing. */

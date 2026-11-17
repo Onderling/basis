@@ -67,4 +67,21 @@ describe('a reply that claims a result', () => {
     expect(interpret).toHaveBeenCalledTimes(1);
     expect(noMatch).toEqual([{ reply: 'Welke lijst bedoel je?' }]);
   });
+
+  // Fable's walk with a real model, 2026-11-17: "wat kan je voor me doen?" was asked twice and the English answer then
+  // dropped, because a sentence saying what CAN be done ("what's been done", "wat er al afgevinkt is" under "Ik kan …:")
+  // read as a claim. An ability is no claim; a done act still is.
+  it('an answer about what can be done is no claim; a done act still is', () => {
+    const real = [
+      'Ik kan hier een paar dingen voor je doen:\n\n- Afspraken in je agenda zetten, bekijken of zoeken\n- Lijsten aanmaken en bijhouden, met wat erop staat en wat er al afgevinkt is\n- Korte weetjes/notities voor jezelf opschrijven, zodat je ze later terug kunt lezen\n\nWaar kan ik je mee helpen?',
+      'Ik kan hier een paar dingen voor je doen:\n\n- Afspraken in je agenda zetten, bekijken of zoeken\n- Lijsten bijhouden: zien wat erop staat en wat er de afgelopen dagen afgerond is\n- Eigen weetjes/notities opschrijven en teruglezen\n\nWaar zal ik mee beginnen?',
+      "I can help you with your own stuff here:\n\n- Keep your own notes — jot down things you want to remember\n- Manage your appointments — add events, see what's coming up, search your calendar\n- Work with your lists — see what's on them, what's been done\n\nWhat would you like to do?",
+      "I can help with your own stuff here: keep your notes, manage your appointments (add, search, and see what's coming up), and work with your lists — see what's on them, add things, and show what's been done. What would you like to do?",
+    ];
+    for (const r of real) expect(claimsResult(r), r.slice(0, 60)).toBe(false);
+    expect(claimsResult('Ik heb melk toegevoegd.')).toBe(true);
+    expect(claimsResult('Melk is toegevoegd. Ik kan nog meer doen als je wilt.')).toBe(true);
+    expect(claimsResult('Done, I added it. I can add more?')).toBe(true);
+  });
 });
+

@@ -1917,3 +1917,26 @@ one act is the duplication the manifest exists to prevent.
 
 A projection asked without a scope offers every op, as before; the "+" asks for `own`. Code:
 `packages/app-manifest/src/scopes.js`, `validate.js` (`checkPlaces`). Ledger: L668.
+
+---
+
+## 2026-11-17 — In the person's own "+", setting your own model route is the agreement (amends 2026-07-18 for the "+")
+
+**Status:** settled (Frits agreed the assistant-thread plan, 2026-11-16) and shipped in the "+" door
+(`apps/basis/src/assistant/plusDoor.js`, the route line `plusRouteLine`).
+
+**Context:** 2026-07-18 made the help bot's LLM forward consent-gated per question: there the person had not chosen a
+route for that purpose. In their own "+" the person sets the route themselves, for this conversation.
+
+**Decision:** the own "+" asks no consent per question. Setting your own route is the agreement. The thread shows at
+its top which route answers and whether it is confidential, by the route's actual confidentiality (2026-07-18's
+wording rule, unchanged). With no route set, nothing goes to a model: the fixed phrases and the buttons work, and the
+"+" says where to set one.
+
+**Alternatives / why:** a consent card per question in a conversation the person opened with a route they chose
+themselves would ask the same thing every line. The honesty part of 2026-07-18 is what protects them, and it stays.
+
+**Consequences:** 2026-07-18's per-question consent stays for the help bot. The own "+" sends the person's own
+things only (own notes, appointments, lists, as the ticked self), never a circle's rows. Area page:
+`docs/catalogue/assistant.md`.
+

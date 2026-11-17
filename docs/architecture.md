@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-14** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-17** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -72,6 +72,7 @@ per-operation surface hints. It is the single source of truth every surface read
 | `renderGate` | deterministic pre-LLM token-gate rules (from each op's `surfaces.slash.match` verbs) | affordance |
 | `renderSlash` | `/commands` + grammar | affordance |
 | `renderAttachments` | the attach ("+") menu (from each op's `surfaces.attach`) | affordance |
+| `createPlusDoor` | the person's own "+" conversation: the plain reading, the own gate (`renderGate` for the own place), the own model, one handler for a model's pick and a "/" line (`docs/catalogue/assistant.md`) | door |
 | `renderA2A` | the ops **another agent** may invoke, one kernel skill per op (`app.opId`) | affordance |
 | `renderWeb` | DOM pages + forms | shell |
 | `renderMobile` | a React Native NavModel (screens/nav) | shell |

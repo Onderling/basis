@@ -25,6 +25,7 @@ Rule for anyone ruling on absence: before "not built" or "needs design", read th
 | [circles-and-pinboard.md](circles-and-pinboard.md) | circles, membership, posts, requests | started 2026-11-14 (membership and its key) |
 | calendar | appointments, rsvp, week overview | owed |
 | [lists.md](lists.md) | a circle's lists (its Lists tab), entries, boards, the lists block | started 2026-11-14 |
+| [assistant.md](assistant.md) | the person's own assistant: the "+" conversation, its phrases, its model route | started 2026-11-17 |
 | household-bot | the bot in a circle: add/done, nudges, digests | owed |
 | nearby | rooms, levels, connection points, LAN/BLE | owed |
 | [contacts-and-personas.md](contacts-and-personas.md) | contacts, trust, personas, disclosure, Mij, message requests, blocking | started 2026-11-12 |

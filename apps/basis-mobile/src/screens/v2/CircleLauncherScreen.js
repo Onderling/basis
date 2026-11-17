@@ -31,7 +31,7 @@ import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyAsk
 import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../basis/src/v2/nearbyLevel.js';
 import { nearbyTabs } from '../../../../basis/src/v2/nearbyTabs.js';
-import { nearbyStream, nearbyTabNews } from '../../../../basis/src/v2/nearbyStream.js';
+import { nearbyStream, nearbyTabNews, nearbyMineSummary } from '../../../../basis/src/v2/nearbyStream.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -5929,7 +5929,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     // Names the REAL reach — "asked 3 of 5 nearby" — rather than implying the whole room heard it; the
     // line then follows the receipts ("heard by 2 of 5") as they come in.
     lastAsk.current = r.ok ? { id: r.ask?.id ?? null, peers: r.peers } : null;
-    setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+    // a refusal the controller can name (hidden from the room) says so; any other says the ask lapsed
+    setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' });
   }, [screen]);
   useEffect(() => {
     const sub = bundle?.nearbyRoom?.subscribeToHeard;
@@ -5961,7 +5962,10 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
   }, [screen]);
 
-  const say = useCallback((text) => { screen.say(text); }, [screen]);
+  const say = useCallback(async (text) => {
+    const r = await screen.say(text);
+    if (r?.notice) setNotice({ key: r.notice });   // refused while hidden: say why
+  }, [screen]);
 
   // Joining a broadcast invite runs the SAME join as a scanned QR — the host hands the uri to the existing
   // wizard rather than to anything new, which is the point of step H.
@@ -6354,7 +6358,8 @@ function NearbyScreen({
         <Text style={styles.ownProfileTitle}>
           {t('circle.nearbyScreen.mine_title')}
           {' · '}
-          {[allows.card ? t('circle.nearbyScreen.mine_card_on') : null, allows.chat ? t('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean).join(' · ') || t('circle.nearbyScreen.mine_none')}
+          {/* what the person shows the room (`nearbyMineSummary`): never "in the conversation" while hidden */}
+          {nearbyMineSummary(model).map((k) => t(k)).join(' · ')}
         </Text>
       </Pressable>
       {mineOpen ? (<>

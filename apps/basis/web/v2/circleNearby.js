@@ -36,7 +36,7 @@ import { ASK_MAX_TEXT } from '../../src/v2/nearbyAsks.js';
 import { CARD_MAX_LABEL, CARD_MAX_LINE, CHAT_MAX_TEXT } from '../../src/v2/nearbyRoom.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { nearbyTabs } from '../../src/v2/nearbyTabs.js';
-import { nearbyStream, nearbyTabNews } from '../../src/v2/nearbyStream.js';
+import { nearbyStream, nearbyTabNews, nearbyMineSummary } from '../../src/v2/nearbyStream.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -663,8 +663,8 @@ export function renderCircleNearby(container, {
     try { if (!localStorage.getItem('basis.nearbyMineSeen')) { mine.open = true; localStorage.setItem('basis.nearbyMineSeen', '1'); } } catch { /* folded */ }
     const mineSummary = document.createElement('summary');
     mineSummary.className = 'circle-nearby__mine-summary';
-    const mineChips = [allows.card ? tr('circle.nearbyScreen.mine_card_on') : null, allows.chat ? tr('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean);
-    mineSummary.textContent = `${tr('circle.nearbyScreen.mine_title')} · ${mineChips.length ? mineChips.join(' · ') : tr('circle.nearbyScreen.mine_none')}`;
+    // what the person shows the room (`nearbyMineSummary`): never "in the conversation" while hidden
+    mineSummary.textContent = [tr('circle.nearbyScreen.mine_title'), ...nearbyMineSummary(safeModel).map((k) => tr(k))].join(' · ');
     mine.appendChild(mineSummary);
     // WHO ENTERS THE ROOM: the switcher's self (or the one question when several are ticked) — a label, said as one
     if (roomSelf?.view) {

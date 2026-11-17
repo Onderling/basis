@@ -646,3 +646,15 @@ describe('hidden from the room: Conversation shows no stream, one line and the w
     expect(el.querySelector('.circle-nearby__chat-visible')).toBeNull();
   });
 });
+
+describe('the "you here" row and being hidden (nearbyMineSummary)', () => {
+  const summary = (el) => el.querySelector('.circle-nearby__mine-summary').textContent;
+  it('in the chat and visible: it says so', () => {
+    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: true } }));
+    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_chat_on');
+  });
+  it('in the chat but hidden: it does not say you are in the conversation', () => {
+    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: false, levelChosen: true }, quiet: true }));
+    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_none');
+  });
+});

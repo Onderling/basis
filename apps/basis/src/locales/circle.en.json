@@ -3603,6 +3603,10 @@
       "text": "{{label}} · {{count}}",
       "doc": "A Nearby tab's name with how many things arrived since the person last looked at that tab; only when there is at least one."
     },
+    "ask_hidden": {
+      "text": "You are hidden. A question tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person sends a question: the controller refuses it, because it would tell the room someone is there."
+    },
     "chat_hidden_line": {
       "text": "You are hidden. Become visible to join the conversation.",
       "doc": "The Conversation tab while the person is hidden from the room: no stream, this line and the way to become visible."

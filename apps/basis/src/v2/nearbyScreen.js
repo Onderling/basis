@@ -107,6 +107,16 @@ export function nearbyWho({ rows = [], t } = {}) {
   };
 }
 
+/** The visibility states in which the room does not see this person: "even stil", the radio off, no level chosen yet.
+ *  Announced against the person's wish ("still visible") is not among them — the room sees the device anyway. */
+const HIDDEN_KEYS = Object.freeze(['hidden', 'not_chosen', 'radio_off']);
+
+/** Whether the room cannot see this person. While it cannot, they say nothing to it: a chat line or a question would
+ *  go to every peer this device sees, from its room address, and tell the room someone is there. */
+export function nearbyIsHidden(visibility) {
+  return HIDDEN_KEYS.includes(nearbyVisibilityKey(visibility));
+}
+
 export function nearbyVisibilityKey(visibility) {
   if (!visibility) return null;
   if (visibility.radioOff)    return 'radio_off';
@@ -605,6 +615,8 @@ export function createNearbyScreen({
      * ask list — the room is what other people asked; my own question is not news to me.
      */
     async askRoom({ text, tags = [], ttlMs } = {}) {
+      // hidden from the room: a question would tell it someone is here (`nearbyIsHidden`); `notice` is what to say
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'ask_hidden' };
       const built = createAsk({ text, tags, ttlMs, from: safeCall(myRoomAddress, null), now });
       if (!built.ok) return { ok: false, reason: built.reason };
       if (!askChannel?.broadcast) return { ok: false, reason: 'no-channel', ask: built.ask };
@@ -723,8 +735,10 @@ export function createNearbyScreen({
       }
     },
 
-    /** Say something in the room chat. The allow is enforced in `createChatMessage`, not here. */
+    /** Say something in the room chat. The allow is enforced in `createChatMessage`; being hidden, here. */
     async say(text) {
+      // hidden from the room: a line would tell it someone is here (`nearbyIsHidden`); `notice` is what to say
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'chat_hidden_line' };
       const built = createChatMessage({ text, from: safeCall(myRoomAddress, null), allows, now });
       if (!built.ok) return built;
       if (!askChannel?.broadcastKind) return { ok: false, reason: 'no-channel' };

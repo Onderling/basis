@@ -156,6 +156,10 @@ test('hidden from the room ("even stil"): no stream and no field to talk in; one
   await expect(page.locator('.circle-nearby__chat-input')).toHaveCount(0);
   await expect(page.locator('.circle-nearby__chat-off-line')).toHaveText('Je bent verborgen. Word zichtbaar om mee te praten.');
   expect(await tabLabel(page, 'conversation'), 'nothing in a stream you cannot see counts as new').toBe('Gesprek');
+  await expect(page.locator('.circle-nearby__mine-summary'), 'the "you here" row does not say you are in the conversation').not.toContainText('gesprek');
+  // the controller itself refuses: a line said while hidden goes to no one, and says why
+  expect(await page.evaluate(() => window.__nearbyTest.screen.say('hoi').then((r) => ({ ok: r.ok, reason: r.reason, notice: r.notice }))))
+    .toEqual({ ok: false, reason: 'hidden', notice: 'chat_hidden_line' });
   await page.screenshot({ path: testInfo.outputPath('verborgen.png'), fullPage: true });
   await page.locator('.circle-nearby__chat-visible').click();
   await expect(page.locator('.circle-nearby__visibility')).toHaveAttribute('data-visibility', 'visible');

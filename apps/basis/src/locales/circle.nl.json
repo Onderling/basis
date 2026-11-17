@@ -10714,5 +10714,79 @@
       "text": "Weghalen",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
     }
+  },
+  "introDeck": {
+    "welcome_title": {
+      "text": "Welkom",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "welcome_body": {
+      "text": "Basis is een app van Onderling om dingen te regelen met de mensen om je heen: je huishouden, je straat, je club. Je gegevens staan op je eigen telefoon, niet bij ons.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "circles_title": {
+      "text": "Kringen",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "circles_body": {
+      "text": "Een kring is een groep mensen die iets samen doet. Je praat er, je zet er lijstjes en afspraken in, en je stelt er vragen. Wat je in een kring zet, zien alleen de leden.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "contacts_title": {
+      "text": "Contacten",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "contacts_body": {
+      "text": "Een contact is één persoon, of een bot, met wie je los praat. Je voegt iemand toe door de code van die persoon te scannen of een link te openen. Je kiest zelf hoeveel die ander van je ziet. Een eerste bericht van iemand die je nog niet kent, komt binnen als verzoek.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "plus_title": {
+      "text": "De +",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "plus_body": {
+      "text": "Met de + maak je iets voor jezelf: een notitie, een afspraak, een lijstje. Kies een knop, of typ wat je wilt, bijvoorbeeld \"afspraak morgen 14:00 kapper\". Typ \"help\" om te zien wat er kan. Stel je een eigen model in, dan kun je er ook gewoon tegen praten. Er gebeurt niets zonder dat jij ja zegt.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "selves_title": {
+      "text": "Jij, op jouw manier",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "selves_body": {
+      "text": "Je kunt meer dan één persona hebben, bijvoorbeeld \"thuis\" en \"werk\": een naam, een foto en wat je over jezelf deelt. Per kring en per contact kies je welke persona zij zien. Bij Mij zie je wie je waar bent.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "nearby_title": {
+      "text": "In de buurt",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "nearby_body": {
+      "text": "Bij In de buurt zie je wie er dichtbij ook openstaat, alleen als jij en zij dat aanzetten. Je kunt een vraag stellen (\"wie heeft een boormachine?\"). Die gaat naar wie er openstaat; hun telefoon kijkt zelf of het past bij wat zij aanbieden, en jij hoort het alleen als zij antwoorden.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "keys_title": {
+      "text": "Je sleutels",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "keys_body": {
+      "text": "Je toegang hangt aan 24 woorden, je herstelzin. Schrijf ze op en bewaar ze ergens veilig: wie ze heeft, is jou. Zonder die woorden kun je niet terug als je telefoon kwijt is.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "next": {
+      "text": "Verder",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "start": {
+      "text": "Aan de slag",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "skip": {
+      "text": "Overslaan",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "position": {
+      "text": "{{at}} van {{of}}",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    }
   }
 }

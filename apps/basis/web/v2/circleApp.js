@@ -304,6 +304,7 @@ import {
 import { buildOnboardingTemplate, loadOnboardingTemplate } from '../../src/v2/onboardingTemplate.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../src/v2/onboardingChat.js';
 import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
+import { renderIntroDeck } from './introDeck.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -4949,7 +4950,8 @@ function onScreenAction(action) {
       .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
-  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openHelpDoor()); }
+  // "Lees meer": the introduction's seven cards (src/v2/introDeck.js); closed or read through, Today again without the card
+  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openIntroDeck()); }
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
@@ -5559,6 +5561,12 @@ async function showMyData(opts) {
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
 // THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared)
+// THE INTRODUCTION (Today's "Nieuw bij Basis?" → "Lees meer"): the seven cards in the shared overlay; leaving it shows
+// Today again (the card is gone: the intro was marked seen before the deck opened)
+function openIntroDeck() {
+  mountMyDataWizard(({ container, onClose }) => renderIntroDeck({ container, t, onClose: () => { onClose(); _showVandaag(); } }));
+}
+
 function openHelpDoor() {
   const r = helpDoorTarget(circlesCache);
   if (r.kind === 'circle') { showDetail(r.circleId); return; }

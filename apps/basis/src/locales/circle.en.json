@@ -10717,5 +10717,79 @@
       "text": "Dismiss",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
     }
+  },
+  "introDeck": {
+    "welcome_title": {
+      "text": "Welcome",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "welcome_body": {
+      "text": "Basis is an app by Onderling for arranging things with the people around you: your household, your street, your club. Your data is on your own phone, not with us.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "circles_title": {
+      "text": "Circles",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "circles_body": {
+      "text": "A circle is a group of people who do something together. You talk there, you put lists and appointments in it, and you ask questions. What you put in a circle, only its members see.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "contacts_title": {
+      "text": "Contacts",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "contacts_body": {
+      "text": "A contact is one person, or a bot, you talk with on your own. You add someone by scanning their code or opening a link. You choose how much the other person sees of you. A first message from someone you do not know yet comes in as a request.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "plus_title": {
+      "text": "The +",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "plus_body": {
+      "text": "With the + you make something for yourself: a note, an appointment, a list. Pick a button, or type what you want, for example \"appointment tomorrow 14:00 hairdresser\". Type \"help\" to see what it can do. If you set up a model of your own, you can also just talk to it. Nothing happens without your yes.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "selves_title": {
+      "text": "You, your way",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "selves_body": {
+      "text": "You can have more than one persona, for example \"home\" and \"work\": a name, a photo and what you share about yourself. Per circle and per contact you choose which persona they see. Under Me you see who you are where.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "nearby_title": {
+      "text": "Nearby",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "nearby_body": {
+      "text": "Under Nearby you see who close by is open too, only if you and they switch it on. You can ask a question (\"who has a drill?\"). It goes to whoever is open; their phone checks itself whether it fits what they offer, and you only hear of it if they answer.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "keys_title": {
+      "text": "Your keys",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "keys_body": {
+      "text": "Your access hangs on 24 words, your recovery phrase. Write them down and keep them somewhere safe: whoever has them is you. Without those words you cannot get back if your phone is lost.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "next": {
+      "text": "Next",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "start": {
+      "text": "Get started",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "skip": {
+      "text": "Skip",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "position": {
+      "text": "{{at}} of {{of}}",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    }
   }
 }

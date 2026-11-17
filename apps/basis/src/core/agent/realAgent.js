@@ -2848,6 +2848,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const [pid, rt] of personas) if (pid !== 'default' && by && rt?.chatId?.pubKey === by) return pid;
     return 'default';
   };
+  /**
+   * The selves an own READ is for: the set the CALL names (`ctx.selves`: Today's blocks, a local call, read every ticked
+   * self), kept to the selves this device holds, else the one self the call is made as. Never a set in the ARGS: args
+   * come from a model's pick, a typed line or a door, and are not followed; a door's call is its person's only. Own rows
+   * of any other self are not there for it.
+   */
+  const ownSelvesOf = (ctx) => {
+    const local = !(typeof ctx?.caller === 'string' && ctx.caller);
+    const named = local && Array.isArray(ctx?.selves) ? ctx.selves.filter((id) => typeof id === 'string' && personas.has(id)) : [];
+    return new Set(named.length ? named : [selfOfOwnItem({ createdBy: actorOf(ctx) })]);
+  };
   /** The own lanes this device rides: its default's and each persona's it runs. */
   const ownLanes = () => [...personas.keys()].map(ownLaneOf);
   // every persona running at boot has its grant set from the start: its lane folded and its issuer trusted before a
@@ -7406,7 +7417,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   const circleCalendarByLang = new Map();   // the calendar over a circle's store, one per call language, made on first use
   // A person's OWN appointments (of no circle): the same ops over their own-devices store, under an own Agenda — made
   // on first use (the shell hands the store; on web and mobile it is durable, so they come back after a restart).
-  const ownCalendarByLang = new Map();   // the own calendar's ops, one per call language
   let ownCalendarStore = null;
   let ownCalendarReady = null;
   let circleTasks = null;      // the bot's chores over the circle store, made on first use
@@ -7783,7 +7793,11 @@ export async function createRealHouseholdAgent(opts = {}) {
           return { ok: false, code: 'own-lane-not-a-circle', error: 'own-lane-not-a-circle' };
         }
         const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
-        const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall ? createGenericAtomHandlers(await getOwnStore()) : null;
+        // the own store AS the selves the call is for (`ownSelvesOf`): that noun's rows they made, nothing else (default-deny)
+        const ownSelves = ownSelvesOf(ctx);
+        const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall
+          ? createGenericAtomHandlers(ownStoreAsSelf(await getOwnStore(), (row) => row?.type === g.noun && ownSelves.has(selfOfOwnItem(row))))
+          : null;
         // the own store answers the atoms a noun DECLARES, as a circle does (one contract; the generic handlers alone
         // would answer any atom for any noun)
         if (ownCap && !(householdManifest.nouns?.[g.noun]?.atoms ?? []).includes(g.atom)) {
@@ -8586,12 +8600,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
       })();
       await ownCalendarReady;
-      const ops = perLang(ownCalendarByLang, ctx?.lang, (tLang) => makeCircleCalendarOps({
-        storeFor: () => ownCalendarStore,
+      // the own agenda AS the selves the call is for (`ownSelvesOf`): their appointments only, default-deny
+      // (`ownStoreAsSelf`); the own Agenda itself is every self's container. Made per call: the set differs per call.
+      const selves = ownSelvesOf(ctx);
+      const agendaView = ownStoreAsSelf(ownCalendarStore, (row) => row?.defaultChild === 'calendar-event'
+        || (row?.type === 'calendar-event' && selves.has(selfOfOwnItem(row))));
+      const ops = makeCircleCalendarOps({
+        storeFor: () => agendaView,
         activeCircle: () => OWN_DEVICES_SCOPE,
-        t: tLang,
+        t: translatorFor(callLang(ctx?.lang) || null),
         localActor: 'me',
-      }));
+      });
       // SHARED WITH A CONTACT: a minimal copy in the pair circle of the self the contact is filed under, carried by its
       // lane; the link stays on this side (the source's `shared` mark), so a move or a cancel here re-shares it
       if (opId === 'shareEvent') return shareOwnEvent(args ?? {});

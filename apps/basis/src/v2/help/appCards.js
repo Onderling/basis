@@ -25,20 +25,20 @@ export const APP_VARIANTS = Object.freeze({
     en: 'For an association or housing co-op, Basis is where members organise things themselves: dividing tasks, planning meetings, asking questions. Circles have their own rules, set by you. And the member list stays with the association.',
   },
   'principe.zeggenschap': {
-    nl: 'Jij bent de baas over je gegevens. Ze worden op je eigen apparaat opgeslagen en zoveel mogelijk ook daar verwerkt. Alleen wat jij zelf deelt verlaat je apparaat, versleuteld, en alleen naar wie jij kiest. Wil je verder op een ander apparaat, dan voeg je dat toe bij Instellingen → Apparaten & sleutels; een reservekopie maak je met een back-upbestand onder Mijn gegevens, of in een Solid Pod als je die hebt.',
-    en: 'You own your data. It is stored on your own device and, as much as possible, processed there too. Only what you choose to share leaves your device, encrypted, and only to whom you choose. To carry on on another device, add it under Settings → Devices & keys; a backup is a backup file under My data, or a Solid Pod if you have one.',
+    nl: 'Jij bent de baas over je gegevens. Ze worden op je eigen apparaat opgeslagen en zoveel mogelijk ook daar verwerkt. Alleen wat jij zelf deelt verlaat je apparaat, versleuteld, en alleen naar wie jij kiest. Wil je verder op een ander apparaat, dan voeg je dat toe bij Instellingen → Apparaten & sleutels; je kringen neem je mee met een herstelbestand (Mijn gegevens), of via een Solid Pod als je die hebt.',
+    en: 'You own your data. It is stored on your own device and, as much as possible, processed there too. Only what you choose to share leaves your device, encrypted, and only to whom you choose. To carry on on another device, add it under Settings → Devices & keys; you take your circles along with a recovery file (My data), or through a Solid Pod if you have one.',
   },
   'principe.geenaccount': {
-    nl: 'Geen verplicht account. Je apparaat maakt zelf een sleutel aan: dat is je identiteit, en die is van jou. Geen e-mailadres, geen wachtwoord, geen profiel bij ons. Verlies je je apparaat, dan haalt je herstelzin van 24 woorden terug wie je bent; je kringen en gesprekken komen terug uit een back-upbestand of een Solid Pod.',
-    en: 'No account required. Your device creates its own key: that is your identity, and it is yours. No email address, no password, no profile with us. If you lose your device, your 24-word recovery phrase brings back who you are; your circles and conversations come back from a backup file or a Solid Pod.',
+    nl: 'Geen verplicht account. Je apparaat maakt zelf een sleutel aan: dat is je identiteit, en die is van jou. Geen e-mailadres, geen wachtwoord, geen profiel bij ons. Verlies je je apparaat, dan haalt je herstelzin van 24 woorden terug wie je bent. Je kringen komen terug met een herstelbestand (Mijn gegevens) of uit een Solid Pod; je gesprekken zitten daar niet in.',
+    en: 'No account required. Your device creates its own key: that is your identity, and it is yours. No email address, no password, no profile with us. If you lose your device, your 24-word recovery phrase brings back who you are. Your circles come back with a recovery file (My data) or from a Solid Pod; your conversations are not in it.',
   },
   'werking.kringen': {
     nl: 'Alles in Basis gebeurt in kringen: je straat, je huis, je club. Een kring maak je zelf, met eigen regels over wie erbij mag en wat gedeeld wordt. Per kring bepaal je wat anderen van je zien; standaard is dat zo min mogelijk.',
     en: 'Everything in Basis happens in circles: your street, your house, your club. You make a circle yourself, with its own rules about who joins and what is shared. Per circle you decide what others see of you; the default is as little as possible.',
   },
   'werking.hulpjes': {
-    nl: 'Een kring kan een hulpje hebben: een bot die vragen beantwoordt of taken bijhoudt, zoals ik in de Hulp-kring. Een hulpje werkt voor de kring, niet voor ons, en kan alleen bij wat de kring hem geeft. Zelf een hulpje aan een kring toevoegen kan in de app nog niet.',
-    en: 'A circle can have a helper: a bot that answers questions or keeps track of tasks, like me in the Help circle. A helper works for the circle, not for us, and can only reach what the circle gives it. Adding a helper to a circle yourself is not possible in the app yet.',
+    nl: 'Een kring kan een hulpje hebben: een bot die vragen beantwoordt of taken bijhoudt, zoals ik hier. Een hulpje werkt voor de kring, niet voor ons, en kan alleen bij wat de kring hem geeft. Zelf een hulpje aan een kring toevoegen kan in de app nog niet.',
+    en: 'A circle can have a helper: a bot that answers questions or keeps track of tasks, like me here. A helper works for the circle, not for us, and can only reach what the circle gives it. Adding a helper to a circle yourself is not possible in the app yet.',
   },
   'werking.ai': {
     nl: 'Gebruikt een hulpje AI, dan kies jij het taalmodel: per kring, en voor je eigen + een model van jezelf (bij Instellingen). In principe kan dat elk model zijn. Onze aanrader is Privatemode, dat draait in een afgeschermde omgeving: hardware waarin je gegevens ook tijdens de verwerking versleuteld blijven, zodat zelfs de beheerder niet kan meekijken. Draait het model op je eigen apparaat, dan verlaat je vraag je apparaat helemaal niet.',
@@ -49,24 +49,24 @@ export const APP_VARIANTS = Object.freeze({
     en: 'Besides messages, a circle has a board (questions, offers, borrow requests), tasks members can pick up, lists and appointments. What you post stays within the circle, on the members\' devices; there is no central server keeping it all.',
   },
   'veilig.grenzen': {
-    nl: 'Eerlijk is eerlijk: geen enkel systeem beschermt alles. De inhoud van berichten is versleuteld, maar wíe met wie contact heeft is bijvoorbeeld deels zichtbaar voor de verbindingspunten. En wat je eenmaal gedeeld hebt, staat op de apparaten van je kringgenoten: verwijderen kun je vragen, niet afdwingen. Zulke grenzen benoemen we liever zelf; op de privacy-pagina staat precies wat wel en niet beschermd is.',
-    en: 'Honestly: no system protects everything. Message content is encrypted, but who contacts whom, for example, is partly visible to the connection points. And what you have shared lives on your circle members\' devices: you can request deletion, not enforce it. We prefer naming such boundaries ourselves; the privacy page states exactly what is and is not protected.',
+    nl: 'Eerlijk is eerlijk: geen enkel systeem beschermt alles. De inhoud van berichten is versleuteld, maar wíe met wie contact heeft is bijvoorbeeld deels zichtbaar voor de verbindingspunten. En wat je eenmaal gedeeld hebt, staat op de apparaten van je kringgenoten: verwijderen kun je vragen, niet afdwingen. Zulke grenzen benoemen we liever zelf; op de pagina Grenzen op onderling.org staat precies wat wel en niet beschermd is.',
+    en: 'Honestly: no system protects everything. Message content is encrypted, but who contacts whom, for example, is partly visible to the connection points. And what you have shared lives on your circle members\' devices: you can request deletion, not enforce it. We prefer naming such boundaries ourselves; the page Boundaries on onderling.org states exactly what is and is not protected.',
   },
   'veilig.dezevraag': {
     nl: 'Vragen aan mij worden op je eigen apparaat beantwoord, uit vaste, door mensen geschreven antwoorden, zonder taalmodel. Past er geen, dan vraag ik eerst of je je vraag wilt doorsturen naar het taalmodel van de kring; alleen met jouw ja gaat hij weg. Je vragen blijven in dit gesprek op je eigen apparaat.',
     en: 'Questions to me are answered on your own device, from fixed answers written by people, without a language model. If none fits, I first ask whether you want to pass your question on to the circle\'s language model; it only leaves with your yes. Your questions stay in this conversation on your own device.',
   },
   'doe.probeer': {
-    nl: 'Je bent al begonnen. Maak een kring (bij Kringen, of "Maak een kring" op Vandaag), geef hem een naam en deel de uitnodiging met wie je erbij wilt hebben. Het is een onderzoeksversie, dus verwacht ruwe randjes.',
-    en: 'You have already started. Make a circle (under Circles, or "Make a circle" on Today), give it a name and share the invitation with whoever you want in. It is a research release, so expect rough edges.',
+    nl: 'Je bent al begonnen. Maak een kring bij Kringen, geef hem een naam en deel de uitnodiging met wie je erbij wilt hebben. Het is een onderzoeksversie, dus verwacht ruwe randjes.',
+    en: 'You have already started. Make a circle under Circles, give it a name and share the invitation with whoever you want in. It is a research release, so expect rough edges.',
   },
   'doe.probeer.dev': {
     nl: 'Meteen te doen: de tutorials op GitHub en `@onderling/*` op npm. Deze app is met het platform gebouwd, dus je kijkt nu al naar een werkend voorbeeld; als ontwikkelaar kun je vandaag beginnen.',
     en: 'Ready today: the tutorials on GitHub and `@onderling/*` on npm. This app is built with the platform, so you are already looking at a working example; as a developer you can start now.',
   },
   'meta.bot': {
-    nl: 'Ik ben de hulp in de Hulp-kring van Basis. Ik kies mijn antwoorden uit vaste, door mensen geschreven teksten. Weet ik het niet, dan zeg ik dat, en vraag ik of je je vraag wilt doorsturen naar een taalmodel; dat antwoord is dan van het model.',
-    en: 'I am the help in Basis\'s Help circle. I choose my answers from fixed, human-written texts. If I do not know, I say so, and I ask whether you want to pass your question on to a language model; that answer is then the model\'s.',
+    nl: 'Ik ben de hulp van Basis. Ik kies mijn antwoorden uit vaste, door mensen geschreven teksten. Weet ik het niet, dan zeg ik dat, en vraag ik of je je vraag wilt doorsturen naar een taalmodel; dat antwoord is dan van het model.',
+    en: 'I am the help of Basis. I choose my answers from fixed, human-written texts. If I do not know, I say so, and I ask whether you want to pass your question on to a language model; that answer is then the model\'s.',
   },
 });
 

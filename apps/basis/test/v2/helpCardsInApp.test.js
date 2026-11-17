@@ -26,6 +26,13 @@ describe('the help cards as the app shows them', () => {
     for (const k of inApp) expect(String(k.nl), k.id).not.toMatch(/\bcircles?\b|circlegenoten/i);
   });
 
+  it('help is a contact to the person, never "the Help circle" (Frits 2026-11-17)', () => {
+    for (const k of inApp) {
+      expect(String(k.nl), k.id).not.toMatch(/hulp-kring/i);
+      expect(String(k.en), k.id).not.toMatch(/help circle/i);
+    }
+  });
+
   it('no card in the app speaks of "this website" or "this page" (the reader is in the app)', () => {
     for (const k of inApp) {
       expect(String(k.nl), k.id).not.toMatch(/deze website|deze pagina/i);
@@ -33,10 +40,10 @@ describe('the help cards as the app shows them', () => {
     }
   });
 
-  it('a card that offers a pod for a backup also names the backup file (Frits keeps both named)', () => {
+  it('a card that offers a pod for a backup also names the recovery file, the app\'s own name for it (Frits keeps both named)', () => {
     for (const k of inApp) {
-      if (/Solid Pod/i.test(k.nl) && /reservekopie|back-up/i.test(k.nl)) expect(k.nl, k.id).toMatch(/back-upbestand/);
-      if (/Solid Pod/i.test(k.en) && /backup/i.test(k.en)) expect(k.en, k.id).toMatch(/backup file/);
+      if (/Solid Pod/i.test(k.nl) && /reservekopie|back-up|kringen/i.test(k.nl)) expect(k.nl, k.id).toMatch(/herstelbestand/);
+      if (/Solid Pod/i.test(k.en) && /backup|circles/i.test(k.en)) expect(k.en, k.id).toMatch(/recovery file/);
     }
   });
 

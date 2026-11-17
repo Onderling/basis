@@ -3089,12 +3089,24 @@ async function refreshSelfSet() {
   try { book = await userScreenStore.get(); _screensBook = book; } catch { /* the book as held stands */ }
   _selfSet = { held, on: held.length ? activeSelves(book ?? {}, held) : ['default'] };
 }
+/** The header's person button just below the host's line when that line is in view, else at the top as before. */
+function placeHeaderAvatar() {
+  if (!_headerAvatarEl) return;
+  const bar = document.querySelector('.cc-host-frame');
+  const below = bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0;
+  _headerAvatarEl.style.top = `calc(${below}px + .5rem)`;
+}
 function paintHeaderAvatar() {
   if (!_headerAvatarEl) {
     _headerAvatarEl = document.createElement('div');
     _headerAvatarEl.style.cssText = 'position:fixed;top:.5rem;right:.75rem;z-index:50;';
     document.body.appendChild(_headerAvatarEl);
+    // placed against the APP, not the whole window: a hosted build paints the site's "back to …" line above the app
+    // (hostFrameBar.js), and the button sat half over it. Its top follows that line while the line is on screen.
+    window.addEventListener('scroll', placeHeaderAvatar, { passive: true });
+    window.addEventListener('resize', placeHeaderAvatar, { passive: true });
   }
+  placeHeaderAvatar();
   // with one self the avatar is the person's editor; with several it is the switcher
   const onOpen = _selfSet.held.length > 1 ? () => showPersonaSwitcher() : () => openAboutMePanel('default');
   renderHeaderAvatar(_headerAvatarEl, { avatar: _headerAvatar, pictureUrl: _headerAvatarUrl, t, onOpen });
@@ -9510,6 +9522,7 @@ async function boot() {
   mountPlusButton();   // after localisation: mounted before it, the button was named by its key
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
+  placeHeaderAvatar();   // the person button below the line just painted (it may already be on screen)
   renderCircleLauncher(rootEl, { loading: true, t });
 
   // register the web-push service worker (root-scoped /sw.js). Best-effort:

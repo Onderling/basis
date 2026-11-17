@@ -43,7 +43,8 @@ async function say(line) {
   await expect(element(by.id('vandaag-plus-line'))).toHaveText(line);
   await pause(1500);
   await tapSoon(by.id('vandaag-plus-read'));
-  await soon(by.text(line).withAncestor(by.id('vandaag-plus-thread')), 20_000);
+  // the same line may be in the thread already (journey 8 asked it too): the first match is enough
+  await present(by.text(line).withAncestor(by.id('vandaag-plus-thread')));
 }
 
 /** The own model, set as a person sets it: Mij → the gear → Weergave → the assistant section, preset Local. */

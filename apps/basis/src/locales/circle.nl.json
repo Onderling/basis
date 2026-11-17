@@ -3572,6 +3572,14 @@
       "text": "Houden",
       "doc": "Cancel removal."
     },
+    "tab_conversation": {
+      "text": "Gesprek",
+      "doc": "Nearby's first tab: the room chat (or, when not in it, one line and the way to join)."
+    },
+    "tab_questions": {
+      "text": "Vragen",
+      "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
     "invites_title": {
       "text": "Kringen die hier open staan",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."

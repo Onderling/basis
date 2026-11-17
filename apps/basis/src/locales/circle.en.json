@@ -3567,6 +3567,14 @@
       "text": "Keep it",
       "doc": "Cancel removal."
     },
+    "tab_conversation": {
+      "text": "Conversation",
+      "doc": "Nearby's first tab: the room chat (or, when not in it, one line and the way to join)."
+    },
+    "tab_questions": {
+      "text": "Questions",
+      "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
     "invites_title": {
       "text": "Circles open here",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."

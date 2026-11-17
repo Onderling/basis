@@ -1973,14 +1973,15 @@ part where a circle's content sits at a store; where a person keeps their recove
 **Alternatives / why:** *Keep the pod as a home and repair it* (a pod per persona, another server): it pays twice for
 access, once in keys and once in the store's rules, and only the keys bind; the second way for content to reach a
 member stays the half that gets less testing. *Remove the pod now:* about thirty apps and packages import the pod
-packages, the sealing code itself lives in the pod client, and pod-backed mirrors and circles are in use; a removal
+packages, the sealing of circle content (the envelope and the group keys) lives in the pod client, and pod-backed
+mirrors and circles are in use; a removal
 before the alpha buys nothing. *One structure in the pod's place:* its roles differ (keeping, a second device, a
 circle's shared store, grants to another person, bytes, files edited with other tools, reuse by other apps), and so do
 their replacements. *A node that asks for keys when someone knocks:* receiving a key is holding it; a breached node
 keeps what it was handed.
 
 **Consequences:** the Pod home in `docs/architecture.md` is rewritten when the first store contract lands, not before.
-The sealing code moves out of the pod client before any pod package leaves. The pod-specific defects found so far (a
+The sealing of circle content moves out of the pod client before any pod package changes its place. The pod-specific defects found so far (a
 read that overlaps a write, a shared-pod post that shows only on opening the circle, the key file races, the sign-in on
 a box) are kept as a list of what a replacement must not repeat. No new pod feature without asking. Ledger: L995
 (L943 answered; L939, L941, L938 carried).

@@ -5585,7 +5585,9 @@ function showFirstOpen() {
 // THE INTRODUCTION (Today's "Nieuw bij Basis?" → "Lees meer"): the seven cards in the shared overlay; leaving it shows
 // Today again (the card is gone: the intro was marked seen before the deck opened)
 function openIntroDeck() {
-  mountMyDataWizard(({ container, onClose }) => renderIntroDeck({ container, t, onClose: () => { onClose(); _showVandaag(); } }));
+  // every way out (its buttons, a click outside the card) paints Today again: the repaint the flag write sets off is not
+  // reliably there in time (the click-outside spec was flaky under a full-suite load, 2026-11-17)
+  mountMyDataWizard(({ container, onClose }) => renderIntroDeck({ container, t, onClose }), { afterClose: () => _showVandaag() });
 }
 
 function openHelpDoor() {
@@ -5628,7 +5630,9 @@ function showSettingsCircleChooser() {
 // mount one of the existing wizard renderers (restore, recovery file, …)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
-function mountMyDataWizard(renderWizard, extra = {}) {
+function mountMyDataWizard(renderWizard, extraIn = {}) {
+  // `afterClose`: what follows EVERY way out (the wizard's own button, a click outside), for a host that repaints behind it
+  const { afterClose = null, ...extra } = extraIn ?? {};
   const overlay = document.createElement('div');
   overlay.className = 'cc-mydata-modal';
   const card = document.createElement('div');
@@ -5643,7 +5647,7 @@ function mountMyDataWizard(renderWizard, extra = {}) {
     close();
   });
   document.body.appendChild(overlay);
-  function close() { try { overlay.remove(); } catch { /* defensive */ } }
+  function close() { try { overlay.remove(); } catch { /* defensive */ } if (typeof afterClose === 'function') afterClose(); }
   try {
     // Thin adapter: hand the shared renderer this shell's DOM + rawCallSkill; `extra` lets a wizard that
     // needs more (the join wizard wants `args`/`sendPeerRedeem`) get it without a bespoke mount fn.

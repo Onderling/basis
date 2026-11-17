@@ -208,8 +208,11 @@ const NO_CLAIM_RETRY = 'Your last answer described a result without calling a to
 
 /** Does a model REPLY say something happened (a ✓, or a done-word)? Only a tool call does anything. */
 const CLAIM_WORDS = /\b(toegevoegd|afgevinkt|verwijderd|gewijzigd|aangepast|gezet op|added|removed|ticked|changed|done)\b/i;
-/** A sentence that says what CAN be done ("Ik kan …", "I can help with …, what's been done"): an ability, no claim. */
-const ABILITY_WORDS = /\b(kan|kun|kunt|kunnen|zal|can|could|will|i'll)\b/i;
+/**
+ * A sentence that OPENS by saying what can be done ("Ik kan …", "Je kunt …", "I can help with …, what's been done"): an
+ * ability, no claim. Only the opening counts: "Ik heb melk toegevoegd en zal je eraan herinneren" still claims.
+ */
+const ABILITY_OPENING = /^(?:[-•*]\s*)?(?:ik kan|kan ik|je kunt|jij kunt|u kunt|we kunnen|wij kunnen|i can|i could|we can|you can)\b/i;
 const BULLET = /^\s*(?:[-•*]|\d+[.)])\s/;
 export function claimsResult(text) {
   const s = String(text ?? '');
@@ -223,12 +226,12 @@ export function claimsResult(text) {
   }
   return units.some((u) => {
     // a list under an intro that states an ability lists abilities ("wat er al afgevinkt is" is what the list shows)
-    if (u.intro && ABILITY_WORDS.test(u.intro)) return false;
+    if (u.intro && ABILITY_OPENING.test(u.intro.trim())) return false;
     // A QUESTION may use a done-word without claiming anything ("Aan welke lijst moet het worden toegevoegd?"), and so
     // may a sentence that says what can be done: only another sentence with a done-word claims.
     return u.text.split(/(?<=[.!?])\s+/).some((part) => {
       const p = part.trim();
-      return p && !/\?\s*$/.test(p) && CLAIM_WORDS.test(p) && !ABILITY_WORDS.test(p);
+      return p && !/\?\s*$/.test(p) && CLAIM_WORDS.test(p) && !ABILITY_OPENING.test(p);
     });
   });
 }

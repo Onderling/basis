@@ -26,7 +26,7 @@ import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
 import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel } from '../v2/vandaagPlus.js';
-import { plusAnswerLine, plusThreadId } from '../v2/plusThread.js';
+import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
 import { circleGateRules } from '../v2/circleGate.js';
 import { loadOwnItems, cutToSelf } from './ownItems.js';
@@ -362,7 +362,8 @@ export function createPlusDoor({
     catalogue: cat,
     threadIdFor,
     /** The last turns of a conversation (one self's, or a set's), oldest first, for the sheet to show. */
-    turns: (opts = {}, n) => { const th = threadIdFor(setOf(opts).set); return th && threads?.memory?.turns ? threads.memory.turns(th, n) : []; },
+    // the sheet's length (`PLUS_TURNS_SHOWN`), never the model's memory window (six turns) the threads default to
+    turns: (opts = {}, n = PLUS_TURNS_SHOWN) => { const th = threadIdFor(setOf(opts).set); return th && threads?.memory?.turns ? threads.memory.turns(th, n) : []; },
     /** "Forget this conversation": the door's own op (`assistant-forget`), for THIS conversation only. */
     forget: (opts = {}) => runDoorOp('assistant-forget', {}, threadIdFor(setOf(opts).set)),
     /** Resolves when no turn is running. */

@@ -2593,9 +2593,14 @@ function buildCircleBot(agent) {
   applyUserLlmRuntime({ userCfg: { preset: 'off' }, env: ENV_LLM, llmProviders, embedProviders });
   let userDefault = { mode: ENV_LLM.mode };
   // A browser spec's stand-in model (development builds only, never a released one): the circle bot answers from the
-  // spec's script through the real route — prompt, tools, reading the answer. It wins over any saved model setting.
+  // spec's script through the real route — prompt, tools, reading the answer. It wins over any saved model setting,
+  // and it is set the way a person sets their own local model (preset and endpoint), so the own "+" asks it too
   const testModel = import.meta.env?.DEV ? readTestModel(globalThis) : null;
-  const useTestModel = () => { if (testModel) { Object.assign(llmProviders, testModelProviders(testModel)); userDefault = { mode: 'local' }; } };
+  const useTestModel = () => {
+    if (!testModel) return;
+    Object.assign(llmProviders, testModelProviders(testModel));
+    userDefault = { preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434', mode: 'local' };
+  };
   useTestModel();
   // Task #13 / #37 — whether the route actually in effect is the confidential preset (Privatemode/TEE).
   // Drives the HONEST help wording: a plain route must NOT be called "de vertrouwelijke assistent".

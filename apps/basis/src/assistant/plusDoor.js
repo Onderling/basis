@@ -129,8 +129,9 @@ const OWN_PLACE_CACHE = new WeakMap();
  * process, per thread, so the phone's door-per-call keeps it too; never written anywhere.
  */
 const PLUS_LAST_READS = createLastReads();
-// The door a form the "+" opened from a line came through, per conversation, until it is settled: the phone composes a
-// door per call, so what `settled` needs to note a refused proposal (ownActions.js `declined`) lives beside the thread.
+// The door a form the "+" opened from a line came through, and the act it is for, per conversation, until it is
+// settled: the phone composes a door per call, so what a Save (`formDoor`) and `settled` need to name the same door for
+// the yes and the no (ownActions.js) lives beside the thread.
 const PLUS_OPEN_FORM_DOOR = new Map();
 
 /**
@@ -436,7 +437,7 @@ export function createPlusDoor({
       const thread = r?.askSelf ? null : threadIdFor(setOf(opts).set);
       if (r && placedNowhere.has(r) && lineDoor) note({ outcome: 'no_act', door: lineDoor });
       // a form opened from a line: the door it came through, until it is settled (`settled` notes a refused one)
-      if (thread) { if (r?.actId) PLUS_OPEN_FORM_DOOR.set(thread, lineDoor ?? 'phrase'); else PLUS_OPEN_FORM_DOOR.delete(thread); }
+      if (thread) { if (r?.actId) PLUS_OPEN_FORM_DOOR.set(thread, { door: lineDoor ?? 'phrase', actId: r.actId }); else PLUS_OPEN_FORM_DOOR.delete(thread); }
       // a turn ended: the read it made lives one turn more, an older one goes
       if (thread) PLUS_LAST_READS.turnEnded(thread);
       if (memory && thread) {
@@ -472,6 +473,17 @@ export function createPlusDoor({
      * conversation, as a closed form is. Returns what was said, or null without a thread.
      * @param {{asSelf?: string|null, selves?: string[]|null}} opts @param {{line?: string}} card
      */
+    /**
+     * The door a Save of this act comes through: the door of the line the "+" opened its form from (the model's
+     * proposal, a phrase), so a yes is recorded by the same door as a no; none for a form the person opened by its
+     * button (the act strip's wrapper names that a tap). Read before the Save; `settled` clears it after.
+     * @param {{asSelf?: string|null, selves?: string[]|null}} opts @param {string} actId
+     * @returns {string|undefined}
+     */
+    formDoor(opts = {}, actId = null) {
+      const open = PLUS_OPEN_FORM_DOOR.get(threadIdFor(setOf(opts).set));
+      return open && open.actId === actId ? open.door : undefined;
+    },
     async cardRefused(opts = {}, card = null) {
       if (card?.command?.opId) note({ app: card.command.appOrigin ?? null, op: card.command.opId, outcome: 'declined', door: card.door ?? 'phrase' });
       const thread = threadIdFor(setOf(opts).set);
@@ -490,7 +502,7 @@ export function createPlusDoor({
       if (!act) return null;
       // another act saved by its button while this form was open: THIS form was not saved (said now, not at a later close)
       const kept = saved && (!actId || actId === act.id);
-      const door = PLUS_OPEN_FORM_DOOR.get(thread) ?? 'phrase';
+      const door = PLUS_OPEN_FORM_DOOR.get(thread)?.door ?? 'phrase';
       PLUS_OPEN_FORM_DOOR.delete(thread);
       // a proposal turned down: noted (a save is recorded by the waist, as the act it is)
       if (!kept) note({ app: act.appOrigin ?? null, op: act.opId ?? null, outcome: 'declined', door });

@@ -713,6 +713,16 @@ describe('what the "+" notes in the person\'s own record that no op shows (ledge
     await d2.read('blablabla qwerty');
     expect(m.out).toEqual([{ app: null, op: null, outcome: 'no_act', door: 'model', circleId: null }]);
   });
+  it('a Save of the form the model proposed comes through the same door as its no would (formDoor); another act, or no form, none', async () => {
+    const standIn = async () => ({ opId: 'addEvent', args: { title: 'sleutel ophalen' } });
+    const { d } = door({ interpret: standIn });
+    expect(d.formDoor({}, 'calendar.calendar-event'), 'no form open').toBeUndefined();
+    const r = await d.read('zet dat morgen om 10 in mijn agenda');
+    expect(d.formDoor({}, r.actId)).toBe('model');
+    expect(d.formDoor({}, 'household.note'), 'another act, by its own button').toBeUndefined();
+    await d.settled({}, { saved: true, actId: r.actId });
+    expect(d.formDoor({}, r.actId), 'settled: gone').toBeUndefined();
+  });
   it('an answer in words, a read, or a form opened is no note', async () => {
     const n = noted();
     const { d } = door({ interpret: async () => ({ reply: 'Ja.' }), noteOwn: n.noteOwn });

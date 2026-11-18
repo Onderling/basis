@@ -50,3 +50,19 @@ test('story 5, the "no": a line the "+" can only propose (a list that does not e
   ]);
   expect(JSON.stringify(await rows(page)), 'never the words').not.toMatch(/melk|vakantie|qwerty/);
 });
+
+test('story 5, the "yes": a proposal accepted on the card keeps the door the line came through (yes and no name the same door)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  const start = (await rows(page)) ?? [];
+  await openPlus(page);
+  const card = page.locator('.circle-vandaag-plus__card');
+  await page.locator('.circle-vandaag-plus__line').fill('zet melk op vakantiespullen');
+  await page.locator('.circle-vandaag-plus__line').press('Enter');
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await card.locator('.circle-vandaag-plus__card-in').first().click();   // yes: make the list, and melk on it
+  await expect.poll(() => since(page, start), { timeout: 10_000 }).toEqual([
+    'lists.createList:phrase:ok',
+    'lists.addToList:phrase:ok',
+  ]);
+});

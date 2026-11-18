@@ -4920,7 +4920,7 @@ function showVandaagPlus({ edit = null } = {}) {
       if (!card) return;
       // the pick on the card: no new line, the run's answer kept (the same shared exchange)
       // what the card carries, in order (the make-a-list card: the list, then the item on it); the first failure stops it
-      await plusDoorNow().exchange({ asSelf }, async () => { for (const c of plusCardCommands(card)) { const r = await runInCircle(c, circleId); if (r?.error) break; } return { error, done }; });
+      await plusDoorNow().exchange({ asSelf }, async () => { for (const c of plusCardCommands(card)) { const r = await runInCircle(c, circleId, card?.door); if (r?.error) break; } return { error, done }; });   // the yes by the door of the line, as the no is
       paint();
     },
     // the card's no: the line was not done, said in the conversation (as a closed form is)
@@ -4929,7 +4929,8 @@ function showVandaagPlus({ edit = null } = {}) {
       values = filled;
       const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);
       if (op.error) { error = t(op.error); paint(); return; }
-      const r = await call(op);
+      // a form the "+" opened from a line is saved by that line's door (a yes as its no); one opened by its button, a tap
+      const r = await call(op, editId ? undefined : plusDoorNow().formDoor({ asSelf }, id));
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
       // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
       if (!editId) actionFrequency.bump(OWN_USAGE_SCOPE, id);

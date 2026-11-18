@@ -139,7 +139,10 @@ export const pinboardManifest = {
     // an offer or a request in a merged view: newest first; mine when I placed it (still open is the read's own filter)
     offer:         { atoms: ['remove'], presents: { primary: 'open', label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { other: 'aanbod' }, en: { one: 'offer', other: 'offers' } } },
-    lend:          { atoms: ['complete', 'reassign', 'remove'] },
+    // a loan: an `offer` of kind `lend`; its ops (`markReturned`, `assignLend`) are gated by these rows (`opNouns`: a
+    // declared kind is the op's noun)
+    lend:          { atoms: ['complete', 'reassign', 'remove'],
+      names: { nl: { one: 'uitlening', other: 'uitleningen' }, en: { one: 'loan', other: 'loans' } } },
     request:       { atoms: ['remove'], presents: { primary: 'open', label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { one: 'vraag', other: 'vragen' }, en: { one: 'request', other: 'requests' } } },
     'group-leave': { atoms: ['remove'] },

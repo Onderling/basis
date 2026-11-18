@@ -19,7 +19,7 @@
  * -strings invariant.
  */
 
-import { canonicalAtom, opNouns, capabilityKey, effectiveCapabilityKeys } from '@onderling/app-manifest';
+import { canonicalAtom, opNouns, capabilityKey, effectiveCapabilityKeys, declaredNounsOf } from '@onderling/app-manifest';
 
 // Re-export the shared capability key so the gate + the freedom template agree by construction — ONE
 // space-separated spelling, human-readable in the `policy.capabilities` template the wizard writes.
@@ -42,7 +42,15 @@ export function effectiveCapabilities(sources, policy = {}) {
   const enabledApps = appList ? new Set(appList) : null;
   // admin-template ∩ member opt-outs: `optOuts` are the current member's declined caps.
   const keys = effectiveCapabilityKeys(sources, { enabledApps, template: policy?.capabilities, optOuts: policy?.optOuts });
-  return { keys, enabledApps };
+  // the nouns each app declares, so the gate resolves an op to the SAME row its manifest's capabilities name (a
+  // declared kind is the op's noun: `opNouns`)
+  const declaredNouns = new Map();
+  for (const s of Array.isArray(sources) ? sources : []) {
+    const app = s?.appOrigin ?? s?.manifest?.app;
+    const d = declaredNounsOf(s?.manifest);
+    if (app && d) declaredNouns.set(app, d);
+  }
+  return { keys, enabledApps, declaredNouns };
 }
 
 /**
@@ -51,13 +59,13 @@ export function effectiveCapabilities(sources, policy = {}) {
  * (`appliesTo.type` / the enum's full `of`).  `'*'` (wildcard) is returned verbatim for the gate to
  * treat as "any".
  */
-function concreteNouns(op, args) {
+function concreteNouns(op, args, declaredNouns = null) {
   for (const p of (Array.isArray(op?.params) ? op.params : [])) {
     if (p?.kind === 'enum' && Array.isArray(p.of) && args && p.of.includes(args[p.name])) {
       return [args[p.name]];
     }
   }
-  const nouns = opNouns(op);
+  const nouns = opNouns(op, [], declaredNouns);
   return nouns.length ? nouns : [];
 }
 
@@ -92,7 +100,7 @@ export function checkCapability({ op, appOrigin, args, atom: atomIn, noun: nounI
   // Domain verbs (help/sync/register/…) aren't capabilities — an enabled app may run them.
   if (!atom) return { allow: true };
 
-  const nouns = op ? concreteNouns(op, args) : (nounIn ? [nounIn] : []);
+  const nouns = op ? concreteNouns(op, args, effective?.declaredNouns?.get?.(appOrigin) ?? null) : (nounIn ? [nounIn] : []);
   // An atom op that names no noun, or a wildcard op, is authorized at app level.
   if (nouns.length === 0 || nouns.includes('*')) return { allow: true };
 

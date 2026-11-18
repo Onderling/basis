@@ -6095,7 +6095,7 @@ function NearbyWizard({ wizard, roomView = null, offers = [], chat = false, onPi
     return () => { live = false; };
   }, [spec.step, onPrefillCard]);
   const nameOf = (c) => (c.nameKey ? t(c.nameKey) : c.name);
-  const shown = (c) => (c.general ? t(spec.generalKey, { name: nameOf(c) }) : nameOf(c));
+  const shown = (c) => (c.labelKey ? t(c.labelKey, c.labelVars) : nameOf(c));
   const selfName = (() => { const c = spec.selves?.find((x) => x.id === spec.selected) ?? spec.selves?.[0]; return c ? nameOf(c) : ''; })();
   const primary = { backgroundColor: theme.color.accentInk, borderColor: theme.color.accentInk };
   const press = (id) => wizard.onPress(id, { label, line, chat: chatOn, ...(offerPick ?? {}) });

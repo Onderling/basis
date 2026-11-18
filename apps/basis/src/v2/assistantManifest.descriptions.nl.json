@@ -1,10 +1,10 @@
 {
   "assistant-memory": {
-    "what": "Kies hoeveel ik van ons gesprek onthoud.",
+    "what": "Kies hoeveel de bot van je gesprek onthoudt.",
     "params": {"mode": "niets, kort of lang"}
   },
   "assistant-forget": {
-    "what": "Vergeet ons gesprek nu; wat je op een lijst zette, blijft.",
+    "what": "Laat de bot je gesprek nu vergeten; wat je op een lijst zette, blijft.",
     "params": {}
   },
   "weekOverview": {
@@ -12,7 +12,7 @@
     "params": {"day": "of alleen deze dag"}
   },
   "sendWeekOverview": {
-    "what": "Stuur je op zondag het overzicht van je week.",
+    "what": "De bot stuurt je op zondag het overzicht van je week.",
     "params": {"occurrence": "welke keer"}
   },
   "assistant-feedback": {
@@ -20,11 +20,11 @@
     "params": {}
   },
   "assistant-hello": {
-    "what": "Groet terug.",
+    "what": "De bot groet terug.",
     "params": {"lang": "in welke taal"}
   },
   "announceChange": {
-    "what": "Laat wie het aangaat weten dat een afspraak of klusje veranderde.",
+    "what": "De bot laat wie het aangaat weten dat een afspraak of klusje veranderde.",
     "params": {"occurrence": "welke keer"}
   },
   "assistant-reminders": {
@@ -36,8 +36,8 @@
     "params": {"item": "waaraan", "rules": "wanneer, bijvoorbeeld 60 minuten ervoor of ochtend", "who": "voor wie"}
   },
   "sayReminder": {
-    "what": "Stuur je een herinnering die je zelf zette, op het moment.",
-    "params": {"say": "wat ik zeg", "occurrence": "welke keer"}
+    "what": "De bot zegt je herinnering op het moment.",
+    "params": {"say": "wat de bot zegt", "occurrence": "welke keer"}
   },
   "cancelReminder": {
     "what": "Haal een eigen herinnering weg.",
@@ -52,7 +52,7 @@
     "params": {"mode": "aan of uit"}
   },
   "assistant-language": {
-    "what": "Kies de taal waarin ik je antwoord.",
+    "what": "Kies de taal waarin de bot je antwoordt.",
     "params": {"lang": "Nederlands, Engels, of zoals je schrijft"}
   },
   "assistant-apps": {
@@ -80,7 +80,7 @@
     "params": {}
   },
   "assistant-planned": {
-    "what": "Laat zien wat ik je komende week stuur.",
+    "what": "Laat zien wat de bot je komende week stuurt.",
     "params": {}
   },
   "assistant-people": {
@@ -116,7 +116,7 @@
     "params": {}
   },
   "assistant-view": {
-    "what": "Kies hoe ik antwoord: met knoppen, op je scherm of in woorden.",
+    "what": "Kies hoe de bot antwoordt: met knoppen, op je scherm of in woorden.",
     "params": {"mode": "knoppen, scherm of woorden"}
   },
   "assistant-agenda-link": {

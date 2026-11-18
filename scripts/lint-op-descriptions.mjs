@@ -131,6 +131,17 @@ export function unreadFiles(paths, registry) {
   });
 }
 
+/**
+ * The words files that sit BESIDE a manifest inside basis (`apps/basis/src/v2/<manifest>.descriptions.<lang>.json`,
+ * several manifests share that folder) that the reader does not import: words nobody reads (red). Read by name off the
+ * reader's own source, since the folder does not say which app a file is.
+ * @param {string[]} paths  repo-relative paths  @param {string} readerSource  opDescriptions.js's text
+ * @returns {string[]}
+ */
+export function unreadBesideFiles(paths, readerSource) {
+  return paths.filter((p) => /\.descriptions\.[a-z]+\.json$/.test(p) && !String(readerSource).includes(`./${path.basename(p)}'`));
+}
+
 /** What `--update` writes: the baseline with described or gone apps REMOVED; never an app added. */
 export function shrunkBaseline({ declared, files, baseline }) {
   return [...new Set(baseline)].filter((app) => app in declared && !files[app]).sort();
@@ -154,10 +165,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const ROOT = path.resolve(HERE, '..');
   const onDisk = readdirSync(path.join(ROOT, 'apps'), { withFileTypes: true }).filter((d) => d.isDirectory())
     .flatMap((d) => readdirSync(path.join(ROOT, 'apps', d.name)).filter((f) => /^descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/${d.name}/${f}`));
+  const beside = readdirSync(path.join(ROOT, 'apps/basis/src/v2')).filter((f) => /\.descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/basis/src/v2/${f}`);
   const problems = [
     ...auditDescriptions({ declared, files, baseline: before }),
     ...auditHelpPhrases({ keys: helpKeys, frozen, describe: (app, opId) => opDescription(app, opId, 'en') }),
     ...unreadFiles(onDisk, files).map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
+    ...unreadBesideFiles(beside, readFileSync(path.join(ROOT, 'apps/basis/src/v2/opDescriptions.js'), 'utf8'))
+      .map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
   ];
   if (problems.length) {
     console.error(`✖ lint-op-descriptions: ${problems.length} problem(s)`);

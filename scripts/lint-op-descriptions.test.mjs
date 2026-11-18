@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auditDescriptions, shrunkBaseline, unreadFiles, auditHelpPhrases, helpPhraseKeys } from './lint-op-descriptions.mjs';
+import { auditDescriptions, shrunkBaseline, unreadFiles, auditHelpPhrases, helpPhraseKeys, unreadBesideFiles } from './lint-op-descriptions.mjs';
 
 // one app, two ops; `params` per op
 const declared = { lists: { addToList: ['list', 'text'], listLists: [] }, tasks: { addTask: ['title'] } };
@@ -71,5 +71,13 @@ describe('the bot help phrases are a frozen second home (L1033)', () => {
   });
   it('reads the keys off a bundle', () => {
     expect(helpPhraseKeys({ bot: { help: { ops: { lists: { listLists: {}, shopVisit: {} } } } } })).toEqual(['lists.listLists', 'lists.shopVisit']);
+  });
+});
+
+describe('a words file beside a manifest in basis counts only when the reader imports it', () => {
+  it('imported: clean; not imported: red', () => {
+    const reader = "import aEn from './assistantManifest.descriptions.en.json' with { type: 'json' };";
+    expect(unreadBesideFiles(['apps/basis/src/v2/assistantManifest.descriptions.en.json'], reader)).toEqual([]);
+    expect(unreadBesideFiles(['apps/basis/src/v2/keyManifest.descriptions.nl.json'], reader)).toEqual(['apps/basis/src/v2/keyManifest.descriptions.nl.json']);
   });
 });

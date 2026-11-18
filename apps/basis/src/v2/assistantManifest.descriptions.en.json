@@ -1,10 +1,10 @@
 {
   "assistant-memory": {
-    "what": "Choose how much I remember of our conversation.",
+    "what": "Choose how much the bot remembers of your conversation.",
     "params": {"mode": "nothing, short or long"}
   },
   "assistant-forget": {
-    "what": "Forget our conversation now; what you put on a list stays.",
+    "what": "Have the bot forget your conversation now; what you put on a list stays.",
     "params": {}
   },
   "weekOverview": {
@@ -12,7 +12,7 @@
     "params": {"day": "or just this day"}
   },
   "sendWeekOverview": {
-    "what": "Send you the overview of your week on Sunday.",
+    "what": "The bot sends you the overview of your week on Sunday.",
     "params": {"occurrence": "which time"}
   },
   "assistant-feedback": {
@@ -20,11 +20,11 @@
     "params": {}
   },
   "assistant-hello": {
-    "what": "Greet back.",
+    "what": "The bot greets back.",
     "params": {"lang": "in which language"}
   },
   "announceChange": {
-    "what": "Tell whoever it concerns that an appointment or chore changed.",
+    "what": "The bot tells whoever it concerns that an appointment or chore changed.",
     "params": {"occurrence": "which time"}
   },
   "assistant-reminders": {
@@ -36,8 +36,8 @@
     "params": {"item": "what for", "rules": "when, for example 60 minutes before or morning", "who": "for whom"}
   },
   "sayReminder": {
-    "what": "Send you a reminder you set yourself, at its moment.",
-    "params": {"say": "what I say", "occurrence": "which time"}
+    "what": "The bot says your reminder at its moment.",
+    "params": {"say": "what the bot says", "occurrence": "which time"}
   },
   "cancelReminder": {
     "what": "Remove a reminder of your own.",
@@ -52,7 +52,7 @@
     "params": {"mode": "on or off"}
   },
   "assistant-language": {
-    "what": "Choose the language I answer you in.",
+    "what": "Choose the language the bot answers you in.",
     "params": {"lang": "Dutch, English, or as you write"}
   },
   "assistant-apps": {
@@ -80,7 +80,7 @@
     "params": {}
   },
   "assistant-planned": {
-    "what": "Show what I will send you this week.",
+    "what": "Show what the bot will send you this week.",
     "params": {}
   },
   "assistant-people": {
@@ -116,7 +116,7 @@
     "params": {}
   },
   "assistant-view": {
-    "what": "Choose how I answer: with buttons, on your screen or in words.",
+    "what": "Choose how the bot answers: with buttons, on your screen or in words.",
     "params": {"mode": "buttons, screen or words"}
   },
   "assistant-agenda-link": {

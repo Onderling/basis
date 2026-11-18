@@ -1,0 +1,50 @@
+{
+  "addEvent": {
+    "what": "Zet een afspraak in de agenda.",
+    "params": { "title": "waar de afspraak over gaat", "when": "wanneer", "duration": "hoe lang", "location": "waar", "attendees": "wie erbij zijn", "attendees-addr": "naar wie de uitnodiging gaat", "reminders": "wanneer je herinnerd wordt" }
+  },
+  "listEvents": {
+    "what": "Laat zien wat er gepland staat.",
+    "params": { "days": "hoeveel dagen vooruit", "day": "op welke dag" }
+  },
+  "rsvpAccept": {
+    "what": "Zeg ja op een uitnodiging.",
+    "params": { "id": "welke afspraak" }
+  },
+  "rsvpDecline": {
+    "what": "Zeg nee op een uitnodiging.",
+    "params": { "id": "welke afspraak" }
+  },
+  "rsvpTentative": {
+    "what": "Zeg misschien op een uitnodiging.",
+    "params": { "id": "welke afspraak" }
+  },
+  "cancelEvent": {
+    "what": "Zeg een afspraak af die jij hebt gemaakt.",
+    "params": { "id": "welke afspraak" }
+  },
+  "updateEvent": {
+    "what": "Verander een afspraak: de naam of het moment.",
+    "params": { "id": "welke afspraak", "title": "de nieuwe naam", "when": "het nieuwe moment" }
+  },
+  "shareEvent": {
+    "what": "Deel een afspraak met iemand.",
+    "params": { "id": "welke afspraak", "with": "met wie" }
+  },
+  "shareTargets": {
+    "what": "Laat zien met wie je een afspraak kunt delen.",
+    "params": {}
+  },
+  "getEventSnapshot": {
+    "what": "Laat één afspraak zien zoals die nu is.",
+    "params": { "id": "welke afspraak" }
+  },
+  "briefSummary": {
+    "what": "Vat je agenda samen voor het ochtendoverzicht.",
+    "params": {}
+  },
+  "searchEvents": {
+    "what": "Zoek een afspraak op een woord.",
+    "params": { "query": "waar je naar zoekt" }
+  }
+}

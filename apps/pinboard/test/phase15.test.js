@@ -79,8 +79,10 @@ describe('Pinboard V1 Phase 15 — persistPath wires FilePersist into the factor
       await callSkill(b1.agent, 'postRequest',
         { text: 'paint the fence', kind: 'ask', expectClaims: 0, timeoutMs: 1 });
 
-      // Allow the debounced FilePersist save to fire.
-      await new Promise(r => setTimeout(r, 250));
+      // Write the debounced FilePersist save NOW (what a closing app does), never "wait a bit longer than the debounce":
+      // a sleep of 250 ms against a 200 ms debounce plus a file write failed once under a busy CI pool (2026-11-17).
+      expect(typeof b1.flushLocal, 'the bundle offers its flush').toBe('function');
+      await b1.flushLocal();
 
       // Session 2 — new agent, same persistPath.
       const id2 = await AgentIdentity.generate(new VaultMemory());

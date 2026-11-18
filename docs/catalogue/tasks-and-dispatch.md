@@ -11,6 +11,10 @@ its verbs), over the core's one store per circle and the one `PolicyEngine`.
   (L200, open: Opus leans one rich type where a line is a task with nothing filled in; appointments stay their own type).
 - Claim it (co-ownership: `assignees[]` capped by `maxAssignees`), be reassigned, complete it; or, where the circle
   asks for it, submit → approve/reject/revoke by an approver (definition-of-done lifecycle).
+- Who may complete and what a row offers differ on purpose: any member may complete a task (`completeTask` has no
+  holder gate; "done" by chat works for anyone), but the tasks tab offers Done and Snooze on a claimed task to its
+  holders only; another member sees "claimed by <name>" and nothing to press (`actionsForStreamRow`,
+  `taskStatusShown` in `apps/basis/src/v2/taskRows.js`, both shells).
 - Break it into subtasks (a tree with cycle guards); propose a subtask upward; the master approves or declines.
 - See "mine" across every circle (a pure roll-up, stores never merged); an in-app inbox of what waits on you.
 - Send a whole list (a container subtree) into another circle.

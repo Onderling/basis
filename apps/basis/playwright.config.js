@@ -50,6 +50,17 @@ const BASE_URL = `http://localhost:${PORT}`;
 const NO_RELAY_PORT = String(Number(PORT) + 1);
 const NO_RELAY_BASE_URL = `http://localhost:${NO_RELAY_PORT}`;
 
+/* THE FIRST OPEN (src/v2/firstOpen.js) is answered before every spec: a fresh browser would otherwise stand on the three
+ * doors, and the specs start from Today. One place, the device flag the app reads (`onboardingFlags.FIRST_OPEN_SEEN_KEY`)
+ * in the origin's localStorage; only the first open, so Today's "New to Basis?" card is still there to test. The one spec
+ * that walks the doors cold (`first-open.spec.js`) empties this with its own `storageState`. Contexts a spec opens itself
+ * with `browser.newContext()` get it too (Playwright hands the project's `use` to them). */
+const FIRST_OPEN_SEEN = {
+  cookies: [],
+  origins: [BASE_URL, NO_RELAY_BASE_URL, `http://127.0.0.1:${PORT}`, `http://127.0.0.1:${NO_RELAY_PORT}`]
+    .map((origin) => ({ origin, localStorage: [{ name: 'cc.firstOpenSeen', value: '1' }] })),
+};
+
 /* Which specs boot SEVERAL clients over the relay fixture (`peerHarness.js`, or their own contexts): they
  * run under `relay`. Everything else is a single-context spec through `helpers.js` and runs under
  * `no-relay`. Matched by file so a spec belongs to exactly one project and nothing has to declare it. */
@@ -60,7 +71,11 @@ const RELAY_SPECS = /(journeys|matrix|twopeer|two-relays|feedback-path-box|scree
  * wss/https a spec or the app's own defaults might dial. Chromium resolves every name except localhost/127.0.0.1 to
  * nothing, so such a dial fails at once (net::ERR_NAME_NOT_RESOLVED, loud in the console) instead of reaching
  * production or the internet. Local servers (the dev servers, the relay fixture) are untouched. */
-const HERMETIC_LAUNCH = { args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1'] };
+// `PEER_TEST_PUBLIC_NETWORK=1` opens the network for the walks that NEED the public one (walk-transports rides public
+// NKN): a by-hand step before a release (docs/conventions/verification-ladder.md), never CI, never the default.
+const HERMETIC_LAUNCH = process.env.PEER_TEST_PUBLIC_NETWORK === '1'
+  ? {}
+  : { args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1'] };
 
 export default defineConfig({
   testDir: './test-browser',
@@ -110,19 +125,19 @@ export default defineConfig({
     {
       name: 'relay',
       testMatch: RELAY_SPECS,
-      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL, launchOptions: HERMETIC_LAUNCH },
+      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL, launchOptions: HERMETIC_LAUNCH, storageState: FIRST_OPEN_SEEN },
     },
     {
       // PROBES (apps/basis/probes-browser/): walks that report what they found (PASS / FINDING) and assert nothing, so
       // they cannot fail — run by hand, never counted as the suite (CI lists test-browser/ only, scripts/browser-shard.mjs)
       name: 'probes',
       testDir: './probes-browser',
-      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL, launchOptions: HERMETIC_LAUNCH },
+      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL, launchOptions: HERMETIC_LAUNCH, storageState: FIRST_OPEN_SEEN },
     },
     {
       name: 'no-relay',
       testIgnore: RELAY_SPECS,
-      use: { ...devices['Desktop Chrome'], baseURL: NO_RELAY_BASE_URL, launchOptions: HERMETIC_LAUNCH },
+      use: { ...devices['Desktop Chrome'], baseURL: NO_RELAY_BASE_URL, launchOptions: HERMETIC_LAUNCH, storageState: FIRST_OPEN_SEEN },
     },
   ],
   /* Boot the dev server automatically.  The reuseExistingServer flag

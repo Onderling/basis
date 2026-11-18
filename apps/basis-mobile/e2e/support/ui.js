@@ -30,6 +30,11 @@ async function tapSoon(matcher, ms = 30_000) {
   }
 }
 
+/** Today's set-up cards sit in one closed strip: open it (a tap) before a card's button. */
+async function openOnboardingStrip(ms = 30_000) {
+  await tapSoon(by.id('onb-strip'), ms);
+}
+
 /** Wait for the first of several matchers; returns its index (-1 when none showed). */
 async function firstOf(matchers, ms) {
   const until = Date.now() + ms;
@@ -71,4 +76,4 @@ function emulatorOnly(name) {
   }
 }
 
-module.exports = { launch, isVisible, soon, tapSoon, firstOf, firstBoot, backToLauncher, emulatorOnly };
+module.exports = { launch, isVisible, soon, tapSoon, firstOf, firstBoot, backToLauncher, emulatorOnly, openOnboardingStrip };

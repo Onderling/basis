@@ -41,6 +41,18 @@ export function blockOpensWhole(block) {
 }
 
 /** The one quiet line an empty block shows. */
+/**
+ * A block that paints nothing at all, not even its empty line: the onboarding strip with nothing left, and the circles
+ * with news when the person sees no circle (it looked at none; Today's onboarding line already says "you are in no
+ * circle yet", once). Both shells ask this before painting a block.
+ */
+export function blockHidden(block) {
+  if (block?.status !== 'empty') return false;
+  if (block.type === 'onboarding') return true;
+  if (block.type === 'circlesUnread') return !(Array.isArray(block.content?.quiet) && block.content.quiet.length > 0);
+  return false;
+}
+
 export function blockEmptyLine(block, t) {
   // a lists block whose feature the circle switched off: one quiet line, not nothing
   if (block?.type === 'lists' && block?.content?.off === true) return t('circle.screen.lists_off');

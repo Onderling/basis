@@ -46,6 +46,8 @@ function startPeer(args) {
   });
   return ready.then((r) => ({
     ready: r,
+    // the relay as both sides dial it (`--phone-host`): a real phone on USB reaches it through `adb reverse` on its port
+    relayUrl: lines.find((l) => l.step === 'relay')?.url ?? null,
     send: (cmd) => { child.stdin.write(`${JSON.stringify(cmd)}\n`); },
     next,
     stop: () => { try { child.stdin.end(); child.kill('SIGTERM'); } catch { /* already gone */ } },
@@ -80,4 +82,33 @@ async function joinByInvite({ invite, circleId, handle = 'anna', shot = null, at
   await soon(by.id(`circle-tile-${circleId}`), 90_000);
 }
 
-module.exports = { startPeer, joinByInvite };
+/** The peer's own lists, asked until `pred` holds (a write crosses the relay). */
+async function peerListsHold(peer, pred, tries = 20) {
+  let last = null;
+  for (let i = 0; i < tries; i += 1) {
+    peer.send({ do: 'lists-dump' });
+    last = (await peer.next('lists', () => true, 20_000)).lists;
+    if (pred(last)) return last;
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  throw new Error(`the peer never held it; its lists: ${JSON.stringify(last)}`);
+}
+
+/**
+ * PROVE THE HARNESS FIRST: the peer's lists setting has reached the phone once its circle shows a Lists tab; until then
+ * no read can find the circle's list. Leaves the phone on the circles tab.
+ */
+async function listsTabReached(circleId, shot = 'peer-lists-tab') {
+  for (let i = 0; i < 12; i += 1) {
+    await tapSoon(by.id('circle-tab-circles'), 30_000);
+    await tapSoon(by.id(`circle-tile-${circleId}`), 30_000);
+    const tab = (await firstOf([by.id('circle-detail-tab-lists')], 6_000)) === 0;
+    await device.takeScreenshot(`${shot}-${i}`);
+    await device.pressBack();
+    if (tab) return;
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  throw new Error("the peer's lists setting never reached the phone: no Lists tab on its circle");
+}
+
+module.exports = { startPeer, joinByInvite, peerListsHold, listsTabReached };

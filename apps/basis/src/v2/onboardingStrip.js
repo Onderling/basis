@@ -8,9 +8,12 @@
  *      (`pinboard.setMyHandle`, which also tells the person's rosters); gone once a handle is set;
  *   2. "Nieuw bij Basis?" — three plain lines and "Lees meer" (the help circle's conversation); gone once seen on THIS
  *      device (a per-device mark), and never shown to a returning person (a handle and a circle: a restored device);
- *   3. "Begin" — make a circle / I have an invitation; gone once the person is in a circle (the help circle does not
- *      count).
- * The block is removable like any other; once all three are done it shows nothing at all.
+ *   (no connection point) — what waits and how to add one, while this device knows no relay.
+ * TODAY FOLDS THEM (Frits, 2026-11-17): the cards sit in ONE strip, closed, whose line counts what is left ("Nog 3
+ * dingen om in te stellen"); a tap opens it. There is no "Begin" card any more: joining is not something to set up,
+ * and both doors (make a circle, join with an invitation) are on Circles. A person in no circle (the help circle does
+ * not count) reads one line under the strip that points there.
+ * The block is removable like any other; with every card done and a circle, it shows nothing at all.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { HELP_CIRCLE_ID } from './helpCircle.js';
@@ -26,7 +29,7 @@ export function keySnoozeUntil(now = Date.now()) {
 
 /**
  * @param {{handle: string|null, inCircle: boolean, introSeen: boolean, keyPending?: boolean}} s
- * @returns {Array<{id: 'key'|'handle'|'intro'|'begin'}>}
+ * @returns {Array<{id: 'key'|'reach'|'handle'|'intro'}>}
  */
 export function onboardingCards({ handle, inCircle, introSeen, keyPending = false, noRelay = false } = {}) {
   const hasHandle = typeof handle === 'string' && handle.trim() !== '';
@@ -39,8 +42,12 @@ export function onboardingCards({ handle, inCircle, introSeen, keyPending = fals
     ...(noRelay ? [{ id: 'reach' }] : []),
     ...(hasHandle ? [] : [{ id: 'handle' }]),
     ...(introSeen || returning ? [] : [{ id: 'intro' }]),
-    ...(inCircle ? [] : [{ id: 'begin' }]),
   ];
+}
+
+/** The folded strip's line: how many set-up cards are left ("Nog 1 ding" / "Nog 3 dingen om in te stellen"). */
+export function onboardingStripLine(count, t) {
+  return count === 1 ? t('circle.vandaag.onboarding_strip_single') : t('circle.vandaag.onboarding_strip_many', { count });
 }
 
 /**
@@ -67,7 +74,9 @@ export async function materializeOnboarding(block, { callSkill, circles = [], al
   if (typeof relayKnown === 'function') { try { noRelay = !(await relayKnown()); } catch { noRelay = false; } }
   const cards = onboardingCards({ handle, inCircle, introSeen: seen, keyPending: keyDue, noRelay })
     .map((c) => (c.id === 'handle' && name ? { ...c, name } : c));
-  return { blockId: block.id, type: 'onboarding', status: cards.length ? 'ok' : 'empty', content: { cards } };
+  // in no circle: the block keeps one line pointing to Circles, even with every card done
+  const noCircle = !inCircle;
+  return { blockId: block.id, type: 'onboarding', status: cards.length || noCircle ? 'ok' : 'empty', content: { cards, noCircle } };
 }
 
 /**

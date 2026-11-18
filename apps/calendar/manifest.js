@@ -40,7 +40,7 @@ export const calendarManifest = {
   // set (inert), now explicit + owned here.
   nouns: {
     // shown in a merged view: soonest first; mine when I made it or am asked to it
-    'calendar-event': { atoms: ['add', 'list', 'remove', 'claim', 'submit', 'reject'],
+    'calendar-event': { atoms: ['add', 'list', 'update', 'remove', 'claim', 'share', 'submit', 'reject'],
       presents: { primary: 'open', label: 'title', moment: 'startsAt', order: 'asc', mine: ['createdBy', 'author', 'actor', 'by', 'attendees'] },
       names: { nl: { one: 'afspraak', other: 'afspraken' }, en: { one: 'appointment', other: 'appointments' } } },
   },

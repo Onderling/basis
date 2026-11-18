@@ -4807,14 +4807,17 @@ function showVandaagPlus({ edit = null } = {}) {
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
   // a self's key: the general self's chat key, a persona's webid (what its rows are made by)
   const selfKeyOf = (id) => (!id || id === 'default' ? (circleHouseholdAgent?.identity?.chat?.pubKey ?? null) : (_selfSet.held.find((p) => p.id === id)?.webid ?? null));
-  // a call AS one self (the waist's actAs): it rides that self's own lane; the default needs no saying
-  const callAs = (id) => (app, opId, args) => {
+  // a call AS one self (the waist's actAs): it rides that self's own lane; the default needs no saying. Through the
+  // wrapped waist for every self, so a persona's act paints the strip and names its door as the general self's does;
+  // `door`: the door the "+" read it through (its own record, ownActions.js), none for what it reads for itself
+  const callAs = (id, door) => (app, opId, args) => {
     const actAs = id && id !== 'default' ? (_selfSet.held.find((p) => p.id === id)?.webid ?? null) : null;
-    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(app, opId, args, { actAs }) : rawCallSkill(app, opId, args))
+    const ctx = actAs || door ? { ...(actAs ? { actAs } : {}), ...(door ? { door } : {}) } : undefined;
+    return Promise.resolve(ctx ? rawCallSkill(app, opId, args, ctx) : rawCallSkill(app, opId, args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
   // made AS the ticked self
-  const call = async (op) => callAs(asSelf)(op.app, op.opId, op.args);
+  const call = async (op, door) => callAs(asSelf, door)(op.app, op.opId, op.args);
   // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
   // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
   const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
@@ -4827,11 +4830,12 @@ function showVandaagPlus({ edit = null } = {}) {
   plusCircles().then((circles) => { suggestionPool = plusSuggestionPool({ circles, lang: currentLang() }); }).catch(() => {});
   // a circle's act the line read: as the person, through the waist with the circle named, so the circle's own doors
   // and governance decide (the "+" has no authority the circle's composer lacks); the reply line says what happened
-  const runInCircle = async (command, circleId) => {
+  // `door`: the door the line came through when the "+" ran it at once (`phrase`); none for a pick on the card (a tap)
+  const runInCircle = async (command, circleId, door) => {
     const op = plusCircleOp(command, circleId);
     if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return { error }; }
     // an own list's op runs as the ticked self (`call`); a circle's as the person
-    const r = op.own ? await call(op) : await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    const r = op.own ? await call(op, door) : await Promise.resolve(door ? rawCallSkill(op.app, op.opId, op.args, { door }) : rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     if (r?.ok === false || r?.error) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); done = null; }
     else { error = null; done = plusDoneLine(r, { opId: op.opId, args: op.args, t }); }
     paint();
@@ -4848,8 +4852,10 @@ function showVandaagPlus({ edit = null } = {}) {
     if (!_door) {
       const th = plusThreadNow();
       _door = createPlusDoor({ llm: selfKeyOf('default') ? circleOwnModel() : null, threads: th.threads, selfKeyOf, readAs: callAs,
+        // what no op shows (a proposal declined, a line placed nowhere) in the person's own record (ownActions.js)
+        noteOwn: (e) => circleHouseholdAgent?.noteOwnAct?.(e),
         householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
-        circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId) => runInCircle(command, circleId) });
+        circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId, _asSelf, door) => runInCircle(command, circleId, door) });
     }
     return _door;
   };

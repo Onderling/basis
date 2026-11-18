@@ -20,6 +20,10 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('household: its device and recovery ops described, the phrase named as the person knows it', () => {
+    expect(opWhat('household', 'revealOwnerPhrase', 'nl')).toBe('Laat je herstelzin zien.');
+    expect(opDescription('household', 'replaceDevice', 'en').params.mnemonic).toBe('your recovery phrase');
+  });
 });
 
 describe('the "/" list shows it under the command', () => {

@@ -5967,6 +5967,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       markAsked: () => { if (roomSelfId) markNearbyAsked(roomSelfId); },
       setAllow: (key, value) => { screen.setAllow(key, value); writeNearbyAllows(screen.model().allows); },
       showCard: (fields) => screen.showCard(fields),
+      // the card reaches the room in its own time; its outcome is the card editor's notice, as on web
+      cardShown: (r) => setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' }),
     });
     setWizard(r.done ? null : { step: r.step, notice: r.notice ?? null });
   }, [wizard, screen, roomLevel, changeLevel, roomSelfId]);

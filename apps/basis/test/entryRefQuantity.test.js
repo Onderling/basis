@@ -102,6 +102,13 @@ describe('a list entry carries a reference to a thing and a quantity', () => {
     expect(r.items.find((i) => i.label === 'brood')?.quantity ?? 1).toBe(1);
   });
 
+  it('an EMPTY ref or quantity, as a form sends it, is absent, not malformed (the screen\'s form, development red 2026-11-18)', async () => {
+    for (const empty of [{ ref: '' }, { ref: {} }, { ref: '   ' }, { quantity: '' }, { quantity: null }, { ref: '', quantity: '' }]) {
+      const r = await A.agent.callSkill('lists', 'addToList', { circleId: CIRCLE_ID, list: 'Boodschappen', text: `uit-een-formulier-${Object.keys(empty).join('-')}-${JSON.stringify(empty).length}`, ...empty });
+      expect(r?.ok, `accepted: ${JSON.stringify(empty)} → ${JSON.stringify(r)}`).toBe(true);
+    }
+  });
+
   it('a bad quantity or ref is refused, not stored', async () => {
     for (const bad of [{ quantity: 0 }, { quantity: 1.5 }, { quantity: 'veel' }, { ref: { type: 'shop.product' } }, { ref: 'ah:1' }]) {
       const r = await A.agent.callSkill('lists', 'addToList', { circleId: CIRCLE_ID, list: 'Boodschappen', text: 'kaas', ...bad });

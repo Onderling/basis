@@ -15,8 +15,11 @@ Native (no native deps in this package).  Provides:
 - **Routing** — `RoutingStrategy`, `FallbackTable`, hop tunneling.
 - **Skills + protocols** — task exchange, streaming, file sharing,
   pubsub, key rotation, reachability oracle.
-- **A2A bridge** — JSON-RPC over HTTPS interop with non-`@onderling`
-  agent frameworks.
+- **A2A bridge** — an HTTP transport (`A2ATransport`) for non-`@onderling`
+  clients: REST routes (`POST /tasks/send`, SSE on `/tasks/sendSubscribe`), JWT
+  bearer auth, an agent card at `/.well-known/agent.json`. It follows an earlier,
+  REST-shaped A2A draft, not the current JSON-RPC protocol (`@a2a-js/sdk` 1.x);
+  moving to current A2A, first as a client, is the decided direction (2026-11-18).
 
 For the bigger picture see the repo root
 [`README.md`](../../README.md), [`QUICKSTART.md`](../../QUICKSTART.md),

@@ -5022,6 +5022,18 @@
     "trash_restored": {
       "text": "\"{{item}}\" is back on {{list}}.",
       "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "quantity_raised": {
+      "text": "{{item}} was already on {{list}}; now {{quantity}} times.",
+      "doc": "A list entry for the same thing (same reference) was added again: its quantity went up (L1035)."
+    },
+    "bad_ref": {
+      "text": "I cannot put that thing on a list: it lacks a kind or a mark.",
+      "doc": "addToList refused a reference that is not {type, ref} (L1035)."
+    },
+    "bad_quantity": {
+      "text": "How many must be a whole number, at least 1.",
+      "doc": "addToList refused a quantity that is not a whole number of at least 1 (L1035)."
     }
   },
   "share": {

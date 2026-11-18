@@ -2316,7 +2316,7 @@ export default function CircleLauncherScreen({
         onCircleRun={async (card, circleId, asSelf) => {
           const r = await plusDoorNow().exchange({ asSelf }, async () => {
             let last = null;
-            for (const c of plusCardCommands(card)) { last = await plusRunInCircle(c, circleId, asSelf); if (last?.error) break; }
+            for (const c of plusCardCommands(card)) { last = await plusRunInCircle(c, circleId, asSelf, card?.door); if (last?.error) break; }   // the yes by the line's door, as the no (web twin)
             return last;
           });
           setPlusTurnsTick((n) => n + 1);
@@ -2349,9 +2349,9 @@ export default function CircleLauncherScreen({
           // a page with no block showing it gets one (undoable)
           const op = plusEdit ? plusSaveOp(actId, values, { id: plusEdit.id }) : plusOp(actId, values);
           if (op.error) return t(op.error);
-          // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-          const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
-          const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+          // made AS the ticked self (`plusAsSelf`: the wrapped waist, its actAs), by the door of the line the "+" opened
+          // this form from (a yes as its no); a form opened by its button, a tap (web twin: circleApp onSave)
+          const r = await Promise.resolve(plusAsSelf(asSelf, plusEdit ? undefined : plusDoorNow().formDoor({ asSelf }, actId))(op.app, op.opId, op.args))
             .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
           if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
           // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)

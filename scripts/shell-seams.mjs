@@ -376,6 +376,9 @@ export const SEAMS = Object.freeze([
   // the quiet and radio switches) is decided once (`src/v2/nearbyMenu.js`); a host deciding it itself writes a level
   // over the person's own choice on one shell and not the other.
   { id: 'nearby-here-choose', pattern: /nearbyHereChoose\(/, shells: ['web', 'mobile'], why: 'a menu choice that writes a different level, or the radio, on one shell than on the other' },
+  // Nearby the first time: what each press of the three-step wizard writes is decided once (`src/v2/nearbyWizard.js`); a
+  // host deciding it itself turns "Alleen kijken" into a level, or sends a card the person did not save, on one shell only.
+  { id: 'nearby-wizard-press', pattern: /nearbyWizardPress\(/, shells: ['web', 'mobile'], why: 'a first-time wizard that writes a level, a card or the chat differently on one shell than on the other' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 

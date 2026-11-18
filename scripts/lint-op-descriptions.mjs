@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 // the words the app READS (the reader's registry): an app counts as described only when its files are imported there
-import { OP_DESCRIPTIONS } from '../apps/basis/src/v2/opDescriptions.js';
+import { OP_DESCRIPTIONS, opDescription } from '../apps/basis/src/v2/opDescriptions.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE = path.join(HERE, 'op-descriptions-baseline.json');
@@ -85,6 +85,35 @@ export function auditDescriptions({ declared, files, baseline }) {
   return problems;
 }
 
+/**
+ * The bot's help phrases (`circle.bot.help.ops.<app>.<opId>`) are a SECOND home for what an op does in a person's words
+ * (ledger L1033). Until Frits chooses the word and they move into the descriptions, the home is FROZEN: no key beyond the
+ * frozen list, and every key names an op that has a description (so the move has somewhere to land). The list only
+ * shrinks (`--update` drops a key that is gone).
+ * @param {{ keys: string[], frozen: string[], describe: (app: string, opId: string) => unknown }} a
+ *   keys: `<app>.<opId>` per help phrase, over every locale
+ * @returns {string[]} problems
+ */
+export function auditHelpPhrases({ keys, frozen, describe }) {
+  const problems = [];
+  const held = new Set(frozen);
+  for (const k of new Set(keys)) {
+    const dot = k.indexOf('.');
+    const app = k.slice(0, dot), opId = k.slice(dot + 1);
+    if (!held.has(k)) problems.push(`circle.bot.help.ops.${k} is a NEW help phrase: what an op does goes in its descriptions file (L1033), not here`);
+    if (!describe(app, opId)) problems.push(`circle.bot.help.ops.${k} names an op with no description: describe ${app}.${opId} first`);
+  }
+  const present = new Set(keys);
+  for (const k of held) if (!present.has(k)) problems.push(`the frozen help list holds ${k}, which no locale has any more: run with --update`);
+  return problems;
+}
+
+/** `<app>.<opId>` for every help phrase in a locale bundle's `bot.help.ops`. */
+export function helpPhraseKeys(bundle) {
+  const ops = bundle?.bot?.help?.ops ?? {};
+  return Object.entries(ops).flatMap(([app, byOp]) => Object.keys(byOp ?? {}).map((op) => `${app}.${op}`));
+}
+
 // an app folder whose name is not its app id
 const APP_OF_DIR = { 'tasks-v0': 'tasks' };
 
@@ -110,10 +139,15 @@ export function shrunkBaseline({ declared, files, baseline }) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const declared = declaredOps();
   const files = OP_DESCRIPTIONS;
-  const before = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).owed ?? [] : [];
+  const stored = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
+  const before = stored.owed ?? [];
+  const ROOT_ = path.resolve(HERE, '..');
+  const helpKeys = LANGS.flatMap((l) => helpPhraseKeys(JSON.parse(readFileSync(path.join(ROOT_, `apps/basis/src/locales/circle.${l}.json`), 'utf8'))));
+  const frozen = stored.helpPhrases ?? [];
   if (process.argv.includes('--update')) {
     const owed = shrunkBaseline({ declared, files, baseline: before });
-    writeFileSync(BASELINE, `${JSON.stringify({ owed }, null, 2)}\n`);
+    const helpPhrases = frozen.filter((k) => helpKeys.includes(k));
+    writeFileSync(BASELINE, `${JSON.stringify({ ...stored, owed, helpPhrases }, null, 2)}\n`);
     console.log(`lint-op-descriptions: baseline shrunk ${before.length} → ${owed.length} (it never grows: a new app ships its words)`);
     process.exit(0);
   }
@@ -122,6 +156,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     .flatMap((d) => readdirSync(path.join(ROOT, 'apps', d.name)).filter((f) => /^descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/${d.name}/${f}`));
   const problems = [
     ...auditDescriptions({ declared, files, baseline: before }),
+    ...auditHelpPhrases({ keys: helpKeys, frozen, describe: (app, opId) => opDescription(app, opId, 'en') }),
     ...unreadFiles(onDisk, files).map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
   ];
   if (problems.length) {

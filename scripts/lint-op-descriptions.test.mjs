@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auditDescriptions, shrunkBaseline, unreadFiles } from './lint-op-descriptions.mjs';
+import { auditDescriptions, shrunkBaseline, unreadFiles, auditHelpPhrases, helpPhraseKeys } from './lint-op-descriptions.mjs';
 
 // one app, two ops; `params` per op
 const declared = { lists: { addToList: ['list', 'text'], listLists: [] }, tasks: { addTask: ['title'] } };
@@ -52,5 +52,24 @@ describe('lint-op-descriptions', () => {
     const onDisk = ['apps/lists/descriptions.en.json', 'apps/lists/descriptions.nl.json', 'apps/calendar/descriptions.nl.json'];
     expect(unreadFiles(onDisk, { lists: { en: {}, nl: {} } })).toEqual(['apps/calendar/descriptions.nl.json']);
     expect(unreadFiles(onDisk.slice(0, 2), { lists: { en: {}, nl: {} } })).toEqual([]);
+  });
+});
+
+describe('the bot help phrases are a frozen second home (L1033)', () => {
+  const describe_ = (app, op) => (app === 'lists' && op === 'listLists' ? { what: 'x' } : null);
+  it('a frozen key whose op is described: clean', () => {
+    expect(auditHelpPhrases({ keys: ['lists.listLists'], frozen: ['lists.listLists'], describe: describe_ })).toEqual([]);
+  });
+  it('a NEW key is red, and so is a key whose op has no description', () => {
+    const p = auditHelpPhrases({ keys: ['lists.listLists', 'lists.addToList'], frozen: ['lists.listLists'], describe: describe_ });
+    expect(p.some((x) => /lists\.addToList is a NEW help phrase/.test(x))).toBe(true);
+    expect(p.some((x) => /lists\.addToList names an op with no description/.test(x))).toBe(true);
+  });
+  it('a frozen key no locale has any more asks for --update (the list only shrinks)', () => {
+    const p = auditHelpPhrases({ keys: [], frozen: ['lists.listLists'], describe: describe_ });
+    expect(p.some((x) => /no locale has any more/.test(x))).toBe(true);
+  });
+  it('reads the keys off a bundle', () => {
+    expect(helpPhraseKeys({ bot: { help: { ops: { lists: { listLists: {}, shopVisit: {} } } } } })).toEqual(['lists.listLists', 'lists.shopVisit']);
   });
 });

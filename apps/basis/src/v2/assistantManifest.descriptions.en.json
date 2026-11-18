@@ -1,0 +1,186 @@
+{
+  "assistant-memory": {
+    "what": "Choose how much I remember of our conversation.",
+    "params": {"mode": "nothing, short or long"}
+  },
+  "assistant-forget": {
+    "what": "Forget our conversation now; what you put on a list stays.",
+    "params": {}
+  },
+  "weekOverview": {
+    "what": "Show your week: chores, appointments, shopping. Or one day.",
+    "params": {"day": "or just this day"}
+  },
+  "sendWeekOverview": {
+    "what": "Send you the overview of your week on Sunday.",
+    "params": {"occurrence": "which time"}
+  },
+  "assistant-feedback": {
+    "what": "Say where feedback about the app goes.",
+    "params": {}
+  },
+  "assistant-hello": {
+    "what": "Greet back.",
+    "params": {"lang": "in which language"}
+  },
+  "announceChange": {
+    "what": "Tell whoever it concerns that an appointment or chore changed.",
+    "params": {"occurrence": "which time"}
+  },
+  "assistant-reminders": {
+    "what": "Switch your reminders on or off, or choose when they come.",
+    "params": {"mode": "on, off, or when"}
+  },
+  "remindMe": {
+    "what": "Set a reminder of your own: at a time, for an appointment or chore, or for everyone.",
+    "params": {"item": "what for", "rules": "when, for example 60 minutes before or morning", "who": "for whom"}
+  },
+  "sayReminder": {
+    "what": "Send you a reminder you set yourself, at its moment.",
+    "params": {"say": "what I say", "occurrence": "which time"}
+  },
+  "cancelReminder": {
+    "what": "Remove a reminder of your own.",
+    "params": {"which": "its number in /gepland, or a word"}
+  },
+  "assistant-quiet": {
+    "what": "Choose your own quiet hours, or the household's.",
+    "params": {"hours": "from when to when"}
+  },
+  "assistant-overview": {
+    "what": "Switch the Sunday overview on or off.",
+    "params": {"mode": "on or off"}
+  },
+  "assistant-language": {
+    "what": "Choose the language I answer you in.",
+    "params": {"lang": "Dutch, English, or as you write"}
+  },
+  "assistant-apps": {
+    "what": "Switch an app for the household on or off.",
+    "params": {"change": "which app, on or off"}
+  },
+  "assistant-settings": {
+    "what": "Show the settings of the whole household, or change one.",
+    "params": {"change": "what changes"}
+  },
+  "assistant-role": {
+    "what": "Change someone's role in the household.",
+    "params": {"who": "who", "role": "which role"}
+  },
+  "assistant-status": {
+    "what": "Show how the bot is doing.",
+    "params": {}
+  },
+  "assistant-usage": {
+    "what": "Show what the model cost this month.",
+    "params": {}
+  },
+  "assistant-users": {
+    "what": "Show who is in the household.",
+    "params": {}
+  },
+  "assistant-planned": {
+    "what": "Show what I will send you this week.",
+    "params": {}
+  },
+  "assistant-people": {
+    "what": "Show who is in this household, with their role.",
+    "params": {}
+  },
+  "assistant-cohort": {
+    "what": "Make a code several people can join with.",
+    "params": {"spec": "how many people, how many days"}
+  },
+  "assistant-invite": {
+    "what": "Make a code one person can join with.",
+    "params": {"role": "with which role"}
+  },
+  "assistant-rotate": {
+    "what": "Replace the codes; the old ones stop working.",
+    "params": {}
+  },
+  "assistant-circle": {
+    "what": "Put the bot in a circle, or take it out.",
+    "params": {"spec": "which circle"}
+  },
+  "assistant-circles": {
+    "what": "Show the circles the bot is in.",
+    "params": {}
+  },
+  "assistant-revoke": {
+    "what": "Take someone out of the household.",
+    "params": {"who": "who"}
+  },
+  "assistant-menu": {
+    "what": "Show your settings, with buttons.",
+    "params": {}
+  },
+  "assistant-view": {
+    "what": "Choose how I answer: with buttons, on your screen or in words.",
+    "params": {"mode": "buttons, screen or words"}
+  },
+  "assistant-agenda-link": {
+    "what": "Make a link to your agenda, for your calendar app; the previous one stops working.",
+    "params": {}
+  },
+  "assistant-screen": {
+    "what": "Connect a screen, so you work with the bot there.",
+    "params": {"how": "with a link or a code"}
+  },
+  "assistant-screen-paste": {
+    "what": "Connect a screen with its own connect code.",
+    "params": {"offer": "the connect code"}
+  },
+  "assistant-screen-confirm": {
+    "what": "Pick the code of a screen that wants to connect.",
+    "params": {"answer": "your answer"}
+  },
+  "assistant-export-key-set": {
+    "what": "Set the export key: your passphrase, on your screen only.",
+    "params": {"passphrase": "your passphrase", "passphraseAgain": "once more"}
+  },
+  "assistant-export-key-unlock": {
+    "what": "Open the export key for an hour, to restore an export.",
+    "params": {"passphrase": "your passphrase"}
+  },
+  "assistant-link": {
+    "what": "Link your Basis app to yourself.",
+    "params": {"offer": "the code from your app"}
+  },
+  "assistant-link-confirm": {
+    "what": "Pick the code your Basis app shows.",
+    "params": {"answer": "your answer"}
+  },
+  "assistant-inapp": {
+    "what": "Put the household in your own app too.",
+    "params": {"answer": "your answer"}
+  },
+  "assistant-unlink": {
+    "what": "Unlink your Basis app.",
+    "params": {}
+  },
+  "assistant-companion": {
+    "what": "Give the bot the household's companion, for the agenda links.",
+    "params": {"card": "the companion's card"}
+  },
+  "assistant-screen-approve": {
+    "what": "Say yes or no to what a screen asked.",
+    "params": {"answer": "your answer"}
+  },
+  "assistant-screens": {
+    "what": "Show your connected screens, or disconnect one.",
+    "params": {"change": "what changes"}
+  },
+  "assistant-exports": {
+    "what": "Show the nightly exports.",
+    "params": {}
+  },
+  "assistant-export": {
+    "what": "Make an export now.",
+    "params": {}
+  },
+  "assistant-import": {
+    "what": "Restore an export.",
+    "params": {"file": "which export"}
+  }
+}

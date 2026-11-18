@@ -20,6 +20,10 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('assistant: the household bot's own commands described, meant as its help phrases mean them', () => {
+    expect(opWhat('assistant', 'assistant-forget', 'nl')).toBe('Vergeet ons gesprek nu; wat je op een lijst zette, blijft.');
+    expect(opDescription('assistant', 'remindMe', 'en').params.rules).toBe('when, for example 60 minutes before or morning');
+  });
 });
 
 describe('the "/" list shows it under the command', () => {

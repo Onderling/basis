@@ -42,7 +42,7 @@ describe('Slice B.2.1 — manifest delta (mine.html data sources)', () => {
     expect(op.verb).toBe('list');
     expect(op.appliesTo).toEqual({ type: 'task' });
     expect(op.params).toEqual([]);
-    expect(op.surfaces?.chat?.hint).toBeTruthy();
+    expect(op.surfaces?.chat?.hint, 'withheld from a model: a task flow that lost its screen (L1025 prune, L442)').toBeUndefined();
     // No surfaces.ui — list ops are an implicit data source, not a button.
     expect(op.surfaces?.ui).toBeUndefined();
   });

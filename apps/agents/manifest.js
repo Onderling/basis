@@ -424,13 +424,6 @@ export const agentsManifest = {
         { name: 'expiresInDays', kind: 'number', schema: { exclusiveMinimum: 0 } },
       ],
       surfaces: {
-        chat: {
-          reply: 'record',
-          hint:  'Grant a member a ROLE and materialize its capability bundle: sets the '
-               + 'governance role (signed) AND issues the role bundle\'s capability tokens to '
-               + 'the member (by groupId + role + the member agentId/pubKey or subject; optional '
-               + 'expiry in days). Reports the role, rank, and the materialized token ids.',
-        },
       },
     },
     {
@@ -567,13 +560,6 @@ export const agentsManifest = {
         { name: 'uri',      kind: 'string' },
       ],
       surfaces: {
-        chat: {
-          reply: 'record',
-          hint:  'List a circle\'s data-version history: without a uri, every resource in the '
-               + 'circle pod that has retained versions (uri, latest timestamp, count); with a '
-               + 'uri, that resource\'s versions newest-first (ts, id, sha256, size, writing '
-               + 'device) — use an id with restoreDataVersion to roll back. Read-only.',
-        },
       },
     },
     {

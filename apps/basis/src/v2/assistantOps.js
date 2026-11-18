@@ -31,6 +31,7 @@ import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { replyLine } from './replyLine.js';
 import { THREAD_LANGS } from './botThreads.js';
+import { toolboxRefusalText } from './toolboxes.js';
 
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
@@ -185,6 +186,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-forget') return forgetOp(caller ?? ctx?.threadId, ctx);
       if (op === 'assistant-circle') return circleOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       if (op === 'assistant-circles') return circlesOp(caller ?? ctx?.threadId);
+      if (op === 'assistant-toolbox') return toolboxOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       // the export key's set and unlock exist for a screen alone: they run only as the yes to a screen's request
       if (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock') {
         if (ctx?.steppedUp !== true) return { ok: false, error: { code: 'screen-only', message: t('circle.bot.export_key_screen_only') } };
@@ -1079,6 +1081,52 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
   /** Is this turn from the person's PRIVATE door (on Telegram the chat whose id is their own; the inbox always)? */
+  /**
+   * `/toolbox` — the toolboxes the operator placed on the box (L1035). No argument: each with its words and on/off.
+   * `<naam> aan`: the card (its name, address, words, what it receives) with Ja/Nee, asked in the admin's own private
+   * chat; the Ja (`<naam> aan ja`) switches it on, from that chat only. `<naam> uit`: off. Calls the tools ops at the waist.
+   */
+  async function toolboxOp(person, spec, ctx) {
+    if (!person) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const words = String(spec ?? '').trim().split(/\s+/).filter(Boolean);
+    const say = (r) => toolboxRefusalText(r, tp);
+    if (!words.length) {
+      const r = await callSkill('tools', 'listTools', { all: true }, ctx);
+      const rows = r?.toolboxes ?? [];
+      if (!rows.length) return { ok: true, message: tp('circle.bot.toolbox_none') };
+      return { ok: true, message: [tp('circle.bot.toolbox_list_head'), ...rows.map((b) => tp('circle.bot.toolbox_row', {
+        title: b.title, name: b.name, state: tp(b.on ? 'circle.bot.toolbox_state_on' : 'circle.bot.toolbox_state_off'),
+        words: b.words?.length ? ` · ${b.words.map((w) => `${w.word} <…>`).join(', ')}` : '',
+      }))].join('\n') };
+    }
+    const [name, verb, answer] = [words[0].toLowerCase(), String(words[1] ?? '').toLowerCase(), String(words[2] ?? '').toLowerCase()];
+    if (verb === 'uit' || verb === 'off') {
+      const r = await callSkill('tools', 'removeToolbox', { name }, ctx);
+      return r?.ok ? { ok: true, message: tp('circle.bot.toolbox_off', { title: r.title ?? name }) } : { ok: false, error: { code: r?.code, message: say(r) } };
+    }
+    if (verb !== 'aan' && verb !== 'on') return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.toolbox_usage') } };
+    // switching a toolbox on says what it will receive: asked and answered in the admin's own private chat only
+    if (!(await fromPrivateDoor(person, ctx))) return { ok: false, error: { code: 'not-private', message: tp('circle.bot.toolbox_not_private') } };
+    if (answer === 'nee' || answer === 'no') return { ok: true, message: tp('circle.bot.toolbox_unchanged') };
+    if (answer === 'ja' || answer === 'yes') {
+      const r = await callSkill('tools', 'addToolbox', { name, confirm: true }, ctx);
+      if (!r?.ok) return { ok: false, error: { code: r?.code, message: say(r) } };
+      const first = (await callSkill('tools', 'listTools', {}, ctx))?.toolboxes?.find((b) => b.name === name)?.words?.[0];
+      return { ok: true, message: tp('circle.bot.toolbox_on', { title: r.title, example: first ? `${first.word} …` : '/toolbox' }) };
+    }
+    const r = await callSkill('tools', 'addToolbox', { name }, ctx);
+    if (!r?.ok) return { ok: false, error: { code: r?.code, message: say(r) } };
+    return {
+      ok: true,
+      message: tp('circle.bot.toolbox_card', {
+        title: r.title, url: r.url, words: r.words.map((w) => `${w.word} <…>`).join(', '),
+        receives: tp(r.receives?.includes('list-refs') ? 'circle.bot.toolbox_receives_list' : 'circle.bot.toolbox_receives_question'),
+      }),
+      buttons: [{ id: `/toolbox ${name} aan ja`, label: tp('circle.bot.toolbox_yes') }, { id: `/toolbox ${name} aan nee`, label: tp('circle.bot.toolbox_no') }],
+    };
+  }
+
   async function fromPrivateDoor(person, ctx) {
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     return ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || isOwnTelegramChat(ctx?.chatId, row.uid));

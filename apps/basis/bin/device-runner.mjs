@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxGateRule } from '../src/v2/toolboxes.js';   // a circle's toolboxes (L1035): the key from the operator's config
+import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText } from '../src/v2/toolboxes.js';   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
@@ -1391,7 +1391,14 @@ if (tgToken || inboxDoor.bridge) {
   });
   await toolboxes.load();
   agent.mountAppOps('tools', {
-    useTool: (args) => toolboxes.useTool(args), listTools: () => toolboxes.listTools(),
+    // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
+    useTool: async (args, ctx) => {
+      const r = await toolboxes.useTool(args);
+      const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
+      if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
+      return Array.isArray(r.items) && !r.items.length ? { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) } : r;
+    },
+    listTools: (args) => toolboxes.listTools(args),
     addToolbox: (args) => toolboxes.addToolbox(args), removeToolbox: (args) => toolboxes.removeToolbox(args),
   }, toolsManifest);
   const doorCall = withAssistantOps({
@@ -1558,12 +1565,12 @@ if (tgToken || inboxDoor.bridge) {
       // the lists' words, then the words a toolbox's admin named (read live: adding or removing one changes them at once)
       gateRules: [...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
       // the first message says what this bot does for this person, and how the reminders stand and change
-      welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings() }),
+      welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings(), toolboxLine: toolboxWelcomeLine(toolboxes.wordsNow(), tp ?? t) }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
       basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
       // `/help` for a person: their language, grouped, the admin's commands last (their level on the bot's map)
       // …and when the bot reminds, in the welcome's own line (the household's rules as they stand)
-      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules } }),
+      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules }, extraLines: toolboxHelpLines(toolboxes.wordsNow(), tp) }),
     } : {}),
   });
   await tgRunner.start();

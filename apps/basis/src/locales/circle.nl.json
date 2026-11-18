@@ -10473,6 +10473,14 @@
         "text": "Hoe lang een gesprek in de ruimte op dit apparaat blijft (dagen)",
         "doc": "A setting's label (projected from the parameter register)."
       },
+      "ownActions_record": {
+        "text": "Wat je zelf doet bijhouden op dit apparaat",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "ownActions_keepWeeks": {
+        "text": "Hoe lang wat je zelf doet op dit apparaat blijft (weken; 0 = alles bewaren)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
       "notify_windowDays": {
         "text": "Hoe lang iets nieuws in je nieuws blijft (dagen)",
         "doc": "A setting's label (projected from the parameter register)."

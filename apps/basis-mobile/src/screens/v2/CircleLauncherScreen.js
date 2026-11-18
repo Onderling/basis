@@ -1949,7 +1949,7 @@ export default function CircleLauncherScreen({
   const sayScanResult = (reply) => { const w = scanOpResultWords(reply); Alert.alert(t('circle.profile.scan'), t(w.key, w.params)); };
   const runOpFromScan = async (target, needs) => {
     const call = (app, op, args) => bundle?.callSkill?.(app, op, args);
-    const next = await opFormOrRun(target, needs, makePickerFetcher(call, target.app));
+    const next = await opFormOrRun(target, needs, makePickerFetcher(call, target.app, t));
     if (next.error) { sayScanResult({ ok: false, outcome: next.error }); return; }
     if (next.run) { sayScanResult(await Promise.resolve(call(next.run.app, next.run.opId, next.run.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }))); return; }
     setScanForm({ target, form: next.form, choices: next.choices });

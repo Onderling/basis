@@ -65,15 +65,15 @@ export function screenPanelsForGrant(ops, t) {
  * param — the read that lists its values) called through the screen's OWN grant, so it offers only what this person may
  * read. A read the screen holds no token for offers nothing (it is not asked). Each item: its id the value, its words
  * the label.
- * @param {{call: (skill: string, args: object) => Promise<any>, ops: () => string[], appOrigin: string}} a
+ * @param {{call: (skill: string, args: object) => Promise<any>, ops: () => string[], appOrigin: string, t?: Function}} a
  *   `appOrigin` — the field's own app, for a source that names none
  * @returns {(decl: {listOp: string, appOrigin?: string, filter?: object}) => Promise<Array<{id: string, label: string}>>}
  */
-export function screenPickerFetcher({ call, ops, appOrigin }) {
+export function screenPickerFetcher({ call, ops, appOrigin, t }) {
   return async (decl) => {
     const skill = `${decl?.appOrigin ?? appOrigin}.${decl?.listOp}`;
     if (!decl?.listOp || !(ops() ?? []).includes(skill)) return [];
-    return pickerChoices(await call(skill, decl.filter && typeof decl.filter === 'object' ? { ...decl.filter } : {}));
+    return pickerChoices(await call(skill, decl.filter && typeof decl.filter === 'object' ? { ...decl.filter } : {}), t);
   };
 }
 

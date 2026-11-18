@@ -23,6 +23,9 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
   pinned = [], onOpenPin, onUnpin, pinnedActIds = [], onTogglePin,
   // the kept conversation (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to empty it
   turns = [], onForget,
+  // what the "+" says as it opens (the door's `opening()`): `{intro: {lines, tryLabel, examples}}` the first time, `{news}`
+  // once for the circles joined since, else nothing. A tap on an example puts it in the line; it does not send.
+  opening = null,
   // what can be typed here: `suggestFor(value)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
   suggestFor = null } = {}) {
   if (!container) return container;
@@ -64,6 +67,32 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
       route.className = 'circle-vandaag-plus__route';
       route.textContent = routeLine;
       container.appendChild(route);
+    }
+    // what the "+" says as it opens: what it is, with examples from what the person has; or, once, what is new
+    if (!editing && (opening?.intro || opening?.news)) {
+      const box = document.createElement('div');
+      box.className = 'circle-vandaag-plus__opening';
+      const say = (text, cls) => { const p = document.createElement('p'); p.className = cls; p.textContent = text; box.appendChild(p); };
+      if (opening.news) say(opening.news, 'circle-vandaag-plus__news');
+      if (opening.intro) {
+        for (const l of opening.intro.lines ?? []) say(l, 'circle-vandaag-plus__intro');
+        const tryRow = document.createElement('p');
+        tryRow.className = 'circle-vandaag-plus__try';
+        tryRow.appendChild(document.createTextNode(`${opening.intro.tryLabel ?? ''} `));
+        for (const ex of opening.intro.examples ?? []) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__example';
+          b.textContent = ex;
+          b.addEventListener('click', () => {
+            const input = container.querySelector('.circle-vandaag-plus__line');
+            if (input) { input.value = ex; input.focus(); }
+          });
+          tryRow.appendChild(b);
+        }
+        box.appendChild(tryRow);
+      }
+      sec['plus-thread'].appendChild(box);
     }
     // the conversation so far: what the person said and what the "+" answered, kept across opens
     if (!editing && Array.isArray(turns) && turns.length) {

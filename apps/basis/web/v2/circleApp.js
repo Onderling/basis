@@ -4852,6 +4852,8 @@ function showVandaagPlus({ edit = null } = {}) {
     if (!_door) {
       const th = plusThreadNow();
       _door = createPlusDoor({ llm: selfKeyOf('default') ? circleOwnModel() : null, threads: th.threads, selfKeyOf, readAs: callAs,
+        // what the "+" told this person it can reach, kept on this device's log (`plus-told`): said once, then what changed
+        toldLog: eventLog,
         // what no op shows (a proposal declined, a line placed nowhere) in the person's own record (ownActions.js)
         noteOwn: (e) => circleHouseholdAgent?.noteOwnAct?.(e),
         householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
@@ -4861,10 +4863,15 @@ function showVandaagPlus({ edit = null } = {}) {
   };
   // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
   let shareTargets = null;
+  if (!editId && conversationSelf(asSelf, selves.length)) {
+    plusDoorNow().opening({ asSelf: conversationSelf(asSelf, selves.length) }).then((o) => { opening = o; paint(); }).catch(() => {});
+  }
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
+  // what the "+" says as it opens (the shared door's `opening`: the intro the first time, what is new once); asked once
+  let opening = null;
   const paint = () => renderVandaagPlus(card, {
     lang: currentLang(),
-    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done, opening,
     routeLine: plusRouteLine(circleOwnRoute(), { t }),
     turns: conversationSelf(asSelf, selves.length) ? plusDoorNow().turns({ asSelf: conversationSelf(asSelf, selves.length) }) : [],
     // under the line: on "/" the door's commands (the "/" list), else the lines it reads here (the shared door; phone twin)

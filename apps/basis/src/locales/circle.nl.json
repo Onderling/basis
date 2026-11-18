@@ -1865,6 +1865,42 @@
     "plus_card_not_done": {
       "text": "'{{line}}': niet gedaan. Er is niets opgeslagen.",
       "doc": "The \"+\" conversation: a card (which place, or make a list) was answered with Cancel; the line was not done and nothing was stored."
+    },
+    "plus_intro_own": {
+      "text": "Dit is je eigen assistent. Ik werk met jouw notities, afspraken en lijsten.",
+      "doc": "The \"+\" the first time a self's conversation opens, line 1: what it is (Fable's words, plan step B)."
+    },
+    "plus_intro_circle": {
+      "text": "Iets voor een kring? Zeg het en ik vraag in welke kring.",
+      "doc": "First open, line 2: a circle's things go through the which-circle card."
+    },
+    "plus_intro_try": {
+      "text": "Probeer:",
+      "doc": "First open, line 3: the label before the tappable examples (a tap fills the field, it does not send)."
+    },
+    "plus_intro_ex_list": {
+      "text": "zet melk op {{list}}",
+      "doc": "An example built from one of the person's own lists ({{list}}); the \"+\" must read it."
+    },
+    "plus_intro_ex_circle": {
+      "text": "{{circle}}: maak een lijst Boodschappen",
+      "doc": "An example naming one of the person's circles ({{circle}}): make a list there; the \"+\" must read it."
+    },
+    "plus_intro_ex_note": {
+      "text": "onthoud dat de sleutel bij de buren ligt",
+      "doc": "A fixed example (a note), when the person has no list or circle to build one from."
+    },
+    "plus_intro_ex_appt": {
+      "text": "afspraak vrijdag om half drie tandarts",
+      "doc": "A fixed example (an appointment)."
+    },
+    "plus_intro_ex_plan": {
+      "text": "wat heb ik morgen gepland?",
+      "doc": "A fixed example (what is planned)."
+    },
+    "plus_news_circle": {
+      "text": "Nieuw: je zit nu ook in {{circle}}. Je kunt me daar iets voor laten doen.",
+      "doc": "A later open of the \"+\": the circles ({{circle}}, comma-separated) the person joined since they were last told; said once."
     }
   },
   "screens": {

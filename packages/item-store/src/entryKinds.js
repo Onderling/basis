@@ -148,6 +148,9 @@ export const ENTRY_KINDS = Object.freeze({
   // The OWNER's own acts (the agent trail above skips them on purpose: an agent's card must not show its owner). Written
   // at the waist, one per act; never carried to another device or a circle (local), mirrored to the person's own storage.
   'own-action':      K(LANE.SYSTEM, false, RETAIN.OWN, false, LOCAL_BINDING, true),
+  // What the person's "+" last told them it can reach (the circles), one entry per self, the newest carrying the whole
+  // set: kept while the self exists (record: past a window everything would be "new" again), never fans, not mirrored.
+  'plus-told':       K(LANE.SYSTEM, false, RETAIN.RECORD, false, LOCAL_BINDING, false),
 
   // ── compaction output ─────────────────────────────────────────────────────
   // What old audit entries FOLD into instead of being dropped (retention step D): `{from, to, counts,

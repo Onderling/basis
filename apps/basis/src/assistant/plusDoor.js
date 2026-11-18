@@ -27,6 +27,7 @@ import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
+import { plusIntro, plusNews, readPlusTold, writePlusTold } from '../v2/plusIntro.js';
 import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel, plusSuggest, NO_OWN_LIST } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
@@ -205,7 +206,7 @@ export function availableOnly(catalogue, manifestsByOrigin = {}, policy = null) 
 export function createPlusDoor({
   llm = null, threads = null, threadId = null, t, lang = 'nl', circles = async () => [], ownListsOf = async () => [],
   runInCircle = null, interpret = interpretToCommand, householdManifest, apps, acts = PLUS_ACTS,
-  readAs = null, selfOf: selfOfIn = null, selfKeyOf = null, noteOwn = null,
+  readAs = null, selfOf: selfOfIn = null, selfKeyOf = null, toldLog = null, noteOwn = null,
 } = {}) {
   if (typeof t !== 'function') throw new TypeError('createPlusDoor: t required');
   const memory = threads?.memory ?? null;
@@ -527,7 +528,35 @@ export function createPlusDoor({
     // the sheet's length (`PLUS_TURNS_SHOWN`), never the model's memory window (six turns) the threads default to
     turns: (opts = {}, n = PLUS_TURNS_SHOWN) => { const th = threadIdFor(setOf(opts).set); return th && threads?.memory?.turns ? threads.memory.turns(th, n) : []; },
     /** "Forget this conversation": the door's own op (`assistant-forget`), for THIS conversation only. */
-    forget: (opts = {}) => runDoorOp('assistant-forget', {}, threadIdFor(setOf(opts).set)),
+    forget: async (opts = {}) => {
+      const thread = threadIdFor(setOf(opts).set);
+      const r = await runDoorOp('assistant-forget', {}, thread);
+      // forgetting the conversation forgets what it told, too: the next open says what it is again (Fable 2026-11-18)
+      writePlusTold(toldLog, thread, null);
+      return r;
+    },
+    /**
+     * The conversation opens (the sheet, for the ticked self): the first time, what the "+" is (`{intro}`: two lines and
+     * three examples from what the person has); later, once, the circles joined since (`{news}`); otherwise `{}`. What
+     * was told is kept on this device's log (`plus-told`, `toldLog`), so a door composed per call says it once too.
+     * No model call. Not an act: nothing of it is recorded as one.
+     * @param {{asSelf?: string|null, selves?: string[]|null}} opts
+     * @returns {Promise<{intro?: object, news?: string}>}
+     */
+    async opening(opts = {}) {
+      const { set, primary } = setOf(opts);
+      const thread = threadIdFor(set);
+      if (!thread) return {};
+      const cs = await Promise.resolve(circles()).catch(() => []);
+      const told = readPlusTold(toldLog, thread);
+      const n = plusNews({ told, circles: cs, t });
+      writePlusTold(toldLog, thread, n.told);
+      if (!told) {
+        const lists = await Promise.resolve(ownListsOf(primary ?? null)).catch(() => []);
+        return { intro: plusIntro({ ownLists: lists, circles: cs, t }) };
+      }
+      return n.line ? { news: n.line } : {};
+    },
     /** Resolves when no turn is running. */
     /** Resolves when THIS conversation has no turn running (no conversation named: every one). */
     idle: (opts) => engine.idle(opts ? (threadIdFor(setOf(opts).set) ?? undefined) : undefined),

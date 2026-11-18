@@ -2265,6 +2265,8 @@ export default function CircleLauncherScreen({
     // what no op shows (a proposal declined, a line placed nowhere) in the person's own record — web twin: circleApp
     noteOwn: (e) => bundle?.agent?.noteOwnAct?.(e),
     householdManifest: bundle?.agent?.manifest, t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
+    // what the "+" told this person it can reach, kept on this device's log (`plus-told`) — web twin: circleApp toldLog
+    toldLog: eventLog,
   });
 
   // THE "+" SHEET, on every tab (the person's own entry): its line, their own acts, their Me actions — one element the tab
@@ -2300,6 +2302,8 @@ export default function CircleLauncherScreen({
         // circle is clear, else the card asks which (plusLineOutcome); the own model reads only what the plain reading
         // missed (their settings' route only; none set = no model). Web twin: circleApp.js
         turns={(asSelf) => plusDoorNow().turns({ asSelf })}
+        // what the "+" says as it opens: the intro the first time, the circles joined since once (web twin: opening)
+        openingFor={(asSelf) => plusDoorNow().opening({ asSelf })}
         routeLine={plusRouteLine(ownRouteOf(userLlmCfg), { t })}
         // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat (web twin)
         onForget={plusThread ? async (asSelf) => { await plusDoorNow().forget({ asSelf }); setPlusTurnsTick((n) => n + 1); } : null}

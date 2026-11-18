@@ -20,6 +20,10 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('folio: described, where a file stays said in the sentence', () => {
+    expect(opWhat('folio', 'deleteFromPod', 'nl')).toBe('Haal een bestand weg van je pod; op dit apparaat blijft het.');
+    expect(opDescription('folio', 'searchNotes', 'en').params.mode).toBe('by words or by meaning');
+  });
 });
 
 describe('the "/" list shows it under the command', () => {

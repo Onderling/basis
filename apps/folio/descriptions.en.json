@@ -1,0 +1,62 @@
+{
+  "deleteFromPod": {
+    "what": "Remove a file from your pod; it stays on this device.",
+    "params": {"relPath": "which file"}
+  },
+  "deleteLocally": {
+    "what": "Remove a file from this device; it stays on your pod.",
+    "params": {"relPath": "which file"}
+  },
+  "forceRepush": {
+    "what": "Put all your files on your pod again; what is there is overwritten.",
+    "params": {}
+  },
+  "syncOnce": {
+    "what": "Bring your folder and your pod in line once, now.",
+    "params": {}
+  },
+  "watchStart": {
+    "what": "Watch your folder and put every change on your pod.",
+    "params": {}
+  },
+  "watchStop": {
+    "what": "Stop watching your folder.",
+    "params": {}
+  },
+  "verifyPodState": {
+    "what": "Check whether a file is the same here and on your pod.",
+    "params": {"relPath": "which file"}
+  },
+  "readNote": {
+    "what": "Read a note from your folder.",
+    "params": {"path": "which note"}
+  },
+  "shareFolder": {
+    "what": "Share a folder with a contact.",
+    "params": {"folder": "which folder", "with": "with whom"}
+  },
+  "getFileSnapshot": {
+    "what": "Show a file as it is now.",
+    "params": {"path": "which file"}
+  },
+  "downloadFile": {
+    "what": "Fetch a shared file from the sender's pod.",
+    "params": {"path": "which file"}
+  },
+  "saveToMyPod": {
+    "what": "Keep a shared file on your own pod.",
+    "params": {"path": "which file", "name": "under which name"}
+  },
+  "folioStatus": {
+    "what": "Show how far your folder and your pod are in line.",
+    "params": {}
+  },
+  "listFiles": {
+    "what": "Show the files in your folder.",
+    "params": {}
+  },
+  "searchNotes": {
+    "what": "Search your notes, by meaning too.",
+    "params": {"query": "what for", "mode": "by words or by meaning"}
+  }
+}

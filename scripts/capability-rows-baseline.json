@@ -1,0 +1,13 @@
+{
+  "noRow": [
+    "agents.getPersonaRelease",
+    "agents.getPersonaView",
+    "agents.getProfileDisclosure",
+    "agents.getProfileDrivers",
+    "agents.getProfileProperties",
+    "calendar.shareEvent",
+    "calendar.updateEvent",
+    "tasks.confirmClaim",
+    "tasks.getTaskSnapshot"
+  ]
+}

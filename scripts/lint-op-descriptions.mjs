@@ -20,7 +20,25 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 // the words the app READS (the reader's registry): an app counts as described only when its files are imported there
-import { OP_DESCRIPTIONS, opDescription } from '../apps/basis/src/v2/opDescriptions.js';
+import { OP_DESCRIPTIONS, genericVerbWords, opDescription } from '../apps/basis/src/v2/opDescriptions.js';
+import { capabilitiesOf } from '../packages/app-manifest/src/index.js';
+
+/** The nouns with generic ops (a capability with no op of its own), `[{app, noun, atoms}]`, and their names. */
+export function genericNouns(manifests = allManifests()) {
+  const generic = [];
+  const names = {};
+  for (const m of manifests) {
+    let caps = [];
+    try { caps = capabilitiesOf(m); } catch { continue; }
+    const byNoun = new Map();
+    for (const c of caps) if (!c.opId && c.noun && c.atom) byNoun.set(c.noun, [...(byNoun.get(c.noun) ?? []), c.atom]);
+    for (const [noun, atoms] of byNoun) {
+      generic.push({ app: m.app, noun, atoms: [...new Set(atoms)] });
+      if (m.nouns?.[noun]?.names) names[`${m.app}.${noun}`] = m.nouns[noun].names;
+    }
+  }
+  return { generic, names };
+}
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE = path.join(HERE, 'op-descriptions-baseline.json');
@@ -85,6 +103,58 @@ export function auditDescriptions({ declared, files, baseline }) {
   return problems;
 }
 
+// an app folder whose name is not its app id
+const APP_OF_DIR = { 'tasks-v0': 'tasks' };
+
+/**
+ * The descriptions files on disk that the reader does not import: words nobody reads (red). `paths` are repo-relative
+ * `apps/<dir>/descriptions.<lang>.json`; `registry` is the reader's `{ app: { lang: … } }`.
+ * @returns {string[]}
+ */
+export function unreadFiles(paths, registry) {
+  return paths.filter((p) => {
+    const m = /^apps\/([^/]+)\/descriptions\.([a-z]+)\.json$/.exec(p);
+    if (!m) return false;
+    const app = APP_OF_DIR[m[1]] ?? m[1];
+    return !registry?.[app]?.[m[2]];
+  });
+}
+
+
+/**
+ * GENERIC OPS (a noun with the generic verbs, no op of its own): the verb is described once, in the locale beside its
+ * label (`circle.settings.verb_what.<atom>`, read through `genericVerbWords`), the noun by its manifest's own names. Red when a verb some named noun uses has
+ * no sentence in a language; a generic noun not owed has no names {one, other} in a language; an owed noun now has its
+ * names, or is no generic noun any more (the owed list only shrinks).
+ * @param {{ generic: Array<{app: string, noun: string, atoms: string[]}>, atomWords: Record<string, Record<string, {what?: string}>>,
+ *   names: Record<string, Record<string, {one?: string, other?: string}>>, owed: string[] }} a
+ * @returns {string[]}
+ */
+export function auditGeneric({ generic, atomWords, names, owed }) {
+  const problems = [];
+  const owedSet = new Set(owed);
+  const named = (key, lang) => Boolean(names[key]?.[lang]?.one && names[key]?.[lang]?.other);
+  const keys = new Set();
+  for (const g of generic) {
+    const key = `${g.app}.${g.noun}`;
+    keys.add(key);
+    if (owedSet.has(key)) continue;
+    for (const lang of LANGS) {
+      if (!named(key, lang)) problems.push(`${key} has no names (${lang}): its manifest's nouns.${g.noun}.names needs {one, other}`);
+      for (const atom of g.atoms) {
+        const what = atomWords[lang]?.[atom]?.what;
+        if (typeof what !== 'string' || !what.trim()) problems.push(`the generic verb \`${atom}\` has no sentence (${lang}), and ${key} uses it`);
+        else if (DASH.test(what)) problems.push(`the generic verb \`${atom}\` (${lang}) has a dash`);
+      }
+    }
+  }
+  for (const key of owedSet) {
+    if (!keys.has(key)) problems.push(`baseline owes ${key}, which is no generic noun any more: run with --update`);
+    else if (LANGS.every((l) => named(key, l))) problems.push(`baseline owes ${key}, which now has its words: run with --update`);
+  }
+  return [...new Set(problems)];
+}
+
 /**
  * The bot's help phrases (`circle.bot.help.ops.<app>.<opId>`) are a SECOND home for what an op does in a person's words
  * (ledger L1033). Until Frits chooses the word and they move into the descriptions, the home is FROZEN: no key beyond the
@@ -114,23 +184,6 @@ export function helpPhraseKeys(bundle) {
   return Object.entries(ops).flatMap(([app, byOp]) => Object.keys(byOp ?? {}).map((op) => `${app}.${op}`));
 }
 
-// an app folder whose name is not its app id
-const APP_OF_DIR = { 'tasks-v0': 'tasks' };
-
-/**
- * The descriptions files on disk that the reader does not import: words nobody reads (red). `paths` are repo-relative
- * `apps/<dir>/descriptions.<lang>.json`; `registry` is the reader's `{ app: { lang: … } }`.
- * @returns {string[]}
- */
-export function unreadFiles(paths, registry) {
-  return paths.filter((p) => {
-    const m = /^apps\/([^/]+)\/descriptions\.([a-z]+)\.json$/.exec(p);
-    if (!m) return false;
-    const app = APP_OF_DIR[m[1]] ?? m[1];
-    return !registry?.[app]?.[m[2]];
-  });
-}
-
 /**
  * The words files that sit BESIDE a manifest inside basis (`apps/basis/src/v2/<manifest>.descriptions.<lang>.json`,
  * several manifests share that folder) that the reader does not import: words nobody reads (red). Read by name off the
@@ -147,18 +200,26 @@ export function shrunkBaseline({ declared, files, baseline }) {
   return [...new Set(baseline)].filter((app) => app in declared && !files[app]).sort();
 }
 
+
+/** `<app>.<opId>` of every help phrase in the shared locale, both languages. */
+function helpKeysNow() {
+  const root = path.resolve(HERE, '..');
+  return LANGS.flatMap((l) => helpPhraseKeys(JSON.parse(readFileSync(path.join(root, `apps/basis/src/locales/circle.${l}.json`), 'utf8'))));
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const declared = declaredOps();
   const files = OP_DESCRIPTIONS;
-  const stored = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
-  const before = stored.owed ?? [];
-  const ROOT_ = path.resolve(HERE, '..');
-  const helpKeys = LANGS.flatMap((l) => helpPhraseKeys(JSON.parse(readFileSync(path.join(ROOT_, `apps/basis/src/locales/circle.${l}.json`), 'utf8'))));
-  const frozen = stored.helpPhrases ?? [];
+  const before = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).owed ?? [] : [];
   if (process.argv.includes('--update')) {
     const owed = shrunkBaseline({ declared, files, baseline: before });
-    const helpPhrases = frozen.filter((k) => helpKeys.includes(k));
-    writeFileSync(BASELINE, `${JSON.stringify({ ...stored, owed, helpPhrases }, null, 2)}\n`);
+    const prev = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).nounsOwed ?? [] : [];
+    const { generic, names } = genericNouns();
+    const isGeneric = new Set(generic.map((g) => `${g.app}.${g.noun}`));
+    const nounsOwed = prev.filter((k) => isGeneric.has(k) && !LANGS.every((l) => names[k]?.[l]?.one && names[k]?.[l]?.other)).sort();
+    const stored = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
+    const helpPhrases = (stored.helpPhrases ?? []).filter((k) => helpKeysNow().includes(k));
+    writeFileSync(BASELINE, `${JSON.stringify({ owed, nounsOwed, helpPhrases }, null, 2)}\n`);
     console.log(`lint-op-descriptions: baseline shrunk ${before.length} → ${owed.length} (it never grows: a new app ships its words)`);
     process.exit(0);
   }
@@ -166,9 +227,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const onDisk = readdirSync(path.join(ROOT, 'apps'), { withFileTypes: true }).filter((d) => d.isDirectory())
     .flatMap((d) => readdirSync(path.join(ROOT, 'apps', d.name)).filter((f) => /^descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/${d.name}/${f}`));
   const beside = readdirSync(path.join(ROOT, 'apps/basis/src/v2')).filter((f) => /\.descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/basis/src/v2/${f}`);
+  const base = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
+  const { generic, names } = genericNouns();
   const problems = [
     ...auditDescriptions({ declared, files, baseline: before }),
-    ...auditHelpPhrases({ keys: helpKeys, frozen, describe: (app, opId) => opDescription(app, opId, 'en') }),
+    ...auditGeneric({ generic, atomWords: Object.fromEntries(LANGS.map((l) => [l, genericVerbWords(l)])), names, owed: base.nounsOwed ?? [] }),
+    ...auditHelpPhrases({ keys: helpKeysNow(), frozen: base.helpPhrases ?? [], describe: (app, opId) => opDescription(app, opId, 'en') }),
     ...unreadFiles(onDisk, files).map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
     ...unreadBesideFiles(beside, readFileSync(path.join(ROOT, 'apps/basis/src/v2/opDescriptions.js'), 'utf8'))
       .map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),

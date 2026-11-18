@@ -20,9 +20,13 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
-  it('assistant: the household bot's own commands described, meant as its help phrases mean them', () => {
+  it("assistant: the household bot's own commands described, meant as its help phrases mean them", () => {
     expect(opWhat('assistant', 'assistant-forget', 'nl')).toBe('Laat de bot je gesprek nu vergeten; wat je op een lijst zette, blijft.');
     expect(opDescription('assistant', 'remindMe', 'en').params.rules).toBe('when, for example 60 minutes before or morning');
+  });
+  it('household: its device and recovery ops described, the phrase named as the person knows it', () => {
+    expect(opWhat('household', 'revealOwnerPhrase', 'nl')).toBe('Laat je herstelzin zien.');
+    expect(opDescription('household', 'replaceDevice', 'en').params.mnemonic).toBe('your recovery phrase');
   });
 });
 
@@ -35,5 +39,26 @@ describe('the "/" list shows it under the command', () => {
     const pin = nl.find((e) => e.appOrigin === 'pinboard');
     const decl = pinboardManifest.operations.find((o) => o.id === pin.opId);
     expect(pin.hint).toBe(decl.surfaces.chat.hint);
+  });
+});
+
+describe('a generic op (a noun with the generic verbs): the verb described once, the noun by its own names', async () => {
+  const { encodeGenericOpId } = await import('@onderling/app-manifest');
+  it('the sentence takes "een" + the singular, or the plural with no article; the param phrase too', () => {
+    const op = (atom) => encodeGenericOpId('household', atom, 'note');
+    expect(opWhat('household', op('add'), 'nl')).toBe('Maak een notitie.');
+    expect(opWhat('household', op('list'), 'nl')).toBe('Laat je notities zien.');
+    expect(opWhat('household', op('add'), 'en')).toBe('Make a note.');
+    expect(opWhat('household', op('list'), 'en')).toBe('Show your notes.');
+    // no noun in the "which" phrase: Dutch would need a stored de/het ('welke aanbod'), so it names none
+    expect(opDescription('household', op('remove'), 'nl').params.id).toBe('welke je bedoelt');
+    expect(opDescription('household', op('get'), 'en').params.id).toBe('which one you mean');
+    // update follows its label (Aanpassen): Pas … aan, not Verander
+    expect(opWhat('household', op('update'), 'nl')).toBe('Pas een notitie aan.');
+    expect(opDescription('household', op('add'), 'nl').params.body).toBe('wat erin staat');
+  });
+  it('a noun not described yet, or a non-generic op of an undescribed app: none', () => {
+    expect(opWhat('pinboard', encodeGenericOpId('pinboard', 'complete', 'lend'), 'nl')).toBeNull();
+    expect(opWhat('pinboard', 'postRequest', 'nl')).toBeNull();   // an app still undescribed (household gets its own words)
   });
 });

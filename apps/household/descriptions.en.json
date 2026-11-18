@@ -1,0 +1,158 @@
+{
+  "addItem": {
+    "what": "Put something on a household list.",
+    "params": {"type": "on which list", "text": "what goes on it"}
+  },
+  "listOpenItems": {
+    "what": "Show what is open on a household list.",
+    "params": {"type": "which list"}
+  },
+  "markComplete": {
+    "what": "Tick something off.",
+    "params": {"match": "which one, or a word from it"}
+  },
+  "removeItem": {
+    "what": "Remove something for good.",
+    "params": {"match": "which one, or a word from it"}
+  },
+  "registerName": {
+    "what": "Say your name in the household.",
+    "params": {"text": "your name"}
+  },
+  "revokeDevice": {
+    "what": "Revoke a device: it can no longer act for you.",
+    "params": {"mnemonic": "your recovery phrase", "deviceId": "which device"}
+  },
+  "pairCirclePeer": {
+    "what": "Pair another device directly with a circle.",
+    "params": {"circle": "which circle", "addr": "that device's address"}
+  },
+  "stashEnrollOffer": {
+    "what": "Keep the offer from your other device, to add this one.",
+    "params": {"offer": "the offer"}
+  },
+  "bindCirclePersona": {
+    "what": "Choose as which persona you are in a circle.",
+    "params": {"circleId": "which circle", "personaId": "which persona", "relayUrl": "through which connection point"}
+  },
+  "claimCompanion": {
+    "what": "Take your companion into use with the code from its log.",
+    "params": {"claim": "the code"}
+  },
+  "companionGrantChoices": {
+    "what": "Show what your companion can let someone else do.",
+    "params": {"node": "which companion"}
+  },
+  "grantCompanion": {
+    "what": "Let someone else, such as a household bot, do something on your companion.",
+    "params": {"node": "which companion", "to": "who", "families": "what they may do"}
+  },
+  "companionGrantList": {
+    "what": "Show who may do what on your companion.",
+    "params": {"node": "which companion"}
+  },
+  "revokeCompanionGrant": {
+    "what": "Take someone's rights on your companion away.",
+    "params": {"to": "who", "node": "which companion"}
+  },
+  "listRecoveryCircles": {
+    "what": "Show which circles a recovery file would carry.",
+    "params": {}
+  },
+  "exportRecoveryFile": {
+    "what": "Make a recovery file, so your circles come back on a new device.",
+    "params": {"rosters": "which circles' members to carry"}
+  },
+  "listReceivablePersonas": {
+    "what": "Show your personas this device does not have yet.",
+    "params": {}
+  },
+  "removePersonaHere": {
+    "what": "Take a persona off this device.",
+    "params": {"mnemonic": "your recovery phrase", "personaId": "which persona"}
+  },
+  "ownSpineOutbox": {
+    "what": "Show what this device still waits for your main device to sign.",
+    "params": {}
+  },
+  "setNearbyLevel": {
+    "what": "Choose how much people nearby see of you.",
+    "params": {"personaId": "which persona", "level": "how much"}
+  },
+  "listPersonasHere": {
+    "what": "Show the personas on this device.",
+    "params": {}
+  },
+  "pausePersona": {
+    "what": "Pause a persona on this device.",
+    "params": {"personaId": "which persona"}
+  },
+  "resumePersona": {
+    "what": "Start a paused persona again.",
+    "params": {"personaId": "which persona"}
+  },
+  "markRead": {
+    "what": "Remember what you have read.",
+    "params": {"group": "in which circle", "read": "up to where", "selfId": "as which persona"}
+  },
+  "listReadMarks": {
+    "what": "Show up to where you have read.",
+    "params": {}
+  },
+  "receivePersonas": {
+    "what": "Put personas you already have on this device too.",
+    "params": {"mnemonic": "your recovery phrase", "personas": "which personas"}
+  },
+  "importRecoveryFile": {
+    "what": "Bring your circles back from a recovery file.",
+    "params": {"file": "the recovery file"}
+  },
+  "restoreStatus": {
+    "what": "Show what came back after restoring.",
+    "params": {}
+  },
+  "restoreSource": {
+    "what": "Choose where your circles come from when nothing came back.",
+    "params": {"source": "a file, or later", "file": "the recovery file"}
+  },
+  "restoreIntent": {
+    "what": "Say what happened to your old device: broken, lost, or you are adding one.",
+    "params": {"intent": "broken, lost or adding"}
+  },
+  "replaceDevice": {
+    "what": "Replace a device that is broken or lost.",
+    "params": {"mnemonic": "your recovery phrase"}
+  },
+  "enrollDevice": {
+    "what": "Add this device to your other devices.",
+    "params": {"mnemonic": "your recovery phrase", "label": "what the device is called", "personas": "which personas go on it", "withDefault": "your default persona too"}
+  },
+  "buildEnrollOffer": {
+    "what": "Make an offer to add a new device.",
+    "params": {"relayUrl": "through which connection point"}
+  },
+  "revealOwnerPhrase": {
+    "what": "Show your recovery phrase.",
+    "params": {}
+  },
+  "restoreOwnerPhrase": {
+    "what": "Restore who you are with your recovery phrase.",
+    "params": {"mnemonic": "your recovery phrase"}
+  },
+  "restoreFromMnemonicWizard": {
+    "what": "Restore everything with your recovery phrase; what is here is replaced.",
+    "params": {}
+  },
+  "grantSurface": {
+    "what": "Let a screen or device act for you, within what you tick.",
+    "params": {"viewPubKey": "which screen", "ops": "what it may do", "reads": "what it may see", "label": "what it is called", "nonce": "the pairing code"}
+  },
+  "revokeSurface": {
+    "what": "Unpair a screen: it can no longer act for you.",
+    "params": {"viewPubKey": "which screen"}
+  },
+  "listSurfaceGrants": {
+    "what": "Show the paired screens and what they may do.",
+    "params": {}
+  }
+}

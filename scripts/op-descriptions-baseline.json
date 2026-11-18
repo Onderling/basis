@@ -6,13 +6,15 @@
     "folio",
     "governance",
     "grants",
-    "household",
     "items-lane",
     "keys",
     "membership",
     "params",
     "pinboard",
     "tasks"
+  ],
+  "nounsOwed": [
+    "pinboard.lend"
   ],
   "helpPhrases": [
     "assistant.assistant-agenda-link",

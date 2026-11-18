@@ -3883,18 +3883,6 @@
       "text": "Nothing is browsed or announced on the local network until you turn it back on.",
       "doc": "Radio-off banner body — states both halves plainly: not seen AND not seeing."
     },
-    "quiet_toggle": {
-      "text": "Go quiet — keep seeing the room without being seen (this visit only)",
-      "doc": "Session-only ghost switch behind the visibility banner. Resets when the screen closes."
-    },
-    "radio_toggle_off": {
-      "text": "Turn Nearby's radio fully off",
-      "doc": "The persisted OFF: nothing browsed or announced until turned back on."
-    },
-    "radio_toggle_on": {
-      "text": "Turn Nearby's radio back on",
-      "doc": "Leaves the radio-off state; the open screen becomes visible again."
-    },
     "still_visible_title": {
       "text": "Still visible",
       "doc": "Banner heading when the device could NOT honour \"hidden\" (older native build)."
@@ -3982,22 +3970,6 @@
     "becoming_visible_body": {
       "text": "The radio is being told to announce you; a moment.",
       "doc": "Second line of that banner."
-    },
-    "mine_title": {
-      "text": "You here",
-      "doc": "The folded \"your side\" section of Nearby (allows, card, what others see) — sketch §2."
-    },
-    "mine_card_on": {
-      "text": "card shown",
-      "doc": "Summary chip when the card allow is on."
-    },
-    "mine_chat_on": {
-      "text": "in the chat",
-      "doc": "Summary chip when the chat allow is on."
-    },
-    "mine_none": {
-      "text": "nothing shown yet",
-      "doc": "Summary when neither allow is on."
     },
     "reach_shared_you": {
       "text": "You shared how to reach you.",

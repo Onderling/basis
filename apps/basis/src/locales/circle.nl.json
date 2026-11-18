@@ -3888,18 +3888,6 @@
       "text": "Er wordt niets op het lokale netwerk gezocht of aangekondigd tot je het weer aanzet.",
       "doc": "Radio-off banner body — states both halves plainly."
     },
-    "quiet_toggle": {
-      "text": "Even stil — blijf de ruimte zien zonder gezien te worden (alleen deze keer)",
-      "doc": "Session-only ghost switch behind the visibility banner."
-    },
-    "radio_toggle_off": {
-      "text": "Zet de Nearby-radio helemaal uit",
-      "doc": "The persisted OFF."
-    },
-    "radio_toggle_on": {
-      "text": "Zet de Nearby-radio weer aan",
-      "doc": "Leaves the radio-off state."
-    },
     "still_visible_title": {
       "text": "Nog steeds zichtbaar",
       "doc": "Banner heading when the device could NOT honour \"hidden\" (older native build)."
@@ -3987,22 +3975,6 @@
     "becoming_visible_body": {
       "text": "De radio krijgt net de opdracht je aan te kondigen; een ogenblik.",
       "doc": "Second line of that banner."
-    },
-    "mine_title": {
-      "text": "Jij hier",
-      "doc": "The folded \"your side\" section of Nearby (allows, card, what others see) — sketch §2."
-    },
-    "mine_card_on": {
-      "text": "kaartje zichtbaar",
-      "doc": "Summary chip when the card allow is on."
-    },
-    "mine_chat_on": {
-      "text": "in het gesprek",
-      "doc": "Summary chip when the chat allow is on."
-    },
-    "mine_none": {
-      "text": "nog niets getoond",
-      "doc": "Summary when neither allow is on."
     },
     "reach_shared_you": {
       "text": "Je hebt gedeeld hoe je bereikbaar bent.",

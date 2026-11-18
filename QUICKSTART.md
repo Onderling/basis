@@ -264,7 +264,7 @@ on `/tasks/sendSubscribe`), JWT bearer auth, and an agent card at
 
 > **Which A2A this is.** These routes follow an EARLIER, REST-shaped
 > draft of A2A. The current A2A protocol is JSON-RPC (what
-> `@a2a-js/sdk` 1.x speaks, `message/send`), and the two do not
+> `@a2a-js/sdk` 1.x speaks), and the two do not
 > understand each other without a translation. The decided direction
 > (2026-11-18): Basis turns to current A2A, first as a CLIENT that calls
 > a circle's toolboxes from the always-on box; this transport is not

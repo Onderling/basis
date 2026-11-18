@@ -4269,6 +4269,8 @@ function showNearby() {
       markAsked: () => { if (id) markAsked(id); },
       setAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); },
       showCard: (fields) => nearbyScreen.showCard(fields),
+      // the card reaches the room in its own time; its outcome is the card editor's notice ("shown to 3 of 5")
+      cardShown: (r) => { notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' }; if (nearbyScreen) draw(nearbyScreen.model()); },
     });
     wizard = r.done ? null : { step: r.step, notice: r.notice ?? null };
     draw(nearbyScreen.model());

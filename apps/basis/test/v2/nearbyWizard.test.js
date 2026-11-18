@@ -85,9 +85,15 @@ describe('the first-time wizard: what a press writes', () => {
     expect(b.showCard).toHaveBeenCalledWith({ label: 'Frits', line: '', tags: [] });
   });
 
-  it('a card the room refused keeps step 2 open with its notice', async () => {
-    const a = acts({ showCard: vi.fn(async () => ({ ok: false, notice: 'card_hidden' })) });
-    expect(await nearbyWizardPress({ step: 2 }, 'next', { label: 'Frits' }, a)).toEqual({ step: 2, notice: 'card_hidden' });
+  it('Verder does not wait for the room to receive the card (a device still connecting took 30 s on a phone): the outcome goes to the host when it comes', async () => {
+    let deliver;
+    const cardShown = vi.fn();
+    const a = acts({ showCard: vi.fn(() => new Promise((r) => { deliver = r; })), cardShown });
+    expect(await nearbyWizardPress({ step: 2 }, 'next', { label: 'Frits' }, a), 'moves on at once').toEqual({ step: 3 });
+    expect(cardShown).not.toHaveBeenCalled();
+    deliver({ ok: false, notice: 'card_hidden' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(cardShown).toHaveBeenCalledWith({ ok: false, notice: 'card_hidden' });
   });
 
   it('step 3 Klaar writes the chat switch and ends; Vorige goes back a step', async () => {

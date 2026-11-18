@@ -86,7 +86,7 @@ export function nearbyCardTags({ showOffers = false, tags = [] } = {}) {
  * @param {object} input  what the step's fields hold (step 2: `{label, line, showOffers, tags}`; step 3: `{chat}`)
  * @param {{now?: object, setLevel?: Function, setQuiet?: Function, setRadio?: Function,
  *   markAsked?: Function, setAllow?: Function, showCard?: Function}} acts  the host's: `now` = `{level, visibility}` for
- *   `nearbyHereChoose`; `setAllow(key, value)`; `showCard({label, line, tags})` → `{ok, notice?}`
+ *   `nearbyHereChoose`; `setAllow(key, value)`; `showCard({label, line, tags})` → `{ok, notice?}` (not awaited); `cardShown(result)` when it settles
  * @returns {Promise<{step?: number, done?: boolean, notice?: string}>}
  */
 export async function nearbyWizardPress(state, press, input = {}, acts = {}) {
@@ -106,9 +106,11 @@ export async function nearbyWizardPress(state, press, input = {}, acts = {}) {
       // the offers are a PREFILL the person sees (removable chips), never derived at send: what is still listed when the card
       // is saved goes as its tags, and only with the switch on (a card is authored, never derived: nearbyRoom's createCard)
       const tags = nearbyCardTags(input);
-      let r = null;
-      try { r = await acts.showCard?.({ label, line: typeof input.line === 'string' ? input.line.trim() : '', tags }); } catch { r = null; }
-      if (r && r.ok === false && r.notice) return { step, notice: r.notice };
+      // handed over, not awaited: the room may take long to receive it (a device still connecting kept a phone on this
+      // step for half a minute); the outcome goes to the host when it comes, as a notice like the card editor's
+      let sent = null;
+      try { sent = acts.showCard?.({ label, line: typeof input.line === 'string' ? input.line.trim() : '', tags }); } catch { sent = null; }
+      Promise.resolve(sent).then((r) => { if (r) acts.cardShown?.(r); }).catch(() => {});
     }
     return { step: 3 };
   }

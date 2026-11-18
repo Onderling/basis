@@ -169,6 +169,7 @@ describe('"help" says what the "+" offers HERE, generated, never a kept list (th
       'circle.vandaag.plus_help_reads {"reads":"/agenda, /notities"}',
       'circle.vandaag.plus_help_makes {"acts":"Een notitie, Een afspraak"}',
       'circle.vandaag.plus_intro_circle',
+      'circle.vandaag.plus_help_ask {"example":"circle.vandaag.plus_help_ask_example"}',
       'route: lokaal',
     ]);
   });
@@ -177,6 +178,7 @@ describe('"help" says what the "+" offers HERE, generated, never a kept list (th
     const r = plusHelp({ reads: [], acts: ['Een notitie'], hasCircle: false, routeLine: null, modelPlace: 'Mij → Instellingen', t });
     expect(r).toEqual([
       'circle.vandaag.plus_help_makes {"acts":"Een notitie"}',
+      'circle.vandaag.plus_help_ask {"example":"circle.vandaag.plus_help_ask_example"}',
       'circle.vandaag.plus_help_no_model {"place":"Mij → Instellingen"}',
     ]);
   });
@@ -191,5 +193,21 @@ describe('"help" says what the "+" offers HERE, generated, never a kept list (th
     // and what to try, the intro's examples (each read by the door, tested above): help still teaches the list lines
     expect(r.done).toMatch(/Probeer: .*zet melk op boodschappen/);
     for (const k of ['plus_help_reads', 'plus_help_makes', 'plus_help_no_model']) expect(en.vandaag?.[k]?.text, k).toBeTruthy();
+  });
+});
+
+describe('help says the "+" answers how things work, with an example a help card answers (Fable)', () => {
+  it('the line sits before the model line; its example, nl and en, is read as a help question with a card', async () => {
+    const { plusHelp } = await import('../../src/v2/plusIntro.js');
+    const { plusLineOutcome } = await import('../../src/v2/vandaagPlus.js');
+    const r = plusHelp({ reads: [], acts: ['x'], routeLine: 'route', t: tNl });
+    expect(r.at(-2)).toMatch(/^Vraag ook hoe iets werkt/);
+    expect(r.at(-1)).toBe('route');
+    for (const [lang, tL] of [['nl', tNl], ['en', tEn]]) {
+      const ex = tL('circle.vandaag.plus_help_ask_example');
+      const o = plusLineOutcome(ex, { circles: [], lang });
+      expect(o?.kind, `${lang}: "${ex}"`).toBe('help');
+      expect(o?.card?.cardId, `${lang}: "${ex}" hits a help card`).toBeTruthy();
+    }
   });
 });

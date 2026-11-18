@@ -20,7 +20,25 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 // the words the app READS (the reader's registry): an app counts as described only when its files are imported there
-import { OP_DESCRIPTIONS } from '../apps/basis/src/v2/opDescriptions.js';
+import { OP_DESCRIPTIONS, genericVerbWords } from '../apps/basis/src/v2/opDescriptions.js';
+import { capabilitiesOf } from '../packages/app-manifest/src/index.js';
+
+/** The nouns with generic ops (a capability with no op of its own), `[{app, noun, atoms}]`, and their names. */
+export function genericNouns(manifests = allManifests()) {
+  const generic = [];
+  const names = {};
+  for (const m of manifests) {
+    let caps = [];
+    try { caps = capabilitiesOf(m); } catch { continue; }
+    const byNoun = new Map();
+    for (const c of caps) if (!c.opId && c.noun && c.atom) byNoun.set(c.noun, [...(byNoun.get(c.noun) ?? []), c.atom]);
+    for (const [noun, atoms] of byNoun) {
+      generic.push({ app: m.app, noun, atoms: [...new Set(atoms)] });
+      if (m.nouns?.[noun]?.names) names[`${m.app}.${noun}`] = m.nouns[noun].names;
+    }
+  }
+  return { generic, names };
+}
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE = path.join(HERE, 'op-descriptions-baseline.json');
@@ -102,6 +120,41 @@ export function unreadFiles(paths, registry) {
   });
 }
 
+
+/**
+ * GENERIC OPS (a noun with the generic verbs, no op of its own): the verb is described once, in the locale beside its
+ * label (`circle.settings.verb_what.<atom>`, read through `genericVerbWords`), the noun by its manifest's own names. Red when a verb some named noun uses has
+ * no sentence in a language; a generic noun not owed has no names {one, other} in a language; an owed noun now has its
+ * names, or is no generic noun any more (the owed list only shrinks).
+ * @param {{ generic: Array<{app: string, noun: string, atoms: string[]}>, atomWords: Record<string, Record<string, {what?: string}>>,
+ *   names: Record<string, Record<string, {one?: string, other?: string}>>, owed: string[] }} a
+ * @returns {string[]}
+ */
+export function auditGeneric({ generic, atomWords, names, owed }) {
+  const problems = [];
+  const owedSet = new Set(owed);
+  const named = (key, lang) => Boolean(names[key]?.[lang]?.one && names[key]?.[lang]?.other);
+  const keys = new Set();
+  for (const g of generic) {
+    const key = `${g.app}.${g.noun}`;
+    keys.add(key);
+    if (owedSet.has(key)) continue;
+    for (const lang of LANGS) {
+      if (!named(key, lang)) problems.push(`${key} has no names (${lang}): its manifest's nouns.${g.noun}.names needs {one, other}`);
+      for (const atom of g.atoms) {
+        const what = atomWords[lang]?.[atom]?.what;
+        if (typeof what !== 'string' || !what.trim()) problems.push(`the generic verb \`${atom}\` has no sentence (${lang}), and ${key} uses it`);
+        else if (DASH.test(what)) problems.push(`the generic verb \`${atom}\` (${lang}) has a dash`);
+      }
+    }
+  }
+  for (const key of owedSet) {
+    if (!keys.has(key)) problems.push(`baseline owes ${key}, which is no generic noun any more: run with --update`);
+    else if (LANGS.every((l) => named(key, l))) problems.push(`baseline owes ${key}, which now has its words: run with --update`);
+  }
+  return [...new Set(problems)];
+}
+
 /** What `--update` writes: the baseline with described or gone apps REMOVED; never an app added. */
 export function shrunkBaseline({ declared, files, baseline }) {
   return [...new Set(baseline)].filter((app) => app in declared && !files[app]).sort();
@@ -113,15 +166,22 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const before = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).owed ?? [] : [];
   if (process.argv.includes('--update')) {
     const owed = shrunkBaseline({ declared, files, baseline: before });
-    writeFileSync(BASELINE, `${JSON.stringify({ owed }, null, 2)}\n`);
+    const prev = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')).nounsOwed ?? [] : [];
+    const { generic, names } = genericNouns();
+    const isGeneric = new Set(generic.map((g) => `${g.app}.${g.noun}`));
+    const nounsOwed = prev.filter((k) => isGeneric.has(k) && !LANGS.every((l) => names[k]?.[l]?.one && names[k]?.[l]?.other)).sort();
+    writeFileSync(BASELINE, `${JSON.stringify({ owed, nounsOwed }, null, 2)}\n`);
     console.log(`lint-op-descriptions: baseline shrunk ${before.length} → ${owed.length} (it never grows: a new app ships its words)`);
     process.exit(0);
   }
   const ROOT = path.resolve(HERE, '..');
   const onDisk = readdirSync(path.join(ROOT, 'apps'), { withFileTypes: true }).filter((d) => d.isDirectory())
     .flatMap((d) => readdirSync(path.join(ROOT, 'apps', d.name)).filter((f) => /^descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/${d.name}/${f}`));
+  const base = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
+  const { generic, names } = genericNouns();
   const problems = [
     ...auditDescriptions({ declared, files, baseline: before }),
+    ...auditGeneric({ generic, atomWords: Object.fromEntries(LANGS.map((l) => [l, genericVerbWords(l)])), names, owed: base.nounsOwed ?? [] }),
     ...unreadFiles(onDisk, files).map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
   ];
   if (problems.length) {

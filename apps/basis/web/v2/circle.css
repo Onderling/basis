@@ -1676,6 +1676,22 @@
 .circle-nearby__here-body { margin-left: 24px; font-size: 13px; color: var(--ink-soft); }
 .circle-nearby__menu-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--line); font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
 .circle-nearby__menu-intro { margin-top: 10px; }
+/* Nearby the first time (nearbyWizard): three steps, one card; while it is open it is the page */
+.circle-nearby__wizard { margin: 12px 0; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.circle-nearby__wizard > * + * { margin-top: 10px; }
+.circle-nearby__wizard-head { font-size: 12px; color: var(--ink-soft); }
+.circle-nearby__wizard-title { font-size: 18px; font-weight: 700; }
+.circle-nearby__wizard-label { font-weight: 600; }
+.circle-nearby__wizard-self, .circle-nearby__wizard-chat, .circle-nearby__offers { display: block; cursor: pointer; }
+.circle-nearby__wizard-self input, .circle-nearby__wizard-chat input, .circle-nearby__offers input { margin-right: 10px; vertical-align: middle; }
+.circle-nearby__wizard-field { display: block; }
+.circle-nearby__wizard-field input { display: block; width: 100%; margin-top: 4px; box-sizing: border-box; }
+.circle-nearby__wizard-under, .circle-nearby__offers-none { font-size: 13px; color: var(--ink-soft); }
+.circle-nearby__wizard-box { padding: 8px 10px; border-left: 3px solid var(--accent-ink); background: var(--paper); }
+.circle-nearby__wizard-notice { color: var(--danger, var(--ink)); }
+.circle-nearby__wizard-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.circle-nearby__offer-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.circle-nearby__offer-chip::after { content: ' ×'; }
 .circle-nearby__tabs { display: flex; border-bottom: 1px solid var(--line); margin: 12px 0 10px; }
 .circle-nearby__tab { flex: 1; padding: 10px 6px; background: none; border: none; font: inherit; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .circle-nearby__tab.is-selected { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }

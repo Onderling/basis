@@ -14,6 +14,7 @@
 import { noticeOverrideRows } from '../../src/v2/noticeSettings.js';
 import { buildCapabilityMatrix } from '@onderling/app-manifest';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { capabilityLabel } from '../../src/v2/capabilityLabel.js';   // a capability as a person reads it, one lookup
 
 const TOP_TOGGLES = ['chatOff', 'revealOpen', 'agentsMayContactMe'];
 const FLOW_TOGGLES = ['tasksToPersonal', 'calendarToPersonal'];
@@ -158,7 +159,7 @@ function renderCapabilityOptOuts(container, { sources, policy, override, tr, emi
         cls: 'circle-override__cap-toggle',
         key: r.key,
         checked: !r.optedOut,   // checked = participate; unchecking opts out
-        label: `${tr(`circle.settings.verb.${r.atom}`, { defaultValue: r.atom })} · ${r.noun}${floorTag}`,
+        label: `${capabilityLabel(tr, r)}${floorTag}`,
         onToggle: (participate) => {
           const next = new Set(current);
           if (participate) next.delete(r.key); else next.add(r.key);

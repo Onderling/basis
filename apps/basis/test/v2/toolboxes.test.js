@@ -1,6 +1,6 @@
 /**
  * A circle's toolboxes: PLACED by the operator, switched ON by the admin's yes, used by a member, the key never seen
- * (ledger L1035, slice 3; Fable's rulings 2026-11-18).
+ * (ledger L1035; Fable's rulings 2026-11-18).
  *
  * @guard a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on the box is refused before any call leaves
  * @guard a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach nothing

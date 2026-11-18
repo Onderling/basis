@@ -1,5 +1,5 @@
 /**
- * The toolbox client: A2A 1.0 over HTTP, as a toolbox answered it on 2026-11-18 (ledger L1035, slice 3).
+ * The toolbox client: A2A 1.0 over HTTP, as a toolbox answered it on 2026-11-18 (ledger L1035).
  *
  * @guard a tool call speaks the recorded wire (card, SendMessage, A2A-Version 1.0, bearer) and every failure ends in ONE code, never a throw
  *

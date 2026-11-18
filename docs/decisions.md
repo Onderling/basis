@@ -2007,3 +2007,32 @@ The sealing of circle content moves out of the pod client before any pod package
 read that overlaps a write, a shared-pod post that shows only on opening the circle, the key file races, the sign-in on
 a box) are kept as a list of what a replacement must not repeat. No new pod feature without asking. Ledger: L995
 (L943 answered; L939, L941, L938 carried).
+
+## 2026-11-18 — A circle uses an outside toolbox: one op for every tool, placed by the operator, switched on by the admin (Frits decided; Fable ruled the shapes)
+
+**Status:** decided; the door half built (the tool call from the box, `/toolbox`, the words); choices, a screen's call
+and the toolbox's own page are later steps.
+
+**Context:** Frits's grocery app (a toolbox) should be usable from the household bot. Nothing in the repo called an
+outside agent from the box: `contactSkills.js` turns a contact's skill cards into commands at runtime (web and phone,
+the native dialect), and `remoteHandlers.js` binds an op to a remote agent by key on the native path; neither reaches a
+bearer-key HTTP endpoint from the box.
+
+**Decision:** the words: a TOOL is one callable function; a TOOLBOX is the program that offers them (it answers when
+asked, keeps nothing of the circle, acts for nobody); a DOOR is an input route (Basis, Telegram, a screen); a NODE is a
+machine that is on, which doors end at and tools are called from; the household bot is the circle's COMPANION. Tools
+never call tools: a person's act calls a tool, and the person's choice becomes an ordinary op. One op reaches every
+tool (`tools.useTool {toolbox, tool, input}`), so the bot's closed op map stays closed; the word that reaches a tool is
+data of the toolbox. No capability row and no feature per toolbox: switching a toolbox on is the switch. The box's
+operator PLACES a toolbox (one file with its name, address and words, beside its key); no chat line carries an
+address, a tool id or a key; a placed toolbox is off until the admin's yes in their own private chat. The wire is
+current A2A (1.0, JSON-RPC `SendMessage`) through one small client with no dependency. A tool's answer that is a list
+of things is a schema.org `ItemList` of Things; a list entry made from one refers to it as `{type: its @type, ref: its
+identifier}`, as given, with the toolbox beside it as `source` (never identity, so the toolbox's own page and the chat
+land on the same entry). The answer borrows the property vocabulary's TERMS (schema.org), not its disclosure policy. A
+price shows on a choice's detail line, a total only as the answer to "what does this list cost", and is never stored in
+an entry.
+
+**Consequences:** `docs/catalogue/tools.md`. The help phrases for new ops are an op's description until the frozen
+phrases move into the descriptions. A key handed over from a person's own app is later work.
+

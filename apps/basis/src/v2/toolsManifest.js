@@ -1,5 +1,5 @@
 /**
- * The `tools` manifest: a circle uses a TOOLBOX's tools (ledger L1035, slice 3; the brief's section 4 as ruled).
+ * The `tools` manifest: a circle uses a TOOLBOX's tools (ledger L1035; the brief's section 4 as ruled).
  *
  * One op reaches every tool (`useTool {toolbox, tool, input}`), so the bot's closed map stays closed: a toolbox's tools
  * are DATA, not ops; the command word that reaches a tool is named by the admin when the toolbox is added (`zoek` →

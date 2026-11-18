@@ -1,5 +1,5 @@
 /**
- * toolboxes — a circle's toolboxes on its box, and the four ops over them (ledger L1035, slice 3).
+ * toolboxes — a circle's toolboxes on its box, and the four ops over them (ledger L1035).
  *
  * A TOOLBOX is a program that offers TOOLS (one callable function each) and keeps nothing of the circle. The admin
  * adds one by its name, its address and the command words that reach its tools; a member uses a tool. Where things

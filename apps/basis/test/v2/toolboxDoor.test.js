@@ -1,5 +1,5 @@
 /**
- * `/toolbox` at the household bot's door (ledger L1035, slice 3; Fable's (4)).
+ * `/toolbox` at the household bot's door (ledger L1035; Fable's (4)).
  *
  * @guard a toolbox is switched on only after the admin's yes in their own private chat, never from a group chat, and no line of the door carries the toolbox's key
  *

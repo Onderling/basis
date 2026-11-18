@@ -1,5 +1,5 @@
 /**
- * toolboxClient — how the box calls a TOOLBOX's tool: A2A 1.0 over HTTP (ledger L1035, slice 3).
+ * toolboxClient — how the box calls a TOOLBOX's tool: A2A 1.0 over HTTP (ledger L1035).
  *
  * A toolbox answers when asked, keeps nothing of the circle and acts for nobody; a tool is one callable function on
  * it. This is the one small client for that wire, in shared code, with no dependency (the brief: no new package unless

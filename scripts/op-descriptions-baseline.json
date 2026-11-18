@@ -1,0 +1,19 @@
+{
+  "owed": [
+    "agents",
+    "assistant",
+    "basis",
+    "calendar",
+    "chat-lane",
+    "folio",
+    "governance",
+    "grants",
+    "household",
+    "items-lane",
+    "keys",
+    "membership",
+    "params",
+    "pinboard",
+    "tasks"
+  ]
+}

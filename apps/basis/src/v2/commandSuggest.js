@@ -7,15 +7,19 @@
 // the same functions. This is the basis "write-once, both shells inject only UI" principle
 // (see web-mobile-consolidation-plan.md; [[basis-unifier-principle]], [[platform-parity]]).
 
+import { opWhat } from './opDescriptions.js';   // what the person reads under a command (step C)
+
 /**
  * Build the slash-command pool from a merged catalogue: every op that declares a `surfaces.slash.command`,
- * as `{ command, hint, opId }`, sorted by command. The `hint` is the op's `surfaces.chat.hint` (falls
- * back to the op id). Mirrors classic `commandPool()` (main.js).
+ * as `{ command, hint, opId }`, sorted by command. The `hint` is what the PERSON reads under the command: the op's
+ * own sentence in their language (`opDescriptions`, step C) where its app is described, else the op's
+ * `surfaces.chat.hint` (the model's text, until its app is), else the op id. Mirrors classic `commandPool()`.
  *
  * @param {{opsById?: Map<string, any>}} catalogue  the merged + filtered catalogue (mergeManifests → filterCatalogue)
+ * @param {{lang?: string}} [o]  the person's language (default: the app's current one)
  * @returns {Array<{command: string, hint: string, opId: string}>}
  */
-export function buildCommandPool(catalogue) {
+export function buildCommandPool(catalogue, { lang } = {}) {
   const ops = catalogue && catalogue.opsById;
   if (!ops || typeof ops.values !== 'function') return [];
   const out = [];
@@ -25,7 +29,7 @@ export function buildCommandPool(catalogue) {
     if (typeof slash !== 'string' || !slash) continue;
     out.push({
       command: slash,
-      hint: (op.surfaces.chat && op.surfaces.chat.hint) || op.id || '',
+      hint: opWhat((entry && entry.appOrigin) || '', op.id, lang) || (op.surfaces.chat && op.surfaces.chat.hint) || op.id || '',
       opId: op.id || '',
       // WHICH app owns the command, carried so a caller can dispatch it without re-resolving the id.
       // Two apps may declare the same op id under different commands, so the id alone is not an address.

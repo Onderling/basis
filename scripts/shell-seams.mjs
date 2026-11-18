@@ -322,6 +322,7 @@ export const SEAMS = Object.freeze([
   // what it told on the device log (`plus-told`), so a shell that does not ask paints the intro never, and one that does
   // not hand `toldLog` paints it on every open
   { id: 'plus-opening', pattern: /\.opening\(\{/, shells: ['web', 'mobile'], why: 'the "+" says what it is the first time, and once what is new, on every shell' },
+  { id: 'plus-help-route', pattern: /createPlusDoor\(\{[^}]*routeLine:/, shells: ['web', 'mobile'], why: '"help" in the "+" ends with the model route that answers, never "no model" while one is set' },
   { id: 'plus-told-log', pattern: /createPlusDoor\(\{[^}]*toldLog:/, shells: ['web', 'mobile'], why: 'what the "+" told a person is kept on their device, so it is said once' },
   { id: 'plus-own-lists', pattern: /createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
   // THE PERSON'S OWN RECORD (ownActions.js, ledger L203): what no op shows (a proposal declined, a line placed nowhere)

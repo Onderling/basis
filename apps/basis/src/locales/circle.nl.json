@@ -1901,6 +1901,18 @@
     "plus_news_circle": {
       "text": "Nieuw: je zit nu ook in {{circle}}. Je kunt me daar iets voor laten doen.",
       "doc": "A later open of the \"+\": the circles ({{circle}}, comma-separated) the person joined since they were last told; said once."
+    },
+    "plus_help_reads": {
+      "text": "Ik kan laten zien: {{reads}}",
+      "doc": "\"help\" in the \"+\": what it reads here ({{reads}}: its read ops by their \"/\" names), generated."
+    },
+    "plus_help_makes": {
+      "text": "Ik kan voor je maken: {{acts}}",
+      "doc": "\"help\" in the \"+\": what it makes ({{acts}}: the own acts by name), generated."
+    },
+    "plus_help_no_model": {
+      "text": "Zonder model lees ik vaste zinnen. Een model stel je in bij {{place}}.",
+      "doc": "\"help\" in the \"+\", last line with no own model set: what it does without one and where to set one ({{place}}: the screens' labels joined by arrows). Fable's words."
     }
   },
   "screens": {

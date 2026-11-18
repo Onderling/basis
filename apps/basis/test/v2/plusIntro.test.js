@@ -132,3 +132,62 @@ describe('the door opens the conversation: the intro once, then what changed, ke
     expect(isMirroredKind('plus-told')).toBe(false);
   });
 });
+
+describe('a circle no name has reached is marked as such where its placeholder is made (Fable, step B)', async () => {
+  const { normalizeCircle, mergeCircles } = await import('../../src/v2/circleModel.js');
+  const { circleSourcesFromAgent } = await import('../../src/v2/circleSources.js');
+  it('the sources give the word AND the mark; a named one has no mark', async () => {
+    const src = circleSourcesFromAgent({ callSkill: async () => ({ circles: ['k1', 'k9'], names: { k1: 'Thuis' } }), unnamedCircleName: () => 'Kring zonder naam' });
+    const got = await src.fetchGroups();
+    expect(got.find((c) => c.id === 'k9')).toMatchObject({ name: 'Kring zonder naam', unnamed: true });
+    expect(got.find((c) => c.id === 'k1').unnamed).toBeFalsy();
+  });
+  it('the model keeps the mark, counts a fallback to the id as nameless, and a real name from another source wins', () => {
+    expect(normalizeCircle({ id: 'k9', name: 'Kring zonder naam', unnamed: true }).unnamed).toBe(true);
+    expect(normalizeCircle({ id: 'k8' }).unnamed, 'the id is no name').toBe(true);
+    expect(normalizeCircle({ id: 'k1', name: 'Thuis' }).unnamed).toBeUndefined();
+    const [c] = mergeCircles([{ id: 'k9', name: 'Kring zonder naam', unnamed: true }], [{ id: 'k9', name: 'Buurt' }]);
+    expect(c).toMatchObject({ name: 'Buurt' });
+    expect(c.unnamed).toBeFalsy();
+  });
+  it('the "+" counts a marked circle as nameless: no news, not kept, not an example', () => {
+    const first = plusNews({ told: null, circles: [thuis], t: tNl });
+    const marked = { id: 'k9', name: 'Kring zonder naam', unnamed: true };
+    const r = plusNews({ told: first.told, circles: [thuis, marked], t: tNl });
+    expect(r.line).toBeNull();
+    expect(r.told.circles).not.toContain('k9');
+    expect(plusIntro({ ownLists: [], circles: [marked], t: tNl }).examples.join(' ')).not.toMatch(/zonder naam/);
+  });
+});
+
+describe('"help" says what the "+" offers HERE, generated, never a kept list (the plan\'s step B)', () => {
+  const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
+  it('what it reads, what it makes, the circle line only with a circle, and the model line last', async () => {
+    const { plusHelp } = await import('../../src/v2/plusIntro.js');
+    const r = plusHelp({ reads: ['/agenda', '/notities'], acts: ['Een notitie', 'Een afspraak'], hasCircle: true, routeLine: 'route: lokaal', t });
+    expect(r).toEqual([
+      'circle.vandaag.plus_help_reads {"reads":"/agenda, /notities"}',
+      'circle.vandaag.plus_help_makes {"acts":"Een notitie, Een afspraak"}',
+      'circle.vandaag.plus_intro_circle',
+      'route: lokaal',
+    ]);
+  });
+  it('no circle: no circle line; no model: the model line says how without one; nothing to read: no read line', async () => {
+    const { plusHelp } = await import('../../src/v2/plusIntro.js');
+    const r = plusHelp({ reads: [], acts: ['Een notitie'], hasCircle: false, routeLine: null, modelPlace: 'Mij → Instellingen', t });
+    expect(r).toEqual([
+      'circle.vandaag.plus_help_makes {"acts":"Een notitie"}',
+      'circle.vandaag.plus_help_no_model {"place":"Mij → Instellingen"}',
+    ]);
+  });
+  it('the door answers "help" with it, from its own catalogue: a read it offers is named, a circle line only with a circle', async () => {
+    const log = new EventLog({ initial: [], muted: [] });
+    const d = createPlusDoor({ llm: null, t: tNl, lang: 'nl', threads: createBotThreads({ eventLog: log, store: memoryThreadStore() }), threadId: 'own:me', circles: async () => [thuis], ownListsOf: async () => [] });
+    const r = await d.read('help');
+    expect(r.done).toMatch(/^Ik kan laten zien: \//);
+    expect(r.done).toMatch(/Ik kan voor je maken: /);
+    expect(r.done).toContain(tNl('circle.vandaag.plus_intro_circle'));
+    expect(r.done).toMatch(/Zonder model lees ik vaste zinnen/);
+    for (const k of ['plus_help_reads', 'plus_help_makes', 'plus_help_no_model']) expect(en.vandaag?.[k]?.text, k).toBeTruthy();
+  });
+});

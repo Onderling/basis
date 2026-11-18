@@ -27,7 +27,8 @@ import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
-import { plusIntro, plusNews, readPlusTold, writePlusTold } from '../v2/plusIntro.js';
+import { plusIntro, plusNews, plusHelp, readPlusTold, writePlusTold } from '../v2/plusIntro.js';
+import { HELP_CIRCLE_ID } from '../v2/helpCircle.js';
 import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel, plusSuggest, NO_OWN_LIST } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
@@ -207,6 +208,9 @@ export function createPlusDoor({
   llm = null, threads = null, threadId = null, t, lang = 'nl', circles = async () => [], ownListsOf = async () => [],
   runInCircle = null, interpret = interpretToCommand, householdManifest, apps, acts = PLUS_ACTS,
   readAs = null, selfOf: selfOfIn = null, selfKeyOf = null, toldLog = null, noteOwn = null,
+  // the line naming the model route that answers (the sheet's header, `plusRouteLine`), for help's last line; a string or
+  // a getter; absent/null: no model is set
+  routeLine = null,
 } = {}) {
   if (typeof t !== 'function') throw new TypeError('createPlusDoor: t required');
   const memory = threads?.memory ?? null;
@@ -387,6 +391,19 @@ export function createPlusDoor({
     return { set, primary: asSelf ?? (set.length === 1 ? set[0] : null) };
   };
 
+  // "help", generated from what this door offers (plusIntro.js `plusHelp`): its reads by their "/" names, its own acts,
+  // the circle line when the person is in one, and the model's route (or how it works without one)
+  async function generatedHelp() {
+    const readNames = commands.pool.filter((c) => { const e = entryOf(c.opId); return e && reads(e); }).map((c) => c.command);
+    const actNames = acts.filter((a) => !actRunsAtOnce(a)).map((a) => plusLabel(t, a));
+    const cs = await Promise.resolve(circles()).catch(() => []);
+    const route = typeof routeLine === 'function' ? routeLine() : routeLine;
+    return plusHelp({
+      reads: [...new Set(readNames)], acts: actNames, hasCircle: cs.some((c) => c?.id && c.id !== HELP_CIRCLE_ID),
+      routeLine: llm ? route : null, modelPlace: ownModelSettingPath({ t }), t,
+    }).join('\n');
+  }
+
   async function read(line, opts = {}) {
     const text = String(line ?? '').trim();
     if (!text) return unread();
@@ -405,7 +422,8 @@ export function createPlusDoor({
     }
     lineDoor = 'phrase';
     const o = plusLineOutcome(text, { circles: await circles(), own: { lists: await ownListsOf(asSelf) }, lang });
-    if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
+    // a help card's own text for a how-to question; plain "help" says what is offered HERE, generated from this door
+    if (o?.kind === 'help') return { done: o.card ? plusHelpAnswer(o, { t }) : await generatedHelp() };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
     if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf, 'phrase') : null) ?? unread();
     if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, door: 'phrase', ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };

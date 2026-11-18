@@ -28,7 +28,7 @@ export function plusIntro({ ownLists = [], circles = [], t, helpCircleId = HELP_
   const add = (line) => { if (line && !examples.includes(line) && examples.length < 3) examples.push(line); };
   const list = (Array.isArray(ownLists) ? ownLists : []).find((l) => typeof l?.name === 'string' && l.name.trim());
   if (list) add(t('circle.vandaag.plus_intro_ex_list', { list: list.name.trim() }));
-  const circle = (Array.isArray(circles) ? circles : []).find((c) => c?.id && c.id !== helpCircleId && typeof c?.name === 'string' && c.name.trim());
+  const circle = (Array.isArray(circles) ? circles : []).find((c) => c?.id && c.id !== helpCircleId && c.unnamed !== true && typeof c?.name === 'string' && c.name.trim());
   if (circle) add(t('circle.vandaag.plus_intro_ex_circle', { circle: circle.name.trim() }));
   for (const key of FIXED_EXAMPLES) add(t(key));
   return {
@@ -48,7 +48,8 @@ export function plusNews({ told = null, circles = [], t, helpCircleId = HELP_CIR
   const now = (Array.isArray(circles) ? circles : []).filter((c) => c?.id && c.id !== helpCircleId);
   // a circle whose name has not arrived yet (a fresh join) is not news yet: it is left out of the line AND of what is
   // kept, so it is told once, by its name, when that arrives; a circle told before stays told while its name is missing
-  const named = (c) => typeof c?.name === 'string' && c.name.trim() !== '';
+  // a placeholder is no name: the sources mark a circle no name reached (`unnamed`, circleSources.js)
+  const named = (c) => c?.unnamed !== true && typeof c?.name === 'string' && c.name.trim() !== '';
   const known = new Set(Array.isArray(told?.circles) ? told.circles : []);
   const keep = { circles: now.filter((c) => named(c) || known.has(c.id)).map((c) => c.id) };
   if (!told || !Array.isArray(told.circles)) return { line: null, told: keep };
@@ -83,5 +84,21 @@ export function writePlusTold(log, key, told, { now = Date.now } = {}) {
     log.append({ id: `${PLUS_TOLD_KIND}:${key}`, type: PLUS_TOLD_KIND, ts: now(), silent: true,
       payload: { circles: Array.isArray(told?.circles) ? told.circles.slice() : null } });
   } catch { /* the sheet still opens */ }
+}
+
+/**
+ * What "help" answers in the "+", generated from what it offers HERE (never a kept list): what it reads (the door's read
+ * ops by their "/" names, until each has its own sentence), what it makes (the own acts), the circle line only when the
+ * person is in a circle, and last the model: the route that answers, or how it works without one and where to set one.
+ * @param {{reads?: string[], acts?: string[], hasCircle?: boolean, routeLine?: string|null, modelPlace?: string, t: Function}} o
+ * @returns {string[]} the lines, in order
+ */
+export function plusHelp({ reads = [], acts = [], hasCircle = false, routeLine = null, modelPlace = '', t } = {}) {
+  const out = [];
+  if (reads.length) out.push(t('circle.vandaag.plus_help_reads', { reads: reads.join(', ') }));
+  if (acts.length) out.push(t('circle.vandaag.plus_help_makes', { acts: acts.join(', ') }));
+  if (hasCircle) out.push(t('circle.vandaag.plus_intro_circle'));
+  out.push(routeLine || t('circle.vandaag.plus_help_no_model', { place: modelPlace }));
+  return out;
 }
 

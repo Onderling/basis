@@ -4821,7 +4821,8 @@ function showVandaagPlus({ edit = null } = {}) {
   // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
   // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
   const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
-    id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
+    // `unnamed`: no name reached this circle yet (its name is the placeholder): the "+" waits for the real one
+    id: c.id, name: c.name ?? '', ...(c.unnamed ? { unnamed: true } : {}), manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
     lists: await circleListsFor((app, op, args = {}) => rawCallSkill(app, op, { ...args, circleId: c.id })).catch(() => []),
   })));
   // the person's OWN lists, of the self ticked in the header (read as that self, so another self's are never read)
@@ -4857,7 +4858,9 @@ function showVandaagPlus({ edit = null } = {}) {
         // what no op shows (a proposal declined, a line placed nowhere) in the person's own record (ownActions.js)
         noteOwn: (e) => circleHouseholdAgent?.noteOwnAct?.(e),
         householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
-        circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId, _asSelf, door) => runInCircle(command, circleId, door) });
+        circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId, _asSelf, door) => runInCircle(command, circleId, door),
+        // help's last line: the route that answers (the header's own line), read when help is asked (last: it holds a brace)
+        routeLine: () => plusRouteLine(circleOwnRoute(), { t }) });
     }
     return _door;
   };

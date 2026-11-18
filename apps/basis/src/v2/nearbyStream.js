@@ -101,19 +101,3 @@ export function nearbyTabNews(model, seen = {}) {
   return { counts, latest };
 }
 
-/**
- * What the "you here" row says the person shows the room, as locale keys: the card, the conversation. While hidden the
- * room is shown nothing (the controller refuses the card and the line), so it says so, whatever is switched on.
- * @param {object|null} model
- * @returns {string[]}
- */
-export function nearbyMineSummary(model) {
-  const m = model && typeof model === 'object' ? model : {};
-  const allows = m.allows ?? {};
-  const keys = [];
-  if (!nearbyIsHidden(m.visibility)) {
-    if (allows.card) keys.push('circle.nearbyScreen.mine_card_on');
-    if (allows.chat) keys.push('circle.nearbyScreen.mine_chat_on');
-  }
-  return keys.length ? keys : ['circle.nearbyScreen.mine_none'];
-}

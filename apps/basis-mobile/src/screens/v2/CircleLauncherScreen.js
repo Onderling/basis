@@ -27,11 +27,12 @@ import { TRANSPORT_MODES } from '../../../../basis/src/v2/circleSettingsControls
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
-import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyAsked, markNearbyAsked, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
+import { readNearbyAllows, writeNearbyAllows, readNearbyAsked, markNearbyAsked, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
 import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../basis/src/v2/nearbyLevel.js';
 import { nearbyTabs } from '../../../../basis/src/v2/nearbyTabs.js';
-import { nearbyStream, nearbyTabNews, nearbyMineSummary } from '../../../../basis/src/v2/nearbyStream.js';
+import { nearbyStream, nearbyTabNews } from '../../../../basis/src/v2/nearbyStream.js';
+import { nearbyMenu, nearbyHereChoose } from '../../../../basis/src/v2/nearbyMenu.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -5860,7 +5861,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   }, [bundle, roomR, roomSelfId]);
   const changeLevel = useCallback(async (v) => {
     const w = await bundle?.nearbyIdentity?.setLevel?.(v);
-    if (!w?.ok) { setNotice({ key: 'level_not_set' }); return; }
+    if (!w?.ok) { setNotice({ key: 'level_not_set' }); return { ok: false }; }
     setRoomLevel(v);
     roomLevelSetRef.current = true;
     screenRef.current?.levelChanged?.();   // chosen now: announced, unless the person went quiet
@@ -5870,6 +5871,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     // told, because "handle" with no handle looks exactly like "Nobody" from the inside.
     const r = await bundle?.nearbyRoom?.announceFace?.();
     setNotice(faceNoticeFor({ choice: v, result: r }));
+    return { ok: true };
   }, [bundle, roomSelfId]);
   // View state, not model state: whether THIS device currently has a text box open says nothing about
   // the room. `answering` holds the ask id being replied to.
@@ -5954,6 +5956,16 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     if (action === 'answer-ask')  { setNotice(null); setAnswering(ask?.id ?? null); }
   }, [screen]);
 
+  // the gear menu's "how you are here": one shared rule for what each choice writes (`nearbyHereChoose`, as on web)
+  const hereChoose = useCallback(async (choice) => {
+    const r = await nearbyHereChoose(choice, { level: roomLevel, visibility: screen?.visibility?.() ?? null }, {
+      setLevel: (l) => changeLevel(l),   // writes the level, announces the face, answers the first-use question
+      setQuiet: (q) => screen?.setQuiet?.(q),
+      setRadio: (v) => screen?.setRadio?.(v),
+    });
+    if (!r.ok && r.reason !== 'level_not_set') setNotice({ key: 'level_not_set' });   // changeLevel says its own
+  }, [screen, roomLevel, changeLevel]);
+
   const toggleAllow = useCallback((key, value) => { screen.setAllow(key, value); writeNearbyAllows(screen.model().allows); setNotice(null); }, [screen]);
 
   const submitCard = useCallback(async (fields) => {
@@ -5993,6 +6005,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       firstUse={askLevel ? { onChoose: changeLevel, onLater: () => { if (roomSelfId) markNearbyAsked(roomSelfId); setAskLevel(false); } } : null}
       onSetQuiet={(v) => screen?.setQuiet?.(v)}
       onSetRadio={(v) => screen?.setRadio?.(v)}
+      onHereChoose={hereChoose}
+      onIntroAgain={() => setAskLevel(true)}
       onCompose={() => { setNotice(null); setComposing(true); }}
       composing={composing}
       answering={!!answering}
@@ -6019,7 +6033,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
 function NearbyScreen({
   model, roomView = null, onPickRoomSelf = null, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
   answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onPrefillCard, level = null, firstUse = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
-  onShareCard = null,
+  onShareCard = null, onHereChoose = null, onIntroAgain = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -6037,9 +6051,18 @@ function NearbyScreen({
   const invites    = Array.isArray(model?.invites) ? model.invites : [];
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
   useEffect(() => { setDraft(''); }, [composing, answering]);
-  const [bannerOpen, setBannerOpen] = useState(false);
-  // "You here" opens on the FIRST-ever open only. so the card/chat toggles are discovered once.
-  const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
+  // The gear menu: which part is open (null closed, 'main', 'self', 'card'); what it holds is `nearbyMenu` (shared with web)
+  const [menuView, setMenuView] = useState(null);
+  const menu = nearbyMenu({ visibility: model?.visibility, allows, can: { quiet: !!model?.hasRadioControl, radio: !!model?.hasRadioControl } });
+  // One allow as a switch, with what OTHERS see while it is off (a setting name does not tell its consequence).
+  const allowSwitch = (key, live, offKey) => (
+    <View key={`allow-${key}`} testID={`nearby-allows-${key}`}>
+      <Pressable onPress={() => onToggleAllow?.(key, !live)} accessibilityRole="switch" accessibilityState={{ checked: !!live }} testID={`nearby-allow-${key}`} style={styles.nearbyAction}>
+        <Text style={styles.nearbyActionText}>{`${live ? '☑' : '☐'} ${t(`circle.nearbyScreen.allow_${key}`)}`}</Text>
+      </Pressable>
+      {offKey ? <Text style={styles.muted} testID={`nearby-allow-off-${key}`}>{t(offKey)}</Text> : null}
+    </View>
+  );
   // Nearby's two tabs: what each holds and in what order, and which opens first, is `nearbyTabs` (shared with web);
   // a part with nothing in it is not in its list. Which tab is selected is this screen's own state.
   const { tabs, defaultTab, chatOff, askOff } = nearbyTabs(model);
@@ -6323,7 +6346,13 @@ function NearbyScreen({
     // below it sat at the bottom edge, unreachable): the peers are sized to their content and everything scrolls together.
     <ScrollView style={styles.page} contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }} keyboardShouldPersistTaps="handled" testID="circle-nearby-screen">
       {/* no "← circles": Nearby is a tab of its own, not a page under Circles */}
-      <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
+      {/* the title, and the gear right after it (not at the right edge: the header's controls are there) */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('circle.nearbyScreen.menu_title')} testID="nearby-gear" style={styles.nearbyAction} onPress={() => setMenuView((v) => (v ? null : 'main'))}>
+          <Text style={styles.nearbyActionText}>⚙</Text>
+        </Pressable>
+      </View>
       {firstUse ? (
         // The first-use question, before anything else: what may this room see of the self entering it.
         <View style={styles.nearbyAsks} testID="nearby-first-use">
@@ -6342,168 +6371,167 @@ function NearbyScreen({
         </View>
       ) : null}
       {visKey ? (
-        // One line for the state; the sentence behind it one tap away (sketch §2). A degraded state keeps
-        // its sentence in view — that one is a warning, not an explanation.
+        // One line for the state, and it opens the gear menu (one menu, no second sheet). A degraded state keeps its
+        // sentence in view: that one is a warning, not an explanation.
         <Pressable
           style={[styles.nearbyBanner, visKey === 'still_visible' ? styles.nearbyBannerAlert : null]}
           testID={`nearby-visibility-${visKey}`}
           accessibilityRole={visKey === 'still_visible' ? 'alert' : 'button'}
-          onPress={() => setBannerOpen((v) => !v)}
+          onPress={() => setMenuView('main')}
         >
           <Text style={styles.nearbyBannerTitle}>{t(`circle.nearbyScreen.${visKey}_title`)}</Text>
-          {(bannerOpen || visKey === 'still_visible') ? (
+          {visKey === 'still_visible' ? (
             <Text style={styles.muted}>{t(`circle.nearbyScreen.${visKey}_body`)}</Text>
           ) : null}
         </Pressable>
       ) : null}
-      {(visKey && (bannerOpen || visKey === 'radio_off') && (model?.hasRadioControl ?? false)) ? (
-        // The two switches live behind the state line they change — not per row, not in a far-away
-        // settings page. Quiet is session-only; the radio switch is the persisted, honest OFF.
-        <View>
-          {visKey !== 'radio_off' ? (
-            <Pressable accessibilityRole="button" testID="nearby-quiet-toggle" onPress={() => onSetQuiet?.(!(model?.quiet))}>
-              <Text style={styles.muted}>{model?.quiet ? '☑' : '☐'} {t('circle.nearbyScreen.quiet_toggle')}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable accessibilityRole="button" testID="nearby-radio-toggle" onPress={() => onSetRadio?.(model?.radioOff ? 'on' : 'off')}>
-            <Text style={styles.muted}>{t(model?.radioOff ? 'circle.nearbyScreen.radio_toggle_on' : 'circle.nearbyScreen.radio_toggle_off')}</Text>
-          </Pressable>
-        </View>
-      ) : null}
       {/* The header line already says "nobody nearby" when the room is empty — the model swaps it
           in at zero peers — so there is no second empty-state line under it. */}
       <Text style={styles.muted}>{headerText}</Text>
-      {/* Your side, folded (sketch §2): the allows, the card, what others see — one row that opens. */}
-      <Pressable onPress={() => setMineOpen((v) => !v)} accessibilityRole="button" testID="nearby-mine" style={styles.nearbyAsks}>
-        <Text style={styles.ownProfileTitle}>
-          {t('circle.nearbyScreen.mine_title')}
-          {' · '}
-          {/* what the person shows the room (`nearbyMineSummary`): never "in the conversation" while hidden */}
-          {nearbyMineSummary(model).map((k) => t(k)).join(' · ')}
-        </Text>
-      </Pressable>
-      {mineOpen ? (<>
-      {/* The room face: the SAME faces a circle offers — name, handle, or nobody. */}
-      <View style={styles.nearbyAsks} testID="nearby-face">
-        {roomView ? (
-          <View testID="nearby-as-self">
-            {roomView.ask ? (
-              <View>
-                <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.as_self_pick')}</Text>
-                <View style={styles.nearbyActions}>
-                  {roomView.choices.map((c) => (
-                    <Pressable key={c.id} accessibilityRole="button" testID={`nearby-as-self-${c.id}`} style={styles.nearbyAction} onPress={() => onPickRoomSelf?.(c.id)}>
-                      <Text style={styles.nearbyActionText}>{c.nameKey ? t(c.nameKey) : c.name}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            ) : roomView.self ? (
-              <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.as_self', { name: roomView.self.nameKey ? t(roomView.self.nameKey) : roomView.self.name })}</Text>
-            ) : null}
-            <Text style={styles.muted}>{t('circle.nearbyScreen.as_self_caveat')}</Text>
-          </View>
-        ) : null}
-        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.face_row')}</Text>
-        <View style={styles.nearbyActions}>
-          {NEARBY_LEVELS.map((v) => (
-            <Pressable
-              key={v}
-              accessibilityRole="button"
-              testID={`nearby-level-${v}`}
-              style={styles.nearbyAction}
-              onPress={() => onLevelChange?.(v)}
-            >
-              <Text style={styles.nearbyActionText}>{(level === v ? '● ' : '○ ') + t(nearbyLevelLabelKey(v))}</Text>
+      {/* BEHIND THE GEAR (`nearbyMenu`, shared with web): how you are here, what you show, the chat, the introduction. */}
+      {menuView ? (
+        <View style={styles.nearbyAsks} testID="nearby-menu" accessibilityLabel={t(menu.titleKey)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={styles.ownProfileTitle}>{t(menu.titleKey)}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('circle.nearbyScreen.menu_close')} testID="nearby-menu-close" style={styles.nearbyAction} onPress={() => setMenuView(null)}>
+              <Text style={styles.nearbyActionText}>×</Text>
             </Pressable>
-          ))}
-        </View>
-        <Text style={styles.muted}>{t('circle.nearbyScreen.face_caveat')}</Text>
-      </View>
-      {/* Cards + chat, each behind its own per-device allow (step G). */}
-      <View style={styles.nearbyAsks} testID="nearby-allows">
-        {['card', 'chat'].map((key) => (
-          <View key={key}>
-            <Pressable
-              onPress={() => onToggleAllow?.(key, !allows[key])}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: !!allows[key] }}
-              testID={`nearby-allow-${key}`}
-              style={styles.nearbyAction}
-            >
-              <Text style={styles.nearbyActionText}>
-                {`${allows[key] ? '☑' : '☐'} ${t(`circle.nearbyScreen.allow_${key}`)}`}
-              </Text>
-            </Pressable>
-            {/* Says what OTHERS see, not what the switch position is. */}
-            {!allows[key] ? (
-              <Text style={styles.muted} testID={`nearby-allow-off-${key}`}>
-                {t(`circle.nearbyScreen.allow_${key}_off`)}
-              </Text>
-            ) : null}
           </View>
-        ))}
-      </View>
-
-      {allows.card ? (
-        <View style={styles.nearbyAsks} testID="nearby-card-form">
-          <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.card_title')}</Text>
-          <ThemedTextInput
-            style={styles.nearbyInput}
-            value={cardLabel}
-            onChangeText={setCardLabel}
-            maxLength={40}
-            placeholder={t('circle.nearbyScreen.card_label')}
-            testID="nearby-card-label"
-          />
-          <ThemedTextInput
-            style={styles.nearbyInput}
-            value={cardLine}
-            onChangeText={setCardLine}
-            maxLength={140}
-            placeholder={t('circle.nearbyScreen.card_line')}
-            testID="nearby-card-line"
-          />
-          {onPrefillCard ? (
-            <Pressable
-              onPress={async () => {
-                let got = {};
-                try { got = (await onPrefillCard()) ?? {}; } catch { got = {}; }
-                if (typeof got.label === 'string' && got.label) setCardLabel(got.label.slice(0, 40));
-              }}
-              accessibilityRole="button"
-              testID="nearby-card-prefill"
-              style={styles.nearbyAction}
-            >
-              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.card_prefill')}</Text>
+          {menuView !== 'main' ? (
+            <Pressable accessibilityRole="button" testID="nearby-menu-back" style={styles.nearbyAction} onPress={() => setMenuView('main')}>
+              <Text style={styles.nearbyActionText}>{t('circle.join.wizard.back')}</Text>
             </Pressable>
           ) : null}
-          {/* The consequence, next to the fields. */}
-          <Text style={styles.muted}>{t('circle.nearbyScreen.card_visible_to')}</Text>
-          <Pressable
-            onPress={() => {
-              const label = cardLabel.trim();
-              if (!label) return;
-              onSubmitCard?.({ label, line: cardLine.trim() });
-            }}
-            accessibilityRole="button"
-            testID="nearby-card-save"
-            style={styles.nearbyAction}
-          >
-            <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.card_save')}</Text>
-          </Pressable>
+          {menuView === 'main' ? (<>
+            <Text style={styles.muted}>{t(menu.here.titleKey)}</Text>
+            {menu.here.choices.map((c) => (
+              <Pressable key={c.id} accessibilityRole="radio" accessibilityState={{ checked: menu.here.selected === c.id }} testID={`nearby-here-${c.id}`} onPress={() => onHereChoose?.(c.id)} style={{ paddingVertical: 6 }}>
+                <Text style={styles.nearbyActionText}>{(menu.here.selected === c.id ? '● ' : '○ ') + t(c.labelKey)}</Text>
+                <Text style={styles.muted}>{t(c.bodyKey)}</Text>
+              </Pressable>
+            ))}
+            <Text style={styles.muted}>{t(menu.show.titleKey)}</Text>
+            {roomView && (roomView.self || roomView.ask) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} testID="nearby-menu-self">
+                <Text style={styles.ownProfileTitle}>{roomView.self ? t(menu.show.appearAsKey, { name: roomView.self.nameKey ? t(roomView.self.nameKey) : roomView.self.name }) : t('circle.nearbyScreen.as_self_pick')}</Text>
+                <Pressable accessibilityRole="button" testID="nearby-menu-change" style={styles.nearbyAction} onPress={() => setMenuView('self')}>
+                  <Text style={styles.nearbyActionText}>{t(menu.show.changeKey)}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <Pressable accessibilityRole="button" testID="nearby-menu-card" style={styles.nearbyAction} onPress={() => setMenuView('card')}>
+              <Text style={styles.nearbyActionText}>{t(menu.show.cardKey)}</Text>
+            </Pressable>
+            {allowSwitch('chat', menu.chat.on, menu.chat.offKey)}
+            {onIntroAgain ? (
+              <Pressable accessibilityRole="button" testID="nearby-menu-intro" style={styles.nearbyAction} onPress={() => { setMenuView(null); onIntroAgain(); }}>
+                <Text style={styles.nearbyActionText}>{t(menu.introKey)}</Text>
+              </Pressable>
+            ) : null}
+          </>) : null}
+          {menuView === 'self' ? (<>
+            {/* The room face: the SAME faces a circle offers — name, handle, or nobody. */}
+            <View style={styles.nearbyAsks} testID="nearby-face">
+              {roomView ? (
+                <View testID="nearby-as-self">
+                  {roomView.ask ? (
+                    <View>
+                      <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.as_self_pick')}</Text>
+                      <View style={styles.nearbyActions}>
+                        {roomView.choices.map((c) => (
+                          <Pressable key={c.id} accessibilityRole="button" testID={`nearby-as-self-${c.id}`} style={styles.nearbyAction} onPress={() => onPickRoomSelf?.(c.id)}>
+                            <Text style={styles.nearbyActionText}>{c.nameKey ? t(c.nameKey) : c.name}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ) : roomView.self ? (
+                    <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.as_self', { name: roomView.self.nameKey ? t(roomView.self.nameKey) : roomView.self.name })}</Text>
+                  ) : null}
+                  <Text style={styles.muted}>{t('circle.nearbyScreen.as_self_caveat')}</Text>
+                </View>
+              ) : null}
+              <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.face_row')}</Text>
+              <View style={styles.nearbyActions}>
+                {NEARBY_LEVELS.map((v) => (
+                  <Pressable
+                    key={v}
+                    accessibilityRole="button"
+                    testID={`nearby-level-${v}`}
+                    style={styles.nearbyAction}
+                    onPress={() => onLevelChange?.(v)}
+                  >
+                    <Text style={styles.nearbyActionText}>{(level === v ? '● ' : '○ ') + t(nearbyLevelLabelKey(v))}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.muted}>{t('circle.nearbyScreen.face_caveat')}</Text>
+            </View>
+          </>) : null}
+          {menuView === 'card' ? (<>
+            {/* the card's own switch on top: it gates what is sent, and keeps its stored value */}
+            {allowSwitch('card', !!allows.card, allows.card ? null : 'circle.nearbyScreen.allow_card_off')}
+            {allows.card ? (
+              <View style={styles.nearbyAsks} testID="nearby-card-form">
+                <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.card_title')}</Text>
+                <ThemedTextInput
+                  style={styles.nearbyInput}
+                  value={cardLabel}
+                  onChangeText={setCardLabel}
+                  maxLength={40}
+                  placeholder={t('circle.nearbyScreen.card_label')}
+                  testID="nearby-card-label"
+                />
+                <ThemedTextInput
+                  style={styles.nearbyInput}
+                  value={cardLine}
+                  onChangeText={setCardLine}
+                  maxLength={140}
+                  placeholder={t('circle.nearbyScreen.card_line')}
+                  testID="nearby-card-line"
+                />
+                {onPrefillCard ? (
+                  <Pressable
+                    onPress={async () => {
+                      let got = {};
+                      try { got = (await onPrefillCard()) ?? {}; } catch { got = {}; }
+                      if (typeof got.label === 'string' && got.label) setCardLabel(got.label.slice(0, 40));
+                    }}
+                    accessibilityRole="button"
+                    testID="nearby-card-prefill"
+                    style={styles.nearbyAction}
+                  >
+                    <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.card_prefill')}</Text>
+                  </Pressable>
+                ) : null}
+                {/* The consequence, next to the fields. */}
+                <Text style={styles.muted}>{t('circle.nearbyScreen.card_visible_to')}</Text>
+                <Pressable
+                  onPress={() => {
+                    const label = cardLabel.trim();
+                    if (!label) return;
+                    onSubmitCard?.({ label, line: cardLine.trim() });
+                  }}
+                  accessibilityRole="button"
+                  testID="nearby-card-save"
+                  style={styles.nearbyAction}
+                >
+                  <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.card_save')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <View style={styles.ownProfile}>
+              <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.own_profile')}</Text>
+              <Text style={styles.muted}>
+                {Array.isArray(own.publishedSkills) && own.publishedSkills.length
+                  ? own.publishedSkills.join(', ')
+                  : t('circle.nearbyScreen.own_profile_empty')}
+              </Text>
+            </View>
+          </>) : null}
         </View>
       ) : null}
-
-      <View style={styles.ownProfile}>
-        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.own_profile')}</Text>
-        <Text style={styles.muted}>
-          {Array.isArray(own.publishedSkills) && own.publishedSkills.length
-            ? own.publishedSkills.join(', ')
-            : t('circle.nearbyScreen.own_profile_empty')}
-        </Text>
-      </View>
-      </>) : null}
 
       {/* The two tabs: Conversation and Questions. */}
       <View style={styles.circleTabs} accessibilityRole="tablist" testID="nearby-tabs">

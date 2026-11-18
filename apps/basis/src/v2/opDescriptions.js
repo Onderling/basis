@@ -11,12 +11,33 @@
 import { currentLang } from '../localisation.js';
 import listsEn from '../../../lists/descriptions.en.json' with { type: 'json' };
 import listsNl from '../../../lists/descriptions.nl.json' with { type: 'json' };
+import paramsEn from './paramsManifest.descriptions.en.json' with { type: 'json' };
+import paramsNl from './paramsManifest.descriptions.nl.json' with { type: 'json' };
+import governanceEn from './governanceManifest.descriptions.en.json' with { type: 'json' };
+import governanceNl from './governanceManifest.descriptions.nl.json' with { type: 'json' };
+import membershipEn from './membershipManifest.descriptions.en.json' with { type: 'json' };
+import membershipNl from './membershipManifest.descriptions.nl.json' with { type: 'json' };
+import keysEn from './keyManifest.descriptions.en.json' with { type: 'json' };
+import keysNl from './keyManifest.descriptions.nl.json' with { type: 'json' };
+import grantsEn from './grantsManifest.descriptions.en.json' with { type: 'json' };
+import grantsNl from './grantsManifest.descriptions.nl.json' with { type: 'json' };
+import itemsLaneEn from './itemsManifest.descriptions.en.json' with { type: 'json' };
+import itemsLaneNl from './itemsManifest.descriptions.nl.json' with { type: 'json' };
+import chatLaneEn from './chatManifest.descriptions.en.json' with { type: 'json' };
+import chatLaneNl from './chatManifest.descriptions.nl.json' with { type: 'json' };
 import calendarEn from '../../../calendar/descriptions.en.json' with { type: 'json' };
 import calendarNl from '../../../calendar/descriptions.nl.json' with { type: 'json' };
 
 /** `{ app: { en, nl } }`: the described apps (the guard's source of truth). */
 export const OP_DESCRIPTIONS = Object.freeze({
   lists: { en: listsEn, nl: listsNl },
+  params: { en: paramsEn, nl: paramsNl },
+  governance: { en: governanceEn, nl: governanceNl },
+  membership: { en: membershipEn, nl: membershipNl },
+  keys: { en: keysEn, nl: keysNl },
+  grants: { en: grantsEn, nl: grantsNl },
+  'items-lane': { en: itemsLaneEn, nl: itemsLaneNl },
+  'chat-lane': { en: chatLaneEn, nl: chatLaneNl },
   calendar: { en: calendarEn, nl: calendarNl },
 });
 

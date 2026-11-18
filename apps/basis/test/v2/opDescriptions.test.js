@@ -20,6 +20,11 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('the plumbing manifests in basis: described beside each manifest, a lane statement said as what it records', () => {
+    expect(opWhat('params', 'set-param', 'nl')).toBe('Verander een instelling.');
+    expect(opWhat('membership', 'membership.leave', 'en')).toBe('Record that you leave the circle.');
+    expect(opWhat('items-lane', 'items.remove', 'nl')).toBe('Laat de kring weten dat een item weg is.');
+  });
 });
 
 describe('the "/" list shows it under the command', () => {

@@ -393,13 +393,16 @@ export function createPlusDoor({
 
   // "help", generated from what this door offers (plusIntro.js `plusHelp`): its reads by their "/" names, its own acts,
   // the circle line when the person is in one, and the model's route (or how it works without one)
-  async function generatedHelp() {
+  async function generatedHelp(asSelf = null) {
     const readNames = commands.pool.filter((c) => { const e = entryOf(c.opId); return e && reads(e); }).map((c) => c.command);
     const actNames = acts.filter((a) => !actRunsAtOnce(a)).map((a) => plusLabel(t, a));
     const cs = await Promise.resolve(circles()).catch(() => []);
     const route = typeof routeLine === 'function' ? routeLine() : routeLine;
+    const lists = await Promise.resolve(ownListsOf(asSelf)).catch(() => []);
+    const ex = plusIntro({ ownLists: lists, circles: cs, t });
     return plusHelp({
       reads: [...new Set(readNames)], acts: actNames, hasCircle: cs.some((c) => c?.id && c.id !== HELP_CIRCLE_ID),
+      tryLine: ex.examples.length ? `${ex.tryLabel} ${ex.examples.join(' · ')}` : null,
       routeLine: llm ? route : null, modelPlace: ownModelSettingPath({ t }), t,
     }).join('\n');
   }
@@ -423,7 +426,7 @@ export function createPlusDoor({
     lineDoor = 'phrase';
     const o = plusLineOutcome(text, { circles: await circles(), own: { lists: await ownListsOf(asSelf) }, lang });
     // a help card's own text for a how-to question; plain "help" says what is offered HERE, generated from this door
-    if (o?.kind === 'help') return { done: o.card ? plusHelpAnswer(o, { t }) : await generatedHelp() };
+    if (o?.kind === 'help') return { done: o.card ? plusHelpAnswer(o, { t }) : await generatedHelp(asSelf) };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
     if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf, 'phrase') : null) ?? unread();
     if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, door: 'phrase', ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };

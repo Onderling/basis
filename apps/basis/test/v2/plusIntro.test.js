@@ -182,12 +182,14 @@ describe('"help" says what the "+" offers HERE, generated, never a kept list (th
   });
   it('the door answers "help" with it, from its own catalogue: a read it offers is named, a circle line only with a circle', async () => {
     const log = new EventLog({ initial: [], muted: [] });
-    const d = createPlusDoor({ llm: null, t: tNl, lang: 'nl', threads: createBotThreads({ eventLog: log, store: memoryThreadStore() }), threadId: 'own:me', circles: async () => [thuis], ownListsOf: async () => [] });
+    const d = createPlusDoor({ llm: null, t: tNl, lang: 'nl', threads: createBotThreads({ eventLog: log, store: memoryThreadStore() }), threadId: 'own:me', circles: async () => [thuis], ownListsOf: async () => [shopping] });
     const r = await d.read('help');
     expect(r.done).toMatch(/^Ik kan laten zien: \//);
     expect(r.done).toMatch(/Ik kan voor je maken: /);
     expect(r.done).toContain(tNl('circle.vandaag.plus_intro_circle'));
     expect(r.done).toMatch(/Zonder model lees ik vaste zinnen/);
+    // and what to try, the intro's examples (each read by the door, tested above): help still teaches the list lines
+    expect(r.done).toMatch(/Probeer: .*zet melk op boodschappen/);
     for (const k of ['plus_help_reads', 'plus_help_makes', 'plus_help_no_model']) expect(en.vandaag?.[k]?.text, k).toBeTruthy();
   });
 });

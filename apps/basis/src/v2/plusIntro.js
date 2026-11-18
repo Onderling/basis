@@ -89,15 +89,18 @@ export function writePlusTold(log, key, told, { now = Date.now } = {}) {
 /**
  * What "help" answers in the "+", generated from what it offers HERE (never a kept list): what it reads (the door's read
  * ops by their "/" names, until each has its own sentence), what it makes (the own acts), the circle line only when the
- * person is in a circle, and last the model: the route that answers, or how it works without one and where to set one.
+ * person is in a circle, what to try (`tryLine`: the intro's examples), and last the model: the route that answers, or
+ * how it works without one and where to set one.
  * @param {{reads?: string[], acts?: string[], hasCircle?: boolean, routeLine?: string|null, modelPlace?: string, t: Function}} o
  * @returns {string[]} the lines, in order
  */
-export function plusHelp({ reads = [], acts = [], hasCircle = false, routeLine = null, modelPlace = '', t } = {}) {
+export function plusHelp({ reads = [], acts = [], hasCircle = false, routeLine = null, modelPlace = '', tryLine = null, t } = {}) {
   const out = [];
   if (reads.length) out.push(t('circle.vandaag.plus_help_reads', { reads: reads.join(', ') }));
   if (acts.length) out.push(t('circle.vandaag.plus_help_makes', { acts: acts.join(', ') }));
   if (hasCircle) out.push(t('circle.vandaag.plus_intro_circle'));
+  // what to try: the intro's examples (`plusIntro`, each one a line the "+" reads), so help still teaches the list lines
+  if (tryLine) out.push(tryLine);
   out.push(routeLine || t('circle.vandaag.plus_help_no_model', { place: modelPlace }));
   return out;
 }

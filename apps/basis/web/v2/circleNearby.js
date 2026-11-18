@@ -114,7 +114,7 @@ export function renderCircleNearby(container, {
     text('title', spec.titleKey);
     text('text', spec.textKey);
     const nameOf = (c) => (c.nameKey ? tr(c.nameKey) : c.name);
-    const shown = (c) => (c.general ? tr(spec.generalKey, { name: nameOf(c) }) : nameOf(c));
+    const shown = (c) => (c.labelKey ? tr(c.labelKey, c.labelVars) : nameOf(c));
     const fields = {};
     if (spec.step === 1) {
       text('label', spec.appearAsKey);

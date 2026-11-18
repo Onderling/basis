@@ -28,13 +28,20 @@ export function nearbyWizardStep(step, { selfView = null, offers = [], chat = fa
   const head = { key: `${K}wizard_step`, vars: { n, of: NEARBY_WIZARD_STEPS } };
   if (n === 1) {
     const listed = Array.isArray(selfView?.choices) && selfView.choices.length ? selfView.choices : (selfView?.self ? [selfView.self] : []);
-    const selves = listed.map((c) => ({ ...c, general: c.id === 'default' }));
+    // the general self is said as "{{name}} · yourself", or "yourself (no name yet)" while it has none; a persona by its name
+    const label = (c) => {
+      if (c.id !== 'default') return {};
+      return c.nameKey ? { labelKey: `${K}wizard1_general_unnamed` } : { labelKey: `${K}wizard1_general`, labelVars: { name: c.name } };
+    };
+    const selves = listed.map((c) => ({ ...c, general: c.id === 'default', ...label(c) }));
+    const chosen = selves.find((c) => c.id === selfView?.self?.id) ?? selves[0] ?? null;
     return {
       step: n, head,
       titleKey: `${K}wizard1_title`, textKey: `${K}wizard1_text`,
       appearAsKey: `${K}wizard1_appear_as`, generalKey: `${K}wizard1_general`, selves, selected: selfView?.self?.id ?? null,
       underKey: `${K}wizard1_fixed`,
-      buttons: [{ id: 'yes', key: `${K}wizard1_yes` }, { id: 'look', key: `${K}wizard1_look` }],
+      // "Ja, als …" names who; with no name yet there is nothing to name, so it is a plain "Ja"
+      buttons: [{ id: 'yes', key: chosen?.nameKey ? `${K}wizard1_yes_plain` : `${K}wizard1_yes` }, { id: 'look', key: `${K}wizard1_look` }],
     };
   }
   if (n === 2) {

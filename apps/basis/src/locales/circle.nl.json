@@ -4084,6 +4084,10 @@
       "text": "{{name}} · jijzelf",
       "doc": "First-time wizard, step 1: the general self in the choice (not a persona)."
     },
+    "wizard1_general_unnamed": {
+      "text": "jijzelf (nog geen naam)",
+      "doc": "First-time wizard, step 1: the general self while it has no name yet."
+    },
     "wizard1_fixed": {
       "text": "Dit wordt je vaste keuze voor In de buurt. Wisselen kan bovenaan het scherm.",
       "doc": "First-time wizard, step 1: under the choice of who enters the room."
@@ -4091,6 +4095,10 @@
     "wizard1_yes": {
       "text": "Ja, als {{name}}",
       "doc": "First-time wizard, step 1: become visible as the chosen self (the gear menu's Zichtbaar)."
+    },
+    "wizard1_yes_plain": {
+      "text": "Ja",
+      "doc": "First-time wizard, step 1: become visible, when the self has no name to name."
     },
     "wizard1_look": {
       "text": "Alleen kijken",

@@ -23,8 +23,17 @@ describe('the first-time wizard: what each step shows', () => {
     expect(s.selves.map((c) => [c.id, c.general])).toEqual([['default', true], ['p1', false]]);
     expect(s.buttons.map((b) => b.id)).toEqual(['yes', 'look']);
     const one = nearbyWizardStep(1, { selfView: { ask: false, self: { id: 'default', name: 'Frits' }, choices: [] } });
-    expect(one.selves).toEqual([{ id: 'default', name: 'Frits', general: true }]);
+    expect(one.selves).toMatchObject([{ id: 'default', name: 'Frits', general: true }]);
     expect(one.selected).toBe('default');
+  });
+
+  it('a general self with no name yet reads "yourself (no name yet)" and the button is a plain Yes; a named one keeps its name', () => {
+    const unnamed = nearbyWizardStep(1, { selfView: { ask: false, self: { id: 'default', nameKey: 'circle.nearbyScreen.no_name_yet' }, choices: [] } });
+    expect(unnamed.selves[0].labelKey).toBe('circle.nearbyScreen.wizard1_general_unnamed');
+    expect(unnamed.buttons[0].key).toBe('circle.nearbyScreen.wizard1_yes_plain');
+    const named = nearbyWizardStep(1, { selfView: { ask: false, self: { id: 'default', name: 'Frits' }, choices: [] } });
+    expect(named.selves[0]).toMatchObject({ labelKey: 'circle.nearbyScreen.wizard1_general', labelVars: { name: 'Frits' } });
+    expect(named.buttons[0].key).toBe('circle.nearbyScreen.wizard1_yes');
   });
 
   it('step 2 offers the switch only when something is offered; otherwise the line that says where', () => {

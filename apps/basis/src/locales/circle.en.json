@@ -4079,6 +4079,10 @@
       "text": "{{name}} · yourself",
       "doc": "First-time wizard, step 1: the general self in the choice (not a persona)."
     },
+    "wizard1_general_unnamed": {
+      "text": "yourself (no name yet)",
+      "doc": "First-time wizard, step 1: the general self while it has no name yet."
+    },
     "wizard1_fixed": {
       "text": "This becomes your fixed choice for Nearby. You can switch at the top of the screen.",
       "doc": "First-time wizard, step 1: under the choice of who enters the room."
@@ -4086,6 +4090,10 @@
     "wizard1_yes": {
       "text": "Yes, as {{name}}",
       "doc": "First-time wizard, step 1: become visible as the chosen self (the gear menu's Zichtbaar)."
+    },
+    "wizard1_yes_plain": {
+      "text": "Yes",
+      "doc": "First-time wizard, step 1: become visible, when the self has no name to name."
     },
     "wizard1_look": {
       "text": "Only look",

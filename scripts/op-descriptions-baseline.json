@@ -11,8 +11,7 @@
     "keys",
     "membership",
     "params",
-    "pinboard",
-    "tasks"
+    "pinboard"
   ],
   "nounsOwed": [
     "pinboard.lend"

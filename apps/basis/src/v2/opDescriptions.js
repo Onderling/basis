@@ -18,12 +18,15 @@ import householdEn from '../../../household/descriptions.en.json' with { type: '
 import householdNl from '../../../household/descriptions.nl.json' with { type: 'json' };
 import calendarEn from '../../../calendar/descriptions.en.json' with { type: 'json' };
 import calendarNl from '../../../calendar/descriptions.nl.json' with { type: 'json' };
+import tasksEn from '../../../tasks-v0/descriptions.en.json' with { type: 'json' };
+import tasksNl from '../../../tasks-v0/descriptions.nl.json' with { type: 'json' };
 
 /** `{ app: { en, nl } }`: the described apps (the guard's source of truth). */
 export const OP_DESCRIPTIONS = Object.freeze({
   lists: { en: listsEn, nl: listsNl },
   household: { en: householdEn, nl: householdNl },
   calendar: { en: calendarEn, nl: calendarNl },
+  tasks: { en: tasksEn, nl: tasksNl },
 });
 
 /**

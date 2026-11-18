@@ -20,6 +20,10 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('tasks: described under its app origin (the manifest lives in tasks-v0)', () => {
+    expect(opWhat('tasks', 'claimTask', 'nl')).toBe('Pak een taak op: jij gaat hem doen.');
+    expect(opDescription('tasks', 'rejectTask', 'en').params.note).toBe('why, in a sentence');
+  });
   it('household: its device and recovery ops described, the phrase named as the person knows it', () => {
     expect(opWhat('household', 'revealOwnerPhrase', 'nl')).toBe('Laat je herstelzin zien.');
     expect(opDescription('household', 'replaceDevice', 'en').params.mnemonic).toBe('your recovery phrase');

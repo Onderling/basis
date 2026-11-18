@@ -31,21 +31,22 @@ export const toolsManifest = Object.freeze({
     },
     {
       id: 'listTools', visibility: 'authenticated', verb: 'list',
-      params: [],
+      // a member sees what is on; the admin's `/toolbox` lists every placed one with its on/off (`all`)
+      params: [{ name: 'all', kind: 'boolean', required: false }],
       surfaces: {
         chat: { reply: 'list', hint: 'The toolboxes this household added, their tools and the words that reach them.' },
       },
     },
     {
-      // the admin adds a toolbox by its name, its address and the words for its tools; the KEY is the box's operator
-      // config (an env value or a key file named by the toolbox's name), never a chat: refused when it is not there
+      // the admin switches ON a toolbox the operator PLACED (one file per toolbox on the box: name, address, words, beside
+      // its key): no chat line carries an address, a tool id or a key. Without `confirm`: the card to say yes to; the yes
+      // (the admin's private chat) switches it on. A placed toolbox is off until then.
       id: 'addToolbox', visibility: 'trusted', verb: 'add-toolbox',
       stepUp: 'private-door',
       writes: { scope: 'device' },
       params: [
-        { name: 'name',  kind: 'string', required: true, schema: { minLength: 1 } },
-        { name: 'url',   kind: 'string', required: true, schema: { minLength: 1 } },
-        { name: 'words', kind: 'object', required: true, schema: { type: 'array', items: { type: 'object' } } },
+        { name: 'name',    kind: 'string',  required: true, schema: { minLength: 1 } },
+        { name: 'confirm', kind: 'boolean', required: false },
       ],
       surfaces: {},
     },

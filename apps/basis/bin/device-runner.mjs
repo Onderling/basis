@@ -1369,15 +1369,23 @@ if (tgToken || inboxDoor.bridge) {
       } catch (err) { console.warn(`device-runner: a removal from a circle was not handled: ${err?.message ?? err}`); }
     };
   }
-  // A CIRCLE'S TOOLBOXES (L1035). The record (address, words) in this box's vault; the KEY from the operator's config
-  // only (an env value TOOLBOX_KEY_<NAME>, or a file <data-dir>/toolbox-keys/<name>.key): it never passes through a chat
-  // and never appears in a reply, a refusal, a log line or the list of tools. Mounted on the waist like any app.
+  // A CIRCLE'S TOOLBOXES (L1035). The operator PLACES a toolbox as one file, <data-dir>/toolboxes/<name>.json
+  // ({name, url, words: [{word, tool, field}]}), beside its key, <data-dir>/toolboxes/<name>.key (or the env value
+  // TOOLBOX_KEY_<NAME>): no chat line carries an address, a tool id or a key, and the key never appears in a reply, a
+  // refusal, a log line or the list of tools. A placed toolbox is off until the admin's yes (`/toolbox <naam> aan`);
+  // which are on lives in this box's vault. Mounted on the waist like any app.
+  const toolboxDir = path.join(dataDir, 'toolboxes');
   const toolboxes = makeToolboxOps({
     store: new VaultNodeFs(path.join(dataDir, 'toolboxes.json'), vaultPassphrase()),
+    placedOf: async () => {
+      let files = [];
+      try { files = readdirSync(toolboxDir).filter((f) => f.endsWith('.json')); } catch { return []; }
+      return files.map((f) => { try { return JSON.parse(readFileSync(path.join(toolboxDir, f), 'utf8')); } catch { return null; } }).filter(Boolean);
+    },
     keyOf: async (name) => {
       const fromEnv = process.env[`TOOLBOX_KEY_${String(name).toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
       if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
-      try { return readFileSync(path.join(dataDir, 'toolbox-keys', `${String(name).replace(/[^a-z0-9-]/g, '')}.key`), 'utf8').trim() || null; } catch { return null; }
+      try { return readFileSync(path.join(toolboxDir, `${String(name).replace(/[^a-z0-9-]/g, '')}.key`), 'utf8').trim() || null; } catch { return null; }
     },
     log: (tag, what, fields) => walkLog({ kind: 'toolbox', what, ...fields }),
   });

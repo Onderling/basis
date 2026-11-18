@@ -15,81 +15,102 @@
  */
 import { readToolboxCard, callTool, readItemList } from './toolboxClient.js';
 
-const RECORDS_KEY = 'tools.toolboxes';
+const ON_KEY = 'tools.on';
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
 const WORD = /^[a-zà-ÿ][a-zà-ÿ0-9-]{0,23}$/;
 
+/** A placed file as the operator wrote it, or null when it is not one (a bad name, address or words). */
+function readPlaced(p) {
+  const name = String(p?.name ?? '').trim();
+  if (!NAME.test(name) || !/^https?:\/\/[^\s/]+/.test(String(p?.url ?? ''))) return null;
+  const words = (Array.isArray(p?.words) ? p.words : [])
+    .filter((w) => w && WORD.test(String(w.word ?? '').toLowerCase()) && typeof w.tool === 'string' && w.tool)
+    .map((w) => ({ word: String(w.word).toLowerCase(), tool: w.tool, ...(typeof w.field === 'string' && w.field ? { field: w.field } : {}) }));
+  return { name, url: String(p.url), words };
+}
+
 /**
  * @param {object} a
- * @param {{get: (k: string) => Promise<string|null>, set: (k: string, v: string) => Promise<void>}} a.store   the box's vault
+ * @param {{get: (k: string) => Promise<string|null>, set: (k: string, v: string) => Promise<void>}} a.store   the box's vault: which are ON, and the card read at the yes
+ * @param {() => Promise<object[]>} a.placedOf   the operator's placed toolboxes (one file each: name, address, words)
  * @param {(name: string) => Promise<string|null>} a.keyOf   the operator's key for a toolbox, or null
  * @param {Function} [a.fetch]
  * @param {(...a: unknown[]) => void} [a.log]   codes only
  */
-export function makeToolboxOps({ store, keyOf, fetch = globalThis.fetch, log = () => {} } = {}) {
-  const read = async () => { try { const v = JSON.parse((await store.get(RECORDS_KEY)) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
-  // the words, held in memory for the deterministic gate (a rule answers synchronously); kept in step with every write
-  let words = [];
-  const remember = (records) => { words = records.flatMap((r) => (r.words ?? []).map((w) => ({ ...w, toolbox: r.name }))); };
-  const write = async (records) => { await store.set(RECORDS_KEY, JSON.stringify(records)); remember(records); };
+export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch = globalThis.fetch, log = () => {} } = {}) {
+  const readOn = async () => { try { const v = JSON.parse((await store.get(ON_KEY)) ?? '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } };
+  const placed = async () => { try { return (await placedOf() ?? []).map(readPlaced).filter(Boolean); } catch { return []; } };
   const keyFor = async (name) => { try { const k = await keyOf(name); return typeof k === 'string' && k.trim() ? k.trim() : null; } catch { return null; } };
-  const wordsOk = (words) => Array.isArray(words) && words.length > 0
-    && words.every((w) => w && WORD.test(String(w.word ?? '')) && typeof w.tool === 'string' && w.tool && (w.field == null || typeof w.field === 'string'));
+  // the words of the toolboxes that are ON, held in memory for the deterministic gate (a rule answers synchronously)
+  let words = [];
+  const remember = async (onMap) => {
+    const ps = await placed();
+    words = ps.filter((p) => onMap[p.name]).flatMap((p) => p.words.map((w) => ({ ...w, toolbox: p.name, title: onMap[p.name].title ?? p.name })));
+  };
+  const writeOn = async (onMap) => { await store.set(ON_KEY, JSON.stringify(onMap)); await remember(onMap); };
 
   return {
-    /** Read the records once at start, so the gate knows the words before the first add of this run. */
-    async load() { remember(await read()); },
-    /** The words that reach a tool now: `{word, tool, field?, toolbox}` (for the gate; no key, no address). */
+    /** Read once at start, so the gate knows the words of what is on before the first switch of this run. */
+    async load() { await remember(await readOn()); },
+    /** The words that reach a tool now (ON toolboxes only): `{word, tool, field?, toolbox, title}`. No key, no address. */
     wordsNow: () => words,
 
-    /** The admin adds a toolbox: its name, its address, the words for its tools. The key must already be on the box. */
-    async addToolbox({ name, url, words } = {}) {
+    /**
+     * Switch on a toolbox the operator placed. Without `confirm`: the card to say yes to (its name, address, words and
+     * what it receives), nothing switched. With `confirm` (the admin's yes, in the private chat): switched on.
+     */
+    async addToolbox({ name, confirm = false } = {}) {
       const n = String(name ?? '').trim();
-      if (!NAME.test(n)) return { ok: false, code: 'toolbox-bad-name' };
-      if (!/^https?:\/\/[^\s/]+/.test(String(url ?? ''))) return { ok: false, code: 'toolbox-bad-address', name: n };
-      if (!wordsOk(words)) return { ok: false, code: 'toolbox-bad-words', name: n };
-      if (!(await keyFor(n))) { log('tools', 'refused', { check: 'add', reason: 'toolbox-no-key' }); return { ok: false, code: 'toolbox-no-key', name: n }; }
-      const card = await readToolboxCard(url, { fetch });
+      const p = (await placed()).find((x) => x.name === n);
+      if (!p) return { ok: false, code: 'toolbox-not-placed', name: n };
+      if (!(await keyFor(n))) { log('tools', 'refused', { check: 'switch-on', reason: 'toolbox-no-key' }); return { ok: false, code: 'toolbox-no-key', name: n }; }
+      const card = await readToolboxCard(p.url, { fetch });
       if (!card.ok) { log('tools', 'refused', { check: 'card', reason: card.code }); return { ok: false, code: card.code, name: n }; }
       const offered = new Set(card.tools.map((t) => t.id));
-      const missing = words.find((w) => !offered.has(w.tool));
+      const missing = p.words.find((w) => !offered.has(w.tool));
       if (missing) return { ok: false, code: 'tool-not-offered', name: n, tool: missing.tool };
-      const record = { name: n, url: String(url), endpoint: card.endpoint, title: card.name, tools: card.tools,
-        words: words.map((w) => ({ word: String(w.word).toLowerCase(), tool: w.tool, ...(w.field ? { field: w.field } : {}) })) };
-      await write([...(await read()).filter((r) => r.name !== n), record]);
-      return { ok: true, name: n, tools: card.tools.map((t) => t.id) };
+      // what it receives, as codes the door words: the words of a question always; a list's references when a word's
+      // tool is one that prices a list (a `keys` field, Fable's section 7)
+      const receives = ['question', ...(p.words.some((w) => w.field === 'keys') ? ['list-refs'] : [])];
+      if (!confirm) return { ok: true, pending: true, name: n, title: card.name || n, url: p.url, words: p.words, receives };
+      const onMap = await readOn();
+      onMap[n] = { title: card.name || n, endpoint: card.endpoint, tools: card.tools.map((t) => ({ id: t.id, name: t.name })) };
+      await writeOn(onMap);
+      return { ok: true, on: true, name: n, title: onMap[n].title };
     },
 
-    /** The admin removes a toolbox: removing it is the switch (no capability row per toolbox). */
+    /** Switch a toolbox off (the admin): its words reach nothing; the operator's file stays. */
     async removeToolbox({ name } = {}) {
       const n = String(name ?? '').trim();
-      const records = await read();
-      if (!records.some((r) => r.name === n)) return { ok: false, code: 'toolbox-not-added', name: n };
-      await write(records.filter((r) => r.name !== n));
-      return { ok: true, name: n };
+      const onMap = await readOn();
+      if (!onMap[n]) return { ok: false, code: 'toolbox-off', name: n };
+      delete onMap[n];
+      await writeOn(onMap);
+      return { ok: true, on: false, name: n };
     },
 
-    /** The toolboxes and their tools and words. Never a key. */
-    async listTools() {
-      const records = await read();
-      return { ok: true, toolboxes: records.map((r) => ({ name: r.name, title: r.title ?? r.name, words: r.words, tools: r.tools })) };
+    /** The toolboxes: those ON (a member's view), or every placed one with its on/off (`all`, the admin's). Never a key. */
+    async listTools({ all = false } = {}) {
+      const onMap = await readOn();
+      const rows = (await placed()).map((p) => ({ name: p.name, title: onMap[p.name]?.title ?? p.name, on: Boolean(onMap[p.name]), words: p.words }));
+      return { ok: true, toolboxes: all ? rows : rows.filter((r) => r.on) };
     },
 
     /**
-     * A member uses a tool. Refused before anything leaves when the toolbox is not added, the tool is not one it
-     * offers, or its key is not on the box. A list of things comes back as choices (`items`); anything else as `output`.
+     * A member uses a tool of an ON toolbox. Refused before anything leaves when the toolbox is off or not placed, the
+     * tool is not one its card offered, or its key is not on the box. A list of things comes back as choices (`items`).
      */
     async useTool({ toolbox, tool, input } = {}) {
       const n = String(toolbox ?? '').trim();
-      const record = (await read()).find((r) => r.name === n);
-      if (!record) return { ok: false, code: 'toolbox-not-added', name: n };
-      if (!record.tools?.some((t) => t.id === tool)) return { ok: false, code: 'tool-not-offered', name: n, tool };
+      const live = (await readOn())[n];
+      if (!live || !(await placed()).some((p) => p.name === n)) return { ok: false, code: 'toolbox-off', name: n };
+      if (!live.tools?.some((t) => t.id === tool)) return { ok: false, code: 'tool-not-offered', name: n, tool };
       const key = await keyFor(n);
       if (!key) { log('tools', 'refused', { check: 'use', reason: 'toolbox-no-key' }); return { ok: false, code: 'toolbox-no-key', name: n }; }
-      const r = await callTool({ endpoint: record.endpoint, key, tool, input: input && typeof input === 'object' ? input : {}, fetch });
+      const r = await callTool({ endpoint: live.endpoint, key, tool, input: input && typeof input === 'object' ? input : {}, fetch });
       if (!r.ok) { log('tools', 'refused', { check: 'call', reason: r.code, ...(r.toolCode ? { toolCode: r.toolCode } : {}) }); return { ...r, name: n }; }
       const list = readItemList(r.output, { source: n });
-      return list.ok ? { ok: true, name: n, tool, items: list.items } : { ok: true, name: n, tool, output: r.output };
+      return list.ok ? { ok: true, name: n, title: live.title, tool, items: list.items } : { ok: true, name: n, title: live.title, tool, output: r.output };
     },
   };
 }

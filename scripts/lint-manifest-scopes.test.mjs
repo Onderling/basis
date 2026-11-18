@@ -5,7 +5,7 @@
  * it cannot go blind silently.
  */
 import { describe, it, expect } from 'vitest';
-import { auditManifest, loadManifests } from './lint-manifest-scopes.mjs';
+import { auditManifest, loadManifests, auditPlacedAgreement } from './lint-manifest-scopes.mjs';
 import { verbKind } from '../packages/app-manifest/src/atoms.js';
 
 const ok = (ops) => ({ app: 'x', hosts: [], operations: ops });
@@ -88,5 +88,20 @@ describe('lint-manifest-scopes', () => {
     // Declared outside `apps/*/manifest.js`: the parameter register and the device-log lanes.
     for (const a of ['params', 'governance', 'membership', 'keys', 'grants', 'items-lane', 'chat-lane']) expect(apps).toContain(a);
     for (const m of loaded) expect(Array.isArray(m.manifest?.operations), m.app).toBe(true);
+  });
+});
+
+
+describe("the reserved host word '@placed' (L1035)", () => {
+  const base = { app: 'x', itemTypes: [], operations: [] };
+  it("is accepted as a host; any other '@' word is not", () => {
+    expect(auditManifest({ ...base, hosts: ['@placed'] })).toEqual([]);
+    expect(auditManifest({ ...base, hosts: ['@anything'] }).map((p) => p.message).join()).toMatch(/only reserved word is '@placed'/);
+  });
+  it('the apps that declare it and the egress gate\'s list must agree, either way', () => {
+    const ms = [{ ...base, app: 'tools', hosts: ['@placed'] }, { ...base, app: 'lists', hosts: [] }];
+    expect(auditPlacedAgreement(ms, new Set(['tools']))).toEqual([]);
+    expect(auditPlacedAgreement(ms, new Set([])).join()).toMatch(/tools declares '@placed' but the egress gate/);
+    expect(auditPlacedAgreement(ms, new Set(['tools', 'lists'])).join()).toMatch(/treats lists as reaching outside but its manifest/);
   });
 });

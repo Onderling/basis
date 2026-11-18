@@ -13,6 +13,9 @@ export const toolsManifest = Object.freeze({
   version: '0.1.0',
   description: 'A circle uses the tools of the toolboxes its admin added: one op for every tool, a word per tool.',
   itemTypes: [],
+  // the hosts a box's OPERATOR places as toolboxes (the reserved word, docs/conventions/manifest-standard.md): none is
+  // fixed in the code; the egress gate treats this app as one that reaches outside
+  hosts: ['@placed'],
   // the non-atom verbs, classified: a tool call reads (it asks; nothing of the circle is written), adding and removing a
   // toolbox write this device's record
   domainVerbs: { use: 'read', 'add-toolbox': 'write', 'remove-toolbox': 'write' },

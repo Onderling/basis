@@ -58,6 +58,8 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
     async load() { await remember(await readOn()); },
     /** The words that reach a tool now (ON toolboxes only): `{word, tool, field?, toolbox, title}`. No key, no address. */
     wordsNow: () => words,
+    /** Is this toolbox on now (the egress gate asks before a call leaves)? */
+    isOn: async (name) => Boolean((await readOn())[String(name ?? '').trim()]),
 
     /**
      * Switch on a toolbox the operator placed. Without `confirm`: the card to say yes to (its name, address, words and
@@ -173,4 +175,21 @@ export function toolboxHelpLines(words, t, lang = 'nl') {
 export function toolboxWelcomeLine(words, t, lang = 'nl') {
   const lines = toolboxHelpLines(words, t, lang);
   return lines.length ? t('circle.bot.toolbox_welcome', { lines: lines.join('; ') }) : null;
+}
+
+/** The device-log kind of a toolbox call's record (packages/item-store entryKinds: kept like the own record, local). */
+export const TOOL_CALL_KIND = 'tool-call';
+
+/**
+ * One record of a toolbox call: the whitelisted keys only (who asked, which toolbox, which tool, how it ended), never
+ * the words of the question, whatever else the caller holds.
+ * @param {{person?: string|null, toolbox?: string|null, tool?: string|null, outcome?: string, ts?: number}} a
+ */
+export function makeToolCallEntry({ person = null, toolbox = null, tool = null, outcome = 'ok', ts = Date.now() } = {}) {
+  const str = (v) => (typeof v === 'string' && v ? v : null);
+  return {
+    id: `${TOOL_CALL_KIND}:${ts.toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+    type: TOOL_CALL_KIND, ts, silent: true,
+    payload: { person: str(person), toolbox: str(toolbox), tool: str(tool), outcome: ['ok', 'refused', 'failed'].includes(outcome) ? outcome : 'failed' },
+  };
 }

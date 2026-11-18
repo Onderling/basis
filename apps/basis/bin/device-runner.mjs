@@ -119,7 +119,8 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText } from '../src/v2/toolboxes.js';   // a circle's toolboxes (L1035): the key from the operator's config
+import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry } from '../src/v2/toolboxes.js';
+import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
@@ -377,7 +378,17 @@ const agent = await createRealHouseholdAgent({
 // windowed classes — the bot's turns with each person among them (chat class) — age out on this device's chat window.
 try { deviceLog.setRetention(retentionFromDays(agent.getParamValue?.('retention.chatDays'))); } catch { /* the defaults stand */ }
 // `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
-const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
+// THE EGRESS GATE (L1035): a call to an app that reaches outside (its manifest declares the host '@placed') passes it:
+// exactly a toolbox's tool and its input leave, a toolbox that is not on is refused before the call, and every call is
+// recorded on this box (who, which toolbox, which tool, how it ended; never the words). `ctx` travels on.
+let toolboxesRef = null;
+const callSkill = wrapCallSkillWithEgressGate((app, op, args, ctx) => agent.callSkill(app, op, args, ctx), {
+  isExternalEgress: (app, op) => isExternalEgressOp(app, op),
+  toolCall: {
+    isOn: async (name) => Boolean(await toolboxesRef?.isOn?.(name)),
+    record: (r) => { try { deviceLog.append(makeToolCallEntry(r)); } catch { /* the record never breaks a call */ } },
+  },
+});
 // A household bot's companion is not configured here: the person linked as its admin hands it the companion's card
 // from their app, in the same act as granting it the agenda files there (`identity-link.companion`, below).
 
@@ -1390,6 +1401,7 @@ if (tgToken || inboxDoor.bridge) {
     log: (tag, what, fields) => walkLog({ kind: 'toolbox', what, ...fields }),
   });
   await toolboxes.load();
+  toolboxesRef = toolboxes;
   agent.mountAppOps('tools', {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {

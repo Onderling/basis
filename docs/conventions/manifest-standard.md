@@ -160,6 +160,12 @@ device-log lanes) are checked like the app manifests.
   and the consent card, which read the declaration itself (an extension that declares both a data-read grant
   and a network host is refused certification). So a false `[]` is not harmless until the realm arrives — it
   is a future false claim on a card.
+  **One reserved word: `'@placed'`** — "the hosts a box's operator places as toolboxes; none is fixed in the code" (the
+  `tools` app, `docs/catalogue/tools.md`). `hosts` stays a list of strings; the word stands in it. Its declaration is
+  honest because it binds: an app that declares `'@placed'` is exactly an app the box's egress gate treats as one that
+  reaches outside (`externalOrigins` in `apps/basis/src/core/agent/egressGate.js`, derived from these declarations),
+  and `lint-manifest-scopes` is red when the two disagree, either way. What a person reads is never the word but the
+  real address, on the toolbox's card.
 
 Nothing at runtime reads either declaration yet; the extension contract (`docs/extending.md`) is where they
 will bind.

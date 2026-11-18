@@ -220,7 +220,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         ok: true, itemId: made.id ?? null, kind: made.type ?? null,
         // what was put on which list: the door words it (`replyLine`), folding several adds into one line
         entry: text, list: target.text ?? ref, ...(thingIn.quantity > 1 ? { quantity: thingIn.quantity } : {}),
-        message: t('circle.lists.added', { text, name: target.text ?? ref }),
+        message: t('circle.lists.added', { text: entryWords({ text, quantity: thingIn.quantity }), name: target.text ?? ref }),
       };
     },
 

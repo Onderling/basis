@@ -59,6 +59,7 @@ describe('a list entry carries a reference to a thing and a quantity', () => {
     });
     expect(added?.ok, JSON.stringify(added)).toBe(true);
     entryId = added.itemId;
+    expect(added.message, 'the first add says how many too').toContain('2× Halfvolle melk 1 L');
 
     const onA = await A.agent.circleStoreFor(CIRCLE_ID).get(entryId);
     expect(refersTo(onA, MILK), 'A holds the reference in the entry\'s embeds, as a plain reference').toBe(true);

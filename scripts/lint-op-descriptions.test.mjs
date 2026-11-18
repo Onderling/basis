@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auditDescriptions, shrunkBaseline } from './lint-op-descriptions.mjs';
+import { auditDescriptions, shrunkBaseline, unreadFiles } from './lint-op-descriptions.mjs';
 
 // one app, two ops; `params` per op
 const declared = { lists: { addToList: ['list', 'text'], listLists: [] }, tasks: { addTask: ['title'] } };
@@ -46,5 +46,11 @@ describe('lint-op-descriptions', () => {
   it('--update only SHRINKS the baseline: described or gone apps leave, a new undescribed app is never added', () => {
     const declared2 = { ...declared, brandNew: { x: [] } };
     expect(shrunkBaseline({ declared: declared2, files: { lists: { nl: good, en: goodEn } }, baseline: ['lists', 'tasks', 'gone'] })).toEqual(['tasks']);
+  });
+
+  it('a descriptions file on disk that the reader does not import is red: words nobody reads', () => {
+    const onDisk = ['apps/lists/descriptions.en.json', 'apps/lists/descriptions.nl.json', 'apps/calendar/descriptions.nl.json'];
+    expect(unreadFiles(onDisk, { lists: { en: {}, nl: {} } })).toEqual(['apps/calendar/descriptions.nl.json']);
+    expect(unreadFiles(onDisk.slice(0, 2), { lists: { en: {}, nl: {} } })).toEqual([]);
   });
 });

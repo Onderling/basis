@@ -15,7 +15,7 @@
  * And: an app with no files that is not in the baseline; a baseline app that now has its files or no manifest. The
  * baseline (`scripts/op-descriptions-baseline.json`, the apps still owed their words) only shrinks: one app per PR.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
@@ -85,6 +85,23 @@ export function auditDescriptions({ declared, files, baseline }) {
   return problems;
 }
 
+// an app folder whose name is not its app id
+const APP_OF_DIR = { 'tasks-v0': 'tasks' };
+
+/**
+ * The descriptions files on disk that the reader does not import: words nobody reads (red). `paths` are repo-relative
+ * `apps/<dir>/descriptions.<lang>.json`; `registry` is the reader's `{ app: { lang: … } }`.
+ * @returns {string[]}
+ */
+export function unreadFiles(paths, registry) {
+  return paths.filter((p) => {
+    const m = /^apps\/([^/]+)\/descriptions\.([a-z]+)\.json$/.exec(p);
+    if (!m) return false;
+    const app = APP_OF_DIR[m[1]] ?? m[1];
+    return !registry?.[app]?.[m[2]];
+  });
+}
+
 /** What `--update` writes: the baseline with described or gone apps REMOVED; never an app added. */
 export function shrunkBaseline({ declared, files, baseline }) {
   return [...new Set(baseline)].filter((app) => app in declared && !files[app]).sort();
@@ -100,7 +117,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`lint-op-descriptions: baseline shrunk ${before.length} → ${owed.length} (it never grows: a new app ships its words)`);
     process.exit(0);
   }
-  const problems = auditDescriptions({ declared, files, baseline: before });
+  const ROOT = path.resolve(HERE, '..');
+  const onDisk = readdirSync(path.join(ROOT, 'apps'), { withFileTypes: true }).filter((d) => d.isDirectory())
+    .flatMap((d) => readdirSync(path.join(ROOT, 'apps', d.name)).filter((f) => /^descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/${d.name}/${f}`));
+  const problems = [
+    ...auditDescriptions({ declared, files, baseline: before }),
+    ...unreadFiles(onDisk, files).map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
+  ];
   if (problems.length) {
     console.error(`✖ lint-op-descriptions: ${problems.length} problem(s)`);
     for (const p of problems.slice(0, 40)) console.error(`  ${p}`);

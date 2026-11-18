@@ -38,6 +38,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the kept conversation with the assistant (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to
   // empty it — web twin: vandaagPlus.js `plus-thread`
   turns = [], onForget = null,
+  // what the "+" says as it opens (the shared door's `opening`), asked once per open: `openingFor(asSelf)` →
+  // `{intro: {lines, tryLabel, examples}}` the first time, `{news}` once for circles joined since — web twin: `opening`
+  openingFor = null,
   // the line naming the route that answers (`plusRouteLine`, shared): painted above the conversation
   routeLine = null,
   // what can be typed here: `suggestFor(line)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
@@ -64,6 +67,14 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [line, setLine] = useState('');
   const [card, setCard] = useState(null);
   const [done, setDone] = useState(null);
+  const [opening, setOpening] = useState(null);
+  // asked once per open, for the conversation's self; an edit of an own row is no conversation opening
+  useEffect(() => {
+    if (!visible || edit?.act || typeof openingFor !== 'function' || !turnsSelf) { if (!visible) setOpening(null); return; }
+    let live = true;
+    Promise.resolve(openingFor(turnsSelf)).then((o) => { if (live) setOpening(o ?? null); }).catch(() => {});
+    return () => { live = false; };
+  }, [visible]);   // eslint-disable-line react-hooks/exhaustive-deps -- once per open, as on web
   useEffect(() => {
     if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); setCard(null); setDone(null); return; }
     if (edit?.act) { setActId(edit.act.id); setValues(edit.values ?? {}); setAsSelf(edit.asSelf ?? 'default'); }  // changed as the self that made it
@@ -124,8 +135,20 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
             const piece = {
-              'plus-thread': () => (!edit && Array.isArray(shownTurns) && shownTurns.length ? (
+              'plus-thread': () => (!edit && (opening?.intro || opening?.news || (Array.isArray(shownTurns) && shownTurns.length)) ? (
             <View testID="vandaag-plus-thread" accessibilityLabel={t('circle.vandaag.plus_thread')}>
+              {/* what the "+" says as it opens: what it is, with examples from what the person has; or, once, what is new */}
+              {opening?.news ? <Text style={styles.turn} testID="vandaag-plus-news">{opening.news}</Text> : null}
+              {opening?.intro ? (
+                <View testID="vandaag-plus-intro">
+                  {(opening.intro.lines ?? []).map((l, i) => <Text key={`intro-${i}`} style={styles.turn}>{l}</Text>)}
+                  <Text style={styles.turn}>{opening.intro.tryLabel}</Text>
+                  {(opening.intro.examples ?? []).map((ex) => (
+                    // a tap puts the example in the line; it does not send (web twin: circle-vandaag-plus__example)
+                    <Btn key={ex} variant="ghost" style={styles.btnAt} onPress={() => setLine(ex)} testID="vandaag-plus-example" label={ex} />
+                  ))}
+                </View>
+              ) : null}
               {shownTurns.map((turn, i) => (
                 <Text key={`${turn.ts ?? i}-${i}`} testID={`vandaag-plus-turn-${turn.who === 'you' ? 'you' : 'assistant'}`}
                   style={[styles.turn, turn.who === 'you' ? styles.turnYou : null]}>{turn.text}</Text>

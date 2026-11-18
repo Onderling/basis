@@ -1909,6 +1909,14 @@
     "plus_help_no_model": {
       "text": "Zonder model lees ik vaste zinnen. Een model stel je in bij {{place}}.",
       "doc": "\"help\" in the \"+\", last line with no own model set: what it does without one and where to set one ({{place}}: the screens' labels joined by arrows). Fable's words."
+    },
+    "plus_help_ask": {
+      "text": "Vraag ook hoe iets werkt, bijvoorbeeld: {{example}}",
+      "doc": "\"help\" in the \"+\", before the model line: it answers how things work ({{example}}: plus_help_ask_example). Fable's words."
+    },
+    "plus_help_ask_example": {
+      "text": "hoe nodig ik iemand uit?",
+      "doc": "The example in plus_help_ask: a question a help card answers (tested: the \"+\" reads it as help with a card)."
     }
   },
   "screens": {

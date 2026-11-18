@@ -101,6 +101,8 @@ export function plusHelp({ reads = [], acts = [], hasCircle = false, routeLine =
   if (hasCircle) out.push(t('circle.vandaag.plus_intro_circle'));
   // what to try: the intro's examples (`plusIntro`, each one a line the "+" reads), so help still teaches the list lines
   if (tryLine) out.push(tryLine);
+  // that it answers how things work, with an example a help card answers (tested)
+  out.push(t('circle.vandaag.plus_help_ask', { example: t('circle.vandaag.plus_help_ask_example') }));
   out.push(routeLine || t('circle.vandaag.plus_help_no_model', { place: modelPlace }));
   return out;
 }

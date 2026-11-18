@@ -1,0 +1,56 @@
+/**
+ * THE "+" SAYS WHAT IT IS — the assistant plan's step B (ledger L1025), shared by both sheets, which only paint it.
+ *
+ * - The first open of a self's conversation: three lines with no model call: what it is, that a circle's things go
+ *   through the card, and examples to try, built from what the person HAS (one of their own lists, a circle they are
+ *   in), filled with fixed ones. A tap on an example puts the line in the field; it does not send. Every example is a
+ *   line the "+" reads here (tested through the door itself): an example that does nothing would contradict it.
+ * - A later open: one line for each circle joined since the person was last told (`plusNews`), then never again for
+ *   it. A circle that went away says nothing; "help" shows what is there now. The Help circle is never news: the "+"
+ *   never offers it.
+ *
+ * What the person was told is a set of circle ids the shell keeps per self on this device (not an act; nothing about
+ * it leaves the device). The acts a bot or an app added since ("Nieuw door …") wait for step C's descriptions: a
+ * manifest names no source a person would recognise yet.
+ */
+import { HELP_CIRCLE_ID } from './helpCircle.js';
+
+const FIXED_EXAMPLES = Object.freeze(['circle.vandaag.plus_intro_ex_note', 'circle.vandaag.plus_intro_ex_appt', 'circle.vandaag.plus_intro_ex_plan']);
+
+/**
+ * The first open's lines and examples.
+ * @param {{ownLists?: Array<{name?: string}>, circles?: Array<{id?: string, name?: string}>, t: Function, helpCircleId?: string}} o
+ * @returns {{lines: string[], tryLabel: string, examples: string[]}}
+ */
+export function plusIntro({ ownLists = [], circles = [], t, helpCircleId = HELP_CIRCLE_ID } = {}) {
+  if (typeof t !== 'function') throw new TypeError('plusIntro: t required');
+  const examples = [];
+  const add = (line) => { if (line && !examples.includes(line) && examples.length < 3) examples.push(line); };
+  const list = (Array.isArray(ownLists) ? ownLists : []).find((l) => typeof l?.name === 'string' && l.name.trim());
+  if (list) add(t('circle.vandaag.plus_intro_ex_list', { list: list.name.trim() }));
+  const circle = (Array.isArray(circles) ? circles : []).find((c) => c?.id && c.id !== helpCircleId && typeof c?.name === 'string' && c.name.trim());
+  if (circle) add(t('circle.vandaag.plus_intro_ex_circle', { circle: circle.name.trim() }));
+  for (const key of FIXED_EXAMPLES) add(t(key));
+  return {
+    lines: [t('circle.vandaag.plus_intro_own'), t('circle.vandaag.plus_intro_circle')],
+    tryLabel: t('circle.vandaag.plus_intro_try'),
+    examples,
+  };
+}
+
+/**
+ * What changed since the person was last told: one line for the circles joined since, or null. `told` is what the
+ * shell kept last time (`null` the first time: then the intro speaks and this only remembers). Returns the set to keep.
+ * @param {{told?: {circles?: string[]}|null, circles?: Array<{id?: string, name?: string}>, t: Function, helpCircleId?: string}} o
+ * @returns {{line: string|null, told: {circles: string[]}}}
+ */
+export function plusNews({ told = null, circles = [], t, helpCircleId = HELP_CIRCLE_ID } = {}) {
+  const now = (Array.isArray(circles) ? circles : []).filter((c) => c?.id && c.id !== helpCircleId);
+  const keep = { circles: now.map((c) => c.id) };
+  if (!told || !Array.isArray(told.circles)) return { line: null, told: keep };
+  const known = new Set(told.circles);
+  const joined = now.filter((c) => !known.has(c.id));
+  if (!joined.length || typeof t !== 'function') return { line: null, told: keep };
+  const names = joined.map((c) => (typeof c.name === 'string' && c.name.trim()) || t('circle.screens.untitled'));
+  return { line: t('circle.vandaag.plus_news_circle', { circle: names.join(', ') }), told: keep };
+}

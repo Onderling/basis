@@ -89,7 +89,7 @@
   },
   "installAgent": {
     "what": "Install an agent, with no rights until you give them.",
-    "params": {"catalogueId": "which one from the list", "card": "or its card", "grants": "which rights it gets at once", "name": "the name", "persona": "as which persona you give them"}
+    "params": {"catalogueId": "which one from the list", "card": "or its card", "grants": "which rights it gets at once", "name": "the name", "persona": "as which persona you give the rights"}
   },
   "listDataVersions": {
     "what": "Show earlier versions of something in a circle's storage.",

@@ -89,7 +89,7 @@
   },
   "installAgent": {
     "what": "Installeer een agent, zonder rechten tot je ze geeft.",
-    "params": {"catalogueId": "welke uit de lijst", "card": "of zijn kaart", "grants": "welke rechten hij meteen krijgt", "name": "de naam", "persona": "als welke persona je die geeft"}
+    "params": {"catalogueId": "welke uit de lijst", "card": "of zijn kaart", "grants": "welke rechten hij meteen krijgt", "name": "de naam", "persona": "als welke persona je de rechten geeft"}
   },
   "listDataVersions": {
     "what": "Laat eerdere versies zien van iets in de opslag van een kring.",

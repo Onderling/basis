@@ -1550,7 +1550,12 @@
 .circle-screen__block--empty { padding: 4px 0; font-size: 14px; color: var(--ink-soft); }
 .circle-screen__more { font: inherit; font-size: 13px; padding: 2px 0; border: 0; background: none; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .circle-screen__more:hover { color: var(--ink); }
-.circle-screen__tasks-circle { flex: 0 0 auto; margin-right: 6px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
+/* the circle's tag on its own line above the task, the task across the row (a long name beside it squeezed the task to
+   one word per line at phone width); the list without the browser's indent, like the other lists */
+.circle-screen__tasks-list { list-style: none; margin: 0; padding: 0; }
+.circle-screen__tasks-row { flex-wrap: wrap; row-gap: 2px; }
+.circle-screen__tasks-text { flex: 1 1 0; min-width: 0; }
+.circle-screen__tasks-circle { flex: 0 0 100%; margin: 0; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
 /* a row's own act ("Change"): a quiet text button, the accent's ink only on hover */
 .circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
 .circle-screen__row-act:hover { color: var(--accent-ink); }
@@ -1658,3 +1663,8 @@
 .circle-nearby__tab { flex: 1; padding: 10px 6px; background: none; border: none; font: inherit; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .circle-nearby__tab.is-selected { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
 .circle-nearby__panel > * + * { margin-top: 12px; }
+
+/* NEARBY'S STREAM (nearbyStream): a question or an offered circle between the chat lines is a boxed card with a head,
+   so it never reads as one more chat line */
+.circle-nearby__stream-card { margin: 8px 0; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent-ink); border-radius: var(--radius); }
+.circle-nearby__stream-head { font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; }

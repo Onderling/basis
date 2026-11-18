@@ -18,7 +18,7 @@ export const LANG_OPTIONS = Object.freeze([
 ]);
 
 /** Transport-mode options exposed in the General section. */
-export const TRANSPORT_MODES = Object.freeze(['nkn', 'relay', 'both']);
+export { TRANSPORT_MODES } from '../../v2/circleSettingsControls.js';   // the one list of transport modes
 
 /** Initial panel state — both reads start as null (loading). */
 export function initialState() {

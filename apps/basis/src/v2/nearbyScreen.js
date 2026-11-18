@@ -78,17 +78,43 @@ export const NEARBY_INVITE_LABELS = Object.freeze({
  * face, else the same `peer-…` the person rows show, so a reader can match a line to a row); when: the clock time.
  * Both shells paint exactly these fields.
  * @param {Array<{id: string, text: string, from?: string|null, createdAt?: number, receivedAt?: number}>} messages
- * @param {{rows?: Array<{id: string, label?: string}>, me?: string|null, t: Function}} o
+ * @param {{rows?: Array<{id: string, pseudonym?: string}>, me?: string|null, t: Function}} o
  * @returns {Array<{id: string, text: string, who: string, when: string, mine: boolean}>}
  */
 export function nearbyChatLines(messages = [], { rows = [], me = null, t } = {}) {
-  const byId = new Map((Array.isArray(rows) ? rows : []).map((r) => [r?.id, r]));
+  const whoOf = nearbyWho({ rows, t });
   return (Array.isArray(messages) ? messages : []).map((m) => {
     const mine = (me != null && m?.from === me) || (m?.createdAt != null && m?.receivedAt == null);
-    const row = m?.from ? byId.get(m.from) : null;
-    const who = mine ? t('circle.nearbyScreen.chat_you') : (row?.label || pickPeerLabel({ pubKey: m?.from ?? '' }) || t(SOMEONE_LABEL_KEY));
-    return { id: m?.id, text: m?.text ?? '', who, when: timeWords(m?.receivedAt ?? m?.createdAt), mine };
+    const who = mine ? t('circle.nearbyScreen.chat_you') : whoOf(m?.from);
+    // `at`: when the line arrived here (mine: when I said it) — the stream orders by it (`nearbyStream`)
+    const at = m?.receivedAt ?? m?.createdAt;
+    return { id: m?.id, text: m?.text ?? '', who, when: timeWords(at), at, mine };
   });
+}
+
+/**
+ * How the room names someone by their room address: the name their row shows (a face, else their own name), else the
+ * same `peer-…` the person rows use, else "someone". One rule for a chat line, a question and an offered circle.
+ * @param {{rows?: Array<{id: string, pseudonym?: string}>, t: Function}} o
+ * @returns {(from: string|null|undefined) => string}
+ */
+export function nearbyWho({ rows = [], t } = {}) {
+  const byId = new Map((Array.isArray(rows) ? rows : []).map((r) => [r?.id, r]));
+  return (from) => {
+    const row = from ? byId.get(from) : null;
+    // `pseudonym` is the name the row shows (a face, else the peer's own name, else `peer-…`, `buildNearbyModel`)
+    return row?.pseudonym || pickPeerLabel({ pubKey: from ?? '' }) || t(SOMEONE_LABEL_KEY);
+  };
+}
+
+/** The visibility states in which the room does not see this person: "even stil", the radio off, no level chosen yet.
+ *  Announced against the person's wish ("still visible") is not among them — the room sees the device anyway. */
+const HIDDEN_KEYS = Object.freeze(['hidden', 'not_chosen', 'radio_off']);
+
+/** Whether the room cannot see this person. While it cannot, they say nothing to it: a chat line or a question would
+ *  go to every peer this device sees, from its room address, and tell the room someone is there. */
+export function nearbyIsHidden(visibility) {
+  return HIDDEN_KEYS.includes(nearbyVisibilityKey(visibility));
 }
 
 export function nearbyVisibilityKey(visibility) {
@@ -279,7 +305,10 @@ export function createNearbyScreen({
       catch (err) { try { onError?.(err, 'evaluateAsk'); } catch { /* diagnostics only */ } }
     }
     asksInFlight.delete(ask.id);
-    asks.set(ask.id, { ask, resonant: !!evaluated.resonant, reason: evaluated.reason ?? null });
+    // `receivedAt` on THIS device's clock: where its card lands in the stream, and whether it is new. Not the
+    // sender's `createdAt` — a sender could date it in the future and pin it to the bottom of every room.
+    const prior = asks.get(ask.id);
+    asks.set(ask.id, { ask, resonant: !!evaluated.resonant, reason: evaluated.reason ?? null, receivedAt: prior?.receivedAt ?? now() });
     pruneAsks();
     emitCoalesced();
   }
@@ -416,15 +445,20 @@ export function createNearbyScreen({
       .filter((inv) => isInviteLive(inv, now))
       .map((inv) => ({ invite: inv, ...inviteActions(inv, { now }) }));
 
+    // who asked, who offers the circle: named as their chat lines are (`nearbyWho`), for the cards in the stream
+    const whoOf = nearbyWho({ rows: withCards, t });
+    const askRowsNamed = askRows.map((entry) => ({ ...entry, who: whoOf(entry.ask?.from) }));
+    const inviteRowsNamed = inviteRows.map((entry) => ({ ...entry, who: whoOf(entry.invite?.from) }));
+
     return {
       ...built,
       rows: withCards,
-      asks: askRows,
+      asks: askRowsNamed,
       myAsks: myAskRows,
       // How many asks this device declined to process, because one sender was flooding. Reported so a
       // surface can be honest about a partial view rather than presenting a filtered room as the room.
       asksIgnored,
-      invites: inviteRows,
+      invites: inviteRowsNamed,
       allows,
       // Only present when I have joined the conversation. An empty array would read as "nobody has said
       // anything", which is a different fact from "I am not in this chat".
@@ -581,6 +615,8 @@ export function createNearbyScreen({
      * ask list — the room is what other people asked; my own question is not news to me.
      */
     async askRoom({ text, tags = [], ttlMs } = {}) {
+      // hidden from the room: a question would tell it someone is here (`nearbyIsHidden`); `notice` is what to say
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'ask_hidden' };
       const built = createAsk({ text, tags, ttlMs, from: safeCall(myRoomAddress, null), now });
       if (!built.ok) return { ok: false, reason: built.reason };
       if (!askChannel?.broadcast) return { ok: false, reason: 'no-channel', ask: built.ask };
@@ -650,6 +686,8 @@ export function createNearbyScreen({
      * the room's much tighter expiry ceiling.
      */
     async publishInvite({ uri, circleId, circleName, expiresAt } = {}) {
+      // hidden from the room: offering a circle would tell it someone is here (`nearbyIsHidden`)
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'invite_hidden' };
       const built = prepareBroadcastInvite({
         uri, circleId, circleName, expiresAt,
         allows: publishAllows, from: safeCall(myRoomAddress, null), now,
@@ -681,6 +719,8 @@ export function createNearbyScreen({
     /** Publish my card to the room. Refused unless the card allow is on. */
     async showCard({ label, line, tags } = {}) {
       if (!allows.card) return { ok: false, reason: 'card-not-allowed' };
+      // hidden from the room: a card would tell it someone is here (`nearbyIsHidden`)
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'card_hidden' };
       // the room self's level `none`: the room is told nothing — no card, whatever was typed
       if (typeof roomLevel === 'function') {
         let level = null;
@@ -699,8 +739,10 @@ export function createNearbyScreen({
       }
     },
 
-    /** Say something in the room chat. The allow is enforced in `createChatMessage`, not here. */
+    /** Say something in the room chat. The allow is enforced in `createChatMessage`; being hidden, here. */
     async say(text) {
+      // hidden from the room: a line would tell it someone is here (`nearbyIsHidden`); `notice` is what to say
+      if (nearbyIsHidden(visibility())) return { ok: false, reason: 'hidden', notice: 'chat_hidden_line' };
       const built = createChatMessage({ text, from: safeCall(myRoomAddress, null), allows, now });
       if (!built.ok) return built;
       if (!askChannel?.broadcastKind) return { ok: false, reason: 'no-channel' };

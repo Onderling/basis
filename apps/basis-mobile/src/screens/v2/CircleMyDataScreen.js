@@ -360,7 +360,7 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
     // not one: the only listGroups is a core GroupManager method, so calling it would have left
     // this list silently empty forever — the exact `screens/**` trap the gotchas file names.)
     try {
-      const cs = await loadCircles(circleSourcesFromAgent({ callSkill }));
+      const cs = await loadCircles(circleSourcesFromAgent({ callSkill, unnamedCircleName: () => t('circle.launcher.unnamed') }));
       setCirclesForConnections((Array.isArray(cs) ? cs : [])
         .map((c) => ({ id: c.id, name: c.name ?? c.label ?? c.id })).filter((c) => c.id));
     } catch { /* leave the previous list rather than blanking it on a transient */ }

@@ -513,6 +513,10 @@
     "not_here": {
       "text": "niet op dit apparaat",
       "doc": "A folded tile's note: this device does not hold this circle (the kring opt-out, My data)."
+    },
+    "unnamed": {
+      "text": "Kring zonder naam",
+      "doc": "A circle's tile, header and Today tag when nobody's name for it reached this device (joined through an invite that carried none): never its key."
     }
   },
   "tile": {
@@ -3611,6 +3615,42 @@
     "tab_questions": {
       "text": "Vragen",
       "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
+    "tab_with_new": {
+      "text": "{{label}} · {{count}}",
+      "doc": "A Nearby tab's name with how many things arrived since the person last looked at that tab; only when there is at least one."
+    },
+    "ask_hidden": {
+      "text": "Je bent verborgen. Een vraag laat de ruimte weten dat je er bent: word eerst zichtbaar.",
+      "doc": "Said when a hidden person sends a question: the controller refuses it, because it would tell the room someone is there."
+    },
+    "card_hidden": {
+      "text": "Je bent verborgen. Je kaartje laat de ruimte weten dat je er bent: word eerst zichtbaar.",
+      "doc": "Said when a hidden person shows their card: the controller refuses it, because it would tell the room someone is there."
+    },
+    "invite_hidden": {
+      "text": "Je bent verborgen. Een kring aanbieden laat de ruimte weten dat je er bent: word eerst zichtbaar.",
+      "doc": "Said when a hidden person offers a circle here: the controller refuses it, for the same reason."
+    },
+    "chat_hidden_line": {
+      "text": "Je bent verborgen. Word zichtbaar om mee te praten.",
+      "doc": "The Conversation tab while the person is hidden from the room: no stream, this line and the way to become visible."
+    },
+    "ask_hidden_line": {
+      "text": "Je bent verborgen. Word zichtbaar om iets te vragen.",
+      "doc": "The Questions tab while the person is hidden from the room: no ask box, this line and the way to become visible."
+    },
+    "chat_hidden_action": {
+      "text": "Word zichtbaar",
+      "doc": "Button under the hidden line: the existing act that ends being hidden (leave \"even stil\", or the radio back on)."
+    },
+    "stream_ask_from": {
+      "text": "Vraag van {{name}}",
+      "doc": "Head of a question card in the Conversation stream, so it reads as a question and not as a chat line."
+    },
+    "stream_invite_from": {
+      "text": "Kring aangeboden door {{name}}",
+      "doc": "Head of an offered-circle card in the Conversation stream."
     },
     "invites_title": {
       "text": "Kringen die hier open staan",

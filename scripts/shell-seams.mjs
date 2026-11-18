@@ -318,6 +318,11 @@ export const SEAMS = Object.freeze([
   // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself
   // says something else in the thread.
+  // THE "+" SAYS WHAT IT IS (the assistant plan's step B): the sheet asks the door's opening once per open; the door keeps
+  // what it told on the device log (`plus-told`), so a shell that does not ask paints the intro never, and one that does
+  // not hand `toldLog` paints it on every open
+  { id: 'plus-opening', pattern: /\.opening\(\{/, shells: ['web', 'mobile'], why: 'the "+" says what it is the first time, and once what is new, on every shell' },
+  { id: 'plus-told-log', pattern: /createPlusDoor\(\{[^}]*toldLog:/, shells: ['web', 'mobile'], why: 'what the "+" told a person is kept on their device, so it is said once' },
   { id: 'plus-own-lists', pattern: /createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
   { id: 'plus-done-line', pattern: /plusDoneLine\(/, shells: ['web', 'mobile'], why: 'the "+" thread says what a line did in one wording, a list\'s read with done and not done' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,

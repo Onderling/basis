@@ -1,7 +1,7 @@
 {
   "addTask": {
     "what": "Maak een nieuwe taak.",
-    "params": {"text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "definitionOfDone": "wanneer het klaar is", "claimConfirmation": "of oppakken eerst bevestigd moet worden", "claimLease": "hoe lang iemand hem vast mag houden"}
+    "params": {"text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "definitionOfDone": "waaraan je ziet dat het klaar is", "claimConfirmation": "of oppakken eerst bevestigd moet worden", "claimLease": "hoe lang iemand hem vast mag houden"}
   },
   "claimTask": {
     "what": "Pak een taak op: jij gaat hem doen.",
@@ -24,7 +24,7 @@
     "params": {"id": "welke taak"}
   },
   "attachTaskGrant": {
-    "what": "Geef iemand voor deze taak wat extra rechten, tot hij klaar is.",
+    "what": "Geef iemand voor deze taak wat extra rechten, tot de taak klaar is.",
     "params": {"taskId": "welke taak", "member": "aan wie"}
   },
   "reassignTask": {
@@ -53,7 +53,7 @@
   },
   "listMine": {
     "what": "Laat zien wat jij nog moet doen.",
-    "params": {"who": "of van wie"}
+    "params": {"who": "van wie, als het niet om jou gaat"}
   },
   "listClaimable": {
     "what": "Laat taken zien die nog niemand doet.",
@@ -65,7 +65,7 @@
   },
   "resolveClaim": {
     "what": "Kies wie een taak doet als twee hem tegelijk oppakten.",
-    "params": {"taskId": "welke taak", "decision": "de jouwe, de hunne of allebei"}
+    "params": {"taskId": "welke taak", "decision": "jij, de ander of allebei"}
   },
   "listAwaitingApproval": {
     "what": "Laat ingeleverde taken zien die op goedkeuring wachten.",
@@ -105,7 +105,7 @@
   },
   "clearInbox": {
     "what": "Haal je meldingen weg.",
-    "params": {"olderThanMs": "alleen wat ouder is dan dit"}
+    "params": {"olderThanMs": "alleen wat ouder is dan zoveel milliseconden"}
   },
   "getDagTree": {
     "what": "Laat een taak zien met alles wat eronder hangt.",
@@ -121,7 +121,7 @@
   },
   "editTask": {
     "what": "Pas een taak aan.",
-    "params": {"id": "welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "wanneer het klaar is", "scheduledAt": "wanneer je eraan werkt", "estimateMinutes": "hoeveel minuten het kost", "visibility": "wie hem kan zien"}
+    "params": {"id": "welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "waaraan je ziet dat het klaar is", "scheduledAt": "wanneer je eraan werkt", "estimateMinutes": "hoeveel minuten het kost", "visibility": "wie hem kan zien"}
   },
   "provisionMyCircle": {
     "what": "Maak een nieuwe kring.",
@@ -137,7 +137,7 @@
   },
   "setMyAvailability": {
     "what": "Zeg of je een halve dag kunt.",
-    "params": {"cellKey": "welke halve dag, en of je kunt"}
+    "params": {"cellKey": "week, dag, ochtend of middag, kan of niet"}
   },
   "setAvailabilityOptIn": {
     "what": "Zeg of anderen mogen zien wanneer je kunt.",
@@ -176,7 +176,7 @@
     "params": {}
   },
   "issueInvite": {
-    "what": "Maak een uitnodiging voor de kring, voor een keer.",
+    "what": "Maak een uitnodiging voor de kring die één keer werkt.",
     "params": {"role": "als lid of beheerder", "ttl-hours": "hoeveel uur hij geldt"}
   },
   "redeemInvite": {
@@ -185,11 +185,11 @@
   },
   "addSubtask": {
     "what": "Maak een deeltaak onder een taak.",
-    "params": {"parentTaskId": "onder welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "wanneer het klaar is"}
+    "params": {"parentTaskId": "onder welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "waaraan je ziet dat het klaar is"}
   },
   "proposeSubtask": {
     "what": "Stel een deeltaak voor onder een ingeleverde taak.",
-    "params": {"parentTaskId": "onder welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "wanneer het klaar is"}
+    "params": {"parentTaskId": "onder welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "waaraan je ziet dat het klaar is"}
   },
   "forceSpawnSubtask": {
     "what": "Maak als beheerder toch een deeltaak, buiten de gewone regels.",

@@ -1,7 +1,7 @@
 {
   "addTask": {
     "what": "Make a new task.",
-    "params": {"text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "definitionOfDone": "when it counts as done", "claimConfirmation": "whether taking it on needs confirming", "claimLease": "how long someone may hold it"}
+    "params": {"text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "definitionOfDone": "how you can tell it is done", "claimConfirmation": "whether taking it on needs confirming", "claimLease": "how long someone may hold it"}
   },
   "claimTask": {
     "what": "Take on a task: you will do it.",
@@ -24,7 +24,7 @@
     "params": {"id": "which task"}
   },
   "attachTaskGrant": {
-    "what": "Give someone extra rights for this task, until it is done.",
+    "what": "Give someone extra rights for this task, until the task is done.",
     "params": {"taskId": "which task", "member": "to whom"}
   },
   "reassignTask": {
@@ -53,7 +53,7 @@
   },
   "listMine": {
     "what": "Show what you still have to do.",
-    "params": {"who": "or whose"}
+    "params": {"who": "whose, if not yours"}
   },
   "listClaimable": {
     "what": "Show tasks nobody has taken on yet.",
@@ -65,7 +65,7 @@
   },
   "resolveClaim": {
     "what": "Choose who does a task two people took on at once.",
-    "params": {"taskId": "which task", "decision": "yours, theirs or both"}
+    "params": {"taskId": "which task", "decision": "you, the other or both"}
   },
   "listAwaitingApproval": {
     "what": "Show handed in tasks waiting for approval.",
@@ -105,7 +105,7 @@
   },
   "clearInbox": {
     "what": "Clear your notifications.",
-    "params": {"olderThanMs": "only those older than this"}
+    "params": {"olderThanMs": "only those older than this many milliseconds"}
   },
   "getDagTree": {
     "what": "Show a task with everything under it.",
@@ -121,7 +121,7 @@
   },
   "editTask": {
     "what": "Change a task.",
-    "params": {"id": "which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "when it counts as done", "scheduledAt": "when you work on it", "estimateMinutes": "how many minutes it takes", "visibility": "who can see it"}
+    "params": {"id": "which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "how you can tell it is done", "scheduledAt": "when you work on it", "estimateMinutes": "how many minutes it takes", "visibility": "who can see it"}
   },
   "provisionMyCircle": {
     "what": "Make a new circle.",
@@ -137,7 +137,7 @@
   },
   "setMyAvailability": {
     "what": "Say whether you are free for half a day.",
-    "params": {"cellKey": "which half day, and whether you can"}
+    "params": {"cellKey": "week, day, morning or afternoon, free or not"}
   },
   "setAvailabilityOptIn": {
     "what": "Say whether others may see when you are free.",
@@ -176,7 +176,7 @@
     "params": {}
   },
   "issueInvite": {
-    "what": "Make an invite to the circle, for one use.",
+    "what": "Make an invite to the circle that works once.",
     "params": {"role": "as member or admin", "ttl-hours": "for how many hours it holds"}
   },
   "redeemInvite": {
@@ -185,11 +185,11 @@
   },
   "addSubtask": {
     "what": "Make a subtask under a task.",
-    "params": {"parentTaskId": "under which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "when it counts as done"}
+    "params": {"parentTaskId": "under which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "how you can tell it is done"}
   },
   "proposeSubtask": {
     "what": "Propose a subtask under a task that was handed in.",
-    "params": {"parentTaskId": "under which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "when it counts as done"}
+    "params": {"parentTaskId": "under which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "how you can tell it is done"}
   },
   "forceSpawnSubtask": {
     "what": "As admin, make a subtask anyway, outside the usual rules.",

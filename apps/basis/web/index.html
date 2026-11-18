@@ -12,14 +12,10 @@
     <!-- pre-boot cache of display.theme — this runs before any module, which is why the cache exists -->
     <script>try{var _t=localStorage.getItem('basis.theme');if(_t==='dark'||_t==='light')document.documentElement.dataset.theme=_t}catch(e){}</script>
     <link rel="stylesheet" href="./v2/circle.css" />
-    <!-- SP-13.2.1 — nkn-sdk CDN.  circleApp.js bootstraps NKN at boot
-         so kring chat-messages can fan out to peers.  Same script the
-         classic-shell page used.  Failures fall through gracefully —
-         the kring view still works locally without a peer transport. -->
-    <script
-      src="https://cdn.jsdelivr.net/npm/nkn-sdk@1.3.4/dist/nkn.min.js"
-      onload="window.__cc_nkn_loaded = true;"
-      onerror="window.__cc_nkn_load_error = 'CDN load failed';"></script>
+    <!-- The NKN library, from THIS origin (ledger L1041: nothing the app runs comes from another origin). It is the
+         installed nkn-sdk, served and built in by vite.config.js (sameOriginNkn); circleApp.js reads window.nkn and
+         stays local-only or relay-only without it. -->
+    <script src="./vendor/nkn.min.js"></script>
   </head>
   <body>
     <div class="circle-page">

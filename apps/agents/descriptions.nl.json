@@ -1,0 +1,102 @@
+{
+  "listAgents": {
+    "what": "Laat je agents zien: je apparaten en wie namens je werkt.",
+    "params": {}
+  },
+  "viewAgent": {
+    "what": "Laat een agent zien: wat hij kan en mag.",
+    "params": {"agentId": "welke agent"}
+  },
+  "setAgentSkillExposure": {
+    "what": "Laat anderen een vaardigheid van een agent wel of niet zien.",
+    "params": {"agentId": "welke agent", "skillId": "welke vaardigheid", "exposed": "zichtbaar of niet", "circleId": "alleen in deze kring"}
+  },
+  "getAgentSkillExposure": {
+    "what": "Laat zien welke vaardigheden van een agent anderen zien.",
+    "params": {"agentId": "welke agent", "circleId": "zoals deze kring het ziet"}
+  },
+  "createProfile": {
+    "what": "Maak een nieuwe persona, te herstellen met je herstelzin.",
+    "params": {"name": "de naam", "id": "een vast kenmerk", "properties": "wat ze van je overneemt"}
+  },
+  "setProfileProperty": {
+    "what": "Leg iets over een persona vast, zoals waar je woont.",
+    "params": {"id": "welke persona", "key": "wat", "value": "de waarde"}
+  },
+  "getProfileProperties": {
+    "what": "Laat zien wat er over een persona is vastgelegd.",
+    "params": {"id": "welke persona"}
+  },
+  "setProfileDriver": {
+    "what": "Leg vast wat een persona drijft: een doel, een hobby.",
+    "params": {"id": "welke persona", "key": "een vast kenmerk", "kind": "wat voor soort", "text": "in een paar woorden", "tags": "trefwoorden, met komma's"}
+  },
+  "removeProfileDriver": {
+    "what": "Haal iets weg van wat een persona drijft.",
+    "params": {"id": "welke persona", "key": "welke"}
+  },
+  "getProfileDrivers": {
+    "what": "Laat zien wat een persona drijft.",
+    "params": {"id": "welke persona"}
+  },
+  "setProfileCircleMembership": {
+    "what": "Onthoud bij een persona dat ze in een kring zit.",
+    "params": {"id": "welke persona", "circleId": "welke kring", "handle": "haar naam daar", "address": "haar adres daar", "sight": "wat ze daar ziet"}
+  },
+  "removeProfileCircleMembership": {
+    "what": "Haal een kring weg bij een persona, na vertrek.",
+    "params": {"id": "welke persona", "circleId": "welke kring"}
+  },
+  "setProfileDisclosure": {
+    "what": "Kies of een persona iets over zich deelt in een kring.",
+    "params": {"id": "welke persona", "contextId": "in welke kring", "key": "wat", "enabled": "delen of niet", "rung": "hoe precies"}
+  },
+  "getProfileDisclosure": {
+    "what": "Laat zien wat een persona waar deelt.",
+    "params": {"id": "welke persona"}
+  },
+  "getPersonaView": {
+    "what": "Laat \"Over mij\" zien: wat er over een persona is vastgelegd, en waar ze het deelt.",
+    "params": {"id": "welke persona"}
+  },
+  "getPersonaRelease": {
+    "what": "Laat zien wat een persona in een kring zou delen.",
+    "params": {"id": "welke persona", "contextId": "in welke kring", "keys": "alleen deze dingen"}
+  },
+  "revokeAgent": {
+    "what": "Zet een agent uit: al zijn rechten vervallen.",
+    "params": {"agentId": "welke agent"}
+  },
+  "grantAgent": {
+    "what": "Geef een agent een recht, voor een tijd.",
+    "params": {"agentId": "welke agent", "skill": "voor welke handeling", "profile": "voor welke persona", "capability": "wat voor recht", "expiresInDays": "hoeveel dagen het geldt", "subject": "wie het recht krijgt", "persona": "als welke persona je het geeft"}
+  },
+  "grantRole": {
+    "what": "Geef iemand een rol in een kring.",
+    "params": {"groupId": "in welke kring", "role": "welke rol", "agentId": "aan welke agent", "subject": "aan wie", "expiresInDays": "hoeveel dagen het geldt"}
+  },
+  "revokeGrant": {
+    "what": "Neem een agent een recht af; de agent blijft.",
+    "params": {"agentId": "welke agent", "tokenId": "welk recht"}
+  },
+  "purgeAgent": {
+    "what": "Wis een agent voorgoed, zonder dat er iets van bewaard blijft.",
+    "params": {"agentId": "welke agent"}
+  },
+  "listCatalogue": {
+    "what": "Laat agents zien die je kunt installeren.",
+    "params": {}
+  },
+  "installAgent": {
+    "what": "Installeer een agent, zonder rechten tot je ze geeft.",
+    "params": {"catalogueId": "welke uit de lijst", "card": "of zijn kaart", "grants": "welke rechten hij meteen krijgt", "name": "de naam", "persona": "als welke persona je de rechten geeft"}
+  },
+  "listDataVersions": {
+    "what": "Laat eerdere versies zien van iets in de opslag van een kring.",
+    "params": {"circleId": "welke kring", "uri": "van welk bestand"}
+  },
+  "restoreDataVersion": {
+    "what": "Zet iets in de opslag van een kring terug naar een eerdere versie; ook dat kan terug.",
+    "params": {"circleId": "welke kring", "uri": "welk bestand", "version": "welke versie"}
+  }
+}

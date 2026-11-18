@@ -2494,6 +2494,66 @@
       "reassign": {
         "text": "Toewijzen",
         "doc": ""
+      },
+      "get": {
+        "text": "Bekijken",
+        "doc": "Label of the generic verb, beside the others."
+      },
+      "update": {
+        "text": "Aanpassen",
+        "doc": "Label of the generic verb, beside the others."
+      }
+    },
+    "verb_what": {
+      "add": {
+        "text": "Maak {{a_noun}}.",
+        "doc": "What a generic op with this verb does, for a person (step C): {{a_noun}} the noun with its article (Dutch een + one; English a/an by its first letter), {{nouns}} the plural, bare. Beside the verb label."
+      },
+      "list": {
+        "text": "Laat je {{nouns}} zien.",
+        "doc": "What a generic op with this verb does, for a person (step C): {{a_noun}} the noun with its article (Dutch een + one; English a/an by its first letter), {{nouns}} the plural, bare. Beside the verb label."
+      },
+      "get": {
+        "text": "Laat {{a_noun}} zien.",
+        "doc": "What a generic op with this verb does, for a person (step C): {{a_noun}} the noun with its article (Dutch een + one; English a/an by its first letter), {{nouns}} the plural, bare. Beside the verb label."
+      },
+      "update": {
+        "text": "Pas {{a_noun}} aan.",
+        "doc": "What a generic op with this verb does, for a person (step C): {{a_noun}} the noun with its article (Dutch een + one; English a/an by its first letter), {{nouns}} the plural, bare. Beside the verb label."
+      },
+      "remove": {
+        "text": "Haal {{a_noun}} weg.",
+        "doc": "What a generic op with this verb does, for a person (step C): {{a_noun}} the noun with its article (Dutch een + one; English a/an by its first letter), {{nouns}} the plural, bare. Beside the verb label."
+      }
+    },
+    "verb_param": {
+      "add": {
+        "body": {
+          "text": "wat erin staat",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
+        }
+      },
+      "get": {
+        "id": {
+          "text": "welke je bedoelt",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
+        }
+      },
+      "update": {
+        "body": {
+          "text": "wat er nu in staat",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
+        },
+        "id": {
+          "text": "welke je bedoelt",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
+        }
+      },
+      "remove": {
+        "id": {
+          "text": "welke je bedoelt",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
+        }
       }
     },
     "title": {

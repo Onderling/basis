@@ -1,17 +1,17 @@
 {
   "owed": [
-    "agents",
     "assistant",
     "basis",
     "chat-lane",
     "governance",
     "grants",
-    "household",
     "items-lane",
     "keys",
     "membership",
     "params",
-    "pinboard",
-    "tasks"
+    "pinboard"
+  ],
+  "nounsOwed": [
+    "pinboard.lend"
   ]
 }

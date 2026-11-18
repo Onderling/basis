@@ -86,7 +86,7 @@ export const tasksManifest = {
   // Keys ∈ itemTypes; atoms are CANONICAL SDK atoms.
   nouns: {
     // shown in a merged view: newest first; mine when I hold it
-    task:            { atoms: ['add', 'list', 'update', 'remove', 'complete', 'claim', 'reassign', 'submit', 'approve', 'reject', 'revoke'],
+    task:            { atoms: ['add', 'list', 'update', 'remove', 'complete', 'claim', 'confirm', 'reassign', 'submit', 'approve', 'reject', 'revoke'],
       presents: { primary: 'complete', label: 'title', moment: 'addedAt', order: 'desc', mine: ['assignee', 'holders', 'assignees'],
         done: { field: 'state', values: ['done', 'approved', 'completed', 'cancelled', 'archived'] } },
       names: { nl: { one: 'taak', other: 'taken' }, en: { one: 'task', other: 'tasks' } } },

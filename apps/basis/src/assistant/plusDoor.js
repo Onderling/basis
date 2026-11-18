@@ -130,6 +130,10 @@ const OWN_PLACE_CACHE = new WeakMap();
  * process, per thread, so the phone's door-per-call keeps it too; never written anywhere.
  */
 const PLUS_LAST_READS = createLastReads();
+// The door a form the "+" opened from a line came through, and the act it is for, per conversation, until it is
+// settled: the phone composes a door per call, so what a Save (`formDoor`) and `settled` need to name the same door for
+// the yes and the no (ownActions.js) lives beside the thread.
+const PLUS_OPEN_FORM_DOOR = new Map();
 
 /**
  * What the model is told about the place it answers in (LLM-facing; the circle door's twin is `CIRCLE_LINES`): the
@@ -185,22 +189,24 @@ export function availableOnly(catalogue, manifestsByOrigin = {}, policy = null) 
  * @param {string} [a.lang]
  * @param {() => Promise<Array>} [a.circles]       the person's circles, as `plusLineOutcome` reads them
  * @param {(asSelf: string|null) => Promise<Array>} [a.ownListsOf]   the ticked self's own lists
- * @param {(command: object, circleId: string, asSelf: string|null) => Promise<any>} [a.runInCircle]  a circle act the
- *        plain reading runs at once (the circle is clear)
+ * @param {(command: object, circleId: string, asSelf: string|null, door?: string) => Promise<any>} [a.runInCircle]  a
+ *        circle act the plain reading runs at once (the circle is clear); `door` is the door it came through (`phrase`),
+ *        for the person's own record (ownActions.js), to be handed to the waist with the call
  * @param {Function} [a.interpret]                 the interpreter (default `interpretToCommand`; a stand-in in tests)
  * @param {object} [a.householdManifest]          the household manifest the person's agent carries (`agent.manifest`)
  * @param {string[]} [a.apps]                       the apps to compose (default: those that declare an own act)
  * @param {Array} [a.acts]                         the own acts (default: the catalogue's own-scope attach entries)
- * @param {(asSelf: string|null) => Function} [a.readAs]  the shell's call AS a self (the waist's `actAs`): what the
- *        assistant reads for a line (own notes, appointments, list entries), and a read the model picks, run through
- *        it as the self the "+" writes as
+ * @param {(asSelf: string|null, door?: string) => Function} [a.readAs]  the shell's call AS a self (the waist's `actAs`):
+ *        what the assistant reads for a line (own notes, appointments, list entries), and a read the model picks, run
+ *        through it as the self the "+" writes as. `door`: the door the read was asked through (slash, phrase, model),
+ *        handed to the waist with the call; none for what the door reads for itself (retrieval)
  * @param {(asSelf: string|null) => {key: string|null, isDefault: boolean}} [a.selfOf]  that self's key
  * A read takes `opts.onSlow`: called when the model is slow and retrying, so the sheet can say "even geduld".
  */
 export function createPlusDoor({
   llm = null, threads = null, threadId = null, t, lang = 'nl', circles = async () => [], ownListsOf = async () => [],
   runInCircle = null, interpret = interpretToCommand, householdManifest, apps, acts = PLUS_ACTS,
-  readAs = null, selfOf: selfOfIn = null, selfKeyOf = null, toldLog = null,
+  readAs = null, selfOf: selfOfIn = null, selfKeyOf = null, toldLog = null, noteOwn = null,
 } = {}) {
   if (typeof t !== 'function') throw new TypeError('createPlusDoor: t required');
   const memory = threads?.memory ?? null;
@@ -226,15 +232,15 @@ export function createPlusDoor({
   const reads = (e) => verbKind(manifestsByOrigin?.[e?.appOrigin] ?? null, e?.op?.verb ?? e?.op?.__generic?.atom) === 'read';
   /** A read as the self the "+" writes as, on the own scope. */
   // a read as one self, cut to that self's rows where the route answers every self (the reader's own rule, `cutToSelf`)
-  const readOwn = async (asSelf, e, args) => cutToSelf(e.appOrigin, await readAs(asSelf)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE }), selfOf(asSelf));
+  const readOwn = async (asSelf, e, args, door = undefined) => cutToSelf(e.appOrigin, await readAs(asSelf, door)(e.appOrigin, e.op.id, { ...(args ?? {}), circleId: OWN_DEVICES_SCOPE }), selfOf(asSelf));
   /**
    * A read for this conversation: as its one self, or, for a SET read together, as EACH self of the set (the same union
    * retrieval reads), every row tagged with the self it is (`self`); one self's refusal leaves the others' rows.
    */
   const readForTurn = async (ctx, e, args) => {
     const set = Array.isArray(ctx?.selves) && ctx.selves.length > 1 ? ctx.selves : null;
-    if (!set) return readOwn(ctx?.asSelf ?? null, e, args);
-    const parts = await Promise.all(set.map(async (id) => ({ id, r: await Promise.resolve(readOwn(id, e, args)).catch(() => null) })));
+    if (!set) return readOwn(ctx?.asSelf ?? null, e, args, ctx?.door);
+    const parts = await Promise.all(set.map(async (id) => ({ id, r: await Promise.resolve(readOwn(id, e, args, ctx?.door)).catch(() => null) })));
     const items = parts.flatMap(({ id, r }) => (Array.isArray(r?.items) ? r.items.map((it) => ({ ...it, self: id })) : []));
     return parts.every(({ r }) => r?.ok === false) ? parts[0].r : { ok: true, items };
   };
@@ -251,7 +257,18 @@ export function createPlusDoor({
     const said = typeof r?.message === 'string' ? r.message : typeof r?.reply === 'string' ? r.reply : null;
     return r?.ok === false ? { error: (typeof r.error === 'object' ? r.error?.message : r.error) || t('circle.vandaag.plus_line_unread') } : said ? { done: said } : unread();
   };
-  const unread = () => ({ error: t('circle.vandaag.plus_line_unread') });
+  // what the "+" could place nowhere: marked (never a field on the answer the sheets paint) so `read` notes it
+  const placedNowhere = new WeakSet();
+  const unread = () => { const r = { error: t('circle.vandaag.plus_line_unread') }; placedNowhere.add(r); return r; };
+  // THE PERSON'S OWN RECORD for what no op shows (ownActions.js): a proposal turned down (`declined`, naming the act it
+  // proposed) and a line placed nowhere (`no_act`, no op). The shell hands the agent's note, which follows the person's
+  // switch; never the words. A note that fails never breaks the turn.
+  const note = ({ app = null, op = null, outcome, door, circleId = null }) => {
+    if (typeof noteOwn !== 'function') return;
+    try { Promise.resolve(noteOwn({ app, op, outcome, door, circleId })).catch(() => {}); } catch { /* never the turn's */ }
+  };
+  // the door the line now being read came through (slash, phrase, model): what a `no_act` names
+  let lineDoor = null;
 
   // What this turn came to: set by the engine's sinks while the turn runs (the lane runs one turn at a time).
   let outcome = null;
@@ -313,7 +330,7 @@ export function createPlusDoor({
     }
     if (e && !reads(e) && !actRunsAtOnce(acts.find((a) => a.opId === cmd.opId))) {
       const { circleId: _c, ...args } = cmd.args ?? {};
-      outcome = { card: { line: currentLine, to: [{ circleId: OWN_DEVICES_SCOPE, name: '', own: true }], command: { appOrigin: e.appOrigin, opId: e.op.id, args } } };
+      outcome = { card: { line: currentLine, to: [{ circleId: OWN_DEVICES_SCOPE, name: '', own: true }], command: { appOrigin: e.appOrigin, opId: e.op.id, args }, door: ctx?.door ?? lineDoor } };
       return;
     }
     if (!act) { outcome = unread(); return; }
@@ -380,16 +397,18 @@ export function createPlusDoor({
     const asSelf = primary;
     const slash = text.startsWith('/') ? commands.parse(text) : null;
     if (slash) {
+      lineDoor = 'slash';
       outcome = null;
       currentLine = text;
-      await answer({ opId: slash.opId, args: slash.args ?? {} }, { asSelf, selves: set, id: threadIdFor(set) });
+      await answer({ opId: slash.opId, args: slash.args ?? {} }, { asSelf, selves: set, id: threadIdFor(set), door: 'slash' });
       return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
     }
+    lineDoor = 'phrase';
     const o = plusLineOutcome(text, { circles: await circles(), own: { lists: await ownListsOf(asSelf) }, lang });
     if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
     // a circle act the plain reading runs at once: what the run says (`{error}` or `{done}`, its reply line)
-    if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf) : null) ?? unread();
-    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };
+    if (o?.kind === 'circle' && o.atOnce) return (typeof runInCircle === 'function' ? await runInCircle(o.command, o.circleId, asSelf, 'phrase') : null) ?? unread();
+    if (o?.kind === 'circle') return { card: { line: text, to: o.to, command: o.command, door: 'phrase', ...(o.makeList ? { makeList: o.makeList } : {}), ...(o.followUp ? { followUp: o.followUp } : {}) } };
     // an own act's form, filled as the primary self (the form may change it)
     if (o?.kind === 'own') return o.actId ? { actId: o.actId, values: o.values ?? {}, asSelf } : o;
     // the plain reading did not take it: the person's own model, or no model at all (the line goes nowhere, and the
@@ -399,10 +418,11 @@ export function createPlusDoor({
     if (gated) {
       outcome = null;
       currentLine = text;
-      await answer(gated, { asSelf, selves: set, id: threadIdFor(set) });
+      await answer(gated, { asSelf, selves: set, id: threadIdFor(set), door: 'phrase' });
       return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
     }
-    if (!llm) return { done: plusNoModelAnswer({ t }) };
+    if (!llm) { const r = { done: plusNoModelAnswer({ t }) }; placedNowhere.add(r); return r; }
+    lineDoor = 'model';
     outcome = null;
     currentLine = text;
     currentOnSlow = typeof opts.onSlow === 'function' ? opts.onSlow : null;
@@ -413,8 +433,12 @@ export function createPlusDoor({
   return {
     /** One line read, and kept: the line and what the door answered go into this conversation's thread afterwards. */
     async read(line, opts = {}) {
+      lineDoor = null;
       const r = await read(line, opts);
       const thread = r?.askSelf ? null : threadIdFor(setOf(opts).set);
+      if (r && placedNowhere.has(r) && lineDoor) note({ outcome: 'no_act', door: lineDoor });
+      // a form opened from a line: the door it came through, until it is settled (`settled` notes a refused one)
+      if (thread) { if (r?.actId) PLUS_OPEN_FORM_DOOR.set(thread, { door: lineDoor ?? 'phrase', actId: r.actId }); else PLUS_OPEN_FORM_DOOR.delete(thread); }
       // a turn ended: the read it made lives one turn more, an older one goes
       if (thread) PLUS_LAST_READS.turnEnded(thread);
       if (memory && thread) {
@@ -450,7 +474,19 @@ export function createPlusDoor({
      * conversation, as a closed form is. Returns what was said, or null without a thread.
      * @param {{asSelf?: string|null, selves?: string[]|null}} opts @param {{line?: string}} card
      */
+    /**
+     * The door a Save of this act comes through: the door of the line the "+" opened its form from (the model's
+     * proposal, a phrase), so a yes is recorded by the same door as a no; none for a form the person opened by its
+     * button (the act strip's wrapper names that a tap). Read before the Save; `settled` clears it after.
+     * @param {{asSelf?: string|null, selves?: string[]|null}} opts @param {string} actId
+     * @returns {string|undefined}
+     */
+    formDoor(opts = {}, actId = null) {
+      const open = PLUS_OPEN_FORM_DOOR.get(threadIdFor(setOf(opts).set));
+      return open && open.actId === actId ? open.door : undefined;
+    },
     async cardRefused(opts = {}, card = null) {
+      if (card?.command?.opId) note({ app: card.command.appOrigin ?? null, op: card.command.opId, outcome: 'declined', door: card.door ?? 'phrase' });
       const thread = threadIdFor(setOf(opts).set);
       if (!memory || !thread) return null;
       const said = t('circle.vandaag.plus_card_not_done', { line: card?.line ?? '' });
@@ -467,6 +503,10 @@ export function createPlusDoor({
       if (!act) return null;
       // another act saved by its button while this form was open: THIS form was not saved (said now, not at a later close)
       const kept = saved && (!actId || actId === act.id);
+      const door = PLUS_OPEN_FORM_DOOR.get(thread)?.door ?? 'phrase';
+      PLUS_OPEN_FORM_DOOR.delete(thread);
+      // a proposal turned down: noted (a save is recorded by the waist, as the act it is)
+      if (!kept) note({ app: act.appOrigin ?? null, op: act.opId ?? null, outcome: 'declined', door });
       const said = t(kept ? 'circle.vandaag.plus_act_saved' : 'circle.vandaag.plus_act_not_saved', { act: plusLabel(t, act) });
       memory.remember(thread, 'system', said);
       return said;

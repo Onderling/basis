@@ -2209,19 +2209,23 @@ export default function CircleLauncherScreen({
 
   // a circle's act the "+" line read: as the person, through the waist with the circle named, so the circle's own doors
   // and governance decide (the "+" has no authority the circle's composer lacks); answers what it did, or why not
-  const plusRunInCircle = async (command, circleId, asSelf = null) => {
+  // `door`: the door the line came through when the "+" ran it at once (`phrase`); none for a pick on the card (a tap)
+  const plusRunInCircle = async (command, circleId, asSelf = null, door = undefined) => {
     const op = plusCircleOp(command, circleId);
     if (!op) return { error: t('circle.vandaag.plus_line_unread') };
     // an own list's op runs as the ticked self (`plusAsSelf`); a circle's as the person
-    const r = await Promise.resolve(op.own ? plusAsSelf(asSelf)(op.app, op.opId, op.args) : bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    const r = await Promise.resolve(op.own ? plusAsSelf(asSelf, door)(op.app, op.opId, op.args) : (door ? bundle?.callSkill?.(op.app, op.opId, op.args, { door }) : bundle?.callSkill?.(op.app, op.opId, op.args))).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     if (r?.ok === false || r?.error) return { error: t('circle.vandaag.plus_failed', { error: r.error ?? '' }) };
     refreshScreensBook();
     return { done: plusDoneLine(r, { opId: op.opId, args: op.args, t }) };
   };
-  // a call AS the self ticked in the "+" (the waist's actAs): it rides that self's own lane; the default needs no saying
-  const plusAsSelf = (asSelf) => {
+  // a call AS the self ticked in the "+" (the waist's actAs): it rides that self's own lane; the default needs no saying.
+  // Through the wrapped waist for every self (a persona's act paints the strip and names its door as the general self's
+  // does); `door`: the door the "+" read it through (its own record, ownActions.js) — web twin: circleApp `callAs`
+  const plusAsSelf = (asSelf, door = undefined) => {
     const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
-    return (app, opId, args) => (actAs ? bundle?.agent?.callSkill?.(app, opId, args, { actAs }) : bundle?.callSkill?.(app, opId, args));
+    const ctx = actAs || door ? { ...(actAs ? { actAs } : {}), ...(door ? { door } : {}) } : undefined;
+    return (app, opId, args) => (ctx ? bundle?.callSkill?.(app, opId, args, ctx) : bundle?.callSkill?.(app, opId, args));
   };
   // the person's OWN lists, of the ticked self (read as that self, so another self's are never read) — web twin: ownLists
   const plusOwnListsOf = (asSelf) => plusOwnLists(plusAsSelf(asSelf));
@@ -2258,6 +2262,8 @@ export default function CircleLauncherScreen({
   const plusSelfKeyOf = (id) => (!id || id === 'default' ? plusSelf : (heldSelves.find((p) => p.id === id)?.webid ?? null));
   const plusDoorNow = () => createPlusDoor({
     llm: plusSelf ? ownModelOf(userLlmCfg) : null, threads: plusThread?.threads ?? null, selfKeyOf: plusSelfKeyOf, readAs: plusAsSelf,
+    // what no op shows (a proposal declined, a line placed nowhere) in the person's own record — web twin: circleApp
+    noteOwn: (e) => bundle?.agent?.noteOwnAct?.(e),
     householdManifest: bundle?.agent?.manifest, t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
     // what the "+" told this person it can reach, kept on this device's log (`plus-told`) — web twin: circleApp toldLog
     toldLog: eventLog,
@@ -2314,7 +2320,7 @@ export default function CircleLauncherScreen({
         onCircleRun={async (card, circleId, asSelf) => {
           const r = await plusDoorNow().exchange({ asSelf }, async () => {
             let last = null;
-            for (const c of plusCardCommands(card)) { last = await plusRunInCircle(c, circleId, asSelf); if (last?.error) break; }
+            for (const c of plusCardCommands(card)) { last = await plusRunInCircle(c, circleId, asSelf, card?.door); if (last?.error) break; }   // the yes by the line's door, as the no (web twin)
             return last;
           });
           setPlusTurnsTick((n) => n + 1);
@@ -2347,9 +2353,9 @@ export default function CircleLauncherScreen({
           // a page with no block showing it gets one (undoable)
           const op = plusEdit ? plusSaveOp(actId, values, { id: plusEdit.id }) : plusOp(actId, values);
           if (op.error) return t(op.error);
-          // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-          const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
-          const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+          // made AS the ticked self (`plusAsSelf`: the wrapped waist, its actAs), by the door of the line the "+" opened
+          // this form from (a yes as its no); a form opened by its button, a tap (web twin: circleApp onSave)
+          const r = await Promise.resolve(plusAsSelf(asSelf, plusEdit ? undefined : plusDoorNow().formDoor({ asSelf }, actId))(op.app, op.opId, op.args))
             .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
           if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
           // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)

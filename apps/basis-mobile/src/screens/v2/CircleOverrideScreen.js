@@ -16,6 +16,7 @@ import { mergeMemberOverride } from '@onderling-app/basis';
 import { buildCapabilityMatrix } from '@onderling/app-manifest';
 import { buildManifestsByOrigin } from '../../core/composeManifests.js';
 import { t } from '../../core/localisation.js';
+import { capabilityLabel } from '../../../../basis/src/v2/capabilityLabel.js';   // a capability as a person reads it, one lookup (web twin)
 
 const TOP_TOGGLES = ['chatOff', 'revealOpen', 'agentsMayContactMe'];
 const FLOW_TOGGLES = ['tasksToPersonal', 'calendarToPersonal'];
@@ -132,7 +133,7 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
               const current = new Set(working.capabilityOptOuts || []);
               return (
                 <View key={r.key} style={styles.row} testID={`override-cap-${r.key}`}>
-                  <Text style={styles.rowLabel}>{`${verbLabel(r.atom)} · ${r.noun}${floorTag}`}</Text>
+                  <Text style={styles.rowLabel}>{`${capabilityLabel(t, r)}${floorTag}`}</Text>
                   <Switch /* sets: store:member-override — a capability you opt out of */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                     value={!r.optedOut}
                     onValueChange={(participate) => {
@@ -155,12 +156,6 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
   );
 }
 
-/** Localised atom verb label, falling back to the atom when no key is translated. */
-function verbLabel(atom) {
-  const k = `circle.settings.verb.${atom}`;
-  const v = t(k);
-  return v && v !== k ? v : atom;
-}
 
 const makeStyles = (theme) => StyleSheet.create({
   page:     { flex: 1, paddingHorizontal: 16, paddingTop: 12, backgroundColor: theme.color.paper },

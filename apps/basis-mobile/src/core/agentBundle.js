@@ -76,7 +76,7 @@ import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnec
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
 // into the ENCAPSULATED identity secret (only the closure escapes).
-import { makeSharedWithMeStoreRN, makeAvailabilityStoreRN } from './circleStoresRN.js';
+import { makeSharedWithMeStoreRN, makeAvailabilityStoreRN, makeCirclePolicyStoreRN, makeMemberOverrideStoreRN } from './circleStoresRN.js';
 import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
 import { primeCircleSecurity, announceCircleAddresses, presenceCircleIds } from '../../../basis/src/v2/circleSecurityPriming.js';
 
@@ -403,6 +403,16 @@ export async function bootAgentBundle(opts = {}) {
       seedPinboardProfile: opts.seedPinboardProfile,
       seedPinboardPosts:   opts.seedPinboardPosts,
       getActiveCircleId: getActiveCircle,   // per-circle store scoping — the active circle scopes chat ops
+      // a person's write in a circle asks that circle's capability set at the outer waist (L1042): the phone hands in
+      // only its stores (the same AsyncStorage keys the launcher's stores read); the decision is the agent's
+      circleCapabilityInputs: (() => {
+        let stores = null;
+        const open = () => (stores ??= { policy: makeCirclePolicyStoreRN(AsyncStorage), override: makeMemberOverrideStoreRN(AsyncStorage) });
+        return async (circleId) => ({
+          policy: (await open().policy.get(circleId).catch(() => null)) ?? {},
+          override: (await open().override.get(circleId).catch(() => null)) ?? {},
+        });
+      })(),
       // L3 — household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.
     });

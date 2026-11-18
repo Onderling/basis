@@ -200,8 +200,10 @@ export function scopedWriteFailureKey(err) {
 
 export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia, { sealed = null, policyNow = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return callSkill;
-  return async (appOrigin, opId, args = {}) => {
-    if (appOrigin !== 'pinboard') return callSkill(appOrigin, opId, args);
+  // `ctx` (which door the act came through) is passed on untouched: the outer waist reads it (the own record, L1042)
+  const pass = (a, o, x, ctx) => (ctx ? callSkill(a, o, x, ctx) : callSkill(a, o, x));
+  return async (appOrigin, opId, args = {}, ctx) => {
+    if (appOrigin !== 'pinboard') return pass(appOrigin, opId, args, ctx);
     // THE POLICY AS IT IS NOW (`policyNow`, the store's live read): an open screen built this call with the policy it
     // read then; a joined circle's policy that was not known yet lands later, and the screen must not stay refused (or
     // keep a posture that changed) until it is re-opened. The strategy getter and `sealed` receive it.
@@ -233,9 +235,9 @@ export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, get
         }
         scoped.attachments = sealed;
       }
-      return callSkill(appOrigin, opId, scoped);
+      return pass(appOrigin, opId, scoped, ctx);
     }
-    const res = await callSkill(appOrigin, opId, args);
+    const res = await pass(appOrigin, opId, args, ctx);
     if (SCOPED_LIST_OPS.has(opId) && res && Array.isArray(res.items)) {
       let items = res.items.filter((it) => keepForCircle(it, circleId));
       if (strategy) items = items.map((it) => openItemText(it, strategy));

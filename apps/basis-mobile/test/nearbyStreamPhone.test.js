@@ -40,7 +40,7 @@ describe('the phone\'s Conversation stream and tab counts', () => {
 
   it('hidden from the room: the chat-off part says so and its button is the existing act (setQuiet / setRadio)', () => {
     const body = nearbyScreenBody();
-    expect(body).toMatch(/const \{ tabs, defaultTab, chatOff \} = nearbyTabs\(model\)/);
+    expect(body).toMatch(/const \{ tabs, defaultTab, chatOff(, askOff)? \} = nearbyTabs\(model\)/);
     const offPart = body.slice(body.indexOf("'nearby-chat-off': () =>"));
     expect(offPart).toMatch(/circle\.nearbyScreen\.chat_hidden_line/);
     expect(offPart).toMatch(/circle\.nearbyScreen\.chat_hidden_action/);
@@ -57,6 +57,17 @@ describe('the phone\'s Conversation stream and tab counts', () => {
   it('a refusal while hidden is said: the host shows the controller\'s notice for an ask and for a line', () => {
     expect(SRC).toMatch(/key: r\.notice \?\? 'ask_expired'/);
     expect(SRC).toMatch(/const r = await screen\.say\(text\);\s*\n\s*if \(r\?\.notice\) setNotice\(\{ key: r\.notice \}\)/);
+  });
+
+  it('hidden: Vragen paints nearby-ask-off from the shared askOff (no composer), with the existing acts', () => {
+    const body = nearbyScreenBody();
+    expect(body).toMatch(/const \{ tabs, defaultTab, chatOff, askOff \} = nearbyTabs\(model\)/);
+    const part = body.slice(body.indexOf("'nearby-ask-off': () =>"), body.indexOf("'nearby-ask-field': () =>"));
+    expect(part).toMatch(/testID="nearby-ask-off"/);
+    expect(part).toMatch(/circle\.nearbyScreen\.ask_hidden_line/);
+    expect(part).toMatch(/unquiet: \(\) => onSetQuiet\?\.\(false\)/);
+    expect(part).not.toMatch(/nearby-ask-compose/);
+    expect(SRC).toMatch(/key: 'card_shown'[^\n]*key: r\.notice \?\? 'ask_expired'/);
   });
 
   it('each tab label carries its count from the shared nearbyTabNews', () => {

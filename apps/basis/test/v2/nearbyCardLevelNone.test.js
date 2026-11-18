@@ -5,12 +5,22 @@
 import { describe, it, expect } from 'vitest';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 
-const screenAt = (level, sent) => createNearbyScreen({
-  allows: { card: true, chat: false },
-  askChannel: { broadcastKind: async (kind, body) => { sent.push({ kind, body }); return { sent: 1 }; } },
-  roomLevel: async () => level,
-  t: (k) => k,
-});
+// seen by the room (a control that announces, a level chosen), so only the level decides; a hidden person's card is
+// refused before it (nearbyHiddenSays.test.js)
+const screenAt = (level, sent) => {
+  let report = null;
+  const control = { set: (state) => { report = { requested: state, effective: state, degraded: false, perTransport: [] }; return report; }, report: () => report, subscribe: () => () => {} };
+  const screen = createNearbyScreen({
+    control,
+    levelChosen: () => true,
+    allows: { card: true, chat: false },
+    askChannel: { broadcastKind: async (kind, body) => { sent.push({ kind, body }); return { sent: 1 }; } },
+    roomLevel: async () => level,
+    t: (k) => k,
+  });
+  screen.open();
+  return screen;
+};
 
 describe('the card at level none', () => {
   it('is refused, nothing sent', async () => {

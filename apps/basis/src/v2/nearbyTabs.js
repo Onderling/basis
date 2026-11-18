@@ -8,7 +8,7 @@
  * the person is in the room chat and seen by the room, Questions otherwise.
  */
 import { sectionsOf } from './screenSections.js';
-import { nearbyChatOff } from './nearbyStream.js';
+import { nearbyChatOff, nearbyAskOff } from './nearbyStream.js';
 
 /** The two tabs, in order: id, the words on the tab, and the declared screen whose sections it paints. */
 export const NEARBY_TABS = Object.freeze([
@@ -25,7 +25,9 @@ const SHOWS = Object.freeze({
   // in the chat" — distinct from a joined chat where nobody has said anything yet
   'nearby-chat':      (m) => nearbyChatOff(m) === null,
   'nearby-chat-off':  (m) => nearbyChatOff(m) !== null,
-  'nearby-ask-field': () => true,
+  // the composer only while the room sees the person; hidden, one line and the way to become visible (`nearbyAskOff`)
+  'nearby-ask-field': (m) => nearbyAskOff(m) === null,
+  'nearby-ask-off':   (m) => nearbyAskOff(m) !== null,
   'nearby-my-asks':   (m) => list(m.myAsks).length > 0,
   'nearby-asks':      (m) => list(m.asks).length > 0,
   'nearby-peers':     (m) => list(m.rows).length > 0,
@@ -45,5 +47,5 @@ export function nearbyTabs(model) {
     sections: sectionsOf(tab.screen).map((s) => s.id).filter((id) => SHOWS[id]?.(m) === true),
   }));
   const chatOff = nearbyChatOff(m);
-  return { tabs, defaultTab: chatOff ? 'questions' : 'conversation', chatOff };
+  return { tabs, defaultTab: chatOff ? 'questions' : 'conversation', chatOff, askOff: nearbyAskOff(m) };
 }

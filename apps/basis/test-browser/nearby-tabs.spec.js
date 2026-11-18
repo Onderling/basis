@@ -161,6 +161,16 @@ test('hidden from the room ("even stil"): no stream and no field to talk in; one
   expect(await page.evaluate(() => window.__nearbyTest.screen.say('hoi').then((r) => ({ ok: r.ok, reason: r.reason, notice: r.notice }))))
     .toEqual({ ok: false, reason: 'hidden', notice: 'chat_hidden_line' });
   await page.screenshot({ path: testInfo.outputPath('verborgen.png'), fullPage: true });
+  // Vragen while hidden: no composer to type a whole question into and then be refused; the same line and button
+  await page.locator('.circle-nearby__tab--questions').click();
+  await expect(page.locator('[data-section="nearby-ask-field"]')).toHaveCount(0);
+  await expect(page.locator('.circle-nearby__ask-off-line')).toHaveText('Je bent verborgen. Word zichtbaar om mee te praten.');
+  await expect(page.locator('.circle-nearby__ask-visible')).toBeVisible();
+  // the card and the circle are refused by the controller too, and nothing is said to be shown
+  await expect(page.locator('.circle-nearby__mine-summary')).toContainText('nog niets getoond');
+  expect(await page.evaluate(() => window.__nearbyTest.screen.publishInvite({ uri: 'x', circleId: 'c1' }).then((r) => r.reason))).toBe('hidden');
+  await page.screenshot({ path: testInfo.outputPath('verborgen-vragen.png'), fullPage: true });
+  await page.locator('.circle-nearby__tab--conversation').click();
   await page.locator('.circle-nearby__chat-visible').click();
   await expect(page.locator('.circle-nearby__visibility')).toHaveAttribute('data-visibility', 'visible');
   await expect(page.locator('[data-section="nearby-chat"]')).toBeVisible();

@@ -5959,7 +5959,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   const submitCard = useCallback(async (fields) => {
     const r = await screen.showCard(fields);
     // Names the real reach, like an ask — "shown to 3 of 5" rather than "saved".
-    setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+    setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' });
   }, [screen]);
 
   const say = useCallback(async (text) => {
@@ -6042,7 +6042,7 @@ function NearbyScreen({
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   // Nearby's two tabs: what each holds and in what order, and which opens first, is `nearbyTabs` (shared with web);
   // a part with nothing in it is not in its list. Which tab is selected is this screen's own state.
-  const { tabs, defaultTab, chatOff } = nearbyTabs(model);
+  const { tabs, defaultTab, chatOff, askOff } = nearbyTabs(model);
   const [pickedTab, setPickedTab] = useState(null);
   const selectedTab = tabs.some((x) => x.id === pickedTab) ? pickedTab : defaultTab;
   // What is new on each tab (`nearbyTabNews`, shared with web). The seen-marks are this screen's own state: the open
@@ -6160,6 +6160,26 @@ function NearbyScreen({
         ) : null}
       </View>
     ),
+    'nearby-ask-off': () => {
+      // Hidden from the room (`nearbyAskOff`, shared with web): no composer to type a whole question into and then be
+      // refused; the hidden line and the same way to become visible as Conversation. The last notice stays in view.
+      const act = { unquiet: () => onSetQuiet?.(false), 'radio-on': () => onSetRadio?.('on') }[askOff?.act];
+      return (
+        <View style={styles.nearbyAsks} testID="nearby-ask-off">
+          <Text style={styles.muted}>{t('circle.nearbyScreen.ask_hidden_line')}</Text>
+          {act ? (
+            <Pressable onPress={act} accessibilityRole="button" testID="nearby-ask-visible" style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_hidden_action')}</Text>
+            </Pressable>
+          ) : null}
+          {notice ? (
+            <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
+              {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
+            </Text>
+          ) : null}
+        </View>
+      );
+    },
     'nearby-ask-field': () => (
       <View style={styles.nearbyAsks} testID="nearby-ask-field">
         {composing || answering ? (

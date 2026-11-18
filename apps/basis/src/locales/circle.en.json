@@ -3615,9 +3615,21 @@
       "text": "You are hidden. A question tells the room you are here: become visible first.",
       "doc": "Said when a hidden person sends a question: the controller refuses it, because it would tell the room someone is there."
     },
+    "card_hidden": {
+      "text": "You are hidden. Your card tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person shows their card: the controller refuses it, because it would tell the room someone is there."
+    },
+    "invite_hidden": {
+      "text": "You are hidden. Offering a circle tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person offers a circle here: the controller refuses it, for the same reason."
+    },
     "chat_hidden_line": {
       "text": "You are hidden. Become visible to join the conversation.",
       "doc": "The Conversation tab while the person is hidden from the room: no stream, this line and the way to become visible."
+    },
+    "ask_hidden_line": {
+      "text": "You are hidden. Become visible to ask something.",
+      "doc": "The Questions tab while the person is hidden from the room: no ask box, this line and the way to become visible."
     },
     "chat_hidden_action": {
       "text": "Become visible",

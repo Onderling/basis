@@ -20,6 +20,10 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('agents: described, a persona by the word the app already uses', () => {
+    expect(opWhat('agents', 'revokeAgent', 'nl')).toBe('Zet een agent uit: al zijn rechten vervallen.');
+    expect(opDescription('agents', 'getPersonaRelease', 'en').params.id).toBe('which persona');
+  });
   it('tasks: described under its app origin (the manifest lives in tasks-v0)', () => {
     expect(opWhat('tasks', 'claimTask', 'nl')).toBe('Pak een taak op: jij gaat hem doen.');
     expect(opDescription('tasks', 'rejectTask', 'en').params.note).toBe('why, in a sentence');

@@ -20,6 +20,8 @@ import calendarEn from '../../../calendar/descriptions.en.json' with { type: 'js
 import calendarNl from '../../../calendar/descriptions.nl.json' with { type: 'json' };
 import tasksEn from '../../../tasks-v0/descriptions.en.json' with { type: 'json' };
 import tasksNl from '../../../tasks-v0/descriptions.nl.json' with { type: 'json' };
+import agentsEn from '../../../agents/descriptions.en.json' with { type: 'json' };
+import agentsNl from '../../../agents/descriptions.nl.json' with { type: 'json' };
 
 /** `{ app: { en, nl } }`: the described apps (the guard's source of truth). */
 export const OP_DESCRIPTIONS = Object.freeze({
@@ -27,6 +29,7 @@ export const OP_DESCRIPTIONS = Object.freeze({
   household: { en: householdEn, nl: householdNl },
   calendar: { en: calendarEn, nl: calendarNl },
   tasks: { en: tasksEn, nl: tasksNl },
+  agents: { en: agentsEn, nl: agentsNl },
 });
 
 /**

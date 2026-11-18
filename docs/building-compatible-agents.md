@@ -23,6 +23,13 @@ compatible, see [`conventions/ports.md`](./conventions/ports.md).
 
 ## 1. Discover — the A2A agent card
 
+> **What is true today.** An agent built on the SDK serves this card when it attaches `A2ATransport`
+> (`packages/core/src/a2a/`), over plain HTTP routes from an earlier, REST-shaped A2A draft (`POST /tasks/send`), not
+> the current JSON-RPC protocol. Basis's own shells (web, phone, the always-on box) serve no card at all: a person's
+> Basis is reached natively (signed envelopes over the relay, keys as addresses) or by a program paired as a screen
+> of their household bot. Decided 2026-11-18: Basis turns to current A2A, first as a client that calls a circle's
+> toolboxes; serving A2A to strangers comes later, if at all.
+
 A Onderling agent advertises itself as a standards-shaped **A2A agent card** (`name`, `description`, `skills`,
 `capabilities`, `authentication`, and an `x-onderling` block with `pubKey` / `groups` / `trustTiers`). Two things
 to read:

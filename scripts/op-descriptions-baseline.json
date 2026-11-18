@@ -13,5 +13,8 @@
     "params",
     "pinboard",
     "tasks"
+  ],
+  "nounsOwed": [
+    "pinboard.lend"
   ]
 }

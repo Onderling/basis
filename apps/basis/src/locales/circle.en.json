@@ -1868,7 +1868,7 @@
       "doc": "The \"+\" the first time a self's conversation opens, line 1: what it is (Fable's words, plan step B)."
     },
     "plus_intro_circle": {
-      "text": "Something for a circle? Say it and I will ask which circle.",
+      "text": "Something for a circle? Say it and I ask which circle.",
       "doc": "First open, line 2: a circle's things go through the which-circle card."
     },
     "plus_intro_try": {
@@ -1884,7 +1884,7 @@
       "doc": "An example naming one of the person's circles ({{circle}}): make a list there; the \"+\" must read it."
     },
     "plus_intro_ex_note": {
-      "text": "remember that the key is at the neighbours'",
+      "text": "remember that the key is at the neighbours",
       "doc": "A fixed example (a note), when the person has no list or circle to build one from."
     },
     "plus_intro_ex_appt": {
@@ -1892,7 +1892,7 @@
       "doc": "A fixed example (an appointment)."
     },
     "plus_intro_ex_plan": {
-      "text": "what do I have planned tomorrow?",
+      "text": "what have I planned tomorrow?",
       "doc": "A fixed example (what is planned)."
     },
     "plus_news_circle": {

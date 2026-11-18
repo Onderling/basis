@@ -10,16 +10,19 @@ import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { EventLog } from '../../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import nl from '../../src/locales/circle.nl.json';
+import en from '../../src/locales/circle.en.json';
 
 const manifestsByOrigin = Object.fromEntries(catalogueManifests().filter((m) => m?.app).map((m) => [m.app, m]));
 const shopping = { name: 'boodschappen', kind: 'list', defaultChild: null, aliases: [] };
 const thuis = { id: 'k1', name: 'Thuis', manifestsByOrigin, lists: [] };
 // the Dutch bundle, filled: the examples must be real lines in the person's language
-const tNl = (k, v = {}) => {
-  const node = k.replace(/^circle\./, '').split('.').reduce((o, p) => o?.[p], nl);
+const tOf = (bundle) => (k, v = {}) => {
+  const node = k.replace(/^circle\./, '').split('.').reduce((o, p) => o?.[p], bundle);
   const s = typeof node === 'string' ? node : node?.text;
   return typeof s === 'string' ? s.replace(/{{(\w+)}}/g, (_, n) => String(v[n] ?? '')) : k;
 };
+const tNl = tOf(nl);
+const tEn = tOf(en);
 
 describe('the first open: three lines, examples from what the person has', () => {
   it('a person with an own list and a circle: an example on her list, one naming her circle, one more; three in all', () => {
@@ -34,14 +37,14 @@ describe('the first open: three lines, examples from what the person has', () =>
     const r = plusIntro({ ownLists: [], circles: [], t: tNl, lang: 'nl' });
     expect(r.examples).toHaveLength(3);
   });
-  it('every example is a line the "+" READS here, with no model: an example that does nothing would contradict it', async () => {
-    for (const has of [{ ownLists: [shopping], circles: [thuis] }, { ownLists: [], circles: [] }]) {
-      const { examples } = plusIntro({ ...has, t: tNl, lang: 'nl' });
+  it('every example, nl and en, is a line the "+" READS here, with no model: an example that does nothing would contradict it', async () => {
+    for (const [lang, tL] of [['nl', tNl], ['en', tEn]]) for (const has of [{ ownLists: [shopping], circles: [thuis] }, { ownLists: [], circles: [] }]) {
+      const { examples } = plusIntro({ ...has, t: tL, lang });
       const d = createPlusDoor({
-        llm: null, t: tNl, lang: 'nl', threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }), threadId: 'own:me',
+        llm: null, t: tL, lang, threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }), threadId: 'own:me',
         circles: async () => has.circles, ownListsOf: async () => has.ownLists, runInCircle: async () => ({ done: 'ok' }), readAs: () => async () => ({ ok: true, items: [] }),
       });
-      const readsNothing = (r) => r?.error === tNl('circle.vandaag.plus_line_unread') || String(r?.done ?? '').startsWith(tNl('circle.vandaag.plus_no_model', { path: '' }).slice(0, 25));
+      const readsNothing = (r) => r?.error === tL('circle.vandaag.plus_line_unread') || String(r?.done ?? '').startsWith(tL('circle.vandaag.plus_no_model', { path: '' }).slice(0, 25));
       // the probe can tell: a line nobody reads is caught by it
       expect(readsNothing(await d.read('qwerty zxcv bnm')), 'the probe sees a line the "+" does not read').toBe(true);
       for (const ex of examples) {

@@ -4870,7 +4870,8 @@ function showVandaagPlus({ edit = null } = {}) {
       line = text; circleCard = null; done = null;
       // the ONE "+" door (shared with the phone): help, then the plain reading, then the person's own model through the
       // assistant engine; the line and what it answered are kept in the thread
-      const r = await plusDoorNow().read(text, { asSelf });
+      // a slow model is said while the person waits ("even geduld"); its answer replaces it (phone twin: the sheet's onRead)
+      const r = await plusDoorNow().read(text, { asSelf, onSlow: () => { done = t('circle.bot.slow'); error = null; paint(); } });
       // several selves ticked and none picked: the sheet shows the choice (it does already); nothing was read
       if (r?.askSelf) { error = null; paint(); return; }
       if (r?.card) { circleCard = r.card; error = null; }

@@ -2296,10 +2296,10 @@ export default function CircleLauncherScreen({
         onForget={plusThread ? async (asSelf) => { await plusDoorNow().forget({ asSelf }); setPlusTurnsTick((n) => n + 1); } : null}
         // under the line: on "/" the door's commands (the "/" list), else the lines it reads here (web twin: circleApp.js)
         suggestFor={(typed) => plusDoorNow().suggest(typed, { pool: plusPool })}
-        onRead={async (line, asSelf) => {
+        onRead={async (line, asSelf, o) => {
           // the ONE "+" door (shared with web): help, then the plain reading, then the person's own model through the
           // assistant engine; it keeps the line and what it answered in the thread
-          const r = await plusDoorNow().read(line, { asSelf });
+          const r = await plusDoorNow().read(line, { asSelf, onSlow: o?.onSlow });
           setPlusTurnsTick((n) => n + 1);
           return r;
         }}

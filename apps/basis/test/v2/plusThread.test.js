@@ -123,7 +123,7 @@ describe('one exchange in the "+" thread (the duty both shells run)', () => {
 
   it('web reads the line through the one shared door, which keeps the exchange; no model call is composed in the shell', () => {
     const web = readFileSync(fileURLToPath(new URL('../../web/v2/circleApp.js', import.meta.url)), 'utf8');
-    expect(web).toMatch(/await plusDoorNow\(\)\.read\(text, \{ asSelf \}\)/);
+    expect(web).toMatch(/await plusDoorNow\(\)\.read\(text, \{ asSelf[,} ]/);
     expect(web).not.toMatch(/plusReadWithModel|plusModelAsk/);
   });
 });

@@ -194,6 +194,7 @@ export function availableOnly(catalogue, manifestsByOrigin = {}, policy = null) 
  *        assistant reads for a line (own notes, appointments, list entries), and a read the model picks, run through
  *        it as the self the "+" writes as
  * @param {(asSelf: string|null) => {key: string|null, isDefault: boolean}} [a.selfOf]  that self's key
+ * A read takes `opts.onSlow`: called when the model is slow and retrying, so the sheet can say "even geduld".
  */
 export function createPlusDoor({
   llm = null, threads = null, threadId = null, t, lang = 'nl', circles = async () => [], ownListsOf = async () => [],
@@ -254,6 +255,8 @@ export function createPlusDoor({
   // What this turn came to: set by the engine's sinks while the turn runs (the lane runs one turn at a time).
   let outcome = null;
   let currentLine = '';
+  // the sheet's "even geduld" for the read running now (the lane runs one turn at a time)
+  let currentOnSlow = null;
   // The deterministic gate reads only what this door offers: a household rule that builds a circle's op ("zet X …" as a
   // list entry or a task) is no reading here, so the line goes on to the model, never to "I could not read that"
   const offeredHere = (c) => Boolean(c?.opId) && (DOOR_OP_IDS.has(c.opId)
@@ -330,6 +333,8 @@ export function createPlusDoor({
     // a line about one family gets that family's tools (the own note's too); no family is kept regardless here
     // the read of the turn before, if any (one turn only)
     threadHints: (thread) => PLUS_LAST_READS.hintsFor(thread),
+    // the model is slow and retrying: the sheet says so while the person waits (the household bot's onSlow)
+    onSlow: () => { try { currentOnSlow?.(); } catch { /* a sheet that cannot paint it: the answer still comes */ } },
     narrowing: {
       keep: [], own: true,
       // a line naming no family: the reads and the acts that MAKE something, and the door's own ops (Fable's ruling)
@@ -399,7 +404,8 @@ export function createPlusDoor({
     if (!llm) return { done: plusNoModelAnswer({ t }) };
     outcome = null;
     currentLine = text;
-    await engine.ask(threadIdFor(set), text, { asSelf, selves: set });
+    currentOnSlow = typeof opts.onSlow === 'function' ? opts.onSlow : null;
+    try { await engine.ask(threadIdFor(set), text, { asSelf, selves: set }); } finally { currentOnSlow = null; }
     return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
   }
 

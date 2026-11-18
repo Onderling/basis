@@ -36,7 +36,7 @@ import ActStateBar from './src/rn/ActStateBar.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
-import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { createAppDeliveryMap } from '../basis/src/v2/deliveryState.js';
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
@@ -160,7 +160,7 @@ export default function App() {
   // The mute membrane's circle↔person index — one per agent lifetime; the roster feed fills it
   // (householdRosterPairing reads `agent._circleGroupsIndex`), the receive path consumes it.
   const circleGroupsIndexRef = useRef(makeCircleGroupsIndex());
-  if (!deliveryStateMapRef.current) deliveryStateMapRef.current = createDeliveryStateMap();
+  if (!deliveryStateMapRef.current) deliveryStateMapRef.current = createAppDeliveryMap();
   const deliverySettingsStoreRef = useRef(null);
   // The agent reads `allowFallback` LIVE through this cache (batch 4): a sync read, because the send
   // path cannot await AsyncStorage per message. Primed from the store at mount; kept fresh by the
@@ -352,8 +352,12 @@ export default function App() {
       .catch(() => setFirstRun('show'));
   }, []);
 
-  const dismissFirstRun = useCallback(() => {
+  // THE FIRST OPEN's door (basis/src/v2/firstOpen.js): which one was chosen on the welcome, run by the launcher once
+  // it is up (the scanner, the introduction); "just continue" asks for nothing more
+  const [firstOpenDoor, setFirstOpenDoor] = useState(null);
+  const dismissFirstRun = useCallback((door = 'continue') => {
     markWelcomeDismissed(AsyncStorage).catch(() => { /* non-fatal */ });
+    setFirstOpenDoor(typeof door === 'string' ? door : 'continue');
     setFirstRun('dismissed');
   }, []);
 
@@ -639,7 +643,7 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <StatusBar style="auto" />
-        <FirstRunWelcomeScreen onStart={dismissFirstRun} onRestore={startRestore} />
+        <FirstRunWelcomeScreen onDoor={dismissFirstRun} onRestore={startRestore} />
       </SafeAreaProvider>
     );
   }
@@ -699,6 +703,9 @@ export default function App() {
           // a contact card opened as a link, handed over by the hidden ChatScreen: the launcher opens its add sheet
           contactLink={contactLink}
           onContactLinkDone={onContactLinkDone}
+          // the first open's door, run once the launcher is up (the welcome chose it before the first boot)
+          firstOpenDoor={firstOpenDoor}
+          onFirstOpenDoorDone={() => setFirstOpenDoor(null)}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}

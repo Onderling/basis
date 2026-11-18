@@ -64,8 +64,9 @@ export function withCalendarOutbound(callSkill, deps = {}) {
   if (typeof callSkill !== 'function') throw new Error('withCalendarOutbound: callSkill required');
   const logger = deps.logger ?? console;
   const hook = makeCalendarOutboundHook({ callSkill, ...deps, logger });
-  return async function callSkillWithCalendarOutbound(appOrigin, opId, args) {
-    const result = await callSkill(appOrigin, opId, args);
+  // the call's context (a self it is made as, the selves it reads for) is passed on, never dropped
+  return async function callSkillWithCalendarOutbound(appOrigin, opId, args, ctx) {
+    const result = await (ctx === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, ctx));
     if (appOrigin === 'calendar') {
       try { await hook(appOrigin, opId, args ?? {}, result); }
       catch (err) { logger.warn?.('[calendar-outbound] hook failed', err); }

@@ -29,6 +29,34 @@ import { resolveCircleDataPolicy } from './circleDataPolicy.js';
 /** The device transport modes a `transport-mode` control offers (mirrors settingsState.TRANSPORT_MODES). */
 export const TRANSPORT_MODES = Object.freeze(['nkn', 'relay', 'both']);
 
+/** The words a person reads and types for each mode (never "relay": that mode is a connection point). */
+const TRANSPORT_MODE_WORDS = Object.freeze({
+  nkn: 'nkn', verbindingspunt: 'relay', 'connection-point': 'relay', relay: 'relay', beide: 'both', both: 'both',
+});
+
+/**
+ * A typed mode word → the mode value the op takes (`nkn` · `relay` · `both`), or null when it is not one.
+ * @param {string} word
+ */
+export function readTransportMode(word) {
+  const w = String(word ?? '').trim().toLowerCase();
+  return Object.hasOwn(TRANSPORT_MODE_WORDS, w) ? TRANSPORT_MODE_WORDS[w] : null;
+}
+
+/**
+ * The `/transports` line both shells paint: the mode by its label (never the value 'relay') and the connection
+ * point by its address, or 'none'.
+ * @param {{mode?: string, relayUrl?: string|null}} ts  the device's transport state
+ * @param {(key: string, v?: object) => string} t
+ */
+export function transportsStatusLine(ts, t) {
+  const mode = TRANSPORT_MODES.includes(ts?.mode) ? ts.mode : 'nkn';
+  return t('circle.settings.transports_status', {
+    mode: t(`circle.settings.transportMode_opt.${mode}`),
+    relay: ts?.relayUrl || t('circle.settings.transports_none'),
+  });
+}
+
 /**
  * Fold the circle policy + device transport state into the ROUTE descriptor the predicates
  * read. `policy` supplies the pod/data-policy half (via C9); `transport` supplies the relay

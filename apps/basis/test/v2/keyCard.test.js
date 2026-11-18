@@ -13,8 +13,8 @@ const memIo = (init = {}) => { const m = new Map(Object.entries(init)); return {
 
 describe('the key card', () => {
   it('comes first while the key is not saved — for everyone, a returning person included', () => {
-    expect(onboardingCards({ handle: null, inCircle: false, introSeen: false, keyPending: true }).map((c) => c.id)).toEqual(['key', 'handle', 'intro', 'begin']);
-    expect(onboardingCards({ handle: 'anna', inCircle: false, introSeen: true, keyPending: false }).map((c) => c.id)).toEqual(['begin']);
+    expect(onboardingCards({ handle: null, inCircle: false, introSeen: false, keyPending: true }).map((c) => c.id)).toEqual(['key', 'handle', 'intro']);
+    expect(onboardingCards({ handle: 'anna', inCircle: false, introSeen: true, keyPending: false }).map((c) => c.id)).toEqual([]);
     expect(onboardingCards({ handle: 'anna', inCircle: true, introSeen: false, keyPending: true }).map((c) => c.id)).toEqual(['key']);
   });
 

@@ -121,6 +121,10 @@ describe('a re-key run on a device that was not the point', () => {
     const phoneId = A.agent.persona('default').enrolledDevice?.deviceId;
     await A2.agent.spinePoint?.requestFromSiblings?.();
     expect(await until(() => (A2.agent.spinePointClaim()?.deviceId === phoneId ? true : null), { timeout: 15000, step: 200 }), 'the box does not know the phone is the point').toBe(true);
+    // the box holds the circle's statements so far (its create and join) before it is cut off: what the walk tests is a
+    // box that misses the NEWEST one, not a box that never had any (a CI red: the box held none and re-keyed anyway)
+    const heldBy = (node) => (node.agent.membershipRail.storedStatements(C2) ?? []).length;
+    expect(await until(() => (heldBy(A2) >= 2 ? true : null), { timeout: 15000, step: 200 }), `the box never held the circle's statements: ${heldBy(A2)}`).toBe(true);
     // the box misses the phone's newest statement: no live fan or carry reaches it, only a catch-up can
     const prior = A2._routerRef.fn;
     A2._routerRef.fn = (env) => (env?.payload?.subtype === MEMBERSHIP_BROADCAST ? undefined : prior?.(env));

@@ -4,7 +4,7 @@
  * own row, Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
  * Pure render.
  */
-import { PLUS_ACTS, plusLabel, plusCardWords, plusMomentNeedsTime, plusAskTime } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
@@ -93,6 +93,7 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
       const li = document.createElement('input');
       li.type = 'text';
       li.className = 'circle-vandaag-plus__line';
+      li.setAttribute('autocapitalize', 'none');   // a line can be a command or a list item: what was typed stays as typed
       li.value = line ?? '';
       li.placeholder = tr('circle.vandaag.plus_line_ph');
       li.setAttribute('aria-label', tr('circle.vandaag.plus_line_ph'));
@@ -279,13 +280,14 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
     box.appendChild(no);
     container.appendChild(box);
   }
-  if (done) {
+  // an answer or error the thread already holds is not said twice (shared rule: plusAnswerLineShown)
+  if (plusAnswerLineShown(done, turns)) {
     const p = document.createElement('p');
     p.className = 'circle-vandaag-plus__done';
     p.textContent = done;
     container.appendChild(p);
   }
-  if (error) {
+  if (plusAnswerLineShown(error, turns)) {
     const p = document.createElement('p');
     p.className = 'circle-vandaag-plus__error';
     p.textContent = error;
@@ -297,5 +299,13 @@ export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null,
   close.textContent = tr('circle.vandaag.done');
   close.addEventListener('click', () => onClose?.());
   container.appendChild(close);
+  // the line in view when the sheet opens and after each turn (it is painted again then): a long thread above it must
+  // not leave the person looking at old turns with the line below the fold (phone twin: VandaagPlusModal's scrollTo).
+  // Guarded: a layout-less DOM (tests) has no scrollIntoView, and the sheet may not be attached yet on this frame.
+  const lineEl = container.querySelector('.circle-vandaag-plus__line');
+  if (lineEl && !editing && typeof lineEl.scrollIntoView === 'function') {
+    const bring = () => { try { lineEl.scrollIntoView({ block: 'nearest' }); } catch { /* layout-less DOM */ } };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(bring); else bring();
+  }
   return container;
 }

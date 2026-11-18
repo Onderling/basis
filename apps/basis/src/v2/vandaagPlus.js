@@ -228,6 +228,21 @@ export function plusAskTime(act, values = {}, { t, lang = 'nl' } = {}) {
  * @param {string} line
  * @returns {{actId: string, values: Record<string, string>}|null}
  */
+/**
+ * What a reminder of one's own is ABOUT ("herinner me morgen om 9 uur aan de vuilnis" → "de vuilnis"), read by the
+ * phrase table's own reminder rule (the household assistant's `remindMe` for "me"), or null when the line is no reminder.
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function reminderThing(text) {
+  for (const rule of listsGateRules(null, [{ name: NO_OWN_LIST }], { greeting: false })) {
+    let cmd = null;
+    try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+    if (cmd?.opId === 'remindMe' && cmd.args?.who === 'me' && cmd.args?.item) return String(cmd.args.item);
+  }
+  return null;
+}
+
 export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
   const text = word(line);
   if (!text) return null;
@@ -277,6 +292,12 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
   if (timed(act)) {
     if (moment?.day) { const f = act.fields.find((x) => x.kind === 'datetime'); values[f.name] = pickerMoment(moment.day, moment.time); words = moment.rest ?? ''; }
     for (const w of wordsFor(act, byOrigin)) words = words.replace(new RegExp(`^${w}\\b[:\\s]*`, 'i'), '');
+  }
+  // "herinner me morgen om 9 uur aan de vuilnis": the reminder's own words are the title ("de vuilnis"), read by the
+  // SAME rule the household assistant reads a reminder with (its {text} slot), never "herinner me aan de vuilnis"
+  if (timed(act)) {
+    const thing = reminderThing(text);
+    if (thing) words = thing;
   }
   // "ik moet …", "I need to …": how the line opens, not what it makes (an appointment's title)
   if (timed(act)) {
@@ -328,15 +349,24 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
   // phrasing elsewhere does not count (the tasks gate reads "zet melk op …" as a new task anywhere)
   const read = scope.map((c) => ({ circle: c, ...circleReading(rest, c, { named: named.length === 1 }) })).filter((x) => x.command);
   const byList = read.filter((x) => x.fromLists);
+  // a list line naming a list that is nowhere (not own, no circle's): ask to make it as an OWN list, never a chore by
+  // the tasks phrasing (the card's yes makes the list; nothing runs before it)
+  if (!mine && !byList.length && named.length !== 1) {
+    const asks = unknownListReading(text);
+    if (asks) {
+      return {
+        kind: 'circle', atOnce: false, circleId: null, to: [ownTo], makeList: asks.list,
+        command: { appOrigin: 'lists', opId: 'createList', args: { text: asks.list, circleId: OWN_DEVICES_SCOPE } },
+        // the yes also puts the item on it: a person who said "zet melk op boodschappen" expects melk there (Fable)
+        followUp: { appOrigin: 'lists', opId: 'addToList', args: { list: asks.list, text: asks.item, circleId: OWN_DEVICES_SCOPE } },
+      };
+    }
+  }
   if (mine) {
     // an own list of that name: there at once, unless a circle holds one too (then the card, 'mine' first)
     if (!byList.length) return atOwn(mine.command);
     return { kind: 'circle', atOnce: false, circleId: null, to: [ownTo, ...byList.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }))], command: mine.command };
   }
-  // a line that addresses a list BY NAME ("zet zonnebrand op vakantie") that no circle and no own list holds is no
-  // circle's act by a looser reading (the tasks gate reads "zet X op …" as a task anywhere): nobody guesses a circle's
-  // task; the line goes on (the own gate, the person's model)
-  if (!byList.length && namesAList(rest)) return null;
   const readers = byList.length ? byList : read;
   if (!readers.length) {
     // nothing to do here: a line that ASKS how something works ("hoe …", gate words `_help.questions`) is looked up in the
@@ -366,18 +396,34 @@ const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeF
  * @returns {{command: {appOrigin: string, opId: string, args: object}, makes: boolean}|null}
  */
 /**
- * Does the line address a list by its name ("zet X op <naam>")? The lists table itself says so, given each word of
- * the line as a list name; whether anyone HOLDS that list is the caller's question.
+ * A line that puts something on a list NOBODY holds ("zet melk op boodschappen" with no list of that name, own or in a
+ * circle): the list it names and the item, or null. Read by the SAME phrase table as every list line (`listsGateRules`),
+ * with the line's last one to three words tried as the list's name, so no second pattern decides what a list line is.
+ * The "+" then asks to make that list instead of letting the tasks phrasing make a chore of it (the help-card audit).
+ * @param {string} text
+ * @returns {{list: string, item: string}|null}
  */
-function namesAList(text) {
-  const words = [...new Set(String(text ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1))];
-  if (!words.length) return false;
-  for (const rule of listsGateRules(null, words.map((name) => ({ name })), { greeting: false })) {
-    let cmd = null;
-    try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
-    if (cmd?.opId === 'addToList' && typeof cmd.args?.list === 'string' && words.includes(cmd.args.list.toLowerCase())) return true;
+/**
+ * The commands a "+" card's yes runs, in order: its command, then its follow-up when it has one (the make-a-list card:
+ * make the list, then put the item on it). Both sheets run exactly these, stopping at the first that fails.
+ * @param {{command?: object, followUp?: object}} card
+ * @returns {object[]}
+ */
+export function plusCardCommands(card) {
+  return [card?.command, card?.followUp].filter(Boolean);
+}
+
+export function unknownListReading(text) {
+  const words = String(text ?? '').trim().replace(/[.!?]+$/u, '').split(/\s+/u).filter(Boolean);
+  for (let n = 1; n <= Math.min(3, words.length - 1); n += 1) {
+    const name = words.slice(-n).join(' ');
+    for (const rule of listsGateRules(null, [{ name }], { greeting: false })) {
+      let cmd = null;
+      try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+      if (cmd?.opId === 'addToList' && cmd.args?.list === name && cmd.args?.text) return { list: name, item: String(cmd.args.text) };
+    }
   }
-  return false;
+  return null;
 }
 
 function ownListsReading(text, own) {
@@ -391,6 +437,9 @@ function ownListsReading(text, own) {
     const command = { appOrigin: 'lists', opId: cmd.opId, args: { ...(cmd.args ?? {}) } };
     if (cmd.opId === 'createList') return { command, makes: true };
     if (names.has(command.args.list)) return { command, makes: false };
+    // "melk is gedaan": a tick names the item, not the list; the lists find it (`list` is optional on the op), so it
+    // reads to the person's own lists when they have any
+    if (command.opId === 'markListItemDone' && !command.args.list && command.args.item && lists.length) return { command, makes: false };
   }
   return null;
 }
@@ -418,6 +467,8 @@ export function plusCardLabel(t, to) {
  */
 export function plusCardWords(card, { t } = {}) {
   const to = Array.isArray(card?.to) ? card.to : [];
+  // a list nobody holds: ask to make it (the yes runs the card's createList on the own lists)
+  if (card?.makeList) return { question: t('circle.vandaag.plus_make_list_ask', { list: card.makeList }), labelFor: () => t('circle.confirm.accept') };
   if (to.length === 1 && to[0]?.own) {
     const key = `circle.bot.help.ops.${card?.command?.appOrigin ?? ''}.${card?.command?.opId ?? ''}`;
     const named = t(key);
@@ -432,6 +483,20 @@ export function plusCardWords(card, { t } = {}) {
  * (`replyLine`); for a read of one list (`listEntries`), its entries, the done ones marked, or that it is empty.
  * @param {object} result @param {{opId: string, args?: object, t: Function}} o
  */
+/**
+ * Whether the sheet shows an answer (or an error) on its own line below the thread. Every answer the door gives is kept
+ * as the assistant's turn, so once the thread shows it the line below would say it twice (the walk, 2026-11-17): the
+ * line is for an answer the thread does not hold yet (no thread, or not its last assistant turn).
+ * @param {string|null} said  the answer or error line
+ * @param {Array<{who: string, text: string}>} [turns]  the thread as the sheet shows it, oldest first
+ */
+export function plusAnswerLineShown(said, turns = []) {
+  if (!said) return false;
+  const answers = (Array.isArray(turns) ? turns : []).filter((x) => x?.who !== 'you');
+  const last = answers.length ? answers[answers.length - 1] : null;
+  return !(last && String(last.text ?? '').trim() === String(said).trim());
+}
+
 export function plusDoneLine(result, { opId, args = {}, t } = {}) {
   const said = replyLine(result, { opId, args, t });
   // ANY read that answers items (a list's entries, the own agenda's appointments, …) is said by its name and its lines,
@@ -550,7 +615,8 @@ export function plusSuggestionPool({ circles = [], acts = PLUS_ACTS, manifestsBy
         seen.add(ex);
         let read = null;
         try { read = plusLineOutcome(ex, { circles, acts, manifestsByOrigin }); } catch { read = null; }
-        if (read) out.push(ex);
+        // an example that would only ask to make a list nobody holds is no example of what the "+" does here
+        if (read && !read.makeList) out.push(ex);
       }
     }
   }

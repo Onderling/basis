@@ -635,3 +635,33 @@ describe('the read a person just saw is handed to the model for the turn after (
     expect(hints[1], 'a turn later it is gone').not.toContain('tandarts');
   });
 });
+
+describe('the make-a-list card: the yes makes the list AND puts the item on it; a no is said (Fable, on #1345)', () => {
+  it('the card carries both steps, in order: make the own list, then the item on it', async () => {
+    const { plusLineOutcome, plusCardCommands } = await import('../../src/v2/vandaagPlus.js');
+    const { OWN_DEVICES_SCOPE } = await import('../../src/v2/grantsManifest.js');
+    const o = plusLineOutcome('zet melk op boodschappen', { circles: [], own: { lists: [] } });
+    expect(plusCardCommands(o)).toEqual([
+      { appOrigin: 'lists', opId: 'createList', args: { text: 'boodschappen', circleId: OWN_DEVICES_SCOPE } },
+      { appOrigin: 'lists', opId: 'addToList', args: { list: 'boodschappen', text: 'melk', circleId: OWN_DEVICES_SCOPE } },
+    ]);
+    // any other card runs its one command
+    expect(plusCardCommands({ command: { opId: 'x' } })).toEqual([{ opId: 'x' }]);
+  });
+
+  it('the door hands the card both steps (the sheets run what the card carries)', async () => {
+    const { d } = door();
+    const r = await d.read('zet melk op boodschappen');
+    expect(r.card?.makeList).toBe('boodschappen');
+    expect(r.card?.followUp?.opId).toBe('addToList');
+  });
+
+  it('a no on a card is said in the thread: the line was not done, nothing stored', async () => {
+    const { d, callSkill } = door();
+    const r = await d.read('zet melk op boodschappen');
+    const said = await d.cardRefused({}, r.card);
+    expect(said).toContain('circle.vandaag.plus_card_not_done');
+    expect(d.turns({}).at(-1)).toMatchObject({ who: 'system', text: said });
+    expect(callSkill).not.toHaveBeenCalled();
+  });
+});

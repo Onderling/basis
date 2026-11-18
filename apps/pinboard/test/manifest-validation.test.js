@@ -59,7 +59,10 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // SLASH-callable ops; button-only ops (e.g. startDm) legitimately have
   // NO slash command — so the slash assertion is conditional on the op
   // declaring a slash surface.
-  it('every op declares { id, verb, surfaces.chat.hint } (+ valid slash.command when present)', () => {
+  // Withheld from a model on purpose (Fable's prune rulings, ledger L1025; record: plans/notes/NOTE-unreached-ops-2026-11-18):
+  // plumbing a person never asks for, or a picker's feed. Every OTHER op still declares its hint.
+  const NO_MODEL = new Set(['broadcastCircleRules', 'getLatestPostAddedAt', 'listCirclePostsSince', 'listConsentingPeers', 'listOfferingCategories']);
+  it('every op declares { id, verb, surfaces.chat.hint } (+ valid slash.command when present), but the ones withheld from a model', () => {
     for (const op of pinboardManifest.operations) {
       expect(op.id, `op missing id: ${JSON.stringify(op)}`).toBeTruthy();
       expect(typeof op.id, `${op.id} id-type`).toBe('string');
@@ -70,6 +73,7 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
       expect(op.surfaces, `${op.id} surfaces`).toBeDefined();
       // an INTERNAL op (a door's write, never typed, never a button) has no surface to hint on
       if (op.surfaces.internal === true) { expect(Object.keys(op.surfaces), `${op.id} internal and surfaced`).toEqual(['internal']); continue; }
+      if (NO_MODEL.has(op.id)) { expect(op.surfaces.chat, `${op.id} is withheld from a model`).toBeUndefined(); continue; }
       expect(op.surfaces.chat, `${op.id} surfaces.chat`).toBeDefined();
       expect(op.surfaces.chat.hint, `${op.id} surfaces.chat.hint`).toBeTruthy();
       expect(typeof op.surfaces.chat.hint, `${op.id} hint-type`).toBe('string');

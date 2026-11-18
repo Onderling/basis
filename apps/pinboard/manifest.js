@@ -993,7 +993,7 @@ export const pinboardManifest = {
       id:   'listOfferingCategories', visibility: 'authenticated', verb: 'list',
       // The offering taxonomy with localised labels; `lang` picks the label set.
       params: [{ name: 'lang', kind: 'string' }],
-      surfaces: { chat: { hint: 'The offering-category taxonomy with localised labels; pass `lang` for the label set.' } , ui: { control: 'page' } },
+      surfaces: { ui: { control: 'page' } },
     },
 
     // ── Where you are ───────────────────────────────────────────────
@@ -1190,7 +1190,6 @@ export const pinboardManifest = {
         { name: 'sinceMs', kind: 'number' },
       ],
       surfaces: {
-        chat: { hint: 'Posts in one circle since a timestamp — the bulletin catch-up.' },
         ui:   { control: 'page' },
       },
     },
@@ -1199,7 +1198,6 @@ export const pinboardManifest = {
       // The cheap "is there anything new" probe — a timestamp, so a poll costs one number rather than a feed.
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
-        chat: { hint: 'When the newest post in a circle arrived — the cheap freshness probe.' },
         ui:   { control: 'page' },
       },
     },
@@ -1209,7 +1207,6 @@ export const pinboardManifest = {
       // membership: being in a circle is not by itself permission to be contacted.
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
-        chat: { hint: 'Members of a circle who have consented to be reached.' },
         ui:   { control: 'page' },
       },
     },
@@ -1651,7 +1648,7 @@ export const pinboardManifest = {
         { name: 'ts',         kind: 'number' },
       ],
       surfaces: {
-        chat: { hint: "Fan a circle's rules document to its members." },
+        actState: 'none',   // background: the rules fan a circle's change sets off; never a person's act (L1025 prune)
         ui:   { control: 'page' },
       },
     },

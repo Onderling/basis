@@ -19,6 +19,9 @@ import { verbKind, circleArg } from '@onderling/app-manifest';
 import { isPersonDoor } from '../ownActions.js';
 import { effectiveCapabilities, checkCapability } from './capabilityGate.js';
 import { refuse } from './refusal.js';
+import { isAppSurfaceEnabled } from './appFeature.js';
+import { isFeatureEnabled } from './circlePolicy.js';
+import { processRefusalLog } from './refusalLog.js';
 
 /** Scopes whose writes are not a circle's (a person's own, this device's): no circle's switch governs them. */
 const NOT_A_CIRCLES = new Set(['person', 'device', 'own']);
@@ -43,10 +46,16 @@ export async function circleActRefusal({ app, op, args = {}, ctx = {}, manifests
   const circleId = circleArg(args) ?? activeCircle?.() ?? null;
   if (!circleId) return null;
   let given = null;
-  try { given = await inputs(circleId); } catch { given = null; }
+  try { given = await inputs(circleId); } catch {
+    // a broken store must not be an open gate nobody sees: the act goes on, and the log says so (codes only)
+    processRefusalLog().note({ tag: 'gate', lane: 'availability', check: 'circle-inputs', reason: 'reader-threw' });
+    given = null;
+  }
   if (!given) return null;
+  // the app is on in this circle, read as the typed path reads it (`isAppSurfaceEnabled` over the circle's policy)
+  const appOn = isAppSurfaceEnabled(app, given.policy ?? {}, isFeatureEnabled);
   const eff = effectiveCapabilities(manifests.map((x) => ({ manifest: x, appOrigin: x?.app })), {
-    apps: null,
+    apps: appOn ? [app] : [],
     capabilities: given.policy?.capabilities,
     optOuts: given.override?.capabilityOptOuts,
   });

@@ -30,7 +30,7 @@ describe('a tap asks the circle', () => {
       ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass), chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') }, seedDemoData: false, seedHousehold: false,
       getActiveCircleId: () => CIRCLE,
-      circleCapabilityInputs: async (circleId) => (circleId === CIRCLE ? { policy, override: {} } : null),
+      circleCapabilityInputs: async (circleId) => { if (circleId === 'broken-store') throw new Error('store down'); return circleId === CIRCLE ? { policy, override: {} } : null; },
     });
     expect((await agent.callSkill('lists', 'createList', { circleId: CIRCLE, text: 'Boodschappen' }))?.ok).toBe(true);
   }, 30_000);
@@ -54,10 +54,25 @@ describe('a tap asks the circle', () => {
     expect(r?.ok).toBe(false);
   });
 
+  it('an app the circle switched off refuses the tap as app-disabled (as the typed line is)', async () => {
+    policy = { features: { tasks: false } };
+    const r = await agent.callSkill('tasks', 'addTask', { circleId: CIRCLE, text: 'ramen lappen' }, { door: 'tap' });
+    expect(r).toMatchObject({ ok: false, code: 'app-disabled', refusal: { layer: 'availability', code: 'app-disabled' } });
+    policy = OFF;
+  });
+
   it('a door-less call (plumbing, a screen\'s own write) is not asked; nor is a read', async () => {
     const r = await agent.callSkill('lists', 'addToList', { circleId: CIRCLE, list: 'Boodschappen', text: 'eieren' });
     expect(r?.ok, JSON.stringify(r)).toBe(true);
     const read = await agent.callSkill('lists', 'listEntries', { circleId: CIRCLE, list: 'Boodschappen' }, { door: 'tap' });
     expect(read?.ok).toBe(true);
+  });
+
+  it('a reader that throws lets the act go on, and the log says so in codes', async () => {
+    const { processRefusalLog } = await import('../src/v2/refusalLog.js');
+    const before = processRefusalLog().size;
+    const r = await agent.callSkill('lists', 'createList', { circleId: 'broken-store', text: 'X' }, { door: 'tap' });
+    expect(r?.refusal).toBeUndefined();
+    expect(processRefusalLog().size, 'one coded line: gate · availability · circle-inputs · reader-threw').toBe(before + 1);
   });
 });

@@ -107,7 +107,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | an entry added with a ref and a quantity on A arrives on B with both (the item travels whole) | `apps/basis/test/entryRefQuantity.test.js` |
 | — | a second add of the same thing raises the quantity, never a second entry; the reply says so | `apps/basis/test/entryRefQuantity.test.js` |
 | — | list never learns what the thing is: nothing branches on the reference's type | `apps/basis/test/entryRefQuantity.test.js` |
-| — | every raw-path call of a circle write a person taps names `door: 'tap'`, on web and on the phone | `apps/basis/test/fitness/tapsNameTheirDoor.test.js` |
+| — | every call, in either shell, of an op the circle's capability check would gate names a person door, or is on the decl… | `apps/basis/test/fitness/tapsNameTheirDoor.test.js` |
 | — | one item of EVERY canonical type, written to a circle store on one device, arrives in the | `apps/basis/test/perTypeSyncMatrix.test.js` |
 | — | a write a circle switched off is refused when tapped, the same refusal as the typed line; a door-less call (plumbing,… | `apps/basis/test/tapAsksTheCircle.test.js` |
 | — | every op is gated by exactly one capability row, and every row gates at least one op | `apps/basis/test/v2/lendCapabilityRows.test.js` |

@@ -513,6 +513,10 @@
     "not_here": {
       "text": "not on this device",
       "doc": "A folded tile's note: this device does not hold this circle (the kring opt-out, My data)."
+    },
+    "unnamed": {
+      "text": "Circle without a name",
+      "doc": "A circle's tile, header and Today tag when nobody's name for it reached this device (joined through an invite that carried none): never its key."
     }
   },
   "tile": {

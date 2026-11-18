@@ -9873,7 +9873,7 @@ async function boot() {
       // `circleCatalogue` (null until buildCircleBot sets it; makeResolvingCallSkill tolerates
       // a null catalogue by trying all origins).
       resolveSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalogue);
-      sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name });
+      sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed') });
       // Phase 5 — build the circle composer's bot now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
       // Delivery honesty + repaint for a signed chat statement that lands: a LIVE inbound insert answers the sender

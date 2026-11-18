@@ -96,7 +96,7 @@ export async function startScreenShell(win = window) {
       const more = screenActionForm(a.skill, a.args);
       if (!more || !area) return run(a.skill, a.args, a.confirm);
       const spec = buildFormSpec({ opParams: more.params, missing: more.missing, prefilledArgs: more.prefilled, opId: more.opId, appOrigin: more.appOrigin });
-      const pickerFetcher = screenPickerFetcher({ call: pickCall, ops: () => view.ops(), appOrigin: more.appOrigin });
+      const pickerFetcher = screenPickerFetcher({ call: pickCall, ops: () => view.ops(), appOrigin: more.appOrigin, t });
       area.replaceChildren(renderForm(spec, { doc: document, t, pickerFetcher, onSubmit: (values) => { area.replaceChildren(); run(a.skill, { ...more.prefilled, ...values }, a.confirm); }, onCancel: () => area.replaceChildren() }));
     };
     household.replaceChildren(
@@ -164,7 +164,7 @@ export async function startScreenShell(win = window) {
           if (!item.needsForm) { run({}); return; }
           const spec = buildFormSpec({ opParams: item.params, missing: item.params.filter((q) => q?.required).map((q) => q.name), prefilledArgs: {}, opId: item.opId, appOrigin: item.appOrigin });
           // a field with a declared source is picked from what this screen may read, not typed as an id
-          const pickerFetcher = screenPickerFetcher({ call: pickCall, ops: () => view.ops(), appOrigin: item.appOrigin });
+          const pickerFetcher = screenPickerFetcher({ call: pickCall, ops: () => view.ops(), appOrigin: item.appOrigin, t });
           area.replaceChildren(renderForm(spec, { doc: document, t, pickerFetcher, onSubmit: (values) => { area.replaceChildren(); run(values); }, onCancel: () => area.replaceChildren() }));
         } }, item.label);
         return el('div', { class: 'screen-op' }, open, area, out, replies);

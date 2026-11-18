@@ -13,6 +13,13 @@ describe('pickerChoices', () => {
     expect(pickerChoices({ circles: ['thuis', { groupId: 'werk' }, pair], names: { thuis: 'Thuis' } }))
       .toEqual([{ id: 'thuis', label: 'Thuis' }, { id: 'werk', label: 'werk' }]);
   });
+  it('a circle no name reached is offered by the host\'s word for it, never its key (the fetcher hands the translator on)', async () => {
+    const t = (k) => (k === 'circle.launcher.unnamed' ? 'Kring zonder naam' : k);
+    const reply = { circles: ['9fccd3f727b0', 'thuis'], names: { thuis: 'Thuis' } };
+    expect(pickerChoices(reply, t)).toEqual([{ id: '9fccd3f727b0', label: 'Kring zonder naam' }, { id: 'thuis', label: 'Thuis' }]);
+    const fetched = await makePickerFetcher(async () => reply, 'household', t)({ listOp: 'listMyCircles', appOrigin: 'pinboard' });
+    expect(fetched[0].label).toBe('Kring zonder naam');
+  });
   it('items, entries, or a bare list: id (or webid) and its words', () => {
     expect(pickerChoices({ items: [{ id: 'a', label: 'A' }, { webid: 'w', name: 'Wim' }] })).toEqual([{ id: 'a', label: 'A' }, { id: 'w', label: 'Wim' }]);
     expect(pickerChoices({ entries: [{ id: 'e', text: 'melk' }] })).toEqual([{ id: 'e', label: 'melk' }]);

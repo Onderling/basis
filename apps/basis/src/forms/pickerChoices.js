@@ -8,12 +8,16 @@ import { isPairCircleId } from '../v2/pairCircleId.js';
 
 const idOf = (c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null));
 
-/** @param {unknown} reply @returns {Array<{id: string, label: string}>} */
-export function pickerChoices(reply) {
+/**
+ * @param {unknown} reply
+ * @param {Function} [t]  the host's translator: a circle no name reached is offered as 'Kring zonder naam', never its key
+ * @returns {Array<{id: string, label: string}>}
+ */
+export function pickerChoices(reply, t) {
   if (Array.isArray(reply?.circles)) {
     const names = reply.names && typeof reply.names === 'object' ? reply.names : {};
     return reply.circles.map(idOf).filter((id) => typeof id === 'string' && id && !isPairCircleId(id))
-      .map((id) => ({ id, label: String(names[id] || id) }));
+      .map((id) => ({ id, label: String(names[id] || (typeof t === 'function' && t('circle.launcher.unnamed')) || id) }));
   }
   const rows = Array.isArray(reply) ? reply : (Array.isArray(reply?.items) ? reply.items : (Array.isArray(reply?.entries) ? reply.entries : []));
   return rows.filter((r) => r && (r.id ?? r.webid) != null)
@@ -24,13 +28,14 @@ export function pickerChoices(reply) {
  * A field's choices, fetched through the shell's waist.
  * @param {(app: string, op: string, args: object) => Promise<unknown>} call
  * @param {string} appOrigin   the field's own app, for a source that names none
+ * @param {Function} [t]        the host's translator (a nameless circle's word)
  * @returns {(decl: {listOp: string, appOrigin?: string, filter?: object}) => Promise<Array<{id: string, label: string}>>}
  */
-export function makePickerFetcher(call, appOrigin) {
+export function makePickerFetcher(call, appOrigin, t) {
   return async (decl) => {
     if (!decl?.listOp || typeof call !== 'function') return [];
     const r = await call(decl.appOrigin ?? appOrigin, decl.listOp, decl.filter && typeof decl.filter === 'object' ? { ...decl.filter } : {});
-    return pickerChoices(r);
+    return pickerChoices(r, t);
   };
 }
 

@@ -5701,7 +5701,7 @@ const SCAN_PAINTERS = {
 
 /** A declared op from a scan: what the code did not say is asked in the shared form (or nothing — it runs). */
 async function runOpFromScan(target, needs) {
-  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), target.app);
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), target.app, t);
   const run = async (op) => {
     const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     const w = scanOpResultWords(r);
@@ -6615,7 +6615,7 @@ function showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = '
   const picked = {};
   let typed = '';        // what was typed survives a repaint (a pick repaints)
   const done = () => { close(); try { onClosed?.(); } catch { /* */ } };
-  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), 'household');
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), 'household', t);
   const step = async (r) => { inst = r; choices = await ceremonyChoices(renderFlow(FLOW, inst, { ops: OPS }).form, fetchChoices); paint(); };
 
   const paint = () => {

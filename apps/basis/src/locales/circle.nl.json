@@ -5027,6 +5027,18 @@
     "trash_restored": {
       "text": "\"{{item}}\" staat weer op {{list}}.",
       "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "quantity_raised": {
+      "text": "{{item}} stond al op {{list}}; nu {{quantity}} keer.",
+      "doc": "A list entry for the same thing (same reference) was added again: its quantity went up (L1035)."
+    },
+    "bad_ref": {
+      "text": "Dat ding kan ik niet aan een lijst hangen: het mist een soort of een kenmerk.",
+      "doc": "addToList refused a reference that is not {type, ref} (L1035)."
+    },
+    "bad_quantity": {
+      "text": "Hoeveel moet een heel getal zijn, minstens 1.",
+      "doc": "addToList refused a quantity that is not a whole number of at least 1 (L1035)."
     }
   },
   "share": {

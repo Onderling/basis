@@ -5,7 +5,7 @@
   },
   "addToList": {
     "what": "Zet iets op een lijst.",
-    "params": { "list": "op welke lijst", "text": "wat erop komt", "kind": "wat voor soort regel", "assignee": "wie het doet", "due": "op welke dag" }
+    "params": { "list": "op welke lijst", "text": "wat erop komt", "kind": "wat voor soort regel", "assignee": "wie het doet", "due": "op welke dag", "ref": "naar welk ding het verwijst", "quantity": "hoeveel" }
   },
   "listLists": {
     "what": "Laat de lijsten zien.",

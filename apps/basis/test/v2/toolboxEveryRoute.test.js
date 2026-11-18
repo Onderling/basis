@@ -1,5 +1,5 @@
 /**
- * EVERY route to a toolbox's tool on the box passes the egress gate (ledger L1035; Fable's (4) on #1405).
+ * EVERY route to a toolbox's tool on the box passes the egress gate (ledger L1035).
  *
  * @guard the Telegram door and a screen's kernel skill both reach tools.useTool through the gated call, so both write the tool-call record
  *

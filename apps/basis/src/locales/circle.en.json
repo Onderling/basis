@@ -1906,6 +1906,26 @@
     "plus_help_no_model": {
       "text": "Without a model I read fixed sentences. You set a model under {{place}}.",
       "doc": "\"help\" in the \"+\", last line with no own model set: what it does without one and where to set one ({{place}}: the screens' labels joined by arrows). Fable's words."
+    },
+    "plus_help_ask": {
+      "text": "Also ask how something works, for example: {{example}}",
+      "doc": "\"help\" in the \"+\", before the model line: it answers how things work ({{example}}: plus_help_ask_example). Fable's words."
+    },
+    "plus_help_ask_example": {
+      "text": "how do I invite someone?",
+      "doc": "The example in plus_help_ask: a question a help card answers (tested: the \"+\" reads it as help with a card)."
+    },
+    "plus_not_my_reach": {
+      "text": "I do not read along in {{circle}}. Open the circle, or tell me what to put in it.",
+      "doc": "The \"+\" for a line about one of the person's circles ({{circle}}) that it cannot place: it does not read along there, and what to do instead (Fable's words)."
+    },
+    "plus_try_example": {
+      "text": "Try for example: {{example}}",
+      "doc": "After \"could not read that\" or the no-model answer: one line the \"+\" reads here that is close to what was typed ({{example}})."
+    },
+    "plus_not_understood": {
+      "text": "I did not understand that. Try for example: {{example}}",
+      "doc": "The \"+\" when the model found nothing to do in a line: not understood, with one line it does read here that is close to what was typed ({{example}}). Fable's words."
     }
   },
   "screens": {

@@ -51,6 +51,6 @@ describe('a generic op (a noun with the generic verbs): the verb described once,
   });
   it('a noun not described yet, or a non-generic op of an undescribed app: none', () => {
     expect(opWhat('pinboard', encodeGenericOpId('pinboard', 'complete', 'lend'), 'nl')).toBeNull();
-    expect(opWhat('household', 'addItem', 'nl')).toBeNull();
+    expect(opWhat('pinboard', 'postRequest', 'nl')).toBeNull();   // an app still undescribed (household gets its own words)
   });
 });

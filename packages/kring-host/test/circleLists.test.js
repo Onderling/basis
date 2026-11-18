@@ -174,3 +174,18 @@ describe('circleLists', () => {
     expect(byType['list-item'].label).toBe('buy milk');              // and the list-item alongside it
   });
 });
+
+describe('an entry for a thing, and how many', () => {
+  it('the read model labels it "N× words" for every shell, and keeps the reference as a plain one', async () => {
+    const { entryWords } = await import('../src/circleLists.js');
+    const svc = makeCircleLists({ dataSource: memoryDataSource() });
+    const list = await svc.createList('c1', 'Boodschappen', 'me');
+    const e = await svc.addItem('c1', list.id, 'Halfvolle melk 1 L', 'me', { ref: { type: 'shop.product', ref: 'ah:1' }, quantity: 2 });
+    expect(e.quantity).toBe(2);
+    expect(e.embeds).toEqual([{ type: 'shop.product', ref: 'ah:1', rel: 'refers' }]);
+    const tree = await svc.tree('c1', list.id);
+    expect(tree.children.map((c) => c.label)).toEqual(['2× Halfvolle melk 1 L']);
+    expect(entryWords({ text: 'brood' })).toBe('brood');
+    expect(entryWords({ text: 'brood', quantity: 1 })).toBe('brood');
+  });
+});

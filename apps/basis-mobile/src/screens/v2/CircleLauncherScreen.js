@@ -30,6 +30,7 @@ import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, readNearbyAsked, markNearbyAsked, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
 import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../basis/src/v2/nearbyLevel.js';
+import { nearbyWizardStep, nearbyWizardPress, nearbyCardTags } from '../../../../basis/src/v2/nearbyWizard.js';
 import { nearbyTabs } from '../../../../basis/src/v2/nearbyTabs.js';
 import { nearbyStream, nearbyTabNews } from '../../../../basis/src/v2/nearbyStream.js';
 import { nearbyMenu, nearbyHereChoose } from '../../../../basis/src/v2/nearbyMenu.js';
@@ -5830,7 +5831,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   // the room self's level, read from ITS disclosure — re-read whenever the self changes
   const [roomLevel, setRoomLevel] = useState(null);
   // the once-per-self-per-device question ("what may this room see of you?"), while it is open
-  const [askLevel, setAskLevel] = useState(false);
+  // the first-time wizard while it is open: `{step, notice}` (`nearbyWizardPress` moves it), or null
+  const [wizard, setWizard] = useState(null);
   // whether the room self chose a level — read by the screen's `levelChosen` port (sync), so kept in a ref;
   // until it is true the device is never announced
   const roomLevelSetRef = useRef(false);
@@ -5855,7 +5857,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       const asked = roomSelfId ? await readNearbyAsked(roomSelfId) : true;
       const fu = nearbyFirstUse({ self: roomSelfId ? { id: roomSelfId } : { asking: true }, asked, levelSet: st.set });
       if (fu.mark) markNearbyAsked(roomSelfId);
-      if (live) setAskLevel(fu.ask);
+      if (live && fu.ask) setWizard((w) => w ?? { step: 1 });   // an open wizard stays open (a self picked in step 1 re-reads the level)
     })().catch(() => {});
     return () => { live = false; };
   }, [bundle, roomR, roomSelfId]);
@@ -5865,8 +5867,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     setRoomLevel(v);
     roomLevelSetRef.current = true;
     screenRef.current?.levelChanged?.();   // chosen now: announced, unless the person went quiet
-    if (roomSelfId) markNearbyAsked(roomSelfId);   // a chosen level answers the first-use question too
-    setAskLevel(false);
+    if (roomSelfId) markNearbyAsked(roomSelfId);   // a chosen level answers the first-time question too
     // Same as web: a face that resolves to nothing is announced as a retraction, and the person is
     // told, because "handle" with no handle looks exactly like "Nobody" from the inside.
     const r = await bundle?.nearbyRoom?.announceFace?.();
@@ -5956,6 +5957,22 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     if (action === 'answer-ask')  { setNotice(null); setAnswering(ask?.id ?? null); }
   }, [screen]);
 
+  // one press in the first-time wizard: what it writes is the shared rule (`nearbyWizardPress`, as on web), through this host's acts
+  const wizardPress = useCallback(async (press, input) => {
+    const r = await nearbyWizardPress(wizard ?? { step: 1 }, press, input, {
+      now: { level: roomLevel, visibility: screen?.visibility?.() ?? null },
+      setLevel: (l) => changeLevel(l),
+      setQuiet: (q) => screen?.setQuiet?.(q),
+      setRadio: (v) => screen?.setRadio?.(v),
+      markAsked: () => { if (roomSelfId) markNearbyAsked(roomSelfId); },
+      setAllow: (key, value) => { screen.setAllow(key, value); writeNearbyAllows(screen.model().allows); },
+      showCard: (fields) => screen.showCard(fields),
+      // the card reaches the room in its own time; its outcome is the card editor's notice, as on web
+      cardShown: (r) => setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' }),
+    });
+    setWizard(r.done ? null : { step: r.step, notice: r.notice ?? null });
+  }, [wizard, screen, roomLevel, changeLevel, roomSelfId]);
+
   // the gear menu's "how you are here": one shared rule for what each choice writes (`nearbyHereChoose`, as on web)
   const hereChoose = useCallback(async (choice) => {
     const r = await nearbyHereChoose(choice, { level: roomLevel, visibility: screen?.visibility?.() ?? null }, {
@@ -6002,11 +6019,11 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       onInviteAction={inviteAction}
       level={roomLevel}
       onLevelChange={changeLevel}
-      firstUse={askLevel ? { onChoose: changeLevel, onLater: () => { if (roomSelfId) markNearbyAsked(roomSelfId); setAskLevel(false); } } : null}
+      wizard={wizard ? { ...wizard, onPress: wizardPress } : null}
       onSetQuiet={(v) => screen?.setQuiet?.(v)}
       onSetRadio={(v) => screen?.setRadio?.(v)}
       onHereChoose={hereChoose}
-      onIntroAgain={() => setAskLevel(true)}
+      onIntroAgain={() => setWizard({ step: 1 })}
       onCompose={() => { setNotice(null); setComposing(true); }}
       composing={composing}
       answering={!!answering}
@@ -6030,9 +6047,105 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
 
 // `NEARBY_ACTION_LABELS` + `nearbyVisibilityKey` are imported from the basis app above — one definition,
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
+/**
+ * What the room self offers, as a switch that copies it into the card as chips the person can remove (a prefill they
+ * see, never derived at send); nothing offered yet says where an offer is made. `value` is `{showOffers, tags}` or null.
+ * The same piece in the wizard's second step and the card editor (web: `offersPicker` in circleNearby.js).
+ */
+function NearbyOffersPicker({ spec, value, onChange, styles }) {
+  if (!spec?.list) return <Text style={styles.muted} testID="nearby-offers-none">{t(spec?.noneKey ?? 'circle.nearbyScreen.wizard2_no_offers')}</Text>;
+  const on = value?.showOffers === true;
+  const tags = Array.isArray(value?.tags) ? value.tags : spec.list;
+  return (
+    <View>
+      <Pressable onPress={() => onChange({ showOffers: !on, tags })} accessibilityRole="switch" accessibilityState={{ checked: on }} testID="nearby-offers" style={styles.nearbyAction}>
+        <Text style={styles.nearbyActionText}>{(on ? '● ' : '○ ') + t(spec.key, spec.vars)}</Text>
+      </Pressable>
+      {on ? (
+        <View style={styles.nearbyActions}>
+          {tags.map((tag) => (
+            <Pressable key={tag} accessibilityRole="button" accessibilityLabel={t('circle.mij.driver_remove', { what: tag })} testID={`nearby-offer-chip-${tag}`} style={styles.nearbyAction}
+              onPress={() => onChange({ showOffers: true, tags: tags.filter((x) => x !== tag) })}>
+              <Text style={styles.nearbyActionText}>{`${tag} ×`}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Nearby the first time: the three steps of `nearbyWizardStep` (shared with web), painted; a press goes to the host with
+ * what the step's fields hold, and the host runs `nearbyWizardPress`. The fields are view state, kept per step.
+ */
+function NearbyWizard({ wizard, roomView = null, offers = [], chat = false, onPickRoomSelf = null, onPrefillCard = null, styles }) {
+  const theme = useTheme();
+  const spec = nearbyWizardStep(wizard.step, { selfView: roomView, offers, chat });
+  const [label, setLabel] = useState('');
+  const [line, setLine] = useState('');
+  const [offerPick, setOfferPick] = useState(null);
+  const [chatOn, setChatOn] = useState(spec.chat?.on === true);
+  useEffect(() => {
+    if (spec.step !== 2 || typeof onPrefillCard !== 'function') return;
+    let live = true;
+    Promise.resolve(onPrefillCard()).then((got) => {
+      if (live && typeof got?.label === 'string' && got.label) setLabel((v) => v || got.label.slice(0, 40));
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [spec.step, onPrefillCard]);
+  const nameOf = (c) => (c.nameKey ? t(c.nameKey) : c.name);
+  const shown = (c) => (c.labelKey ? t(c.labelKey, c.labelVars) : nameOf(c));
+  const selfName = (() => { const c = spec.selves?.find((x) => x.id === spec.selected) ?? spec.selves?.[0]; return c ? nameOf(c) : ''; })();
+  const primary = { backgroundColor: theme.color.accentInk, borderColor: theme.color.accentInk };
+  const press = (id) => wizard.onPress(id, { label, line, chat: chatOn, ...(offerPick ?? {}) });
+  return (
+    <View style={[styles.nearbyStreamCard, { padding: 14 }]} testID={`nearby-wizard-step${spec.step}`}>
+      <Text style={styles.muted}>{t(spec.head.key, spec.head.vars)}</Text>
+      <Text style={styles.ownProfileTitle}>{t(spec.titleKey)}</Text>
+      <Text style={styles.nearbyActionText}>{t(spec.textKey)}</Text>
+      {spec.step === 1 ? (<>
+        <Text style={[styles.ownProfileTitle, { marginTop: 10 }]}>{t(spec.appearAsKey)}</Text>
+        {spec.selves.map((c) => (
+          <Pressable key={c.id} accessibilityRole="radio" accessibilityState={{ checked: spec.selected === c.id }} testID={`nearby-wizard-self-${c.id}`} style={styles.nearbyAction} onPress={() => onPickRoomSelf?.(c.id)}>
+            <Text style={styles.nearbyActionText}>{(spec.selected === c.id ? '● ' : '○ ') + shown(c)}</Text>
+          </Pressable>
+        ))}
+      </>) : null}
+      {spec.step === 2 ? (<>
+        <Text style={[styles.ownProfileTitle, { marginTop: 10 }]}>{t(spec.nameKey)}</Text>
+        <ThemedTextInput style={styles.nearbyInput} value={label} onChangeText={setLabel} maxLength={40} testID="nearby-wizard-name" />
+        <Text style={[styles.ownProfileTitle, { marginTop: 8 }]}>{t(spec.lineKey)}</Text>
+        <ThemedTextInput style={styles.nearbyInput} value={line} onChangeText={setLine} maxLength={140} placeholder={t(spec.lineExampleKey)} testID="nearby-wizard-line" />
+        <NearbyOffersPicker spec={spec.offers} value={offerPick} onChange={setOfferPick} styles={styles} />
+      </>) : null}
+      {spec.step === 3 ? (<>
+        <View style={[styles.nearbyStreamCard, { marginTop: 10 }]} accessibilityRole="text" testID="nearby-wizard-box">
+          <Text style={styles.nearbyActionText}>{t(spec.boxKey)}</Text>
+        </View>
+        <Pressable onPress={() => setChatOn((v) => !v)} accessibilityRole="switch" accessibilityState={{ checked: chatOn }} testID="nearby-wizard-chat" style={styles.nearbyAction}>
+          <Text style={styles.nearbyActionText}>{(chatOn ? '● ' : '○ ') + t(spec.chat.key)}</Text>
+        </Pressable>
+      </>) : null}
+      <Text style={[styles.muted, { marginTop: 8 }]}>{t(spec.underKey)}</Text>
+      {wizard.notice ? <Text style={styles.nearbyActionText} testID="nearby-wizard-notice">{t(`circle.nearbyScreen.${wizard.notice}`)}</Text> : null}
+      <View style={[styles.nearbyActions, { justifyContent: 'flex-end' }]}>
+        {spec.buttons.map((b) => {
+          const main = b.id === 'yes' || b.id === 'next' || b.id === 'done';
+          return (
+            <Pressable key={b.id} accessibilityRole="button" testID={`nearby-wizard-${b.id}`} style={[styles.nearbyAction, main ? primary : null]} onPress={() => press(b.id)}>
+              <Text style={[styles.nearbyActionText, main ? { color: theme.color.accentContrast, fontWeight: '600' } : null]}>{t(b.key, { name: selfName })}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function NearbyScreen({
   model, roomView = null, onPickRoomSelf = null, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onPrefillCard, level = null, firstUse = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
+  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onPrefillCard, level = null, wizard = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
   onShareCard = null, onHereChoose = null, onIntroAgain = null,
 }) {
   const theme = useTheme();
@@ -6047,6 +6160,7 @@ function NearbyScreen({
   const allows     = model?.allows ?? { card: false, chat: false };
   const [cardLabel, setCardLabel] = useState('');
   const [cardLine, setCardLine]   = useState('');
+  const [cardOffers, setCardOffers] = useState(null);   // the offers switch and the chips left: `{showOffers, tags}`
   const [chatDraft, setChatDraft] = useState('');
   const invites    = Array.isArray(model?.invites) ? model.invites : [];
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
@@ -6341,6 +6455,15 @@ function NearbyScreen({
       );
     },
   };
+  if (wizard) {
+    // THE FIRST TIME: while the wizard is open it is the page (no gear, no tabs); its last line says where the gear holds it all
+    return (
+      <ScrollView style={styles.page} contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }} keyboardShouldPersistTaps="handled" testID="circle-nearby-screen">
+        <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
+        <NearbyWizard wizard={wizard} roomView={roomView} offers={own.publishedSkills ?? []} chat={!!allows.chat} onPickRoomSelf={onPickRoomSelf} onPrefillCard={onPrefillCard} styles={styles} />
+      </ScrollView>
+    );
+  }
   return (
     // ONE scroll column for the whole room (the walk of 2026-10-26: the peer list took the full height and the sections
     // below it sat at the bottom edge, unreachable): the peers are sized to their content and everything scrolls together.
@@ -6353,23 +6476,6 @@ function NearbyScreen({
           <Text style={styles.nearbyActionText}>⚙</Text>
         </Pressable>
       </View>
-      {firstUse ? (
-        // The first-use question, before anything else: what may this room see of the self entering it.
-        <View style={styles.nearbyAsks} testID="nearby-first-use">
-          <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.first_use_title')}</Text>
-          <Text style={styles.muted}>{t('circle.nearbyScreen.first_use_body')}</Text>
-          <View style={styles.nearbyActions}>
-            {NEARBY_LEVELS.map((v) => (
-              <Pressable key={v} accessibilityRole="button" testID={`nearby-first-use-${v}`} style={styles.nearbyAction} onPress={() => firstUse.onChoose?.(v)}>
-                <Text style={styles.nearbyActionText}>{t(nearbyLevelLabelKey(v))}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable accessibilityRole="button" testID="nearby-first-use-later" style={styles.nearbyAction} onPress={() => firstUse.onLater?.()}>
-            <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.first_use_later')}</Text>
-          </Pressable>
-        </View>
-      ) : null}
       {visKey ? (
         // One line for the state, and it opens the gear menu (one menu, no second sheet). A degraded state keeps its
         // sentence in view: that one is a warning, not an explanation.
@@ -6504,13 +6610,15 @@ function NearbyScreen({
                     <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.card_prefill')}</Text>
                   </Pressable>
                 ) : null}
+                {/* the same offers switch as the wizard's second step: a prefill the person sees, copied in when saved */}
+                <NearbyOffersPicker spec={nearbyWizardStep(2, { offers: own.publishedSkills ?? [] }).offers} value={cardOffers} onChange={setCardOffers} styles={styles} />
                 {/* The consequence, next to the fields. */}
                 <Text style={styles.muted}>{t('circle.nearbyScreen.card_visible_to')}</Text>
                 <Pressable
                   onPress={() => {
                     const label = cardLabel.trim();
                     if (!label) return;
-                    onSubmitCard?.({ label, line: cardLine.trim() });
+                    onSubmitCard?.({ label, line: cardLine.trim(), tags: nearbyCardTags(cardOffers ?? {}) });
                   }}
                   accessibilityRole="button"
                   testID="nearby-card-save"

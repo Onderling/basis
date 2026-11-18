@@ -3792,7 +3792,7 @@
       "doc": "Who said a line in the room chat, for your own lines (the others' lines carry the name or face the room shows)."
     },
     "chat_ephemeral": {
-      "text": "Nothing here is kept. Leaving forgets it.",
+      "text": "Nothing is kept here. Whoever leaves loses the conversation.",
       "doc": "Says the ephemerality out loud, since a chat window normally implies history."
     },
     "chat_placeholder": {
@@ -4019,18 +4019,6 @@
       "text": "The room sees a new key each time. The network still sees your device.",
       "doc": "Nearby → You here: what the room key does and does not hide. A new key per entry and per self; the network (IP, MAC) still sees the device."
     },
-    "first_use_title": {
-      "text": "What may this room see of you?",
-      "doc": "Nearby first-use question (once per self per device): the room self's level."
-    },
-    "first_use_body": {
-      "text": "You choose this per persona; it goes with it to your other devices. You can change it later under \"Show here as\".",
-      "doc": "Under the first-use question: the level is the persona's and syncs; where to change it later."
-    },
-    "first_use_later": {
-      "text": "Later (your handle until then)",
-      "doc": "Dismiss the first-use question; the self stays on the floor default (its handle) and is not asked again on this device."
-    },
     "face_row": {
       "text": "Show here as",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
@@ -4070,6 +4058,106 @@
     "header_none": {
       "text": "Nobody here is showing what they offer yet",
       "doc": "Nearby's top line when people are here but none shows what they offer."
+    },
+    "wizard_step": {
+      "text": "Nearby · step {{n}} of {{of}}",
+      "doc": "First-time wizard: the line above each step."
+    },
+    "wizard1_title": {
+      "text": "Do you want to be visible here?",
+      "doc": "First-time wizard, step 1: its title."
+    },
+    "wizard1_text": {
+      "text": "Nearby shows who close by is open too. People who are visible see each other's name and card. You can change this at any time.",
+      "doc": "First-time wizard, step 1: what being visible means."
+    },
+    "wizard1_appear_as": {
+      "text": "You appear as",
+      "doc": "First-time wizard, step 1: above the choice of who enters the room."
+    },
+    "wizard1_general": {
+      "text": "{{name}} · yourself",
+      "doc": "First-time wizard, step 1: the general self in the choice (not a persona)."
+    },
+    "wizard1_general_unnamed": {
+      "text": "yourself (no name yet)",
+      "doc": "First-time wizard, step 1: the general self while it has no name yet."
+    },
+    "wizard1_fixed": {
+      "text": "This becomes your fixed choice for Nearby. You can switch at the top of the screen.",
+      "doc": "First-time wizard, step 1: under the choice of who enters the room."
+    },
+    "wizard1_yes": {
+      "text": "Yes, as {{name}}",
+      "doc": "First-time wizard, step 1: become visible as the chosen self (the gear menu's Zichtbaar)."
+    },
+    "wizard1_yes_plain": {
+      "text": "Yes",
+      "doc": "First-time wizard, step 1: become visible, when the self has no name to name."
+    },
+    "wizard1_look": {
+      "text": "Only look",
+      "doc": "First-time wizard, step 1: write nothing, stay hidden, end the wizard."
+    },
+    "wizard2_title": {
+      "text": "Your card",
+      "doc": "First-time wizard, step 2: its title."
+    },
+    "wizard2_text": {
+      "text": "This is what people here see of you. Nothing more.",
+      "doc": "First-time wizard, step 2: what the card is."
+    },
+    "wizard2_name": {
+      "text": "Name",
+      "doc": "First-time wizard, step 2: the card's name field."
+    },
+    "wizard2_line": {
+      "text": "One line about yourself",
+      "doc": "First-time wizard, step 2: the card's line field."
+    },
+    "wizard2_line_example": {
+      "text": "e.g. I live at number 8",
+      "doc": "First-time wizard, step 2: the example in the line field."
+    },
+    "wizard2_offers": {
+      "text": "Also show what I offer: {{offers}}",
+      "doc": "First-time wizard, step 2 and the card editor: copy what the room self offers into the card as tags (a prefill the person sees and can remove)."
+    },
+    "wizard2_no_offers": {
+      "text": "You offer nothing yet. You can add that later, under Me.",
+      "doc": "First-time wizard, step 2: in place of the offers switch when nothing is offered yet; Mij/Me is the tab."
+    },
+    "wizard2_under": {
+      "text": "Someone else's question is compared with what you offer on your own phone. The asker hears nothing until you answer.",
+      "doc": "First-time wizard, step 2: how a question meets what you offer."
+    },
+    "wizard3_title": {
+      "text": "The conversation here",
+      "doc": "First-time wizard, step 3: its title."
+    },
+    "wizard3_text": {
+      "text": "Whoever is visible can talk with the people who are here now. Every message shows a name and a time.",
+      "doc": "First-time wizard, step 3: what the conversation is."
+    },
+    "wizard3_switch": {
+      "text": "Take part in the conversation",
+      "doc": "First-time wizard, step 3: the chat switch (the same allow as the gear menu's)."
+    },
+    "wizard3_under": {
+      "text": "Everything you chose here is behind the gear in Nearby.",
+      "doc": "First-time wizard, step 3: where these choices live afterwards."
+    },
+    "wizard_back": {
+      "text": "Back",
+      "doc": "First-time wizard: the step before."
+    },
+    "wizard_next": {
+      "text": "Next",
+      "doc": "First-time wizard: the next step."
+    },
+    "wizard_done": {
+      "text": "Done",
+      "doc": "First-time wizard: the last step's button; ends it."
     }
   },
   "viewAsSplit": {

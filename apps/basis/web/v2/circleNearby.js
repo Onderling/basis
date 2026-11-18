@@ -38,6 +38,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { nearbyTabs } from '../../src/v2/nearbyTabs.js';
 import { nearbyStream, nearbyTabNews } from '../../src/v2/nearbyStream.js';
 import { nearbyMenu } from '../../src/v2/nearbyMenu.js';
+import { nearbyWizardStep, nearbyCardTags } from '../../src/v2/nearbyWizard.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -51,7 +52,7 @@ export function renderCircleNearby(container, {
   onSubmitAsk = null,
   notice = null,
   level = null,          // the room self's Nearby level (null while it is being read)
-  firstUse = null,       // { onChoose(level), onLater() } — the once-per-self-per-device question, or null
+  wizard = null,         // { step, notice?, onPress(press, input) } — the first-time wizard while it is open, or null
   onLevelChange = null,
   onToggleAllow = null,
   onSubmitCard = null,
@@ -79,36 +80,6 @@ export function renderCircleNearby(container, {
   topRow.appendChild(head);
   container.appendChild(topRow);
 
-  // The first-use question, before anything else: what may this room see of the self entering it.
-  if (firstUse && typeof firstUse.onChoose === 'function') {
-    const fu = document.createElement('div');
-    fu.className = 'circle-nearby__first-use';
-    fu.setAttribute('role', 'group');
-    const fuTitle = document.createElement('div');
-    fuTitle.className = 'circle-nearby__first-use-title';
-    fuTitle.textContent = tr('circle.nearbyScreen.first_use_title');
-    fu.appendChild(fuTitle);
-    const fuBody = document.createElement('div');
-    fuBody.className = 'circle-nearby__first-use-body';
-    fuBody.textContent = tr('circle.nearbyScreen.first_use_body');
-    fu.appendChild(fuBody);
-    for (const v of NEARBY_LEVELS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `cc-btn cc-btn--quiet circle-nearby__first-use-option circle-nearby__first-use-option--${v}`;
-      b.textContent = tr(nearbyLevelLabelKey(v));
-      b.addEventListener('click', () => firstUse.onChoose(v));
-      fu.appendChild(b);
-    }
-    const later = document.createElement('button');
-    later.type = 'button';
-    later.className = 'cc-btn cc-btn--quiet circle-nearby__first-use-later';
-    later.textContent = tr('circle.nearbyScreen.first_use_later');
-    later.addEventListener('click', () => firstUse.onLater?.());
-    fu.appendChild(later);
-    container.appendChild(fu);
-  }
-
   // THE GEAR: everything about how you are here sits behind it (`nearbyMenu`), not on the page;
   // its glyph is the stylesheet's (a button with a name, no untranslated text)
   const gear = document.createElement('button');
@@ -116,6 +87,7 @@ export function renderCircleNearby(container, {
   gear.className = 'circle-nearby__gear';
   gear.setAttribute('aria-label', tr('circle.nearbyScreen.menu_title'));
   gear.title = tr('circle.nearbyScreen.menu_title');
+  gear.hidden = !!wizard;   // while the wizard is open it is the page; its last line says where the gear holds it all
   topRow.appendChild(gear);
 
   const safeModel = model && typeof model === 'object' ? model : { rows: [], counts: { total: 0, sharingAny: 0 }, ownProfile: {}, headerLabel: '' };
@@ -123,6 +95,93 @@ export function renderCircleNearby(container, {
     rows = [], ownProfile = {}, headerLabel = '', visibility = null, asks = [],
     allows = { card: false, chat: false }, chat = null, invites = [],
   } = safeModel;
+
+  // THE FIRST TIME: three steps (`nearbyWizardStep`), before anything else; what a press writes is the host's
+  // (`nearbyWizardPress`), so this paints the step and hands the press with what its fields hold
+  if (wizard && typeof wizard.onPress === 'function') {
+    const spec = nearbyWizardStep(wizard.step, { selfView: roomSelf?.view ?? null, offers: ownProfile?.publishedSkills ?? [], chat: !!allows?.chat });
+    const wz = document.createElement('div');
+    wz.className = `circle-nearby__wizard circle-nearby__wizard--step${spec.step}`;
+    wz.setAttribute('role', 'group');
+    const text = (cls, key, vars) => {
+      const el = document.createElement('div');
+      el.className = `circle-nearby__wizard-${cls}`;
+      el.textContent = tr(key, vars);
+      wz.appendChild(el);
+      return el;
+    };
+    text('head', spec.head.key, spec.head.vars);
+    text('title', spec.titleKey);
+    text('text', spec.textKey);
+    const nameOf = (c) => (c.nameKey ? tr(c.nameKey) : c.name);
+    const shown = (c) => (c.labelKey ? tr(c.labelKey, c.labelVars) : nameOf(c));
+    const fields = {};
+    if (spec.step === 1) {
+      text('label', spec.appearAsKey);
+      for (const c of spec.selves) {
+        const lbl = document.createElement('label');
+        lbl.className = 'circle-nearby__wizard-self';
+        const radio = document.createElement('input');
+        radio.type = 'radio'; radio.name = 'nearby-wizard-self'; radio.value = c.id; radio.checked = spec.selected === c.id;
+        radio.addEventListener('change', () => roomSelf?.onPick?.(c.id));
+        lbl.appendChild(radio);
+        lbl.appendChild(document.createTextNode(shown(c)));
+        wz.appendChild(lbl);
+      }
+      text('under', spec.underKey);
+    } else if (spec.step === 2) {
+      const input = (cls, key, max, placeholderKey) => {
+        const lbl = document.createElement('label');
+        lbl.className = `circle-nearby__wizard-field circle-nearby__wizard-field--${cls}`;
+        lbl.appendChild(document.createTextNode(tr(key)));
+        const el = document.createElement('input');
+        el.type = 'text'; el.maxLength = max;
+        if (placeholderKey) el.placeholder = tr(placeholderKey);
+        lbl.appendChild(el);
+        wz.appendChild(lbl);
+        return el;
+      };
+      fields.label = input('name', spec.nameKey, CARD_MAX_LABEL, null);
+      fields.line = input('line', spec.lineKey, CARD_MAX_LINE, spec.lineExampleKey);
+      // pre-filled from what this room may see of the self, as the card editor's "fill in" does; the person still reads it
+      Promise.resolve(typeof onPrefillCard === 'function' ? onPrefillCard() : null).then((got) => {
+        if (typeof got?.label === 'string' && got.label && !fields.label.value) fields.label.value = got.label.slice(0, CARD_MAX_LABEL);
+      }).catch(() => {});
+      fields.offers = offersPicker(wz, spec.offers);
+      text('under', spec.underKey);
+    } else {
+      const box = text('box', spec.boxKey);
+      box.setAttribute('role', 'note');
+      const lbl = document.createElement('label');
+      lbl.className = 'circle-nearby__wizard-chat';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = spec.chat.on;   // sets: local:basis.nearbyAllows — the chat allow, written on Klaar
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(tr(spec.chat.key)));
+      wz.appendChild(lbl);
+      fields.chat = cb;
+      text('under', spec.underKey);
+    }
+    if (wizard.notice) text('notice', `circle.nearbyScreen.${wizard.notice}`);
+    const bar = document.createElement('div');
+    bar.className = 'circle-nearby__wizard-buttons';
+    const selfName = (() => { const c = spec.selves?.find((x) => x.id === spec.selected) ?? spec.selves?.[0]; return c ? nameOf(c) : ''; })();
+    for (const b of spec.buttons) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `cc-btn ${b.id === 'yes' || b.id === 'next' || b.id === 'done' ? 'cc-btn--primary' : 'cc-btn--quiet'} circle-nearby__wizard-${b.id}`;
+      btn.dataset.press = b.id;
+      btn.textContent = tr(b.key, { name: selfName });
+      btn.addEventListener('click', () => wizard.onPress(b.id, {
+        label: fields.label?.value ?? '', line: fields.line?.value ?? '', chat: fields.chat ? fields.chat.checked : false,
+        ...(fields.offers ? fields.offers.read() : {}),
+      }));
+      bar.appendChild(btn);
+    }
+    wz.appendChild(bar);
+    container.appendChild(wz);
+    return;   // while the wizard is open it is the page
+  }
 
   // ── Visibility banner ──────────────────────────────────────────────────────
   // Ordered by what a person most needs to know, not by what we asked for:
@@ -879,6 +938,9 @@ export function renderCircleNearby(container, {
         form.appendChild(fill);
       }
 
+      // the same offers switch as the wizard's second step: a prefill the person sees, copied into the card when it is saved
+      const offers = offersPicker(form, nearbyWizardStep(2, { offers: ownProfile?.publishedSkills ?? [] }).offers);
+
       // The consequence, next to the fields. "Everyone in this room" is not obvious from a text box.
       const who = document.createElement('div');
       who.className = 'circle-nearby__card-visible';
@@ -895,7 +957,7 @@ export function renderCircleNearby(container, {
         e.preventDefault();
         const name = label.value.trim();
         if (!name) return;
-        if (typeof onSubmitCard === 'function') onSubmitCard({ label: name, line: line.value.trim() });
+        if (typeof onSubmitCard === 'function') onSubmitCard({ label: name, line: line.value.trim(), tags: nearbyCardTags(offers.read()) });
       });
       cardView.appendChild(form);
     }
@@ -915,6 +977,47 @@ export function renderCircleNearby(container, {
     footer.appendChild(ownSkills);
     cardView.appendChild(footer);
     return menu;
+  }
+
+  /**
+   * What the room self offers, as a switch that copies it into the card as chips the person can remove (a prefill they
+   * see, never derived at send); nothing offered yet says where an offer is made. `read()` → `{showOffers, tags}`.
+   */
+  function offersPicker(parent, spec) {
+    if (!spec?.list) {
+      const none = document.createElement('div');
+      none.className = 'circle-nearby__offers-none';
+      none.textContent = tr(spec?.noneKey ?? 'circle.nearbyScreen.wizard2_no_offers');
+      parent.appendChild(none);
+      return { read: () => ({ showOffers: false, tags: [] }) };
+    }
+    const lbl = document.createElement('label');
+    lbl.className = 'circle-nearby__offers';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = false;   // sets: form — the card's tags, copied in when the card is saved
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(tr(spec.key, spec.vars)));
+    parent.appendChild(lbl);
+    const chips = document.createElement('div');
+    chips.className = 'circle-nearby__offer-chips';
+    chips.hidden = true;
+    let tags = [...spec.list];
+    const paint = () => {
+      chips.innerHTML = '';
+      for (const tag of tags) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'cc-btn cc-btn--quiet circle-nearby__offer-chip';
+        chip.textContent = tag;
+        chip.setAttribute('aria-label', tr('circle.mij.driver_remove', { what: tag }));
+        chip.addEventListener('click', () => { tags = tags.filter((x) => x !== tag); paint(); });
+        chips.appendChild(chip);
+      }
+    };
+    paint();
+    cb.addEventListener('change', () => { chips.hidden = !cb.checked; });
+    parent.appendChild(chips);
+    return { read: () => ({ showOffers: cb.checked, tags: [...tags] }) };
   }
 
   /** One allow as a switch, with what OTHERS see while it is off (a setting name does not tell its consequence). */

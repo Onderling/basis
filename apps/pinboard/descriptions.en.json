@@ -1,0 +1,378 @@
+{
+  "postRequest": {
+    "what": "Put something on the pinboard: a request, an offer or something to lend.",
+    "params": {"text": "what you ask or offer", "intent": "ask, offer or lend", "dueAt": "until when", "skill": "what skill it needs"}
+  },
+  "listOpenRequests": {
+    "what": "Show what is open on the pinboard.",
+    "params": {"intent": "ask, offer or lend", "skill": "what skill it needs"}
+  },
+  "listMyRequests": {
+    "what": "Show your own open posts on the pinboard.",
+    "params": {}
+  },
+  "respondToItem": {
+    "what": "Respond to a post on the pinboard.",
+    "params": {"itemId": "which post", "body": "what you say"}
+  },
+  "cancelRequest": {
+    "what": "Withdraw a post from the pinboard.",
+    "params": {"requestId": "which post"}
+  },
+  "assignLend": {
+    "what": "Lend something to someone; the post stays open.",
+    "params": {"itemId": "which post", "borrowerWebid": "to whom"}
+  },
+  "markReturned": {
+    "what": "Say that something you lent is back.",
+    "params": {"requestId": "which post"}
+  },
+  "leaveGroup": {
+    "what": "Leave a circle.",
+    "params": {"groupId": "which circle", "deletePosts": "remove your posts too"}
+  },
+  "getItemTree": {
+    "what": "Show a post with everything attached to it.",
+    "params": {"itemId": "which post"}
+  },
+  "signOutOfPod": {
+    "what": "Sign out of your pod.",
+    "params": {}
+  },
+  "listFeed": {
+    "what": "Show what is new in your circle.",
+    "params": {}
+  },
+  "getPinboardProfile": {
+    "what": "Show what others see of you on the pinboard.",
+    "params": {}
+  },
+  "startDm": {
+    "what": "Start a one to one conversation.",
+    "params": {"webid": "with whom"}
+  },
+  "setHolidayMode": {
+    "what": "Switch holiday mode on or off.",
+    "params": {"on": "on or off"}
+  },
+  "getHolidayMode": {
+    "what": "Show whether holiday mode is on.",
+    "params": {}
+  },
+  "listContacts": {
+    "what": "Show your contacts.",
+    "params": {"min-trust": "from which trust level", "tag": "with which label"}
+  },
+  "addContact": {
+    "what": "Add a contact.",
+    "params": {"webid": "who", "name": "the name"}
+  },
+  "setContactTrust": {
+    "what": "Choose how much you trust a contact.",
+    "params": {"webid": "who", "level": "how much"}
+  },
+  "setContactHidden": {
+    "what": "Hide a contact, or show it again.",
+    "params": {"webid": "who", "hidden": "hide or not", "hiddenAt": "when hidden", "deleted": "delete too", "deletedAt": "when deleted"}
+  },
+  "listMessageRequests": {
+    "what": "Show first messages from people you did not choose.",
+    "params": {"persona": "as which persona", "state": "open or ignored"}
+  },
+  "holdMessageRequest": {
+    "what": "Keep a first message from someone you did not choose as a request.",
+    "params": {"from": "from whom", "messageId": "which message", "ts": "when", "text": "what it says", "card": "their card", "file": "whether a file came with it", "persona": "as which persona", "memberName": "their name in the circle", "refused": "why it did not get through"}
+  },
+  "acceptMessageRequest": {
+    "what": "Accept a request: whoever sent it becomes a contact.",
+    "params": {"from": "from whom", "persona": "as which persona", "revealPreset": "how much they see of you"}
+  },
+  "removeMessageRequest": {
+    "what": "Remove a request.",
+    "params": {"from": "from whom", "persona": "as which persona"}
+  },
+  "ignoreMessageRequest": {
+    "what": "Ignore a request; you can still accept it later.",
+    "params": {"from": "from whom", "persona": "as which persona"}
+  },
+  "mintSharedCard": {
+    "what": "Make a link someone can add you as a contact with.",
+    "params": {"persona": "as which persona"}
+  },
+  "listSharedCards": {
+    "what": "Show the contact links you shared, and whether they were used.",
+    "params": {"persona": "as which persona"}
+  },
+  "withdrawSharedCard": {
+    "what": "Withdraw a contact link; whoever opens it later lands in requests.",
+    "params": {"token": "which link", "persona": "as which persona"}
+  },
+  "clearContactLinkToken": {
+    "what": "Forget which link a contact came in through.",
+    "params": {"webid": "who"}
+  },
+  "useSharedCard": {
+    "what": "Remember that someone used a contact link of yours.",
+    "params": {"token": "which link", "by": "by whom", "card": "their card", "persona": "as which persona"}
+  },
+  "setContactPersona": {
+    "what": "Choose as which persona a contact sees you, and how much.",
+    "params": {"webid": "who", "persona": "which persona", "revealPreset": "how much they see of you", "personaAt": "since when"}
+  },
+  "setContactPersonKey": {
+    "what": "Record a contact's key, from their card.",
+    "params": {"webid": "who", "personKey": "their key", "links": "the proof that it is theirs"}
+  },
+  "getContactShareQr": {
+    "what": "Show the code someone can add you as a contact with.",
+    "params": {"trust": "how much trust", "extra-relays": "extra connection points", "persona": "as which persona"}
+  },
+  "conflictDisputeWizard": {
+    "what": "Raise an objection in your circle.",
+    "params": {"postId": "about which post"}
+  },
+  "postAudienceWizard": {
+    "what": "Put something on the pinboard for part of the circle.",
+    "params": {"text": "what it says"}
+  },
+  "createGroupWizard": {
+    "what": "Make a new circle, in five steps.",
+    "params": {}
+  },
+  "joinGroupWizard": {
+    "what": "Join a circle: read the rules and choose your name.",
+    "params": {"invite": "the invite"}
+  },
+  "getCurrentGroup": {
+    "what": "Show which circle you are in now.",
+    "params": {}
+  },
+  "listGroupMembers": {
+    "what": "Show the members of your circle.",
+    "params": {"spineless": "also who is not confirmed yet"}
+  },
+  "memberStatus": {
+    "what": "Show how things stand with a member of the circle.",
+    "params": {"webid": "who", "after": "since when"}
+  },
+  "getGroupRules": {
+    "what": "Show your circle's rules.",
+    "params": {}
+  },
+  "acceptGroupRules": {
+    "what": "Agree to the circle's rules.",
+    "params": {"groupId": "which circle"}
+  },
+  "listMyOfferings": {
+    "what": "Show what you offer.",
+    "params": {}
+  },
+  "listOfferingCategories": {
+    "what": "Show the kinds of offer.",
+    "params": {"lang": "in which language"}
+  },
+  "setMyLocation": {
+    "what": "Say roughly where you are; the circle does not see it exactly.",
+    "params": {"lat": "latitude", "lon": "longitude", "label": "what the place is called"}
+  },
+  "clearMyLocation": {
+    "what": "Forget where you are.",
+    "params": {}
+  },
+  "getMyLocation": {
+    "what": "Show the place you gave.",
+    "params": {}
+  },
+  "geocode": {
+    "what": "Look up a place name; nothing is kept.",
+    "params": {"query": "which place"}
+  },
+  "getDataLocation": {
+    "what": "Show where your data rests: on your pod or on this device.",
+    "params": {}
+  },
+  "setMyHandle": {
+    "what": "Choose your handle in this circle.",
+    "params": {"handle": "the handle"}
+  },
+  "setMyDisplayName": {
+    "what": "Choose the name others see.",
+    "params": {"displayName": "the name"}
+  },
+  "listMyHandles": {
+    "what": "Show your handles, one per circle.",
+    "params": {}
+  },
+  "getMyProfile": {
+    "what": "Show your own profile.",
+    "params": {}
+  },
+  "subscribeWebPush": {
+    "what": "Let this device get notifications in the browser.",
+    "params": {"subscription": "the subscription"}
+  },
+  "unsubscribeWebPush": {
+    "what": "Stop notifications in the browser.",
+    "params": {"endpoint": "which subscription"}
+  },
+  "subscribeExpoPush": {
+    "what": "Let this phone get notifications.",
+    "params": {"token": "the phone's code"}
+  },
+  "unsubscribeExpoPush": {
+    "what": "Stop notifications on this phone.",
+    "params": {"token": "the phone's code"}
+  },
+  "getVapidPublicKey": {
+    "what": "Fetch the key the browser needs for notifications.",
+    "params": {}
+  },
+  "getCircleStoragePolicy": {
+    "what": "Show where a circle's data rests.",
+    "params": {"groupId": "which circle"}
+  },
+  "setCircleStoragePolicy": {
+    "what": "Choose where a circle's data rests; it holds for everyone.",
+    "params": {"groupId": "which circle", "storagePolicy": "where the data rests", "groupPodUri": "the circle's pod"}
+  },
+  "podSignInStatus": {
+    "what": "Show whether you are signed in to your pod.",
+    "params": {}
+  },
+  "listMyCircles": {
+    "what": "Show your circles.",
+    "params": {}
+  },
+  "dismissRemovedCircle": {
+    "what": "Close a circle you were removed from; this device forgets it.",
+    "params": {"groupId": "which circle"}
+  },
+  "listCirclePostsSince": {
+    "what": "Show a circle's posts since a moment.",
+    "params": {"groupId": "which circle", "sinceMs": "since when"}
+  },
+  "getLatestPostAddedAt": {
+    "what": "Show when the latest post in a circle came.",
+    "params": {"groupId": "which circle"}
+  },
+  "listConsentingPeers": {
+    "what": "Show the members who gave consent.",
+    "params": {"groupId": "which circle"}
+  },
+  "getPrivacyNotice": {
+    "what": "Show the privacy notice.",
+    "params": {"lang": "in which language"}
+  },
+  "getMetrics": {
+    "what": "Show this device's counters; they go nowhere.",
+    "params": {}
+  },
+  "createGroupV2": {
+    "what": "Make a circle you run, with rules and invites.",
+    "params": {"groupId": "a fixed label", "name": "the name", "rules": "the rules", "storagePolicy": "where the data rests", "groupPodUri": "the circle's pod", "inviteExpiresInHours": "for how many hours an invite holds", "inviteMaxRedemptions": "how often an invite works", "keyRotationMode": "when the key changes", "rotationDays": "after how many days"}
+  },
+  "redeemMembershipCode": {
+    "what": "Join a circle with a code.",
+    "params": {"groupId": "which circle", "code": "the code", "circleAddress": "the address in the circle", "circleAddressProof": "the proof for that address"}
+  },
+  "verifyMembershipCodeForPeer": {
+    "what": "As admin, check the code of someone who wants to join.",
+    "params": {"groupId": "which circle", "code": "the code", "requesterWebid": "who wants to join", "circleAddress": "the address in the circle", "circleAddressProof": "the proof for that address"}
+  },
+  "recordRemoteRedemption": {
+    "what": "Record that an admin confirmed your joining.",
+    "params": {"groupId": "which circle", "code": "the code", "codeId": "which code", "confirmedBy": "by whom", "confirmedByCircleAddress": "their address in the circle", "confirmedByCircleAddressProof": "the proof for their address", "circleAddress": "the address in the circle", "circleAddressProof": "the proof for that address", "peerDisplay": "their name", "expiresAt": "until when", "rules": "the rules"}
+  },
+  "acknowledgeCaretaker": {
+    "what": "Confirm you have seen this circle is now yours to run.",
+    "params": {"groupId": "which circle"}
+  },
+  "setMemberRole": {
+    "what": "Make a member an admin of the circle, or undo that.",
+    "params": {"groupId": "which circle", "memberWebid": "which member", "role": "admin or member", "proposalId": "for which proposal", "policyVersion": "for which version of the rules"}
+  },
+  "removeMember": {
+    "what": "Remove a member from the circle; the key changes.",
+    "params": {"groupId": "which circle", "memberWebid": "which member", "memberStableId": "which member", "reason": "why", "policy": "under which rule", "proposalId": "for which proposal", "policyVersion": "for which version of the rules"}
+  },
+  "listGroupRoster": {
+    "what": "Show a circle's member list.",
+    "params": {"groupId": "which circle"}
+  },
+  "getCurrentMembershipCode": {
+    "what": "Show the code to invite someone.",
+    "params": {"groupId": "which circle"}
+  },
+  "rotateMyGroupCode": {
+    "what": "Make a new invite code; the old one stops working.",
+    "params": {"groupId": "which circle", "inviteExpiresInHours": "for how many hours an invite holds", "maxRedemptions": "how often it works"}
+  },
+  "editGroupRules": {
+    "what": "Change a circle's rules.",
+    "params": {"groupId": "which circle", "rules": "the rules", "proposalId": "for which proposal", "policyVersion": "for which version of the rules"}
+  },
+  "recordGroupRulesUpdate": {
+    "what": "Record new circle rules another member sent.",
+    "params": {"groupId": "which circle", "rules": "the rules", "version": "which version", "updatedBy": "by whom"}
+  },
+  "recordRosterSeed": {
+    "what": "Take over the member list from your other device.",
+    "params": {"groupId": "which circle", "rows": "the members", "members": "who is in it"}
+  },
+  "getGroupRulesUpdateStatement": {
+    "what": "Show the signed change of the rules.",
+    "params": {"groupId": "which circle"}
+  },
+  "postAnnouncement": {
+    "what": "As admin, post an announcement to the circle.",
+    "params": {"groupId": "which circle", "text": "what it says"}
+  },
+  "whoAmI": {
+    "what": "Show who you are on this device.",
+    "params": {}
+  },
+  "addContactFromQr": {
+    "what": "Add a contact with a scanned code.",
+    "params": {"linkToken": "through which link", "payload": "what the code holds", "persona": "through which persona", "revealPreset": "how much they see of you"}
+  },
+  "acceptResponder": {
+    "what": "Choose someone who responded to your post.",
+    "params": {"requestId": "which post", "responderWebid": "who"}
+  },
+  "broadcastCircleGovernance": {
+    "what": "Send a proposal or vote to the circle.",
+    "params": {"groupId": "which circle", "event": "what happened", "msgId": "the message's mark", "ts": "when"}
+  },
+  "broadcastCircleKeyStatement": {
+    "what": "Send a new circle key to the members.",
+    "params": {"groupId": "which circle", "event": "what happened", "msgId": "the message's mark", "ts": "when", "only": "only to whom"}
+  },
+  "broadcastCircleMembership": {
+    "what": "Send a membership change to the circle.",
+    "params": {"groupId": "which circle", "event": "what happened", "msgId": "the message's mark", "ts": "when"}
+  },
+  "broadcastCircleChatStatement": {
+    "what": "Send a signed chat message to the circle.",
+    "params": {"groupId": "which circle", "event": "what happened", "msgId": "the message's mark", "ts": "when"}
+  },
+  "broadcastCircleItems": {
+    "what": "Send a change to an item to the circle.",
+    "params": {"groupId": "which circle", "event": "what happened", "msgId": "the message's mark", "ts": "when"}
+  },
+  "broadcastCircleRules": {
+    "what": "Send the rules to the circle.",
+    "params": {"groupId": "which circle", "rulesDoc": "the rules", "fromActor": "from whom", "msgId": "the message's mark", "ts": "when"}
+  },
+  "broadcastCircleRecipe": {
+    "what": "Send a shared template to the members.",
+    "params": {"groupId": "which circle", "recipe": "the template", "fromActor": "from whom", "msgId": "the message's mark", "ts": "when"}
+  },
+  "broadcastCircleAddresses": {
+    "what": "Tell the circle at which address this device can be reached.",
+    "params": {"groupId": "which circle", "announcements": "the addresses with proof", "to": "to whom", "msgId": "the message's mark", "ts": "when"}
+  },
+  "recordCircleAddressAnnouncement": {
+    "what": "Record a member's proven address; without proof, nothing.",
+    "params": {"groupId": "which circle", "memberWebid": "which member", "circleAddress": "the address in the circle", "circleAddressProof": "the proof for that address", "personaProperties": "what their persona shows"}
+  }
+}

@@ -170,6 +170,14 @@ device-log lanes) are checked like the app manifests.
 Nothing at runtime reads either declaration yet; the extension contract (`docs/extending.md`) is where they
 will bind.
 
+## A param no form shows: `form: false`
+
+A param that only a program fills (a thing's reference, set by a toolbox's choice: `lists.addToList`'s `ref`) declares
+`form: false`, and no form ever paints it: every form is built by one builder (`apps/basis/src/forms/buildFormSpec.js`),
+which leaves it out, so web, a connected screen, the phone and the page panel follow by construction. A form posts every
+field it paints, so an op reads a field left alone (an empty string, whitespace, an empty object) as absent, never as
+malformed.
+
 ## What is not a conformance failure
 
 The registry (`@onderling/item-types`) is the source of truth for nouns, but app-local (non-registry) item types

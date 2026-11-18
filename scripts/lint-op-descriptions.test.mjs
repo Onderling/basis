@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auditDescriptions, shrunkBaseline, unreadFiles } from './lint-op-descriptions.mjs';
+import { auditDescriptions, shrunkBaseline, unreadFiles, auditGeneric, auditHelpPhrases, helpPhraseKeys, unreadBesideFiles } from './lint-op-descriptions.mjs';
 
 // one app, two ops; `params` per op
 const declared = { lists: { addToList: ['list', 'text'], listLists: [] }, tasks: { addTask: ['title'] } };
@@ -52,5 +52,52 @@ describe('lint-op-descriptions', () => {
     const onDisk = ['apps/lists/descriptions.en.json', 'apps/lists/descriptions.nl.json', 'apps/calendar/descriptions.nl.json'];
     expect(unreadFiles(onDisk, { lists: { en: {}, nl: {} } })).toEqual(['apps/calendar/descriptions.nl.json']);
     expect(unreadFiles(onDisk.slice(0, 2), { lists: { en: {}, nl: {} } })).toEqual([]);
+  });
+
+  it('generic ops: every verb a described noun uses has its sentence in both languages; every such noun its two names', () => {
+    const generic = [{ app: 'household', noun: 'note', atoms: ['add', 'list'] }, { app: 'pinboard', noun: 'lend', atoms: ['complete'] }];
+    const atomWords = { en: { add: { what: 'Make {{a_noun}}.' }, list: { what: 'Show your {{nouns}}.' } }, nl: { add: { what: 'Maak {{a_noun}}.' } } };
+    const names = { 'household.note': { en: { one: 'note', other: 'notes' }, nl: { one: 'notitie', other: 'notities' } } };
+    const p = auditGeneric({ generic, atomWords, names, owed: ['pinboard.lend'] });
+    expect(p).toEqual(['the generic verb `list` has no sentence (nl), and household.note uses it']);
+    const p2 = auditGeneric({ generic, atomWords: { ...atomWords, nl: { ...atomWords.nl, list: { what: 'Laat je {{nouns}} zien.' } } }, names: {}, owed: [] });
+    expect(p2.some((x) => /household\.note has no names \(en\)/.test(x))).toBe(true);
+    expect(p2.some((x) => /pinboard\.lend has no names \(nl\)/.test(x))).toBe(true);
+    expect(p2.some((x) => /the generic verb `complete` has no sentence \(en\), and pinboard\.lend uses it/.test(x))).toBe(true);
+  });
+  it('an owed noun that is now named, or no longer generic, is a stale baseline entry', () => {
+    const generic = [{ app: 'household', noun: 'note', atoms: ['add'] }];
+    const atomWords = { en: { add: { what: 'Make {{a_noun}}.' } }, nl: { add: { what: 'Maak {{a_noun}}.' } } };
+    const names = { 'household.note': { en: { one: 'note', other: 'notes' }, nl: { one: 'notitie', other: 'notities' } } };
+    const p = auditGeneric({ generic, atomWords, names, owed: ['household.note', 'gone.thing'] });
+    expect(p.some((x) => /baseline owes household\.note, which now has its words/.test(x))).toBe(true);
+    expect(p.some((x) => /baseline owes gone\.thing, which is no generic noun/.test(x))).toBe(true);
+  });
+});
+
+describe('the bot help phrases are a frozen second home (L1033)', () => {
+  const describe_ = (app, op) => (app === 'lists' && op === 'listLists' ? { what: 'x' } : null);
+  it('a frozen key whose op is described: clean', () => {
+    expect(auditHelpPhrases({ keys: ['lists.listLists'], frozen: ['lists.listLists'], describe: describe_ })).toEqual([]);
+  });
+  it('a NEW key is red, and so is a key whose op has no description', () => {
+    const p = auditHelpPhrases({ keys: ['lists.listLists', 'lists.addToList'], frozen: ['lists.listLists'], describe: describe_ });
+    expect(p.some((x) => /lists\.addToList is a NEW help phrase/.test(x))).toBe(true);
+    expect(p.some((x) => /lists\.addToList names an op with no description/.test(x))).toBe(true);
+  });
+  it('a frozen key no locale has any more asks for --update (the list only shrinks)', () => {
+    const p = auditHelpPhrases({ keys: [], frozen: ['lists.listLists'], describe: describe_ });
+    expect(p.some((x) => /no locale has any more/.test(x))).toBe(true);
+  });
+  it('reads the keys off a bundle', () => {
+    expect(helpPhraseKeys({ bot: { help: { ops: { lists: { listLists: {}, shopVisit: {} } } } } })).toEqual(['lists.listLists', 'lists.shopVisit']);
+  });
+});
+
+describe('a words file beside a manifest in basis counts only when the reader imports it', () => {
+  it('imported: clean; not imported: red', () => {
+    const reader = "import aEn from './assistantManifest.descriptions.en.json' with { type: 'json' };";
+    expect(unreadBesideFiles(['apps/basis/src/v2/assistantManifest.descriptions.en.json'], reader)).toEqual([]);
+    expect(unreadBesideFiles(['apps/basis/src/v2/keyManifest.descriptions.nl.json'], reader)).toEqual(['apps/basis/src/v2/keyManifest.descriptions.nl.json']);
   });
 });

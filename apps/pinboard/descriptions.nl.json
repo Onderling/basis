@@ -1,0 +1,378 @@
+{
+  "postRequest": {
+    "what": "Zet iets op het prikbord: een vraag, aanbod of iets om uit te lenen.",
+    "params": {"text": "wat je vraagt of biedt", "intent": "vragen, aanbieden of uitlenen", "dueAt": "tot wanneer", "skill": "wat iemand ervoor moet kunnen"}
+  },
+  "listOpenRequests": {
+    "what": "Laat zien wat er open staat op het prikbord.",
+    "params": {"intent": "vragen, aanbieden of uitlenen", "skill": "wat iemand ervoor moet kunnen"}
+  },
+  "listMyRequests": {
+    "what": "Laat je eigen open berichten op het prikbord zien.",
+    "params": {}
+  },
+  "respondToItem": {
+    "what": "Reageer op een bericht op het prikbord.",
+    "params": {"itemId": "welk bericht", "body": "wat je zegt"}
+  },
+  "cancelRequest": {
+    "what": "Trek een bericht van het prikbord in.",
+    "params": {"requestId": "welk bericht"}
+  },
+  "assignLend": {
+    "what": "Leen iets uit aan iemand; het bericht blijft open.",
+    "params": {"itemId": "welk bericht", "borrowerWebid": "aan wie"}
+  },
+  "markReturned": {
+    "what": "Zeg dat iets dat je uitleende terug is.",
+    "params": {"requestId": "welk bericht"}
+  },
+  "leaveGroup": {
+    "what": "Verlaat een kring.",
+    "params": {"groupId": "welke kring", "deletePosts": "ook je berichten weghalen"}
+  },
+  "getItemTree": {
+    "what": "Laat een bericht zien met alles wat eraan hangt.",
+    "params": {"itemId": "welk bericht"}
+  },
+  "signOutOfPod": {
+    "what": "Meld je af bij je pod.",
+    "params": {}
+  },
+  "listFeed": {
+    "what": "Laat zien wat er nieuw is in je kring.",
+    "params": {}
+  },
+  "getPinboardProfile": {
+    "what": "Laat zien wat anderen op het prikbord van je zien.",
+    "params": {}
+  },
+  "startDm": {
+    "what": "Begin een gesprek met één persoon.",
+    "params": {"webid": "met wie"}
+  },
+  "setHolidayMode": {
+    "what": "Zet de vakantiestand aan of uit.",
+    "params": {"on": "aan of uit"}
+  },
+  "getHolidayMode": {
+    "what": "Laat zien of de vakantiestand aan staat.",
+    "params": {}
+  },
+  "listContacts": {
+    "what": "Laat je contacten zien.",
+    "params": {"min-trust": "vanaf welk vertrouwen", "tag": "met welk label"}
+  },
+  "addContact": {
+    "what": "Voeg een contact toe.",
+    "params": {"webid": "wie", "name": "de naam"}
+  },
+  "setContactTrust": {
+    "what": "Kies hoeveel je een contact vertrouwt.",
+    "params": {"webid": "wie", "level": "hoeveel"}
+  },
+  "setContactHidden": {
+    "what": "Verberg een contact, of laat het weer zien.",
+    "params": {"webid": "wie", "hidden": "verbergen of niet", "hiddenAt": "wanneer verborgen", "deleted": "ook weggooien", "deletedAt": "wanneer weggegooid"}
+  },
+  "listMessageRequests": {
+    "what": "Laat eerste berichten zien van mensen die je niet koos.",
+    "params": {"persona": "als welke persona", "state": "open of genegeerd"}
+  },
+  "holdMessageRequest": {
+    "what": "Bewaar een eerste bericht van iemand die je niet koos als verzoek.",
+    "params": {"from": "van wie", "messageId": "welk bericht", "ts": "wanneer", "text": "wat erin staat", "card": "hun kaart", "file": "of er een bestand bij zit", "persona": "als welke persona", "memberName": "hun naam in de kring", "refused": "waarom het niet doorkwam"}
+  },
+  "acceptMessageRequest": {
+    "what": "Neem een verzoek aan: wie het stuurde wordt een contact.",
+    "params": {"from": "van wie", "persona": "als welke persona", "revealPreset": "hoeveel ze van je zien"}
+  },
+  "removeMessageRequest": {
+    "what": "Haal een verzoek weg.",
+    "params": {"from": "van wie", "persona": "als welke persona"}
+  },
+  "ignoreMessageRequest": {
+    "what": "Negeer een verzoek; je kunt het later nog aannemen.",
+    "params": {"from": "van wie", "persona": "als welke persona"}
+  },
+  "mintSharedCard": {
+    "what": "Maak een link waarmee iemand je als contact toevoegt.",
+    "params": {"persona": "als welke persona"}
+  },
+  "listSharedCards": {
+    "what": "Laat de contactlinks zien die je deelde, en of ze gebruikt zijn.",
+    "params": {"persona": "als welke persona"}
+  },
+  "withdrawSharedCard": {
+    "what": "Trek een contactlink in; wie hem later opent, komt bij de verzoeken.",
+    "params": {"token": "welke link", "persona": "als welke persona"}
+  },
+  "clearContactLinkToken": {
+    "what": "Vergeet via welke link een contact binnenkwam.",
+    "params": {"webid": "wie"}
+  },
+  "useSharedCard": {
+    "what": "Onthoud dat iemand een contactlink van je gebruikte.",
+    "params": {"token": "welke link", "by": "door wie", "card": "hun kaart", "persona": "als welke persona"}
+  },
+  "setContactPersona": {
+    "what": "Kies als welke persona een contact je ziet, en hoeveel.",
+    "params": {"webid": "wie", "persona": "welke persona", "revealPreset": "hoeveel ze van je zien", "personaAt": "sinds wanneer"}
+  },
+  "setContactPersonKey": {
+    "what": "Leg de sleutel van een contact vast, van hun kaart.",
+    "params": {"webid": "wie", "personKey": "hun sleutel", "links": "het bewijs dat hij van hen is"}
+  },
+  "getContactShareQr": {
+    "what": "Laat de code zien waarmee iemand je als contact toevoegt.",
+    "params": {"trust": "hoeveel vertrouwen", "extra-relays": "extra verbindingspunten", "persona": "als welke persona"}
+  },
+  "conflictDisputeWizard": {
+    "what": "Maak bezwaar in je kring.",
+    "params": {"postId": "over welk bericht"}
+  },
+  "postAudienceWizard": {
+    "what": "Zet iets op het prikbord voor een deel van de kring.",
+    "params": {"text": "wat erin staat"}
+  },
+  "createGroupWizard": {
+    "what": "Maak een nieuwe kring, in vijf stappen.",
+    "params": {}
+  },
+  "joinGroupWizard": {
+    "what": "Doe mee met een kring: lees de regels en kies je naam.",
+    "params": {"invite": "de uitnodiging"}
+  },
+  "getCurrentGroup": {
+    "what": "Laat zien in welke kring je nu bent.",
+    "params": {}
+  },
+  "listGroupMembers": {
+    "what": "Laat de leden van je kring zien.",
+    "params": {"spineless": "ook wie nog niet bevestigd is"}
+  },
+  "memberStatus": {
+    "what": "Laat zien hoe het staat met een lid van de kring.",
+    "params": {"webid": "wie", "after": "sinds wanneer"}
+  },
+  "getGroupRules": {
+    "what": "Laat de regels van je kring zien.",
+    "params": {}
+  },
+  "acceptGroupRules": {
+    "what": "Ga akkoord met de regels van de kring.",
+    "params": {"groupId": "welke kring"}
+  },
+  "listMyOfferings": {
+    "what": "Laat zien wat je aanbiedt.",
+    "params": {}
+  },
+  "listOfferingCategories": {
+    "what": "Laat de soorten aanbod zien.",
+    "params": {"lang": "in welke taal"}
+  },
+  "setMyLocation": {
+    "what": "Zeg ongeveer waar je bent; de kring ziet het niet precies.",
+    "params": {"lat": "breedtegraad", "lon": "lengtegraad", "label": "hoe de plek heet"}
+  },
+  "clearMyLocation": {
+    "what": "Vergeet waar je bent.",
+    "params": {}
+  },
+  "getMyLocation": {
+    "what": "Laat zien welke plek je opgaf.",
+    "params": {}
+  },
+  "geocode": {
+    "what": "Zoek een plaatsnaam op; er wordt niets bewaard.",
+    "params": {"query": "welke plaats"}
+  },
+  "getDataLocation": {
+    "what": "Laat zien waar je gegevens staan: op je pod of op dit apparaat.",
+    "params": {}
+  },
+  "setMyHandle": {
+    "what": "Kies je gebruikersnaam in deze kring.",
+    "params": {"handle": "de gebruikersnaam"}
+  },
+  "setMyDisplayName": {
+    "what": "Kies de naam die anderen zien.",
+    "params": {"displayName": "de naam"}
+  },
+  "listMyHandles": {
+    "what": "Laat je gebruikersnamen zien, een per kring.",
+    "params": {}
+  },
+  "getMyProfile": {
+    "what": "Laat je eigen profiel zien.",
+    "params": {}
+  },
+  "subscribeWebPush": {
+    "what": "Laat dit apparaat meldingen krijgen in de browser.",
+    "params": {"subscription": "de aanmelding"}
+  },
+  "unsubscribeWebPush": {
+    "what": "Stop de meldingen in de browser.",
+    "params": {"endpoint": "welke aanmelding"}
+  },
+  "subscribeExpoPush": {
+    "what": "Laat deze telefoon meldingen krijgen.",
+    "params": {"token": "de code van de telefoon"}
+  },
+  "unsubscribeExpoPush": {
+    "what": "Stop de meldingen op deze telefoon.",
+    "params": {"token": "de code van de telefoon"}
+  },
+  "getVapidPublicKey": {
+    "what": "Haal de sleutel op die de browser nodig heeft voor meldingen.",
+    "params": {}
+  },
+  "getCircleStoragePolicy": {
+    "what": "Laat zien waar de gegevens van een kring staan.",
+    "params": {"groupId": "welke kring"}
+  },
+  "setCircleStoragePolicy": {
+    "what": "Kies waar de gegevens van een kring staan; dat geldt voor iedereen.",
+    "params": {"groupId": "welke kring", "storagePolicy": "waar de gegevens staan", "groupPodUri": "de pod van de kring"}
+  },
+  "podSignInStatus": {
+    "what": "Laat zien of je bij je pod bent aangemeld.",
+    "params": {}
+  },
+  "listMyCircles": {
+    "what": "Laat je kringen zien.",
+    "params": {}
+  },
+  "dismissRemovedCircle": {
+    "what": "Sluit een kring waar je uit bent gezet; dit apparaat vergeet hem.",
+    "params": {"groupId": "welke kring"}
+  },
+  "listCirclePostsSince": {
+    "what": "Laat de berichten van een kring sinds een moment zien.",
+    "params": {"groupId": "welke kring", "sinceMs": "sinds wanneer"}
+  },
+  "getLatestPostAddedAt": {
+    "what": "Laat zien wanneer het laatste bericht in een kring kwam.",
+    "params": {"groupId": "welke kring"}
+  },
+  "listConsentingPeers": {
+    "what": "Laat de leden zien die ermee instemden dat je ze benadert.",
+    "params": {"groupId": "welke kring"}
+  },
+  "getPrivacyNotice": {
+    "what": "Laat de privacyverklaring zien.",
+    "params": {"lang": "in welke taal"}
+  },
+  "getMetrics": {
+    "what": "Laat de tellers van dit apparaat zien; ze gaan nergens heen.",
+    "params": {}
+  },
+  "createGroupV2": {
+    "what": "Maak een kring die jij beheert, met regels en uitnodigingen.",
+    "params": {"groupId": "een vast kenmerk", "name": "de naam", "rules": "de regels", "storagePolicy": "waar de gegevens staan", "groupPodUri": "de pod van de kring", "inviteExpiresInHours": "hoeveel uur een uitnodiging geldt", "inviteMaxRedemptions": "hoe vaak een uitnodiging werkt", "keyRotationMode": "wanneer de sleutel wisselt", "rotationDays": "na hoeveel dagen"}
+  },
+  "redeemMembershipCode": {
+    "what": "Doe mee met een kring met een code.",
+    "params": {"groupId": "welke kring", "code": "de code", "circleAddress": "het adres in de kring", "circleAddressProof": "het bewijs bij dat adres"}
+  },
+  "verifyMembershipCodeForPeer": {
+    "what": "Controleer als beheerder de code van wie wil meedoen.",
+    "params": {"groupId": "welke kring", "code": "de code", "requesterWebid": "wie wil meedoen", "circleAddress": "het adres in de kring", "circleAddressProof": "het bewijs bij dat adres"}
+  },
+  "recordRemoteRedemption": {
+    "what": "Leg vast dat een beheerder je toetreden bevestigde.",
+    "params": {"groupId": "welke kring", "code": "de code", "codeId": "welke code", "confirmedBy": "door wie", "confirmedByCircleAddress": "hun adres in de kring", "confirmedByCircleAddressProof": "het bewijs bij hun adres", "circleAddress": "het adres in de kring", "circleAddressProof": "het bewijs bij dat adres", "peerDisplay": "hun naam", "expiresAt": "tot wanneer", "rules": "de regels"}
+  },
+  "acknowledgeCaretaker": {
+    "what": "Bevestig dat je ziet dat deze kring nu door jou wordt beheerd.",
+    "params": {"groupId": "welke kring"}
+  },
+  "setMemberRole": {
+    "what": "Maak een lid beheerder van de kring, of draai dat terug.",
+    "params": {"groupId": "welke kring", "memberWebid": "welk lid", "role": "beheerder of lid", "proposalId": "bij welk voorstel", "policyVersion": "bij welke versie van de regels"}
+  },
+  "removeMember": {
+    "what": "Zet een lid uit de kring; de sleutel wisselt.",
+    "params": {"groupId": "welke kring", "memberWebid": "welk lid", "memberStableId": "welk lid", "reason": "waarom", "policy": "volgens welke regel", "proposalId": "bij welk voorstel", "policyVersion": "bij welke versie van de regels"}
+  },
+  "listGroupRoster": {
+    "what": "Laat de ledenlijst van een kring zien.",
+    "params": {"groupId": "welke kring"}
+  },
+  "getCurrentMembershipCode": {
+    "what": "Laat de code zien om iemand uit te nodigen.",
+    "params": {"groupId": "welke kring"}
+  },
+  "rotateMyGroupCode": {
+    "what": "Maak een nieuwe uitnodigingscode; de oude werkt niet meer.",
+    "params": {"groupId": "welke kring", "inviteExpiresInHours": "hoeveel uur een uitnodiging geldt", "maxRedemptions": "hoe vaak hij werkt"}
+  },
+  "editGroupRules": {
+    "what": "Pas de regels van een kring aan.",
+    "params": {"groupId": "welke kring", "rules": "de regels", "proposalId": "bij welk voorstel", "policyVersion": "bij welke versie van de regels"}
+  },
+  "recordGroupRulesUpdate": {
+    "what": "Leg nieuwe regels van een kring vast die een ander lid stuurde.",
+    "params": {"groupId": "welke kring", "rules": "de regels", "version": "welke versie", "updatedBy": "door wie"}
+  },
+  "recordRosterSeed": {
+    "what": "Neem de ledenlijst over van je andere apparaat.",
+    "params": {"groupId": "welke kring", "rows": "de leden", "members": "wie erin staan"}
+  },
+  "getGroupRulesUpdateStatement": {
+    "what": "Laat de ondertekende wijziging van de regels zien.",
+    "params": {"groupId": "welke kring"}
+  },
+  "postAnnouncement": {
+    "what": "Zet als beheerder een mededeling in de kring.",
+    "params": {"groupId": "welke kring", "text": "wat erin staat"}
+  },
+  "whoAmI": {
+    "what": "Laat zien wie je op dit apparaat bent.",
+    "params": {}
+  },
+  "addContactFromQr": {
+    "what": "Voeg een contact toe met een gescande code.",
+    "params": {"linkToken": "via welke link", "payload": "wat de code bevat", "persona": "via welke persona", "revealPreset": "hoeveel ze van je zien"}
+  },
+  "acceptResponder": {
+    "what": "Kies iemand die op je bericht reageerde.",
+    "params": {"requestId": "welk bericht", "responderWebid": "wie"}
+  },
+  "broadcastCircleGovernance": {
+    "what": "Stuur een voorstel of stem naar de kring.",
+    "params": {"groupId": "welke kring", "event": "wat er gebeurde", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
+  },
+  "broadcastCircleKeyStatement": {
+    "what": "Stuur een nieuwe sleutel van de kring naar de leden.",
+    "params": {"groupId": "welke kring", "event": "wat er gebeurde", "msgId": "het kenmerk van het bericht", "ts": "wanneer", "only": "alleen naar wie"}
+  },
+  "broadcastCircleMembership": {
+    "what": "Stuur een wijziging in het lidmaatschap naar de kring.",
+    "params": {"groupId": "welke kring", "event": "wat er gebeurde", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
+  },
+  "broadcastCircleChatStatement": {
+    "what": "Stuur een ondertekend chatbericht naar de kring.",
+    "params": {"groupId": "welke kring", "event": "wat er gebeurde", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
+  },
+  "broadcastCircleItems": {
+    "what": "Stuur een wijziging van een item naar de kring.",
+    "params": {"groupId": "welke kring", "event": "wat er gebeurde", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
+  },
+  "broadcastCircleRules": {
+    "what": "Stuur de regels naar de kring.",
+    "params": {"groupId": "welke kring", "rulesDoc": "de regels", "fromActor": "van wie", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
+  },
+  "broadcastCircleRecipe": {
+    "what": "Stuur een gedeeld sjabloon naar de leden.",
+    "params": {"groupId": "welke kring", "recipe": "het sjabloon", "fromActor": "van wie", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
+  },
+  "broadcastCircleAddresses": {
+    "what": "Laat de kring weten op welk adres dit apparaat te bereiken is.",
+    "params": {"groupId": "welke kring", "announcements": "de adressen met bewijs", "to": "naar wie", "msgId": "het kenmerk van het bericht", "ts": "wanneer"}
+  },
+  "recordCircleAddressAnnouncement": {
+    "what": "Leg het bewezen adres van een lid vast; zonder bewijs niet.",
+    "params": {"groupId": "welke kring", "memberWebid": "welk lid", "circleAddress": "het adres in de kring", "circleAddressProof": "het bewijs bij dat adres", "personaProperties": "wat hun persona laat zien"}
+  }
+}

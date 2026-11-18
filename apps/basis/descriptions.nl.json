@@ -1,0 +1,174 @@
+{
+  "help": {
+    "what": "Laat zien wat je kunt doen.",
+    "params": {}
+  },
+  "help-with": {
+    "what": "Bied hulp aan bij een bericht op het prikbord, in een eigen gesprek.",
+    "params": {"postId": "bij welk bericht"}
+  },
+  "embed": {
+    "what": "Zet een kaartje van een item in het gesprek.",
+    "params": {"itemId": "welk item", "claim": "en meteen zelf oppakken", "app": "uit welke app"}
+  },
+  "embed-file": {
+    "what": "Zet een bestand in het gesprek.",
+    "params": {"path": "welk bestand", "pick": "kies het zelf", "name": "de naam", "mime": "wat voor bestand", "share": "met wie je het deelt"}
+  },
+  "personWeekOverview": {
+    "what": "Krijg elke week een overzicht van je week.",
+    "params": {"occurrence": "welke keer"}
+  },
+  "embed-time": {
+    "what": "Maak een afspraak en zet hem in het gesprek.",
+    "params": {"title": "wat", "when": "wanneer", "duration": "hoe lang", "location": "waar", "share": "met wie je het deelt"}
+  },
+  "logs": {
+    "what": "Laat zien wat er de laatste tijd gebeurde.",
+    "params": {"app": "in welke app", "type": "wat voor gebeurtenis", "actor": "door wie", "since": "sinds wanneer", "mute": "wat je niet wilt zien", "limit": "hoeveel"}
+  },
+  "feedback": {
+    "what": "Open het gesprek om feedback over de app te geven.",
+    "params": {"screen": "over welk scherm"}
+  },
+  "scanQr": {
+    "what": "Open de camera om een code te scannen.",
+    "params": {}
+  },
+  "find": {
+    "what": "Zoek in alles wat de apps hier bewaren.",
+    "params": {"query": "waarnaar"}
+  },
+  "brief": {
+    "what": "Laat een overzicht van de dag zien, uit alle apps.",
+    "params": {"refresh": "opnieuw ophalen"}
+  },
+  "signin": {
+    "what": "Meld je aan bij je pod.",
+    "params": {"issuer": "bij welke aanbieder"}
+  },
+  "whoami": {
+    "what": "Laat zien als wie je bent aangemeld.",
+    "params": {}
+  },
+  "me": {
+    "what": "Laat de sleutel en het adres van dit apparaat zien.",
+    "params": {}
+  },
+  "send-file": {
+    "what": "Stuur iemand een bestand.",
+    "params": {"peer": "wie"}
+  },
+  "lookup-peer": {
+    "what": "Zoek het adres van iemand op via hun pod.",
+    "params": {"webid": "wie"}
+  },
+  "publish-peer": {
+    "what": "Zet je adres op je pod, zodat anderen je vinden.",
+    "params": {}
+  },
+  "security-status": {
+    "what": "Laat zien of je berichten getekend en versleuteld gaan.",
+    "params": {}
+  },
+  "set-relay": {
+    "what": "Kies het verbindingspunt, of haal het weg.",
+    "params": {"url": "het adres", "clear": "weghalen"}
+  },
+  "transport-mode": {
+    "what": "Kies langs welke weg berichten naar anderen gaan.",
+    "params": {"mode": "welke weg"}
+  },
+  "transports": {
+    "what": "Laat zien welke verbindingen werken.",
+    "params": {}
+  },
+  "settings": {
+    "what": "Open de instellingen.",
+    "params": {"lang": "in welke taal"}
+  },
+  "mute": {
+    "what": "Blokkeer iemand: je krijgt en stuurt niets meer.",
+    "params": {"peer": "wie", "label": "hoe je ze noemt"}
+  },
+  "unmute": {
+    "what": "Haal een blokkade weg.",
+    "params": {"peer": "wie"}
+  },
+  "muted": {
+    "what": "Laat zien wie je blokkeert.",
+    "params": {}
+  },
+  "debug-dump": {
+    "what": "Maak een overzicht van de toestand, voor een foutmelding.",
+    "params": {}
+  },
+  "audit-tail": {
+    "what": "Laat de laatste ondertekende gebeurtenissen zien.",
+    "params": {"n": "hoeveel", "event": "wat voor gebeurtenis"}
+  },
+  "peer-connect": {
+    "what": "Maak verbinding met andere apparaten.",
+    "params": {}
+  },
+  "test-peer": {
+    "what": "Stuur een testbericht naar een ander apparaat.",
+    "params": {"addr": "naar welk adres", "text": "wat erin staat"}
+  },
+  "signout": {
+    "what": "Meld je af.",
+    "params": {}
+  },
+  "screen-add-page": {
+    "what": "Voeg een pagina toe.",
+    "params": {"name": "de naam", "circleIds": "welke kringen"}
+  },
+  "screen-remove-page": {
+    "what": "Haal een pagina weg.",
+    "params": {"pageId": "welke pagina"}
+  },
+  "screen-rename-page": {
+    "what": "Geef een pagina een andere naam.",
+    "params": {"pageId": "welke pagina", "name": "de nieuwe naam"}
+  },
+  "screen-set-active": {
+    "what": "Ga naar een pagina.",
+    "params": {"pageId": "welke pagina"}
+  },
+  "screen-set-personas": {
+    "what": "Kies welke persona's je nu ziet.",
+    "params": {"ids": "welke persona's"}
+  },
+  "screen-set-circles": {
+    "what": "Kies welke kringen een pagina laat zien.",
+    "params": {"pageId": "welke pagina", "circleIds": "welke kringen"}
+  },
+  "screen-pin": {
+    "what": "Zet iets vast onder de plus.",
+    "params": {"kind": "wat voor iets", "actId": "welke handeling", "circleId": "in welke kring", "appOrigin": "uit welke app", "opId": "welke handeling"}
+  },
+  "screen-unpin": {
+    "what": "Haal iets weg onder de plus.",
+    "params": {"key": "wat"}
+  },
+  "screen-add-block": {
+    "what": "Zet een blok op een pagina.",
+    "params": {"pageId": "welke pagina", "type": "wat voor blok", "config": "hoe het blok staat"}
+  },
+  "screen-remove-block": {
+    "what": "Haal een blok van een pagina.",
+    "params": {"pageId": "welke pagina", "blockId": "welk blok"}
+  },
+  "screen-move-block": {
+    "what": "Verplaats een blok op een pagina.",
+    "params": {"pageId": "welke pagina", "blockId": "welk blok", "index": "naar welke plek"}
+  },
+  "screen-set-block-config": {
+    "what": "Stel een blok anders in.",
+    "params": {"pageId": "welke pagina", "blockId": "welk blok", "config": "hoe het blok staat"}
+  },
+  "screen-undo": {
+    "what": "Maak de laatste wijziging aan je pagina's ongedaan.",
+    "params": {}
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "deleteFromPod": {
+    "what": "Haal een bestand weg van je pod; op dit apparaat blijft het.",
+    "params": {"relPath": "welk bestand"}
+  },
+  "deleteLocally": {
+    "what": "Haal een bestand weg van dit apparaat; op je pod blijft het.",
+    "params": {"relPath": "welk bestand"}
+  },
+  "forceRepush": {
+    "what": "Zet al je bestanden opnieuw op je pod; wat daar staat wordt overschreven.",
+    "params": {}
+  },
+  "syncOnce": {
+    "what": "Breng je map en je pod nu een keer gelijk.",
+    "params": {}
+  },
+  "watchStart": {
+    "what": "Houd je map in de gaten en zet elke wijziging op je pod.",
+    "params": {}
+  },
+  "watchStop": {
+    "what": "Houd je map niet meer in de gaten.",
+    "params": {}
+  },
+  "verifyPodState": {
+    "what": "Kijk of een bestand hier en op je pod hetzelfde is.",
+    "params": {"relPath": "welk bestand"}
+  },
+  "readNote": {
+    "what": "Lees een notitie uit je map.",
+    "params": {"path": "welke notitie"}
+  },
+  "shareFolder": {
+    "what": "Deel een map met een contact.",
+    "params": {"folder": "welke map", "with": "met wie"}
+  },
+  "getFileSnapshot": {
+    "what": "Laat een bestand zien zoals het nu is.",
+    "params": {"path": "welk bestand"}
+  },
+  "downloadFile": {
+    "what": "Haal een gedeeld bestand op van de pod van wie het stuurde.",
+    "params": {"path": "welk bestand"}
+  },
+  "saveToMyPod": {
+    "what": "Bewaar een gedeeld bestand op je eigen pod.",
+    "params": {"path": "welk bestand", "name": "onder welke naam"}
+  },
+  "folioStatus": {
+    "what": "Laat zien hoe ver je map en je pod gelijk zijn.",
+    "params": {}
+  },
+  "listFiles": {
+    "what": "Laat de bestanden in je map zien.",
+    "params": {}
+  },
+  "searchNotes": {
+    "what": "Zoek in je notities, ook op betekenis.",
+    "params": {"query": "waarnaar", "mode": "op woorden of op betekenis"}
+  }
+}

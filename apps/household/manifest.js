@@ -449,6 +449,8 @@ export const householdManifest = {
         { name: 'read',   kind: 'object', required: true },
         { name: 'selfId', kind: 'string', required: false },
       ],
+      // background: a screen marks what it showed; never a person's act (no strip, no tap, no own-action; actState.js)
+      surfaces: { actState: 'none' },
     },
     {
       id:   'listReadMarks', visibility: 'private', group: 'device',

@@ -142,3 +142,13 @@ describe('runDispatch — integration with parser + router + manifestMerge', () 
     ]);
   });
 });
+
+describe('runDispatch — the call context travels', () => {
+  it('hands ctx (the door a person came through) to callSkill, and calls without it when there is none', async () => {
+    const callSkill = vi.fn(async () => ({ ok: true }));
+    await runDispatch(readyDispatch, callSkill, { door: 'slash' });
+    expect(callSkill).toHaveBeenLastCalledWith('household', 'markComplete', { choreText: 'dishwasher' }, { door: 'slash' });
+    await runDispatch(readyDispatch, callSkill);
+    expect(callSkill.mock.calls.at(-1)).toHaveLength(3);
+  });
+});

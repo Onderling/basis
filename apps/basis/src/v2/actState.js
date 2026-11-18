@@ -40,6 +40,14 @@ export const ACT_INTERACTION_WINDOW_MS = 1500;
 export const ACT_STATE_OWN = 'bubble';
 
 /**
+ * An op that writes but is NEVER a person's act — background work a tap sets off (read marks on opening a circle, the
+ * key fan-out after a circle is made) — declares `surfaces.actState: 'none'`. The strip paints nothing for it and the
+ * wrapper names no tap, so the person's own record (ownActions.js) leaves it out too: one declaration, both readers.
+ * (A declared UI control cannot stand in for this: 141 of the 222 writing ops declare none, real taps among them.)
+ */
+export const ACT_STATE_NONE = 'none';
+
+/**
  * Does this op WRITE, by the manifests' own classification, and paint on the strip? Unknown op or verb → false (no claim).
  * @param {object|(() => object)|null} manifestsByOrigin   appOrigin → manifest (or a getter)
  */
@@ -49,7 +57,7 @@ export function isActOp(manifestsByOrigin, appOrigin, opId) {
   try { byOrigin = typeof manifestsByOrigin === 'function' ? manifestsByOrigin() : manifestsByOrigin; } catch { byOrigin = null; }
   const manifest = byOrigin?.[appOrigin] ?? null;
   const op = manifest?.operations?.find?.((o) => o?.id === opId) ?? null;
-  if (op?.surfaces?.actState === ACT_STATE_OWN) return false;
+  if (op?.surfaces?.actState === ACT_STATE_OWN || op?.surfaces?.actState === ACT_STATE_NONE) return false;
   const verb = typeof op?.verb === 'string' ? op.verb : null;
   if (!verb) return false;
   if (isAtom(verb)) return isWritingVerb(verb);   // alias-aware: `edit`, `done`, `delete` are writes; `list`/`get`/`read` are not
@@ -129,11 +137,14 @@ export function wrapCallSkillWithActState(callSkill, { store, manifestsByOrigin 
   if (typeof callSkill !== 'function' || !store) return callSkill;
   // the call's context (a self it is made as, the selves it reads for) is passed on, never dropped
   return async function callSkillWithActState(appOrigin, opId, args, ctx) {
-    const call = () => (ctx === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, ctx));
-    if (!store.recentlyInteracted() || !isActOp(manifestsByOrigin, appOrigin, opId)) return call();
+    const call = (c) => (c === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, c));
+    if (!store.recentlyInteracted() || !isActOp(manifestsByOrigin, appOrigin, opId)) return call(ctx);
+    // The act this strip follows is a TAP: say so to the waist, so the person's own record (ownActions.js) names the
+    // same act the strip paints. A door a turn already named (slash, phrase, model) is kept.
+    const tapped = ctx && typeof ctx === 'object' ? (ctx.door ? ctx : { ...ctx, door: 'tap' }) : { door: 'tap' };
     const token = store.begin({ appOrigin, opId, args });
     let result;
-    try { result = await call(); }
+    try { result = await call(tapped); }
     catch (err) { store.end(token, { error: err }); throw err; }
     store.end(token, { result });
     return result;

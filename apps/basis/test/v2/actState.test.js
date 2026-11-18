@@ -7,8 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   createActState, wrapCallSkillWithActState, isActOp, actStateLine, actFailed,
-  ACT_PENDING_DELAY_MS, ACT_DONE_SHOWN_MS, ACT_INTERACTION_WINDOW_MS,
+  ACT_PENDING_DELAY_MS, ACT_DONE_SHOWN_MS, ACT_INTERACTION_WINDOW_MS, ACT_STATE_NONE,
 } from '../../src/v2/actState.js';
+import { allManifests } from '../../src/v2/manifestSources.js';
 import { basisManifest } from '../../src/index.js';
 import { pinboardManifest } from '../../../pinboard/manifest.js';
 
@@ -28,6 +29,16 @@ const MANIFESTS = {
   basis: basisManifest,
   lists: { operations: [{ id: 'addToList', verb: 'add' }, { id: 'listLists', verb: 'list' }, { id: 'editEntry', verb: 'edit' }, { id: 'peek', verb: 'glance' }, { id: 'undoIt', verb: 'undo' }], domainVerbs: { glance: 'read', undo: 'write' } },
 };
+
+describe('an op that is never a person\'s act (surfaces.actState: none)', () => {
+  it('the real background writes a tap sets off: neither the strip nor the tap door; a real act still is', () => {
+    const real = Object.fromEntries(allManifests().map((m) => [m.app, m]));
+    expect(isActOp(real, 'household', 'markRead'), 'read marks, on opening a circle').toBe(false);
+    expect(isActOp(real, 'pinboard', 'broadcastCircleKeyStatement'), 'the key fan-out after a circle is made').toBe(false);
+    expect(isActOp(real, 'pinboard', 'setMyHandle')).toBe(true);
+    expect(isActOp({ x: { operations: [{ id: 'bg', verb: 'add', surfaces: { actState: ACT_STATE_NONE } }] } }, 'x', 'bg')).toBe(false);
+  });
+});
 
 describe('what counts as an act', () => {
   it('a writing atom (alias-aware) is; a read is not; a domain verb follows the manifest; an unknown op is no claim', () => {
@@ -122,6 +133,25 @@ describe('the waist, wrapped', () => {
     await expect(call('lists', 'editEntry', {})).rejects.toThrow('boom');
     expect(store.current?.state).toBe('failed');
     expect(store.current?.error).toBe('boom');
+  });
+  it('the act it follows is a TAP: the call goes down with door tap; a door already named is kept; background and reads get none', async () => {
+    const seen = [];
+    const rawCtx = async (o, id, args, ctx) => { seen.push([id, ctx]); return { ok: true }; };
+    const store = createActState(fakeTimers());
+    const call = wrapCallSkillWithActState(rawCtx, { store, manifestsByOrigin: MANIFESTS });
+    await call('lists', 'addToList', {});                       // no interaction: background
+    store.noteInteraction();
+    await call('lists', 'listLists', {});                       // a read the screen makes
+    await call('lists', 'addToList', {});                       // the person's tap
+    await call('lists', 'addToList', {}, { door: 'model', actAs: 'p1' });   // a turn names its own door
+    await call('lists', 'addToList', {}, { actAs: 'p1' });      // a tap made as a persona keeps that
+    expect(seen).toEqual([
+      ['addToList', undefined],
+      ['listLists', undefined],
+      ['addToList', { door: 'tap' }],
+      ['addToList', { door: 'model', actAs: 'p1' }],
+      ['addToList', { actAs: 'p1', door: 'tap' }],
+    ]);
   });
   it('without a store it is the same function', () => {
     expect(wrapCallSkillWithActState(raw, {})).toBe(raw);

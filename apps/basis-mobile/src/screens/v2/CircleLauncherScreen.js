@@ -152,6 +152,7 @@ import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import MultiFieldFormBubble from '../../rn/MultiFieldFormBubble.js';   // 2+-field inline form (parity with web)
 import { addressesBot, stripBotTag } from '../../../../basis/src/v2/circleDispatch.js';
 import { createPeek } from '../../../../basis/src/v2/circlePeek.js';
+import { doorOnly } from '../../../../basis/src/ownActions.js';   // the door a turn came through, and only that, down to the waist
 import { createAssistantEngine, assistantReplyText } from '../../../../basis/src/v2/assistantEngine.js';
 import { followUpClaim } from '../../../../basis/src/v2/assistantFollowUp.js';
 import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
@@ -3954,7 +3955,8 @@ function CircleDetail({
     return verdict.allow ? null : (verdict.code || 'capability-denied');
   }, [catalogue, circle?.id, policy, capabilitySources]);
 
-  const runCircleCommandResolved = useCallback(async ({ opId, args, appOrigin }) => {
+  // `turn`: the turn's (or a tap's) context; only its door goes down to the waist (`doorOnly`), web parity
+  const runCircleCommandResolved = useCallback(async ({ opId, args, appOrigin }, turn) => {
     if (!catalogue) { appendCircleMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     let dispatch;
     try {
@@ -4009,7 +4011,7 @@ function CircleDetail({
       // callSkill (used for the picker lookup) silently arg-shifts here: appOrigin→opId, opId→args, real
       // args dropped — so the dispatched op was literally 'tasks-v0' and NO circle-bot command ever
       // executed on mobile (device-verify 2026-06-11: logs showed `[callSkill] tasks-v0 →` not `addTask →`).
-      try { reply = await runDispatch(scoped, rawCallSkill); }
+      try { reply = await runDispatch(scoped, rawCallSkill, doorOnly(turn)); }
       catch (e) { appendCircleMessage({ actor: 'bot', text: t('circle.bot.failed', { msg: e?.message ?? String(e) }) }); return; }
       // The op's verb drives Added:/Completed: phrasing (a bare "✓ X" was identical for add + complete).
       const entry = catalogue?.opsById?.get(dispatch.opId);
@@ -4406,7 +4408,7 @@ function CircleDetail({
     // (never sharing/); the circle's available pseudo-pod StorageBackend, in-memory in the standalone posture.
     vectorStore: circleSearchVectorStore,
     retrieverScope: 'circle-rag',
-    dispatch: (input) => {
+    dispatch: (input, ctx) => {
       let cmd = input;
       if (typeof input === 'string') {
         const parsed = catalogue ? parseInput(input, catalogue) : null;
@@ -4418,7 +4420,7 @@ function CircleDetail({
         const r = resolveDispatch({ kind: 'slash', opId: cmd.opId, args: cmd.args || {} }, catalogue);
         if (r && r.kind === 'bulk') return handleCircleBulk(r);
       } catch { /* not bulk → normal path */ }
-      return clarify.run(cmd, { id: circle?.id });
+      return clarify.run(cmd, { id: circle?.id, ...doorOnly(ctx) });   // the door the engine named rides the clarify scope
     },
     postToCircle: (text, ctx) => { if (ctx?.msgId) broadcastFanOut({ msgId: ctx.msgId, text, ts: ctx.ts ?? Date.now() }); },
     // Addressed the bot, but the LLM mapped it to no tool → reply instead of going silent.
@@ -4430,7 +4432,7 @@ function CircleDetail({
     peek: createPeek({
       catalogue: () => catalogue,
       deny: async (ready) => capabilityDenyFor(ready),
-      run: (ready) => runDispatch(scopeReadyDispatch(ready, circle?.id), rawCallSkill),
+      run: (ready, ctx) => runDispatch(scopeReadyDispatch(ready, circle?.id), rawCallSkill, doorOnly(ctx)),
     }),
     // No collect window here (web parity): in a circle composer a person types one line on purpose, and a wait on
     // every bot reply would read as a slow app. The lane still takes the circle's lines one turn at a time.

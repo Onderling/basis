@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { entryKind, RETAIN, retentionWindowFor, SYNC, SIGNS, isMirroredKind } from '@onderling/item-store';
-import { OWN_ACTION_KIND, makeOwnActionEntry, ownRetentionMs, OWN_KEEP_WEEKS, OWN_RECORD, DOORS, ownActIs, recordOwnAction } from '../src/ownActions.js';
+import { OWN_ACTION_KIND, makeOwnActionEntry, ownRetentionMs, OWN_KEEP_WEEKS, OWN_RECORD, DOORS, ownActIs, recordOwnAction, ownOutcome, ownActionRows, doorOnly } from '../src/ownActions.js';
 import { EventLog } from '../src/eventLog.js';
 import { allManifests } from '../src/v2/manifestSources.js';
 
@@ -55,8 +55,11 @@ describe('an own-action entry carries the whitelist and nothing else', () => {
 });
 
 describe('which calls are the person\'s own acts (the outer waist)', () => {
-  it('an op that writes always; a read only when a door says a person asked; a door person never; an undeclared op never', () => {
-    expect(ownActIs({ app: 'lists', op: 'addToList', ctx: {}, manifests })).toBe(true);
+  it('only a call that names a person door (Fable 2026-11-18: door-less is background); a door person never; an undeclared op never', () => {
+    expect(ownActIs({ app: 'lists', op: 'addToList', ctx: { door: 'tap' }, manifests })).toBe(true);
+    expect(ownActIs({ app: 'lists', op: 'addToList', ctx: {}, manifests }), 'a write no door names is background').toBe(false);
+    expect(ownActIs({ app: 'lists', op: 'addToList', ctx: { door: 'unknown' }, manifests }), '"unknown" is no door').toBe(false);
+    expect(ownActIs({ app: 'lists', op: 'addToList', ctx: { door: 'clock' }, manifests }), 'a planned row the person made').toBe(true);
     expect(ownActIs({ app: 'pinboard', op: 'listMyCircles', ctx: {}, manifests }), 'a paint read is not an act').toBe(false);
     expect(ownActIs({ app: 'lists', op: 'listEntries', ctx: { door: 'slash' }, manifests }), 'a read the person asked for').toBe(true);
     expect(ownActIs({ app: 'lists', op: 'addToList', ctx: { caller: 'someone-at-the-door' }, manifests }), 'a door person is not the owner').toBe(false);
@@ -67,16 +70,62 @@ describe('which calls are the person\'s own acts (the outer waist)', () => {
     const appended = [];
     const deviceLog = { append: (e) => appended.push(e) };
     recordOwnAction({ manifests, deviceLog, enabled: true, app: 'lists', op: 'addToList', args: { circleId: 'c1', text: 'melk' }, ctx: { door: 'tap' }, result: { ok: true } });
-    recordOwnAction({ manifests, deviceLog, enabled: true, app: 'lists', op: 'addToList', args: { groupId: 'g2' }, ctx: {}, result: { ok: false, error: 'x' } });
+    recordOwnAction({ manifests, deviceLog, enabled: true, app: 'lists', op: 'addToList', args: { groupId: 'g2' }, ctx: { door: 'phrase' }, result: { ok: false, error: 'x' } });
+    recordOwnAction({ manifests, deviceLog, enabled: true, app: 'lists', op: 'addToList', args: { circleId: 'c3' }, ctx: {}, result: { ok: true } });   // background
     recordOwnAction({ manifests, deviceLog, enabled: true, app: 'pinboard', op: 'listMyCircles', args: {}, ctx: {}, result: { ok: true } });
-    recordOwnAction({ manifests, deviceLog, enabled: false, app: 'lists', op: 'addToList', args: {}, ctx: {}, result: { ok: true } });
+    recordOwnAction({ manifests, deviceLog, enabled: false, app: 'lists', op: 'addToList', args: {}, ctx: { door: 'tap' }, result: { ok: true } });
     expect(appended.map((e) => [e.payload.op, e.payload.outcome, e.payload.door, e.circleId])).toEqual([
-      ['addToList', 'ok', 'tap', 'c1'], ['addToList', 'failed', 'unknown', 'g2'],
+      ['addToList', 'ok', 'tap', 'c1'], ['addToList', 'failed', 'phrase', 'g2'],
     ]);
     expect(JSON.stringify(appended)).not.toMatch(/melk/);
   });
 
   it('a log that throws never breaks the act', () => {
     expect(() => recordOwnAction({ deviceLog: { append: () => { throw new Error('full'); } }, enabled: true, app: 'lists', op: 'addToList', ctx: {}, result: {} })).not.toThrow();
+  });
+});
+
+describe('the outcome: refused is not failed', () => {
+  it('a gate or a rule that says no is refused; something that broke is failed; anything else is ok', () => {
+    expect(ownOutcome({ ok: true })).toBe('ok');
+    expect(ownOutcome({ items: [] })).toBe('ok');
+    // the waist's refusals: the shape renderA2A already gives, the op's own "not yours", and "no self in this circle"
+    expect(ownOutcome({ ok: false, error: 'not-bound', refusal: { layer: 'admission', code: 'not-bound' } })).toBe('refused');
+    expect(ownOutcome({ ok: false, code: 'forbidden', error: 'not yours' })).toBe('refused');
+    expect(ownOutcome({ ok: false, code: 'no-self', error: 'x' })).toBe('refused');
+    // the kernel's gate throws
+    const denied = Object.assign(new Error('denied'), { name: 'PolicyDeniedError', code: 'capability' });
+    expect(ownOutcome(null, denied)).toBe('refused');
+    // broken things
+    expect(ownOutcome({ ok: false, code: 'not-found', error: 'x' })).toBe('failed');
+    expect(ownOutcome({ ok: false, error: 'boom' })).toBe('failed');
+    expect(ownOutcome(null, new Error('network'))).toBe('failed');
+  });
+
+  it('recordOwnAction writes refused for a call the waist turned down', () => {
+    const deviceLog = new EventLog({ initial: [], muted: [] });
+    recordOwnAction({ deviceLog, app: 'lists', op: 'addToList', args: { circleId: 'c1' }, ctx: { door: 'tap' }, result: { ok: false, code: 'forbidden', error: 'no' }, manifests });
+    expect(deviceLog.query().find((e) => e.type === OWN_ACTION_KIND)?.payload?.outcome).toBe('refused');
+  });
+});
+
+describe('reading the record back, and what goes down to the waist', () => {
+  it('ownActionRows: only this kind, oldest first, the whitelisted fields', () => {
+    const deviceLog = new EventLog({ initial: [], muted: [] });
+    const t0 = Date.now() - 60_000;   // inside the retention window: the log drops what is older
+    let t = t0;
+    const now = () => (t += 10);
+    recordOwnAction({ deviceLog, app: 'lists', op: 'addToList', args: { circleId: 'c1', item: 'melk' }, ctx: { door: 'tap' }, result: { ok: true }, manifests, now });
+    deviceLog.append({ id: 'x', type: 'chat-message', ts: t0 + 15, circleId: 'c1', payload: { text: 'hoi' } });
+    recordOwnAction({ deviceLog, app: 'lists', op: 'listLists', args: {}, ctx: { door: 'slash' }, result: { ok: true }, manifests, now });
+    expect(ownActionRows(deviceLog)).toEqual([
+      { ts: t0 + 10, circleId: 'c1', app: 'lists', op: 'addToList', outcome: 'ok', door: 'tap' },
+      { ts: t0 + 20, circleId: null, app: 'lists', op: 'listLists', outcome: 'ok', door: 'slash' },
+    ]);
+  });
+  it('doorOnly: the door and nothing else of a turn\'s context; no door, no context', () => {
+    expect(doorOnly({ door: 'model', msgId: 'm1', history: [1] })).toEqual({ door: 'model' });
+    expect(doorOnly({ msgId: 'm1' })).toBeUndefined();
+    expect(doorOnly(undefined)).toBeUndefined();
   });
 });

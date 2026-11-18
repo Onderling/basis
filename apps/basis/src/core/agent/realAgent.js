@@ -9808,12 +9808,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // (`recordOwnAction`: the owner's writes, and the reads a door says they asked for), never at the inner `callSkill`,
     // which this agent also calls for itself many times over. The record follows the person's switch.
     callSkill: async (appOrigin, opId, args, ctx = {}) => {
-      const record = (result, threw) => recordOwnAction({
+      const record = (result, threw, error = null) => recordOwnAction({
         deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
-        app: appOrigin, op: opId, args, ctx, result, threw, manifests: allManifests(),
+        app: appOrigin, op: opId, args, ctx, result, threw, error, manifests: allManifests(),
       });
       let result;
-      try { result = await callSkill(appOrigin, opId, args, ctx); } catch (err) { record(null, true); throw err; }
+      try { result = await callSkill(appOrigin, opId, args, ctx); } catch (err) { record(null, true, err); throw err; }
       record(result, false);
       return result;
     },

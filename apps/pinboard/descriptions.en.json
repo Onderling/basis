@@ -48,7 +48,7 @@
     "params": {}
   },
   "startDm": {
-    "what": "Start a one to one conversation.",
+    "what": "Start a conversation with one person.",
     "params": {"webid": "with whom"}
   },
   "setHolidayMode": {
@@ -256,7 +256,7 @@
     "params": {"groupId": "which circle"}
   },
   "listConsentingPeers": {
-    "what": "Show the members who gave consent.",
+    "what": "Show the members who agreed that you may contact them.",
     "params": {"groupId": "which circle"}
   },
   "getPrivacyNotice": {

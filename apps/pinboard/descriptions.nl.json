@@ -48,7 +48,7 @@
     "params": {}
   },
   "startDm": {
-    "what": "Begin een gesprek met iemand alleen.",
+    "what": "Begin een gesprek met één persoon.",
     "params": {"webid": "met wie"}
   },
   "setHolidayMode": {
@@ -256,7 +256,7 @@
     "params": {"groupId": "welke kring"}
   },
   "listConsentingPeers": {
-    "what": "Laat de leden zien die toestemming gaven.",
+    "what": "Laat de leden zien die ermee instemden dat je ze benadert.",
     "params": {"groupId": "welke kring"}
   },
   "getPrivacyNotice": {

@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 // the words the app READS (the reader's registry): an app counts as described only when its files are imported there
-import { OP_DESCRIPTIONS, genericVerbWords } from '../apps/basis/src/v2/opDescriptions.js';
+import { OP_DESCRIPTIONS, genericVerbWords, opDescription } from '../apps/basis/src/v2/opDescriptions.js';
 import { capabilitiesOf } from '../packages/app-manifest/src/index.js';
 
 /** The nouns with generic ops (a capability with no op of its own), `[{app, noun, atoms}]`, and their names. */
@@ -155,9 +155,56 @@ export function auditGeneric({ generic, atomWords, names, owed }) {
   return [...new Set(problems)];
 }
 
+/**
+ * The bot's help phrases (`circle.bot.help.ops.<app>.<opId>`) are a SECOND home for what an op does in a person's words
+ * (ledger L1033). Until Frits chooses the word and they move into the descriptions, the home is FROZEN: no key beyond the
+ * frozen list, and every key names an op that has a description (so the move has somewhere to land). The list only
+ * shrinks (`--update` drops a key that is gone).
+ * @param {{ keys: string[], frozen: string[], describe: (app: string, opId: string) => unknown }} a
+ *   keys: `<app>.<opId>` per help phrase, over every locale
+ * @returns {string[]} problems
+ */
+export function auditHelpPhrases({ keys, frozen, describe }) {
+  const problems = [];
+  const held = new Set(frozen);
+  for (const k of new Set(keys)) {
+    const dot = k.indexOf('.');
+    const app = k.slice(0, dot), opId = k.slice(dot + 1);
+    if (!held.has(k)) problems.push(`circle.bot.help.ops.${k} is a NEW help phrase: what an op does goes in its descriptions file (L1033), not here`);
+    if (!describe(app, opId)) problems.push(`circle.bot.help.ops.${k} names an op with no description: describe ${app}.${opId} first`);
+  }
+  const present = new Set(keys);
+  for (const k of held) if (!present.has(k)) problems.push(`the frozen help list holds ${k}, which no locale has any more: run with --update`);
+  return problems;
+}
+
+/** `<app>.<opId>` for every help phrase in a locale bundle's `bot.help.ops`. */
+export function helpPhraseKeys(bundle) {
+  const ops = bundle?.bot?.help?.ops ?? {};
+  return Object.entries(ops).flatMap(([app, byOp]) => Object.keys(byOp ?? {}).map((op) => `${app}.${op}`));
+}
+
+/**
+ * The words files that sit BESIDE a manifest inside basis (`apps/basis/src/v2/<manifest>.descriptions.<lang>.json`,
+ * several manifests share that folder) that the reader does not import: words nobody reads (red). Read by name off the
+ * reader's own source, since the folder does not say which app a file is.
+ * @param {string[]} paths  repo-relative paths  @param {string} readerSource  opDescriptions.js's text
+ * @returns {string[]}
+ */
+export function unreadBesideFiles(paths, readerSource) {
+  return paths.filter((p) => /\.descriptions\.[a-z]+\.json$/.test(p) && !String(readerSource).includes(`./${path.basename(p)}'`));
+}
+
 /** What `--update` writes: the baseline with described or gone apps REMOVED; never an app added. */
 export function shrunkBaseline({ declared, files, baseline }) {
   return [...new Set(baseline)].filter((app) => app in declared && !files[app]).sort();
+}
+
+
+/** `<app>.<opId>` of every help phrase in the shared locale, both languages. */
+function helpKeysNow() {
+  const root = path.resolve(HERE, '..');
+  return LANGS.flatMap((l) => helpPhraseKeys(JSON.parse(readFileSync(path.join(root, `apps/basis/src/locales/circle.${l}.json`), 'utf8'))));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -170,19 +217,25 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const { generic, names } = genericNouns();
     const isGeneric = new Set(generic.map((g) => `${g.app}.${g.noun}`));
     const nounsOwed = prev.filter((k) => isGeneric.has(k) && !LANGS.every((l) => names[k]?.[l]?.one && names[k]?.[l]?.other)).sort();
-    writeFileSync(BASELINE, `${JSON.stringify({ owed, nounsOwed }, null, 2)}\n`);
+    const stored = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
+    const helpPhrases = (stored.helpPhrases ?? []).filter((k) => helpKeysNow().includes(k));
+    writeFileSync(BASELINE, `${JSON.stringify({ owed, nounsOwed, helpPhrases }, null, 2)}\n`);
     console.log(`lint-op-descriptions: baseline shrunk ${before.length} → ${owed.length} (it never grows: a new app ships its words)`);
     process.exit(0);
   }
   const ROOT = path.resolve(HERE, '..');
   const onDisk = readdirSync(path.join(ROOT, 'apps'), { withFileTypes: true }).filter((d) => d.isDirectory())
     .flatMap((d) => readdirSync(path.join(ROOT, 'apps', d.name)).filter((f) => /^descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/${d.name}/${f}`));
+  const beside = readdirSync(path.join(ROOT, 'apps/basis/src/v2')).filter((f) => /\.descriptions\.[a-z]+\.json$/.test(f)).map((f) => `apps/basis/src/v2/${f}`);
   const base = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
   const { generic, names } = genericNouns();
   const problems = [
     ...auditDescriptions({ declared, files, baseline: before }),
     ...auditGeneric({ generic, atomWords: Object.fromEntries(LANGS.map((l) => [l, genericVerbWords(l)])), names, owed: base.nounsOwed ?? [] }),
+    ...auditHelpPhrases({ keys: helpKeysNow(), frozen: base.helpPhrases ?? [], describe: (app, opId) => opDescription(app, opId, 'en') }),
     ...unreadFiles(onDisk, files).map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
+    ...unreadBesideFiles(beside, readFileSync(path.join(ROOT, 'apps/basis/src/v2/opDescriptions.js'), 'utf8'))
+      .map((f) => `${f} is on disk but the reader (apps/basis/src/v2/opDescriptions.js) does not import it: words nobody reads`),
   ];
   if (problems.length) {
     console.error(`✖ lint-op-descriptions: ${problems.length} problem(s)`);

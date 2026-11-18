@@ -14,6 +14,7 @@
  */
 
 import { t as defaultT } from '../../src/localisation.js';
+import { capabilityLabel } from '../../src/v2/capabilityLabel.js';   // a capability as a person reads it, one lookup
 
 function btn(doc, label, onClick) {
   const b = doc.createElement('button');
@@ -26,8 +27,7 @@ function btn(doc, label, onClick) {
 
 /** A human label for a capability key "<app> <atom> <noun>", falling back to the raw parts. */
 function capLabel(t, cap) {
-  const verb = t(`circle.settings.verb.${cap.atom}`, { defaultValue: cap.atom });
-  return `${verb} · ${cap.noun}`;
+  return capabilityLabel(t, cap);
 }
 
 /**

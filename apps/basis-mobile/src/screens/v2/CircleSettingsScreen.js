@@ -22,6 +22,7 @@ import {
 import { buildSettingsForm, buildCapabilityMatrix, FREEDOM_LEVELS, OPT_OUT_CONSEQUENCES } from '@onderling/app-manifest';
 import { buildManifestsByOrigin } from '../../core/composeManifests.js';
 import { t } from '../../core/localisation.js';
+import { capabilityLabel } from '../../../../basis/src/v2/capabilityLabel.js';   // a capability as a person reads it, one lookup (web twin)
 import GuidedSetupPanel from './GuidedSetupPanel.js';
 import PairedDevices from './PairedDevices.js';
 import RecipeConsentCard from './RecipeConsentCard.js';
@@ -651,7 +652,7 @@ export default function CircleSettingsScreen({
                   return (
                     <View key={row.key} style={styles.capRow} testID={`cap-${row.key}`}>
                       <View style={styles.row}>
-                        <Text style={styles.rowLabel}>{`${verbLabel(row.atom)} · ${row.noun}`}</Text>
+                        <Text style={styles.rowLabel}>{capabilityLabel(t, row)}</Text>
                         <Switch /* sets: policy:capabilities — a capability the circle allows */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                           value={row.enabled} onValueChange={(v) => patch({ capabilities: { [row.key]: { ...base, enabled: v } } })}
                           testID={`cap-${row.key}-enabled`} />
@@ -768,12 +769,6 @@ function groupByApp(matrix) {
   return [...byApp.entries()];
 }
 
-/** Localised atom verb label, falling back to the atom when no key is translated (t() echoes the key on a miss). */
-function verbLabel(atom) {
-  const k = `circle.settings.verb.${atom}`;
-  const v = t(k);
-  return v && v !== k ? v : atom;
-}
 
 const makeStyles = (theme, insets) => StyleSheet.create({
   advancedToggle: { paddingVertical: 10, marginTop: 14 },

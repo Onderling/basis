@@ -21,7 +21,7 @@
   },
   "entryReminders": {
     "what": "Set when everyone is reminded of an entry.",
-    "params": { "item": "which entry", "reminders": "when, for example 60 or morning", "list": "on which list" }
+    "params": { "item": "which entry", "reminders": "when, for example 60 minutes before or morning", "list": "on which list" }
   },
   "shopVisit": {
     "what": "Show what you need at a shop.",

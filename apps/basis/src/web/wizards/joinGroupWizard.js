@@ -59,6 +59,7 @@ import {
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
 import { mkHandleField } from './_wizardKit.js';   // the one handle field the join and create wizards share
+import { capabilityLabel } from '../../v2/capabilityLabel.js';   // a capability as a person reads it, one lookup
 
 /**
  * Wizard renderer for /join-group.  Wired via openPagePanel's
@@ -291,7 +292,7 @@ function renderConsentCaps(wrap, doc, state, rerender) {
     const floorTag = cap.privacyFloor
       ? ` (${t('circle.settings.privacyFloor')})`
       : '';
-    const label = `${t(`circle.settings.verb.${cap.atom}`, { defaultValue: cap.atom })} · ${cap.noun}${floorTag}`;
+    const label = `${capabilityLabel(t, cap)}${floorTag}`;
     row.append(box, doc.createTextNode(` ${label}`));
     sec.appendChild(row);
   }

@@ -38,7 +38,8 @@ describe('circleModel · mergeCircles', () => {
 
   it('ignores non-array sources and id-less items', () => {
     expect(mergeCircles(null, undefined, [{ name: 'x' }, { id: 'ok' }]))
-      .toEqual([{ id: 'ok', name: 'ok', kind: null, memberCount: null, lastActivity: null, features: null }]);
+      // no name reached it: its name is its id, and it says so (`unnamed`)
+      .toEqual([{ id: 'ok', name: 'ok', kind: null, memberCount: null, lastActivity: null, features: null, unnamed: true }]);
   });
 });
 

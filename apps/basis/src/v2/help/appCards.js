@@ -7,7 +7,7 @@
 /**
  * THE APP'S OWN WORDS FOR SITE CARDS THAT ARE WRONG INSIDE THE APP. The site deck (kaartjes.js) stays the site's copy;
  * a card read in the app that speaks of "this website", "your browser" or "open Basis", says "circles" in Dutch (the app
- * says "kringen"), or names one way where the app has two (a pod OR a backup file, Frits 2026-11-17), gets its text here,
+ * says "kringen"), or names one way where the app has two (a pod OR a recovery file, Frits 2026-11-17), gets its text here,
  * keyed by the site card's id. Only the text changes: the id, its tags and its heading stay the site's, so the matcher
  * finds the same card. helpCards.js applies these; a sentence that is wrong on the SITE too also goes on the site's list.
  */

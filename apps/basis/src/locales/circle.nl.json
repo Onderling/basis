@@ -7116,7 +7116,7 @@
       "doc": "J-CS10 — name the escape rather than leaving a dead end."
     },
     "pod_local_consequence": {
-      "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent — niet je kringen of je gesprekken. Koppel een pod, of exporteer een back-upbestand, om hier ergens anders mee verder te kunnen.",
+      "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent — niet je kringen of je gesprekken. Koppel een pod, of exporteer een herstelbestand, om hier ergens anders mee verder te kunnen.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "receive_personas": "Persona's op dit apparaat",

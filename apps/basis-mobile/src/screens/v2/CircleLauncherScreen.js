@@ -2243,7 +2243,8 @@ export default function CircleLauncherScreen({
     const manifests = buildManifestsByOrigin();
     const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
     return Promise.all((circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
-      id: c.id, name: c.name ?? '', manifestsByOrigin: manifests,
+      // `unnamed`: no name reached this circle yet (its name is the placeholder): the "+" waits for the real one (web twin)
+      id: c.id, name: c.name ?? '', ...(c.unnamed ? { unnamed: true } : {}), manifestsByOrigin: manifests,
       availability: await circleAvailabilityFor(c.id, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null),
       lists: await circleListsFor((app, op, args = {}) => bundle?.callSkill?.(app, op, { ...args, circleId: c.id })).catch(() => []),
     })));
@@ -2267,6 +2268,8 @@ export default function CircleLauncherScreen({
     householdManifest: bundle?.agent?.manifest, t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
     // what the "+" told this person it can reach, kept on this device's log (`plus-told`) — web twin: circleApp toldLog
     toldLog: eventLog,
+    // help's last line: the route that answers (the header's own line) — web twin: circleApp routeLine
+    routeLine: () => plusRouteLine(ownRouteOf(userLlmCfg), { t }),
   });
 
   // THE "+" SHEET, on every tab (the person's own entry): its line, their own acts, their Me actions — one element the tab

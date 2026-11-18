@@ -12,6 +12,10 @@ still to be described.
 - Make a list (or a board, which holds entries of more than one kind) by name, add an entry to it, tick an entry off,
   remove and restore entries and lists, and edit an entry's words.
 - Make a list from the circle's "+" (`/new-list`), wherever lists are on.
+- Put a THING on a list (an entry that carries a reference, say a shop's product, and how many): a second add of the
+  same thing raises how many instead of adding a line. Every door shows how many ("2× Halfvolle melk 1 L"); no door shows a
+  price, and the list never learns what the thing is. The reference sits in the entry's `embeds` as a plain reference;
+  the words come from `entryWords` (`@onderling/kring-host/circleLists`), the one formatter every door reads.
 - Put a lists block on a screen of their own (a page's recipe); a block whose circle has lists off says so in one line.
 - Keep lists of their OWN from the "+" thread: "nieuwe lijst Vakantie" makes one, "zet melk op mijn boodschappen" adds
   to it, "wat staat er op mijn boodschappen" answers with its entries, the done ones marked. A done entry stays, marked,
@@ -46,6 +50,8 @@ lists: createList addToList listLists markListItemDone makeChore entryReminders 
   screen in the tab.
 - `apps/basis/test/v2/listsBlock.test.js` — the lists block: what it reads, its one act per entry, the off line.
 - `apps/basis/test/v2/offeredFeatures.test.js` — a feature with no surface is neither a toggle nor in the "+".
+- `apps/basis/test/entryRefQuantity.test.js` — an entry with a reference and a quantity crosses to a second device
+  whole; a second add of the same thing raises the quantity; bad input is refused; made a chore it keeps both.
 - `apps/basis/test/v2/ownListsPlus.test.js` — own lists land in the own store and nowhere else; a door and a persona's
   lane are refused; a list made as a persona is read only with that persona; the "+" reads own lists first, asks when a
   circle holds the same name, makes an own list; the thread's answer to a read.

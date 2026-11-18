@@ -5,7 +5,7 @@
   },
   "addToList": {
     "what": "Put something on a list.",
-    "params": { "list": "which list", "text": "what goes on it", "kind": "what kind of entry", "assignee": "who does it", "due": "on which day" }
+    "params": { "list": "which list", "text": "what goes on it", "kind": "what kind of entry", "assignee": "who does it", "due": "on which day", "ref": "the thing it refers to", "quantity": "how many" }
   },
   "listLists": {
     "what": "Show the lists.",

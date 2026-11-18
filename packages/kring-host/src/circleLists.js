@@ -29,6 +29,16 @@ export { TASKS_ACCEPTS_MANIFEST } from './tasksInLists.js';
  * `list-item`s; a `list-item` CONTAINS sub-items (the composable nesting). `buildAcceptsPolicy` merges this
  * with any other apps' declarations, so what a container accepts is EXTENSIBLE, not baked into this module.
  */
+/**
+ * An entry's words as every door shows them: how many before the words when more than one ("2× Halfvolle melk 1 L").
+ * The ONE formatter (the read model's label, the lists ops' replies, the shop visit), so web, phone and bot say the same.
+ * @param {{text?: string, quantity?: number}} item
+ */
+export function entryWords(item) {
+  const text = item?.text ?? '';
+  return Number.isInteger(item?.quantity) && item.quantity > 1 ? `${item.quantity}× ${text}` : text;
+}
+
 export const LISTS_ACCEPTS_MANIFEST = Object.freeze({
   app: 'lists',
   accepts: {
@@ -84,7 +94,7 @@ export function makeCircleLists({ storeFor, dataSource, manifests, rootPrefix } 
     if (CONTAINER_TYPES.includes(item.type)) return { label: item.text, canAdd };   // list/board = container, no row-actions
     const done = item.completedAt != null;
     return {
-      label: `${done ? '✓ ' : ''}${item.text}`,
+      label: `${done ? '✓ ' : ''}${entryWords(item)}`,
       rowActions: done ? ['removeItem'] : ['markComplete', 'removeItem'],
       canAdd,
     };
@@ -112,7 +122,7 @@ export function makeCircleLists({ storeFor, dataSource, manifests, rootPrefix } 
      * `opts.hint` names a specific accepted child type (e.g. a UI picker for an ambiguous container). Returns
      * the created child, or null when the container isn't found / accepts nothing / the type is ambiguous.
      */
-    async addItem(circleId, containerId, text, by, { hint } = {}) {
+    async addItem(circleId, containerId, text, by, { hint, ref, quantity } = {}) {
       const store = s(circleId);
       const container = await store.get(containerId);
       if (!container) return null;
@@ -121,7 +131,10 @@ export function makeCircleLists({ storeFor, dataSource, manifests, rootPrefix } 
       if (r.ambiguous) return { ambiguous: r.ambiguous };  // ≥2 accepted types, no default → the shell shows a type
                                                            // picker, then re-calls addItem(…, { hint: <chosen type> })
       const childText = (r.body && r.body.trim()) ? r.body.trim() : text;
-      return addChildTo(store, containerId, { type: r.type, text: childText, completedAt: null, createdBy: by });
+      // a THING the entry stands for rides as a plain reference in its own embeds (never read here); how many beside the words
+      const thing = ref && typeof ref.type === 'string' && typeof ref.ref === 'string' ? { embeds: [{ type: ref.type, ref: ref.ref, rel: 'refers' }] } : {};
+      const many = Number.isInteger(quantity) && quantity > 1 ? { quantity } : {};
+      return addChildTo(store, containerId, { type: r.type, text: childText, completedAt: null, createdBy: by, ...thing, ...many });
     },
     async markDone(circleId, itemId, by) {
       const it = await s(circleId).get(itemId);

@@ -15,7 +15,7 @@ describe('the words of an op', () => {
     expect(opWhat('lists', 'addToList', 'en')).toBe('Put something on a list.');
     expect(opDescription('lists', 'addToList', 'nl').params.list).toBe('op welke lijst');
     expect(opWhat('lists', 'addToList', 'fr'), 'another language: English').toBe('Put something on a list.');
-    expect(opWhat('pinboard', 'postRequest', 'nl')).toBeNull();
+    expect(opWhat('no-such-app', 'postRequest', 'nl')).toBeNull();   // an app with no words file
     expect(Object.keys(OP_DESCRIPTIONS)).toContain('lists');
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
@@ -24,6 +24,26 @@ describe('the words of an op', () => {
     expect(opWhat('assistant', 'assistant-forget', 'nl')).toBe('Laat de bot je gesprek nu vergeten; wat je op een lijst zette, blijft.');
     expect(opDescription('assistant', 'remindMe', 'en').params.rules).toBe('when, for example 60 minutes before or morning');
   });
+  it('basis: its own commands described, a page and a block by the words the screens use', () => {
+    expect(opWhat('basis', 'screen-undo', 'nl')).toBe('Maak de laatste wijziging aan je pagina\'s ongedaan.');
+    expect(opDescription('basis', 'screen-move-block', 'en').params.pageId).toBe('which page');
+  });
+  it('pinboard: described, a shared parameter phrased once (the circle)', () => {
+    expect(opWhat('pinboard', 'postRequest', 'nl')).toBe('Zet iets op het prikbord: een vraag, aanbod of iets om uit te lenen.');
+    expect(opDescription('pinboard', 'removeMember', 'en').params.groupId).toBe('which circle');
+  });
+  it('folio: described, where a file stays said in the sentence', () => {
+    expect(opWhat('folio', 'deleteFromPod', 'nl')).toBe('Haal een bestand weg van je pod; op dit apparaat blijft het.');
+    expect(opDescription('folio', 'searchNotes', 'en').params.mode).toBe('by words or by meaning');
+  });
+  it('agents: described, a persona by the word the app already uses', () => {
+    expect(opWhat('agents', 'revokeAgent', 'nl')).toBe('Zet een agent uit: al zijn rechten vervallen.');
+    expect(opDescription('agents', 'getPersonaRelease', 'en').params.id).toBe('which persona');
+  });
+  it('tasks: described under its app origin (the manifest lives in tasks-v0)', () => {
+    expect(opWhat('tasks', 'claimTask', 'nl')).toBe('Pak een taak op: jij gaat hem doen.');
+    expect(opDescription('tasks', 'rejectTask', 'en').params.note).toBe('why, in a sentence');
+  });
   it('household: its device and recovery ops described, the phrase named as the person knows it', () => {
     expect(opWhat('household', 'revealOwnerPhrase', 'nl')).toBe('Laat je herstelzin zien.');
     expect(opDescription('household', 'replaceDevice', 'en').params.mnemonic).toBe('your recovery phrase');
@@ -31,14 +51,19 @@ describe('the words of an op', () => {
 });
 
 describe('the "/" list shows it under the command', () => {
+  // an app with no words file of its own: a made-up one, so the case does not depend on which apps are described yet
+  const plain = { app: 'plain', itemTypes: [], operations: [{ id: 'doPlain', visibility: 'authenticated', verb: 'add', params: [],
+    surfaces: { slash: { command: '/plain' }, chat: { reply: 'text', hint: 'the model\'s own hint' } } }] };
   it('a lists command shows its sentence in the person\'s language; another app keeps the model\'s hint', () => {
-    const cat = mergeManifests([{ manifest: listsManifest }, { manifest: pinboardManifest }]);
+    const cat = mergeManifests([{ manifest: listsManifest }, { manifest: plain }]);
     const nl = buildCommandPool(cat, { lang: 'nl' });
     expect(nl.find((e) => e.opId === 'addToList')?.hint).toBe('Zet iets op een lijst.');
     expect(buildCommandPool(cat, { lang: 'en' }).find((e) => e.opId === 'addToList')?.hint).toBe('Put something on a list.');
-    const pin = nl.find((e) => e.appOrigin === 'pinboard');
-    const decl = pinboardManifest.operations.find((o) => o.id === pin.opId);
-    expect(pin.hint).toBe(decl.surfaces.chat.hint);
+    expect(nl.find((e) => e.opId === 'doPlain')?.hint).toBe('the model\'s own hint');
+  });
+  it('pinboard, described, shows its sentence too', () => {
+    const nl = buildCommandPool(mergeManifests([{ manifest: pinboardManifest }]), { lang: 'nl' });
+    expect(nl.find((e) => e.opId === 'addContact')?.hint).toBe('Voeg een contact toe.');
   });
 });
 
@@ -59,6 +84,6 @@ describe('a generic op (a noun with the generic verbs): the verb described once,
   });
   it('a noun not described yet, or a non-generic op of an undescribed app: none', () => {
     expect(opWhat('pinboard', encodeGenericOpId('pinboard', 'complete', 'lend'), 'nl')).toBeNull();
-    expect(opWhat('pinboard', 'postRequest', 'nl')).toBeNull();   // an app still undescribed (household gets its own words)
+    expect(opWhat('no-such-app', 'postRequest', 'nl')).toBeNull();   // an app with no words file
   });
 });

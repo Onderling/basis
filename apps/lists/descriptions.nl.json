@@ -53,6 +53,6 @@
   },
   "editEntry": {
     "what": "Verander een regel op een lijst: de woorden of de tijd.",
-    "params": { "item": "welke regel", "text": "de nieuwe woorden", "list": "op welke lijst", "when": "de nieuwe tijd" }
+    "params": { "item": "welke regel", "text": "de nieuwe woorden", "list": "op welke lijst", "when": "de nieuwe tijd", "quantity": "hoeveel" }
   }
 }

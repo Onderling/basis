@@ -121,6 +121,21 @@ describe('a list entry carries a reference to a thing and a quantity', () => {
     expect(c.itemId).not.toBe(a.itemId);
   });
 
+  it('editEntry sets how many, alone or with the words; one is shown without a number; a bad number is refused', async () => {
+    const five = await A.agent.callSkill('lists', 'editEntry', { circleId: CIRCLE_ID, item: entryId, quantity: 5 });
+    expect(five?.ok, JSON.stringify(five)).toBe(true);
+    expect(five.message).toContain('5× Halfvolle melk 1 L');
+    let r = await A.agent.callSkill('lists', 'listEntries', { circleId: CIRCLE_ID, list: 'Boodschappen' });
+    expect(r.items.find((i) => i.id === entryId)).toMatchObject({ quantity: 5, label: '5× Halfvolle melk 1 L', ref: MILK });
+    expect((await A.agent.callSkill('lists', 'editEntry', { circleId: CIRCLE_ID, item: entryId, quantity: 1 }))?.ok).toBe(true);
+    r = await A.agent.callSkill('lists', 'listEntries', { circleId: CIRCLE_ID, list: 'Boodschappen' });
+    expect(r.items.find((i) => i.id === entryId)).toMatchObject({ quantity: 1, label: 'Halfvolle melk 1 L' });
+    for (const bad of [0, 2.5, 'veel']) {
+      expect((await A.agent.callSkill('lists', 'editEntry', { circleId: CIRCLE_ID, item: entryId, quantity: bad }))?.ok, `refused ${bad}`).toBe(false);
+    }
+    expect((await A.agent.callSkill('lists', 'editEntry', { circleId: CIRCLE_ID, item: entryId, quantity: 3 }))?.ok).toBe(true);
+  });
+
   it('made a chore, the entry keeps its reference and quantity', async () => {
     const r = await A.agent.callSkill('lists', 'makeChore', { circleId: CIRCLE_ID, item: entryId });
     expect(r?.ok, JSON.stringify(r)).toBe(true);

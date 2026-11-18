@@ -93,7 +93,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
-## Named design guards (`G-*`, in fitness tests) · 20
+## Named design guards (`G-*`, in fitness tests) · 21
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -108,6 +108,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a second add of the same thing raises the quantity, never a second entry; the reply says so | `apps/basis/test/entryRefQuantity.test.js` |
 | — | list never learns what the thing is: nothing branches on the reference's type | `apps/basis/test/entryRefQuantity.test.js` |
 | — | one item of EVERY canonical type, written to a circle store on one device, arrives in the | `apps/basis/test/perTypeSyncMatrix.test.js` |
+| — | confirming a claim, editing and sharing an appointment pass the capability gate in a circle that did not switch them off | `apps/basis/test/v2/threeActsRows.test.js` |
 | — | a tool call speaks the recorded wire (card, SendMessage, A2A-Version 1.0, bearer) and every failure ends in ONE code,… | `apps/basis/test/v2/toolboxClient.test.js` |
 | — | a toolbox is switched on only after the admin's yes in their own private chat, never from a group chat, and no line o… | `apps/basis/test/v2/toolboxDoor.test.js` |
 | — | Telegram door and a screen's kernel skill both reach tools.useTool through the gated call, so both write the tool-cal… | `apps/basis/test/v2/toolboxEveryRoute.test.js` |

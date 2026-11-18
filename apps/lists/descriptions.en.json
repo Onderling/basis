@@ -53,6 +53,6 @@
   },
   "editEntry": {
     "what": "Change an entry on a list: its words or its time.",
-    "params": { "item": "which entry", "text": "the new words", "list": "on which list", "when": "the new time" }
+    "params": { "item": "which entry", "text": "the new words", "list": "on which list", "when": "the new time", "quantity": "how many" }
   }
 }

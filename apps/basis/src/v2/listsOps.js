@@ -484,7 +484,11 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // a new time: an appointment moves (keeping its length), a chore gets a new due — the line's time, as its words
       const when = args?.when ? parseDateInput(args.when) : null;
       if (args?.when && !when) return { ok: false, error: t('circle.lists.need_list_and_text') };
-      if (!text && !when) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      // how many: a whole number of at least one, or absent (the same reading an add makes: `readThing`)
+      const q = args?.quantity;
+      const hasQuantity = q !== undefined && q !== null;
+      if (hasQuantity && !(Number.isInteger(q) && q >= 1)) return { ok: false, error: t('circle.lists.bad_quantity') };
+      if (!text && !when && !hasQuantity) return { ok: false, error: t('circle.lists.need_list_and_text') };
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       const timed = {};
@@ -498,8 +502,12 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         Object.assign(timed, { dueAt: when });
       }
       const words = text || at.entry.text || at.entry.title || '';
-      await svc.storeFor(at.circleId).put({ ...at.entry, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: writer(at.circleId, ctx) });
-      return { ok: true, message: t('circle.lists.edited', { text: words, name: at.target.text ?? '' }) };
+      // stored only above one (absent = one), as an add stores it
+      const { quantity: _was, ...rest } = at.entry;
+      const counted = hasQuantity ? (q > 1 ? { ...rest, quantity: q } : rest) : at.entry;
+      await svc.storeFor(at.circleId).put({ ...counted, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: writer(at.circleId, ctx) });
+      const shown = entryWords({ text: words, quantity: hasQuantity ? q : at.entry.quantity });
+      return { ok: true, message: t('circle.lists.edited', { text: shown, name: at.target.text ?? '' }) };
     },
 
     /**

@@ -19,21 +19,6 @@ AsyncStorage.getItem(KEY)
 export function readNearbyAllows() { return cached; }
 
 /**
- * "You here" opens on the FIRST-ever open of Nearby only: true once, then never again.
- * Synchronous like the allows cache; before the prime lands the answer is false (folded), which only
- * costs the very first open on a cold cache — honest enough.
- */
-const SEEN_KEY = 'cc.nearbyMineSeen';
-let seen = true;
-AsyncStorage.getItem(SEEN_KEY).then((raw) => { seen = raw === '1'; }).catch(() => {});
-export function firstNearbyMineOpen() {
-  if (seen) return false;
-  seen = true;
-  AsyncStorage.setItem(SEEN_KEY, '1').catch(() => {});
-  return true;
-}
-
-/**
  * The Nearby radio switch, persisted: 'on' (default) or 'off'. Off means nothing is browsed or
  * announced on the local network — at boot, at rest, and while the screen is open — until it is
  * turned back on. Same synchronous cache as the allows.

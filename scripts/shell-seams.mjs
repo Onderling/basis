@@ -372,6 +372,10 @@ export const SEAMS = Object.freeze([
   // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.
   { id: 'nearby-stream-by-arrival', pattern: /nearbyStream\(/, shells: ['web', 'mobile'], why: 'a Conversation tab ordered by a painter of its own shows one shell a question where the other shows it elsewhere, or not at all' },
   { id: 'nearby-tab-news', pattern: /nearbyTabNews\(/, shells: ['web', 'mobile'], why: 'a tab count computed in a painter says "3 new" on one shell and nothing on the other' },
+  // NEARBY'S GEAR MENU: what "Zichtbaar", "Even stil" and "Helemaal uit" write (the level only from none, to the floor;
+  // the quiet and radio switches) is decided once (`src/v2/nearbyMenu.js`); a host deciding it itself writes a level
+  // over the person's own choice on one shell and not the other.
+  { id: 'nearby-here-choose', pattern: /nearbyHereChoose\(/, shells: ['web', 'mobile'], why: 'a menu choice that writes a different level, or the radio, on one shell than on the other' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 

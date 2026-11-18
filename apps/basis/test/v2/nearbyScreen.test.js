@@ -556,6 +556,19 @@ describe('cards and room chat (step G)', () => {
     expect(broadcastKind).not.toHaveBeenCalled();
   });
 
+  it('the gear menu moves no gate: going Zichtbaar through it, with a card typed and the card allow off, sends no card', async () => {
+    const { nearbyHereChoose } = await import('../../src/v2/nearbyMenu.js');
+    const { screen, broadcastKind } = withRoom({ levelChosen: () => true });
+    screen.open();
+    await settle();
+    const r = await nearbyHereChoose('visible', { level: 'handle', visibility: screen.visibility() },
+      { setLevel: async () => ({ ok: true }), setQuiet: (q) => screen.setQuiet(q), setRadio: (v) => screen.setRadio(v) });
+    expect(r.ok).toBe(true);
+    expect(screen.model().allows.card, 'the allow keeps its stored value').toBe(false);
+    expect(await screen.showCard({ label: 'Sam', line: 'net verhuisd' })).toMatchObject({ ok: false, reason: 'card-not-allowed' });
+    expect(broadcastKind).not.toHaveBeenCalled();
+  });
+
   it('and published once it is on', async () => {
     const { screen, broadcastKind } = withRoom({ allows: { card: true } });
     screen.open();

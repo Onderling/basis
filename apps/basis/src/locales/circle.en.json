@@ -3695,6 +3695,66 @@
       "text": "You are not in this conversation.",
       "doc": "State when the chat allow is off. Distinct from \"nobody has said anything\"."
     },
+    "menu_title": {
+      "text": "Set up Nearby",
+      "doc": "The gear menu's title on Nearby; also the gear button's accessible name."
+    },
+    "menu_close": {
+      "text": "Close",
+      "doc": "The gear menu's close button (its accessible name)."
+    },
+    "menu_here": {
+      "text": "How you are here",
+      "doc": "The gear menu's first group: the three ways to be in the Nearby room."
+    },
+    "here_visible": {
+      "text": "Visible",
+      "doc": "Gear menu, how you are here: the room sees you."
+    },
+    "here_visible_body": {
+      "text": "People here see your name and card.",
+      "doc": "Under 'Visible' in the gear menu."
+    },
+    "here_quiet": {
+      "text": "Quiet for now",
+      "doc": "Gear menu, how you are here: see the room without being seen, for this visit only."
+    },
+    "here_quiet_body": {
+      "text": "You see who is here, they do not see you. This once only.",
+      "doc": "Under 'Quiet for now' in the gear menu."
+    },
+    "here_off": {
+      "text": "Fully off",
+      "doc": "Gear menu, how you are here: the radio off, nothing searched or announced."
+    },
+    "here_off_body": {
+      "text": "Nothing is searched for and nothing is announced.",
+      "doc": "Under 'Fully off' in the gear menu."
+    },
+    "menu_show": {
+      "text": "What you show",
+      "doc": "The gear menu's second group."
+    },
+    "menu_appear_as": {
+      "text": "You appear as {{name}}",
+      "doc": "Gear menu row: the self this device enters the room as ({{name}})."
+    },
+    "menu_change": {
+      "text": "Change",
+      "doc": "The button on the 'You appear as' row: opens who you enter as and what the room sees of you."
+    },
+    "menu_card": {
+      "text": "My card and what I offer",
+      "doc": "Gear menu row: opens the card editor and what you offer."
+    },
+    "menu_chat_off": {
+      "text": "You do not see the conversation and nobody can say anything to you there.",
+      "doc": "Under the chat switch in the gear menu while it is off."
+    },
+    "menu_intro_again": {
+      "text": "Read the introduction to Nearby again",
+      "doc": "The gear menu's last line."
+    },
     "card_title": {
       "text": "Your card",
       "doc": "Heading of the card composer."
@@ -3823,18 +3883,6 @@
       "text": "Nothing is browsed or announced on the local network until you turn it back on.",
       "doc": "Radio-off banner body — states both halves plainly: not seen AND not seeing."
     },
-    "quiet_toggle": {
-      "text": "Go quiet — keep seeing the room without being seen (this visit only)",
-      "doc": "Session-only ghost switch behind the visibility banner. Resets when the screen closes."
-    },
-    "radio_toggle_off": {
-      "text": "Turn Nearby's radio fully off",
-      "doc": "The persisted OFF: nothing browsed or announced until turned back on."
-    },
-    "radio_toggle_on": {
-      "text": "Turn Nearby's radio back on",
-      "doc": "Leaves the radio-off state; the open screen becomes visible again."
-    },
     "still_visible_title": {
       "text": "Still visible",
       "doc": "Banner heading when the device could NOT honour \"hidden\" (older native build)."
@@ -3922,22 +3970,6 @@
     "becoming_visible_body": {
       "text": "The radio is being told to announce you; a moment.",
       "doc": "Second line of that banner."
-    },
-    "mine_title": {
-      "text": "You here",
-      "doc": "The folded \"your side\" section of Nearby (allows, card, what others see) — sketch §2."
-    },
-    "mine_card_on": {
-      "text": "card shown",
-      "doc": "Summary chip when the card allow is on."
-    },
-    "mine_chat_on": {
-      "text": "in the chat",
-      "doc": "Summary chip when the chat allow is on."
-    },
-    "mine_none": {
-      "text": "nothing shown yet",
-      "doc": "Summary when neither allow is on."
     },
     "reach_shared_you": {
       "text": "You shared how to reach you.",

@@ -2505,29 +2505,29 @@
       "add": {
         "body": {
           "text": "what it says",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       },
       "get": {
         "id": {
-          "text": "which {{noun}}",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "text": "which one you mean",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       },
       "update": {
         "body": {
           "text": "what it says now",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         },
         "id": {
-          "text": "which {{noun}}",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "text": "which one you mean",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       },
       "remove": {
         "id": {
-          "text": "which {{noun}}",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "text": "which one you mean",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       }
     },

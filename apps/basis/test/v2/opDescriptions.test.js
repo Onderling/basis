@@ -42,7 +42,11 @@ describe('a generic op (a noun with the generic verbs): the verb described once,
     expect(opWhat('household', op('list'), 'nl')).toBe('Laat je notities zien.');
     expect(opWhat('household', op('add'), 'en')).toBe('Make a note.');
     expect(opWhat('household', op('list'), 'en')).toBe('Show your notes.');
-    expect(opDescription('household', op('remove'), 'nl').params.id).toBe('welke notitie');
+    // no noun in the "which" phrase: Dutch would need a stored de/het ('welke aanbod'), so it names none
+    expect(opDescription('household', op('remove'), 'nl').params.id).toBe('welke je bedoelt');
+    expect(opDescription('household', op('get'), 'en').params.id).toBe('which one you mean');
+    // update follows its label (Aanpassen): Pas … aan, not Verander
+    expect(opWhat('household', op('update'), 'nl')).toBe('Pas een notitie aan.');
     expect(opDescription('household', op('add'), 'nl').params.body).toBe('wat erin staat');
   });
   it('a noun not described yet, or a non-generic op of an undescribed app: none', () => {

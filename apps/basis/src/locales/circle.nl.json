@@ -2498,7 +2498,7 @@
         "doc": "What a generic op with this verb does, for a person (step C): {{a_noun}} the noun with its article (Dutch een + one; English a/an by its first letter), {{nouns}} the plural, bare. Beside the verb label."
       },
       "update": {
-        "text": "Verander {{a_noun}}.",
+        "text": "Pas {{a_noun}} aan.",
         "doc": "What a generic op with this verb does, for a person (step C): {{a_noun}} the noun with its article (Dutch een + one; English a/an by its first letter), {{nouns}} the plural, bare. Beside the verb label."
       },
       "remove": {
@@ -2510,29 +2510,29 @@
       "add": {
         "body": {
           "text": "wat erin staat",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       },
       "get": {
         "id": {
-          "text": "welke {{noun}}",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "text": "welke je bedoelt",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       },
       "update": {
         "body": {
           "text": "wat er nu in staat",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         },
         "id": {
-          "text": "welke {{noun}}",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "text": "welke je bedoelt",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       },
       "remove": {
         "id": {
-          "text": "welke {{noun}}",
-          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare."
+          "text": "welke je bedoelt",
+          "doc": "A generic op's parameter, for a person (step C); {{noun}} the noun, bare (the which-phrase names no noun: no stored de/het)."
         }
       }
     },

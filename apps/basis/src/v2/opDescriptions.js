@@ -59,8 +59,8 @@ export function fillNounSlots(text, names, lang) {
 }
 
 /**
- * The generic verbs' words, from the locale where their labels live (`circle.settings.verb.<atom>` the label,
- * `verb_what.<atom>` the sentence, `verb_param.<atom>.<param>` the phrases): ONE vocabulary per verb. Read straight from
+ * The generic verbs' words, from the locale where their labels live (the verb label key that capabilityLabel.js reads
+ * is the label, `verb_what.<atom>` the sentence, `verb_param.<atom>.<param>` the phrases): ONE vocabulary per verb. Read straight from
  * the bundle, as `chatHints.js` does: the language is an argument, no i18n instance needed.
  */
 export function genericVerbWords(lang) {

@@ -1917,6 +1917,14 @@
     "plus_help_ask_example": {
       "text": "hoe nodig ik iemand uit?",
       "doc": "The example in plus_help_ask: a question a help card answers (tested: the \"+\" reads it as help with a card)."
+    },
+    "plus_not_my_reach": {
+      "text": "Ik lees je kringen niet. Open de kring, of zeg wat ik erin moet zetten.",
+      "doc": "The \"+\" for a line about one of the person's circles that it cannot place: it does not read circles, and what to do instead (the brief's words)."
+    },
+    "plus_try_example": {
+      "text": "Probeer bijvoorbeeld: {{example}}",
+      "doc": "After \"could not read that\" or the no-model answer: one line the \"+\" reads here that is close to what was typed ({{example}})."
     }
   },
   "screens": {

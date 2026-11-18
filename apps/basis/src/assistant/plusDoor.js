@@ -27,8 +27,9 @@ import { opScopes, verbKind, isPeopleWritten } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from '../v2/grantsManifest.js';
 import { makeOpAvailability } from '../v2/opAvailability.js';
 import { ownPlacePolicy } from '../v2/circlePolicy.js';
-import { plusIntro, plusNews, plusHelp, readPlusTold, writePlusTold } from '../v2/plusIntro.js';
+import { plusIntro, plusNews, plusHelp, plusNearest, readPlusTold, writePlusTold } from '../v2/plusIntro.js';
 import { HELP_CIRCLE_ID } from '../v2/helpCircle.js';
+import { plusSuggestionPool } from '../v2/vandaagPlus.js';
 import { PLUS_ACTS, plusLineOutcome, plusHelpAnswer, actRunsAtOnce, plusDoneLine, plusLabel, plusSuggest, NO_OWN_LIST } from '../v2/vandaagPlus.js';
 import { plusAnswerLine, plusThreadId, PLUS_TURNS_SHOWN } from '../v2/plusThread.js';
 import { interpretToCommand } from '../v2/interpretCommand.js';
@@ -407,6 +408,24 @@ export function createPlusDoor({
     }).join('\n');
   }
 
+  // NOTHING TO DO WITH A LINE, said with its reason (the plan's step B): a line that names one of the person's circles
+  // is about a circle, which the "+" does not read (what to do instead); any other gets its answer (`said`: no model, or
+  // could not read) and, when one fits, an example of a line the "+" does read here. `asError`: the answer is an error.
+  async function nothingFor(text, said, { asError = false, asSelf = null } = {}) {
+    const cs = await Promise.resolve(circles()).catch(() => []);
+    const low = ` ${String(text).toLowerCase()} `;
+    const names = cs.filter((c) => c?.id && c.id !== HELP_CIRCLE_ID && c.unnamed !== true && typeof c?.name === 'string' && c.name.trim());
+    const aboutCircle = names.some((c) => new RegExp(`[^\\p{L}\\p{N}]${c.name.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\p{L}\\p{N}]`, 'u').test(low));
+    if (aboutCircle) { const r = { error: t('circle.vandaag.plus_not_my_reach') }; placedNowhere.add(r); return r; }
+    const lists = await Promise.resolve(ownListsOf(asSelf)).catch(() => []);
+    const pool = [...plusIntro({ ownLists: lists, circles: cs, t }).examples, ...plusSuggestionPool({ circles: cs, lang })];
+    const ex = plusNearest(text, pool);
+    const line = ex ? `${said} ${t('circle.vandaag.plus_try_example', { example: ex })}` : said;
+    const r = asError ? { error: line } : { done: line };
+    placedNowhere.add(r);
+    return r;
+  }
+
   async function read(line, opts = {}) {
     const text = String(line ?? '').trim();
     if (!text) return unread();
@@ -442,13 +461,16 @@ export function createPlusDoor({
       await answer(gated, { asSelf, selves: set, id: threadIdFor(set), door: 'phrase' });
       return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
     }
-    if (!llm) { const r = { done: plusNoModelAnswer({ t }) }; placedNowhere.add(r); return r; }
+    if (!llm) return nothingFor(text, plusNoModelAnswer({ t }), { asSelf });
     lineDoor = 'model';
     outcome = null;
     currentLine = text;
     currentOnSlow = typeof opts.onSlow === 'function' ? opts.onSlow : null;
     try { await engine.ask(threadIdFor(set), text, { asSelf, selves: set }); } finally { currentOnSlow = null; }
-    return outcome?.actId ? { ...outcome, asSelf } : (outcome ?? unread());
+    if (outcome?.actId) return { ...outcome, asSelf };
+    // the model found nothing to do: said with its reason (a circle's line, or an example that fits)
+    if (!outcome || placedNowhere.has(outcome)) return nothingFor(text, t('circle.vandaag.plus_line_unread'), { asError: true, asSelf });
+    return outcome;
   }
 
   return {

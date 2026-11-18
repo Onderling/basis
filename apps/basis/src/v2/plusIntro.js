@@ -58,6 +58,26 @@ export function plusNews({ told = null, circles = [], t, helpCircleId = HELP_CIR
   return { line: t('circle.vandaag.plus_news_circle', { circle: joined.map((c) => c.name.trim()).join(', ') }), told: keep };
 }
 
+const wordsOf = (s) => String(s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1);
+
+/**
+ * The line from `pool` (lines the "+" reads here) that shares the most words with what was typed, or null when none
+ * shares one: the example a "could not read that" offers, so the person sees a line that works and is close to theirs.
+ * @param {string} line @param {string[]} pool
+ * @returns {string|null}
+ */
+export function plusNearest(line, pool = []) {
+  const want = new Set(wordsOf(line));
+  if (!want.size) return null;
+  let best = null;
+  let score = 0;
+  for (const cand of Array.isArray(pool) ? pool : []) {
+    const n = wordsOf(cand).filter((w) => want.has(w)).length;
+    if (n > score) { best = cand; score = n; }
+  }
+  return best;
+}
+
 export const PLUS_TOLD_KIND = 'plus-told';
 
 /**

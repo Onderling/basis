@@ -678,3 +678,59 @@ describe('the make-a-list card: the yes makes the list AND puts the item on it; 
     expect(callSkill).not.toHaveBeenCalled();
   });
 });
+
+describe('what the "+" notes in the person\'s own record that no op shows (ledger L203)', () => {
+  const noted = () => { const out = []; return { out, noteOwn: (e) => { out.push(e); } }; };
+  it('a no on the card is declined, naming the act it proposed and the door the line came through; never the words', async () => {
+    const n = noted();
+    const { d } = door({ noteOwn: n.noteOwn });
+    const r = await d.read('zet melk op boodschappen');
+    await d.cardRefused({}, r.card);
+    expect(n.out).toEqual([{ app: 'lists', op: 'createList', outcome: 'declined', door: 'phrase', circleId: null }]);
+    expect(JSON.stringify(n.out)).not.toMatch(/melk|boodschappen/);
+  });
+  it('a form the model proposed and the person closed is declined, door model; saved is no note (the waist records the save)', async () => {
+    const standIn = async () => ({ opId: 'addEvent', args: { title: 'sleutel ophalen' } });
+    const n = noted();
+    const { d } = door({ interpret: standIn, noteOwn: n.noteOwn });
+    const r = await d.read('zet dat morgen om 10 in mijn agenda');
+    expect(r.actId).toBe('calendar.calendar-event');
+    await d.settled({}, { saved: false });
+    expect(n.out).toEqual([{ app: 'calendar', op: 'addEvent', outcome: 'declined', door: 'model', circleId: null }]);
+    const m = noted();
+    const { d: d2 } = door({ interpret: standIn, noteOwn: m.noteOwn });
+    await d2.read('zet dat morgen om 10 in mijn agenda');
+    await d2.settled({}, { saved: true, actId: 'calendar.calendar-event' });
+    expect(m.out).toEqual([]);
+  });
+  it('a line placed nowhere is no_act, with no op: by phrase with no model, by model when the model found nothing', async () => {
+    const n = noted();
+    const { d } = createPlusDoorNoModel(n.noteOwn);
+    await d.read('wat kan je allemaal?');
+    expect(n.out).toEqual([{ app: null, op: null, outcome: 'no_act', door: 'phrase', circleId: null }]);
+    const m = noted();
+    const { d: d2 } = door({ interpret: async () => null, noteOwn: m.noteOwn });
+    await d2.read('blablabla qwerty');
+    expect(m.out).toEqual([{ app: null, op: null, outcome: 'no_act', door: 'model', circleId: null }]);
+  });
+  it('a Save of the form the model proposed comes through the same door as its no would (formDoor); another act, or no form, none', async () => {
+    const standIn = async () => ({ opId: 'addEvent', args: { title: 'sleutel ophalen' } });
+    const { d } = door({ interpret: standIn });
+    expect(d.formDoor({}, 'calendar.calendar-event'), 'no form open').toBeUndefined();
+    const r = await d.read('zet dat morgen om 10 in mijn agenda');
+    expect(d.formDoor({}, r.actId)).toBe('model');
+    expect(d.formDoor({}, 'household.note'), 'another act, by its own button').toBeUndefined();
+    await d.settled({}, { saved: true, actId: r.actId });
+    expect(d.formDoor({}, r.actId), 'settled: gone').toBeUndefined();
+  });
+  it('an answer in words, a read, or a form opened is no note', async () => {
+    const n = noted();
+    const { d } = door({ interpret: async () => ({ reply: 'Ja.' }), noteOwn: n.noteOwn });
+    await d.read('gaat het goed?');
+    expect(n.out).toEqual([]);
+  });
+});
+
+function createPlusDoorNoModel(noteOwn) {
+  return { d: createPlusDoor({ llm: null, threads: threadsOf(), threadId: 'own:me', t, lang: 'nl', circles: async () => [], ownListsOf: async () => [], noteOwn }) };
+}

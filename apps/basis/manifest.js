@@ -1213,6 +1213,8 @@ export const basisManifest = {
         { id: 'privacy',         kind: 'fact'    },
         { id: 'usage',           kind: 'fact'    },
         { id: 'frequent',        kind: 'control' },
+        // the person's own record of what they do in the app (ownActions.js): its switch, how much is kept, export, wipe
+        { id: 'own-actions',     kind: 'control' },
         { id: 'log-report',      kind: 'door', target: { kind: 'nav', to: 'logReport' } },
       ],
     },

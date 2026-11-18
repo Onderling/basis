@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { entryKind, RETAIN, retentionWindowFor, SYNC, SIGNS, isMirroredKind } from '@onderling/item-store';
-import { OWN_ACTION_KIND, makeOwnActionEntry, ownRetentionMs, OWN_KEEP_WEEKS, OWN_RECORD, DOORS, ownActIs, recordOwnAction, ownOutcome, ownActionRows, doorOnly, noteOwnOutcome } from '../src/ownActions.js';
+import { OWN_ACTION_KIND, makeOwnActionEntry, ownRetentionMs, OWN_KEEP_WEEKS, OWN_RECORD, DOORS, ownActIs, recordOwnAction, ownOutcome, ownActionRows, doorOnly, ownActionsLines, noteOwnOutcome } from '../src/ownActions.js';
 import { EventLog } from '../src/eventLog.js';
 import { allManifests } from '../src/v2/manifestSources.js';
 
@@ -127,6 +127,16 @@ describe('reading the record back, and what goes down to the waist', () => {
     expect(doorOnly({ door: 'model', msgId: 'm1', history: [1] })).toEqual({ door: 'model' });
     expect(doorOnly({ msgId: 'm1' })).toBeUndefined();
     expect(doorOnly(undefined)).toBeUndefined();
+  });
+});
+
+describe('the row\'s words under My data', () => {
+  it('none, one and more read apart; off says nothing is being recorded, and keeps the count', () => {
+    const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
+    expect(ownActionsLines({ count: 0, t })).toEqual({ count: 'circle.mydata.own_actions_none', off: null });
+    expect(ownActionsLines({ count: 1, t }).count).toBe('circle.mydata.own_actions_count_one');
+    expect(ownActionsLines({ count: 7, t }).count).toBe('circle.mydata.own_actions_count_n {"count":7}');
+    expect(ownActionsLines({ on: false, count: 7, t })).toEqual({ count: 'circle.mydata.own_actions_count_n {"count":7}', off: 'circle.mydata.own_actions_off' });
   });
 });
 

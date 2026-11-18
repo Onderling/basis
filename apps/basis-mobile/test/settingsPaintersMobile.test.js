@@ -10,6 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { settingsSectionIds } from '../../basis/src/v2/settingsHome.js';
+import { basisManifest } from '../../basis/manifest.js';
 
 const SRC = readFileSync(fileURLToPath(new URL('../src/screens/v2/CircleMyDataScreen.js', import.meta.url)), 'utf8');
 const titles = (text) => [...text.matchAll(/<Section title=\{t\('([^']+)'\)\}/g)].map((m) => m[1]);
@@ -41,6 +43,7 @@ const OWN_TITLE = {
   'connection-add': 'circle.mydata.connection_add',
   'keys': 'circle.mydata.keys',
   'storage': 'circle.mydata.storage',
+  'own-actions': 'circle.params.key.ownActions_record',
 };
 
 const painterBodies = () => {
@@ -51,6 +54,13 @@ const painterBodies = () => {
 };
 
 describe('mobile settings painters', () => {
+  it('every section a group declares has its painter here (a new section that only web paints is red, not missing)', () => {
+    const declared = [...settingsSectionIds(basisManifest)];
+    expect(declared.filter((id) => !(id in OWN_TITLE)), 'declared, but no title pinned in OWN_TITLE').toEqual([]);
+    const bodies = painterBodies();
+    expect(declared.filter((id) => !bodies[id]), 'declared, but mobile paints nothing for it').toEqual([]);
+  });
+
   it('each painter opens exactly its own section, and no other', () => {
     const bodies = painterBodies();
     for (const [id, title] of Object.entries(OWN_TITLE)) expect(titles(bodies[id] ?? ''), id).toEqual([title]);

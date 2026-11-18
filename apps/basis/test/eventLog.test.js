@@ -504,3 +504,22 @@ describe('compactEntries — the one way a record-class entry changes after it w
     expect(log.compactEntries(['membership:b'], () => ({ id: 'other' })), 'a transform that changes the id is refused').toBe(0);
   });
 });
+
+describe('dropKind: the person wipes one kind of their own record', () => {
+  it('drops every entry of that kind and nothing else; an audit kind is never dropped; it persists', async () => {
+    const now = Date.now();
+    const saved = [];
+    const log = new EventLog({ initial: [], muted: [], persist: async (evs) => { saved.push(evs.length); } });
+    log.append({ id: 'o1', type: 'own-action', ts: now - 10, payload: { op: 'a' } });
+    log.append({ id: 'o2', type: 'own-action', ts: now - 5, payload: { op: 'b' } });
+    log.append({ id: 'c1', type: 'chat-message', ts: now - 3, circleId: 'k', payload: { text: 'hoi' } });
+    log.append({ id: 'a1', type: 'agent-action', ts: now - 2, payload: { op: 'x' } });
+    expect(log.dropKind('own-action')).toBe(2);
+    expect(log.query().map((e) => e.id).sort()).toEqual(['a1', 'c1']);
+    expect(log.dropKind('agent-action'), 'an audit trail is never wiped this way').toBe(0);
+    expect(log.query().map((e) => e.id).sort()).toEqual(['a1', 'c1']);
+    expect(log.dropKind(''), 'no kind, nothing').toBe(0);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(saved.at(-1), 'the shrunk log is persisted').toBe(2);
+  });
+});

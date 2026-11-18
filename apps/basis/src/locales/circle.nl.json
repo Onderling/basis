@@ -7460,6 +7460,42 @@
     "mnemonic_later": {
       "text": "Later",
       "doc": "The recovery-phrase dialog opened from Vandaag's key card: put the card away for a few days."
+    },
+    "own_actions_note": {
+      "text": "Alleen op dit apparaat. Geen inhoud: alleen welke handeling, in welke kring en wanneer.",
+      "doc": "Under the record's switch in My data (Fable's words, L203): what it keeps and where."
+    },
+    "own_actions_off": {
+      "text": "Er wordt niets bijgehouden.",
+      "doc": "Under the record's switch when it is off (Fable's words); the count and Export stay for what is already kept."
+    },
+    "own_actions_count_one": {
+      "text": "Nu bewaard: 1 handeling",
+      "doc": "How many of the person's own acts this device keeps: exactly one."
+    },
+    "own_actions_count_n": {
+      "text": "Nu bewaard: {{count}} handelingen",
+      "doc": "How many of the person's own acts this device keeps ({{count}}, two or more)."
+    },
+    "own_actions_none": {
+      "text": "Nog niets bewaard.",
+      "doc": "The record is empty."
+    },
+    "own_actions_export": {
+      "text": "Als bestand downloaden",
+      "doc": "Button: save the record as one file (rows only, no words); the same word as the history export beside it."
+    },
+    "own_actions_wipe": {
+      "text": "Wissen",
+      "doc": "Button: wipe the record (this kind only); asks once more first."
+    },
+    "own_actions_wipe_confirm": {
+      "text": "Alles wissen? Dit kan niet terug.",
+      "doc": "The second tap on Wipe: it cannot be undone."
+    },
+    "own_actions_wiped": {
+      "text": "{{n}} gewist.",
+      "doc": "After the wipe: how many went ({{n}})."
     }
   },
   "admin": {

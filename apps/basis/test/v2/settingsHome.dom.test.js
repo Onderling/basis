@@ -35,6 +35,7 @@ const allSettingsProps = () => ({
   privacy: [{ title: 'P', body: 'b' }],
   metrics: { opens: 3 },
   frequent: [], onClearFrequent: vi.fn(),
+  ownActions: { on: true, count: 3, onToggle: vi.fn(), onExport: vi.fn(), onWipe: vi.fn(async () => 3) },
   podStatus: { signedIn: false }, onExportRecovery: vi.fn(),
   devices: [{ deviceId: 'dev-1', label: 'telefoon', revoked: false }], onRevokeDevice: vi.fn(),
   companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }], onOpenCompanionGrant: vi.fn(), onGrantCompanion: vi.fn(),

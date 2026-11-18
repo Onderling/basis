@@ -6,7 +6,7 @@
  *   in), filled with fixed ones. A tap on an example puts the line in the field; it does not send. Every example is a
  *   line the "+" reads here (tested through the door itself): an example that does nothing would contradict it.
  * - A later open: one line for each circle joined since the person was last told (`plusNews`), then never again for
- *   it. A circle that went away says nothing; "help" shows what is there now. The Help circle is never news: the "+"
+ *   it. A circle whose name has not arrived yet is not news until it has one: then it is told once, by name. A circle that went away says nothing; "help" shows what is there now. The Help circle is never news: the "+"
  *   never offers it.
  *
  * What the person was told is a set of circle ids the shell keeps per self on this device (not an act; nothing about
@@ -46,13 +46,15 @@ export function plusIntro({ ownLists = [], circles = [], t, helpCircleId = HELP_
  */
 export function plusNews({ told = null, circles = [], t, helpCircleId = HELP_CIRCLE_ID } = {}) {
   const now = (Array.isArray(circles) ? circles : []).filter((c) => c?.id && c.id !== helpCircleId);
-  const keep = { circles: now.map((c) => c.id) };
+  // a circle whose name has not arrived yet (a fresh join) is not news yet: it is left out of the line AND of what is
+  // kept, so it is told once, by its name, when that arrives; a circle told before stays told while its name is missing
+  const named = (c) => typeof c?.name === 'string' && c.name.trim() !== '';
+  const known = new Set(Array.isArray(told?.circles) ? told.circles : []);
+  const keep = { circles: now.filter((c) => named(c) || known.has(c.id)).map((c) => c.id) };
   if (!told || !Array.isArray(told.circles)) return { line: null, told: keep };
-  const known = new Set(told.circles);
-  const joined = now.filter((c) => !known.has(c.id));
+  const joined = now.filter((c) => !known.has(c.id) && named(c));
   if (!joined.length || typeof t !== 'function') return { line: null, told: keep };
-  const names = joined.map((c) => (typeof c.name === 'string' && c.name.trim()) || t('circle.screens.untitled'));
-  return { line: t('circle.vandaag.plus_news_circle', { circle: names.join(', ') }), told: keep };
+  return { line: t('circle.vandaag.plus_news_circle', { circle: joined.map((c) => c.name.trim()).join(', ') }), told: keep };
 }
 
 export const PLUS_TOLD_KIND = 'plus-told';

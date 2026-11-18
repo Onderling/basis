@@ -74,6 +74,23 @@ describe('what changed since the last open: said once', () => {
     expect(plusNews({ told: later.told, circles: [thuis, werk], t: tNl }).line, 'said once').toBeNull();
     expect(plusNews({ told: later.told, circles: [werk], t: tNl }).line, 'a circle gone says nothing').toBeNull();
   });
+  it('a circle whose name has not arrived yet is not news: left out of the line and of what is kept, then told once BY NAME', () => {
+    const first = plusNews({ told: null, circles: [thuis], t: tNl });
+    const fresh = plusNews({ told: first.told, circles: [thuis, { id: 'k9', name: '' }], t: tNl });
+    expect(fresh.line, 'no "untitled" news').toBeNull();
+    expect(fresh.told.circles, 'not kept as told').not.toContain('k9');
+    const named = plusNews({ told: fresh.told, circles: [thuis, { id: 'k9', name: 'Buurt' }], t: tNl });
+    expect(named.line).toMatch(/Buurt/);
+    // a circle already told whose name is missing for a moment stays told: no second news when it comes back
+    const blink = plusNews({ told: named.told, circles: [{ id: 'k1', name: '' }, { id: 'k9', name: 'Buurt' }], t: tNl });
+    expect(blink.line).toBeNull();
+    expect(plusNews({ told: blink.told, circles: [thuis, { id: 'k9', name: 'Buurt' }], t: tNl }).line, 'Thuis was told before').toBeNull();
+  });
+  it('the first open keeps only the named circles too, so a nameless one is news once it has its name', () => {
+    const first = plusNews({ told: null, circles: [thuis, { id: 'k9' }], t: tNl });
+    expect(first.told.circles).toEqual(['k1']);
+    expect(plusNews({ told: first.told, circles: [thuis, { id: 'k9', name: 'Buurt' }], t: tNl }).line).toMatch(/Buurt/);
+  });
   it('the Help circle is never news (the "+" never offers it)', () => {
     const first = plusNews({ told: null, circles: [], t: tNl });
     expect(plusNews({ told: first.told, circles: [{ id: 'help', name: 'Help' }], t: tNl, helpCircleId: 'help' }).line).toBeNull();

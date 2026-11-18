@@ -409,18 +409,21 @@ export function createPlusDoor({
   }
 
   // NOTHING TO DO WITH A LINE, said with its reason (the plan's step B): a line that names one of the person's circles
-  // is about a circle, which the "+" does not read (what to do instead); any other gets its answer (`said`: no model, or
-  // could not read) and, when one fits, an example of a line the "+" does read here. `asError`: the answer is an error.
-  async function nothingFor(text, said, { asError = false, asSelf = null } = {}) {
+  // is about that circle, which the "+" does not read along in (what to do instead); with no model, the no-model answer
+  // and, when one fits, an example of a line the "+" reads here; a line the model found nothing in: "not understood"
+  // with that example, or today's line when none fits. Each stays no_act in the person's record (Fable's words).
+  async function nothingFor(text, said, { asError = false, asSelf = null, understood = true } = {}) {
     const cs = await Promise.resolve(circles()).catch(() => []);
     const low = ` ${String(text).toLowerCase()} `;
     const names = cs.filter((c) => c?.id && c.id !== HELP_CIRCLE_ID && c.unnamed !== true && typeof c?.name === 'string' && c.name.trim());
-    const aboutCircle = names.some((c) => new RegExp(`[^\\p{L}\\p{N}]${c.name.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\p{L}\\p{N}]`, 'u').test(low));
-    if (aboutCircle) { const r = { error: t('circle.vandaag.plus_not_my_reach') }; placedNowhere.add(r); return r; }
+    const aboutCircle = names.find((c) => new RegExp(`[^\\p{L}\\p{N}]${c.name.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\\p{L}\\p{N}]`, 'u').test(low));
+    if (aboutCircle) { const r = { error: t('circle.vandaag.plus_not_my_reach', { circle: aboutCircle.name.trim() }) }; placedNowhere.add(r); return r; }
     const lists = await Promise.resolve(ownListsOf(asSelf)).catch(() => []);
     const pool = [...plusIntro({ ownLists: lists, circles: cs, t }).examples, ...plusSuggestionPool({ circles: cs, lang })];
     const ex = plusNearest(text, pool);
-    const line = ex ? `${said} ${t('circle.vandaag.plus_try_example', { example: ex })}` : said;
+    const line = !ex ? said
+      : understood ? `${said} ${t('circle.vandaag.plus_try_example', { example: ex })}`
+        : t('circle.vandaag.plus_not_understood', { example: ex });
     const r = asError ? { error: line } : { done: line };
     placedNowhere.add(r);
     return r;
@@ -469,7 +472,7 @@ export function createPlusDoor({
     try { await engine.ask(threadIdFor(set), text, { asSelf, selves: set }); } finally { currentOnSlow = null; }
     if (outcome?.actId) return { ...outcome, asSelf };
     // the model found nothing to do: said with its reason (a circle's line, or an example that fits)
-    if (!outcome || placedNowhere.has(outcome)) return nothingFor(text, t('circle.vandaag.plus_line_unread'), { asError: true, asSelf });
+    if (!outcome || placedNowhere.has(outcome)) return nothingFor(text, t('circle.vandaag.plus_line_unread'), { asError: true, asSelf, understood: false });
     return outcome;
   }
 

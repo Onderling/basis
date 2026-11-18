@@ -1916,12 +1916,16 @@
       "doc": "The example in plus_help_ask: a question a help card answers (tested: the \"+\" reads it as help with a card)."
     },
     "plus_not_my_reach": {
-      "text": "I do not read your circles. Open the circle, or tell me what to put in it.",
-      "doc": "The \"+\" for a line about one of the person's circles that it cannot place: it does not read circles, and what to do instead (the brief's words)."
+      "text": "I do not read along in {{circle}}. Open the circle, or tell me what to put in it.",
+      "doc": "The \"+\" for a line about one of the person's circles ({{circle}}) that it cannot place: it does not read along there, and what to do instead (Fable's words)."
     },
     "plus_try_example": {
       "text": "Try for example: {{example}}",
       "doc": "After \"could not read that\" or the no-model answer: one line the \"+\" reads here that is close to what was typed ({{example}})."
+    },
+    "plus_not_understood": {
+      "text": "I did not understand that. Try for example: {{example}}",
+      "doc": "The \"+\" when the model found nothing to do in a line: not understood, with one line it does read here that is close to what was typed ({{example}}). Fable's words."
     }
   },
   "screens": {

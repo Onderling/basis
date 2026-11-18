@@ -53,8 +53,9 @@ describe('a line the "+" could not read', () => {
       threadId: 'own:me', circles: async () => [thuis], ownListsOf: async () => [shopping],
     });
     const r = await d.read('melk erbij graag');
-    expect(r.error).toMatch(/^Dat kon ik niet lezen\./);
-    expect(TRY.exec(r.error)?.[1]).toMatch(/melk/);
+    expect(r.error).toMatch(/^Dat begreep ik niet\. Probeer bijvoorbeeld: .*melk/);
+    // none fits: today's line
+    expect((await d.read('qwerty zxcv')).error).toBe(t('circle.vandaag.plus_line_unread'));
   });
   it('with no example that fits, the line alone', async () => {
     const r = await door().read('qwerty zxcv');
@@ -65,7 +66,7 @@ describe('a line the "+" could not read', () => {
 describe('a line about one of the person\'s circles that the "+" cannot place', () => {
   it('says it does not read circles and what to do instead (not "I could not read that")', async () => {
     const r = await door().read('wat is er gebeurd in Thuis vandaag');
-    expect(r.error).toBe(t('circle.vandaag.plus_not_my_reach'));
+    expect(r.error).toBe('Ik lees niet mee in Thuis. Open de kring, of zeg wat ik erin moet zetten.');
   });
   it('a line the "+" CAN place in that circle is never refused for it', async () => {
     const r = await door().read('Thuis: maak een lijst Boodschappen');
@@ -83,5 +84,19 @@ describe('a circle\'s name is no help topic', async () => {
     const o = plusLineOutcome('hoe nodig ik iemand uit in Thuis?', { circles: [thuis], lang: 'nl' });
     expect(o?.kind).toBe('help');
     expect(o?.card?.cardId).toBeTruthy();
+  });
+});
+
+describe('both stay no_act in the person\'s own record', () => {
+  it('a circle\'s line placed nowhere, and a line not understood: each one no_act, never the words', async () => {
+    const out = [];
+    const d = createPlusDoor({
+      llm: null, t, lang: 'nl', threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }),
+      threadId: 'own:me', circles: async () => [thuis], ownListsOf: async () => [shopping], noteOwn: (e) => { out.push(e); },
+    });
+    await d.read('wat is er gebeurd in Thuis vandaag');
+    await d.read('melk erbij graag');
+    expect(out.map((e) => `${e.outcome}:${e.door}:${e.op}`)).toEqual(['no_act:phrase:null', 'no_act:phrase:null']);
+    expect(JSON.stringify(out)).not.toMatch(/Thuis|melk/);
   });
 });

@@ -8115,6 +8115,7 @@ function showCircle(id, circle, policy) {
           notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() }),
           identityOf: (addr) => _peerAgent?.identityOfAddress?.(addr) ?? addr,
         });
+        toldTap(r);
         if (r.ok && r.toPubKey) openThreadWith = r.toPubKey;
       } else if (action === 'cancel') {
         toldTap(await pinboardCall('pinboard', 'cancelRequest', { requestId: post.id }, { door: 'tap' }));

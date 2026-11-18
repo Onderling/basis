@@ -223,7 +223,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     // The reply starts a 1:1 conversation with the poster: persisted into their contact thread, and
     // the launcher opens that thread so the answer that comes back has a place to land (web parity).
     let r = null;
-    try { r = await replyToPost({ callSkill, contactChannel, notePeer, identityOf, itemId: post.id, body }); } catch { /* */ }
+    try { r = told(await replyToPost({ callSkill, contactChannel, notePeer, identityOf, itemId: post.id, body })); } catch { /* */ }
     setReplyingTo(null); setReplyText('');
     reload();
     if (r?.ok && r.toPubKey) { try { onReplied?.(r); } catch { /* opening the thread is a courtesy */ } }

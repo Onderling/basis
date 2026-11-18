@@ -18,7 +18,9 @@ import { verbKind } from '@onderling/app-manifest';
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
-const SHELLS = ['apps/basis/web', 'apps/basis-mobile/src'];
+const SHELLS = ['apps/basis/web', 'apps/basis-mobile/src', 'apps/basis/src'];
+// the agent's own waist and its handlers are where calls ARRIVE, not people's doors
+const NOT_SCANNED = [/apps\/basis\/src\/core\//];
 const PERSON_DOOR = /door:\s*'(tap|slash|phrase|model|bot|clock|agent)'/;
 
 /**
@@ -36,6 +38,13 @@ const NOT_A_PERSONS_ACT = {
   },
   'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js': {
     'tasks.addTask': 1,   // the after-claim hook, the phone's twin of web's
+  },
+  // shared code
+  'apps/basis/src/v2/householdExport.js': {
+    'lists.createList': 1,   // restoring an export: the owner's own restore, recreating the household's lists
+  },
+  'apps/basis/src/v2/householdTemplate.js': {
+    'lists.createList': 1,   // the bot's first start making its template's lists: the device's own act
   },
 };
 
@@ -62,7 +71,7 @@ const walk = (d) => readdirSync(d).flatMap((f) => {
 function doorlessCalls(gated) {
   const re = /([A-Za-z_$][\w$]*(?:\??\.[\w$]+)*)\??\.?\(\s*'([a-z-]+)'\s*,\s*'([A-Za-z:_-]+)'/g;
   const out = {};
-  for (const shell of SHELLS) for (const file of walk(path.join(ROOT, shell))) {
+  for (const shell of SHELLS) for (const file of walk(path.join(ROOT, shell)).filter((f) => !NOT_SCANNED.some((r) => r.test(f)))) {
     const src = readFileSync(file, 'utf8');
     for (let m; (m = re.exec(src));) {
       if (!/call/i.test(m[1])) continue;

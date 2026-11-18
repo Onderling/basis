@@ -2346,7 +2346,8 @@ export default function CircleLauncherScreen({
           if (op.error) return t(op.error);
           // taken away as the self that made it, like a change
           const actAs = plusEdit.asSelf && plusEdit.asSelf !== 'default' ? (heldSelves.find((p) => p.id === plusEdit.asSelf)?.webid ?? null) : null;
-          const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+          // through the wrapped waist, the door named (web parity: circleApp passes { actAs, door }), so the circle is asked (L1042)
+          const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args, actAs ? { actAs, door: 'tap' } : { door: 'tap' }))
             .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
           if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
           setPlusOpen(false); setPlusEdit(null); refreshScreensBook();

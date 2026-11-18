@@ -20,6 +20,10 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('basis: its own commands described, a page and a block by the words the screens use', () => {
+    expect(opWhat('basis', 'screen-undo', 'nl')).toBe('Maak de laatste wijziging aan je pagina\'s ongedaan.');
+    expect(opDescription('basis', 'screen-move-block', 'en').params.pageId).toBe('which page');
+  });
 });
 
 describe('the "/" list shows it under the command', () => {

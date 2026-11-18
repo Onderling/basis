@@ -1,0 +1,186 @@
+{
+  "assistant-memory": {
+    "what": "Kies hoeveel de bot van je gesprek onthoudt.",
+    "params": {"mode": "niets, kort of lang"}
+  },
+  "assistant-forget": {
+    "what": "Laat de bot je gesprek nu vergeten; wat je op een lijst zette, blijft.",
+    "params": {}
+  },
+  "weekOverview": {
+    "what": "Laat je week zien: klusjes, afspraken, boodschappen. Of één dag.",
+    "params": {"day": "of alleen deze dag"}
+  },
+  "sendWeekOverview": {
+    "what": "De bot stuurt je op zondag het overzicht van je week.",
+    "params": {"occurrence": "welke keer"}
+  },
+  "assistant-feedback": {
+    "what": "Zeg waar feedback over de app heen gaat.",
+    "params": {}
+  },
+  "assistant-hello": {
+    "what": "De bot groet terug.",
+    "params": {"lang": "in welke taal"}
+  },
+  "announceChange": {
+    "what": "De bot laat wie het aangaat weten dat een afspraak of klusje veranderde.",
+    "params": {"occurrence": "welke keer"}
+  },
+  "assistant-reminders": {
+    "what": "Zet je herinneringen aan of uit, of kies wanneer ze komen.",
+    "params": {"mode": "aan, uit, of wanneer"}
+  },
+  "remindMe": {
+    "what": "Zet een eigen herinnering: op een tijd, voor een afspraak of klusje, of voor iedereen.",
+    "params": {"item": "waaraan", "rules": "wanneer, bijvoorbeeld 60 minuten ervoor of ochtend", "who": "voor wie"}
+  },
+  "sayReminder": {
+    "what": "De bot zegt je herinnering op het moment.",
+    "params": {"say": "wat de bot zegt", "occurrence": "welke keer"}
+  },
+  "cancelReminder": {
+    "what": "Haal een eigen herinnering weg.",
+    "params": {"which": "het nummer uit /gepland, of een woord ervan"}
+  },
+  "assistant-quiet": {
+    "what": "Kies je eigen stille uren, of die van het huis.",
+    "params": {"hours": "van hoe laat tot hoe laat"}
+  },
+  "assistant-overview": {
+    "what": "Zet het zondagsoverzicht aan of uit.",
+    "params": {"mode": "aan of uit"}
+  },
+  "assistant-language": {
+    "what": "Kies de taal waarin de bot je antwoordt.",
+    "params": {"lang": "Nederlands, Engels, of zoals je schrijft"}
+  },
+  "assistant-apps": {
+    "what": "Zet een app voor het huishouden aan of uit.",
+    "params": {"change": "welke app, aan of uit"}
+  },
+  "assistant-settings": {
+    "what": "Laat de instellingen van het hele huishouden zien, of verander er een.",
+    "params": {"change": "wat er verandert"}
+  },
+  "assistant-role": {
+    "what": "Verander iemands rol in het huishouden.",
+    "params": {"who": "wie", "role": "welke rol"}
+  },
+  "assistant-status": {
+    "what": "Laat zien hoe de bot ervoor staat.",
+    "params": {}
+  },
+  "assistant-usage": {
+    "what": "Laat zien wat het model deze maand kostte.",
+    "params": {}
+  },
+  "assistant-users": {
+    "what": "Laat zien wie er in het huishouden zitten.",
+    "params": {}
+  },
+  "assistant-planned": {
+    "what": "Laat zien wat de bot je komende week stuurt.",
+    "params": {}
+  },
+  "assistant-people": {
+    "what": "Laat zien wie er in dit huishouden zitten, met hun rol.",
+    "params": {}
+  },
+  "assistant-cohort": {
+    "what": "Maak een code waarmee meerdere mensen mee kunnen doen.",
+    "params": {"spec": "hoeveel mensen, hoeveel dagen"}
+  },
+  "assistant-invite": {
+    "what": "Maak een code waarmee één persoon mee kan doen.",
+    "params": {"role": "met welke rol"}
+  },
+  "assistant-rotate": {
+    "what": "Vervang de codes; de oude werken niet meer.",
+    "params": {}
+  },
+  "assistant-circle": {
+    "what": "Zet de bot in een kring, of haal hem eruit.",
+    "params": {"spec": "welke kring"}
+  },
+  "assistant-circles": {
+    "what": "Laat de kringen zien waar de bot in zit.",
+    "params": {}
+  },
+  "assistant-revoke": {
+    "what": "Haal iemand uit het huishouden.",
+    "params": {"who": "wie"}
+  },
+  "assistant-menu": {
+    "what": "Laat je instellingen zien, met knoppen.",
+    "params": {}
+  },
+  "assistant-view": {
+    "what": "Kies hoe de bot antwoordt: met knoppen, op je scherm of in woorden.",
+    "params": {"mode": "knoppen, scherm of woorden"}
+  },
+  "assistant-agenda-link": {
+    "what": "Maak een link naar je agenda, voor je agenda-app; de vorige werkt dan niet meer.",
+    "params": {}
+  },
+  "assistant-screen": {
+    "what": "Koppel een scherm, zodat je daar met de bot werkt.",
+    "params": {"how": "met een link of een code"}
+  },
+  "assistant-screen-paste": {
+    "what": "Koppel een scherm met zijn eigen koppelcode.",
+    "params": {"offer": "de koppelcode"}
+  },
+  "assistant-screen-confirm": {
+    "what": "Kies de code van een scherm dat wil koppelen.",
+    "params": {"answer": "je antwoord"}
+  },
+  "assistant-export-key-set": {
+    "what": "Zet de exportsleutel: je wachtwoord, alleen op je scherm.",
+    "params": {"passphrase": "je wachtwoord", "passphraseAgain": "nog een keer"}
+  },
+  "assistant-export-key-unlock": {
+    "what": "Open de exportsleutel voor een uur, om een export terug te zetten.",
+    "params": {"passphrase": "je wachtwoord"}
+  },
+  "assistant-link": {
+    "what": "Koppel je Basis-app aan jezelf.",
+    "params": {"offer": "de code uit je app"}
+  },
+  "assistant-link-confirm": {
+    "what": "Kies de code die je Basis-app laat zien.",
+    "params": {"answer": "je antwoord"}
+  },
+  "assistant-inapp": {
+    "what": "Zet het huishouden ook in je eigen app.",
+    "params": {"answer": "je antwoord"}
+  },
+  "assistant-unlink": {
+    "what": "Ontkoppel je Basis-app.",
+    "params": {}
+  },
+  "assistant-companion": {
+    "what": "Geef de bot de metgezel van het huishouden, voor de agendalinks.",
+    "params": {"card": "de kaart van de metgezel"}
+  },
+  "assistant-screen-approve": {
+    "what": "Zeg ja of nee op wat een scherm vroeg.",
+    "params": {"answer": "je antwoord"}
+  },
+  "assistant-screens": {
+    "what": "Laat je gekoppelde schermen zien, of ontkoppel er een.",
+    "params": {"change": "wat er verandert"}
+  },
+  "assistant-exports": {
+    "what": "Laat de nachtelijke exports zien.",
+    "params": {}
+  },
+  "assistant-export": {
+    "what": "Maak nu een export.",
+    "params": {}
+  },
+  "assistant-import": {
+    "what": "Zet een export terug.",
+    "params": {"file": "welke export"}
+  }
+}

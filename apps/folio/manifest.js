@@ -243,7 +243,6 @@ export const folioManifest = {
       params:    [],
       appliesTo: { type: '*' },
       surfaces: {
-        chat: { hint: 'Stop the local-folder watcher.  Future edits no longer auto-sync; manual sync still works.' },
         ui: {
           control:   'button', labelKey: 'circle.button.folio.watchStop',
           label:     'Stop watching',

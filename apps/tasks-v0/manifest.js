@@ -398,7 +398,6 @@ export const tasksManifest = {
         { name: 'reason', kind: 'string', required: true, ...STR_NONEMPTY },
       ],
       surfaces: {
-        chat: { hint: 'Revoke an assignment with a mandatory reason (master only).' },
         ui:   { control: 'button', labelKey: 'circle.button.tasks.revokeTask', label: 'Revoke' },
       },
     },
@@ -484,7 +483,6 @@ export const tasksManifest = {
       appliesTo: { type: 'task' },
       params:    [],
       surfaces: {
-        chat: { hint: 'List unresolved double-claim conflicts for this circle.' },
       },
     },
     {
@@ -537,7 +535,6 @@ export const tasksManifest = {
       appliesTo: { type: 'task' },
       params:    [],
       surfaces: {
-        chat: { hint: 'List open tasks where the caller is the master.' },
       },
     },
     {
@@ -598,7 +595,6 @@ export const tasksManifest = {
         { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY },
       ],
       surfaces: {
-        chat: { hint: 'Delete one inbox notification by id.' },
         ui:   { control: 'button', labelKey: 'circle.button.tasks.clearInboxItem', label: 'Dismiss' },
       },
     },
@@ -695,7 +691,6 @@ export const tasksManifest = {
         { name: 'olderThanMs', kind: 'number' },  // optional age cutoff
       ],
       surfaces: {
-        chat: { hint: 'Bulk-delete inbox notifications (optionally older than a cutoff).' },
         // section-level CTA. Renders in
         // `section.sectionActions[]`, NOT in per-row itemActions[]
         // or app-shell globals[].
@@ -738,7 +733,6 @@ export const tasksManifest = {
         { name: 'rootId', kind: 'string' },
       ],
       surfaces: {
-        chat: { hint: 'Return the sub-task tree rooted at rootId, or every top-level tree.' },
       },
     },
 

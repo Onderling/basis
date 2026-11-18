@@ -31,6 +31,7 @@ import { pageLabel } from '../../src/v2/pageProjection.js';
 import { SETTINGS_ENUM_AXES } from '../../src/v2/circlePolicy.js';
 import { isAdvancedSetting } from '../../src/v2/alphaSurface.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { capabilityLabel } from '../../src/v2/capabilityLabel.js';   // a capability as a person reads it, one lookup
 
 // 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' —
 // 'cross-stream' retired with the Stream view, batch 5); an admin picks which surface
@@ -657,7 +658,7 @@ function renderCapabilitiesSection(container, { matrix, tr, emit }) {
       en.type = 'checkbox'; en.checked = row.enabled; en.dataset.role = 'enabled';   // sets: policy:capabilities — a capability the circle allows
       en.addEventListener('change', () => emit({ capabilities: { [row.key]: { ...base(), enabled: en.checked } } }));
       const enSpan = document.createElement('span');
-      enSpan.textContent = `${tr(`circle.settings.verb.${row.atom}`, { defaultValue: row.atom })} · ${row.noun}`;
+      enSpan.textContent = capabilityLabel(tr, row);
       enWrap.append(en, enSpan);
       el.appendChild(enWrap);
 

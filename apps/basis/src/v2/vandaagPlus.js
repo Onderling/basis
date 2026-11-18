@@ -372,7 +372,12 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
     // nothing to do here: a line that ASKS how something works ("hoe …", gate words `_help.questions`) is looked up in the
     // help cards (before any model reads it); only such a line: the cards' matcher alone hits ordinary lines on a keyword
     const asks = helpQuestionOpeners().some((o) => text.toLowerCase().startsWith(o));
-    const card = asks ? answerHelp(text, { lang: lang ?? undefined }) : null;
+    // looked up WITHOUT the person's circle names: a circle called "Thuis" is no help topic (the personas card says
+    // "thuis"), so a line about a circle borrows no card by its name, while a real how-to question keeps its own
+    const withoutCircles = all.reduce((acc, c) => (c?.unnamed !== true && typeof c?.name === 'string' && c.name.trim()
+      ? acc.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${c.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^\\p{L}\\p{N}])`, 'giu'), '$1')
+      : acc), text);
+    const card = asks ? answerHelp(withoutCircles, { lang: lang ?? undefined }) : null;
     return card ? { kind: 'help', card: { cardId: card.source?.cardId ?? null, text: card.text } } : null;
   }
   const to = readers.map(({ circle: c }) => ({ circleId: c.id, name: c.name ?? '' }));

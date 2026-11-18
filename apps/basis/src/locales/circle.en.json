@@ -1615,6 +1615,14 @@
       "text": "Nothing found.",
       "doc": "The \"+\": a read it ran (one the model picked) answered no items and carries no name to say it by."
     },
+    "plus_model_refused": {
+      "text": "Your own model refuses the question (your key or your credit?). Your setting: {{path}}. The fixed phrases and the buttons still work.",
+      "doc": "The \"+\": the person's OWN model refused the call (their key, their credit, a 4xx); {{path}} is the way to their model setting. Never \"the admin knows\": it is their own route."
+    },
+    "plus_model_slow": {
+      "text": "Your own model is too slow to answer in time right now. Try again in a moment; the fixed phrases and the buttons still work.",
+      "doc": "The \"+\": the person's own model did not answer in time (a timeout, after the retries)."
+    },
     "plus_model_unreachable": {
       "text": "Your own model cannot be reached right now. Try again later; the fixed phrases and the buttons still work.",
       "doc": "The \"+\": the person's own model is set but could not be reached for this line."
@@ -3607,9 +3615,25 @@
       "text": "{{label}} · {{count}}",
       "doc": "A Nearby tab's name with how many things arrived since the person last looked at that tab; only when there is at least one."
     },
+    "ask_hidden": {
+      "text": "You are hidden. A question tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person sends a question: the controller refuses it, because it would tell the room someone is there."
+    },
+    "card_hidden": {
+      "text": "You are hidden. Your card tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person shows their card: the controller refuses it, because it would tell the room someone is there."
+    },
+    "invite_hidden": {
+      "text": "You are hidden. Offering a circle tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person offers a circle here: the controller refuses it, for the same reason."
+    },
     "chat_hidden_line": {
       "text": "You are hidden. Become visible to join the conversation.",
       "doc": "The Conversation tab while the person is hidden from the room: no stream, this line and the way to become visible."
+    },
+    "ask_hidden_line": {
+      "text": "You are hidden. Become visible to ask something.",
+      "doc": "The Questions tab while the person is hidden from the room: no ask box, this line and the way to become visible."
     },
     "chat_hidden_action": {
       "text": "Become visible",

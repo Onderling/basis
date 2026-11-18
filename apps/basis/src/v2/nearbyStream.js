@@ -14,13 +14,9 @@
  * Not in the room chat, or hidden from the room (`nearbyChatOff`): no stream — the tab says why, and the way out.
  */
 
-import { nearbyVisibilityKey } from './nearbyScreen.js';
+import { nearbyIsHidden } from './nearbyScreen.js';
 
 const list = (v) => (Array.isArray(v) ? v : []);
-
-/** The visibility states in which the person is not seen by the room: they have no conversation there. A line said
- *  while hidden would still go to everyone this device sees, from an address nobody here can see. */
-const HIDDEN = Object.freeze(['hidden', 'not_chosen', 'radio_off']);
 
 /**
  * Why the Conversation tab shows no stream, or null when it does. Hidden comes first: joining the chat would not
@@ -32,10 +28,24 @@ const HIDDEN = Object.freeze(['hidden', 'not_chosen', 'radio_off']);
  */
 export function nearbyChatOff(model) {
   const m = model && typeof model === 'object' ? model : {};
-  if (HIDDEN.includes(nearbyVisibilityKey(m.visibility))) {
-    return { reason: 'hidden', act: m.radioOff === true || m.visibility?.radioOff === true ? 'radio-on' : m.quiet === true ? 'unquiet' : null };
-  }
-  return Array.isArray(m.chat) ? null : { reason: 'not-joined', act: 'join' };
+  return nearbyHiddenOff(m) ?? (Array.isArray(m.chat) ? null : { reason: 'not-joined', act: 'join' });
+}
+
+/**
+ * Why the Questions tab shows no ask composer, or null when it does: only being hidden — a question would tell the
+ * room someone is here, and the controller refuses it (`askRoom`), so the person is not let type one first.
+ * @param {object|null} model
+ * @returns {null | { reason: 'hidden', act: 'radio-on'|'unquiet'|null }}
+ */
+export function nearbyAskOff(model) {
+  return nearbyHiddenOff(model && typeof model === 'object' ? model : {});
+}
+
+/** Hidden, and the existing act that ends it: the radio switch, leaving "even stil", or none (no level chosen yet:
+ *  the first-use question is the way). */
+function nearbyHiddenOff(m) {
+  if (!nearbyIsHidden(m.visibility)) return null;
+  return { reason: 'hidden', act: m.radioOff === true || m.visibility?.radioOff === true ? 'radio-on' : m.quiet === true ? 'unquiet' : null };
 }
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
@@ -89,4 +99,21 @@ export function nearbyTabNews(model, seen = {}) {
     latest[tab] = ats.reduce((mx, at) => Math.max(mx, at), since);
   }
   return { counts, latest };
+}
+
+/**
+ * What the "you here" row says the person shows the room, as locale keys: the card, the conversation. While hidden the
+ * room is shown nothing (the controller refuses the card and the line), so it says so, whatever is switched on.
+ * @param {object|null} model
+ * @returns {string[]}
+ */
+export function nearbyMineSummary(model) {
+  const m = model && typeof model === 'object' ? model : {};
+  const allows = m.allows ?? {};
+  const keys = [];
+  if (!nearbyIsHidden(m.visibility)) {
+    if (allows.card) keys.push('circle.nearbyScreen.mine_card_on');
+    if (allows.chat) keys.push('circle.nearbyScreen.mine_chat_on');
+  }
+  return keys.length ? keys : ['circle.nearbyScreen.mine_none'];
 }

@@ -15,7 +15,12 @@ assistant-thread build.
   the day and time read; "zet melk op Vakantie" adds to an own list at once; "wat heb ik (morgen) gepland?" and
   "mijn agenda" say the appointments. Nothing the model proposes happens without a yes: a form's Save, or Bevestigen
   on the card that names the act.
+- Say something that belongs in a circle: a line two places can take gets a card naming the act and the places, and
+  nothing runs before the pick; an own act the model proposes gets a card naming it, run only on Bevestigen.
+- Be answered in the language of the line they wrote, whatever language the turns before were in.
 - Type "/" for the same acts the buttons and the model have; picking one opens the same form.
+- Hear why the model did not answer: their own model refused (their key or credit, with where the setting is), was too
+  slow, or could not be reached; the fixed phrases and buttons still work.
 - Follow up on the previous turn ("zet dat morgen om 10 in mijn agenda"); refuse a proposal by closing its form, and
   the thread says it was not saved.
 - See at the top which model answers and whether it is confidential; with no model set, learn what works without

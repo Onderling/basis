@@ -646,3 +646,41 @@ describe('hidden from the room: Conversation shows no stream, one line and the w
     expect(el.querySelector('.circle-nearby__chat-visible')).toBeNull();
   });
 });
+
+describe('the "you here" row and being hidden (nearbyMineSummary)', () => {
+  const summary = (el) => el.querySelector('.circle-nearby__mine-summary').textContent;
+  it('in the chat and visible: it says so', () => {
+    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: true } }));
+    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_chat_on');
+  });
+  it('in the chat but hidden: it does not say you are in the conversation', () => {
+    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: false, levelChosen: true }, quiet: true }));
+    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_none');
+  });
+});
+
+describe('hidden: Questions shows no ask composer (nearbyAskOff)', () => {
+  const hiddenRoom = (over = {}) => model({ visibility: { publishing: false, levelChosen: true }, quiet: true, radioOff: false, ...over });
+  it('the hidden line and "become visible" in place of the composer; the button leaves quiet', () => {
+    const onSetQuiet = vi.fn();
+    const el = render(hiddenRoom(), { onSetQuiet });
+    expect(el.querySelector('[data-section="nearby-ask-field"]')).toBeNull();
+    expect(el.querySelector('.circle-nearby__ask-compose')).toBeNull();
+    const off = el.querySelector('[data-section="nearby-ask-off"]');
+    expect(off.querySelector('.circle-nearby__ask-off-line').textContent).toBe('circle.nearbyScreen.ask_hidden_line');
+    off.querySelector('.circle-nearby__ask-visible').click();
+    expect(onSetQuiet).toHaveBeenCalledWith(false);
+  });
+  it('a refusal\'s notice stays in view there', () => {
+    const el = render(hiddenRoom(), { notice: { key: 'card_hidden' } });
+    expect(el.querySelector('[data-section="nearby-ask-off"] .circle-nearby__notice').dataset.notice).toBe('card_hidden');
+  });
+  it('no host act: the line without a dead button', () => {
+    const el = render(hiddenRoom());
+    expect(el.querySelector('.circle-nearby__ask-visible')).toBeNull();
+  });
+  it('the "you here" row says nothing is shown, though the card is switched on', () => {
+    const el = render(hiddenRoom({ allows: { card: true, chat: true }, chat: [] }));
+    expect(el.querySelector('.circle-nearby__mine-summary').textContent).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_none');
+  });
+});

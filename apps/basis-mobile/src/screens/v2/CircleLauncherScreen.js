@@ -31,7 +31,7 @@ import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyAsk
 import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../basis/src/v2/nearbyLevel.js';
 import { nearbyTabs } from '../../../../basis/src/v2/nearbyTabs.js';
-import { nearbyStream, nearbyTabNews } from '../../../../basis/src/v2/nearbyStream.js';
+import { nearbyStream, nearbyTabNews, nearbyMineSummary } from '../../../../basis/src/v2/nearbyStream.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -5929,7 +5929,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     // Names the REAL reach — "asked 3 of 5 nearby" — rather than implying the whole room heard it; the
     // line then follows the receipts ("heard by 2 of 5") as they come in.
     lastAsk.current = r.ok ? { id: r.ask?.id ?? null, peers: r.peers } : null;
-    setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+    // a refusal the controller can name (hidden from the room) says so; any other says the ask lapsed
+    setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' });
   }, [screen]);
   useEffect(() => {
     const sub = bundle?.nearbyRoom?.subscribeToHeard;
@@ -5958,10 +5959,13 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   const submitCard = useCallback(async (fields) => {
     const r = await screen.showCard(fields);
     // Names the real reach, like an ask — "shown to 3 of 5" rather than "saved".
-    setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+    setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' });
   }, [screen]);
 
-  const say = useCallback((text) => { screen.say(text); }, [screen]);
+  const say = useCallback(async (text) => {
+    const r = await screen.say(text);
+    if (r?.notice) setNotice({ key: r.notice });   // refused while hidden: say why
+  }, [screen]);
 
   // Joining a broadcast invite runs the SAME join as a scanned QR — the host hands the uri to the existing
   // wizard rather than to anything new, which is the point of step H.
@@ -6038,7 +6042,7 @@ function NearbyScreen({
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   // Nearby's two tabs: what each holds and in what order, and which opens first, is `nearbyTabs` (shared with web);
   // a part with nothing in it is not in its list. Which tab is selected is this screen's own state.
-  const { tabs, defaultTab, chatOff } = nearbyTabs(model);
+  const { tabs, defaultTab, chatOff, askOff } = nearbyTabs(model);
   const [pickedTab, setPickedTab] = useState(null);
   const selectedTab = tabs.some((x) => x.id === pickedTab) ? pickedTab : defaultTab;
   // What is new on each tab (`nearbyTabNews`, shared with web). The seen-marks are this screen's own state: the open
@@ -6156,6 +6160,26 @@ function NearbyScreen({
         ) : null}
       </View>
     ),
+    'nearby-ask-off': () => {
+      // Hidden from the room (`nearbyAskOff`, shared with web): no composer to type a whole question into and then be
+      // refused; the hidden line and the same way to become visible as Conversation. The last notice stays in view.
+      const act = { unquiet: () => onSetQuiet?.(false), 'radio-on': () => onSetRadio?.('on') }[askOff?.act];
+      return (
+        <View style={styles.nearbyAsks} testID="nearby-ask-off">
+          <Text style={styles.muted}>{t('circle.nearbyScreen.ask_hidden_line')}</Text>
+          {act ? (
+            <Pressable onPress={act} accessibilityRole="button" testID="nearby-ask-visible" style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_hidden_action')}</Text>
+            </Pressable>
+          ) : null}
+          {notice ? (
+            <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
+              {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
+            </Text>
+          ) : null}
+        </View>
+      );
+    },
     'nearby-ask-field': () => (
       <View style={styles.nearbyAsks} testID="nearby-ask-field">
         {composing || answering ? (
@@ -6354,7 +6378,8 @@ function NearbyScreen({
         <Text style={styles.ownProfileTitle}>
           {t('circle.nearbyScreen.mine_title')}
           {' · '}
-          {[allows.card ? t('circle.nearbyScreen.mine_card_on') : null, allows.chat ? t('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean).join(' · ') || t('circle.nearbyScreen.mine_none')}
+          {/* what the person shows the room (`nearbyMineSummary`): never "in the conversation" while hidden */}
+          {nearbyMineSummary(model).map((k) => t(k)).join(' · ')}
         </Text>
       </Pressable>
       {mineOpen ? (<>

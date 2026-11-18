@@ -36,7 +36,7 @@ import { ASK_MAX_TEXT } from '../../src/v2/nearbyAsks.js';
 import { CARD_MAX_LABEL, CARD_MAX_LINE, CHAT_MAX_TEXT } from '../../src/v2/nearbyRoom.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { nearbyTabs } from '../../src/v2/nearbyTabs.js';
-import { nearbyStream, nearbyTabNews } from '../../src/v2/nearbyStream.js';
+import { nearbyStream, nearbyTabNews, nearbyMineSummary } from '../../src/v2/nearbyStream.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -165,12 +165,13 @@ export function renderCircleNearby(container, {
     'nearby-chat': paintChat,
     'nearby-chat-off': paintChatOff,
     'nearby-ask-field': paintAskField,
+    'nearby-ask-off': paintAskOff,
     'nearby-my-asks': paintMyAsks,
     'nearby-asks': paintAsks,
     'nearby-peers': paintPeers,
     'nearby-invites': paintInvites,
   };
-  const { tabs, defaultTab, chatOff } = nearbyTabs(safeModel);
+  const { tabs, defaultTab, chatOff, askOff } = nearbyTabs(safeModel);
   const kept = container.dataset.nearbyTab;
   let selected = tabs.some((x) => x.id === kept) ? kept : defaultTab;
   // What is new on each tab (`nearbyTabNews`). The seen-marks are paint state, on the container like the picked tab:
@@ -263,6 +264,39 @@ export function renderCircleNearby(container, {
       btn.addEventListener('click', () => act?.());
       el.appendChild(btn);
     }
+    return el;
+  }
+
+  function paintAskOff() {
+    // Hidden from the room (`nearbyAskOff`): no composer to type a whole question into and then be refused; the hidden
+    // line and the same way to become visible as the Conversation tab. The last action's notice stays in view.
+    const el = document.createElement('div');
+    el.className = 'circle-nearby__ask-off';
+    const line = document.createElement('div');
+    line.className = 'circle-nearby__ask-off-line';
+    line.textContent = tr('circle.nearbyScreen.ask_hidden_line');
+    el.appendChild(line);
+    const act = { unquiet: typeof onSetQuiet === 'function' ? () => onSetQuiet(false) : null,
+      'radio-on': typeof onSetRadio === 'function' ? () => onSetRadio('on') : null }[askOff?.act];
+    if (act) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cc-btn cc-btn--quiet circle-nearby__ask-visible';
+      btn.dataset.act = askOff.act;
+      btn.textContent = tr('circle.nearbyScreen.chat_hidden_action');
+      btn.addEventListener('click', act);
+      el.appendChild(btn);
+    }
+    if (notice) el.appendChild(paintNotice());
+    return el;
+  }
+
+  function paintNotice() {
+    const el = document.createElement('div');
+    el.className = 'circle-nearby__notice';
+    el.dataset.notice = notice.key;
+    el.setAttribute('role', 'status');
+    el.textContent = tr(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {});
     return el;
   }
 
@@ -369,14 +403,7 @@ export function renderCircleNearby(container, {
     }
 
     // Result of the last action — the real reach of a broadcast, or that an answer just made me visible.
-    if (notice) {
-      const el = document.createElement('div');
-      el.className = 'circle-nearby__notice';
-      el.dataset.notice = notice.key;
-      el.setAttribute('role', 'status');
-      el.textContent = tr(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {});
-      block.appendChild(el);
-    }
+    if (notice) block.appendChild(paintNotice());
     return block;
   }
 
@@ -663,8 +690,8 @@ export function renderCircleNearby(container, {
     try { if (!localStorage.getItem('basis.nearbyMineSeen')) { mine.open = true; localStorage.setItem('basis.nearbyMineSeen', '1'); } } catch { /* folded */ }
     const mineSummary = document.createElement('summary');
     mineSummary.className = 'circle-nearby__mine-summary';
-    const mineChips = [allows.card ? tr('circle.nearbyScreen.mine_card_on') : null, allows.chat ? tr('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean);
-    mineSummary.textContent = `${tr('circle.nearbyScreen.mine_title')} · ${mineChips.length ? mineChips.join(' · ') : tr('circle.nearbyScreen.mine_none')}`;
+    // what the person shows the room (`nearbyMineSummary`): never "in the conversation" while hidden
+    mineSummary.textContent = [tr('circle.nearbyScreen.mine_title'), ...nearbyMineSummary(safeModel).map((k) => tr(k))].join(' · ');
     mine.appendChild(mineSummary);
     // WHO ENTERS THE ROOM: the switcher's self (or the one question when several are ticked) — a label, said as one
     if (roomSelf?.view) {

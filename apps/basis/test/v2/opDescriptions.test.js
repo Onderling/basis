@@ -20,6 +20,10 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it('folio: described, where a file stays said in the sentence', () => {
+    expect(opWhat('folio', 'deleteFromPod', 'nl')).toBe('Haal een bestand weg van je pod; op dit apparaat blijft het.');
+    expect(opDescription('folio', 'searchNotes', 'en').params.mode).toBe('by words or by meaning');
+  });
   it('agents: described, a persona by the word the app already uses', () => {
     expect(opWhat('agents', 'revokeAgent', 'nl')).toBe('Zet een agent uit: al zijn rechten vervallen.');
     expect(opDescription('agents', 'getPersonaRelease', 'en').params.id).toBe('which persona');

@@ -16,6 +16,8 @@ import listsEn from '../../../lists/descriptions.en.json' with { type: 'json' };
 import listsNl from '../../../lists/descriptions.nl.json' with { type: 'json' };
 import householdEn from '../../../household/descriptions.en.json' with { type: 'json' };
 import householdNl from '../../../household/descriptions.nl.json' with { type: 'json' };
+import folioEn from '../../../folio/descriptions.en.json' with { type: 'json' };
+import folioNl from '../../../folio/descriptions.nl.json' with { type: 'json' };
 import calendarEn from '../../../calendar/descriptions.en.json' with { type: 'json' };
 import calendarNl from '../../../calendar/descriptions.nl.json' with { type: 'json' };
 import tasksEn from '../../../tasks-v0/descriptions.en.json' with { type: 'json' };
@@ -27,6 +29,7 @@ import agentsNl from '../../../agents/descriptions.nl.json' with { type: 'json' 
 export const OP_DESCRIPTIONS = Object.freeze({
   lists: { en: listsEn, nl: listsNl },
   household: { en: householdEn, nl: householdNl },
+  folio: { en: folioEn, nl: folioNl },
   calendar: { en: calendarEn, nl: calendarNl },
   tasks: { en: tasksEn, nl: tasksNl },
   agents: { en: agentsEn, nl: agentsNl },

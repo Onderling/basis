@@ -193,6 +193,30 @@ Where a writing op writes — the value set of an op's `writes: { scope }` decla
   • `circle` — the circle's shared store or log, which syncs to the circle's other members.
 Not the same axis as a setting's or a param's `scope` (who a SETTING applies to).
 
+### `CIRCLE_ARG_NAMES`
+
+**Kind:** constant · **Import:** `CIRCLE_ARG_NAMES` from `'@onderling/app-manifest'`
+
+The names an op's parameters give the circle it is about: `groupId` (the older name, most ops) and `circleId`. One
+reading of them, so a caller that wants an op's circle (the person's own-act record, a peer clean-up) does not spell
+the pair out again; `circleId` first when both are given.
+
+### `circleArg`
+
+**Kind:** function · **Import:** `circleArg` from `'@onderling/app-manifest'`
+
+```js
+circleArg(args)
+```
+
+The circle an op's args name, or null.
+
+**Parameters**
+
+- `args` `object|null`
+
+**Returns:** `string|null`
+
 ## `src/capabilities.js`
 
 ### `opNouns`

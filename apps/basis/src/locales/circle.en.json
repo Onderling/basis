@@ -10596,6 +10596,14 @@
         "text": "How long a conversation in the room stays on this device (days)",
         "doc": "A setting's label (projected from the parameter register)."
       },
+      "ownActions_record": {
+        "text": "Keep a record of what you do in the app",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "ownActions_keepWeeks": {
+        "text": "Kept for (weeks; 0 = always)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
       "notify_windowDays": {
         "text": "How long something new stays in your news (days)",
         "doc": "A setting's label (projected from the parameter register)."

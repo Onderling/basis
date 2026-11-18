@@ -53,6 +53,9 @@ export {
   // Who writes a noun's items (`nouns[noun].writtenBy`): people only — no model tool, maker-or-admin to change.
   NOUN_WRITERS,
   isPeopleWritten,
+  // The circle an op is about, read from its args by the names the manifests give it (`circleId`, `groupId`).
+  CIRCLE_ARG_NAMES,
+  circleArg,
 } from './atoms.js';
 
 // B · (ruling) — read helpers over manifest.settings (the wizard/form layer).

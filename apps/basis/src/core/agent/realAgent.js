@@ -118,6 +118,7 @@ import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPee
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
+import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY } from '../../ownActions.js';   // the person's own acts, at the outer waist
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -332,7 +333,7 @@ import { opDeclared, allManifests } from '../../v2/manifestSources.js';         
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
-import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
+import { isGenericOpId, decodeGenericOpId, isPeopleWritten, circleArg } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 import { makeIsKnownPeer, rosterRowNaming } from '../../v2/knownPeer.js';
 import { parseUntrustedJson } from '@onderling/core';
@@ -436,7 +437,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the identity is up, below), else the legacy bucket.
   let homeCircleId = 'household';
   function resolveCircleId(args) {
-    return (args?.circleId ?? args?.circleId ?? args?.groupId ?? getActiveHouseholdCircleId()) || homeCircleId;
+    return (circleArg(args) ?? getActiveHouseholdCircleId()) || homeCircleId;
   }
   // cluster L · L3 — household is now the UNIFORM wired path by DEFAULT (the legacy agent is retired).
   // Household ops route to the dissolved pure cores (`v2/householdApp.js`) over the per-circle
@@ -3680,7 +3681,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const w = personas.get(args.persona)?.chatId?.pubKey ?? null;
       if (w) return { actAs: w };
     }
-    const c = args?.groupId ?? args?.circleId ?? null;
+    const c = circleArg(args);
     if (typeof c !== 'string' || !c) return {};
     let as = null;
     try { as = circleSelf(c).sendAs ?? null; } catch { as = null; }   // (circleSelf is bound further down; early boot reads none)
@@ -7946,6 +7947,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // The transport mode applies LIVE too — the register is the one home, this hook the one
       // application point (shells and builtins just set-param).
       // the kept Nearby conversations' window applies LIVE (a shortened one drops at once)
+      // the person's own acts: their window applies LIVE too (a shortened one drops at once)
+      if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === OWN_KEEP_WEEKS_KEY) {
+        try { opts.deviceLog?.setRetention?.({ own: ownRetentionMs(args.value) }); } catch { /* the register still holds the value */ }
+      }
       if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === KEEP_DAYS_KEY) {
         try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(args.value) }); } catch { /* the register still holds the value */ }
       }
@@ -8949,7 +8954,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // no-op so existing tests keep their behaviour.
       if (opId === 'claimTask' && typeof claimRouterRef.hook === 'function') {
         // the call's own args (handed in: this adapter is not inside the call's scope)
-        const circleId = args?.circleId ?? args?.groupId ?? null;
+        const circleId = circleArg(args);
         if (circleId) {
           Promise.resolve(claimRouterRef.hook({ task, circleId, args }))
             .catch((err) => publishEvent?.({
@@ -9579,7 +9584,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // above; when invoked for real, friendly text.
     if (opId === 'leaveGroup' && data.ok) {
       // Forget the left circle's no-pod sync peers (stops stale-peer boot HI-pings).
-      clearCirclePeers(args?.groupId ?? args?.circleId ?? args?.circleId).catch(() => {});
+      clearCirclePeers(circleArg(args)).catch(() => {});
       return {
         ok: true,
         message: tr('circle.groups.left'),
@@ -9739,6 +9744,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // the kept Nearby conversations' window, as the person set it
   try { opts.deviceLog?.setRetention?.({ room: roomRetentionMs(paramsService.register.valueOf(KEEP_DAYS_KEY)) }); } catch { /* the default stands */ }
+  try { opts.deviceLog?.setRetention?.({ own: ownRetentionMs(paramsService.register.valueOf(OWN_KEEP_WEEKS_KEY)) }); } catch { /* the default stands */ }
 
   // THE A2A SURFACE — the declared ops, projected onto the agent peers can reach (2026-08-19).
   //
@@ -9798,7 +9804,19 @@ export async function createRealHouseholdAgent(opts = {}) {
     // catalogue source of truth for the household surface.  (The mock manifest
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)
     manifest: householdManifest,
-    callSkill,
+    // THE OUTER WAIST: what the shells and the doors reach. The person's own acts are recorded HERE, once per act
+    // (`recordOwnAction`: the owner's writes, and the reads a door says they asked for), never at the inner `callSkill`,
+    // which this agent also calls for itself many times over. The record follows the person's switch.
+    callSkill: async (appOrigin, opId, args, ctx = {}) => {
+      const record = (result, threw) => recordOwnAction({
+        deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
+        app: appOrigin, op: opId, args, ctx, result, threw, manifests: allManifests(),
+      });
+      let result;
+      try { result = await callSkill(appOrigin, opId, args, ctx); } catch (err) { record(null, true); throw err; }
+      record(result, false);
+      return result;
+    },
     // #36 — a consumer's read of a registered param's LIVE value (sync, from the hydrated register), e.g. the
     // retention window. Reads only; writes go through callSkill('params','set-param',…).
     getParamValue: (key) => paramsService.register.valueOf(key),

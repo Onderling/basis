@@ -260,7 +260,7 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
     const dt = act.fields.find((f) => f.kind === 'datetime');
     const tf = act.fields.find((f) => f.kind !== 'datetime');
     if (dt && !values[dt.name] && tf && values[tf.name]) {
-      const m = readDayAndTime(values[tf.name], now ? { now } : {});
+      const m = readDayAndTime(values[tf.name], now ? { now: () => new Date(now) } : {});
       if (m?.day) { values[dt.name] = pickerMoment(m.day, m.time); values[tf.name] = word(m.rest ?? ''); if (!values[tf.name]) delete values[tf.name]; }
     }
     if (Object.keys(values).length) return { actId: act.id, values };
@@ -273,7 +273,7 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
     if (w) { act = a; rest = text.slice(w.length).replace(/^[:\s]+/, ''); break; }
   }
   const timed = (a) => a.fields.some((f) => f.kind === 'datetime');
-  const moment = readDayAndTime(rest, now ? { now } : {});
+  const moment = readDayAndTime(rest, now ? { now: () => new Date(now) } : {});
   // a day alone makes a line an appointment, unless the line ASKS something ("wat is het weer morgen", "…?"): a question
   // is not an act. The question openers are the gate's own (`_help.questions`); an act word above still names its act.
   const asks = /\?\s*$/u.test(text) || helpQuestionOpeners().some((o) => lower.startsWith(o));

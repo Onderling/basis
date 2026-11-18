@@ -60,12 +60,20 @@ const entryFacts = (c) => {
   return { quantity: quantityOf(c), ...(thing ? { ref: thing } : {}) };
 };
 /** A ref and a quantity as the caller gave them: absent is fine; present must be well formed, or the add is refused. */
+/**
+ * What a form sends for a field left alone (an empty string, whitespace, an empty object) is ABSENT, not malformed:
+ * a screen's or a page's form posts every field it painted (development was red on this, 2026-11-18). A whole number a
+ * form sends as text ('3') is that number.
+ */
+const blank = (v) => v === undefined || v === null || (typeof v === 'string' && !v.trim())
+  || (typeof v === 'object' && !Array.isArray(v) && Object.values(v).every((x) => x === undefined || x === null || (typeof x === 'string' && !x.trim())));
+const wholeOf = (v) => (typeof v === 'string' && /^\s*\d+\s*$/.test(v) ? Number(v) : v);
 const readThing = (args) => {
-  const ref = args?.ref;
-  const okRef = ref === undefined || ref === null
+  const ref = blank(args?.ref) ? undefined : args.ref;
+  const okRef = ref === undefined
     || (ref && typeof ref === 'object' && typeof ref.type === 'string' && ref.type.trim() && typeof ref.ref === 'string' && ref.ref.trim());
-  const q = args?.quantity;
-  const okQ = q === undefined || q === null || (Number.isInteger(q) && q >= 1);
+  const q = blank(args?.quantity) ? undefined : wholeOf(args.quantity);
+  const okQ = q === undefined || (Number.isInteger(q) && q >= 1);
   return { ok: Boolean(okRef && okQ), ref: okRef && ref ? { type: ref.type.trim(), ref: ref.ref.trim() } : null, quantity: okQ && Number.isInteger(q) ? q : 1, badRef: !okRef, badQuantity: !okQ };
 };
 
@@ -485,8 +493,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const when = args?.when ? parseDateInput(args.when) : null;
       if (args?.when && !when) return { ok: false, error: t('circle.lists.need_list_and_text') };
       // how many: a whole number of at least one, or absent (the same reading an add makes: `readThing`)
-      const q = args?.quantity;
-      const hasQuantity = q !== undefined && q !== null;
+      const q = blank(args?.quantity) ? undefined : wholeOf(args.quantity);   // a form's empty field is absent (readThing)
+      const hasQuantity = q !== undefined;
       if (hasQuantity && !(Number.isInteger(q) && q >= 1)) return { ok: false, error: t('circle.lists.bad_quantity') };
       if (!text && !when && !hasQuantity) return { ok: false, error: t('circle.lists.need_list_and_text') };
       const at = await locate(args);

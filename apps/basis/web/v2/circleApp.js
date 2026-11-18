@@ -820,7 +820,7 @@ import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
 import { mergeCirclePolicy, mergeMemberOverride, settingsSaveNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
-import { settingsControlsFromManifest, transportsStatusLine } from '../../src/v2/circleSettingsControls.js';
+import { settingsControlsFromManifest, transportsStatusLine, TRANSPORT_MODES } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
 // dispatch as built-ins, not to the bot/LLM).
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
@@ -1725,7 +1725,7 @@ function readTransportMode() {
   return (v === 'nkn' || v === 'relay' || v === 'both') ? v : null;
 }
 function applyTransportMode(mode) {
-  if (!['nkn', 'relay', 'both'].includes(String(mode))) return { ok: false, error: 'bad_mode' };
+  if (!TRANSPORT_MODES.includes(String(mode))) return { ok: false, error: 'bad_mode' };
   // One home, one application point: the kind-gated write; realAgent's set-param hook applies it
   // to the live transport router. Fire-and-forget — the control re-reads the register.
   circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'transport.mode', value: mode })
@@ -4296,9 +4296,10 @@ function showNearby() {
       // Name the REAL reach. "Asked 3 of 5 nearby" is true; "sent" implies the whole room heard it. The
       // line then follows the receipts ("heard by 2 of 5").
       lastAsk = r.ok ? { id: r.ask?.id ?? null, peers: r.peers } : null;
+      // a refusal the controller can name (hidden from the room) says so; any other says the ask lapsed
       notice = r.ok
         ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } }
-        : { key: 'ask_expired' };
+        : { key: r.notice ?? 'ask_expired' };
       draw(nearbyScreen.model());
     },
     onAskAction: handleNearbyAskAction,
@@ -4315,11 +4316,14 @@ function showNearby() {
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);
       // The real reach, like an ask — "shown to 3 of 5" rather than "saved".
-      notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' };
+      notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' };
       draw(nearbyScreen.model());
     },
     onPrefillCard: () => _nearbyIdentity?.cardPrefill?.() ?? Promise.resolve({}),
-    onSay: (text) => { nearbyScreen.say(text); },
+    onSay: async (text) => {
+      const r = await nearbyScreen.say(text);
+      if (r?.notice) { notice = { key: r.notice }; draw(nearbyScreen.model()); }   // refused while hidden: say why
+    },
     onInviteAction: (action, invite) => {
       // A broadcast invite joins through the SAME path as a scanned QR — that is the point of step H: the
       // carrier changed, the object and the gate did not.

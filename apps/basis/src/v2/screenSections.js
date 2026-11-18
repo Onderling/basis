@@ -62,8 +62,9 @@ export const SCREEN_SECTIONS = Object.freeze({
   ]),
   // Nearby's two tabs. Which of these a room shows, and which tab opens first, is `nearbyTabs` (a part with nothing in it
   // is not painted); the shells paint by that list, so both lists are named here and a shell paints every id.
-  // Conversation: the room chat (who and when on each line, the field at the bottom), or — not in it — one line and the
-  // way to join it.
+  // Conversation: the room chat as one stream by arrival (`nearbyStream`: chat lines with who and when, and a card for each
+  // question asked here and each circle offered here; the field at the bottom), or — not in it — one line and the way
+  // to join it.
   nearbyConversation: Object.freeze([
     Object.freeze({ id: 'nearby-chat',     titleKey: null }),
     Object.freeze({ id: 'nearby-chat-off', titleKey: null }),
@@ -72,6 +73,8 @@ export const SCREEN_SECTIONS = Object.freeze({
   // here, and circles offered here.
   nearbyQuestions: Object.freeze([
     Object.freeze({ id: 'nearby-ask-field', titleKey: null }),
+    // hidden from the room: in place of the ask field, one line and the way to become visible
+    Object.freeze({ id: 'nearby-ask-off',   titleKey: null }),
     Object.freeze({ id: 'nearby-my-asks',   titleKey: null }),
     Object.freeze({ id: 'nearby-asks',      titleKey: 'circle.nearbyScreen.asks_title' }),
     Object.freeze({ id: 'nearby-peers',     titleKey: null }),

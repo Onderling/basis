@@ -20,6 +20,10 @@ import folioEn from '../../../folio/descriptions.en.json' with { type: 'json' };
 import folioNl from '../../../folio/descriptions.nl.json' with { type: 'json' };
 import pinboardEn from '../../../pinboard/descriptions.en.json' with { type: 'json' };
 import pinboardNl from '../../../pinboard/descriptions.nl.json' with { type: 'json' };
+import basisEn from '../../descriptions.en.json' with { type: 'json' };
+import basisNl from '../../descriptions.nl.json' with { type: 'json' };
+import assistantEn from './assistantManifest.descriptions.en.json' with { type: 'json' };
+import assistantNl from './assistantManifest.descriptions.nl.json' with { type: 'json' };
 import calendarEn from '../../../calendar/descriptions.en.json' with { type: 'json' };
 import calendarNl from '../../../calendar/descriptions.nl.json' with { type: 'json' };
 import tasksEn from '../../../tasks-v0/descriptions.en.json' with { type: 'json' };
@@ -33,6 +37,8 @@ export const OP_DESCRIPTIONS = Object.freeze({
   household: { en: householdEn, nl: householdNl },
   folio: { en: folioEn, nl: folioNl },
   pinboard: { en: pinboardEn, nl: pinboardNl },
+  basis: { en: basisEn, nl: basisNl },
+  assistant: { en: assistantEn, nl: assistantNl },
   calendar: { en: calendarEn, nl: calendarNl },
   tasks: { en: tasksEn, nl: tasksNl },
   agents: { en: agentsEn, nl: agentsNl },

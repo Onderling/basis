@@ -1,0 +1,174 @@
+{
+  "help": {
+    "what": "Show what you can do.",
+    "params": {}
+  },
+  "help-with": {
+    "what": "Offer help with a pinboard post, in a conversation of its own.",
+    "params": {"postId": "with which post"}
+  },
+  "embed": {
+    "what": "Put a card of an item in the conversation.",
+    "params": {"itemId": "which item", "claim": "and take it on at once", "app": "from which app"}
+  },
+  "embed-file": {
+    "what": "Put a file in the conversation.",
+    "params": {"path": "which file", "pick": "pick it yourself", "name": "the name", "mime": "what kind of file", "share": "who you share it with"}
+  },
+  "personWeekOverview": {
+    "what": "Get an overview of your week, every week.",
+    "params": {"occurrence": "which time"}
+  },
+  "embed-time": {
+    "what": "Make an appointment and put it in the conversation.",
+    "params": {"title": "what", "when": "when", "duration": "how long", "location": "where", "share": "who you share it with"}
+  },
+  "logs": {
+    "what": "Show what happened lately.",
+    "params": {"app": "in which app", "type": "what kind of event", "actor": "by whom", "since": "since when", "mute": "what you do not want to see", "limit": "how many"}
+  },
+  "feedback": {
+    "what": "Open the conversation to give feedback about the app.",
+    "params": {"screen": "about which screen"}
+  },
+  "scanQr": {
+    "what": "Open the camera to scan a code.",
+    "params": {}
+  },
+  "find": {
+    "what": "Search everything the apps keep here.",
+    "params": {"query": "what for"}
+  },
+  "brief": {
+    "what": "Show an overview of the day, from all apps.",
+    "params": {"refresh": "fetch again"}
+  },
+  "signin": {
+    "what": "Sign in to your pod.",
+    "params": {"issuer": "with which provider"}
+  },
+  "whoami": {
+    "what": "Show who you are signed in as.",
+    "params": {}
+  },
+  "me": {
+    "what": "Show this device's key and address.",
+    "params": {}
+  },
+  "send-file": {
+    "what": "Send someone a file.",
+    "params": {"peer": "who"}
+  },
+  "lookup-peer": {
+    "what": "Look up someone's address through their pod.",
+    "params": {"webid": "who"}
+  },
+  "publish-peer": {
+    "what": "Put your address on your pod, so others find you.",
+    "params": {}
+  },
+  "security-status": {
+    "what": "Show whether your messages go signed and encrypted.",
+    "params": {}
+  },
+  "set-relay": {
+    "what": "Choose the connection point, or remove it.",
+    "params": {"url": "the address", "clear": "remove it"}
+  },
+  "transport-mode": {
+    "what": "Choose which way messages to others go.",
+    "params": {"mode": "which way"}
+  },
+  "transports": {
+    "what": "Show which connections work.",
+    "params": {}
+  },
+  "settings": {
+    "what": "Open the settings.",
+    "params": {"lang": "in which language"}
+  },
+  "mute": {
+    "what": "Block someone: nothing comes in or goes out.",
+    "params": {"peer": "who", "label": "what you call them"}
+  },
+  "unmute": {
+    "what": "Remove a block.",
+    "params": {"peer": "who"}
+  },
+  "muted": {
+    "what": "Show who you block.",
+    "params": {}
+  },
+  "debug-dump": {
+    "what": "Make a summary of the state, for a bug report.",
+    "params": {}
+  },
+  "audit-tail": {
+    "what": "Show the latest signed events.",
+    "params": {"n": "how many", "event": "what kind of event"}
+  },
+  "peer-connect": {
+    "what": "Connect to other devices.",
+    "params": {}
+  },
+  "test-peer": {
+    "what": "Send a test message to another device.",
+    "params": {"addr": "to which address", "text": "what it says"}
+  },
+  "signout": {
+    "what": "Sign out.",
+    "params": {}
+  },
+  "screen-add-page": {
+    "what": "Add a page.",
+    "params": {"name": "the name", "circleIds": "which circles"}
+  },
+  "screen-remove-page": {
+    "what": "Remove a page.",
+    "params": {"pageId": "which page"}
+  },
+  "screen-rename-page": {
+    "what": "Give a page another name.",
+    "params": {"pageId": "which page", "name": "the new name"}
+  },
+  "screen-set-active": {
+    "what": "Go to a page.",
+    "params": {"pageId": "which page"}
+  },
+  "screen-set-personas": {
+    "what": "Choose which personas you see now.",
+    "params": {"ids": "which personas"}
+  },
+  "screen-set-circles": {
+    "what": "Choose which circles a page shows.",
+    "params": {"pageId": "which page", "circleIds": "which circles"}
+  },
+  "screen-pin": {
+    "what": "Pin something under the plus.",
+    "params": {"kind": "what kind", "actId": "which act", "circleId": "in which circle", "appOrigin": "from which app", "opId": "which act"}
+  },
+  "screen-unpin": {
+    "what": "Unpin something from the plus.",
+    "params": {"key": "what"}
+  },
+  "screen-add-block": {
+    "what": "Put a block on a page.",
+    "params": {"pageId": "which page", "type": "what kind of block", "config": "how the block is set"}
+  },
+  "screen-remove-block": {
+    "what": "Take a block off a page.",
+    "params": {"pageId": "which page", "blockId": "which block"}
+  },
+  "screen-move-block": {
+    "what": "Move a block on a page.",
+    "params": {"pageId": "which page", "blockId": "which block", "index": "to which place"}
+  },
+  "screen-set-block-config": {
+    "what": "Set a block differently.",
+    "params": {"pageId": "which page", "blockId": "which block", "config": "how the block is set"}
+  },
+  "screen-undo": {
+    "what": "Undo the last change to your pages.",
+    "params": {}
+  }
+}

@@ -20,6 +20,14 @@ describe('the words of an op', () => {
     expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
     expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
+  it("assistant: the household bot's own commands described, meant as its help phrases mean them", () => {
+    expect(opWhat('assistant', 'assistant-forget', 'nl')).toBe('Laat de bot je gesprek nu vergeten; wat je op een lijst zette, blijft.');
+    expect(opDescription('assistant', 'remindMe', 'en').params.rules).toBe('when, for example 60 minutes before or morning');
+  });
+  it('basis: its own commands described, a page and a block by the words the screens use', () => {
+    expect(opWhat('basis', 'screen-undo', 'nl')).toBe('Maak de laatste wijziging aan je pagina\'s ongedaan.');
+    expect(opDescription('basis', 'screen-move-block', 'en').params.pageId).toBe('which page');
+  });
   it('pinboard: described, a shared parameter phrased once (the circle)', () => {
     expect(opWhat('pinboard', 'postRequest', 'nl')).toBe('Zet iets op het prikbord: een vraag, aanbod of iets om uit te lenen.');
     expect(opDescription('pinboard', 'removeMember', 'en').params.groupId).toBe('which circle');

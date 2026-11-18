@@ -6,6 +6,16 @@ before you start bisecting a build or native crash.
 
 ---
 
+## A browser walk that reloads right after an act can read an empty log (the write had not persisted yet)
+
+The device log persists asynchronously (the sealed web backend, IndexedDB). A walk that acts and then calls
+`page.goto('/')` within about a second can reload before the newest entry is on disk, and then reads the log as if
+the act never happened. Cost (2026-11-18, twice in one afternoon): the own-acts record "vanished" after a reload, and
+the "+" said its intro again on the next open. Both looked like product defects; a probe that waited 3 s before the
+reload showed the entry there at every moment after it. Before blaming the product, wait before the reload (a person's
+next open is never that close): `plus-intro.spec.js` has a `reload` helper that does, and `own-actions-mydata.spec.js`
+waits inline. If a reload must be immediate, that is a product question about flushing on unload, not a test fix.
+
 ## A Vite alias pointing at `./node_modules/<pkg>` cannot resolve under a hoisted install
 
 `apps/basis/vite.config.js` aliased the `events` polyfill to a path built with

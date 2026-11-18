@@ -59,4 +59,21 @@ describe('own acts at the outer waist', () => {
     await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 77_000 }, { door: 'tap' });
     expect(own(deviceLog).slice(before)).toEqual([]);
   });
+
+  it('My data reads the record, exports it as one file and wipes it: the wipe takes this kind only', async () => {
+    const deviceLog = new EventLog({ initial: [], muted: [] });
+    const a = await boot(deviceLog);
+    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 55_000 }, { door: 'tap' });
+    await a.callSkill('lists', 'addToList', { circleId: 'thuis', item: 'melk' }, { door: 'phrase' });
+    const rows = a.ownActionRows();
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    const file = JSON.parse(a.exportOwnActions());
+    expect(file).toMatchObject({ format: 'onderling-own-actions', version: 1 });
+    expect(file.rows).toEqual(rows);
+    expect(JSON.stringify(file)).not.toMatch(/melk|55000/);
+    const others = deviceLog.query().filter((e) => e.type !== OWN_ACTION_KIND).length;
+    expect(a.wipeOwnActions()).toBe(rows.length);
+    expect(a.ownActionRows()).toEqual([]);
+    expect(deviceLog.query().filter((e) => e.type !== OWN_ACTION_KIND).length, 'nothing else went').toBe(others);
+  });
 });

@@ -11,6 +11,7 @@
  */
 
 import { renderUserLlmSettings } from './userLlmSettings.js';
+import { ownActionsLines } from '../../src/ownActions.js';   // the record's row: its count and its off line, shared
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
@@ -38,6 +39,9 @@ export function renderCircleMyData(container, {
   onClaimCompanion,
   // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
   frequent = [], onClearFrequent,
+  // the person's own record of what they do in the app (ownActions.js): `{on, count, onToggle, onExport, onWipe}`;
+  // `onWipe()` resolves to how many went. Absent ⇒ the section is omitted.
+  ownActions = null,
   devices = [],
   // this device's id and the browser's name for it: the list says "this device (Firefox on Linux)", never a d-… id
   thisDeviceId = null, deviceName = null,
@@ -650,6 +654,48 @@ export function renderCircleMyData(container, {
         }
         container.appendChild(sec);
       }
+    },
+    'own-actions': () => {
+      // ── the record of what you do in the app (this device only; ledger L203) ─────
+      if (!ownActions) return;
+      const sec = section(tr('circle.params.key.ownActions_record'));
+      const note = document.createElement('p');
+      note.className = 'cc-mydata__note';
+      note.textContent = tr('circle.mydata.own_actions_note');
+      sec.appendChild(note);
+      const btn = (cls, key, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `cc-mydata__action ${cls}`;
+        b.textContent = tr(key);
+        b.addEventListener('click', fn);
+        return b;
+      };
+      sec.appendChild(btn('cc-mydata__own-actions-toggle', ownActions.on ? 'circle.mydata.history_disable' : 'circle.mydata.history_enable', () => ownActions.onToggle?.()));
+      const lines = ownActionsLines({ on: ownActions.on, count: ownActions.count, t: tr });
+      if (lines.off) {
+        const off = document.createElement('p');
+        off.className = 'cc-mydata__note cc-mydata__own-actions-off';
+        off.textContent = lines.off;
+        sec.appendChild(off);
+      }
+      const count = document.createElement('p');
+      count.className = 'cc-mydata__note cc-mydata__own-actions-count';
+      count.textContent = lines.count;
+      sec.appendChild(count);
+      if (ownActions.count) {
+        sec.appendChild(btn('cc-mydata__own-actions-export', 'circle.mydata.own_actions_export', () => ownActions.onExport?.()));
+        // two taps: the first arms it and says it cannot be undone, the second wipes (as the message cleanup does)
+        let armed = false;
+        const wipe = btn('cc-btn--danger cc-mydata__own-actions-wipe', 'circle.mydata.own_actions_wipe', async () => {
+          if (!armed) { armed = true; wipe.textContent = tr('circle.mydata.own_actions_wipe_confirm'); return; }
+          const n = await Promise.resolve(ownActions.onWipe?.()).catch(() => 0);
+          count.textContent = tr('circle.mydata.own_actions_wiped', { n: Number(n) || 0 });
+          wipe.remove();
+        });
+        sec.appendChild(wipe);
+      }
+      container.appendChild(sec);
     },
     'devices': () => {
       // ── enrolled devices (add-a-device) ─────────────────────────────────────────

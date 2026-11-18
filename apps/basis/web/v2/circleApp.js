@@ -181,7 +181,7 @@ import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
 import { trackContactTurn } from '../../src/v2/contactTurnDelivery.js';
 import { createActState, wrapCallSkillWithActState, actStateLine } from '../../src/v2/actState.js';
-import { doorOnly, ownActionRows } from '../../src/ownActions.js';   // the door a turn came through, down to the waist; the record read back
+import { doorOnly, ownActionRows, OWN_RECORD_KEY } from '../../src/ownActions.js';   // the door a turn came through, down to the waist; the record read back
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -5467,6 +5467,26 @@ async function showMyData(opts) {
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showSettingsHome,
     only: group.sections.map((sec) => sec.id), groupTitle: t(group.labelKey),
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
+    // the person's own record (ownActions.js): its switch (the registered param, set through the waist), how much is
+    // kept, a file to save, the wipe — the agent's own methods, as the history export is
+    ownActions: circleHouseholdAgent?.ownActionRows ? {
+      on: circleHouseholdAgent.getParamValue?.(OWN_RECORD_KEY) !== false,
+      count: circleHouseholdAgent.ownActionRows().length,
+      onToggle: async () => {
+        const on = circleHouseholdAgent.getParamValue?.(OWN_RECORD_KEY) !== false;
+        try { await rawCallSkill('params', 'set-param', { key: OWN_RECORD_KEY, value: !on }); } catch { /* the row re-reads the truth */ }
+        rerender();
+      },
+      onExport: () => {
+        const url = URL.createObjectURL(new Blob([circleHouseholdAgent.exportOwnActions()], { type: 'application/json' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `onderling-handelingen-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      onWipe: () => circleHouseholdAgent.wipeOwnActions(),
+    } : null,
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,

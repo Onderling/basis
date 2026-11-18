@@ -118,7 +118,7 @@ import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPee
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
-import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY } from '../../ownActions.js';   // the person's own acts, at the outer waist
+import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND } from '../../ownActions.js';   // the person's own acts, at the outer waist
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -9817,6 +9817,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       record(result, false);
       return result;
     },
+    // The person's own record, for My data (ownActions.js): the rows, one file to save, and the wipe (this kind only).
+    ownActionRows: () => ownActionRows(opts.deviceLog),
+    exportOwnActions: () => ownActionsExport(ownActionRows(opts.deviceLog)),
+    wipeOwnActions: () => (typeof opts.deviceLog?.dropKind === 'function' ? opts.deviceLog.dropKind(OWN_ACTION_KIND) : 0),
     // #36 — a consumer's read of a registered param's LIVE value (sync, from the hydrated register), e.g. the
     // retention window. Reads only; writes go through callSkill('params','set-param',…).
     getParamValue: (key) => paramsService.register.valueOf(key),

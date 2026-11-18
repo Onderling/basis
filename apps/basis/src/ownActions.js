@@ -154,3 +154,33 @@ export function ownActionRows(log) {
     .map((e) => ({ ts: e.ts, circleId: e.circleId ?? null, app: e.payload.app, op: e.payload.op, outcome: e.payload.outcome, door: e.payload.door }))
     .sort((a, b) => a.ts - b.ts);
 }
+
+export const OWN_ACTIONS_EXPORT_FORMAT = 'onderling-own-actions';
+export const OWN_ACTIONS_EXPORT_VERSION = 1;
+
+/**
+ * The person's own record as ONE file they save (My data's Export): the rows (`ownActionRows`) and nothing else, with
+ * a format and a version so a later version can still read it. Never the words: the rows carry none.
+ * @param {object[]} rows @param {{now?: () => number}} [o]
+ * @returns {string} JSON
+ */
+export function ownActionsExport(rows, { now = Date.now } = {}) {
+  return JSON.stringify({
+    format: OWN_ACTIONS_EXPORT_FORMAT, version: OWN_ACTIONS_EXPORT_VERSION, exportedAt: now(),
+    rows: Array.isArray(rows) ? rows : [],
+  }, null, 2);
+}
+
+/**
+ * The words of the record's row under My data, for both shells: how much is kept (one and more read apart), and, when
+ * the switch is off, that nothing is being recorded (what is kept stays, with its count and its Export).
+ * @param {{on?: boolean, count?: number, t: Function}} o
+ * @returns {{count: string, off: string|null}}
+ */
+export function ownActionsLines({ on = true, count = 0, t } = {}) {
+  const n = Number(count) || 0;
+  const countLine = n === 0 ? t('circle.mydata.own_actions_none')
+    : n === 1 ? t('circle.mydata.own_actions_count_one') : t('circle.mydata.own_actions_count_n', { count: n });
+  return { count: countLine, off: on === false ? t('circle.mydata.own_actions_off') : null };
+}
+

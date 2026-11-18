@@ -38,7 +38,7 @@ function within(ms, promise) {
  * @param {{fetch?: Function, timeoutMs?: number}} [o]
  * @returns {Promise<{ok: true, name: string, endpoint: string, tools: Array<{id: string, name: string, description: string}>}|{ok: false, code: string}>}
  */
-export async function readToolboxCard(baseUrl, { fetch = globalThis.fetch, timeoutMs = TOOL_CALL_TIMEOUT.default } = {}) {
+export async function readToolboxCard(baseUrl, { fetch = globalThis.fetch, timeoutMs = TOOL_CALL_TIMEOUT } = {}) {
   const r = await within(timeoutMs, Promise.resolve().then(() => fetch(`${trimSlash(baseUrl)}${CARD_PATH}`, { method: 'GET', headers: { Accept: 'application/json' } })));
   if (r.timedOut) return { ok: false, code: 'toolbox-timeout' };
   if (r.error || !r.value?.ok) return { ok: false, code: 'toolbox-unreachable' };
@@ -63,7 +63,7 @@ export async function readToolboxCard(baseUrl, { fetch = globalThis.fetch, timeo
  * @param {Function} [a.fetch] @param {number} [a.timeoutMs]
  * @returns {Promise<{ok: true, output: unknown}|{ok: false, code: string, toolCode?: string}>}
  */
-export async function callTool({ endpoint, key, tool, input = {}, fetch = globalThis.fetch, timeoutMs = TOOL_CALL_TIMEOUT.default }) {
+export async function callTool({ endpoint, key, tool, input = {}, fetch = globalThis.fetch, timeoutMs = TOOL_CALL_TIMEOUT }) {
   const body = {
     jsonrpc: '2.0', id: 1, method: 'SendMessage',
     params: { message: { messageId: messageId(), role: 'ROLE_USER', parts: [{ data: { operation: tool, input: input ?? {} } }] } },

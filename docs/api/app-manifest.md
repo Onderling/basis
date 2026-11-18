@@ -224,10 +224,20 @@ The circle an op's args name, or null.
 **Kind:** function · **Import:** `opNouns` from `'@onderling/app-manifest'`
 
 ```js
-opNouns(op, itemTypes = [])
+opNouns(op, itemTypes = [], declaredNouns = null)
 ```
 
 The noun types an op names — via appliesTo.type (string|array|'*') and/or a type-enum param.
+
+### `declaredNounsOf`
+
+**Kind:** function · **Import:** `declaredNounsOf` from `'@onderling/app-manifest'`
+
+```js
+declaredNounsOf(manifest)
+```
+
+The nouns a manifest declares (`manifest.nouns`' keys), or null when it declares none.
 
 ### `capabilityKey`
 

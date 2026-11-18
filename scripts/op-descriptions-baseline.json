@@ -8,9 +8,7 @@
     "membership",
     "params"
   ],
-  "nounsOwed": [
-    "pinboard.lend"
-  ],
+  "nounsOwed": [],
   "helpPhrases": [
     "assistant.assistant-agenda-link",
     "assistant.assistant-circle",

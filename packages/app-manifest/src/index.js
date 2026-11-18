@@ -77,6 +77,7 @@ export {
   resolveCapability,
   atomsForNoun,
   opNouns,
+  declaredNounsOf,
   capabilityKey,
 } from './capabilities.js';
 // §1b — the synthetic op-id codec for GENERIC (op-less) capabilities (catalogue synth ⇄ dispatch decode).

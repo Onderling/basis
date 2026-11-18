@@ -59,18 +59,19 @@ describe('createPinboardService — callCapability atom-dispatch over the real s
     expect(claimed).toMatchObject({ ok: true, via: 'op', opId: 'respondToItem' });
     expect(claimed.result).toMatchObject({ error: 'chat-not-wired' });    // real handler, no chat controller
 
-    // lend — reassign·offer → assignLend. The ATOM addresses `offer`, because that is the noun; a
-    // lend is a KIND of offer, and the capability layer resolves ops by noun alone. The op's own
-    // guard is what keeps it honest — `assignLend` refuses an offer that is not a lend.
+    // lend — reassign·lend → assignLend. A lend is a KIND of offer, and the manifest declares `lend` as a noun of its
+    // own, so the kind is the op's noun (L1040: the lend rows gate the lend ops); `offer` has no reassign row. The op's
+    // own guard still refuses an offer that is not a lend.
     const lendA = await seedLend(svc, 'a ladder');
-    const reassigned = await svc.callCapability('reassign', 'offer', { itemId: lendA.id, borrowerWebid: 'webid:bob' }, c);
+    expect((await svc.callCapability('reassign', 'offer', { itemId: lendA.id, borrowerWebid: 'webid:bob' }, c)).ok).toBe(false);
+    const reassigned = await svc.callCapability('reassign', 'lend', { itemId: lendA.id, borrowerWebid: 'webid:bob' }, c);
     expect(reassigned).toMatchObject({ ok: true, via: 'op', opId: 'assignLend' });
     expect(reassigned.result.error).toBeUndefined();
     expect(reassigned.result.item).toBeTruthy();
 
-    // lend — complete·offer → markReturned, same reasoning as above.
+    // lend — complete·lend → markReturned, same reasoning as above.
     const lendB = await seedLend(svc, 'a hedge trimmer');
-    const returned = await svc.callCapability('complete', 'offer', { requestId: lendB.id }, c);
+    const returned = await svc.callCapability('complete', 'lend', { requestId: lendB.id }, c);
     expect(returned).toMatchObject({ ok: true, via: 'op', opId: 'markReturned' });
     expect(returned.result.item.completedAt).toBeTruthy();
 

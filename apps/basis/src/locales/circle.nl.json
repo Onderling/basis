@@ -3700,6 +3700,66 @@
       "text": "Je doet niet mee aan dit gesprek.",
       "doc": "State when the chat allow is off. Distinct from \"nobody has said anything\"."
     },
+    "menu_title": {
+      "text": "In de buurt instellen",
+      "doc": "The gear menu's title on Nearby; also the gear button's accessible name."
+    },
+    "menu_close": {
+      "text": "Sluiten",
+      "doc": "The gear menu's close button (its accessible name)."
+    },
+    "menu_here": {
+      "text": "Hoe je hier bent",
+      "doc": "The gear menu's first group: the three ways to be in the Nearby room."
+    },
+    "here_visible": {
+      "text": "Zichtbaar",
+      "doc": "Gear menu, how you are here: the room sees you."
+    },
+    "here_visible_body": {
+      "text": "Mensen hier zien je naam en kaartje.",
+      "doc": "Under 'Visible' in the gear menu."
+    },
+    "here_quiet": {
+      "text": "Even stil",
+      "doc": "Gear menu, how you are here: see the room without being seen, for this visit only."
+    },
+    "here_quiet_body": {
+      "text": "Jij ziet wie er is, zij zien jou niet. Alleen deze keer.",
+      "doc": "Under 'Quiet for now' in the gear menu."
+    },
+    "here_off": {
+      "text": "Helemaal uit",
+      "doc": "Gear menu, how you are here: the radio off, nothing searched or announced."
+    },
+    "here_off_body": {
+      "text": "Er wordt niets gezocht en niets aangekondigd.",
+      "doc": "Under 'Fully off' in the gear menu."
+    },
+    "menu_show": {
+      "text": "Wat je laat zien",
+      "doc": "The gear menu's second group."
+    },
+    "menu_appear_as": {
+      "text": "Je verschijnt als {{name}}",
+      "doc": "Gear menu row: the self this device enters the room as ({{name}})."
+    },
+    "menu_change": {
+      "text": "Wijzig",
+      "doc": "The button on the 'You appear as' row: opens who you enter as and what the room sees of you."
+    },
+    "menu_card": {
+      "text": "Mijn kaartje en wat ik aanbied",
+      "doc": "Gear menu row: opens the card editor and what you offer."
+    },
+    "menu_chat_off": {
+      "text": "Je ziet het gesprek niet en niemand kan je daar iets zeggen.",
+      "doc": "Under the chat switch in the gear menu while it is off."
+    },
+    "menu_intro_again": {
+      "text": "De uitleg van In de buurt nog eens lezen",
+      "doc": "The gear menu's last line."
+    },
     "card_title": {
       "text": "Jouw kaartje",
       "doc": "Heading of the card composer."

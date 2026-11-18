@@ -28,6 +28,7 @@ const MODS = {
   painter: fsUrl('../web/v2/circleNearby.js'),
   alpha: fsUrl('../src/v2/alphaSurface.js'),
   loc: fsUrl('../src/localisation.js'),
+  menu: fsUrl('../src/v2/nearbyMenu.js'),
 };
 const ready = async (page) => {
   await expect.poll(() => page.evaluate(() => typeof window.onderlingCall === 'function'), { timeout: 60_000 }).toBe(true);
@@ -40,8 +41,8 @@ const ready = async (page) => {
  *  controller's own `setQuiet` really makes the person hidden. */
 async function openNearby(page, { fill, chat = fill }) {
   return page.evaluate(async ([mods, full, inChat]) => {
-    const [{ createNearbyScreen }, { renderCircleNearby }, { isAlphaTab }, loc] = await Promise.all(
-      [mods.screen, mods.painter, mods.alpha, mods.loc].map((u) => import(u)));
+    const [{ createNearbyScreen }, { renderCircleNearby }, { isAlphaTab }, loc, { nearbyHereChoose }] = await Promise.all(
+      [mods.screen, mods.painter, mods.alpha, mods.loc, mods.menu].map((u) => import(u)));
     await loc.setLang('nl');
     const root = document.getElementById('circle-root');
     root.innerHTML = '';
@@ -72,6 +73,10 @@ async function openNearby(page, { fill, chat = fill }) {
       onAskAction: (action, ask) => { if (action === 'dismiss-ask') screen.dismissAsk(ask?.id); },
       onToggleAllow: () => {},
       onSetQuiet: (v) => screen.setQuiet(v),
+      onSetRadio: (v) => screen.setRadio(v),
+      // the phone's shape: all three ways to be here, through the one shared rule (the level is already chosen here)
+      onHereChoose: (c) => nearbyHereChoose(c, { level: 'handle', visibility: screen.visibility() },
+        { setLevel: async () => ({ ok: true }), setQuiet: (q) => screen.setQuiet(q), setRadio: (r) => screen.setRadio(r) }),
     });
     screen.subscribe(() => draw());
     screen.open();
@@ -156,7 +161,6 @@ test('hidden from the room ("even stil"): no stream and no field to talk in; one
   await expect(page.locator('.circle-nearby__chat-input')).toHaveCount(0);
   await expect(page.locator('.circle-nearby__chat-off-line')).toHaveText('Je bent verborgen. Word zichtbaar om mee te praten.');
   expect(await tabLabel(page, 'conversation'), 'nothing in a stream you cannot see counts as new').toBe('Gesprek');
-  await expect(page.locator('.circle-nearby__mine-summary'), 'the "you here" row does not say you are in the conversation').not.toContainText('gesprek');
   // the controller itself refuses: a line said while hidden goes to no one, and says why
   expect(await page.evaluate(() => window.__nearbyTest.screen.say('hoi').then((r) => ({ ok: r.ok, reason: r.reason, notice: r.notice }))))
     .toEqual({ ok: false, reason: 'hidden', notice: 'chat_hidden_line' });
@@ -167,7 +171,6 @@ test('hidden from the room ("even stil"): no stream and no field to talk in; one
   await expect(page.locator('.circle-nearby__ask-off-line')).toHaveText('Je bent verborgen. Word zichtbaar om iets te vragen.');
   await expect(page.locator('.circle-nearby__ask-visible')).toBeVisible();
   // the card and the circle are refused by the controller too, and nothing is said to be shown
-  await expect(page.locator('.circle-nearby__mine-summary')).toContainText('nog niets getoond');
   expect(await page.evaluate(() => window.__nearbyTest.screen.publishInvite({ uri: 'x', circleId: 'c1' }).then((r) => r.reason))).toBe('hidden');
   await page.screenshot({ path: testInfo.outputPath('verborgen-vragen.png'), fullPage: true });
   await page.locator('.circle-nearby__tab--conversation').click();
@@ -192,5 +195,36 @@ test('the empty room: no part says it is empty, the two tabs are still there', a
     await expect(page.locator(gone), `${gone} is not painted in an empty room`).toHaveCount(0);
   }
   await page.screenshot({ path: testInfo.outputPath('empty-room.png'), fullPage: true });
+  expect(errs).toEqual([]);
+});
+
+test('the gear menu: the state line and the gear open it; Even stil hides you, Zichtbaar brings you back', async ({ page }, testInfo) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openNearby(page, { fill: true });
+  const menu = page.locator('.circle-nearby__menu');
+  await expect(menu).toBeHidden();
+  await expect(page.locator('.circle-nearby__mine'), 'nothing about you stands on the page').toHaveCount(0);
+  await page.locator('.circle-nearby__gear').click();
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('.circle-nearby__menu-title')).toHaveText('In de buurt instellen');
+  await expect(menu.locator('.circle-nearby__here-label')).toHaveText(['Zichtbaar', 'Even stil', 'Helemaal uit']);
+  await expect(menu.locator('.circle-nearby__allow-off--chat'), 'out of the chat: what that means').toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('menu.png'), fullPage: true });
+  await menu.locator('.circle-nearby__here--quiet').click();
+  await expect(page.locator('.circle-nearby__visibility')).toHaveAttribute('data-visibility', 'hidden');
+  // the state line opens the same menu, with the choice that holds now
+  await menu.locator('.circle-nearby__menu-close').click();
+  await expect(menu).toBeHidden();
+  await page.locator('.circle-nearby__visibility-title').click();
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('.circle-nearby__here--quiet input')).toBeChecked();
+  await menu.locator('.circle-nearby__menu-row--card').click();
+  await expect(menu.locator('[data-menu-view="card"] input[data-allow="card"]'), 'the card switch, in the card editor').toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('menu-card.png'), fullPage: true });
+  await menu.locator('[data-menu-view="card"] .circle-nearby__menu-back').click();
+  await menu.locator('.circle-nearby__here--visible').click();
+  await expect(page.locator('.circle-nearby__visibility')).toHaveAttribute('data-visibility', 'visible');
   expect(errs).toEqual([]);
 });

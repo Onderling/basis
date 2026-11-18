@@ -40,7 +40,6 @@ describe('the visibility banner', () => {
     const banner = el.querySelector('.circle-nearby__visibility');
     expect(banner.dataset.visibility).toBe('visible');
     expect(banner.textContent).toContain('circle.nearbyScreen.visible_title');
-    expect(banner.textContent).toContain('circle.nearbyScreen.visible_body');
   });
 
   it('says HIDDEN in ghost mode', () => {
@@ -65,16 +64,15 @@ describe('the visibility banner', () => {
     expect(banner.getAttribute('role')).toBeNull();
   });
 
-  it('the state line itself opens the explanation — there is no bare "…" control', () => {
-    // It used to render the state as a title, then a `<summary>` whose whole text was "…": on screen a
-    // stray "▶ …" that named nothing and read as a rendering fault. The sentence belongs behind the
-    // state line, and the state line is what you press — which is also the gesture mobile already had.
+  it('the state line is what you press, and it opens the gear menu (one menu, no second sheet behind the line)', () => {
     const el = render(model({ visibility: { publishing: false, degraded: false, unavailable: false } }));
-    const sum = el.querySelector('.circle-nearby__visibility summary');
-    expect(sum, 'the banner should fold behind its own state line').not.toBeNull();
-    expect(sum.textContent).toBe('circle.nearbyScreen.hidden_title');
-    expect(el.querySelector('.circle-nearby__visibility-body').textContent)
-      .toBe('circle.nearbyScreen.hidden_body');
+    const line = el.querySelector('.circle-nearby__visibility button.circle-nearby__visibility-title');
+    expect(line, 'the state line is a button').not.toBeNull();
+    expect(line.textContent).toBe('circle.nearbyScreen.hidden_title');
+    expect(el.querySelector('.circle-nearby__menu').hidden, 'closed until asked for').toBe(true);
+    line.click();
+    expect(el.querySelector('.circle-nearby__menu').hidden).toBe(false);
+    expect(el.querySelector('[data-menu-view="main"]').hidden).toBe(false);
   });
 
   it('a DEGRADED state keeps its sentence in view instead of folding it away', () => {
@@ -292,7 +290,7 @@ describe('cards and chat, each behind its allow (step G)', () => {
   it('both allows render as toggles, off by default', () => {
     const el = render(model());
     const boxes = [...el.querySelectorAll('.circle-nearby__allow input')];
-    expect(boxes.map((b) => b.dataset.allow)).toEqual(['card', 'chat']);
+    expect(boxes.map((b) => b.dataset.allow).sort()).toEqual(['card', 'chat']);
     expect(boxes.every((b) => b.checked)).toBe(false);
   });
 
@@ -303,7 +301,7 @@ describe('cards and chat, each behind its allow (step G)', () => {
     expect(el.querySelector('.circle-nearby__allow-off--card').textContent)
       .toBe('circle.nearbyScreen.allow_card_off');
     expect(el.querySelector('.circle-nearby__allow-off--chat').textContent)
-      .toBe('circle.nearbyScreen.allow_chat_off');
+      .toBe('circle.nearbyScreen.menu_chat_off');
   });
 
   it('toggling reports the key and the new value', () => {
@@ -492,7 +490,7 @@ describe('the first-use question', () => {
     const el = render(model(), { firstUse: { onChoose: (v) => chosen.push(v), onLater: () => { later += 1; } } });
     const block = el.querySelector('.circle-nearby__first-use');
     expect(block, 'the question is shown').not.toBe(null);
-    expect(el.querySelector('.circle-nearby__title').nextElementSibling).toBe(block);
+    expect(el.querySelector('.circle-nearby__top').nextElementSibling, 'right under the title row').toBe(block);
     const opts = [...block.querySelectorAll('.circle-nearby__first-use-option')];
     expect(opts.map((b) => b.textContent)).toEqual(['circle.nearbyScreen.face_none', 'circle.reveal.preset.handle', 'circle.reveal.preset.profile', 'circle.reveal.preset.full']);
     opts[2].click();
@@ -546,10 +544,12 @@ describe('the two tabs (Conversation · Questions), painted from the shared list
     expect(onToggleAllow).toHaveBeenCalledWith('chat', true);
   });
 
-  it('the "you here" row stays above the tabs', () => {
+  it('the gear menu sits above the tabs, closed: nothing about you stands on the page', () => {
     const el = render(model());
-    const mine = el.querySelector('.circle-nearby__mine');
-    expect(mine.compareDocumentPosition(el.querySelector('.circle-nearby__tabs')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const menu = el.querySelector('.circle-nearby__menu');
+    expect(menu.compareDocumentPosition(el.querySelector('.circle-nearby__tabs')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(menu.hidden).toBe(true);
+    expect(el.querySelector('.circle-nearby__mine')).toBeNull();
   });
 });
 
@@ -647,18 +647,6 @@ describe('hidden from the room: Conversation shows no stream, one line and the w
   });
 });
 
-describe('the "you here" row and being hidden (nearbyMineSummary)', () => {
-  const summary = (el) => el.querySelector('.circle-nearby__mine-summary').textContent;
-  it('in the chat and visible: it says so', () => {
-    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: true } }));
-    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_chat_on');
-  });
-  it('in the chat but hidden: it does not say you are in the conversation', () => {
-    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: false, levelChosen: true }, quiet: true }));
-    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_none');
-  });
-});
-
 describe('hidden: Questions shows no ask composer (nearbyAskOff)', () => {
   const hiddenRoom = (over = {}) => model({ visibility: { publishing: false, levelChosen: true }, quiet: true, radioOff: false, ...over });
   it('the hidden line and "become visible" in place of the composer; the button leaves quiet', () => {
@@ -679,8 +667,59 @@ describe('hidden: Questions shows no ask composer (nearbyAskOff)', () => {
     const el = render(hiddenRoom());
     expect(el.querySelector('.circle-nearby__ask-visible')).toBeNull();
   });
-  it('the "you here" row says nothing is shown, though the card is switched on', () => {
-    const el = render(hiddenRoom({ allows: { card: true, chat: true }, chat: [] }));
-    expect(el.querySelector('.circle-nearby__mine-summary').textContent).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_none');
+});
+
+describe('the gear menu (nearbyMenu): how you are here, what you show, the chat, the introduction', () => {
+  const open = (el) => { el.querySelector('.circle-nearby__gear').click(); return el.querySelector('.circle-nearby__menu'); };
+  it('the gear opens it and the close button shuts it; the gear has a name, not a glyph for text', () => {
+    const el = render(model());
+    const gear = el.querySelector('.circle-nearby__gear');
+    expect(gear.getAttribute('aria-label')).toBe('circle.nearbyScreen.menu_title');
+    expect(gear.textContent).toBe('');
+    const menu = open(el);
+    expect(menu.hidden).toBe(false);
+    expect(menu.querySelector('.circle-nearby__menu-title').textContent).toBe('circle.nearbyScreen.menu_title');
+    menu.querySelector('.circle-nearby__menu-close').click();
+    expect(menu.hidden).toBe(true);
+  });
+  it('a host without quiet and radio acts (the web) offers only Zichtbaar; a phone host offers all three, the one that holds checked', () => {
+    const web = open(render(model({ visibility: { publishing: true, levelChosen: true } })));
+    expect([...web.querySelectorAll('input[name="nearby-here"]')].map((r) => r.value)).toEqual(['visible']);
+    const onHereChoose = vi.fn();
+    const phone = open(render(model({ visibility: { publishing: false, levelChosen: true, quiet: true } }), { onSetQuiet: vi.fn(), onSetRadio: vi.fn(), onHereChoose }));
+    const radios = [...phone.querySelectorAll('input[name="nearby-here"]')];
+    expect(radios.map((r) => r.value)).toEqual(['visible', 'quiet', 'off']);
+    expect(radios.find((r) => r.checked)?.value).toBe('quiet');
+    expect(phone.querySelector('.circle-nearby__here--off .circle-nearby__here-body').textContent).toBe('circle.nearbyScreen.here_off_body');
+    radios[0].checked = true;
+    radios[0].dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onHereChoose).toHaveBeenCalledWith('visible');
+  });
+  it('"Change" opens who you appear as and the finer levels; the card row opens the card editor with its own switch on top', () => {
+    const el = render(model({ allows: { card: false, chat: false } }), {
+      roomSelf: { view: { self: { id: 'me', name: 'Anna' }, choices: [] } }, onLevelChange: vi.fn(),
+    });
+    const menu = open(el);
+    expect(menu.querySelector('.circle-nearby__menu-row--self span').textContent).toBe('circle.nearbyScreen.menu_appear_as');
+    menu.querySelector('.circle-nearby__menu-change').click();
+    const self = menu.querySelector('[data-menu-view="self"]');
+    expect(self.hidden).toBe(false);
+    expect(self.querySelectorAll('.circle-nearby__face-option')).toHaveLength(4);
+    self.querySelector('.circle-nearby__menu-back').click();
+    menu.querySelector('.circle-nearby__menu-row--card').click();
+    const card = menu.querySelector('[data-menu-view="card"]');
+    expect(card.hidden).toBe(false);
+    expect(card.querySelector('.circle-nearby__allows input').dataset.allow, 'the card switch, first in the editor').toBe('card');
+    expect(menu.querySelector('[data-menu-view="main"] input[data-allow="card"]'), 'not a menu row').toBeNull();
+  });
+  it('the chat switch is in the menu with what being out means; the introduction again goes to the host', () => {
+    const onIntroAgain = vi.fn();
+    const menu = open(render(model({ allows: { card: false, chat: false } }), { onIntroAgain }));
+    const main = menu.querySelector('[data-menu-view="main"]');
+    expect(main.querySelector('input[data-allow="chat"]').checked).toBe(false);
+    expect(main.querySelector('.circle-nearby__allow-off--chat').textContent).toBe('circle.nearbyScreen.menu_chat_off');
+    main.querySelector('.circle-nearby__menu-intro').click();
+    expect(onIntroAgain).toHaveBeenCalled();
+    expect(menu.hidden).toBe(true);
   });
 });

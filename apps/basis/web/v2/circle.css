@@ -1659,6 +1659,23 @@
 .circle-nearby__chat-line + .circle-nearby__chat-line { margin-top: 6px; }
 
 /* NEARBY'S TWO TABS (nearbyTabs): Conversation and Questions, the same underline tabs as a circle's own */
+/* Nearby's gear and the menu behind it (one menu: the state line opens it too) */
+.circle-nearby__top { display: flex; align-items: center; justify-content: flex-start; gap: 10px; }
+.circle-nearby__top .circle-nearby__title { margin: 0; }
+.circle-nearby__gear { flex: 0 0 auto; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+.circle-nearby__gear::before { content: '⚙'; }
+.circle-nearby__visibility-title { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; }
+.circle-nearby__menu { margin: 8px 0 12px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.circle-nearby__menu-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.circle-nearby__menu-title { font-weight: 700; }
+.circle-nearby__menu-close { width: 32px; height: 32px; border: 0; background: none; color: var(--ink-soft); font-size: 22px; cursor: pointer; }
+.circle-nearby__menu-close::before { content: '×'; }
+.circle-nearby__menu-group { margin: 12px 0 6px; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
+.circle-nearby__here { display: block; padding: 6px 0; cursor: pointer; }
+.circle-nearby__here-label { margin-left: 6px; }
+.circle-nearby__here-body { margin-left: 24px; font-size: 13px; color: var(--ink-soft); }
+.circle-nearby__menu-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--line); font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.circle-nearby__menu-intro { margin-top: 10px; }
 .circle-nearby__tabs { display: flex; border-bottom: 1px solid var(--line); margin: 12px 0 10px; }
 .circle-nearby__tab { flex: 1; padding: 10px 6px; background: none; border: none; font: inherit; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .circle-nearby__tab.is-selected { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }

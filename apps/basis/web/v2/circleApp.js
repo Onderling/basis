@@ -795,6 +795,7 @@ import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomB
 import { earlierRoomMessages } from '../../src/v2/nearbyKept.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
+import { nearbyHereChoose } from '../../src/v2/nearbyMenu.js';
 import { renderCircleMyThings } from './circleMyThings.js';
 import { renderCircleAdvisor } from './circleAdvisor.js';
 import { renderOfferingEditor } from './circleOfferingEditor.js';
@@ -4312,6 +4313,19 @@ function showNearby() {
     level: roomLevel,
     firstUse,
     onLevelChange: changeLevel,
+    // the gear menu's "how you are here": one shared rule for what each choice writes (`nearbyHereChoose`); the web
+    // carries no quiet or radio switch, so its menu offers Zichtbaar only (the painter reads that from the props)
+    onHereChoose: (choice) => nearbyHereChoose(choice, { level: roomLevel, visibility: nearbyScreen.visibility() }, {
+      setLevel: async (l) => { await changeLevel(l); return { ok: roomLevel === l }; },
+      setQuiet: (q) => nearbyScreen.setQuiet(q),
+      setRadio: (r) => nearbyScreen.setRadio(r),
+    }).then((r) => { if (!r.ok) { notice = { key: 'level_not_set' }; } draw(nearbyScreen.model()); }),
+    // "read the introduction again": the first-use question once more, until the first-time wizard replaces it
+    onIntroAgain: () => {
+      const id = roomSelfId();
+      firstUse = { onChoose: changeLevel, onLater: () => { if (id) markAsked(id); firstUse = null; draw(nearbyScreen.model()); } };
+      draw(nearbyScreen.model());
+    },
     onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); notice = null; draw(nearbyScreen.model()); },
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);

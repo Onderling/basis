@@ -119,6 +119,14 @@ describe('a line that puts something on a list NOBODY holds asks to make that li
     expect(words.question).toBe("Een lijst 'boodschappen' bestaat nog niet. Maken?");
   });
 
+  // A line naming a list nobody holds asks to make the list: never a circle's task by a guess.
+  it('"zet zonnebrand en slippers op vakantie" in a circle without that list: asks to make the list, never a circle task', () => {
+    const r = plusLineOutcome('zet zonnebrand en slippers op vakantie', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [])], own: { lists: [] } });
+    expect(r, JSON.stringify(r)).toMatchObject({ makeList: 'vakantie', atOnce: false, command: { opId: 'createList' } });
+    expect(r.circleId ?? null, 'not a circle act').toBeNull();
+    expect(r.command.opId).not.toBe('addTask');
+  });
+
   it('a list that DOES exist is not asked about: a circle holding it still runs there at once', () => {
     const r = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [SHOP])], own: { lists: [] } });
     expect(r).toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c1', command: { opId: 'addToList' } });

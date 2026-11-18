@@ -601,6 +601,27 @@ describe('a read that fails says it could not read, never "could not save" (item
   });
 });
 
+describe('the own model that did not answer is said by its cause (refused, too slow, not reachable)', () => {
+  const failing = (error) => ({ invoke: async () => { throw error; } });
+  const cases = [
+    [Object.assign(new Error('Unauthorized'), { status: 401 }), 'circle.vandaag.plus_model_refused'],
+    [Object.assign(new Error('timed out'), { name: 'TimeoutError' }), 'circle.vandaag.plus_model_slow'],
+    [new Error('fetch failed: ECONNREFUSED'), 'circle.vandaag.plus_model_unreachable'],
+  ];
+  for (const [error, key] of cases) {
+    it(`${error.message} → ${key.split('.').pop()}`, async () => {
+      const { d } = door({ llm: failing(error), interpret: interpretToCommand });
+      const r = await d.read('wat kan je voor me doen?');
+      expect(r.error).toContain(key);
+    });
+  }
+  it('refused names the person\'s own setting (their key, their credit), never "the admin knows"', async () => {
+    const { d } = door({ llm: failing(Object.assign(new Error('Payment Required'), { status: 402 })), interpret: interpretToCommand });
+    const r = await d.read('wat kan je voor me doen?');
+    expect(r.error).toContain('circle.userLlm.title');
+  });
+});
+
 describe('the make-a-list card: the yes makes the list AND puts the item on it; a no is said (Fable, on #1345)', () => {
   it('the card carries both steps, in order: make the own list, then the item on it', async () => {
     const { plusLineOutcome, plusCardCommands } = await import('../../src/v2/vandaagPlus.js');

@@ -7,11 +7,13 @@
     "folio",
     "governance",
     "grants",
-    "household",
     "items-lane",
     "keys",
     "membership",
     "params",
     "pinboard"
+  ],
+  "nounsOwed": [
+    "pinboard.lend"
   ]
 }

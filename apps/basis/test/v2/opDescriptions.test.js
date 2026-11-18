@@ -18,6 +18,10 @@ describe('the words of an op', () => {
     expect(opWhat('pinboard', 'postRequest', 'nl')).toBeNull();
     expect(Object.keys(OP_DESCRIPTIONS)).toContain('lists');
   });
+  it('agents: described, a persona by the word the app already uses', () => {
+    expect(opWhat('agents', 'revokeAgent', 'nl')).toBe('Zet een agent uit: al zijn rechten vervallen.');
+    expect(opDescription('agents', 'getPersonaRelease', 'en').params.id).toBe('which persona');
+  });
 });
 
 describe('the "/" list shows it under the command', () => {

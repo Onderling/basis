@@ -18,6 +18,8 @@ import householdEn from '../../../household/descriptions.en.json' with { type: '
 import householdNl from '../../../household/descriptions.nl.json' with { type: 'json' };
 import folioEn from '../../../folio/descriptions.en.json' with { type: 'json' };
 import folioNl from '../../../folio/descriptions.nl.json' with { type: 'json' };
+import pinboardEn from '../../../pinboard/descriptions.en.json' with { type: 'json' };
+import pinboardNl from '../../../pinboard/descriptions.nl.json' with { type: 'json' };
 import calendarEn from '../../../calendar/descriptions.en.json' with { type: 'json' };
 import calendarNl from '../../../calendar/descriptions.nl.json' with { type: 'json' };
 import tasksEn from '../../../tasks-v0/descriptions.en.json' with { type: 'json' };
@@ -30,6 +32,7 @@ export const OP_DESCRIPTIONS = Object.freeze({
   lists: { en: listsEn, nl: listsNl },
   household: { en: householdEn, nl: householdNl },
   folio: { en: folioEn, nl: folioNl },
+  pinboard: { en: pinboardEn, nl: pinboardNl },
   calendar: { en: calendarEn, nl: calendarNl },
   tasks: { en: tasksEn, nl: tasksNl },
   agents: { en: agentsEn, nl: agentsNl },

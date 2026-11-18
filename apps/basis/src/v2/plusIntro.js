@@ -54,3 +54,32 @@ export function plusNews({ told = null, circles = [], t, helpCircleId = HELP_CIR
   const names = joined.map((c) => (typeof c.name === 'string' && c.name.trim()) || t('circle.screens.untitled'));
   return { line: t('circle.vandaag.plus_news_circle', { circle: names.join(', ') }), told: keep };
 }
+
+export const PLUS_TOLD_KIND = 'plus-told';
+
+/**
+ * What a self's "+" last told them, read from this device's log: `{circles}` or null (never told, or forgotten). One
+ * entry per self (its id is the self's conversation), so the newest is the only one.
+ * @param {{entryById?: Function, query?: Function}} log @param {string} key   the self's conversation id
+ */
+export function readPlusTold(log, key) {
+  if (!key || !log) return null;
+  const id = `${PLUS_TOLD_KIND}:${key}`;
+  let e = null;
+  try { e = typeof log.entryById === 'function' ? log.entryById(id) : (log.query?.() ?? []).find((x) => x?.id === id) ?? null; } catch { e = null; }
+  return Array.isArray(e?.payload?.circles) ? { circles: e.payload.circles.slice() } : null;
+}
+
+/**
+ * Keep what the "+" told a self (`told` null: forgotten, so the next open is a first open again). Replaces the self's
+ * one entry. Best-effort: a log that refuses never breaks the sheet.
+ * @param {{append: Function}} log @param {string} key @param {{circles: string[]}|null} told
+ */
+export function writePlusTold(log, key, told, { now = Date.now } = {}) {
+  if (!key || typeof log?.append !== 'function') return;
+  try {
+    log.append({ id: `${PLUS_TOLD_KIND}:${key}`, type: PLUS_TOLD_KIND, ts: now(), silent: true,
+      payload: { circles: Array.isArray(told?.circles) ? told.circles.slice() : null } });
+  } catch { /* the sheet still opens */ }
+}
+

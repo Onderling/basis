@@ -79,3 +79,39 @@ describe('what changed since the last open: said once', () => {
     expect(plusNews({ told: first.told, circles: [{ id: 'help', name: 'Help' }], t: tNl, helpCircleId: 'help' }).line).toBeNull();
   });
 });
+
+describe('the door opens the conversation: the intro once, then what changed, kept on this device (plus-told)', async () => {
+  const { entryKind, RETAIN, SYNC, isMirroredKind } = await import('@onderling/item-store');
+  const mk = (log, circles) => createPlusDoor({
+    llm: null, t: tNl, lang: 'nl', threads: createBotThreads({ eventLog: log, store: memoryThreadStore() }), threadId: 'own:me',
+    circles: async () => circles.list, ownListsOf: async () => [], toldLog: log,
+  });
+  it('first open: the intro; again: nothing; a circle joined: one line, once; forgetting the conversation: the intro again', async () => {
+    const log = new EventLog({ initial: [], muted: [] });
+    const circles = { list: [thuis] };
+    // a fresh door per call, as the phone composes one: what was told lives on the log, not in the door
+    const first = await mk(log, circles).opening({});
+    expect(first.intro?.examples?.length).toBe(3);
+    expect(await mk(log, circles).opening({}), 'said once').toEqual({});
+    circles.list = [thuis, { id: 'k2', name: 'Werk', manifestsByOrigin, lists: [] }];
+    expect((await mk(log, circles).opening({})).news).toMatch(/Werk/);
+    expect(await mk(log, circles).opening({}), 'the news is said once').toEqual({});
+    await mk(log, circles).forget({});
+    expect((await mk(log, circles).opening({})).intro, 'forgotten: a first open again').toBeTruthy();
+  });
+  it('one entry per self, whatever happens: the newest carries the whole set', async () => {
+    const log = new EventLog({ initial: [], muted: [] });
+    const circles = { list: [thuis] };
+    for (let i = 0; i < 4; i += 1) await mk(log, circles).opening({});
+    circles.list = [thuis, { id: 'k3', name: 'Club' }];
+    await mk(log, circles).opening({});
+    const told = log.query().filter((e) => e.type === 'plus-told');
+    expect(told).toHaveLength(1);
+    expect(told[0].payload.circles.sort()).toEqual(['k1', 'k3']);
+  });
+  it('the kind: system plumbing, never wakes, kept while the self exists (record), never leaves the device, not mirrored', () => {
+    const k = entryKind('plus-told');
+    expect(k).toMatchObject({ lane: 'system', wakes: false, retain: RETAIN.RECORD, audit: false, syncPolicy: SYNC.NONE });
+    expect(isMirroredKind('plus-told')).toBe(false);
+  });
+});

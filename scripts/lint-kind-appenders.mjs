@@ -58,6 +58,7 @@ export const APPENDERS = {
   grants:            { file: 'apps/basis/src/v2/grantsRail.js', needle: 'GRANTS_LANE' },
   'agent-action':    { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'agent-action' },
   'own-action':      { file: 'apps/basis/src/ownActions.js', needle: 'type: OWN_ACTION_KIND' },
+  'plus-told':       { file: 'apps/basis/src/v2/plusIntro.js', needle: 'type: PLUS_TOLD_KIND' },
   'settings-change': { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'settings-change' },
   'audit-summary':   { file: 'apps/basis/src/eventLog.js', needle: 'audit-summary' },
 };

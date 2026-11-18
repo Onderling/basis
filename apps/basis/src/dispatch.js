@@ -44,9 +44,11 @@ import { runCompositeOp } from './composite.js';
  *
  * @param {import('./router.js').ReadyDispatch}  ready
  * @param {CallSkill}                            callSkill
+ * @param {object}                               [ctx]  the call's context (the door a person came through, a self it is
+ *                                                       made as), handed to `callSkill` as its fourth argument; never dropped
  * @returns {Promise<Reply>}
  */
-export async function runDispatch(ready, callSkill) {
+export async function runDispatch(ready, callSkill, ctx) {
   if (!ready || ready.kind !== 'ready') {
     throw new Error(
       `runDispatch: expected ready dispatch, got kind=${ready?.kind ?? '(none)'}`,
@@ -59,7 +61,7 @@ export async function runDispatch(ready, callSkill) {
   const { opId, args, appOrigin, threadId, replyShape } = ready;
 
   try {
-    const payload = await callSkill(appOrigin, opId, args);
+    const payload = await (ctx === undefined ? callSkill(appOrigin, opId, args) : callSkill(appOrigin, opId, args, ctx));
     // v0.5.x defensive guard — when the skill returns an explicit
     // {ok: false, error} envelope, elevate it to reply.error so the
     // renderer falls back to the error-bubble path instead of force-

@@ -1593,6 +1593,7 @@ export const pinboardManifest = {
       surfaces: {
         chat: { hint: 'Fan a signed group-key statement (establish/rotate) to a circle\u2019s current key recipients.' },
         ui:   { control: 'page' },
+        actState: 'none',   // background: the key fan-out a made circle or a rotation sets off; never a person's act
       },
     },
     {

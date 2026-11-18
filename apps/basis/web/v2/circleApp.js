@@ -181,6 +181,7 @@ import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
 import { trackContactTurn } from '../../src/v2/contactTurnDelivery.js';
 import { createActState, wrapCallSkillWithActState, actStateLine } from '../../src/v2/actState.js';
+import { doorOnly, ownActionRows } from '../../src/ownActions.js';   // the door a turn came through, down to the waist; the record read back
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -2666,7 +2667,8 @@ function buildCircleBot(agent) {
     return 'circle.bot.unknown';
   }
 
-  async function dispatchReady({ opId, args, appOrigin }) {
+  // `turn`: the turn's (or a tap's) context; only its door goes down to the waist (`doorOnly`)
+  async function dispatchReady({ opId, args, appOrigin }, turn) {
     let route;
     try { route = resolveDispatch({ kind: 'slash', opId, args: args || {}, appOrigin, command: '(bot)', body: '' }, catalogue); }
     catch {
@@ -2732,7 +2734,7 @@ function buildCircleBot(agent) {
         return;
       }
       let reply;
-      try { reply = await runDispatch(scopeReadyDispatch(route, getActiveCircle()), rawCallSkill); }
+      try { reply = await runDispatch(scopeReadyDispatch(route, getActiveCircle()), rawCallSkill, doorOnly(turn)); }
       catch (e) { _circleRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); return; }
       // The op's verb drives Added:/Completed: phrasing (a bare "✓ X" was identical for add + complete).
       const entry = catalogue?.opsById?.get(route.opId);
@@ -2995,7 +2997,7 @@ function buildCircleBot(agent) {
     peek: createPeek({
       catalogue: () => catalogue,
       deny: (ready) => circleCapabilityDeny(ready.appOrigin, ready.opId, ready.args),
-      run: (ready) => runDispatch(scopeReadyDispatch(ready, getActiveCircle()), rawCallSkill),
+      run: (ready, ctx) => runDispatch(scopeReadyDispatch(ready, getActiveCircle()), rawCallSkill, doorOnly(ctx)),
     }),
     // No collect window here: in a circle composer a person types one line on purpose, and a wait on every bot reply
     // would read as a slow app. The lane still takes the circle's lines one turn at a time.
@@ -5031,6 +5033,8 @@ let _mijShown = 0;   // bumped whenever a screen replaces the tab's own: a read 
 let _mijPaint = null;
 const _mijReads = { landings: 0, materializes: 0, ops: 0 };
 if (typeof window !== 'undefined') window.onderlingMijReads = _mijReads;
+// the person's own record, read back (a debug / e2e seam; the same projection My data exports)
+if (typeof window !== 'undefined') window.onderlingOwnActions = () => ownActionRows(eventLog);
 function mijHead() {
   if (_mijHead || typeof circleHouseholdAgent?.onCircleChanged !== 'function') return _mijHead;
   _mijHead = createScreenHead({ subscribe: [

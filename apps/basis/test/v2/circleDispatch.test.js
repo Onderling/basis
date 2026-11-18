@@ -243,6 +243,32 @@ describe('createCircleDispatch — routing', () => {
   });
 });
 
+describe('createCircleDispatch — each dispatch names the door the person came through', () => {
+  const run = async (opts, text, ctx = { id: 'c1' }) => {
+    const seen = [];
+    const peeked = [];
+    const cd = createCircleDispatch({
+      botName: 'helper', dispatch: (input, c) => { seen.push(c); },
+      peek: async (cmd, c) => { peeked.push(c); return { items: [] }; },
+      ...opts,
+    });
+    await cd.handle(text, ctx);
+    return { seen, peeked };
+  };
+  it('a /command is slash; a gate rule is phrase; the model is model, its read-before-act too; the turn ctx is kept', async () => {
+    expect((await run({}, '/help')).seen).toEqual([{ id: 'c1', door: 'slash' }]);
+    const rule = await run({ gate: { evaluate: async () => ({ via: 'rule', command: { opId: 'listOpen', args: {} } }) }, interpret: vi.fn(), policy: { llmTool: 'local' }, llmProviders: { local: { invoke: vi.fn() } } }, '@helper open?');
+    expect(rule.seen).toEqual([{ id: 'c1', door: 'phrase' }]);
+    const catalogue = { opsById: new Map([['listOpen', { op: { id: 'listOpen', verb: 'list' }, appOrigin: 'lists' }], ['addTask', { op: { id: 'addTask', verb: 'add' }, appOrigin: 'lists' }]]), commandMenu: [] };
+    const interpret = vi.fn()
+      .mockResolvedValueOnce({ opId: 'listOpen', args: {} })
+      .mockResolvedValueOnce({ opId: 'addTask', args: { title: 'melk' } });
+    const model = await run({ interpret, catalogue, policy: { llmTool: 'local' }, llmProviders: { local: { invoke: vi.fn() } } }, '@helper melk erbij');
+    expect(model.peeked).toEqual([{ id: 'c1', door: 'model' }]);
+    expect(model.seen).toEqual([{ id: 'c1', door: 'model' }]);
+  });
+});
+
 describe('addressesBot', () => {
   it('matches @bot / @assistent / @assistant', () => {
     expect(addressesBot('@bot do x', 'helper')).toBe(true);

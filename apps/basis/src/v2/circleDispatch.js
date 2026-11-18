@@ -54,7 +54,12 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
   // colliding bare op-id to the gate's app, not the merge's first-declarer.
   const expanded = (c) => (typeof expand === 'function' ? expand(c) : [c]);
   const slowFor = (ctx) => (typeof onSlow === 'function' ? { onSlow: () => onSlow(ctx) } : {});
-  async function dispatchRule(command, ctx) {
+  // THE DOOR a dispatch came through, named here because only this engine knows which branch it took: a typed /command
+  // is `slash`, a gate rule's command `phrase`, what the model picked (its read-before-act too) `model`. The shell hands
+  // it on to the waist, where the person's own record reads it (ownActions.js). The turn's ctx is kept as it is.
+  const through = (ctx, door) => ({ ...(ctx && typeof ctx === 'object' ? ctx : {}), door });
+  async function dispatchRule(command, ctx0) {
+    const ctx = through(ctx0, 'phrase');
     for (const c of expanded({ opId: command.opId, args: command.args || {}, appOrigin: command.appOrigin })) await dispatch(c, ctx);
     for (const m of (Array.isArray(command.more) ? command.more : [])) {
       if (m && m.opId) for (const c of expanded({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? command.appOrigin })) await dispatch(c, ctx);
@@ -69,7 +74,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
 
       // 1. explicit slash command → dispatch verbatim (unless the shell handles slash upstream).
       if (trimmed.startsWith('/')) {
-        if (dispatchSlash) { await dispatch(trimmed, ctx); return { via: 'slash' }; }
+        if (dispatchSlash) { await dispatch(trimmed, through(ctx, 'slash')); return { via: 'slash' }; }
         return { via: await sink(trimmed, ctx) };
       }
 
@@ -110,7 +115,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             // A rule that names an item may fall back to the model: when the words name nothing ("ik doe mee"), the
             // line is the model's if there is one; without a model the rule's refusal stands.
             if (g.command.fallback === 'model' && llm) {
-              const out = await dispatch({ opId: g.command.opId, args: g.command.args || {}, appOrigin: g.command.appOrigin }, { ...ctx, tryRule: true });
+              const out = await dispatch({ opId: g.command.opId, args: g.command.args || {}, appOrigin: g.command.appOrigin }, { ...through(ctx, 'phrase'), tryRule: true });
               if (!out?.notFound) return { via: 'rule', cmd: g.command };
               context = g.context;
             } else {
@@ -161,7 +166,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             }
           }
           if (cmd && cmd.opId && typeof peek === 'function' && !(Array.isArray(cmd.more) && cmd.more.length) && isRead(scopedCatalogue, cmd.opId)) {
-            const seen = await Promise.resolve(peek({ opId: cmd.opId, args: cmd.args ?? {} }, ctx)).catch(() => null);
+            const seen = await Promise.resolve(peek({ opId: cmd.opId, args: cmd.args ?? {} }, through(ctx, 'model'))).catch(() => null);
             const line = readLine(cmd, seen);
             if (line) {
               const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
@@ -170,10 +175,10 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             }
           }
           if (cmd && cmd.opId) {
-            for (const c of expanded({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} })) await dispatch(c, ctx);
+            for (const c of expanded({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} })) await dispatch(c, through(ctx, 'model'));
             // A member who names three items gets three acts in one turn — the further calls, in order.
             for (const m of (Array.isArray(cmd.more) ? cmd.more : [])) {
-              if (m && m.opId) for (const c of expanded({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} })) await dispatch(c, ctx);
+              if (m && m.opId) for (const c of expanded({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} })) await dispatch(c, through(ctx, 'model'));
             }
             // The turn was cut (the per-turn cap, or a call the output cut off): ask the member for the rest.
             if (cmd.partial && typeof onNoMatch === 'function') await onNoMatch(modelText, ctx, { partial: true });

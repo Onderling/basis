@@ -67,37 +67,90 @@ export function makeOwnActionEntry({ app = null, op, outcome = null, door = 'unk
 }
 
 /**
- * Is this call one of the person's own acts? Only the owner's (a call with a door person, `ctx.caller`, is that
- * person's, not the owner's); an op that writes always; an op that only reads only when a door says the person asked
- * (`ctx.door`: a slash command, a phrase, the model): a screen reading what it paints is not an act. Read or write is
- * the manifest's own reading (`verbKind`); an op no manifest declares is not recorded. `manifests`: every manifest the
+ * The part of a turn's context that goes down to the waist: the door the person came through, and nothing else (a
+ * shell's turn scope carries message ids, history and the like, which the waist must not read as a call's context).
+ * `undefined` when there is no door, so the call is made exactly as before.
+ * @param {object} [ctx]
+ * @returns {{door: string}|undefined}
+ */
+export function doorOnly(ctx) {
+  const door = ctx && typeof ctx === 'object' ? ctx.door : null;
+  return typeof door === 'string' && door ? { door } : undefined;
+}
+
+/** The doors a person comes through: a call naming one of these is theirs; `unknown` is no door. */
+const PERSON_DOORS = new Set(DOORS.filter((d) => d !== 'unknown'));
+
+/**
+ * Is this call one of the person's own acts? Only a call that NAMES a person door (`ctx.door`: tap, slash, phrase,
+ * model, clock …): a call no door names is background work (an address announce, a sync, a key fan-out), however much
+ * it writes (Fable 2026-11-18: a missed person path shows as absence, not as noise). Only the owner's (a call with a
+ * door person, `ctx.caller`, is that person's); a read only when a door other than a tap asked for it (a tap reading
+ * what a screen paints is not an act); an op no manifest declares never. Read or write is the manifest's own reading
+ * (`verbKind`). `manifests`: every manifest the
  * app runs (`allManifests()`, handed in by the caller so this module stays below the manifest list).
  * @param {{app: string, op: string, ctx?: object, manifests: object[]}} a
  */
 export function ownActIs({ app, op, ctx = {}, manifests = [] }) {
   if (typeof ctx?.caller === 'string' && ctx.caller) return false;
+  if (!PERSON_DOORS.has(ctx?.door)) return false;
   const m = (Array.isArray(manifests) ? manifests : []).find((x) => x?.app === app);
   const declared = m?.operations?.find((o) => o?.id === op);
   if (!declared) return false;
   const kind = verbKind(m, declared.verb);
-  if (kind === 'read') return typeof ctx?.door === 'string' && ctx.door !== '';
+  if (kind === 'read') return ctx.door !== 'tap';
   return true;
 }
 
 /**
- * Write one own-action entry for a call that is an act (`ownActIs`), with its outcome: `ok`, or `failed` when the
- * result says `ok: false` or the call threw. Best-effort: a log that refuses never breaks the act it records.
- * @param {{deviceLog?: {append: Function}, enabled?: boolean, app: string, op: string, args?: object, ctx?: object,
- *   result?: object, threw?: boolean, manifests?: object[], now?: () => number}} a
+ * The codes a waist op answers with when it says NO on purpose (who may, or as whom), not because something broke: the
+ * op's own "not yours" (`forbidden`) and "you have no self in this circle" (`no-self`, `not-a-self-here`).
  */
-export function recordOwnAction({ deviceLog, enabled = true, app, op, args = {}, ctx = {}, result = null, threw = false, manifests = [], now = Date.now }) {
+const REFUSAL_CODES = new Set(['forbidden', 'no-self', 'not-a-self-here']);
+
+/**
+ * How a call ended, for the record: `refused` when it was turned down on purpose (a result carrying the admission
+ * `refusal` shape, one of the waist's refusal codes, or the kernel gate's `PolicyDeniedError`), `failed` when something
+ * broke (`ok: false` otherwise, or it threw), else `ok`.
+ * @param {object|null} result
+ * @param {unknown} [error]   what the call threw, if it did
+ */
+export function ownOutcome(result, error = null) {
+  if (error != null) return error?.name === 'PolicyDeniedError' ? 'refused' : 'failed';
+  if (result?.ok !== false) return 'ok';
+  if (result.refusal && typeof result.refusal === 'object') return 'refused';
+  return REFUSAL_CODES.has(result.code) ? 'refused' : 'failed';
+}
+
+/**
+ * Write one own-action entry for a call that is an act (`ownActIs`), with its outcome (`ownOutcome`): `ok`, `refused`
+ * or `failed`. Best-effort: a log that refuses never breaks the act it records.
+ * @param {{deviceLog?: {append: Function}, enabled?: boolean, app: string, op: string, args?: object, ctx?: object,
+ *   result?: object, threw?: boolean, error?: unknown, manifests?: object[], now?: () => number}} a
+ */
+export function recordOwnAction({ deviceLog, enabled = true, app, op, args = {}, ctx = {}, result = null, threw = false, error = null, manifests = [], now = Date.now }) {
   if (enabled === false || typeof deviceLog?.append !== 'function') return null;
   try {
     if (!ownActIs({ app, op, ctx, manifests })) return null;
-    const outcome = threw || result?.ok === false ? 'failed' : 'ok';
+    const outcome = ownOutcome(result, threw ? (error ?? new Error('threw')) : null);
     const circleId = circleArg(args);   // the op's own circle argument, by whichever name its manifest gives it
     const entry = makeOwnActionEntry({ app, op, outcome, door: ctx?.door ?? 'unknown', circleId, ts: now() });
     if (entry) deviceLog.append(entry);
     return entry;
   } catch { return null; }
+}
+
+/**
+ * The person's own acts as rows, oldest first: a projection over the device log (never a second store). What the My
+ * data row exports, and what a walk reads.
+ * @param {{query: Function}} log
+ * @returns {{ts: number, circleId: string|null, app: string|null, op: string, outcome: string|null, door: string}[]}
+ */
+export function ownActionRows(log) {
+  let entries = [];
+  try { entries = log?.query?.() ?? []; } catch { entries = []; }
+  return entries
+    .filter((e) => e?.type === OWN_ACTION_KIND && e.payload)
+    .map((e) => ({ ts: e.ts, circleId: e.circleId ?? null, app: e.payload.app, op: e.payload.op, outcome: e.payload.outcome, door: e.payload.door }))
+    .sort((a, b) => a.ts - b.ts);
 }

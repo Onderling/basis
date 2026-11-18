@@ -25,7 +25,11 @@ function readPlaced(p) {
   if (!NAME.test(name) || !/^https?:\/\/[^\s/]+/.test(String(p?.url ?? ''))) return null;
   const words = (Array.isArray(p?.words) ? p.words : [])
     .filter((w) => w && WORD.test(String(w.word ?? '').toLowerCase()) && typeof w.tool === 'string' && w.tool)
-    .map((w) => ({ word: String(w.word).toLowerCase(), tool: w.tool, ...(typeof w.field === 'string' && w.field ? { field: w.field } : {}) }));
+    .map((w) => ({
+      word: String(w.word).toLowerCase(), tool: w.tool, ...(typeof w.field === 'string' && w.field ? { field: w.field } : {}),
+      // what the word does, in a person's words per language (the operator's: 'zoekt producten'), for /help and the welcome
+      ...(w.says && typeof w.says === 'object' ? { says: Object.fromEntries(Object.entries(w.says).filter(([, v]) => typeof v === 'string' && v.trim())) } : {}),
+    }));
   return { name, url: String(p.url), words };
 }
 
@@ -132,4 +136,41 @@ export function toolboxGateRule(getWords) {
     return { opId: 'useTool', appOrigin: 'tools', args: { toolbox: w.toolbox, tool: w.tool, input: { [w.field ?? 'query']: rest } } };
   };
   return { name: 'tools:useTool(word)', test: (text) => Boolean(command(text)), command };
+}
+
+/** The door's words for a toolbox refusal code (`circle.bot.toolbox_*`), the same from `/toolbox` and from a tool's use. */
+const REFUSAL_KEY = Object.freeze({
+  'toolbox-not-placed': 'toolbox_not_placed', 'toolbox-no-key': 'toolbox_no_key', 'toolbox-off': 'toolbox_is_off',
+  'toolbox-unreachable': 'toolbox_unreachable', 'toolbox-no-endpoint': 'toolbox_unreachable', 'toolbox-unauthorized': 'toolbox_unreachable',
+  'toolbox-error': 'toolbox_unreachable', 'toolbox-timeout': 'toolbox_timeout', 'tool-not-offered': 'toolbox_tool_not_offered',
+  'tool-error': 'toolbox_tool_failed', 'toolbox-bad-answer': 'toolbox_failed',
+});
+
+/**
+ * A toolbox result told in the door's words: the refusal's sentence (never a key, never an address), or null when it
+ * is not a refusal. `title` is the toolbox's name as its card gives it, when known.
+ * @param {{ok: boolean, code?: string, name?: string, title?: string, tool?: string}} r @param {Function} t
+ */
+export function toolboxRefusalText(r, t) {
+  if (!r || r.ok !== false) return null;
+  const key = REFUSAL_KEY[r.code] ?? 'toolbox_failed';
+  return t(`circle.bot.${key}`, { name: r.name ?? '', title: r.title ?? r.name ?? '', tool: r.tool ?? '' });
+}
+
+/**
+ * The help line per word of an ON toolbox: 'zoek <iets>: zoekt producten bij Boodschappen' (the operator's `says` in
+ * this language, else 'gebruikt <title>').
+ * @param {Array<{word: string, title: string, says?: Record<string, string>}>} words @param {Function} t @param {string} [lang]
+ * @returns {string[]}
+ */
+export function toolboxHelpLines(words, t, lang = 'nl') {
+  return (Array.isArray(words) ? words : []).map((w) => t('circle.bot.toolbox_help_line', {
+    word: w.word, says: w.says?.[lang] ?? w.says?.nl ?? t('circle.bot.toolbox_says_default', { title: w.title ?? w.toolbox }),
+  }));
+}
+
+/** The welcome's one line when an ON toolbox has words, else null. */
+export function toolboxWelcomeLine(words, t, lang = 'nl') {
+  const lines = toolboxHelpLines(words, t, lang);
+  return lines.length ? t('circle.bot.toolbox_welcome', { lines: lines.join('; ') }) : null;
 }

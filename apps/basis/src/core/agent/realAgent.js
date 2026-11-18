@@ -118,7 +118,7 @@ import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPee
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { KEEP_DAYS_KEY, roomRetentionMs, makeRoomKeeper, earlierInTheRoom } from '../../v2/nearbyKept.js';
-import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND } from '../../ownActions.js';   // the person's own acts, at the outer waist
+import { recordOwnAction, ownRetentionMs, OWN_RECORD_KEY, OWN_KEEP_WEEKS_KEY, ownActionRows, ownActionsExport, OWN_ACTION_KIND, noteOwnOutcome } from '../../ownActions.js';   // the person's own acts, at the outer waist
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -9821,6 +9821,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     ownActionRows: () => ownActionRows(opts.deviceLog),
     exportOwnActions: () => ownActionsExport(ownActionRows(opts.deviceLog)),
     wipeOwnActions: () => (typeof opts.deviceLog?.dropKind === 'function' ? opts.deviceLog.dropKind(OWN_ACTION_KIND) : 0),
+    // What no op shows, noted in the person's own record by the door that knows it (the "+": a proposal declined, a
+    // line placed nowhere; ownActions.js `noteOwnOutcome`), under the same switch as the acts the waist records.
+    noteOwnAct: (e = {}) => noteOwnOutcome({
+      ...e, deviceLog: opts.deviceLog, enabled: paramsService.register.valueOf(OWN_RECORD_KEY) !== false,
+    }),
     // #36 — a consumer's read of a registered param's LIVE value (sync, from the hydrated register), e.g. the
     // retention window. Reads only; writes go through callSkill('params','set-param',…).
     getParamValue: (key) => paramsService.register.valueOf(key),

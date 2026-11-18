@@ -319,6 +319,9 @@ export const SEAMS = Object.freeze([
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself
   // says something else in the thread.
   { id: 'plus-own-lists', pattern: /createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
+  // THE PERSON'S OWN RECORD (ownActions.js, ledger L203): what no op shows (a proposal declined, a line placed nowhere)
+  // is noted by the "+" door through the agent's `noteOwnAct`; a shell that does not hand it records only what ran
+  { id: 'plus-own-record', pattern: /createPlusDoor\(\{[^}]*noteOwn:/, shells: ['web', 'mobile'], why: 'a proposal the person turns down, and a line the "+" places nowhere, are in their own record as on every shell' },
   { id: 'plus-done-line', pattern: /plusDoneLine\(/, shells: ['web', 'mobile'], why: 'the "+" thread says what a line did in one wording, a list\'s read with done and not done' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.

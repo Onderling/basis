@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { entryKind, RETAIN, retentionWindowFor, SYNC, SIGNS, isMirroredKind } from '@onderling/item-store';
-import { OWN_ACTION_KIND, makeOwnActionEntry, ownRetentionMs, OWN_KEEP_WEEKS, OWN_RECORD, DOORS, ownActIs, recordOwnAction, ownOutcome, ownActionRows, doorOnly, ownActionsLines } from '../src/ownActions.js';
+import { OWN_ACTION_KIND, makeOwnActionEntry, ownRetentionMs, OWN_KEEP_WEEKS, OWN_RECORD, DOORS, ownActIs, recordOwnAction, ownOutcome, ownActionRows, doorOnly, ownActionsLines, noteOwnOutcome } from '../src/ownActions.js';
 import { EventLog } from '../src/eventLog.js';
 import { allManifests } from '../src/v2/manifestSources.js';
 
@@ -137,5 +137,24 @@ describe('the row\'s words under My data', () => {
     expect(ownActionsLines({ count: 1, t }).count).toBe('circle.mydata.own_actions_count_one');
     expect(ownActionsLines({ count: 7, t }).count).toBe('circle.mydata.own_actions_count_n {"count":7}');
     expect(ownActionsLines({ on: false, count: 7, t })).toEqual({ count: 'circle.mydata.own_actions_count_n {"count":7}', off: 'circle.mydata.own_actions_off' });
+  });
+});
+
+describe('what no op shows: a proposal declined, a line placed nowhere (the "+")', () => {
+  it('declined names the act; no_act has no op; both need a person door; the switch off writes nothing; nothing else is noted here', () => {
+    const deviceLog = new EventLog({ initial: [], muted: [] });
+    const at = Date.now() - 1000;
+    let i = 0;
+    const now = () => at + (i += 1);
+    noteOwnOutcome({ deviceLog, app: 'lists', op: 'createList', outcome: 'declined', door: 'phrase', now });
+    noteOwnOutcome({ deviceLog, outcome: 'no_act', door: 'model', now });
+    noteOwnOutcome({ deviceLog, outcome: 'declined', door: 'phrase', now });                       // declined names an act
+    noteOwnOutcome({ deviceLog, app: 'lists', op: 'addToList', outcome: 'ok', door: 'tap', now });  // ok is the waist's to record
+    noteOwnOutcome({ deviceLog, outcome: 'no_act', now });                                          // no door: background
+    noteOwnOutcome({ deviceLog, enabled: false, outcome: 'no_act', door: 'phrase', now });
+    expect(ownActionRows(deviceLog).map((r) => [r.app, r.op, r.outcome, r.door])).toEqual([
+      ['lists', 'createList', 'declined', 'phrase'],
+      [null, null, 'no_act', 'model'],
+    ]);
   });
 });

@@ -50,7 +50,8 @@ const rid = () => {
  * @returns {object|null} null without an op
  */
 export function makeOwnActionEntry({ app = null, op, outcome = null, door = 'unknown', circleId = null, ts = Date.now() } = {}) {
-  if (typeof op !== 'string' || !op) return null;
+  // an op names every entry but a line the "+" placed nowhere (`no_act`: there was no op)
+  if ((typeof op !== 'string' || !op) && outcome !== 'no_act') return null;
   return {
     id: `${OWN_ACTION_KIND}:${rid()}`,
     type: OWN_ACTION_KIND,
@@ -59,7 +60,7 @@ export function makeOwnActionEntry({ app = null, op, outcome = null, door = 'unk
     silent: true,
     payload: {
       app: typeof app === 'string' && app ? app : null,
-      op,
+      op: typeof op === 'string' && op ? op : null,
       outcome: outcome == null ? null : String(outcome),
       door: DOORS.includes(door) ? door : 'unknown',
     },
@@ -184,3 +185,23 @@ export function ownActionsLines({ on = true, count = 0, t } = {}) {
   return { count: countLine, off: on === false ? t('circle.mydata.own_actions_off') : null };
 }
 
+/**
+ * What no op shows, noted by the door that knows it (the "+", `plusDoor.js`): a proposal the person turned down
+ * (`declined`, naming the act it proposed) and a line placed nowhere (`no_act`, no op). Only these two: an act that ran
+ * is the waist's to record (`recordOwnAction`). Like every own act it needs a person door, follows the switch, and is
+ * best-effort.
+ * @param {{deviceLog?: {append: Function}, enabled?: boolean, app?: string|null, op?: string|null,
+ *   outcome: 'declined'|'no_act', door: string, circleId?: string|null, now?: () => number}} a
+ * @returns {object|null} the entry written, or null
+ */
+export function noteOwnOutcome({ deviceLog, enabled = true, app = null, op = null, outcome, door, circleId = null, now = Date.now } = {}) {
+  if (enabled === false || typeof deviceLog?.append !== 'function') return null;
+  if (!PERSON_DOORS.has(door)) return null;
+  if (outcome !== 'declined' && outcome !== 'no_act') return null;
+  if (outcome === 'declined' && (typeof op !== 'string' || !op)) return null;
+  try {
+    const entry = makeOwnActionEntry({ app, op: outcome === 'no_act' ? null : op, outcome, door, circleId, ts: now() });
+    if (entry) deviceLog.append(entry);
+    return entry;
+  } catch { return null; }
+}

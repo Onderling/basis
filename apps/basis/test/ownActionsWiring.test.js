@@ -76,4 +76,17 @@ describe('own acts at the outer waist', () => {
     expect(a.ownActionRows()).toEqual([]);
     expect(deviceLog.query().filter((e) => e.type !== OWN_ACTION_KIND).length, 'nothing else went').toBe(others);
   });
+
+  it('the "+"\'s notes (a proposal declined, a line placed nowhere) land through the agent, and follow the switch', async () => {
+    const deviceLog = new EventLog({ initial: [], muted: [] });
+    const a = await boot(deviceLog);
+    const before = own(deviceLog).length;
+    a.noteOwnAct({ app: 'lists', op: 'createList', outcome: 'declined', door: 'phrase' });
+    a.noteOwnAct({ outcome: 'no_act', door: 'model' });
+    expect(own(deviceLog).slice(before)).toEqual(['lists.createList:declined', 'null.null:no_act']);
+    await a.callSkill('params', 'set-param', { key: OWN_RECORD_KEY, value: false }, { door: 'tap' });
+    const off = own(deviceLog).length;
+    a.noteOwnAct({ outcome: 'no_act', door: 'phrase' });
+    expect(own(deviceLog).length).toBe(off);
+  });
 });

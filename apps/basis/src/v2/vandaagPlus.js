@@ -509,15 +509,13 @@ export function plusDoneLine(result, { opId, args = {}, t } = {}) {
 }
 
 /**
- * What the "+" answers in its thread to a help reading (`plusLineOutcome` kind 'help'): a card's own text, or what the "+"
- * can do: its own acts by name, and that it answers how things work. Both shells say this one line.
- * @param {{acts?: string[], card?: {text: string}|null}} o
- * @param {{t: Function, acts?: object[]}} a
+ * What the "+" answers to a how-to question a help card knows (`plusLineOutcome` kind 'help' with a card): the card's
+ * own text. Plain "help" is generated from what the door offers (`plusHelp`, plusIntro.js).
+ * @param {{card?: {text: string}|null}} o
+ * @returns {string|null}
  */
-export function plusHelpAnswer(o, { t, acts = PLUS_ACTS } = {}) {
-  if (o?.card?.text) return o.card.text;
-  const names = (o?.acts ?? acts.map((a) => a.id)).map((id) => acts.find((a) => a.id === id)).filter(Boolean).map((a) => plusLabel(t, a));
-  return t('circle.vandaag.plus_help', { acts: names.join(', ') });
+export function plusHelpAnswer(o) {
+  return o?.card?.text ?? null;
 }
 
 /**

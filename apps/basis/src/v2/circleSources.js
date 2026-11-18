@@ -41,7 +41,12 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
         // `names` carries what a PERSON called the circle (the rules item's text). Falling back to the
         // id is now a genuine last resort rather than the normal case: it used to be invisible because
         // an id was a slug of the name, and the moment ids became derived every tile showed hex.
-        const raw = (typeof b === 'string') ? { id: b, name: names[b] || nameless(b) } : { ...b, name: b?.name ?? names[b?.id] ?? nameless(b?.id) };
+        // …and a circle called by the placeholder is MARKED so (`unnamed`): a reader that says what is new (the "+") waits
+        // for its real name instead of announcing the word
+        const id = typeof b === 'string' ? b : b?.id;
+        const real = typeof b === 'string' ? names[b] : (b?.name ?? names[b?.id]);
+        const raw = (typeof b === 'string') ? { id: b, name: real || nameless(b) } : { ...b, name: real ?? nameless(id) };
+        if (!real) raw.unnamed = true;
         // The help circle is a system circle whose title is localised chrome, so its name comes from
         // the locale rather than from what anyone typed.
         if (helpName && raw.id === HELP_CIRCLE_ID) raw.name = helpName;
@@ -53,7 +58,7 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
     // and none of those may reach a circle the person is out of. Only the tile painter reads this.
     fetchRemoved: async () => {
       const res = await call('listMyCircles');
-      return (Array.isArray(res?.removed) ? res.removed : []).filter((r) => r?.id).map((r) => ({ id: r.id, name: r.name || nameless(r.id), removed: true }));
+      return (Array.isArray(res?.removed) ? res.removed : []).filter((r) => r?.id).map((r) => ({ id: r.id, name: r.name || nameless(r.id), removed: true, ...(r.name ? {} : { unnamed: true }) }));
     },
     // NO `fetchCircles` here. It used to read an optional `@onderling/circles` store off the agent — and
     // nothing has EVER assigned `agent.circlesStore`, on any branch, in 4,422 commits. So the branch was

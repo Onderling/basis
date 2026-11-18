@@ -26,6 +26,8 @@ export function normalizeCircle(raw = {}) {
     lastActivity: raw.lastActivity ?? raw.lastMessageAt ?? raw.updatedAt ?? null,
     features: Array.isArray(raw.features) ? raw.features : null,
     ...(raw.removed === true ? { removed: true } : {}),
+    // no name reached this device: the name is a placeholder (the sources' word) or the id itself
+    ...(raw.unnamed === true || (raw.name == null && raw.title == null) ? { unnamed: true } : {}),
   };
 }
 
@@ -49,9 +51,12 @@ export function mergeCircles(...sources) {
 }
 
 function mergeOne(a, b) {
+  // a real name from either source wins over a placeholder
+  const named = a.unnamed && !b.unnamed ? b : a;
   return {
     id: a.id,
-    name: a.name ?? b.name,
+    name: named.name ?? b.name,
+    ...(a.unnamed && b.unnamed ? { unnamed: true } : {}),
     kind: a.kind ?? b.kind,
     memberCount: a.memberCount ?? b.memberCount,
     lastActivity: pickLatest(a.lastActivity, b.lastActivity),

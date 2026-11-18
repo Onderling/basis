@@ -1591,10 +1591,6 @@
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
-    "plus_help": {
-      "text": "I can do this for you: {{acts}}. Lists too: \"new list Shopping\", \"add milk to Shopping\". Or ask me how something works.",
-      "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
-    },
     "plus_line_unread": {
       "text": "I could not read that. Type \"help\" to see what I can do, or fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."
@@ -1898,6 +1894,18 @@
     "plus_news_circle": {
       "text": "New: you are now in {{circle}} too. You can have me do things there.",
       "doc": "A later open of the \"+\": the circles ({{circle}}, comma-separated) the person joined since they were last told; said once."
+    },
+    "plus_help_reads": {
+      "text": "I can show: {{reads}}",
+      "doc": "\"help\" in the \"+\": what it reads here ({{reads}}: its read ops by their \"/\" names), generated."
+    },
+    "plus_help_makes": {
+      "text": "I can make for you: {{acts}}",
+      "doc": "\"help\" in the \"+\": what it makes ({{acts}}: the own acts by name), generated."
+    },
+    "plus_help_no_model": {
+      "text": "Without a model I read fixed sentences. You set a model under {{place}}.",
+      "doc": "\"help\" in the \"+\", last line with no own model set: what it does without one and where to set one ({{place}}: the screens' labels joined by arrows). Fable's words."
     }
   },
   "screens": {

@@ -707,8 +707,9 @@ const makeStyles = (theme) => StyleSheet.create({
   rowAct:              { paddingVertical: 4, paddingHorizontal: 6, marginLeft: 'auto' },
   rowActText:          { fontSize: 13, color: theme.color.inkSoft },
   taskRowCompact:      { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  taskCircle:          { fontSize: 10, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0 },
-  taskCircleCompact:   { fontSize: 9,  fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 },
+  // the circle's tag on its own line above the task: beside it, a long name took the width and the task wrapped per word
+  taskCircle:          { fontSize: 10, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0, flexBasis: '100%' },
+  taskCircleCompact:   { fontSize: 9,  fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0, flexBasis: '100%' },
   taskText:            { fontSize: 14, color: theme.color.ink, flex: 1 },
   taskTextCompact:     { fontSize: 12, color: theme.color.ink, flex: 1, lineHeight: 16 },
   // S6.B — accent-tinted background flashed on the row a "See also" chip

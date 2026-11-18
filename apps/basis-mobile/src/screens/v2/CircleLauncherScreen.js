@@ -1508,7 +1508,7 @@ export default function CircleLauncherScreen({
     setLoading(true);
     try {
       const sources = resolveSkill
-        ? circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name })
+        ? circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed') })
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);

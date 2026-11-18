@@ -61,7 +61,7 @@ const LIST_SCHEMA = Object.freeze({
 const LIST_ITEM_SCHEMA = Object.freeze({
   iri: `${NAMESPACE}ListItem`,
   type: 'object',
-  properties: { type: { const: 'list-item' }, text: { type: 'string', minLength: 1 }, completedAt: { type: ['number', 'null'] } },
+  properties: { type: { const: 'list-item' }, text: { type: 'string', minLength: 1 }, completedAt: { type: ['number', 'null'] }, quantity: { type: 'integer', minimum: 1 } },
   required: ['type', 'text'],
 });
 /** A board: a HETEROGENEOUS container with NO default child type, so "+ add" is a genuine choice. */

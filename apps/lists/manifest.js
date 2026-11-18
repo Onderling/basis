@@ -103,7 +103,7 @@ export const listsManifest = {
         // A THING the entry stands for (a product in a shop's range, say): a type word and a reference, as the toolbox
         // that offered it names them. Kept in the entry's own `embeds` as a plain reference; the list never learns what
         // the thing is (nothing here branches on the type). Two adds of the same thing are one entry, its quantity raised.
-        { name: 'ref', kind: 'object', required: false, schema: { type: 'object', properties: { type: { type: 'string', minLength: 1 }, ref: { type: 'string', minLength: 1 } }, required: ['type', 'ref'] } },
+        { name: 'ref', kind: 'object', required: false, form: false, schema: { type: 'object', properties: { type: { type: 'string', minLength: 1 }, ref: { type: 'string', minLength: 1 } }, required: ['type', 'ref'] } },
         // How many: a whole number, at least one; absent means one.
         { name: 'quantity', kind: 'number', required: false, schema: { type: 'integer', minimum: 1 } },
       ],

@@ -1,0 +1,26 @@
+{
+  "set-param": {
+    "what": "Verander een instelling.",
+    "params": {"key": "welke instelling", "value": "de nieuwe waarde"}
+  },
+  "get-param": {
+    "what": "Laat zien hoe een instelling staat.",
+    "params": {"key": "welke instelling"}
+  },
+  "list-user-params": {
+    "what": "Laat de instellingen zien die je zelf kunt kiezen.",
+    "params": {}
+  },
+  "restore-probe": {
+    "what": "Kijk of de instellingen op je pod hier passen.",
+    "params": {}
+  },
+  "restore-merge": {
+    "what": "Kies per instelling: die van dit apparaat of die van je pod.",
+    "params": {"choices": "je keuze per instelling"}
+  },
+  "restore-resolve-mismatch": {
+    "what": "Kies wat er gebeurt als je pod niet te openen is.",
+    "params": {"choice": "houden, herstellen of overschrijven"}
+  }
+}

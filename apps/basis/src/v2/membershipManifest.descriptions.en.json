@@ -1,0 +1,38 @@
+{
+  "membership.create": {
+    "what": "Record that you started the circle.",
+    "params": {}
+  },
+  "membership.join": {
+    "what": "Record that someone becomes a member.",
+    "params": {}
+  },
+  "membership.leave": {
+    "what": "Record that you leave the circle.",
+    "params": {}
+  },
+  "membership.evict": {
+    "what": "Record that an admin removes a member.",
+    "params": {}
+  },
+  "membership.role": {
+    "what": "Record that someone's role changes.",
+    "params": {}
+  },
+  "membership.addressRevoke": {
+    "what": "Withdraw one of your devices' addresses.",
+    "params": {}
+  },
+  "membership.personKey": {
+    "what": "Tell the circle your new key.",
+    "params": {}
+  },
+  "membership.rulesAccept": {
+    "what": "Agree again to the circle's rules.",
+    "params": {}
+  },
+  "membership.props": {
+    "what": "Change what others see of you: your name, your picture.",
+    "params": {}
+  }
+}

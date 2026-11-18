@@ -10,6 +10,7 @@
  *     one data part `{operation, input}`;
  *   - the answer is `result.message.parts[0].data`: `{operation, output}`, or the tool's own error
  *     `{operation, error: {code, params}}` at HTTP 200; the endpoint's own errors are JSON-RPC errors with a status.
+ * Both fetches refuse a redirect (`redirect: 'error'`): the key goes to the address that was asked, never on.
  * Every failure ends in ONE code (never a throw): `toolbox-unreachable` · `toolbox-unauthorized` · `toolbox-error` ·
  * `toolbox-timeout` · `toolbox-bad-answer` · `toolbox-no-endpoint` · `tool-error` (+ the tool's own `toolCode`).
  *
@@ -39,7 +40,7 @@ function within(ms, promise) {
  * @returns {Promise<{ok: true, name: string, endpoint: string, tools: Array<{id: string, name: string, description: string}>}|{ok: false, code: string}>}
  */
 export async function readToolboxCard(baseUrl, { fetch = globalThis.fetch, timeoutMs = TOOL_CALL_TIMEOUT } = {}) {
-  const r = await within(timeoutMs, Promise.resolve().then(() => fetch(`${trimSlash(baseUrl)}${CARD_PATH}`, { method: 'GET', headers: { Accept: 'application/json' } })));
+  const r = await within(timeoutMs, Promise.resolve().then(() => fetch(`${trimSlash(baseUrl)}${CARD_PATH}`, { method: 'GET', redirect: 'error', headers: { Accept: 'application/json' } })));
   if (r.timedOut) return { ok: false, code: 'toolbox-timeout' };
   if (r.error || !r.value?.ok) return { ok: false, code: 'toolbox-unreachable' };
   let card;
@@ -69,7 +70,7 @@ export async function callTool({ endpoint, key, tool, input = {}, fetch = global
     params: { message: { messageId: messageId(), role: 'ROLE_USER', parts: [{ data: { operation: tool, input: input ?? {} } }] } },
   };
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json', 'A2A-Version': '1.0', ...(key ? { Authorization: `Bearer ${key}` } : {}) };
-  const r = await within(timeoutMs, Promise.resolve().then(() => fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) })));
+  const r = await within(timeoutMs, Promise.resolve().then(() => fetch(endpoint, { method: 'POST', redirect: 'error', headers, body: JSON.stringify(body) })));
   if (r.timedOut) return { ok: false, code: 'toolbox-timeout' };
   if (r.error) return { ok: false, code: 'toolbox-unreachable' };
   let json = null;

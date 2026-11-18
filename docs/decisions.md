@@ -2026,7 +2026,8 @@ tool (`tools.useTool {toolbox, tool, input}`), so the bot's closed op map stays 
 data of the toolbox. No capability row and no feature per toolbox: switching a toolbox on is the switch. The box's
 operator PLACES a toolbox (one file with its name, address and words, beside its key); no chat line carries an
 address, a tool id or a key; a placed toolbox is off until the admin's yes in their own private chat. The wire is
-current A2A (1.0, JSON-RPC `SendMessage`) through one small client with no dependency. A tool's answer that is a list
+current A2A (1.0, JSON-RPC `SendMessage`) through one small client with no dependency: Basis turns to current A2A,
+and core's older transport (`packages/core/src/a2a`, an earlier REST draft) keeps its name. A tool's answer that is a list
 of things is a schema.org `ItemList` of Things; a list entry made from one refers to it as `{type: its @type, ref: its
 identifier}`, as given, with the toolbox beside it as `source` (never identity, so the toolbox's own page and the chat
 land on the same entry). The answer borrows the property vocabulary's TERMS (schema.org), not its disclosure policy. A

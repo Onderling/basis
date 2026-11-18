@@ -116,12 +116,58 @@ describe('the door\'s words for a toolbox', () => {
   it('a refusal is a sentence by code (never the key); help and welcome lines come from the words that are on', async () => {
     const { toolboxRefusalText, toolboxHelpLines, toolboxWelcomeLine } = await import('../../src/v2/toolboxes.js');
     const t = (k, p) => `${k} ${JSON.stringify(p ?? {})}`;
-    expect(toolboxRefusalText({ ok: false, code: 'toolbox-no-key', name: 'boodschappen' }, t)).toBe('circle.bot.toolbox_no_key {"name":"boodschappen","title":"boodschappen","tool":""}');
+    expect(toolboxRefusalText({ ok: false, code: 'toolbox-no-key', name: 'boodschappen' }, t)).toBe('circle.bot.toolbox_no_key {"name":"boodschappen","title":"boodschappen","tool":"","word":""}');
     expect(toolboxRefusalText({ ok: true }, t)).toBeNull();
     const words = [{ word: 'zoek', toolbox: 'boodschappen', title: 'Boodschappen', says: { nl: 'zoekt producten bij Boodschappen' } }];
     expect(toolboxHelpLines(words, t, 'nl')).toEqual(['circle.bot.toolbox_help_line {"word":"zoek","says":"zoekt producten bij Boodschappen"}']);
     expect(toolboxHelpLines([{ word: 'zoek', title: 'Boodschappen' }], t, 'en')[0]).toContain('toolbox_says_default');
     expect(toolboxWelcomeLine([], t)).toBeNull();
     expect(toolboxWelcomeLine(words, t)).toContain('circle.bot.toolbox_welcome');
+  });
+});
+
+describe('what the admin said yes to is what runs (Fable on #1405)', () => {
+  it('a card whose endpoint is on another host than the placed address is refused; the key never goes there', async () => {
+    const h = harness();
+    const keyless = []; const origFetch = h.ops;
+    const evil = makeToolboxOps({
+      store: { get: async () => null, set: async () => {} }, placedOf: async () => [PLACED], keyOf: async () => KEY,
+      fetch: async (url, init = {}) => { keyless.push({ url, init }); return { ok: true, status: 200, json: async () => ({ ...CARD, supportedInterfaces: [{ url: 'https://elders.example/a2a', protocolBinding: 'JSONRPC' }] }) }; },
+    });
+    await evil.load();
+    expect(await evil.addToolbox({ name: 'boodschappen', confirm: true })).toEqual({ ok: false, code: 'toolbox-no-endpoint', name: 'boodschappen' });
+    expect(keyless.every((c) => !JSON.stringify(c).includes(KEY))).toBe(true);
+    void origFetch;
+  });
+
+  it('both fetches refuse a redirect', async () => {
+    const h = harness(); await on(h);
+    await h.ops.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } });
+    expect(h.calls.length).toBeGreaterThan(1);
+    for (const c of h.calls) expect(c.init.redirect, c.url).toBe('error');
+  });
+
+  it('the yes covers the record it was shown: a changed address or new words switch it off until a new yes', async () => {
+    const h = harness(); await on(h);
+    expect(h.ops.wordsNow().length).toBe(1);
+    h.placed[0] = { ...PLACED, words: [...PLACED.words, { word: 'prijs', tool: 'products.choices', field: 'keys' }] };
+    await h.ops.load();
+    expect(h.ops.wordsNow(), 'new words do not start working unasked').toEqual([]);
+    expect(await h.ops.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } })).toEqual({ ok: false, code: 'toolbox-off', name: 'boodschappen' });
+    expect((await h.ops.listTools({ all: true })).toolboxes[0]).toMatchObject({ on: false, changed: true });
+    await h.ops.addToolbox({ name: 'boodschappen', confirm: true });
+    expect(h.ops.wordsNow().map((w) => w.word)).toEqual(['zoek', 'prijs']);
+  });
+
+  it('a word this door already uses is refused at the switch, and named', async () => {
+    const vault = new Map();
+    const ops = makeToolboxOps({
+      store: { get: async (k) => vault.get(k) ?? null, set: async (k, v) => { vault.set(k, v); } },
+      placedOf: async () => [PLACED], keyOf: async () => KEY, takenWords: () => new Set(['zoek', 'help']),
+      fetch: async () => ({ ok: true, status: 200, json: async () => CARD }),
+    });
+    await ops.load();
+    expect(await ops.addToolbox({ name: 'boodschappen' })).toEqual({ ok: false, code: 'toolbox-word-taken', name: 'boodschappen', word: 'zoek' });
+    expect(await ops.addToolbox({ name: 'boodschappen', confirm: true })).toEqual({ ok: false, code: 'toolbox-word-taken', name: 'boodschappen', word: 'zoek' });
   });
 });

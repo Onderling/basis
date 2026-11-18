@@ -6274,11 +6274,15 @@
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_welcome": {
-      "text": "With a toolbox: {{lines}}.",
+      "text": "You can also say: {{lines}}.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_none_found": {
       "text": "{{title}} found nothing.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_word_taken": {
+      "text": "I already use the word '{{word}}' of {{title}} for something else. Choose another word in the file on the box.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     }
   },

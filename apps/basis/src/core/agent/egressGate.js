@@ -28,7 +28,12 @@ export function externalOrigins(manifests = allManifests()) {
 
 /**
  * Does a call to this origin reach outside? Its manifest declares `'@placed'`, OR no manifest declares the origin at all
- * (fail-safe: an unrecognised target is gated, not trusted). Every known app that declares no placed host is local.
+ * (an unrecognised target). Every known app that declares no placed host is local.
+ *
+ * What the gate then DOES with an unknown origin, said plainly: when the composition declares
+ * `gateInputs` for it, the disclosure path below gates it; when nothing declares its inputs, the call passes on to the
+ * waist unchanged, and the waist itself refuses an origin it does not know (`realAgent` `callSkill` throws
+ * `unknown appOrigin`). So an unknown origin is never SENT anywhere by this gate; the refusal is the waist's.
  */
 export function isExternalEgressOp(appOrigin, _opId, manifests = allManifests()) {
   if (typeof appOrigin !== 'string' || !appOrigin) return false;

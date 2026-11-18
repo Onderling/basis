@@ -396,6 +396,16 @@ extensionVerbsFor(noun, atom)
 
 The words an extension noun's free atom answers to, unless the noun declares its own: `<noun word> <atom>`.
 
+### `firstPartyFirstWords`
+
+**Kind:** function · **Import:** `firstPartyFirstWords` from `'@onderling/app-manifest'`
+
+```js
+firstPartyFirstWords(manifests = [])
+```
+
+The first word of every verb a first-party manifest's ops answer to (also: the words a door's toolbox may not take).
+
 ### `checkExtensionManifest`
 
 **Kind:** function · **Import:** `checkExtensionManifest` from `'@onderling/app-manifest'`

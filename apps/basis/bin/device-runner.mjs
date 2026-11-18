@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -1399,6 +1399,12 @@ if (tgToken || inboxDoor.bridge) {
       try { return readFileSync(path.join(toolboxDir, `${String(name).replace(/[^a-z0-9-]/g, '')}.key`), 'utf8').trim() || null; } catch { return null; }
     },
     log: (tag, what, fields) => walkLog({ kind: 'toolbox', what, ...fields }),
+    // the words this door already uses (its commands, its manifests' gate words, its own gate's examples): not a toolbox's
+    takenWords: () => doorTakenWords({
+      // …and `help`, which the Telegram runner answers itself before the catalogue (src/telegram/runner.js: the slash `help`)
+      commands: ['/help', ...['admin', 'member', 'observer'].flatMap((role) => (scopeCatalogueToRole(doorCatalogue.catalogue(), role, rolesPreset()).commandMenu ?? []).map((e) => e.command))],
+      manifests: Object.values(doorCatalogue.manifestsByOrigin()),
+    }),
   });
   await toolboxes.load();
   toolboxesRef = toolboxes;

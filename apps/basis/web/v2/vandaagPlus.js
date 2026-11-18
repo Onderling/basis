@@ -4,11 +4,11 @@
  * own row, Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
  * Pure render.
  */
-import { PLUS_ACTS, plusLabel, plusCardLabel } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { sectionsOf } from '../../src/v2/screenSections.js';
 
-export function renderVandaagPlus(container, { t, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
+export function renderVandaagPlus(container, { t, lang = 'nl', routeLine = null, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does
   shareTargets = null, onShare,
   // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
@@ -58,6 +58,13 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       container.appendChild(b);
     }
   } else {
+    // which route answers this conversation, and whether it is confidential (the shared line, `plusRouteLine`)
+    if (!editing && routeLine) {
+      const route = document.createElement('p');
+      route.className = 'circle-vandaag-plus__route';
+      route.textContent = routeLine;
+      container.appendChild(route);
+    }
     // the conversation so far: what the person said and what the "+" answered, kept across opens
     if (!editing && Array.isArray(turns) && turns.length) {
       const list = document.createElement('ol');
@@ -86,6 +93,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       const li = document.createElement('input');
       li.type = 'text';
       li.className = 'circle-vandaag-plus__line';
+      li.setAttribute('autocapitalize', 'none');   // a line can be a command or a list item: what was typed stays as typed
       li.value = line ?? '';
       li.placeholder = tr('circle.vandaag.plus_line_ph');
       li.setAttribute('aria-label', tr('circle.vandaag.plus_line_ph'));
@@ -156,13 +164,22 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     form.className = 'circle-vandaag-plus__form';
     form.dataset.act = act.id;
     const inputs = {};
+    // a day was said but no time: the form asks for the time on that day, and Save waits for it (never a time filled in)
+    const askTimeOn = plusMomentNeedsTime(act, values);
     for (const f of act.fields) {
       const label = document.createElement('label');
       label.textContent = f.labelKey ? tr(f.labelKey) : f.name;
       const input = document.createElement('input');
       input.type = f.kind === 'datetime' ? 'datetime-local' : 'text';
       input.name = f.name;
-      if (values?.[f.name] != null) input.value = values[f.name];
+      if (f.kind === 'datetime' && askTimeOn) {
+        // the picker opens on the day that was said; the field stays empty until a time is chosen
+        Object.assign(input, { min: `${askTimeOn}T00:00`, max: `${askTimeOn}T23:59`, required: true });
+        const ask = document.createElement('span');
+        ask.className = 'circle-vandaag-plus__ask-time';
+        ask.textContent = ` ${plusAskTime(act, values, { t: tr, lang })}`;
+        label.appendChild(ask);
+      } else if (values?.[f.name] != null) input.value = values[f.name];
       input.className = `circle-vandaag-plus__${f.name}`;
       label.appendChild(input);
       form.appendChild(label);
@@ -242,14 +259,16 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     const box = document.createElement('div');
     box.className = 'circle-vandaag-plus__card';
     const q = document.createElement('p');
-    q.textContent = tr('circle.vandaag.plus_circle_ask', { line: circleCard.line ?? '' });
+    // the shared wording: the own place confirms the act; a choice of places asks which (phone twin: VandaagPlusModal)
+    const words = plusCardWords(circleCard, { t: tr });
+    q.textContent = words.question;
     box.appendChild(q);
     for (const r of circleCard.to) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__card-in';
       b.dataset.circleId = r.circleId;
-      b.textContent = plusCardLabel(tr, r);
+      b.textContent = words.labelFor(r);
       b.addEventListener('click', () => onCircleRun?.(r.circleId));
       box.appendChild(b);
     }
@@ -261,13 +280,14 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     box.appendChild(no);
     container.appendChild(box);
   }
-  if (done) {
+  // an answer or error the thread already holds is not said twice (shared rule: plusAnswerLineShown)
+  if (plusAnswerLineShown(done, turns)) {
     const p = document.createElement('p');
     p.className = 'circle-vandaag-plus__done';
     p.textContent = done;
     container.appendChild(p);
   }
-  if (error) {
+  if (plusAnswerLineShown(error, turns)) {
     const p = document.createElement('p');
     p.className = 'circle-vandaag-plus__error';
     p.textContent = error;
@@ -279,5 +299,13 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   close.textContent = tr('circle.vandaag.done');
   close.addEventListener('click', () => onClose?.());
   container.appendChild(close);
+  // the line in view when the sheet opens and after each turn (it is painted again then): a long thread above it must
+  // not leave the person looking at old turns with the line below the fold (phone twin: VandaagPlusModal's scrollTo).
+  // Guarded: a layout-less DOM (tests) has no scrollIntoView, and the sheet may not be attached yet on this frame.
+  const lineEl = container.querySelector('.circle-vandaag-plus__line');
+  if (lineEl && !editing && typeof lineEl.scrollIntoView === 'function') {
+    const bring = () => { try { lineEl.scrollIntoView({ block: 'nearest' }); } catch { /* layout-less DOM */ } };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(bring); else bring();
+  }
   return container;
 }

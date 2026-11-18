@@ -47,7 +47,7 @@ export default function CeremonyFlowModal({ visible, deviceId, callSkill, onClos
   const view = visible && inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
   useEffect(() => {
     let alive = true;
-    ceremonyChoices(view?.form ?? null, makePickerFetcher(callSkill, 'household'))
+    ceremonyChoices(view?.form ?? null, makePickerFetcher(callSkill, 'household', t))
       .then((c) => { if (alive) { setChoices(c); setPicked({}); } });
     return () => { alive = false; };
   }, [inst]); // eslint-disable-line react-hooks/exhaustive-deps

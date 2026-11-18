@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { decodeGenericOpId } from '@onderling/app-manifest';
-import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusActs, plusMomentNeedsTime, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, actRunsAtOnce, plusCardWords } from '../../src/v2/vandaagPlus.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 // N CALENDAR days from now at this clock time — never `now + N × 24h`, which on a DST night lands on the wrong day
 const daysFromNow = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
@@ -23,7 +23,7 @@ describe('Vandaag — the "+"', () => {
   it('an entry not declared for the own scope never appears on Vandaag (a circle composer entry stays a circle\'s)', () => {
     const acts = plusActs({ manifestsByOrigin: {
       lists: { app: 'lists', operations: [{ id: 'createList', surfaces: { attach: { label: 'x' } } }] },
-      calendar: { app: 'calendar', operations: [{ id: 'addEvent', appliesTo: { type: 'calendar-event' }, surfaces: { attach: { label: 'y', scopes: ['own'] } }, params: [] }] },
+      calendar: { app: 'calendar', operations: [{ id: 'addEvent', appliesTo: { type: 'calendar-event' }, scopes: ['own', 'circle'], surfaces: { attach: { label: 'y', buttonIn: ['own'] } }, params: [] }] },
     } });
     expect(acts.map((a) => a.opId)).toEqual(['addEvent']);
   });
@@ -121,21 +121,48 @@ describe('Vandaag — the free line at the top of the sheet', () => {
     expect(plusRead('ooit eens iets')).toBe(null);
     expect(plusRead('  ')).toBe(null);
   });
+  it('a said appointment: the day and the time in words are read, and "ik moet" is no part of its title', () => {
+    const r = plusRead('ik moet vrijdag om half drie naar de tandarts');
+    expect(r?.actId).toBe('calendar.calendar-event');
+    expect(r.values.when).toMatch(/T14:30$/);
+    expect(r.values.title).toBe('naar de tandarts');
+    expect(plusRead('I need to see the dentist tomorrow at half past two')?.values?.title).toBe('see the dentist');
+  });
+  it('a line that only POINTS back ("zet dat morgen om 10 in mijn agenda") is not read: only a model with the turns knows what', () => {
+    expect(plusRead('zet dat morgen om 10 in mijn agenda')).toBe(null);
+    expect(plusRead('put that in my calendar tomorrow at 10')).toBe(null);
+    // an article that also points opens an ordinary title; an act word still names its act
+    expect(plusRead('het etentje morgen om 7')?.values?.title).toBe('het etentje');
+    expect(plusRead('afspraak morgen 14:00 dat ding')?.actId).toBe('calendar.calendar-event');
+    // "dat" joining a clause that says what: still read (the line says something of its own)
+    expect(plusRead('onthoud dat de vuilnis dinsdag buiten gaat')).not.toBe(null);
+  });
+  it('a day without a time keeps the day and fills in NO time: the form asks for it (no 09:00 nobody said)', () => {
+    const a = plusRead('afspraak morgen tandarts');
+    expect(a.actId).toBe('calendar.calendar-event');
+    expect(a.values.when).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const act = PLUS_ACTS.find((x) => x.id === a.actId);
+    expect(plusMomentNeedsTime(act, a.values)).toBe(a.values.when);
+    // a time said: nothing to ask
+    const b = plusRead('afspraak morgen 14:00 tandarts');
+    expect(plusMomentNeedsTime(act, b.values)).toBe(null);
+    // a note has no moment: nothing to ask
+    expect(plusMomentNeedsTime(PLUS_ACTS.find((x) => x.id === 'household.note'), { body: 'x' })).toBe(null);
+  });
+  it('a QUESTION that mentions a day is not an appointment (a question is not an act)', () => {
+    for (const line of ['what is the weather tomorrow', 'wat is het weer morgen', 'is het morgen mooi weer?', 'hoe laat begint het morgen']) {
+      expect(plusRead(line), line).toBe(null);
+    }
+    // an act word still names its act, question mark or not; a plain line with a day stays an appointment
+    expect(plusRead('afspraak morgen 14:00 tandarts?')?.actId).toBe('calendar.calendar-event');
+    expect(plusRead('tandarts vrijdag 10:30')?.actId).toBe('calendar.calendar-event');
+  });
   it('a reading that names an act outside the sheet (a circle\'s list, the household\'s chores) is no reading', () => {
     expect(plusRead('zet melk op de boodschappen')).toBe(null);
   });
   it('whatever it reads compiles on the OWN scope — never a circle', () => {
     const r = plusRead('notitie: melk');
     expect(plusOp(r.actId, r.values).args.circleId).toBe(OWN_DEVICES_SCOPE);
-  });
-  it('a model is asked with the sheet\'s acts and the own scope only, and never widens either', async () => {
-    let asked = null;
-    const ok = await plusReadWithModel('iets', { ask: async (line, bounds) => { asked = bounds; return { actId: 'household.note', values: { body: 'x', circleId: 'kring' } }; } });
-    expect(asked.scope).toBe(OWN_DEVICES_SCOPE);
-    // the acts that make something — feedback opens a thread from its button, never from a read line
-    expect(asked.acts.map((a) => a.actId)).toEqual(['household.note', 'calendar.calendar-event']);
-    expect(ok).toEqual({ actId: 'household.note', values: { body: 'x' } });
-    expect(await plusReadWithModel('iets', { ask: async () => ({ actId: 'household.addItem', values: { text: 'x' } }) })).toBe(null);
   });
 });
 
@@ -145,6 +172,8 @@ describe('the "+" free line read by the person\'s OWN model', () => {
     const local = { invoke: async () => ({}) };
     expect(ownModelClient({ userCfg: { preset: 'off' }, providers: { local } })).toBe(null);
     expect(ownModelClient({ userCfg: null, providers: { local } }), 'the deployment\'s env route is not the person\'s').toBe(null);
+    const cloud = { invoke: async () => ({}) };
+    expect(ownModelClient({ userCfg: null, providers: { local, cloud } }), 'a circle\'s route present, no own route: the "+" stays without a model (gate only)').toBe(null);
     expect(ownModelClient({ userCfg: { preset: 'local-ollama' }, providers: { local } }), 'a preset without its address is no route').toBe(null);
     expect(ownModelClient({ userCfg: { preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434' }, providers: { local } })).toBe(local);
     const { ownModelOf } = await import('../../src/v2/userLlmRuntime.js');
@@ -152,19 +181,25 @@ describe('the "+" free line read by the person\'s OWN model', () => {
     expect(ownModelOf({ preset: 'off' })).toBe(null);
     expect(ownModelOf({ preset: 'confidential-proxy', llmBaseUrl: 'https://example.org' }), 'a refused confidential route is no model').toBe(null);
   });
-
-  it('the ask sends the line only, with the acts and the own scope as bounds, and reads the JSON answer back', async () => {
-    let sent = null;
-    const client = { invoke: async (req) => { sent = req; return { replyText: 'Sure: {"actId":"calendar.calendar-event","values":{"title":"kapper","when":"2026-10-20T10:00"}}' }; } };
-    const r = await plusReadWithModel('morgen 10 uur kapper', { ask: plusModelAsk(client) });
-    expect(r).toEqual({ actId: 'calendar.calendar-event', values: { title: 'kapper', when: '2026-10-20T10:00' } });
-    expect(sent.messages).toEqual([{ role: 'user', content: 'morgen 10 uur kapper' }]);
-    expect(sent.system).toContain('household.note');
-    expect(sent.system).toContain(OWN_DEVICES_SCOPE);
-    expect(sent.tools ?? null).toBe(null);
-    // an unreadable answer is no reading
-    expect(await plusReadWithModel('x', { ask: plusModelAsk({ invoke: async () => ({ replyText: 'geen idee' }) }) })).toBe(null);
-    expect(plusModelAsk(null)).toBe(null);
-  });
 });
 
+
+describe('the "+" card in words: the own place asks to confirm the act, a choice of places asks which', () => {
+  const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
+  it('one choice, the own place: the act named, and Bevestigen; no "in which circle?"', () => {
+    // the help's name for the act (circle.bot.help.ops.<app>.<op>), as the locale has it
+    const t = (k, v) => (k === 'circle.bot.help.ops.lists.createList' ? 'een nieuwe lijst' : v ? `${k} ${JSON.stringify(v)}` : k);
+    const card = { line: 'maak een lijstje voor de vakantie', to: [{ circleId: 'own', name: '', own: true }], command: { appOrigin: 'lists', opId: 'createList', args: { text: 'vakantie' } } };
+    const w = plusCardWords(card, { t });
+    expect(w.question).toContain('circle.vandaag.plus_own_confirm');
+    expect(w.question).toContain('een nieuwe lijst');
+    expect(w.question).not.toContain('plus_circle_ask');
+    expect(w.labelFor(card.to[0])).toBe('circle.confirm.accept');
+  });
+  it('a choice of places: which circle, one button per place', () => {
+    const card = { line: 'zet kaas op Boodschappen', to: [{ circleId: 'own', own: true }, { circleId: 'c1', name: 'Thuis' }], command: { opId: 'addToList' } };
+    const w = plusCardWords(card, { t });
+    expect(w.question).toContain('circle.vandaag.plus_circle_ask');
+    expect(w.labelFor(card.to[1])).toContain('Thuis');
+  });
+});

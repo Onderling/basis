@@ -181,7 +181,11 @@ describe('the router', () => {
 describe('through the controller — the screen actually asks the room', () => {
   it('askRoom reports the real reach and the other device\'s screen lists the ask', async () => {
     const { a, b } = pair();
-    const screenA = createNearbyScreen({ ...a.screenDeps(), t: (k) => k, now });
+    // A is SEEN by the room (a level chosen, a control that announces): a hidden person's question is refused by the
+    // controller itself (nearbyHiddenSays.test.js)
+    let report = null;
+    const control = { set: (state) => { report = { requested: state, effective: state, degraded: false, perTransport: [] }; return report; }, report: () => report, subscribe: () => () => {} };
+    const screenA = createNearbyScreen({ ...a.screenDeps(), control, levelChosen: () => true, t: (k) => k, now });
     const screenB = createNearbyScreen({ ...b.screenDeps(), t: (k) => k, now });
     screenA.open(); screenB.open();
     const r = await screenA.askRoom({ text: 'anyone have a ladder?' });

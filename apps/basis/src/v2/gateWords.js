@@ -41,6 +41,30 @@ export function helpQuestionOpeners(words = GATE_WORDS) {
   return out;
 }
 
+/** How a person opens a line saying what they will do ("ik moet", "I need to"; the gate files' `_lead.words`), every
+ *  language together, lower-cased, longest first: not part of the title of what the line makes. */
+export function leadWords(words = GATE_WORDS) {
+  const out = new Set();
+  for (const entries of Object.values(words)) for (const w of entries?._lead?.words ?? []) out.add(String(w).toLowerCase());
+  return [...out].sort((a, b) => b.length - a.length);
+}
+
+/** Words that point back at something said before ("zet DAT morgen in mijn agenda"; the gate files' `_refers.words`),
+ *  every language together, lower-cased: only a model with the previous turns knows what such a line is about. */
+export function referringWords(words = GATE_WORDS) {
+  const out = new Set();
+  for (const entries of Object.values(words)) for (const w of entries?._refers?.words ?? []) out.add(String(w).toLowerCase());
+  return out;
+}
+
+/** The words around a pointing word in such a request ("zet … in mijn agenda"; `_refers.around`), every language
+ *  together, lower-cased: a line of only these and a pointing word says nothing of its own. */
+export function referringAround(words = GATE_WORDS) {
+  const out = new Set();
+  for (const entries of Object.values(words)) for (const w of entries?._refers?.around ?? []) out.add(String(w).toLowerCase());
+  return out;
+}
+
 /** The whole lines that ask for help, every language together, lower-cased. */
 export function helpWords(words = GATE_WORDS) {
   const out = new Set();

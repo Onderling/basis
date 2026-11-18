@@ -293,8 +293,11 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   notice: { fontSize: 13, color: theme.color.accent, paddingVertical: 4 },
   section: { borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, padding: 12, gap: 10, backgroundColor: theme.color.paper },
   sectionTitle: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: theme.color.inkSoft },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  name: { flex: 1, fontSize: 14, color: theme.color.ink },
+  // wrap, as web's row does: with `flex: 1` (basis 0) and no floor, the role, its 'via' line and two buttons squeezed
+  // the name to one letter per line on a phone (seen on the Samsung and the emulator). The name keeps a floor; what
+  // does not fit beside it moves to the next line.
+  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 6 },
+  name: { flexGrow: 1, flexShrink: 1, minWidth: 96, fontSize: 14, color: theme.color.ink },
   role: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: theme.color.accent },
   // A caretaker holds the circle because nobody else was left to — a state of the circle, not a
   // title someone was given, so it reads softer than the badge beside it.

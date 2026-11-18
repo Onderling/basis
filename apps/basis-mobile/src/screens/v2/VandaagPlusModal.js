@@ -5,13 +5,15 @@
  * host's (`onSave(actId, values, asSelf)` / `onRead(line, asSelf)` / `onRemove(actId)` → null, or the line to show). A moment
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
-import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
+import { conversationSelf } from '../../../../basis/src/assistant/plusDoor.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
-import { t } from '../../core/localisation.js';
-import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardLabel } from '../../../../basis/src/v2/vandaagPlus.js';
+import { t, lang } from '../../core/localisation.js';
+import { PLUS_ACTS, plusLabel, actRunsAtOnce, plusCardWords, plusMomentNeedsTime, plusAskTime, plusAnswerLineShown } from '../../../../basis/src/v2/vandaagPlus.js';
+import { useSheetCap, SHEET_SCROLL } from './sheetCap.js';   // the card's cap in window pixels, the scroll may shrink to it
 import ThemedTextInput from './ThemedTextInput.js';   // every text input's colours come from the theme (lint-themed-inputs)
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
@@ -24,6 +26,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the line read to an act more than one circle holds: the card asks which; a pick → `onCircleRun(card, circleId)`, which
   // runs it as the person and answers `{done}` (what it did) or `{error}`; nothing runs before a pick
   onCircleRun = null,
+  // the card's no (Cancel): `onCircleCancel(card, asSelf)`, so the conversation says the line was not done
+  onCircleCancel = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
   // an act that makes nothing (feedback): the host runs it at once — the sheet only hands it over
@@ -34,15 +38,29 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the kept conversation with the assistant (`createPlusThread(...).turns()`: `{who, text}`, oldest first) and how to
   // empty it — web twin: vandaagPlus.js `plus-thread`
   turns = [], onForget = null,
+  // the line naming the route that answers (`plusRouteLine`, shared): painted above the conversation
+  routeLine = null,
   // what can be typed here: `suggestFor(line)` → the lines to offer (shared `plusSuggest` over the sheet's pool)
   suggestFor = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const sheetCap = useSheetCap(0.92);
   const [actId, setActId] = useState(null);
+  // the sheet scrolls (a long thread, the "/" list): the line is brought into view whenever its place changes, so on
+  // open and after each turn the person sees the line, not old turns (web twin: scrollIntoView on the line)
+  const scrollRef = useRef(null);
+  const lineInView = (e) => {
+    const y = e?.nativeEvent?.layout?.y;
+    if (typeof y === 'number') scrollRef.current?.scrollTo({ y: Math.max(0, y - 160), animated: false });
+  };
   const [values, setValues] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [asSelf, setAsSelf] = useState(writeAsSelf);
+  // the conversation of the self this is written as (`turns(asSelf)`, the shared door's). With one self or none ticked it
+  // is the general self's (as the door reads it); with several, none until the sheet's question is answered
+  const turnsSelf = conversationSelf(asSelf, Array.isArray(selves) ? selves.length : 0);
+  const shownTurns = typeof turns === 'function' ? (turnsSelf ? turns(turnsSelf) : []) : turns;
   const [line, setLine] = useState('');
   const [card, setCard] = useState(null);
   const [done, setDone] = useState(null);
@@ -52,6 +70,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
+  // closing tells the host which self and which form were open: a form the "+" opened from a line, closed unsaved, is
+  // refused, and the host has the conversation say so (the shared door's `settled`)
+  const closeSheet = () => onClose?.({ asSelf, actId, editing: Boolean(edit?.act) });
   const save = async () => {
     setBusy(true);
     const said = await onSave?.(act.id, values, asSelf);
@@ -75,7 +96,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const read = async () => {
     setDone(null);
     // the ticked self goes with the line: the person's own lists are read and written as that self
-    const r = await onRead?.(line, asSelf);
+    // a slow model is said while the person waits ("even geduld"); its answer replaces it (web twin: circleApp.js)
+    const r = await onRead?.(line, asSelf, { onSlow: () => { setDone(t('circle.bot.slow')); setError(null); } });
     setCard(r?.card && Array.isArray(r.card.to) && r.card.to.length ? r.card : null);
     if (r?.card) setError(null);
     else if (r && 'done' in r) { setDone(r.done ?? null); setError(null); }
@@ -91,27 +113,31 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     if (r?.error) setError(r.error); else { setDone(r?.done ?? null); setError(null); }
   };
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="slide" onRequestClose={closeSheet}>
       <View style={styles.backdrop}>
-        <View style={styles.card} testID="vandaag-plus">
+        <View style={[styles.card, sheetCap]} testID="vandaag-plus">
+          {/* the sheet scrolls: a long thread or the "/" list must never push the line and the first lines off the screen */}
+          <ScrollView ref={scrollRef} style={SHEET_SCROLL} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardBody} testID="vandaag-plus-scroll">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
+          {/* which route answers this conversation, and whether it is confidential (web twin: circle-vandaag-plus__route) */}
+          {!edit && routeLine ? <Text style={styles.route} testID="vandaag-plus-route">{routeLine}</Text> : null}
           {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
           {sectionsOf('plusSheet').map((d) => {
             const piece = {
-              'plus-thread': () => (!edit && Array.isArray(turns) && turns.length ? (
+              'plus-thread': () => (!edit && Array.isArray(shownTurns) && shownTurns.length ? (
             <View testID="vandaag-plus-thread" accessibilityLabel={t('circle.vandaag.plus_thread')}>
-              {turns.map((turn, i) => (
+              {shownTurns.map((turn, i) => (
                 <Text key={`${turn.ts ?? i}-${i}`} testID={`vandaag-plus-turn-${turn.who === 'you' ? 'you' : 'assistant'}`}
                   style={[styles.turn, turn.who === 'you' ? styles.turnYou : null]}>{turn.text}</Text>
               ))}
-              {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={onForget} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
+              {onForget ? <Btn variant="ghost" style={styles.btnAt} onPress={() => onForget(turnsSelf)} testID="vandaag-plus-forget" label={t('circle.vandaag.plus_forget')} /> : null}
             </View>
           ) : null),
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (<>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {/* with a form open the line shows what was said but takes no typing or focus: the form below has them */}
               <ThemedTextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1} editable={!act}
-                placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
+                placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} autoCapitalize="none" testID="vandaag-plus-line" />
               {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
               <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
             </View>
@@ -143,11 +169,15 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               {act.fields.map((f) => (
                 <View key={f.name} style={styles.field}>
                   <Text style={styles.label}>{f.labelKey ? t(f.labelKey) : f.name}</Text>
+                  {/* a day was said but no time: ask for it (web twin); Save waits until the time is there */}
+                  {f.kind === 'datetime' && plusMomentNeedsTime(act, values) ? (
+                    <Text style={styles.label} testID="vandaag-plus-ask-time">{plusAskTime(act, values, { t, lang: lang() })}</Text>
+                  ) : null}
                   <ThemedTextInput style={styles.input} value={values[f.name] ?? ''} testID={`vandaag-plus-${f.name}`}
                     onChangeText={(v) => setValues((cur) => ({ ...cur, [f.name]: v }))} />
                 </View>
               ))}
-              <Btn disabled={busy} onPress={save} testID="vandaag-plus-save" label={t('circle.vandaag.plus_save')} style={styles.btnAt} />
+              <Btn disabled={busy || !!plusMomentNeedsTime(act, values)} onPress={save} testID="vandaag-plus-save" label={t('circle.vandaag.plus_save')} style={styles.btnAt} />
               {edit && onRemove ? (
                 <Btn disabled={busy} onPress={remove} testID="vandaag-plus-remove" label={t('circle.vandaag.plus_remove')} style={styles.btnAt} />
               ) : null}
@@ -181,7 +211,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             }[d.id]?.();
             if (!piece) return null;
             return (
-              <View key={d.id} testID={d.id}>
+              <View key={d.id} testID={d.id} onLayout={d.id === 'plus-line' ? lineInView : undefined}>
                 {d.titleKey ? <Text style={styles.label}>{t(d.titleKey)}</Text> : null}
                 {piece}
               </View>
@@ -189,18 +219,21 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           })}
           {card ? (
             <View testID="vandaag-plus-card">
-              <Text style={styles.label}>{t('circle.vandaag.plus_circle_ask', { line: card.line ?? '' })}</Text>
+              {/* the shared wording: the own place confirms the act; a choice of places asks which (web twin: vandaagPlus.js) */}
+              <Text style={styles.label}>{plusCardWords(card, { t }).question}</Text>
               {card.to.map((r) => (
-                <Btn key={r.circleId} label={plusCardLabel(t, r)}
+                <Btn key={r.circleId} label={plusCardWords(card, { t }).labelFor(r)}
                   onPress={() => runIn(r.circleId)} disabled={busy} testID={`vandaag-plus-card-in-${r.circleId}`} style={styles.btnAt} />
               ))}
-              <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => setCard(null)} testID="vandaag-plus-card-no" style={styles.btnAt} />
+              <Btn variant="ghost" label={t('circle.confirm.cancel')} onPress={() => { const c = card; setCard(null); onCircleCancel?.(c, asSelf); }} testID="vandaag-plus-card-no" style={styles.btnAt} />
             </View>
           ) : null}
-          {done ? <Text style={styles.label} testID="vandaag-plus-done">{done}</Text> : null}
-          {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
+          {/* an answer or error the thread already holds is not said twice (shared rule; web twin: the same call) */}
+          {plusAnswerLineShown(done, shownTurns) ? <Text style={styles.label} testID="vandaag-plus-done">{done}</Text> : null}
+          {plusAnswerLineShown(error, shownTurns) ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
           {/* the way out, not one of the acts */}
-          <Btn variant="ghost" onPress={onClose} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
+          <Btn variant="ghost" onPress={closeSheet} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -209,10 +242,12 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
 
 const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16, gap: 8 },
+  card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16 },
+  cardBody: { gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 4 },
   field: { gap: 4, marginBottom: 8 },
   label: { fontSize: 13, color: theme.color.inkSoft },
+  route: { fontSize: 13, color: theme.color.inkSoft, marginBottom: 6 },
   // a turn of the kept conversation: the assistant's on the left, the person's own to the right
   turn: { fontSize: 14, color: theme.color.ink, marginVertical: 2, alignSelf: 'flex-start' },
   turnYou: { alignSelf: 'flex-end', color: theme.color.inkSoft },

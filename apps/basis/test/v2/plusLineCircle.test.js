@@ -88,16 +88,7 @@ describe('the "+" line: own acts, else the circle act — at once when the circl
   });
 });
 
-describe('a MODEL reading never acts in a circle', () => {
-  it("the model is asked the own scope's acts only; its answer naming a circle's op is no reading", async () => {
-    const { plusReadWithModel } = await import('../../src/v2/vandaagPlus.js');
-    let bounds = null;
-    const ask = async (_line, b) => { bounds = b; return { actId: 'addToList', values: { list: 'Boodschappen', text: 'melk', circleId: 'c1' } }; };
-    expect(await plusReadWithModel('melk halen voor thuis', { ask })).toBeNull();
-    expect(bounds.scope).not.toMatch(/^c1$/);
-    expect(bounds.acts.map((a) => a.actId)).not.toContain('addToList');
-  });
-});
+// a MODEL reading never acts in a circle: the door's tests (plusDoor.test.js, 'a model\'s proposal never widens the "+"')
 
 describe("the sheet's own acts, most used first (this device's counts, an 'own' key space)", () => {
   it('orders by the own counts; acts never used keep their declared order after', async () => {
@@ -108,5 +99,36 @@ describe("the sheet's own acts, most used first (this device's counts, an 'own' 
     f.bump(OWN_USAGE_SCOPE, last.id, 3);
     expect(orderedPlusActs(PLUS_ACTS, f)[0].id).toBe(last.id);
     expect(orderedPlusActs(PLUS_ACTS, null).map((a) => a.id)).toEqual(PLUS_ACTS.map((a) => a.id));
+  });
+});
+
+describe('a line that puts something on a list NOBODY holds asks to make that list, never a chore (help-card audit)', () => {
+  it('"zet melk op boodschappen" with no list of that name anywhere: the own card asks to make it; no task', async () => {
+    const { OWN_DEVICES_SCOPE } = await import('../../src/v2/grantsManifest.js');
+    for (const line of ['zet melk op boodschappen', 'zet melk op de boodschappen']) {
+      const r = plusLineOutcome(line, { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [])], own: { lists: [] } });
+      expect(r, line).toMatchObject({ kind: 'circle', atOnce: false, makeList: 'boodschappen', to: [{ own: true }] });
+      expect(r.command, line).toEqual({ appOrigin: 'lists', opId: 'createList', args: { text: 'boodschappen', circleId: OWN_DEVICES_SCOPE } });
+    }
+  });
+
+  it('the card says so, in the words of the ruling', async () => {
+    const { plusCardWords } = await import('../../src/v2/vandaagPlus.js');
+    const t = (k, v = {}) => (k === 'circle.vandaag.plus_make_list_ask' ? `Een lijst '${v.list}' bestaat nog niet. Maken?` : k);
+    const words = plusCardWords({ line: 'zet melk op boodschappen', makeList: 'boodschappen', to: [{ own: true }], command: { appOrigin: 'lists', opId: 'createList' } }, { t });
+    expect(words.question).toBe("Een lijst 'boodschappen' bestaat nog niet. Maken?");
+  });
+
+  // A line naming a list nobody holds asks to make the list: never a circle's task by a guess.
+  it('"zet zonnebrand en slippers op vakantie" in a circle without that list: asks to make the list, never a circle task', () => {
+    const r = plusLineOutcome('zet zonnebrand en slippers op vakantie', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [])], own: { lists: [] } });
+    expect(r, JSON.stringify(r)).toMatchObject({ makeList: 'vakantie', atOnce: false, command: { opId: 'createList' } });
+    expect(r.circleId ?? null, 'not a circle act').toBeNull();
+    expect(r.command.opId).not.toBe('addTask');
+  });
+
+  it('a list that DOES exist is not asked about: a circle holding it still runs there at once', () => {
+    const r = plusLineOutcome('zet melk op de boodschappen', { circles: [circle('c1', 'Thuis', ['lists', 'tasks'], [SHOP])], own: { lists: [] } });
+    expect(r).toMatchObject({ kind: 'circle', atOnce: true, circleId: 'c1', command: { opId: 'addToList' } });
   });
 });

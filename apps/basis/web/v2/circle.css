@@ -1526,6 +1526,10 @@
 .circle-screen__group > summary { cursor: pointer; font-size: 13px; color: var(--ink-soft); padding: 4px 0; }
 .circle-screen__agenda-moment { flex: 0 0 auto; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 /* Vandaag's onboarding strip: a card per first step, gone once it is done */
+.circle-screen__onb-strip { display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; font-size: 14px; padding: 10px 12px; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); }
+.circle-screen__onb-strip::after { content: ' ▾'; color: var(--ink-soft); }
+.circle-screen__onb-strip[aria-expanded="true"]::after { content: ' ▴'; }
+.circle-screen__onb-nocircle { margin: 6px 0; font-size: 14px; color: var(--ink-soft); }
 .circle-screen__onb-card { padding: 10px 12px; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
 .circle-screen__onb-card h4 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
 .circle-screen__onb-card p { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
@@ -1546,7 +1550,12 @@
 .circle-screen__block--empty { padding: 4px 0; font-size: 14px; color: var(--ink-soft); }
 .circle-screen__more { font: inherit; font-size: 13px; padding: 2px 0; border: 0; background: none; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .circle-screen__more:hover { color: var(--ink); }
-.circle-screen__tasks-circle { flex: 0 0 auto; margin-right: 6px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
+/* the circle's tag on its own line above the task, the task across the row (a long name beside it squeezed the task to
+   one word per line at phone width); the list without the browser's indent, like the other lists */
+.circle-screen__tasks-list { list-style: none; margin: 0; padding: 0; }
+.circle-screen__tasks-row { flex-wrap: wrap; row-gap: 2px; }
+.circle-screen__tasks-text { flex: 1 1 0; min-width: 0; }
+.circle-screen__tasks-circle { flex: 0 0 100%; margin: 0; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
 /* a row's own act ("Change"): a quiet text button, the accent's ink only on hover */
 .circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
 .circle-screen__row-act:hover { color: var(--accent-ink); }
@@ -1561,6 +1570,8 @@
 /* the "+" sheet's fields: the theme's paper and ink, so they follow dark mode (the browser default is a light box) */
 .circle-vandaag-plus input, .circle-vandaag-plus textarea, .circle-vandaag-plus select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
 .circle-vandaag-plus__line { width: 100%; box-sizing: border-box; }
+/* which route answers the "+" conversation, and whether it is confidential: a quiet line above it */
+.circle-vandaag-plus__route { margin: 0 0 6px; font-size: 0.9em; color: var(--ink-soft, inherit); }
 /* each section is a wrapping row of pills with room between them (they sat flush against each other and against the
    line above at laptop width); a section's title, the free line and an act's form take a whole row */
 .circle-vandaag-plus__section { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
@@ -1629,3 +1640,31 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .cc-banner[hidden] { display: none; }
+
+/* THE INTRODUCTION (introDeck.js): one card per screen in the shared overlay; the words carry it, nothing else */
+.circle-intro { display: flex; flex-direction: column; gap: 12px; max-width: 32rem; }
+.circle-intro__position { margin: 0; font-size: 0.85em; color: var(--ink-soft, inherit); }
+.circle-intro__title { margin: 0; }
+.circle-intro__body { margin: 0; line-height: 1.5; }
+.circle-intro__next, .circle-intro__skip { align-self: flex-start; }
+
+/* THE FIRST OPEN (firstOpen.js): the welcome's title, one line, three doors stacked */
+.circle-first-open { display: flex; flex-direction: column; gap: 12px; max-width: 28rem; margin: 15vh auto 0; padding: 0 16px; }
+.circle-first-open__title { margin: 0; }
+.circle-first-open__lead { margin: 0 0 8px; line-height: 1.5; }
+.circle-first-open__door { width: 100%; }
+
+/* THE ROOM CHAT: each line says who and when (nearbyChatLines), small and soft above the words */
+.circle-nearby__chat-meta { font-size: 12px; color: var(--ink-soft); }
+.circle-nearby__chat-line + .circle-nearby__chat-line { margin-top: 6px; }
+
+/* NEARBY'S TWO TABS (nearbyTabs): Conversation and Questions, the same underline tabs as a circle's own */
+.circle-nearby__tabs { display: flex; border-bottom: 1px solid var(--line); margin: 12px 0 10px; }
+.circle-nearby__tab { flex: 1; padding: 10px 6px; background: none; border: none; font: inherit; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.circle-nearby__tab.is-selected { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
+.circle-nearby__panel > * + * { margin-top: 12px; }
+
+/* NEARBY'S STREAM (nearbyStream): a question or an offered circle between the chat lines is a boxed card with a head,
+   so it never reads as one more chat line */
+.circle-nearby__stream-card { margin: 8px 0; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent-ink); border-radius: var(--radius); }
+.circle-nearby__stream-head { font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; }

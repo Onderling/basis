@@ -30,24 +30,9 @@ export const PRIVATEMODE_ENDPOINT = 'https://api.privatemode.ai';
  */
 export const PRIVATEMODE_DEFAULT_MODEL = 'glm-5.3';
 
-/**
- * Privatemode has no unified reasoning switch — it is per model family (`chat_template_kwargs` for
- * Kimi and Gemma, `reasoning_effort` for gpt-oss and GLM). GLM's reasoning cannot be switched off: its
- * `reasoning_effort` takes low | high | max, and with nothing sent it reasons at max (Privatemode's models page,
- * 2026-10-03) — which is why GLM "returned nothing in 5.5 s" in September. A tool pick is a clear task:
- * reasoning off/low keeps latency and tokens down.
- * @param {string} model
- * @param {'off'|'low'|'on'} [thinking='off']
- */
-export function reasoningBodyFor(model, thinking = 'off') {
-  const m = String(model || '').toLowerCase();
-  if (thinking === 'on') return null;
-  if (/kimi/.test(m))   return { chat_template_kwargs: { thinking: false } };
-  if (/gemma/.test(m))  return { chat_template_kwargs: { enable_thinking: false } };
-  if (/gpt-oss/.test(m)) return { reasoning_effort: thinking === 'off' ? 'low' : thinking };
-  if (/glm/.test(m))     return { reasoning_effort: 'low' };   // off and low are both its lowest
-  return null;
-}
+// the model family's reasoning switch: a pure module (the phone bundles it), re-exported here as before
+export { reasoningBodyFor } from './reasoning.js';
+import { reasoningBodyFor } from './reasoning.js';
 
 /**
  * Read the key from the environment or the key file. Returns null when neither exists.
@@ -110,8 +95,9 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
 }
 
 /**
- * Privatemode's prompt cache is off unless a request carries a `cache_salt` (≥256 bits, kept private); requests with the
- * same salt share a cache. One cache per PERSON, not per box: a cache shared by the household would let one person learn,
+ * Privatemode's prompt cache is ON per API KEY even with no `cache_salt` (measured 2026-11-17, four calls on one key: the
+ * second unsalted call had 4,352 of 4,598 prompt tokens cached); a salt (≥256 bits, kept private) SPLITS that cache:
+ * requests with the same salt share one, a fresh salt starts cold. One cache per PERSON, not per key: a cache shared by the household would let one person learn,
  * by how fast an answer comes, whether another sent the same words. So the salt is derived from the box's secret and the
  * request's `cacheKey` (the person's thread) — HMAC-SHA256: neither the secret nor whose it is can be read off it.
  * A request without a key gets the box's own salt.

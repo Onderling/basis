@@ -66,6 +66,8 @@ export {
 // B · Layer 1 — the (verb × noun) CAPABILITY set derived from a manifest
 // (declared `nouns` ∪ derived from ops).  The unit the B gate authorises.
 export { dispatchAtom, dispatchCapability } from './dispatchAtom.js';
+// WHERE an op is offered, declared once on the op (own, circle, contact) and read by every projection
+export { SCOPE_PLACES, opScopes, inScope, buttonScopes } from './scopes.js';
 export {
   capabilitiesOf,
   resolveAtom,

@@ -5,7 +5,7 @@
  * says, and was told "only commands here".
  */
 import { describe, it, expect } from 'vitest';
-import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../../src/assistant/assistantCatalogue.js';
 import { resolveDispatch } from '../../src/router.js';
 import { parseInput } from '../../src/parser.js';
 import { createRealHouseholdAgent } from '../../src/core/agent/realAgent.js';

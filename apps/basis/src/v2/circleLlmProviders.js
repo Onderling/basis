@@ -9,6 +9,8 @@
 
 import { LlmClient } from '@onderling/llm-client';
 import { ollamaProvider } from '@onderling/llm-client/providers/ollama';
+import { reasoningBodyFor } from '@onderling/llm-client/providers/reasoning';
+import { hmacBase64Url } from '@onderling/core';
 
 /**
  * @param {object} [cfg]
@@ -17,15 +19,23 @@ import { ollamaProvider } from '@onderling/llm-client/providers/ollama';
  * @param {(entry:object)=>void} [cfg.audit] optional audit hook (every invoke flows through it)
  * @param {string|null} [cfg.apiKey]         Bearer key for the local/proxy route (Privatemode project key)
  * @param {string|null} [cfg.cloudApiKey]    Bearer key for the cloud route (falls back to apiKey)
+ * @param {string|null} [a.cacheSecret]  a device's prompt-cache secret: each request then carries its conversation's salt
  * @returns {{local?: object, cloud?: object}}
  */
-export function buildCircleLlmProviders({ localBaseUrl = null, model, audit, cloudBaseUrl = null, localModel, cloudModel, apiKey = null, cloudApiKey = null, timeoutMs } = {}) {
+export function buildCircleLlmProviders({ localBaseUrl = null, model, audit, cloudBaseUrl = null, localModel, cloudModel, apiKey = null, cloudApiKey = null, timeoutMs, cacheSecret = null } = {}) {
   // `timeoutMs` overrides the provider's 12s default — too short for a local model's
   // first (cold-load) call (qwen2.5:7b can take 30–60s warming up), which otherwise
   // aborts mid-flight and the bot drops to "basic mode". Pass-through; the app sets a
   // generous default + an env override.
   const mk = (baseUrl, m, key) => new LlmClient({
-    provider: ollamaProvider({ baseUrl: normalizeBase(baseUrl), ...(m ? { model: m } : {}), ...(key ? { apiKey: key } : {}), ...(timeoutMs != null ? { timeoutMs } : {}) }),
+    provider: ollamaProvider({ baseUrl: normalizeBase(baseUrl), ...(m ? { model: m } : {}), ...(key ? { apiKey: key } : {}), ...(timeoutMs != null ? { timeoutMs } : {}),
+      // per request: the model family's low-reasoning switch (GLM with nothing sent reasons at max), and with a cache
+      // secret the conversation's prompt-cache salt: Privatemode caches per KEY without one, so two people behind one
+      // key would share a cache (the box's rule, `cacheSaltFor`; same bytes, `hmacBase64Url`)
+      ...((reasoningBodyFor(m) || cacheSecret) ? { bodyFor: ({ cacheKey } = {}) => ({
+        ...(reasoningBodyFor(m) ?? {}),
+        ...(cacheSecret ? { cache_salt: hmacBase64Url(cacheSecret, `prompt-cache:${cacheKey ?? ''}`) } : {}),
+      }) } : {}) }),
     ...(typeof audit === 'function' ? { audit } : {}),
   });
   const providers = {};

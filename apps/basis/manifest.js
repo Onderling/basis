@@ -282,10 +282,12 @@ export const basisManifest = {
       params: [
         { name: 'screen', kind: 'string' },
       ],
+      // offered in a circle and in the person's own "+"; its BUTTON only in the "+" (attach.buttonIn narrows)
+      scopes: ['circle', 'own'],
       surfaces: {
         slash:  { command: '/feedback' },
         chat:   { reply: 'text', hint: 'open the thread to Onderling to give feedback about the app; never sends anything itself' },
-        attach: { label: 'circle.feedback.plus', scopes: ['own'] },
+        attach: { label: 'circle.feedback.plus', buttonIn: ['own'] },
       },
     },
 
@@ -440,6 +442,8 @@ export const basisManifest = {
      */
     {
       id:    'send-file', visibility: 'authenticated',
+      // sent in a circle and in a contact thread; its BUTTON only in a contact thread (attach.buttonIn narrows)
+      scopes: ['circle', 'contact'],
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
@@ -453,7 +457,7 @@ export const basisManifest = {
         actState: 'bubble',
         // the "+" in a CONTACT thread (Frits: one attach affordance everywhere; a walk found no way to send a file to a
         // contact but the slash): the same projector the circle composer reads, offered only where a contact is
-        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', scopes: ['contact'] },
+        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', buttonIn: ['contact'] },
       },
     },
 
@@ -518,8 +522,8 @@ export const basisManifest = {
      * cross-peer transport.  Frits 2026-05-23: "users must be able to
      * choose either relay or nkn when connecting through internet."
      *
-     *   /set-relay <ws://ip:port>   persist + connect to a relay
-     *   /set-relay --clear          disconnect + clear persisted URL
+     *   /connection-point <ws://ip:port>   persist + connect to a relay
+     *   /connection-point --clear          disconnect + clear persisted URL
      */
     {
       id:    'set-relay', visibility: 'private',
@@ -531,7 +535,8 @@ export const basisManifest = {
         { name: 'clear', kind: 'boolean', required: false },
       ],
       surfaces: {
-        slash: { command: '/set-relay', body: 'flags' },
+        // the typed name says what a person reads (a connection point); the op id stays
+        slash: { command: '/connection-point', body: 'flags' },
         chat:  { reply: 'text', hint: 'set the relay URL (or --clear to drop it)' },
         // Objective D / Surface 4 — first LIVE consumer of openPagePanel's
         // simple-form path (web `pagePanel.js`).  The docked side-panel auto-builds
@@ -1214,6 +1219,8 @@ export const basisManifest = {
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
     // help: the Help circle, where the Onderling bot answers questions about the app (walk row 78: findable from Settings)
     { id: 'help', kind: 'door', labelKey: 'circle.settings_home.help', target: { kind: 'nav', to: 'help' } },
+    // the introduction's seven cards again (src/v2/introDeck.js): once seen, Today's card is gone, so this is the way back
+    { id: 'intro', kind: 'door', labelKey: 'circle.introDeck.reopen', target: { kind: 'nav', to: 'intro' } },
     // feedback about the app: the feedback op (its thread to Onderling, prefilled), the same act /feedback and the "+" run
     { id: 'feedback', kind: 'door', labelKey: 'circle.feedback.plus', target: { kind: 'op', opId: 'feedback' } },
   ],

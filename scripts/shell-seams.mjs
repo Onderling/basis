@@ -290,17 +290,35 @@ export const SEAMS = Object.freeze([
   // THE "+" LINE talks to the person's own agent only: an own act, or a referral to the circle where it lives — opened,
   // never acted on (`plusLineOutcome`, with each circle's availability from `circleAvailabilityFor`). A shell reading the
   // line any other way is how the sheet would come to act in a circle.
-  { id: 'plus-line-outcome', pattern: /plusLineOutcome\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // (the shared "+" door, `createPlusDoor`, reads the line through `plusLineOutcome` itself: a shell composes the door)
+  { id: 'plus-line-outcome', pattern: /createPlusDoor\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // THE BOX AND THE "+": every `plus-*` seam names web and the phone only. The box (the always-on household device) does
+  // not compose the person's own "+": a declared exception until after the alpha (docs/catalogue/assistant.md,
+  // "Decided, not built"); its Telegram door runs the same engine over the household's things.
   // THE "+" IS ONE KEPT CONVERSATION: each read of its line is one exchange in the person's own thread (`exchange` on
   // `createPlusThread`: the line heard, the read run, what it answered kept as the bot's own turn entries). A shell that
   // records the turns any other way says different things in its thread. The box has no "+" sheet: its door already
   // keeps the same turns through `botThreads` (the Telegram thread), so it is not a shell of this seam.
-  { id: 'plus-kept-thread', pattern: /plusThread(Now\(\))?\.exchange\(/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
+  // (since the shared "+" door, the door keeps each exchange in the conversation of the self it is read as: a shell composes
+  // the door with the device's bot threads)
+  // THE "+" SAYS WHICH ROUTE ANSWERS (`plusRouteLine` over `ownRouteOf`): the line at the top of the conversation,
+  // confidential only when the route guard accepts a confidential preset. A shell that words it itself, or leaves it
+  // out, says something else about where the person's words go. The box's door has its own route line.
+  { id: 'plus-route-line', pattern: /plusRouteLine\(/, shells: ['web', 'mobile'], why: 'the "+" names the route that answers and whether it is confidential' },
+  { id: 'plus-kept-thread', pattern: /createPlusDoor\(\{[^}]*threads:/, shells: ['web', 'mobile'], why: 'the "+" opens on the person\'s kept conversation; each read is one shared exchange that keeps the line and the answer' },
+  // A FORM THE "+" OPENED IS SETTLED IN THE CONVERSATION (`settled` on the door): saved, or closed without saving (a
+  // refused proposal: nothing stored, and the thread says so). Both sheets call it from Save and from closing.
+  { id: 'plus-form-settled', pattern: /plusDoorNow\(\)\.settled\(/, shells: ['web', 'mobile'], why: 'a form the "+" opened from a line is said in the conversation once it is saved or closed unsaved' },
+  // THE "+" HAS A "/" LIST: on a "/" word the sheet offers its door's own commands (`suggest` on the door: the same acts its
+  // buttons and its model have), and a "/" line goes through the door's one handler. Both sheets ask the door.
+  { id: 'plus-slash-list', pattern: /plusDoorNow\(\)\.suggest\(/, shells: ['web', 'mobile'], why: 'typing "/" in the "+" offers the door\'s own commands, and picking one opens the same form' },
+  // A SLOW MODEL IS SAID: a read hands the door the sheet's "even geduld" (`onSlow`), painted while the person waits.
+  { id: 'plus-slow', pattern: /plusDoorNow\(\)\.read\([^)]*onSlow/, shells: ['web', 'mobile'], why: 'a model that is slow and retrying is said while the person waits, never a silent sheet' },
   // THE "+" READS THE TICKED SELF'S OWN LISTS FIRST (`plusLineOutcome`'s `own`, read AS that self), and answers what a
   // line did in one shared wording (`plusDoneLine`: an act's reply line, a list's read with done and not done). A shell
   // that leaves the own lists out sends "zet melk op mijn boodschappen" to a circle; one that words the answer itself
   // says something else in the thread.
-  { id: 'plus-own-lists', pattern: /plusLineOutcome\([^)]*own:\s*\{\s*lists:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
+  { id: 'plus-own-lists', pattern: /createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
   { id: 'plus-done-line', pattern: /plusDoneLine\(/, shells: ['web', 'mobile'], why: 'the "+" thread says what a line did in one wording, a list\'s read with done and not done' },
   // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
   // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
@@ -349,12 +367,17 @@ export const SEAMS = Object.freeze([
   // `useSignatureEquation`): node:crypto on the box, WebCrypto's batch on the web. A shell that does not checks every
   // signature in pure JS (~10 ms on a laptop, ~61 ms on a mid-range phone, against ~0.15 ms).
   { id: 'signature-equation', pattern: /install\w*SignatureEquation\(/, why: 'a shell that installs no fast equation checks every signature in pure JS: seconds of a start on a phone' },
+  // NEARBY'S CONVERSATION STREAM AND TAB COUNTS: what the Conversation tab holds in what order (chat lines, question and
+  // circle cards by arrival) and how much is new on each tab are decided by shared functions; a painter that sorts or
+  // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.
+  { id: 'nearby-stream-by-arrival', pattern: /nearbyStream\(/, shells: ['web', 'mobile'], why: 'a Conversation tab ordered by a painter of its own shows one shell a question where the other shows it elsewhere, or not at all' },
+  { id: 'nearby-tab-news', pattern: /nearbyTabNews\(/, shells: ['web', 'mobile'], why: 'a tab count computed in a painter says "3 new" on one shell and nothing on the other' },
   { id: 'redeem-names-pod-webid', pattern: /podWebId:\s*\(?/, why: 'a joiner whose redeem names no pod WebID is admitted with a grant no session holds: the pod refuses every read' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
-  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
+  { name: 'web',    files: ['apps/basis/web/v2/circleApp.js', 'apps/basis/web/v2/circleNearby.js'] },
   { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/core/phoneInboundWiring.js', 'apps/basis-mobile/src/core/phoneAppOps.js', 'apps/basis-mobile/src/core/phonePodReadBack.js', 'apps/basis-mobile/src/core/phonePodSession.js', 'apps/basis-mobile/src/core/circleMedia.js', 'apps/basis-mobile/src/core/circlePods.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);

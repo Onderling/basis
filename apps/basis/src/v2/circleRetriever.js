@@ -303,6 +303,10 @@ export function makePodSearchRetriever({
     let resolved;
     try { resolved = await resolve(ctx); } catch { resolved = null; }
     const emb = normalizeEmbedder(resolved);
+    // No embedder: the lexical tier, by the words a line and an item SHARE (`lexicalRank`). The index's search matches
+    // only when every word of the line is in the item, so a question ("waar ligt de sleutel?") found nothing: its
+    // question words are in no item (measured 2026-11-16). The index earns its place with an embedder (semantic).
+    if (!emb) return lexicalRank(items, text, { limit });
 
     const circleKey = ctx?.circleId != null ? String(ctx.circleId) : '__default__';
     let entry = cache.get(circleKey);

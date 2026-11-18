@@ -16,7 +16,7 @@ import { createTelegramRunner } from '../src/telegram/runner.js';
 import { EventLog } from '../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 
 const t = (k, p) => (p && typeof p === 'object' && Object.keys(p).length ? `${k}:${JSON.stringify(p)}` : k);
 

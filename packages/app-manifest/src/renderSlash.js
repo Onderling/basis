@@ -1,4 +1,5 @@
 import { gateVerbsOf, gateDropTrailingOf } from './gateVerbs.js';
+import { inScope } from './scopes.js';
 
 /**
  * Render the deterministic, generic slash-grammar matcher.
@@ -46,11 +47,12 @@ export function renderSlash(manifest, opts = {}) {
   const typeAliases = grammar.typeAliases ?? {};
   const defaultType = grammar.defaultType;
 
-  const ops      = Array.isArray(manifest?.operations) ? manifest.operations : [];
+  // only the ops offered where this surface asks (`opts.scope`, scopes.js); none asked: all (renderGate passes it on)
+  const ops      = (Array.isArray(manifest?.operations) ? manifest.operations : []).filter((op) => inScope(op, opts.scope));
   const matchers = [];
   for (const op of ops) {
     const m = op?.surfaces?.slash?.match;
-    const verbs = m ? gateVerbsOf(manifest, op, trailLocale) : [];
+    const verbs = m ? gateVerbsOf(manifest, op, trailLocale, (opts && typeof opts.place === 'string') ? opts.place : null) : [];
     if (!verbs.length) continue;
     const verbRes = verbs.map((tokens) => {
       const head   = tokens.map(escapeRe).join('\\s+');

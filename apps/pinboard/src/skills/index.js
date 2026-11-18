@@ -144,6 +144,10 @@ import { encodeContactCard, decodeContactCard } from '../lib/contactCard.js';
  * @param {string|undefined|null} role
  * @returns {boolean}
  */
+/** The rules row a joiner writes when the invite carried no circle name: its text, and the one thing `listMyCircles`
+ *  must never read back as the name (it holds the circle's key). One definition for the writer and the reader. */
+const mirroredRulesPlaceholder = (groupId) => `Rules for ${groupId} (mirrored from invite)`;
+
 function isCircleAdmin(role) {
   const rank = roleRank(role);
   return rank !== undefined && rank >= roleRank(ROLES.COORDINATOR);
@@ -2723,7 +2727,7 @@ export function buildSkills({
             type:       'group-rules',
             text:       (typeof a.name === 'string' && a.name.trim())
               ? a.name.trim()
-              : `Rules for ${a.groupId} (mirrored from invite)`,
+              : mirroredRulesPlaceholder(a.groupId),
             // The doc's OWN version, not a constant: the invite now carries the admin's current doc
             // (L55), and a v3 doc stamped "version 1" made a fresh joiner read as three versions behind
             // a head it already held.
@@ -2953,6 +2957,9 @@ export function buildSkills({
         const gid = it?.source?.groupId;
         if (typeof gid !== 'string' || !gid) continue;
         const label = typeof it.text === 'string' ? it.text.trim() : '';
+        // a joiner's copy made from an invite that carried no name holds a placeholder with the circle's key in it:
+        // not a name (a shell shows no name rather than a key)
+        if (label === mirroredRulesPlaceholder(gid)) continue;
         if (label && !names.has(gid)) names.set(gid, label);
         if (it?.addedBy !== from) continue;
         ids.add(gid);

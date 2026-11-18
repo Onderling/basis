@@ -219,8 +219,8 @@ describe('asks in the room (step F)', () => {
   it('the compose button is always available, even in an empty room', () => {
     const onCompose = vi.fn();
     const el = render(model({ asks: [] }), { onCompose });
-    expect(el.querySelector('.circle-nearby__asks-empty').textContent)
-      .toBe('circle.nearbyScreen.asks_empty');
+    expect(el.querySelector('.circle-nearby__asks'), 'no asks: the part is not painted').toBeNull();
+    expect(el.textContent).not.toContain('asks_empty');
     el.querySelector('.circle-nearby__ask-compose').click();
     expect(onCompose).toHaveBeenCalled();
   });
@@ -449,10 +449,10 @@ describe('circles advertised in the room (step H)', () => {
     expect(actions).toEqual(['join-published-circle']);
   });
 
-  it('an empty room says so', () => {
+  it('no circle offered: the part is not painted at all, no "nothing here" line', () => {
     const el = render(model({ invites: [] }));
-    expect(el.querySelector('.circle-nearby__invites-empty').textContent)
-      .toBe('circle.nearbyScreen.invites_empty');
+    expect(el.querySelector('.circle-nearby__invites')).toBeNull();
+    expect(el.textContent).not.toContain('invites_empty');
   });
 
   it('no untranslated strings in the invite block', () => {
@@ -502,5 +502,185 @@ describe('the first-use question', () => {
   });
   it('is absent when the shell does not ask', () => {
     expect(render(model()).querySelector('.circle-nearby__first-use')).toBe(null);
+  });
+});
+
+describe('the two tabs (Conversation · Questions), painted from the shared list', () => {
+  const panel = (el, tab) => el.querySelector(`.circle-nearby__panel--${tab}`);
+  const sections = (el, tab) => [...panel(el, tab).children].map((n) => n.dataset.section);
+
+  it('a full room: the chat in Conversation; the ask field, my asks, the room\'s asks, who is here, circles in Questions', () => {
+    const el = render(model({
+      allows: { card: false, chat: true }, chat: [{ id: 'm1', text: 'hoi' }],
+      myAsks: [{ ask: { id: 'a0' }, heard: 1, answers: [] }],
+      asks: [{ ask: { id: 'a1', text: 'fiets?' }, actions: [] }],
+      rows: [row()],
+      invites: [{ invite: { circleId: 'c1', circleName: 'C' }, actions: [] }],
+    }));
+    expect([...el.querySelectorAll('.circle-nearby__tab')].map((b) => b.textContent))
+      .toEqual(['circle.nearbyScreen.tab_conversation', 'circle.nearbyScreen.tab_questions']);
+    expect(sections(el, 'conversation')).toEqual(['nearby-chat']);
+    expect(sections(el, 'questions')).toEqual(['nearby-ask-field', 'nearby-my-asks', 'nearby-asks', 'nearby-peers', 'nearby-invites']);
+  });
+
+  it('in the chat: opens on Conversation; clicking Questions shows that one, and a redraw keeps it', () => {
+    const el = document.createElement('div');
+    const m = model({ allows: { card: false, chat: true }, chat: [] });
+    renderCircleNearby(el, { model: m, t });
+    expect(panel(el, 'conversation').hidden).toBe(false);
+    expect(panel(el, 'questions').hidden).toBe(true);
+    el.querySelector('.circle-nearby__tab--questions').click();
+    expect(panel(el, 'questions').hidden).toBe(false);
+    expect(el.querySelector('.circle-nearby__tab--questions').getAttribute('aria-selected')).toBe('true');
+    renderCircleNearby(el, { model: m, t });
+    expect(panel(el, 'questions').hidden, 'the person\'s pick survives a redraw').toBe(false);
+  });
+
+  it('not in the chat: opens on Questions; Conversation says so in one line, with the way to join', () => {
+    const onToggleAllow = vi.fn();
+    const el = render(model({ chat: null }), { onToggleAllow });
+    expect(panel(el, 'questions').hidden).toBe(false);
+    expect(sections(el, 'conversation')).toEqual(['nearby-chat-off']);
+    expect(el.querySelector('.circle-nearby__chat-off-line').textContent).toBe('circle.nearbyScreen.allow_chat_off');
+    el.querySelector('.circle-nearby__chat-join').click();
+    expect(onToggleAllow).toHaveBeenCalledWith('chat', true);
+  });
+
+  it('the "you here" row stays above the tabs', () => {
+    const el = render(model());
+    const mine = el.querySelector('.circle-nearby__mine');
+    expect(mine.compareDocumentPosition(el.querySelector('.circle-nearby__tabs')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('the Conversation stream: questions and offered circles as cards between the chat lines (nearbyStream)', () => {
+  const tv = (k, v = {}) => (Object.keys(v).length ? `${k}(${Object.entries(v).map(([a, b]) => `${a}=${b}`).join(',')})` : k);
+  const room = () => model({
+    allows: { card: false, chat: true },
+    chat: [{ id: 'm1', text: 'hoi', who: 'Ans', at: 100 }, { id: 'm2', text: 'ja', who: 'Jij', at: 300, mine: true }],
+    asks: [{ ask: { id: 'a1', text: 'pomp?', expiresAt: Date.now() + 120_000 }, receivedAt: 200, who: 'Bob', resonant: true, reason: 'fietsen', actions: ['answer-ask', 'dismiss-ask'] }],
+    invites: [{ invite: { circleId: 'c1', circleName: 'Tuin', receivedAt: 400 }, who: 'Dirk', actions: ['join-published-circle'] }],
+  });
+  const streamOf = (el) => [...el.querySelector('[data-section="nearby-chat"]').children]
+    .filter((n) => n.matches('.circle-nearby__chat-line, .circle-nearby__stream-card'))
+    .map((n) => n.dataset.streamKind ?? 'line');
+
+  it('in arrival order, oldest first; each card boxed and headed with who, so it does not read as a chat line', () => {
+    const el = document.createElement('div');
+    renderCircleNearby(el, { model: room(), t: tv });
+    expect(streamOf(el)).toEqual(['line', 'ask', 'line', 'invite']);
+    const ask = el.querySelector('.circle-nearby__stream-card[data-stream-kind="ask"]');
+    expect(ask.querySelector('.circle-nearby__stream-head').textContent).toBe('circle.nearbyScreen.stream_ask_from(name=Bob)');
+    expect(ask.querySelector('.circle-nearby__ask-reason').textContent).toContain('fietsen');
+    expect(ask.querySelector('.circle-nearby__ask-clock').textContent).toContain('ask_expires_in');
+    const inv = el.querySelector('.circle-nearby__stream-card[data-stream-kind="invite"]');
+    expect(inv.querySelector('.circle-nearby__stream-head').textContent).toBe('circle.nearbyScreen.stream_invite_from(name=Dirk)');
+  });
+
+  it('Answer / Dismiss / Join on a card go through the same handlers as the Questions tab', () => {
+    const onAskAction = vi.fn(); const onInviteAction = vi.fn();
+    const el = document.createElement('div');
+    const m = room();
+    renderCircleNearby(el, { model: m, t, onAskAction, onInviteAction });
+    const card = el.querySelector('.circle-nearby__stream-card[data-stream-kind="ask"]');
+    card.querySelector('[data-action="answer-ask"]').click();
+    card.querySelector('[data-action="dismiss-ask"]').click();
+    expect(onAskAction.mock.calls).toEqual([['answer-ask', m.asks[0].ask], ['dismiss-ask', m.asks[0].ask]]);
+    el.querySelector('.circle-nearby__stream-card[data-stream-kind="invite"] [data-action="join-published-circle"]').click();
+    expect(onInviteAction).toHaveBeenCalledWith('join-published-circle', m.invites[0].invite);
+  });
+
+  it('the question and the circle stay in the Questions tab too', () => {
+    const el = render(room());
+    expect(el.querySelector('[data-section="nearby-asks"] .circle-nearby__ask[data-ask-id="a1"]')).not.toBeNull();
+    expect(el.querySelector('[data-section="nearby-invites"] .circle-nearby__invite[data-circle-id="c1"]')).not.toBeNull();
+  });
+
+  it('each tab counts what is new; the open tab is seen, opening the other one marks it seen', () => {
+    const el = document.createElement('div');
+    renderCircleNearby(el, { model: room(), t: tv });
+    const label = (id) => el.querySelector(`.circle-nearby__tab--${id}`).textContent;
+    // Conversation is open (in the chat): seen. Questions: the question and the circle are new.
+    expect(label('conversation')).toBe('circle.nearbyScreen.tab_conversation');
+    expect(label('questions')).toBe('circle.nearbyScreen.tab_with_new(label=circle.nearbyScreen.tab_questions,count=2)');
+    el.querySelector('.circle-nearby__tab--questions').click();
+    expect(label('questions')).toBe('circle.nearbyScreen.tab_questions');
+    // a new chat line arrives while Questions is open: Conversation counts it
+    const next = room();
+    next.chat.push({ id: 'm3', text: 'nog iets', who: 'Ans', at: 500 });
+    renderCircleNearby(el, { model: next, t: tv });
+    expect(label('conversation')).toBe('circle.nearbyScreen.tab_with_new(label=circle.nearbyScreen.tab_conversation,count=1)');
+    expect(label('questions')).toBe('circle.nearbyScreen.tab_questions');
+  });
+});
+
+describe('hidden from the room: Conversation shows no stream, one line and the way to become visible', () => {
+  const hiddenRoom = (over = {}) => model({
+    allows: { card: false, chat: true },
+    chat: [{ id: 'm1', text: 'hoi', who: 'Ans', at: 100 }],
+    visibility: { publishing: false, levelChosen: true }, quiet: true, radioOff: false, ...over,
+  });
+
+  it('even stil: the hidden line, and its button leaves quiet (the controller\'s setQuiet)', () => {
+    const onSetQuiet = vi.fn();
+    const el = render(hiddenRoom(), { onSetQuiet });
+    expect(el.querySelector('[data-section="nearby-chat"]')).toBeNull();
+    const off = el.querySelector('[data-section="nearby-chat-off"]');
+    expect(off.dataset.reason).toBe('hidden');
+    expect(off.querySelector('.circle-nearby__chat-off-line').textContent).toBe('circle.nearbyScreen.chat_hidden_line');
+    off.querySelector('.circle-nearby__chat-visible').click();
+    expect(onSetQuiet).toHaveBeenCalledWith(false);
+    expect(el.querySelector('.circle-nearby__chat-input')).toBeNull();
+  });
+
+  it('the radio off: the button turns it back on', () => {
+    const onSetRadio = vi.fn();
+    const el = render(hiddenRoom({ visibility: { radioOff: true }, radioOff: true, quiet: false }), { onSetRadio });
+    el.querySelector('.circle-nearby__chat-visible').click();
+    expect(onSetRadio).toHaveBeenCalledWith('on');
+  });
+
+  it('a host that cannot carry the act shows the line without a dead button', () => {
+    const el = render(hiddenRoom());
+    expect(el.querySelector('.circle-nearby__chat-off-line')).not.toBeNull();
+    expect(el.querySelector('.circle-nearby__chat-visible')).toBeNull();
+  });
+});
+
+describe('the "you here" row and being hidden (nearbyMineSummary)', () => {
+  const summary = (el) => el.querySelector('.circle-nearby__mine-summary').textContent;
+  it('in the chat and visible: it says so', () => {
+    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: true } }));
+    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_chat_on');
+  });
+  it('in the chat but hidden: it does not say you are in the conversation', () => {
+    const el = render(model({ allows: { card: false, chat: true }, chat: [], visibility: { publishing: false, levelChosen: true }, quiet: true }));
+    expect(summary(el)).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_none');
+  });
+});
+
+describe('hidden: Questions shows no ask composer (nearbyAskOff)', () => {
+  const hiddenRoom = (over = {}) => model({ visibility: { publishing: false, levelChosen: true }, quiet: true, radioOff: false, ...over });
+  it('the hidden line and "become visible" in place of the composer; the button leaves quiet', () => {
+    const onSetQuiet = vi.fn();
+    const el = render(hiddenRoom(), { onSetQuiet });
+    expect(el.querySelector('[data-section="nearby-ask-field"]')).toBeNull();
+    expect(el.querySelector('.circle-nearby__ask-compose')).toBeNull();
+    const off = el.querySelector('[data-section="nearby-ask-off"]');
+    expect(off.querySelector('.circle-nearby__ask-off-line').textContent).toBe('circle.nearbyScreen.ask_hidden_line');
+    off.querySelector('.circle-nearby__ask-visible').click();
+    expect(onSetQuiet).toHaveBeenCalledWith(false);
+  });
+  it('a refusal\'s notice stays in view there', () => {
+    const el = render(hiddenRoom(), { notice: { key: 'card_hidden' } });
+    expect(el.querySelector('[data-section="nearby-ask-off"] .circle-nearby__notice').dataset.notice).toBe('card_hidden');
+  });
+  it('no host act: the line without a dead button', () => {
+    const el = render(hiddenRoom());
+    expect(el.querySelector('.circle-nearby__ask-visible')).toBeNull();
+  });
+  it('the "you here" row says nothing is shown, though the card is switched on', () => {
+    const el = render(hiddenRoom({ allows: { card: true, chat: true }, chat: [] }));
+    expect(el.querySelector('.circle-nearby__mine-summary').textContent).toBe('circle.nearbyScreen.mine_title · circle.nearbyScreen.mine_none');
   });
 });

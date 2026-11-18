@@ -31,6 +31,7 @@ import { checker } from './_util.mjs';
 import { declaredOp } from './_util.mjs';
 
 import basisManifest from '../../basis/manifest.js';
+import { buttonScopes } from '@onderling/app-manifest';
 import { mergeManifests } from '../../basis/src/manifestMerge.js';
 import { createLocalBuiltins } from '../../basis/src/core/localBuiltins.js';
 import { advancedOpRows } from '../../basis/src/v2/advancedSurface.js';
@@ -109,7 +110,8 @@ export async function run() {
     // send-file has its own door now (the contact thread's "+", its declared attach entry), so it leaves the drawer of
     // last resort, as the embed ops did: a door elsewhere, not a stranded op.
     check('send-file has a door of its own: the contact thread\'s +, not the drawer',
-      !rowFor('send-file') && basisManifest.operations.find((o) => o.id === 'send-file')?.surfaces?.attach?.scopes?.includes('contact') === true,
+      // where its button shows, read as every projection reads it: the op's place, narrowed by `attach.buttonIn`
+      !rowFor('send-file') && buttonScopes(basisManifest.operations.find((o) => o.id === 'send-file'), basisManifest.operations.find((o) => o.id === 'send-file')?.surfaces?.attach).includes('contact'),
       JSON.stringify(basisManifest.operations.find((o) => o.id === 'send-file')?.surfaces?.attach ?? null));
 
     // help — the printed list. Frits kept it deliberately ("a printed list could still be useful"), so

@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
 import { createTelegramRunner } from '../src/telegram/runner.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { composeAssistantCatalogue } from '../src/assistant/assistantCatalogue.js';
 
 describe('a failing admission', () => {
   it('is logged with its reason, and the person is told it went wrong', async () => {

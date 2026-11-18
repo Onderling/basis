@@ -121,18 +121,28 @@ describe('one exchange in the "+" thread (the duty both shells run)', () => {
     expect(plus.turns().map((x) => x.who)).toEqual(['you', 'assistant', 'you', 'you']);
   });
 
-  it('both shells hand it that shape: web\'s read returns card and actId, never circleCard or ownActId', () => {
+  it('web reads the line through the one shared door, which keeps the exchange; no model call is composed in the shell', () => {
     const web = readFileSync(fileURLToPath(new URL('../../web/v2/circleApp.js', import.meta.url)), 'utf8');
-    const at = web.indexOf('await plusThreadNow().exchange(text,');
-    expect(at).toBeGreaterThan(-1);
-    const body = web.slice(at, web.indexOf('}, { t });', at));
-    expect(body).toMatch(/return \{ error, card: circleCard, actId: /);
-    expect(body).not.toMatch(/ownActId/);
+    expect(web).toMatch(/await plusDoorNow\(\)\.read\(text, \{ asSelf[,} ]/);
+    expect(web).not.toMatch(/plusReadWithModel|plusModelAsk/);
   });
 });
 
 describe('where a "+" turn goes', () => {
   it('it is never carried: no member, no own other device (the dictionary\'s sync policy for the kind)', () => {
     expect(entryKind('assistant-turn').syncPolicy).toBe('none');
+  });
+});
+
+describe('the sheet does not say an answer twice (the walk, 2026-11-17)', () => {
+  it('an answer the thread already holds as its last assistant turn gets no line of its own', async () => {
+    const { plusAnswerLineShown } = await import('../../src/v2/vandaagPlus.js');
+    const turns = [{ who: 'you', text: 'wat kan je' }, { who: 'assistant', text: 'Je eigen notities.' }];
+    expect(plusAnswerLineShown('Je eigen notities.', turns)).toBe(false);
+    // an answer the thread does not hold yet (no thread, or another last turn) is said on its line
+    expect(plusAnswerLineShown('Je eigen notities.', [])).toBe(true);
+    expect(plusAnswerLineShown('Opgeslagen.', turns)).toBe(true);
+    // nothing to say: no line
+    expect(plusAnswerLineShown(null, turns)).toBe(false);
   });
 });

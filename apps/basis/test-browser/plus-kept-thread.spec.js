@@ -15,7 +15,7 @@ test('the "+" opens on the conversation so far, also after a reload; Forget empt
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
 
-  // a line the "+" cannot read: the person's turn and its answer ("I could not read that") are both kept
+  // a line nothing reads (no model set): the person's turn and its answer (no model is set, and where) are both kept
   await page.locator('.circle-vandaag__plus').click();
   await expect(page.locator('.circle-vandaag-plus__thread'), 'a fresh person has no conversation yet').toHaveCount(0);
   await page.locator('.circle-vandaag-plus__line').fill('blauwe olifanten dansen');
@@ -41,5 +41,28 @@ test('the "+" opens on the conversation so far, also after a reload; Forget empt
   // Forget empties it
   await page.locator('.circle-vandaag-plus__forget').click();
   await expect(page.locator('.circle-vandaag-plus__thread')).toHaveCount(0);
+  expect(errs).toEqual([]);
+});
+
+test('a long conversation: the "+" opens with the line in view, and keeps it there after each turn', async ({ page }) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
+  // a phone-sized screen, where a dozen turns are taller than the screen
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('.circle-vandaag__plus').click();
+  const line = page.locator('.circle-vandaag-plus__line');
+  const turns = page.locator('.circle-vandaag-plus__turn');
+  for (let i = 1; i <= 8; i += 1) {
+    await line.fill(`blauwe olifant nummer ${i}`);
+    await line.press('Enter');
+    await expect(turns).toHaveCount(i * 2, { timeout: 10_000 });
+    await expect(line, `after turn ${i} the line is in view`).toBeInViewport();
+  }
+  await page.locator('.circle-vandaag-plus__close').click();
+  await page.locator('.circle-vandaag__plus').click();
+  await expect(turns).toHaveCount(16);
+  await expect(line, 'opened again on a long conversation, the line is in view').toBeInViewport();
   expect(errs).toEqual([]);
 });

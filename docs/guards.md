@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 78
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 80
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -56,6 +56,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `my-circle-ids` | — | the circles this device is in are read through ONE reader (`apps/basis/src/v2/myCircleIds.js`) |
 | `no-pinboard-pod-attach` | — | basis never attaches pinboard's own store to a person's pod while what it writes is |
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
+| `no-relay-word` | — | THE WORD "RELAY" IS NOT SHOWN TO A PERSON |
 | `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |
 | `one-signature-check` | — | every Ed25519 signature check in shipped code goes through ONE function, |
@@ -78,6 +79,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
 | `switch-names-its-setting` | — | EVERY SWITCH NAMES WHAT IT SETS. A switch a person can flip that changes nothing is a promise unkept |
+| `telegram-imports` | — | the Telegram folder is the BOX's Telegram door, nothing more |
 | `theme-tokens` | — | the web design system's drift guards (theme.css regenerates clean; circle.css uses only defined tokens; no … |
 | `themed-inputs` | — | every text input takes its colours from the theme, never from the platform |
 | `typed-commands-reachable` | — | a command a person can TYPE must have a door, in both shells |

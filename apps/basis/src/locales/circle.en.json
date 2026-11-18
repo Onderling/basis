@@ -193,11 +193,11 @@
           "doc": "Join wizard: present the address used in another circle ({{name}} = that circle)."
         },
         "hint": {
-          "text": "The relay cannot see that your circles belong together. Members who are in both circles can.",
+          "text": "The connection point cannot see that your circles belong together. Members who are in both circles can.",
           "doc": "Join wizard: the honest sentence about a new address. It hides the link from the relay, not from members of both circles."
         },
         "hint_same": {
-          "text": "The relay and the members of both circles see that this is the same person.",
+          "text": "The connection point and the members of both circles see that this is the same person.",
           "doc": "Join wizard: the sentence under the address choice when the same address as in another circle is chosen (the relay and members of both circles see one person)."
         }
       },
@@ -513,6 +513,10 @@
     "not_here": {
       "text": "not on this device",
       "doc": "A folded tile's note: this device does not hold this circle (the kring opt-out, My data)."
+    },
+    "unnamed": {
+      "text": "Circle without a name",
+      "doc": "A circle's tile, header and Today tag when nobody's name for it reached this device (joined through an invite that carried none): never its key."
     }
   },
   "tile": {
@@ -657,8 +661,12 @@
       }
     },
     "delivery": {
+      "waiting_for_connection": {
+        "text": "Not sent yet: waiting for a connection",
+        "doc": "A message still sending after a while: it waits on this device until there is a connection, and goes by itself."
+      },
       "maybe_received": {
-        "text": "Sent · maybe received",
+        "text": "Sent · not confirmed yet",
         "doc": "It left this device. Whether it arrived is unknown unless the other person chose to confirm."
       },
       "stored": {
@@ -763,6 +771,14 @@
     "claimed": {
       "text": "claimed",
       "doc": "Taken (tasks) tab — status badge: someone is on it."
+    },
+    "claimed_by": {
+      "text": "claimed by {{who}}",
+      "doc": "Tasks tab — status of a claimed task with who holds it: one name, several joined by commas, or 'you'."
+    },
+    "you": {
+      "text": "you",
+      "doc": "Tasks tab — the viewer as the holder of a claimed task, in 'claimed by {{who}}'."
     },
     "submitted": {
       "text": "submitted",
@@ -1499,9 +1515,17 @@
       "text": "Save",
       "doc": "Vandaag → '+': save the own note or appointment."
     },
+    "plus_which_time": {
+      "text": "Which time on {{day}}?",
+      "doc": "Vandaag → '+': a day was said but no time; the form asks for the time (Save waits), never fills one in."
+    },
     "plus_empty": {
       "text": "Fill this in first.",
       "doc": "Vandaag → '+': something needed is empty."
+    },
+    "plus_read_failed": {
+      "text": "Could not read it: {{error}}",
+      "doc": "The \"+\": a READ it ran (a list, the agenda, notes) failed; {{error}} is the read's own reason. Never \"could not save\": nothing was being saved."
     },
     "plus_failed": {
       "text": "Could not save: {{error}}",
@@ -1530,6 +1554,10 @@
     "plus_line_ph": {
       "text": "Say what you want — \"note: milk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
+    },
+    "plus_own_confirm": {
+      "text": "“{{line}}”: {{act}}. Shall I do that?",
+      "doc": "The \"+\" card when the act it read can only happen in the person's own place (an own list, nothing to choose): the line, the act named (circle.bot.help.ops.<app>.<op>), and a yes/no; nothing runs before Confirm."
     },
     "plus_circle_ask": {
       "text": "“{{line}}”: in which circle?",
@@ -1564,12 +1592,60 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_help": {
-      "text": "I can do this for you: {{acts}}. Or ask me how something works.",
+      "text": "I can do this for you: {{acts}}. Lists too: \"new list Shopping\", \"add milk to Shopping\". Or ask me how something works.",
       "doc": "The \"+\" thread's answer to \"help\" or \"?\": what it can do ({{acts}}: its own acts by name, comma-separated), and that it answers how things work."
     },
     "plus_line_unread": {
-      "text": "I could not read that.",
+      "text": "I could not read that. Type \"help\" to see what I can do, or fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "plus_no_model": {
+      "text": "No model of your own is set. Without one, the fixed phrases work (like \"put milk on Groceries\" or \"note: ...\"), the buttons below, and \"help\". To set a model: {{path}}.",
+      "doc": "The \"+\" with NO own model set, for a line the plain reading did not take: no model is set, what works without one, and the way to the setting ({{path}}: the screens' own labels joined by arrows)."
+    },
+    "plus_act_saved": {
+      "text": "{{act}}: saved.",
+      "doc": "The \"+\" conversation: the form the \"+\" opened from a line was saved. {{act}} is the act's label as the thread showed it."
+    },
+    "plus_act_not_saved": {
+      "text": "{{act}}: not saved. Nothing was stored.",
+      "doc": "The \"+\" conversation: the form the \"+\" opened from a line was closed without saving (a refused proposal); nothing was stored."
+    },
+    "plus_read_none": {
+      "text": "Nothing found.",
+      "doc": "The \"+\": a read it ran (one the model picked) answered no items and carries no name to say it by."
+    },
+    "plus_model_refused": {
+      "text": "Your own model refuses the question (your key or your credit?). Your setting: {{path}}. The fixed phrases and the buttons still work.",
+      "doc": "The \"+\": the person's OWN model refused the call (their key, their credit, a 4xx); {{path}} is the way to their model setting. Never \"the admin knows\": it is their own route."
+    },
+    "plus_model_slow": {
+      "text": "Your own model is too slow to answer in time right now. Try again in a moment; the fixed phrases and the buttons still work.",
+      "doc": "The \"+\": the person's own model did not answer in time (a timeout, after the retries)."
+    },
+    "plus_model_unreachable": {
+      "text": "Your own model cannot be reached right now. Try again later; the fixed phrases and the buttons still work.",
+      "doc": "The \"+\": the person's own model is set but could not be reached for this line."
+    },
+    "plus_route_none": {
+      "text": "No model of your own is set: the fixed phrases and the buttons work.",
+      "doc": "The line at the top of the \"+\" conversation when no own model is set."
+    },
+    "plus_route_confidential": {
+      "text": "Your own model answers, confidentially.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is confidential (a confidential preset the route guard accepts)."
+    },
+    "plus_route_local": {
+      "text": "Your own model answers, on {{host}}: a model you run yourself.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is a LOCAL model the person runs themselves (the Local preset); {{host}} is where it runs."
+    },
+    "plus_route_confidential_asserted": {
+      "text": "Your own model answers via {{host}}. You marked that route as attested; this app has not checked it.",
+      "doc": "The line at the top of the \"+\" conversation: a REMOTE confidential route accepted only because the person set its attestation flag; the app has not checked the enclave, so it never claims confidentiality as checked. {{host}} is where it goes."
+    },
+    "plus_route_plain": {
+      "text": "Your own model answers via {{host}}. That is not confidential.",
+      "doc": "The line at the top of the \"+\" conversation: the own route is NOT confidential; {{host}} is where it goes."
     },
     "plus_forget": {
       "text": "Forget this conversation",
@@ -1679,13 +1755,21 @@
       "text": "Got it",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     },
-    "onboarding_begin_title": {
-      "text": "Begin",
-      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
-    },
     "onboarding_begin_create": {
       "text": "Make a circle",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_strip_single": {
+      "text": "1 thing left to set up",
+      "doc": "Today's folded set-up strip, closed: its line when one card is left; a tap opens it."
+    },
+    "onboarding_strip_many": {
+      "text": "{{count}} things left to set up",
+      "doc": "Today's folded set-up strip, closed: its line when {{count}} cards are left; a tap opens it."
+    },
+    "onboarding_no_circle": {
+      "text": "You are not in a circle yet. On Circles you make one, or join with an invitation.",
+      "doc": "Today, for a person in no circle (the help circle does not count): the one line that points to Circles."
     },
     "onboarding_begin_join": {
       "text": "I have an invitation",
@@ -1770,6 +1854,14 @@
     "plus_list_empty": {
       "text": "Nothing on {{name}}.",
       "doc": "The \"+\" thread's answer to a read of a list that has no entries."
+    },
+    "plus_make_list_ask": {
+      "text": "There is no list '{{list}}' yet. Make it?",
+      "doc": "The \"+\": a line puts something on a list nobody holds; the card asks to make it as the person's own list (the yes makes it)."
+    },
+    "plus_card_not_done": {
+      "text": "'{{line}}': not done. Nothing was stored.",
+      "doc": "The \"+\" conversation: a card (which place, or make a list) was answered with Cancel; the line was not done and nothing was stored."
     }
   },
   "screens": {
@@ -2419,7 +2511,7 @@
         "doc": "transport-mode option: the built-in NKN transport."
       },
       "relay": {
-        "text": "Relay (default)",
+        "text": "Connection point (default)",
         "doc": "transport-mode option: a WebSocket relay."
       },
       "both": {
@@ -2428,11 +2520,11 @@
       }
     },
     "relayEndpoint": {
-      "text": "Relay server",
+      "text": "Connection point",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
     "relayEndpoint_placeholder": {
-      "text": "wss://relay.example.org",
+      "text": "wss://point.example.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
     },
     "relayEndpoint_apply": {
@@ -2444,7 +2536,7 @@
       "doc": "Phase 4 §9 — relay endpoint clear button."
     },
     "relayAsk_title": {
-      "text": "Which relay do you use?",
+      "text": "Which connection point do you use?",
       "doc": "The relay question — asked at the first action that needs a relay when the device knows none (there is no default relay)."
     },
     "relayAsk_body": {
@@ -2460,7 +2552,7 @@
       "doc": "The relay question — not now; asked again at the next app start."
     },
     "relayAsk_invalid": {
-      "text": "That is not a relay address — it starts with wss:// or ws://.",
+      "text": "That is not a connection point address: it starts with wss:// or ws://.",
       "doc": "The relay question — the typed value is not a ws:// or wss:// URL."
     },
     "privateDm": {
@@ -2472,7 +2564,7 @@
       "doc": "Phase 4 §9 — private-chat toggle hint."
     },
     "privateDm_disabled": {
-      "text": "Needs a relay: pod-only circles can't set up a private channel between members.",
+      "text": "Needs a connection point: pod-only circles can't set up a private channel between members.",
       "doc": "Phase 4 §7 — shown when the private-chat toggle greys out under pod-only (no relay)."
     },
     "wakeNudges": {
@@ -2480,7 +2572,7 @@
       "doc": "offline delivery M1 — the wake-nudges device toggle (registers the push token on the relay; off by default)."
     },
     "wakeNudges_hint": {
-      "text": "Off by default. When on, the relay sends an empty wake signal through your platform's push service when a message is waiting. That service only learns that something is pending, and when — never from whom or what.",
+      "text": "Off by default. When on, the connection point sends an empty wake signal through your platform's push service when a message is waiting. That service only learns that something is pending, and when — never from whom or what.",
       "doc": "offline delivery M1 — states the metadata floor: what the push service learns."
     },
     "wakeNudges_disabled": {
@@ -2488,11 +2580,11 @@
       "doc": "offline delivery M1 — shown where the platform has no OS push path (web)."
     },
     "relay_applied": {
-      "text": "Relay set: {{url}}",
+      "text": "Connection point set: {{url}}",
       "doc": "G17 — /set-relay built-in confirmation bubble."
     },
     "relay_failed": {
-      "text": "Couldn't set relay: {{error}}",
+      "text": "Couldn't set the connection point: {{error}}",
       "doc": "G17 — /set-relay built-in failure bubble."
     },
     "transport_set": {
@@ -2500,11 +2592,11 @@
       "doc": "G17 — /transport-mode built-in confirmation bubble."
     },
     "transport_bad": {
-      "text": "Unknown transport: {{mode}} (use nkn, relay or both)",
+      "text": "Unknown transport: {{mode}} (use nkn, connection-point or both)",
       "doc": "G17 — /transport-mode built-in bad-mode bubble."
     },
     "transports_status": {
-      "text": "Transport {{mode}} · relay {{relay}}",
+      "text": "Transport {{mode}} · connection point {{relay}}",
       "doc": "G17 — /transports built-in status bubble."
     },
     "transports_none": {
@@ -3408,7 +3500,7 @@
       "doc": "Turns the per-user fallback setting on."
     },
     "point_primary": {
-      "text": "Your relay — connected",
+      "text": "Your connection point — connected",
       "doc": "The device's OWN relay (the one in the setting), connected. Replaced point_active on 2026-09-08: a device is now on several relays at once, so 'the one in use' was no longer a fact."
     },
     "point_connected": {
@@ -3468,15 +3560,15 @@
       "doc": "Remove a connection point."
     },
     "point_add_title": {
-      "text": "Add a relay",
+      "text": "Add a connection point",
       "doc": "Heading of the add-a-relay field (2026-09-08). Adding one connects to it beside the relays you are already on — it does not replace your own."
     },
     "point_add_hint": {
-      "text": "Running a relay yourself, or did someone give you one? Enter its address. You stay on the relays you already use.",
+      "text": "Running a connection point yourself, or did someone give you one? Enter its address. You stay on the connection points you already use.",
       "doc": "Says what adding does, because the old model (one relay, swapped) is what people expect."
     },
     "point_add_placeholder": {
-      "text": "wss://relay.example.org",
+      "text": "wss://point.example.org",
       "doc": "Placeholder for the relay address field."
     },
     "point_add_button": {
@@ -3484,7 +3576,7 @@
       "doc": "Confirms the add-a-relay field."
     },
     "point_add_invalid": {
-      "text": "That is not a relay address. A relay starts with ws:// or wss://.",
+      "text": "That is not a connection point address. It starts with ws:// or wss://.",
       "doc": "Shown when the typed address is not a websocket endpoint."
     },
     "point_add_failed": {
@@ -3511,13 +3603,53 @@
       "text": "Keep it",
       "doc": "Cancel removal."
     },
+    "tab_conversation": {
+      "text": "Conversation",
+      "doc": "Nearby's first tab: the room chat (or, when not in it, one line and the way to join)."
+    },
+    "tab_questions": {
+      "text": "Questions",
+      "doc": "Nearby's second tab: the ask field, what was asked here, who is here, circles offered here."
+    },
+    "tab_with_new": {
+      "text": "{{label}} · {{count}}",
+      "doc": "A Nearby tab's name with how many things arrived since the person last looked at that tab; only when there is at least one."
+    },
+    "ask_hidden": {
+      "text": "You are hidden. A question tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person sends a question: the controller refuses it, because it would tell the room someone is there."
+    },
+    "card_hidden": {
+      "text": "You are hidden. Your card tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person shows their card: the controller refuses it, because it would tell the room someone is there."
+    },
+    "invite_hidden": {
+      "text": "You are hidden. Offering a circle tells the room you are here: become visible first.",
+      "doc": "Said when a hidden person offers a circle here: the controller refuses it, for the same reason."
+    },
+    "chat_hidden_line": {
+      "text": "You are hidden. Become visible to join the conversation.",
+      "doc": "The Conversation tab while the person is hidden from the room: no stream, this line and the way to become visible."
+    },
+    "ask_hidden_line": {
+      "text": "You are hidden. Become visible to ask something.",
+      "doc": "The Questions tab while the person is hidden from the room: no ask box, this line and the way to become visible."
+    },
+    "chat_hidden_action": {
+      "text": "Become visible",
+      "doc": "Button under the hidden line: the existing act that ends being hidden (leave \"even stil\", or the radio back on)."
+    },
+    "stream_ask_from": {
+      "text": "Question from {{name}}",
+      "doc": "Head of a question card in the Conversation stream, so it reads as a question and not as a chat line."
+    },
+    "stream_invite_from": {
+      "text": "Circle offered by {{name}}",
+      "doc": "Head of an offered-circle card in the Conversation stream."
+    },
     "invites_title": {
       "text": "Circles open here",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."
-    },
-    "invites_empty": {
-      "text": "No circle is being advertised here.",
-      "doc": "Empty state for the invite list."
     },
     "action_join_published": {
       "text": "Join",
@@ -3591,13 +3723,13 @@
       "text": "Shown to {{sent}} of {{peers}} nearby",
       "doc": "Result after publishing a card — the real reach, not \"saved\"."
     },
-    "chat_title": {
-      "text": "Room chat",
-      "doc": "Heading of the room chat."
-    },
     "chat_empty": {
       "text": "Nobody has said anything yet.",
       "doc": "Chat empty state — only shown once you have JOINED."
+    },
+    "chat_you": {
+      "text": "You",
+      "doc": "Who said a line in the room chat, for your own lines (the others' lines carry the name or face the room shows)."
     },
     "chat_ephemeral": {
       "text": "Nothing here is kept. Leaving forgets it.",
@@ -3614,10 +3746,6 @@
     "asks_title": {
       "text": "Asked here",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."
-    },
-    "asks_empty": {
-      "text": "Nobody has asked anything yet.",
-      "doc": "Shown when the room carries no live asks."
     },
     "ask_resonant": {
       "text": "This matches you: {{reason}}",
@@ -3768,7 +3896,7 @@
       "doc": "Footer when no skills are published."
     },
     "delivery_fallback_note": {
-      "text": "With the fallback on, reaching someone whose per-circle address you don't have yet uses your main address, so a relay you both use can tell those circles belong to one person. The setting counts for all your circles at once.",
+      "text": "With the fallback on, reaching someone whose per-circle address you don't have yet uses your main address, so a connection point you both use can tell those circles belong to one person. The setting counts for all your circles at once.",
       "doc": "The consequence of turning the fallback on, stated where the setting is shown. The setting is one for all circles (per circle was judged too technical)."
     },
     "answer_placeholder": {
@@ -6694,19 +6822,19 @@
       "doc": "S5 — pod root URI."
     },
     "relay": {
-      "text": "Relay",
+      "text": "Connection point",
       "doc": "S5 — relay operator/url."
     },
     "relay_set": {
-      "text": "Relay server",
+      "text": "Connection point",
       "doc": "In-app relay URL setting (ws://|wss://); blank ⇒ the build-time env fallback."
     },
     "relay_open": {
-      "text": "Set relay server…",
+      "text": "Set the connection point…",
       "doc": "Entry button that opens the relay-URL editor in the docked side-panel (openPagePanel, set-relay surfaces.page)."
     },
     "relay_current": {
-      "text": "Relay: {{url}}",
+      "text": "Connection point: {{url}}",
       "doc": "Current in-app relay setting shown beside the open-panel button."
     },
     "relay_save": {
@@ -6722,7 +6850,7 @@
       "doc": "Relay saved + reconnected."
     },
     "relay_off": {
-      "text": "no relay",
+      "text": "no connection point",
       "doc": "Shown as {{url}} when the setting is cleared and there's no env fallback."
     },
     "relay_error": {
@@ -6974,7 +7102,7 @@
       "doc": "J-CS8 — button when the lock is on."
     },
     "notif_privacy": {
-      "text": "To wake your phone, your connection point (the relay you are connected to) keeps one wake code for this device. That lets it see that your circles belong to one device, and so that they are yours.",
+      "text": "To wake your phone, your connection point keeps one wake code for this device. That lets it see that your circles belong to one device, and so that they are yours.",
       "doc": "J-CS10 — the trade, stated where it is made. One device gets one push token from the OS, registered under each of its per-circle addresses; grouping by token groups the circles."
     },
     "notif_privacy_not": {
@@ -6982,11 +7110,11 @@
       "doc": "J-CS10 — what is NOT learned. A bare \"affects your privacy\" invites imagining something worse than the truth."
     },
     "notif_privacy_escape": {
-      "text": "If that matters to you, run your own relay or spread your circles over different relays. A relay only sees the circles that use it.",
+      "text": "If that matters to you, run your own connection point or spread your circles over different connection points. A connection point only sees the circles that use it.",
       "doc": "J-CS10 — name the escape rather than leaving a dead end (the companion node; relay diversity)."
     },
     "pod_local_consequence": {
-      "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are — not your circles or your conversations. Connect a pod, or export a backup file, to be able to pick this up somewhere else.",
+      "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are — not your circles or your conversations. Connect a pod, or export a recovery file, to be able to pick this up somewhere else.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "receive_personas": "Personas on this device",
@@ -7136,7 +7264,7 @@
       "doc": "Refusal (screen door): no key or nonce in the offer."
     },
     "connection_offer_pairing-other-relay": {
-      "text": "That screen waits on another relay than this device, so it cannot be connected from here.",
+      "text": "That screen waits on another connection point than this device, so it cannot be connected from here.",
       "doc": "Refusal (screen door): the offer's relay is not one this device is on (the grant could never reach it)."
     },
     "connection_offer_pairing-nonce-replayed": {
@@ -8316,7 +8444,7 @@
     "failed": "Claiming did not work.",
     "outcome_bad_claim": "That is not a claim line. Copy everything after 'Claim:' — the code, the @ and the address.",
     "outcome_no_device_key": "This device has no device key of its own yet. Open the app again and try once more.",
-    "outcome_unreachable": "The companion does not answer. Is it running and connected to the relay?",
+    "outcome_unreachable": "The companion does not answer. Is it running and connected to the connection point?",
     "outcome_already_owned": "This companion already has an owner.",
     "outcome_invalid_code": "The code is wrong or has expired. Take the newest line from the log (a new one every ten minutes).",
     "outcome_stale": "This device's clock is more than five minutes off the companion's. Set your device's time right and try again.",
@@ -8337,7 +8465,7 @@
     "failed": "Giving access did not work.",
     "outcome_not_owned": "This companion is not yours. Claim it first.",
     "outcome_no_device_key": "This device has no device key of its own yet. Reopen the app and try again.",
-    "outcome_unreachable": "The companion does not answer. Is it on and connected to the relay?",
+    "outcome_unreachable": "The companion does not answer. Is it on and connected to the connection point?",
     "outcome_forbidden": "The companion did not accept this device's signature.",
     "outcome_stale": "This device's clock is more than five minutes off from the companion's. Set your device's time and try again.",
     "outcome_unknown_family": "This companion cannot give that.",
@@ -8345,7 +8473,7 @@
     "outcome_bad_args": "Choose to whom, and tick what it may do.",
     "outcome_gate_off": "This companion runs without its access check, so it gives no access.",
     "outcome_not_bot_admin": "Only the bot's admin can give it your companion. Ask them to grant it from their app.",
-    "outcome_bot_unreachable": "The bot does not answer. Is it running and connected to the relay?",
+    "outcome_bot_unreachable": "The bot does not answer. Is it running and connected to the connection point?",
     "outcome_bot_refused": "The bot did not take your companion. Link your Basis app to it again (/koppel) and try once more.",
     "granted": "Access given to",
     "may": "may: {{what}}",
@@ -8783,15 +8911,15 @@
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_section": {
-        "text": "NKN relay",
+        "text": "NKN connection point",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_url": {
-        "text": "Relay URL",
+        "text": "Connection point address",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "relay_hint": {
-        "text": "Override the automatically chosen NKN relay (advanced). ws:// or wss:// only.",
+        "text": "Override the automatically chosen NKN connection point (advanced). ws:// or wss:// only.",
         "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
       },
       "loading": {
@@ -10273,7 +10401,7 @@
         "doc": "A setting's label (projected from the parameter register)."
       },
       "relay_url": {
-        "text": "Relay server",
+        "text": "Connection point",
         "doc": "A setting's label (projected from the parameter register)."
       },
       "app_developer": {
@@ -10403,7 +10531,7 @@
         "doc": "A choice on the settings screen."
       },
       "relay": {
-        "text": "Relay",
+        "text": "Connection point",
         "doc": "A choice on the settings screen."
       },
       "both": {
@@ -10672,6 +10800,102 @@
     "dismiss": {
       "text": "Dismiss",
       "doc": "'Nieuw voor jou' on Today: the notification projection's rows (what came in for the person, from others, not yet read on any of their devices)."
+    }
+  },
+  "introDeck": {
+    "welcome_title": {
+      "text": "Welcome",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "welcome_body": {
+      "text": "Basis is an app by Onderling for arranging things with the people around you: your household, your street, your club. Your data is on your own device, not with us.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "circles_title": {
+      "text": "Circles",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "circles_body": {
+      "text": "A circle is a group of people who do something together. You talk there, you put lists and appointments in it, and you ask questions. Only its members see what you put in a circle.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "contacts_title": {
+      "text": "Contacts",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "contacts_body": {
+      "text": "A contact is one person, or a bot, you talk with one to one. You add someone by scanning their code or opening a link. You choose how much the other person sees of you. A first message from someone you do not know yet comes in as a request.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "plus_title": {
+      "text": "The +",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "plus_body": {
+      "text": "With the + you make something for yourself: a note, an appointment, a list. Pick a button, or type what you want, for example \"appointment tomorrow 14:00 hairdresser\". Type \"help\" to see what it can do. If you set up a model of your own, you can also just talk to it. Nothing happens without your yes.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "selves_title": {
+      "text": "You, your way",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "selves_body": {
+      "text": "You can have more than one persona, for example \"home\" and \"work\": a name, a photo and what you share about yourself. Per circle and per contact you choose which persona they see. Under Me you see who you are where.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "nearby_title": {
+      "text": "Nearby",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "nearby_body": {
+      "text": "Under Nearby you see who close by is open too, only if you and they switch it on. You can ask a question (\"who has a drill?\"). It goes to whoever is open; their device checks for itself whether it fits what they offer, and you only hear of it if they answer.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "keys_title": {
+      "text": "Your keys",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "keys_body": {
+      "text": "Your access depends on 24 words, your recovery phrase. Write them down and keep them somewhere safe: whoever has them is you. Without those words you cannot get back if you lose your device.",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "next": {
+      "text": "Next",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "start": {
+      "text": "Get started",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "skip": {
+      "text": "Skip",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "position": {
+      "text": "{{at}} of {{of}}",
+      "doc": "The introduction: seven short cards, one per screen, opened from Today's 'New to Basis?' card (src/v2/introDeck.js)."
+    },
+    "reopen": {
+      "text": "Introduction",
+      "doc": "Settings' door back to the introduction's seven cards (Today's card is gone once the intro is seen)."
+    }
+  },
+  "firstOpen": {
+    "lead": {
+      "text": "Did someone give you a code? Scan it. New here? Read the introduction first.",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
+    },
+    "scan": {
+      "text": "Scan",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
+    },
+    "intro": {
+      "text": "Introduction",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
+    },
+    "continue": {
+      "text": "Just continue",
+      "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
   }
 }

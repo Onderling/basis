@@ -61,6 +61,8 @@ export const calendarManifest = {
       // `/addappt --when='tomorrow 3pm'` now matches the param name.
       // CalendarStore accepts both internally for back-compat.
       // Aliased: 'startsAt' still works for any existing callers.
+      // a circle's appointment and the person's own (their own agenda); its BUTTON only in the "+" (attach.buttonIn)
+      scopes: ['circle', 'own'],
       params: [
         { name: 'title',         kind: 'string', required: true  },
         { name: 'when',          kind: 'date',   required: true  },
@@ -77,7 +79,7 @@ export const calendarManifest = {
       ],
       surfaces: {
         // the person's own "+" (Vandaag): an own appointment — with no circle named it lands in the own agenda
-        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent', share: 'shareEvent',
+        attach: { label: 'circle.vandaag.plus_own', buttonIn: ['own'], edit: 'updateEvent', remove: 'cancelEvent', share: 'shareEvent',
           fields: [
             { name: 'title', kind: 'text', labelKey: 'circle.vandaag.plus_title_ph' },
             { name: 'when', kind: 'datetime', labelKey: 'circle.vandaag.plus_when' },
@@ -96,13 +98,19 @@ export const calendarManifest = {
      */
     {
       id:    'listEvents', visibility: 'authenticated', group: 'data',
+      // the person's own agenda serves it too (the agent's own-calendar route): offered in a circle and in their own "+"
+      scopes: ['circle', 'own'],
       verb:  'list',
       appliesTo: { type: 'calendar-event' },
       params: [
         { name: 'days', kind: 'number', required: false },
+        // one local day (YYYY-MM-DD) instead of the coming `days`: "wat heb ik morgen gepland?"
+        { name: 'day', kind: 'string', required: false },
       ],
       surfaces: {
-        slash: { command: '/upcoming', body: 'flags' },
+        // the own "+" reads it from a phrase ("wat heb ik gepland"); its words are placed `in: own` (gate.<lang>.json), so
+        // a circle's bot matches none of them
+        slash: { command: '/upcoming', body: 'flags', match: { body: 'none' } },
         chat:  {
           reply: 'list',
           hint:  'list upcoming events',
@@ -181,6 +189,7 @@ export const calendarManifest = {
     },
     {
       id:    'cancelEvent', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'remove',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -204,6 +213,7 @@ export const calendarManifest = {
     },
     {
       id:    'updateEvent', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'edit',
       writes: { scope: 'circle' },
       // a person's words and moment, like an entry's edited text: the newer change wins
@@ -224,6 +234,7 @@ export const calendarManifest = {
     // or a cancel. A person's own act: a button, no chat tool — the model never decides what crosses to a contact.
     {
       id:    'shareEvent', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'share',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -242,6 +253,7 @@ export const calendarManifest = {
     // pick, never a row a person taps. `internal` takes it out of coverage and the Other shelf.
     {
       id:    'shareTargets', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'list',
       params: [],
       surfaces: { internal: true },
@@ -253,6 +265,7 @@ export const calendarManifest = {
      */
     {
       id:    'getEventSnapshot', visibility: 'authenticated',
+      scopes: ['circle', 'own'],
       verb:  'list',
       appliesTo: { type: 'calendar-event' },
       params: [
@@ -272,6 +285,7 @@ export const calendarManifest = {
      */
     {
       id:    'briefSummary', visibility: 'authenticated', group: 'data',
+      scopes: ['circle', 'own'],
       verb:  'list',
       params: [],
       surfaces: {
@@ -285,6 +299,7 @@ export const calendarManifest = {
      */
     {
       id:    'searchEvents', visibility: 'authenticated', group: 'data',
+      scopes: ['circle', 'own'],
       verb:  'list',
       params: [
         { name: 'query', kind: 'string', required: true },

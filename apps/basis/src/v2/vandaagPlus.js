@@ -11,7 +11,7 @@ import { attachEntriesFor } from './attachEntries.js';
 import { catalogueManifests } from './manifestSources.js';
 import { renderGate } from '@onderling/app-manifest';
 import { listsGateRules, circleListsFor } from './circleGate.js';
-import { GATE_WORDS, helpWords, helpQuestionOpeners } from './gateWords.js';
+import { GATE_WORDS, helpWords, helpQuestionOpeners, referringWords, referringAround, leadWords } from './gateWords.js';
 import { answerHelp } from './help/helpAnswer.js';
 import { HELP_CIRCLE_ID } from './helpCircle.js';
 import { replyLine } from './replyLine.js';
@@ -187,7 +187,38 @@ function wordsFor(act, manifestsByOrigin) {
   return Object.values(names).flatMap((n) => [n?.one, n?.other]).filter((w) => typeof w === 'string' && w).map((w) => w.toLowerCase());
 }
 const catalogueByOrigin = () => Object.fromEntries(catalogueManifests().filter((m) => m?.app).map((m) => [m.app, m]));
-const pickerMoment = (day, time) => `${day}T${time ?? '09:00'}`;
+// the moment a reading fills in: the day and the time that were SAID; no time said, the day alone (the form then asks
+// for the time, `plusMomentNeedsTime`): a time nobody said is never filled in
+const pickerMoment = (day, time) => (time ? `${day}T${time}` : day);
+const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Does this act's moment still need its time? The day a reading kept (a day was said, no time), or null. Both shells ask
+ * for the time on that day and hold Save until it is there.
+ * @param {{fields: Array<{name: string, kind?: string}>}} act @param {object} values
+ * @returns {string|null}
+ */
+export function plusMomentNeedsTime(act, values = {}) {
+  const f = (act?.fields ?? []).find((x) => x.kind === 'datetime');
+  const v = f ? String(values?.[f.name] ?? '') : '';
+  return DAY_ONLY.test(v) ? v : null;
+}
+
+/**
+ * The question the sheet asks when a day was read but no time: the DAY in the person's words ("dinsdag 17 nov."), never
+ * the stored form (2026-11-17). Null when there is nothing to ask. Both sheets show this one sentence.
+ * @param {object} act @param {Record<string,string>} values
+ * @param {{t: Function, lang?: string|null}} o
+ * @returns {string|null}
+ */
+export function plusAskTime(act, values = {}, { t, lang = 'nl' } = {}) {
+  const day = plusMomentNeedsTime(act, values);
+  if (!day || typeof t !== 'function') return null;
+  const [y, m, d] = day.slice(0, 10).split('-').map(Number);
+  const words = new Intl.DateTimeFormat(String(lang ?? 'nl').startsWith('en') ? 'en-GB' : 'nl-NL', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'short' })
+    .format(new Date(Date.UTC(y, m - 1, d)));
+  return t('circle.vandaag.plus_which_time', { day: words });
+}
 
 /**
  * THE FREE LINE at the top of the "+" sheet: what was typed, read by the same bounded readers the circle chat uses —
@@ -197,6 +228,21 @@ const pickerMoment = (day, time) => `${day}T${time ?? '09:00'}`;
  * @param {string} line
  * @returns {{actId: string, values: Record<string, string>}|null}
  */
+/**
+ * What a reminder of one's own is ABOUT ("herinner me morgen om 9 uur aan de vuilnis" → "de vuilnis"), read by the
+ * phrase table's own reminder rule (the household assistant's `remindMe` for "me"), or null when the line is no reminder.
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function reminderThing(text) {
+  for (const rule of listsGateRules(null, [{ name: NO_OWN_LIST }], { greeting: false })) {
+    let cmd = null;
+    try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+    if (cmd?.opId === 'remindMe' && cmd.args?.who === 'me' && cmd.args?.item) return String(cmd.args.item);
+  }
+  return null;
+}
+
 export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
   const text = word(line);
   if (!text) return null;
@@ -214,7 +260,7 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
     const dt = act.fields.find((f) => f.kind === 'datetime');
     const tf = act.fields.find((f) => f.kind !== 'datetime');
     if (dt && !values[dt.name] && tf && values[tf.name]) {
-      const m = readDayAndTime(values[tf.name], now ? { now } : {});
+      const m = readDayAndTime(values[tf.name], now ? { now: () => new Date(now) } : {});
       if (m?.day) { values[dt.name] = pickerMoment(m.day, m.time); values[tf.name] = word(m.rest ?? ''); if (!values[tf.name]) delete values[tf.name]; }
     }
     if (Object.keys(values).length) return { actId: act.id, values };
@@ -227,14 +273,37 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
     if (w) { act = a; rest = text.slice(w.length).replace(/^[:\s]+/, ''); break; }
   }
   const timed = (a) => a.fields.some((f) => f.kind === 'datetime');
-  const moment = readDayAndTime(rest, now ? { now } : {});
-  if (!act && moment?.day) act = acts.find(timed) ?? null;
+  const moment = readDayAndTime(rest, now ? { now: () => new Date(now) } : {});
+  // a day alone makes a line an appointment, unless the line ASKS something ("wat is het weer morgen", "…?"): a question
+  // is not an act. The question openers are the gate's own (`_help.questions`); an act word above still names its act.
+  const asks = /\?\s*$/u.test(text) || helpQuestionOpeners().some((o) => lower.startsWith(o));
+  // …and unless what is left only POINTS back ("zet dat morgen om 10 in mijn agenda"): the fixed phrases cannot know
+  // what "dat" is; the person's own model, which has the previous turns, reads it (none set: the "+" says so)
+  // (a pointing word, and nothing else but the words around one: "onthoud dat de vuilnis dinsdag buiten gaat" says what)
+  const points = () => {
+    const ws = (moment?.rest ?? rest).toLowerCase().split(/[^\p{L}]+/u).filter(Boolean);
+    const refers = referringWords(); const around = referringAround();
+    return ws.some((w) => refers.has(w)) && ws.every((w) => refers.has(w) || around.has(w));
+  };
+  if (!act && moment?.day && !asks && !points()) act = acts.find(timed) ?? null;
   if (!act) return null;
   const values = {};
   let words = rest;
   if (timed(act)) {
     if (moment?.day) { const f = act.fields.find((x) => x.kind === 'datetime'); values[f.name] = pickerMoment(moment.day, moment.time); words = moment.rest ?? ''; }
     for (const w of wordsFor(act, byOrigin)) words = words.replace(new RegExp(`^${w}\\b[:\\s]*`, 'i'), '');
+  }
+  // "herinner me morgen om 9 uur aan de vuilnis": the reminder's own words are the title ("de vuilnis"), read by the
+  // SAME rule the household assistant reads a reminder with (its {text} slot), never "herinner me aan de vuilnis"
+  if (timed(act)) {
+    const thing = reminderThing(text);
+    if (thing) words = thing;
+  }
+  // "ik moet …", "I need to …": how the line opens, not what it makes (an appointment's title)
+  if (timed(act)) {
+    const low = word(words).toLowerCase();
+    const lead = leadWords().find((w) => low === w || low.startsWith(`${w} `));
+    if (lead) words = word(words).slice(lead.length);
   }
   const textField = act.fields.find((f) => f.kind !== 'datetime');
   if (textField && word(words)) values[textField.name] = word(words);
@@ -280,6 +349,19 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
   // phrasing elsewhere does not count (the tasks gate reads "zet melk op …" as a new task anywhere)
   const read = scope.map((c) => ({ circle: c, ...circleReading(rest, c, { named: named.length === 1 }) })).filter((x) => x.command);
   const byList = read.filter((x) => x.fromLists);
+  // a list line naming a list that is nowhere (not own, no circle's): ask to make it as an OWN list, never a chore by
+  // the tasks phrasing (the card's yes makes the list; nothing runs before it)
+  if (!mine && !byList.length && named.length !== 1) {
+    const asks = unknownListReading(text);
+    if (asks) {
+      return {
+        kind: 'circle', atOnce: false, circleId: null, to: [ownTo], makeList: asks.list,
+        command: { appOrigin: 'lists', opId: 'createList', args: { text: asks.list, circleId: OWN_DEVICES_SCOPE } },
+        // the yes also puts the item on it: a person who said "zet melk op boodschappen" expects melk there (Fable)
+        followUp: { appOrigin: 'lists', opId: 'addToList', args: { list: asks.list, text: asks.item, circleId: OWN_DEVICES_SCOPE } },
+      };
+    }
+  }
   if (mine) {
     // an own list of that name: there at once, unless a circle holds one too (then the card, 'mine' first)
     if (!byList.length) return atOwn(mine.command);
@@ -304,7 +386,8 @@ export function plusLineOutcome(line, { circles = [], own = null, acts = PLUS_AC
 
 /** The list ops a person's own lists answer in the "+" (what the phrase table reads to; a chore or a person is a circle's). */
 /** Stands in for the list words while a person has no own list (a control character: never typed). */
-const NO_OWN_LIST = '\u0000';
+/** The stand-in list word when a self has no own list yet: the lists table needs list words to compile; nobody types it. */
+export const NO_OWN_LIST = '\u0000';
 const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeFromList', 'markListItemDone']);
 
 /**
@@ -312,6 +395,37 @@ const OWN_LIST_OPS = new Set(['createList', 'addToList', 'listEntries', 'removeF
  * when it names one of them, or makes a list (`makes`). Their agenda is the calendar's, not a list here.
  * @returns {{command: {appOrigin: string, opId: string, args: object}, makes: boolean}|null}
  */
+/**
+ * A line that puts something on a list NOBODY holds ("zet melk op boodschappen" with no list of that name, own or in a
+ * circle): the list it names and the item, or null. Read by the SAME phrase table as every list line (`listsGateRules`),
+ * with the line's last one to three words tried as the list's name, so no second pattern decides what a list line is.
+ * The "+" then asks to make that list instead of letting the tasks phrasing make a chore of it (the help-card audit).
+ * @param {string} text
+ * @returns {{list: string, item: string}|null}
+ */
+/**
+ * The commands a "+" card's yes runs, in order: its command, then its follow-up when it has one (the make-a-list card:
+ * make the list, then put the item on it). Both sheets run exactly these, stopping at the first that fails.
+ * @param {{command?: object, followUp?: object}} card
+ * @returns {object[]}
+ */
+export function plusCardCommands(card) {
+  return [card?.command, card?.followUp].filter(Boolean);
+}
+
+export function unknownListReading(text) {
+  const words = String(text ?? '').trim().replace(/[.!?]+$/u, '').split(/\s+/u).filter(Boolean);
+  for (let n = 1; n <= Math.min(3, words.length - 1); n += 1) {
+    const name = words.slice(-n).join(' ');
+    for (const rule of listsGateRules(null, [{ name }], { greeting: false })) {
+      let cmd = null;
+      try { cmd = rule.test(text) ? rule.command(text) : null; } catch { cmd = null; }
+      if (cmd?.opId === 'addToList' && cmd.args?.list === name && cmd.args?.text) return { list: name, item: String(cmd.args.text) };
+    }
+  }
+  return null;
+}
+
 function ownListsReading(text, own) {
   const lists = (Array.isArray(own?.lists) ? own.lists : []).filter((l) => l?.name && l.defaultChild !== 'calendar-event');
   const names = new Set(lists.map((l) => l.name));
@@ -323,6 +437,9 @@ function ownListsReading(text, own) {
     const command = { appOrigin: 'lists', opId: cmd.opId, args: { ...(cmd.args ?? {}) } };
     if (cmd.opId === 'createList') return { command, makes: true };
     if (names.has(command.args.list)) return { command, makes: false };
+    // "melk is gedaan": a tick names the item, not the list; the lists find it (`list` is optional on the op), so it
+    // reads to the person's own lists when they have any
+    if (command.opId === 'markListItemDone' && !command.args.list && command.args.item && lists.length) return { command, makes: false };
   }
   return null;
 }
@@ -341,15 +458,53 @@ export function plusCardLabel(t, to) {
 }
 
 /**
+ * The "+" card in words, the one wording both sheets and the thread use: a card whose ONLY place is the person's own
+ * asks to confirm the act, named ("“maak een lijstje …”: een nieuwe lijst. Zal ik dat doen?", Bevestigen), since there
+ * is no circle to choose; a card with a choice of places asks which, one button per place.
+ * @param {{line?: string, to?: Array<object>, command?: {appOrigin?: string, opId?: string}}} card
+ * @param {{t: Function}} o
+ * @returns {{question: string, labelFor: (to: object) => string}}
+ */
+export function plusCardWords(card, { t } = {}) {
+  const to = Array.isArray(card?.to) ? card.to : [];
+  // a list nobody holds: ask to make it (the yes runs the card's createList on the own lists)
+  if (card?.makeList) return { question: t('circle.vandaag.plus_make_list_ask', { list: card.makeList }), labelFor: () => t('circle.confirm.accept') };
+  if (to.length === 1 && to[0]?.own) {
+    const key = `circle.bot.help.ops.${card?.command?.appOrigin ?? ''}.${card?.command?.opId ?? ''}`;
+    const named = t(key);
+    const act = named && named !== key ? named : (card?.command?.opId ?? '');
+    return { question: t('circle.vandaag.plus_own_confirm', { line: card?.line ?? '', act }), labelFor: () => t('circle.confirm.accept') };
+  }
+  return { question: t('circle.vandaag.plus_circle_ask', { line: card?.line ?? '' }), labelFor: (r) => plusCardLabel(t, r) };
+}
+
+/**
  * What the "+" thread answers after a circle or own act ran: the reply line every door words an act with
  * (`replyLine`); for a read of one list (`listEntries`), its entries, the done ones marked, or that it is empty.
  * @param {object} result @param {{opId: string, args?: object, t: Function}} o
  */
+/**
+ * Whether the sheet shows an answer (or an error) on its own line below the thread. Every answer the door gives is kept
+ * as the assistant's turn, so once the thread shows it the line below would say it twice (the walk, 2026-11-17): the
+ * line is for an answer the thread does not hold yet (no thread, or not its last assistant turn).
+ * @param {string|null} said  the answer or error line
+ * @param {Array<{who: string, text: string}>} [turns]  the thread as the sheet shows it, oldest first
+ */
+export function plusAnswerLineShown(said, turns = []) {
+  if (!said) return false;
+  const answers = (Array.isArray(turns) ? turns : []).filter((x) => x?.who !== 'you');
+  const last = answers.length ? answers[answers.length - 1] : null;
+  return !(last && String(last.text ?? '').trim() === String(said).trim());
+}
+
 export function plusDoneLine(result, { opId, args = {}, t } = {}) {
   const said = replyLine(result, { opId, args, t });
-  if (said || opId !== 'listEntries' || !result || result.ok === false || result.error) return said;
+  // ANY read that answers items (a list's entries, the own agenda's appointments, …) is said by its name and its lines,
+  // empty as "nothing on it": a read the "+" ran never ends in "could not read that"
+  if (said || !result || result.ok === false || result.error || !(Array.isArray(result.items) || opId === 'listEntries')) return said;
   const name = result.title ?? args?.list ?? '';
-  const items = (Array.isArray(result.items) ? result.items : []).map((i) => i?.label ?? i?.text ?? '').filter(Boolean);
+  const items = (Array.isArray(result.items) ? result.items : []).map((i) => i?.label ?? i?.text ?? i?.title ?? '').filter(Boolean);
+  if (!name) return items.length ? items.join(', ') : t('circle.vandaag.plus_read_none');
   return items.length ? t('circle.vandaag.plus_list_items', { name, items: items.join(', ') }) : t('circle.vandaag.plus_list_empty', { name });
 }
 
@@ -402,54 +557,6 @@ function circleReading(text, c, { named = false } = {}) {
 function offered(c, app, opId, ms, av) {
   const offers = new Set(attachEntriesFor({ manifestsByOrigin: c?.manifestsByOrigin ?? {}, availability: av }).map((e) => `${e.appOrigin}.${e.opId}`));
   return offers.has(`${app}.${opId}`) || ms.some((m) => m.app === app && (m.operations ?? []).some((o) => o.id === opId));
-}
-
-/**
- * The free line read by a MODEL, when one is configured: asked with the sheet's acts (and their fields) and the own
- * scope only. Its answer is held to those bounds — an act outside them is no reading, a field it does not declare is
- * dropped — so a model can improve the reading, never widen it.
- * @param {string} line
- * @param {{ask: (line: string, bounds: {scope: string, acts: Array<{actId: string, fields: string[]}>}) => Promise<{actId: string, values: object}|null>}} a
- */
-export async function plusReadWithModel(line, { ask, acts = PLUS_ACTS } = {}) {
-  if (typeof ask !== 'function' || !word(line)) return null;
-  let r = null;
-  // only the acts that MAKE something: a line is never read as "open a door" (feedback runs at once, from its button)
-  const makers = acts.filter((a) => !actRunsAtOnce(a));
-  try { r = await ask(word(line), { scope: OWN_DEVICES_SCOPE, acts: makers.map((a) => ({ actId: a.id, fields: a.fields.map((f) => f.name) })) }); } catch { r = null; }
-  const act = r && makers.find((a) => a.id === r.actId);
-  if (!act) return null;
-  const values = {};
-  for (const f of act.fields) if (r.values?.[f.name] != null && word(String(r.values[f.name]))) values[f.name] = word(String(r.values[f.name]));
-  return Object.keys(values).length ? { actId: act.id, values } : null;
-}
-
-/**
- * The model's side of the free line (LLM-facing, not a user string): pick one of the acts and fill its fields from the
- * line, or say none — nothing else, no circle, no other act.
- */
-const PLUS_MODEL_SYSTEM = 'You read one short line a person typed to make something of their own. Choose at most ONE of the acts below '
-  + 'and fill only its listed fields from the line; a moment field as local "YYYY-MM-DDTHH:mm". Answer with JSON only: '
-  + '{"actId": "...", "values": {...}}, or {"actId": null} when no act fits. Never invent an act, a field, or a place to put it.';
-
-/**
- * `ask` for `plusReadWithModel` over one model client: the line is the only thing sent (the acts and the own scope are
- * the bounds, in the instruction); the answer's JSON is read back, anything else is no reading.
- * @param {{invoke: Function}|null} client   the person's own model (`ownModelClient`), or null
- * @returns {Function|null}
- */
-export function plusModelAsk(client) {
-  if (!client || typeof client.invoke !== 'function') return null;
-  return async (line, bounds) => {
-    const acts = (bounds?.acts ?? []).map((a) => `- ${a.actId}: ${a.fields.join(', ')}`).join('\n');
-    const now = new Date();
-    const system = `${PLUS_MODEL_SYSTEM}\nScope: ${bounds?.scope}\nNow: ${now.toString()}\nActs:\n${acts}`;
-    const res = await client.invoke({ system, messages: [{ role: 'user', content: line }] });
-    const text = typeof res?.replyText === 'string' ? res.replyText : '';
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return null;
-    try { const j = JSON.parse(m[0]); return j && typeof j.actId === 'string' ? { actId: j.actId, values: j.values ?? {} } : null; } catch { return null; }
-  };
 }
 
 /** The block that shows what each noun makes. */
@@ -508,7 +615,8 @@ export function plusSuggestionPool({ circles = [], acts = PLUS_ACTS, manifestsBy
         seen.add(ex);
         let read = null;
         try { read = plusLineOutcome(ex, { circles, acts, manifestsByOrigin }); } catch { read = null; }
-        if (read) out.push(ex);
+        // an example that would only ask to make a list nobody holds is no example of what the "+" does here
+        if (read && !read.makeList) out.push(ex);
       }
     }
   }

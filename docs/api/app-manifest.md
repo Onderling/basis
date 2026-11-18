@@ -537,7 +537,7 @@ A cap not in the matrix (domain verb / not gated) → `'show'`. Pure; surfaces m
 **Kind:** function · **Import:** `gateVerbsOf` from `'@onderling/app-manifest'`
 
 ```js
-gateVerbsOf(manifest, op, locale = null)
+gateVerbsOf(manifest, op, locale = null, place = null)
 ```
 
 gateVerbs — the words an op's deterministic match starts with, per language.
@@ -559,6 +559,7 @@ for), every language's do, in the order the files were given. An op whose app ha
 - `manifest` `object`
 - `op` `object`
 - `[locale]` `string|null`
+- `[place]` `string|null` — the place asking ('own', 'circle', …): a verb declared `{words, in}` only there
 
 **Returns:** `Array<string[]>` — each verb as its words
 
@@ -991,6 +992,51 @@ holds by construction. Throws when `manifest` is missing.
 Deliberate typedef-carrier marker — the module's only runtime export, always `true`. `schema.js`
 exists for its JSDoc `@typedef`s (doc/IDE artefacts, no runtime validation); this constant makes
 the file a real ES module so imports of the schema subpath resolve cleanly.
+
+## `src/scopes.js`
+
+### `SCOPE_PLACES`
+
+**Kind:** constant · **Import:** `SCOPE_PLACES` from `'@onderling/app-manifest'`
+
+WHERE an op (or a noun's generic atoms) is offered, declared ONCE on the op or noun: `scopes`, any of
+  own     the person's own "+" (their own things, their own assistant thread)
+  circle  a circle's composer and its bot (the default when nothing is declared)
+  contact a contact thread
+Read by every projection that offers an op: the model's tools (`renderChat`), the "/" list and the gate phrases
+(`renderSlash`, `renderGate`), and the buttons (`renderAttachments`). A button may only NARROW it
+(`surfaces.attach.buttonIn`, a subset); no surface names a place of its own: the validator refuses that, so a place
+is decided in one spot and an app that declares an own-scope op appears in the "+" with no shell code.
+
+### `opScopes`
+
+**Kind:** function · **Import:** `opScopes` from `'@onderling/app-manifest'`
+
+```js
+opScopes(holder)
+```
+
+The places an op or noun is offered: its declared `scopes`, else a circle.
+
+### `inScope`
+
+**Kind:** function · **Import:** `inScope` from `'@onderling/app-manifest'`
+
+```js
+inScope(holder, scope)
+```
+
+Is it offered in `scope`? No scope asked (a caller that does not filter): yes, as before the declaration.
+
+### `buttonScopes`
+
+**Kind:** function · **Import:** `buttonScopes` from `'@onderling/app-manifest'`
+
+```js
+buttonScopes(holder, attach)
+```
+
+Where its BUTTON shows: `attach.buttonIn` narrowed to the op's places, else the op's places.
 
 ## `src/settings.js`
 

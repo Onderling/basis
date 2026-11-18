@@ -195,6 +195,16 @@ describe('/transport-mode', () => {
     expect(r.message).toMatch(/Transport mode set/);
   });
 
+  it('says the mode by its label, never the value "relay" (a person reads "connection point")', async () => {
+    const agent = makeAgent();
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
+    const r = await builtins['transport-mode']({ mode: 'verbindingspunt' });
+    expect(r.ok).toBe(true);
+    expect(agent.callSkill).toHaveBeenCalledWith('params', 'set-param', { key: 'transport.mode', value: 'relay' });
+    expect(r.message).not.toMatch(/relay/i);
+    expect(r.message).toMatch(/Connection point/);
+  });
+
   it('accepts the "both" mode', async () => {
     const agent = makeAgent();
     const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
@@ -245,7 +255,7 @@ describe('/set-relay', () => {
     expect(r.ok).toBe(true);
     expect(agent.vault.set).toHaveBeenCalledWith('cc-relay-url', 'wss://relay.example:9090');
     expect(agent.relay.connect).toHaveBeenCalledWith({ relayUrl: 'wss://relay.example:9090' });
-    expect(r.message).toMatch(/Relay connected/);
+    expect(r.message).toMatch(/Connection point connected/);
     expect(r.message).toMatch(/wss:\/\/relay\.example:9090/);
   });
 
@@ -264,7 +274,7 @@ describe('/set-relay', () => {
     expect(r.ok).toBe(true);
     expect(agent.relay.disconnect).toHaveBeenCalledTimes(1);
     expect(agent.vault.delete).toHaveBeenCalledWith('cc-relay-url');
-    expect(r.message).toMatch(/Relay cleared/);
+    expect(r.message).toMatch(/Connection point cleared/);
   });
 
   it('rejects a URL missing the ws:// scheme', async () => {
@@ -272,7 +282,7 @@ describe('/set-relay', () => {
     const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['set-relay']({ url: 'relay.example' });
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Bad relay URL/);
+    expect(r.error).toMatch(/Bad connection point address/);
     expect(agent.relay.connect).not.toHaveBeenCalled();
   });
 
@@ -283,7 +293,7 @@ describe('/set-relay', () => {
     });
     const r = await builtins['set-relay']({ url: 'wss://x' });
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Relay support not wired/);
+    expect(r.error).toMatch(/Connection points are not supported/);
   });
 });
 

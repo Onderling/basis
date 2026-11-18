@@ -6,8 +6,8 @@
 // them, and the sheet says what it did. Bram's own store has melk on Boodschappen. Web twin:
 // apps/basis/test-browser/plus-circle-act.spec.js. Release APK, emulator only.
 
-const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, backToLauncher, emulatorOnly } = require('./support/ui');
-const { startPeer, joinByInvite } = require('./support/peer');
+const { launch, isVisible, soon, tapSoon, firstBoot, backToLauncher, emulatorOnly } = require('./support/ui');
+const { startPeer, joinByInvite, peerListsHold, listsTabReached } = require('./support/peer');
 
 const LIST = 'Boodschappen';
 const CIRCLE = 'Plus Kring';
@@ -32,17 +32,7 @@ async function typeLine(text) {
 }
 let ready = null;
 
-/** Bram's own lists, asked until `pred` holds (a write crosses the relay). */
-async function bramHolds(pred, tries = 20) {
-  let last = null;
-  for (let i = 0; i < tries; i += 1) {
-    peer.send({ do: 'lists-dump' });
-    last = (await peer.next('lists', () => true, 20_000)).lists;
-    if (pred(last)) return last;
-    await new Promise((r) => setTimeout(r, 3000));
-  }
-  throw new Error(`Bram never held it; his lists: ${JSON.stringify(last)}`);
-}
+const bramHolds = (pred) => peerListsHold(peer, pred);
 
 describe('the "+" on the phone acts in the one circle that holds the list', () => {
   beforeAll(async () => {
@@ -64,16 +54,7 @@ describe('the "+" on the phone acts in the one circle that holds the list', () =
   });
 
   it("the policy reached the phone: Bram's circle shows its Lists tab", async () => {
-    // PROVE THE HARNESS FIRST: lists came on by Bram's setting; until it is on the phone, no read can find the list
-    let tab = false;
-    for (let i = 0; i < 12 && !tab; i += 1) {
-      await tapSoon(by.id('circle-tab-circles'), 30_000);
-      await tapSoon(by.id(`circle-tile-${ready.circleId}`), 30_000);
-      tab = (await firstOf([by.id('circle-detail-tab-lists')], 6_000)) === 0;
-      await device.takeScreenshot(`plus-01b-tabs-${i}`);
-      if (!tab) { await device.pressBack(); await new Promise((r) => setTimeout(r, 5000)); }
-    }
-    if (!tab) throw new Error("Bram's lists setting never reached the phone: no Lists tab on his circle");
+    await listsTabReached(ready.circleId, 'plus-01b-tabs');
     await backToLauncher();   // out of the circle: the tab bar (Today, where the "+" is) shows again
   });
 
@@ -89,7 +70,9 @@ describe('the "+" on the phone acts in the one circle that holds the list', () =
       await tapSoon(by.id('vandaag-plus-read'));
       await new Promise((r) => setTimeout(r, 3000));
       await device.takeScreenshot(`plus-02-read-${i}`);   // what the sheet said to this read, whichever branch
-      did = await isVisible(by.id('vandaag-plus-done'));
+      // the act ran when no card asks and the thread answered (the answer is said once, in the thread); Bram's own
+      // store below is the proof that it landed
+      did = !(await isVisible(by.id('vandaag-plus-card'))) && (await isVisible(by.id('vandaag-plus-thread')));
       if (!did) {
         if (await isVisible(by.id('vandaag-plus-card'))) { cards += 1; await tapSoon(by.id('vandaag-plus-card-no')); }
         await tapSoon(by.id('vandaag-plus-close'));
@@ -114,9 +97,13 @@ describe('the "+" on the phone acts in the one circle that holds the list', () =
   it('a line the word rule does not know, with no model set, gets a plain answer, never silence', async () => {
     await typeLine('flubber quaxel');
     await tapSoon(by.id('vandaag-plus-read'));
-    // the answer shows under the line (and is kept as the assistant's turn above it: the same words twice)
-    await soon(by.id('vandaag-plus-error'), 20_000);
-    await expect(element(by.id('vandaag-plus-error'))).toHaveText('I could not read that.');
+    // the answer: no model is set, and where to set one, in the screens' own labels
+    // the exact answer, from the same locale file and the same labels the app joins (English on the test phone), said
+    // once: in the thread, as the assistant's turn (the sheet no longer repeats it on a line below)
+    const en = require('../../basis/src/locales/circle.en.json');
+    const txt = (v) => (typeof v === 'string' ? v : v.text);
+    const path = [en.tab.mij, en.settings_home.title, en.settings_home.appearance, en.userLlm.title].map(txt).join(' \u2192 ');
+    await soon(by.text(txt(en.vandaag.plus_no_model).replace('{{path}}', path)).withAncestor(by.id('vandaag-plus-thread')), 20_000);
     await device.takeScreenshot('plus-04-unread');
   });
 

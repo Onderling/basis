@@ -215,7 +215,7 @@ function contextBlock(context) {
     size += add;
   }
   const cut = kept.length < lines.length;
-  return `Relevant items already in this circle (reference only — do NOT invent commands from them):\n${kept.join('\n')}`
+  return `Relevant items already here (reference only — do NOT invent commands from them):\n${kept.join('\n')}`
     + (cut ? '\n(some items were left out; ask to list them)' : '');
 }
 

@@ -22,13 +22,16 @@ import { ensureVandaagBook, expandedPage, customiseModel, customiseOp, vandaagLa
 import { createScreenHead } from '../../../../basis/src/v2/screenHead.js';
 import { createReadMarks } from '../../../../basis/src/v2/readMarks.js';
 import { watchCircleChanges } from '../../../../basis/src/v2/headCircleWatch.js';
-import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
+import { startTabFor, startScreenStillApplies, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
+import { TRANSPORT_MODES } from '../../../../basis/src/v2/circleSettingsControls.js';   // the one list of transport modes
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyAsked, markNearbyAsked, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
 import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../basis/src/v2/nearbyLevel.js';
+import { nearbyTabs } from '../../../../basis/src/v2/nearbyTabs.js';
+import { nearbyStream, nearbyTabNews, nearbyMineSummary } from '../../../../basis/src/v2/nearbyStream.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -79,7 +82,9 @@ import {
   // "Never share my global address" — the publication lock (web parity).
   shareableAddress,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
-  buildTaskRows,
+  buildTaskRows, taskStatusShown,
+  // the /transports line (the mode by its label; shared with web)
+  transportsStatusLine,
   // per-circle bottom tabs from policy.features (v2 §1).
   buildCircleTabs, DEFAULT_CIRCLE_TAB,
   // D1 (§5A) — quickActions row: feature↔tab mapping + frequency counter.
@@ -94,7 +99,7 @@ import {
   // the in-app banner over the same rows (the shared driver; this screen only paints it)
   createBannerDriver, notifyPolicyKey,
   // δ.2 — per-message delivery state for optimistic circle chat sends.
-  createDeliveryStateMap,
+  createAppDeliveryMap,
   // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out).
   circleChatMessageEvent, broadcastCircleFanOut,
   // Phase 3 — the shared circle label→candidate lookup (base items + app-qualified live fetch).
@@ -238,7 +243,7 @@ import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDis
 // the shared confirm gate at the dispatch waist (mobile presenter: Alert.alert, destructive style).
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../basis/src/v2/userLlmDefault.js';
-import { buildUserLlmRuntime, validateUserLlmConfig, ownModelOf } from '../../../../basis/src/v2/userLlmRuntime.js';
+import { buildUserLlmRuntime, validateUserLlmConfig, ownModelOf, ownRouteOf } from '../../../../basis/src/v2/userLlmRuntime.js';
 import { t, lang } from '../../core/localisation.js';
 import {
   makeCirclePolicyStoreRN, makeMemberOverrideStoreRN, makeAvailabilityStoreRN,
@@ -288,8 +293,9 @@ import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { createPlusThread, plusThreadId } from '../../../../basis/src/v2/plusThread.js';
+import { createPlusDoor, plusRouteLine } from '../../../../basis/src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../../../basis/src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, plusCircleOp, plusCardCommands, plusDoneLine, plusOwnLists } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../../../basis/src/v2/circleGate.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
@@ -323,6 +329,8 @@ import { loadCircleStoragePod } from '../../../../basis/src/v2/circleStoragePoli
 import { splitBySight, SIGHT } from '../../../../basis/src/v2/circleSight.js';
 import { makeSyncSelection } from '../../../../basis/src/v2/syncSelection.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
+import IntroDeckModal from './IntroDeckModal.js';   // the introduction's seven cards (web twin: web/v2/introDeck.js)
+import { firstOpenThen } from '../../../../basis/src/v2/firstOpen.js';   // the first open's doors (web twin: showFirstOpen)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
 import { bindCircleGovernance, openPolicyProposals, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
@@ -525,6 +533,9 @@ export default function CircleLauncherScreen({
   // sheet the person sees, then cleared (`onContactLinkDone`).
   contactLink = null,
   onContactLinkDone = null,
+  // THE FIRST OPEN's door the welcome chose (basis/src/v2/firstOpen.js), run once the launcher is up, then cleared
+  firstOpenDoor = null,
+  onFirstOpenDoorDone = null,
   // cluster J — the OidcSessionRN ref (App.js:187), the Solid session the pod writer authenticates with.
   sessionRef = null,
   // cluster J — podAuth (lifted from the hidden ChatScreen) so the "Me" screen can drive pod sign-in.
@@ -552,6 +563,7 @@ export default function CircleLauncherScreen({
   const leavingCircles = useRef(new Map());
   // The persona the Me tab's pointers open (the general one — there is no circle context here).
   const [myPersona, setMyPersona] = useState(null);
+  const [introOpen, setIntroOpen] = useState(false);   // the introduction's seven cards (IntroDeckModal), from Today's intro card
   const [loading, setLoading] = useState(true);
   // Whether the list has had a real answer: "No circles yet." is said only then, never in "not known yet" (see
   // `launcherListPaint`).
@@ -643,7 +655,7 @@ export default function CircleLauncherScreen({
       loadCircleTransport();
       return { ok: !saveError && reconnect?.ok !== false, effective, error: saveError ?? reconnect?.error ?? null };
     }
-    if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
+    if (opId === 'transport-mode' && TRANSPORT_MODES.includes(String(args?.mode))) {
       // One home, one application point (web parity): the kind-gated write; realAgent's set-param
       // hook applies it to the live transport router.
       try { await bundle?.callSkill?.('params', 'set-param', { key: 'transport.mode', value: args.mode }); } catch { /* the control re-reads */ }
@@ -1263,6 +1275,10 @@ export default function CircleLauncherScreen({
     try { book = await ensureVandaagBook({ store: userScreenStore, t }); } catch { /* the book as read stands */ }
     setScreensBook(book);
   }, [userScreenStore]);
+  // AFTER AN OWN ACT that changes what Today shows without writing a store (a device flag: the intro seen, the key card
+  // put away): the head is told, as screenHead.js asks, and repaints the shown page (web twin: _showVandaag, which
+  // invalidates on every paint that follows an act). Without it the card stayed until the next landing (walk 2026-11-17).
+  const repaintAfterOwnAct = () => { vandaagHead.current?.invalidate(); return refreshScreensBook(); };
   // every edit of the person's pages is a screen op (kept, logged, undoable); the book is re-read after it
   const runScreenOp = useCallback(async (opId, args) => {
     try { await bundle?.callSkill?.('basis', opId, args); }
@@ -1492,7 +1508,7 @@ export default function CircleLauncherScreen({
     setLoading(true);
     try {
       const sources = resolveSkill
-        ? circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name })
+        ? circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed') })
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);
@@ -1890,14 +1906,21 @@ export default function CircleLauncherScreen({
   };
   // WHERE THE APP OPENS — the person's setting on this device (startScreen.js): Vandaag by default, the circles list,
   // or the tab last used. Once, when the agent is there; a person who already moved somewhere keeps their place.
+  // "Moved" is read when the start is applied, after the await, never from this effect's own render: a tap during the
+  // cold start (even on Circles, the tab already showing), an opened circle or "Make a circle" all count. The start
+  // screen used to take over anyway (the emulator walk of 2026-11-13).
   const startedRef = useRef(false);
+  const personMovedRef = useRef(false);   // set by a tab-bar tap; the start's own onTab does not set it
+  const onTabTap = (id) => { personMovedRef.current = true; onTab(id); };
+  const placeRef = useRef(null);
+  placeRef.current = { view, selected, creating };
   useEffect(() => {
     if (startedRef.current || !bundle?.agent) return;
     startedRef.current = true;
     (async () => {
       let lastTab = null;
       try { lastTab = await AsyncStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
-      if (view !== 'list' || selected) return;
+      if (!startScreenStillApplies({ tapped: personMovedRef.current, ...placeRef.current })) return;
       onTab(startTabFor(bundle.agent.getParamValue?.('home.startScreen'), lastTab));
     })();
   }, [bundle]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -1926,7 +1949,7 @@ export default function CircleLauncherScreen({
   const sayScanResult = (reply) => { const w = scanOpResultWords(reply); Alert.alert(t('circle.profile.scan'), t(w.key, w.params)); };
   const runOpFromScan = async (target, needs) => {
     const call = (app, op, args) => bundle?.callSkill?.(app, op, args);
-    const next = await opFormOrRun(target, needs, makePickerFetcher(call, target.app));
+    const next = await opFormOrRun(target, needs, makePickerFetcher(call, target.app, t));
     if (next.error) { sayScanResult({ ok: false, outcome: next.error }); return; }
     if (next.run) { sayScanResult(await Promise.resolve(call(next.run.app, next.run.opId, next.run.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }))); return; }
     setScanForm({ target, form: next.form, choices: next.choices });
@@ -1960,6 +1983,17 @@ export default function CircleLauncherScreen({
         .catch((err) => Alert.alert(t('circle.profile.scan'), String(err?.message ?? err)));
     }
   };
+
+  // THE FIRST OPEN's door, once the app is up: the one scanner (the scanQr op, as Me's Scan) or the introduction's cards
+  // over Today (marked seen as "Lees meer" does); "just continue" asks for nothing (web twin: showFirstOpen)
+  useEffect(() => {
+    if (!firstOpenDoor || !bundle?.callSkill) return;
+    const then = firstOpenThen(firstOpenDoor);
+    onFirstOpenDoorDone?.();
+    if (then === 'scan') onMeAction('scan');
+    else if (then === 'intro') { setView('screens'); onboardingFlags.markIntroSeen().then(() => setIntroOpen(true)); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstOpenDoor, bundle]);
 
   // OBJ-2 — show THIS circle's membership QR (admin-gated by the substrate). Carries the same fields a
   // web-built invite does (invariant 2): the freedom template (join-time consent), the pod disclosure +
@@ -2193,8 +2227,9 @@ export default function CircleLauncherScreen({
   // chat retention class, never carried), one thread per person — web twin: circleApp.js `plusThreadNow`
   const plusSelf = bundle?.agent?.identity?.chat?.pubKey ?? null;
   const plusThread = useMemo(() => (eventLog?.append ? createPlusThread({ threads: createBotThreads({ eventLog, store: memoryThreadStore() }), threadId: plusThreadId(plusSelf) }) : null), [eventLog, plusSelf]);
-  const [plusTurnsTick, setPlusTurnsTick] = useState(0);
-  const plusTurns = useMemo(() => plusThread?.turns() ?? [], [plusThread, plusTurnsTick, plusOpen]);
+  // a turn kept or forgotten paints the sheet again (it asks the door for the conversation on render)
+  const [, setPlusTurnsTick] = useState(0);
+  // the conversation the sheet shows is the self's it is written as: asked of the door by the sheet (`turns(asSelf)`)
   // the circles the "+" line is read against (what each offers, its lists): the read uses them, and so does the pool of
   // suggestions, read when the sheet opens — a suggestion is a line the "+" reads here (web twin: circleApp.js plusCircles)
   const plusCircles = async () => {
@@ -2214,12 +2249,14 @@ export default function CircleLauncherScreen({
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plusOpen]);
-  // one exchange in the kept thread (the shared duty, web twin): the line heard, the read run, what it answered kept
-  const plusRecorded = async (line, run) => {
-    const r = plusThread ? await plusThread.exchange(line, run, { t }) : await run();
-    setPlusTurnsTick((n) => n + 1);
-    return r;
-  };
+  // the person's own "+" door (web twin: circleApp.js plusDoorNow): their own model as set now, this thread, these
+  // circles; composed per read (the conversation lives in the thread, so nothing is lost between reads)
+  // a self's key: the general self's chat key, a persona's webid (what its rows are made by)
+  const plusSelfKeyOf = (id) => (!id || id === 'default' ? plusSelf : (heldSelves.find((p) => p.id === id)?.webid ?? null));
+  const plusDoorNow = () => createPlusDoor({
+    llm: plusSelf ? ownModelOf(userLlmCfg) : null, threads: plusThread?.threads ?? null, selfKeyOf: plusSelfKeyOf, readAs: plusAsSelf,
+    householdManifest: bundle?.agent?.manifest, t, lang: lang(), circles: plusCircles, ownListsOf: plusOwnListsOf, runInCircle: plusRunInCircle,
+  });
 
   // THE "+" SHEET, on every tab (the person's own entry): its line, their own acts, their Me actions — one element the tab
   // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
@@ -2243,24 +2280,41 @@ export default function CircleLauncherScreen({
           setPlusOpen(false); setPlusEdit(null); setPendingPinOpen(r); if (c) openCircle(c);
           return null;
         }}
-        visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
+        visible={plusOpen} edit={plusEdit}
+        // closing with a form the "+" opened from a line still unsaved: refused, nothing stored, the conversation says so
+        onClose={(o) => {
+          if (o?.actId && !o.editing) plusDoorNow().settled({ asSelf: o.asSelf }, { saved: false }).then(() => setPlusTurnsTick((n) => n + 1)).catch(() => null);
+          setPlusOpen(false); setPlusEdit(null);
+        }}
         selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
         // the free line: an own act; or, for something that lives in a circle, that circle's act: run at once where the
         // circle is clear, else the card asks which (plusLineOutcome); the own model reads only what the plain reading
         // missed (their settings' route only; none set = no model). Web twin: circleApp.js
-        turns={plusTurns}
-        onForget={plusThread ? () => { plusThread.forget(); setPlusTurnsTick((n) => n + 1); } : null}
-        suggestFor={(typed) => plusSuggest(plusPool, typed)}
-        onRead={(line, asSelf) => plusRecorded(line, async () => {
-          const list = await plusCircles();
-          const o = plusLineOutcome(line, { circles: list, own: { lists: await plusOwnListsOf(asSelf) }, lang: lang() });
-          // help ("help", "?", a how-to question a help card knows): answered in the thread (web twin)
-          if (o?.kind === 'help') return { done: plusHelpAnswer(o, { t }) };
-          if (o?.kind === 'circle' && o.atOnce) return plusRunInCircle(o.command, o.circleId, asSelf);
-          if (o?.kind === 'circle') return { card: { line, to: o.to, command: o.command } };
-          return (o?.kind === 'own' ? o : null) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') };
-        })}
-        onCircleRun={(card, circleId, asSelf) => plusRecorded(null, () => plusRunInCircle(card?.command, circleId, asSelf))}
+        turns={(asSelf) => plusDoorNow().turns({ asSelf })}
+        routeLine={plusRouteLine(ownRouteOf(userLlmCfg), { t })}
+        // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat (web twin)
+        onForget={plusThread ? async (asSelf) => { await plusDoorNow().forget({ asSelf }); setPlusTurnsTick((n) => n + 1); } : null}
+        // under the line: on "/" the door's commands (the "/" list), else the lines it reads here (web twin: circleApp.js)
+        suggestFor={(typed) => plusDoorNow().suggest(typed, { pool: plusPool })}
+        onRead={async (line, asSelf, o) => {
+          // the ONE "+" door (shared with web): help, then the plain reading, then the person's own model through the
+          // assistant engine; it keeps the line and what it answered in the thread
+          const r = await plusDoorNow().read(line, { asSelf, onSlow: o?.onSlow });
+          setPlusTurnsTick((n) => n + 1);
+          return r;
+        }}
+        // what the card carries, in order (the make-a-list card: the list, then the item on it); the first failure stops it
+        onCircleRun={async (card, circleId, asSelf) => {
+          const r = await plusDoorNow().exchange({ asSelf }, async () => {
+            let last = null;
+            for (const c of plusCardCommands(card)) { last = await plusRunInCircle(c, circleId, asSelf); if (last?.error) break; }
+            return last;
+          });
+          setPlusTurnsTick((n) => n + 1);
+          return r;
+        }}
+        // the card's no: the line was not done, said in the conversation (web twin: onCircleCancel)
+        onCircleCancel={async (card, asSelf) => { await plusDoorNow().cardRefused({ asSelf }, card); setPlusTurnsTick((n) => n + 1); }}
         shareTargets={plusShareList}
         onShare={plusEdit ? async (actId, contact) => {
           const op = plusShareOp(actId, { id: plusEdit.id, with: contact });
@@ -2293,6 +2347,8 @@ export default function CircleLauncherScreen({
           if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
           // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
           if (!plusEdit) actionFrequency.bump(OWN_USAGE_SCOPE, actId);
+          // a form the "+" opened from a line: the conversation says it was saved (web twin: circleApp.js)
+          if (!plusEdit) await plusDoorNow().settled({ asSelf }, { saved: true, actId }).catch(() => null);
           const follow = plusEdit ? null : plusFollowUp(screensBook, actId);
           if (follow) await runScreenOp(follow.opId, follow.args);
           setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
@@ -2304,7 +2360,7 @@ export default function CircleLauncherScreen({
     // when there is more than one; "Pas aan" opens the customise sheet (every control a screen op). Web: circleApp.js.
     const active = getActiveScreen(screensBook);
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="screens" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         {/* clear the status bar: the day's header sat under the clock */}
         <View style={{ flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper }}>
           {/* the day this page is about, above everything: a day, not a list (web twin: circle-vandaag__day) */}
@@ -2356,8 +2412,9 @@ export default function CircleLauncherScreen({
                   saveNameCard(a.value, { callSkill: bundle?.callSkill })
                     .then((r) => { Alert.alert(nameCardWords(r, t)); if (r.ok) refreshScreensBook(); });
                 }
-                else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
-                else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => openHelpDoor());
+                else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => repaintAfterOwnAct());
+                // "Lees meer": the introduction's seven cards (shared model, src/v2/introDeck.js; web twin: openIntroDeck)
+                else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => setIntroOpen(true));
                 // the key card: its explicit "Toon" reads the owner phrase and opens it; "Later" puts the card away
                 else if (a?.kind === 'key-show') {
                   Promise.resolve(bundle?.callSkill?.('household', 'revealOwnerPhrase', {})).catch(() => null).then((res) => {
@@ -2365,7 +2422,7 @@ export default function CircleLauncherScreen({
                     setKeyPhrase(Array.isArray(w) ? w.join(' ') : String(w || ''));
                   });
                 }
-                else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => refreshScreensBook());
+                else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => repaintAfterOwnAct());
                 // the reach card: the connection points, where a relay is added (the relay question stays quiet after 'Later')
                 else if (a?.kind === 'open-points') setView('points');
                 else if (a?.kind === 'create-circle') setCreating(true);
@@ -2380,13 +2437,14 @@ export default function CircleLauncherScreen({
         <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook, { circles })}
           onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
           onClose={() => setCustomiseOpen(false)} />
+        <IntroDeckModal visible={introOpen} onClose={() => { setIntroOpen(false); repaintAfterOwnAct(); }} />
       </WithTabBar>
     );
   }
   // Mij = identity, the declared screen; its other doors are behind My data.
   if (view === 'profile') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} head={mijHead} landedByTab={mijByTab} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
@@ -2399,7 +2457,7 @@ export default function CircleLauncherScreen({
   // its only undo, in a place a person can find without being any circle's admin.
   if (view === 'blocked') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('contacten')} />
       </WithTabBar>
     );
@@ -2407,7 +2465,7 @@ export default function CircleLauncherScreen({
   // This device's log, to copy — a My data sub-view (web parity: showLogReport); nothing is sent from it.
   if (view === 'logReport') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <LogReportScreen onBack={() => { setSettingsGroupId('my-data'); setView('settingsGroup'); }} />
       </WithTabBar>
     );
@@ -2415,7 +2473,7 @@ export default function CircleLauncherScreen({
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2424,7 +2482,7 @@ export default function CircleLauncherScreen({
   // op + the settable params, from the shared projections; back returns to profile.
   if (view === 'advanced') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2437,7 +2495,7 @@ export default function CircleLauncherScreen({
   // built from the encapsulated identity secret). A null opener makes a row tap a deny-safe no-op.
   if (view === 'sharedWithMe') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
@@ -2456,13 +2514,15 @@ export default function CircleLauncherScreen({
   // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <SettingsHomeScreen onBack={() => setView('profile')}
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
           onOpenPerCircle={() => setView('settingsCircles')}
           onOpenDoor={(d) => {
             // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same; web parity)
             if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
+            // the introduction's seven cards again (the manifest's settings door), over Today where the deck is drawn
+            if (d?.target?.kind === 'nav' && d.target.to === 'intro') { setView('screens'); setIntroOpen(true); return; }
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
             Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))
@@ -2474,14 +2534,14 @@ export default function CircleLauncherScreen({
   if (view === 'settingsGroup') {
     const group = settingsGroupFor(basisManifest, settingsGroupId);
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         {myDataScreen({ only: group ? group.sections.map((sec) => sec.id) : [], groupTitle: group ? t(group.labelKey) : null, onBack: () => setView('settingsHome') })}
       </WithTabBar>
     );
   }
   if (view === 'settingsCircles') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleSettingsChooserScreen circles={circles ?? []} onBack={() => setView('settingsHome')}
           onOpenCircle={(c) => { setSelected(c); setView('settings'); }} />
       </WithTabBar>
@@ -2489,7 +2549,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'availability') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="mij" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleAvailabilityScreen
           store={availabilityStore}
           onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }}
@@ -2502,7 +2562,7 @@ export default function CircleLauncherScreen({
     if (contactThread) {
       // the 1:1 thread has no "+": its composer is the act, and the button would float over its send button
       return (
-        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
             deliveryStateMap={deliveryStateMap}
             bundle={bundle}
@@ -2520,7 +2580,7 @@ export default function CircleLauncherScreen({
       );
     }
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="contacten" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <ContactsScreen bundle={bundle} unread={contactUnread}
           helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
           onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
@@ -2654,7 +2714,7 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="nearby" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <NearbyScreenHost
           bundle={bundle}
           heldSelves={heldSelves}
@@ -2898,7 +2958,7 @@ export default function CircleLauncherScreen({
 
   const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
-    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={screenOverlay} active="circles" onSelect={onTabTap} badges={tabBadges} hasMesh={!!bundle?.mdns}>
       <View style={styles.page} testID="circle-launcher">
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>
@@ -3417,7 +3477,7 @@ function CircleDetail({
   // Prefer the SHARED map from App.js — inbound receipts land there. The local fallback keeps older
   // callers/tests working, but a private map here means receipts advance a state no bubble reads.
   if (deliveryStateMapRef.current == null) {
-    deliveryStateMapRef.current = deliveryStateMap ?? createDeliveryStateMap();
+    deliveryStateMapRef.current = deliveryStateMap ?? createAppDeliveryMap();
   }
   const [deliveryTick, setDeliveryTick] = useState(0);
   // …and REDRAW when something else writes to that map. The send path bumps the tick itself (it owns the
@@ -4563,19 +4623,17 @@ function CircleDetail({
       }
       if (builtin.opId === 'transport-mode') {
         const mode = builtin.args?.mode;
-        if (['nkn', 'relay', 'both'].includes(String(mode))) {
+        if (TRANSPORT_MODES.includes(String(mode))) {
           await onCircleControl('transport-mode', builtin.args);
-          appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_set', { mode }) });
+          appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_set', { mode: t(`circle.settings.transportMode_opt.${mode}`) }) });
         } else {
           appendCircleMessage({ actor: 'bot', text: t('circle.settings.transport_bad', { mode: mode ?? '—' }) });
         }
         return;
       }
       if (builtin.opId === 'transports') {
-        const ts = circleTransport || {};
-        appendCircleMessage({ actor: 'bot', text: t('circle.settings.transports_status', {
-          mode: ts.mode ?? 'nkn', relay: ts.relayUrl || t('circle.settings.transports_none'),
-        }) });
+        // the mode by its label, never the value 'relay' (shared with web)
+        appendCircleMessage({ actor: 'bot', text: transportsStatusLine(circleTransport || {}, t) });
         return;
       }
       if (builtin.opId === 'security-status') {
@@ -4969,7 +5027,8 @@ function CircleDetail({
                     {row.text || t('circle.view.tasks_untitled')}
                   </Text>
                   <Text style={styles.taskStatus}>
-                    {t(`circle.taskStatus.${row.status || 'open'}`, { defaultValue: row.status || '' })}
+                    {/* a claimed task says who holds it, through the reveal ladder (shared with web: taskStatusShown) */}
+                    {taskStatusShown(row, { members: tabMembers ?? [], viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise', t })}
                   </Text>
                   <View style={styles.rowActions}>
                     {actionsForStreamRow(row, {
@@ -5220,6 +5279,7 @@ function CircleDetail({
           ) : null}
           <ThemedTextInput
             style={styles.composerInput}
+            autoCapitalize="none"
             value={composerText}
             onChangeText={setComposerText}
             placeholder={t('circle.view.composer_placeholder')}
@@ -5869,7 +5929,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     // Names the REAL reach — "asked 3 of 5 nearby" — rather than implying the whole room heard it; the
     // line then follows the receipts ("heard by 2 of 5") as they come in.
     lastAsk.current = r.ok ? { id: r.ask?.id ?? null, peers: r.peers } : null;
-    setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+    // a refusal the controller can name (hidden from the room) says so; any other says the ask lapsed
+    setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' });
   }, [screen]);
   useEffect(() => {
     const sub = bundle?.nearbyRoom?.subscribeToHeard;
@@ -5898,10 +5959,13 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   const submitCard = useCallback(async (fields) => {
     const r = await screen.showCard(fields);
     // Names the real reach, like an ask — "shown to 3 of 5" rather than "saved".
-    setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+    setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' });
   }, [screen]);
 
-  const say = useCallback((text) => { screen.say(text); }, [screen]);
+  const say = useCallback(async (text) => {
+    const r = await screen.say(text);
+    if (r?.notice) setNotice({ key: r.notice });   // refused while hidden: say why
+  }, [screen]);
 
   // Joining a broadcast invite runs the SAME join as a scanned QR — the host hands the uri to the existing
   // wizard rather than to anything new, which is the point of step H.
@@ -5967,8 +6031,6 @@ function NearbyScreen({
   const asks       = Array.isArray(model?.asks) ? model.asks : [];
   const [draft, setDraft] = useState('');
   const allows     = model?.allows ?? { card: false, chat: false };
-  // `null` means "I have not joined" — deliberately distinct from an empty conversation.
-  const chat       = Array.isArray(model?.chat) ? model.chat : null;
   const [cardLabel, setCardLabel] = useState('');
   const [cardLine, setCardLine]   = useState('');
   const [chatDraft, setChatDraft] = useState('');
@@ -5978,6 +6040,284 @@ function NearbyScreen({
   const [bannerOpen, setBannerOpen] = useState(false);
   // "You here" opens on the FIRST-ever open only. so the card/chat toggles are discovered once.
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
+  // Nearby's two tabs: what each holds and in what order, and which opens first, is `nearbyTabs` (shared with web);
+  // a part with nothing in it is not in its list. Which tab is selected is this screen's own state.
+  const { tabs, defaultTab, chatOff, askOff } = nearbyTabs(model);
+  const [pickedTab, setPickedTab] = useState(null);
+  const selectedTab = tabs.some((x) => x.id === pickedTab) ? pickedTab : defaultTab;
+  // What is new on each tab (`nearbyTabNews`, shared with web). The seen-marks are this screen's own state: the open
+  // tab is seen up to its latest arrival, so only the other tab counts up.
+  const [seenTabs, setSeenTabs] = useState({});
+  const seenLatest = nearbyTabNews(model, seenTabs).latest[selectedTab] ?? 0;
+  const seenNow = Object.assign({}, seenTabs, { [selectedTab]: seenLatest });
+  const tabCounts = nearbyTabNews(model, seenNow).counts;
+  useEffect(() => {
+    if ((seenTabs[selectedTab] ?? 0) !== seenLatest) setSeenTabs((prev) => Object.assign({}, prev, { [selectedTab]: seenLatest }));
+  }, [selectedTab, seenLatest]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const tabLabel = (tab) => (tabCounts[tab.id] > 0
+    ? t('circle.nearbyScreen.tab_with_new', { label: t(tab.labelKey), count: tabCounts[tab.id] })
+    : t(tab.labelKey));
+  const stream = nearbyStream(model);
+  // Someone's question: in Questions, and as a card in the Conversation stream, boxed and headed with who asked so it
+  // never reads as a chat line (only answering it shows you to the asker).
+  const askCard = (entry, inStream = false) => (
+    <View key={`ask-${entry.ask?.id}`} style={inStream ? styles.nearbyStreamCard : styles.nearbyAsk} testID={inStream ? `nearby-stream-ask-${entry.ask?.id}` : `nearby-ask-${entry.ask?.id}`}>
+      {inStream ? <Text style={styles.muted}>{t('circle.nearbyScreen.stream_ask_from', { name: entry.who ?? '' })}</Text> : null}
+      <Text style={styles.rowName}>{entry.ask?.text}</Text>
+      {entry.resonant && entry.reason ? (
+        // Names the SHARED tags only; my unmatched drivers never appear here.
+        <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_resonant', { reason: entry.reason })}</Text>
+      ) : null}
+      {/* Shown to me, sent nowhere — the reminder that replying is what reveals me. */}
+      <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_disclosure')}</Text>
+      {typeof entry.ask?.expiresAt === 'number' ? (
+        <Text style={styles.rowMeta} testID={`nearby-ask-clock-${inStream ? 'stream-' : ''}${entry.ask?.id}`}>
+          {t('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) })}
+        </Text>
+      ) : null}
+      {Array.isArray(entry.actions) && entry.actions.some((a) => NEARBY_ASK_LABELS[a]) ? (
+        <View style={styles.nearbyActions}>
+          {entry.actions.filter((a) => NEARBY_ASK_LABELS[a]).map((action) => (
+            <Pressable
+              key={action}
+              onPress={() => { if (typeof onAskAction === 'function') onAskAction(action, entry.ask); }}
+              accessibilityRole="button"
+              testID={`nearby-ask-action-${action}-${inStream ? 'stream-' : ''}${entry.ask?.id}`}
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t(NEARBY_ASK_LABELS[action])}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+  // A circle offered here: in Questions, and as a card in the Conversation stream, headed with who offers it.
+  const inviteCard = (entry, inStream = false) => (
+    <View key={`invite-${entry.invite?.circleId}`} style={inStream ? styles.nearbyStreamCard : styles.nearbyAsk} testID={inStream ? `nearby-stream-invite-${entry.invite?.circleId}` : `nearby-invite-${entry.invite?.circleId}`}>
+      {inStream ? <Text style={styles.muted}>{t('circle.nearbyScreen.stream_invite_from', { name: entry.who ?? '' })}</Text> : null}
+      <Text style={styles.rowName}>{entry.invite?.circleName || entry.invite?.circleId}</Text>
+      {/* On every invite: the carrier changed, the gate did not. */}
+      <Text style={styles.rowMeta}>{t('circle.nearbyScreen.join_is_a_join')}</Text>
+      <View style={styles.nearbyActions}>
+        {(entry.actions ?? []).filter((a) => NEARBY_INVITE_LABELS[a]).map((action) => (
+          <Pressable
+            key={action}
+            onPress={() => onInviteAction?.(action, entry.invite)}
+            accessibilityRole="button"
+            testID={`nearby-invite-action-${action}-${inStream ? 'stream-' : ''}${entry.invite?.circleId}`}
+            style={styles.nearbyAction}
+          >
+            <Text style={styles.nearbyActionText}>{t(NEARBY_INVITE_LABELS[action])}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+  // One painter per declared part; the root of each carries the part's id as its testID.
+  const SECTION_PAINTERS = {
+    'nearby-peers': () => (
+      <View testID="nearby-peers">
+        <View style={styles.list}>
+          {rows.map((row) => (
+            <View
+              key={row.id || row.pseudonym}
+              style={styles.row}
+              testID={`nearby-row-${row.id || row.pseudonym}`}
+            >
+              <Text style={styles.rowName}>{row.pseudonym}</Text>
+              {row.sharedSkills.length ? (
+                <Text style={styles.rowMeta}>{row.sharedSkills.join(', ')}</Text>
+              ) : null}
+              {row.proximity ? <Text style={styles.rowMeta}>{row.proximity}</Text> : null}
+              {/* Attached to the person, not a separate list — a face and a card are one thing. */}
+              {row.card?.line ? <Text style={styles.rowMeta}>{row.card.line}</Text> : null}
+              {row.card?.tags?.length ? <Text style={styles.rowMeta}>{row.card.tags.join(', ')}</Text> : null}
+              {/* Rule (b): a stranger you can see is still a stranger — say it, rather than letting the
+                  absence of an "open" button be the only hint. */}
+              {Array.isArray(row.actions) && row.actions.some((a) => NEARBY_ACTION_LABELS[a]) ? (
+                <View style={styles.nearbyActions}>
+                  {row.actions.filter((a) => NEARBY_ACTION_LABELS[a]).map((action) => (
+                    <Pressable
+                      key={action}
+                      onPress={() => { if (typeof onAction === 'function') onAction(action, row); }}
+                      accessibilityRole="button"
+                      testID={`nearby-action-${action}-${row.id || row.pseudonym}`}
+                      style={styles.nearbyAction}
+                    >
+                      <Text style={styles.nearbyActionText}>{t(NEARBY_ACTION_LABELS[action])}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ))}
+        </View>
+        {rows.some((row) => row.note === 'nearby-not-member') ? (
+          // Rule (b), said ONCE for the room rather than under every stranger: a person you can see is
+          // still a stranger.
+          <Text style={styles.muted} testID="nearby-note">{t('circle.nearbyScreen.not_member_note')}</Text>
+        ) : null}
+      </View>
+    ),
+    'nearby-ask-off': () => {
+      // Hidden from the room (`nearbyAskOff`, shared with web): no composer to type a whole question into and then be
+      // refused; the hidden line and the same way to become visible as Conversation. The last notice stays in view.
+      const act = { unquiet: () => onSetQuiet?.(false), 'radio-on': () => onSetRadio?.('on') }[askOff?.act];
+      return (
+        <View style={styles.nearbyAsks} testID="nearby-ask-off">
+          <Text style={styles.muted}>{t('circle.nearbyScreen.ask_hidden_line')}</Text>
+          {act ? (
+            <Pressable onPress={act} accessibilityRole="button" testID="nearby-ask-visible" style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_hidden_action')}</Text>
+            </Pressable>
+          ) : null}
+          {notice ? (
+            <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
+              {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
+            </Text>
+          ) : null}
+        </View>
+      );
+    },
+    'nearby-ask-field': () => (
+      <View style={styles.nearbyAsks} testID="nearby-ask-field">
+        {composing || answering ? (
+          // Inline, not a modal: the room stays visible while you type. You are about to say something out
+          // loud in a place where you can see who is standing there.
+          <View style={styles.nearbyComposer} testID="nearby-ask-composer">
+            {answering && answeringAsk?.text ? (
+              <Text style={styles.rowMeta} testID="nearby-answering-to">{t('circle.nearbyScreen.answering_to', { text: answeringAsk.text })}</Text>
+            ) : null}
+            <ThemedTextInput
+              style={styles.nearbyInput}
+              value={draft}
+              onChangeText={setDraft}
+              maxLength={280}
+              placeholder={t(answering ? 'circle.nearbyScreen.answer_placeholder' : 'circle.nearbyScreen.ask_placeholder')}
+              testID="nearby-ask-input"
+              autoFocus
+            />
+            <Pressable
+              onPress={() => {
+                const text = draft.trim();
+                if (!text) return;
+                if (answering) onSubmitAnswer?.(text); else onSubmitAsk?.(text);
+              }}
+              accessibilityRole="button"
+              testID="nearby-ask-send"
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t(answering ? 'circle.nearbyScreen.answer_send' : 'circle.nearbyScreen.ask_send')}</Text>
+            </Pressable>
+            <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t('circle.confirm.cancel')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Btn variant="primary" onPress={onCompose} testID="nearby-ask-compose" label={t('circle.nearbyScreen.ask_compose')} />
+        )}
+        {notice ? (
+          <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
+            {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
+          </Text>
+        ) : null}
+      </View>
+    ),
+    'nearby-my-asks': () => (
+      <View style={styles.nearbyAsks} testID="nearby-my-asks">
+        {(model?.myAsks ?? []).map((e) => (
+          <View key={`mine-${e.ask?.id}`}>
+            <Text style={styles.rowMeta} testID={`nearby-my-ask-${e.ask?.id}`}>
+              {t('circle.nearbyScreen.my_ask_row', { heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)) })}
+            </Text>
+            {(e.answers ?? []).map((a) => {
+              const who = a.label ?? String(a.from ?? '').slice(0, 8);
+              return (
+                <View key={`ans-${a.from}`} style={styles.nearbyAsk} testID={`nearby-answer-${e.ask?.id}-${a.from}`}>
+                  <Text style={styles.rowName}>{t('circle.nearbyScreen.answer_row', { name: who, text: a.text ?? '' })}</Text>
+                  <Btn variant="quiet" onPress={(ev) => onShareCard?.(a.from, ev?.nativeEvent ?? null)} testID={`nearby-share-card-${a.from}`} label={t('circle.nearbyScreen.share_card_with', { name: who })} />
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    ),
+    'nearby-asks': () => (
+      <View style={styles.nearbyAsks} testID="nearby-asks">
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.asks_title')}</Text>
+        {asks.map((entry) => askCard(entry))}
+      </View>
+    ),
+    'nearby-invites': () => (
+      <View style={styles.nearbyAsks} testID="nearby-invites">
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.invites_title')}</Text>
+        {invites.map((entry) => inviteCard(entry))}
+      </View>
+    ),
+    'nearby-chat': () => (
+        <View style={styles.nearbyAsks} testID="nearby-chat">
+          {/* No title: the tab names it. A chat window normally implies history; this one has none, so it says so. */}
+          <Text style={styles.muted}>{t('circle.nearbyScreen.chat_ephemeral')}</Text>
+          {/* One stream by arrival (`nearbyStream`, shared with web): the chat lines, and a card for each question asked
+              here and each circle offered here. */}
+          {stream.length === 0 ? (
+            <Text style={styles.muted}>{t('circle.nearbyScreen.chat_empty')}</Text>
+          ) : stream.map((item) => {
+            if (item.kind === 'ask') return askCard(item.entry, true);
+            if (item.kind === 'invite') return inviteCard(item.entry, true);
+            const m = item.line;
+            // who said it and when (shared `nearbyChatLines`), then the words
+            return (
+              <View key={item.key} testID={`nearby-chat-${m.id}`} style={{ marginTop: 6 }}>
+                <Text style={styles.muted} testID={`nearby-chat-who-${m.id}`}>{[m.who, m.when].filter(Boolean).join(' · ')}</Text>
+                <Text style={styles.rowMeta}>{m.text}</Text>
+              </View>
+            );
+          })}
+          <View style={styles.nearbyComposer}>
+            <ThemedTextInput
+              style={styles.nearbyInput}
+              value={chatDraft}
+              onChangeText={setChatDraft}
+              maxLength={500}
+              placeholder={t('circle.nearbyScreen.chat_placeholder')}
+              testID="nearby-chat-input"
+            />
+            <Pressable
+              onPress={() => {
+                const text = chatDraft.trim();
+                if (!text) return;
+                onSay?.(text);
+                setChatDraft('');
+              }}
+              accessibilityRole="button"
+              testID="nearby-chat-send"
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_send')}</Text>
+            </Pressable>
+          </View>
+        </View>
+    ),
+    'nearby-chat-off': () => {
+      // No stream (`nearbyChatOff`, shared with web): hidden from the room, or not in the chat. One line, and the
+      // existing act that ends it — leaving "even stil", the radio back on, or the chat allow (the one under "you here").
+      const hidden = chatOff?.reason === 'hidden';
+      const act = { join: () => onToggleAllow?.('chat', true), unquiet: () => onSetQuiet?.(false), 'radio-on': () => onSetRadio?.('on') }[chatOff?.act];
+      return (
+        <View style={styles.nearbyAsks} testID="nearby-chat-off">
+          <Text style={styles.muted} testID={hidden ? 'nearby-chat-hidden' : undefined}>{t(hidden ? 'circle.nearbyScreen.chat_hidden_line' : 'circle.nearbyScreen.allow_chat_off')}</Text>
+          {act ? (
+            <Pressable onPress={act} accessibilityRole="button" testID={hidden ? 'nearby-chat-visible' : 'nearby-chat-join'} style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t(hidden ? 'circle.nearbyScreen.chat_hidden_action' : 'circle.nearbyScreen.allow_chat')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      );
+    },
+  };
   return (
     // ONE scroll column for the whole room (the walk of 2026-10-26: the peer list took the full height and the sections
     // below it sat at the bottom edge, unreachable): the peers are sized to their content and everything scrolls together.
@@ -6033,176 +6373,13 @@ function NearbyScreen({
       {/* The header line already says "nobody nearby" when the room is empty — the model swaps it
           in at zero peers — so there is no second empty-state line under it. */}
       <Text style={styles.muted}>{headerText}</Text>
-      {rows.length === 0 ? null : (
-        <View style={styles.list} testID="nearby-peers">
-          {rows.map((row) => (
-            <View
-              key={row.id || row.pseudonym}
-              style={styles.row}
-              testID={`nearby-row-${row.id || row.pseudonym}`}
-            >
-              <Text style={styles.rowName}>{row.pseudonym}</Text>
-              {row.sharedSkills.length ? (
-                <Text style={styles.rowMeta}>{row.sharedSkills.join(', ')}</Text>
-              ) : null}
-              {row.proximity ? <Text style={styles.rowMeta}>{row.proximity}</Text> : null}
-              {/* Attached to the person, not a separate list — a face and a card are one thing. */}
-              {row.card?.line ? <Text style={styles.rowMeta}>{row.card.line}</Text> : null}
-              {row.card?.tags?.length ? <Text style={styles.rowMeta}>{row.card.tags.join(', ')}</Text> : null}
-              {/* Rule (b): a stranger you can see is still a stranger — say it, rather than letting the
-                  absence of an "open" button be the only hint. */}
-              {Array.isArray(row.actions) && row.actions.some((a) => NEARBY_ACTION_LABELS[a]) ? (
-                <View style={styles.nearbyActions}>
-                  {row.actions.filter((a) => NEARBY_ACTION_LABELS[a]).map((action) => (
-                    <Pressable
-                      key={action}
-                      onPress={() => { if (typeof onAction === 'function') onAction(action, row); }}
-                      accessibilityRole="button"
-                      testID={`nearby-action-${action}-${row.id || row.pseudonym}`}
-                      style={styles.nearbyAction}
-                    >
-                      <Text style={styles.nearbyActionText}>{t(NEARBY_ACTION_LABELS[action])}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      )}
-      {/* Asks (step F). Every live ask shows, matching or not — filtering the room to what resonates
-          would make it a recommender, and would leak my own drivers into what I am able to see. */}
-      {rows.some((row) => row.note === 'nearby-not-member') ? (
-        // Rule (b), said ONCE for the room rather than under every stranger: a person you can see is
-        // still a stranger.
-        <Text style={styles.muted} testID="nearby-note">{t('circle.nearbyScreen.not_member_note')}</Text>
-      ) : null}
-      <View style={styles.nearbyAsks} testID="nearby-asks">
-        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.asks_title')}</Text>
-        {composing || answering ? (
-          // Inline, not a modal: the room stays visible while you type. You are about to say something out
-          // loud in a place where you can see who is standing there.
-          <View style={styles.nearbyComposer} testID="nearby-ask-composer">
-            {answering && answeringAsk?.text ? (
-              <Text style={styles.rowMeta} testID="nearby-answering-to">{t('circle.nearbyScreen.answering_to', { text: answeringAsk.text })}</Text>
-            ) : null}
-            <ThemedTextInput
-              style={styles.nearbyInput}
-              value={draft}
-              onChangeText={setDraft}
-              maxLength={280}
-              placeholder={t(answering ? 'circle.nearbyScreen.answer_placeholder' : 'circle.nearbyScreen.ask_placeholder')}
-              testID="nearby-ask-input"
-              autoFocus
-            />
-            <Pressable
-              onPress={() => {
-                const text = draft.trim();
-                if (!text) return;
-                if (answering) onSubmitAnswer?.(text); else onSubmitAsk?.(text);
-              }}
-              accessibilityRole="button"
-              testID="nearby-ask-send"
-              style={styles.nearbyAction}
-            >
-              <Text style={styles.nearbyActionText}>{t(answering ? 'circle.nearbyScreen.answer_send' : 'circle.nearbyScreen.ask_send')}</Text>
-            </Pressable>
-            <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
-              <Text style={styles.nearbyActionText}>{t('circle.confirm.cancel')}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Btn variant="primary" onPress={onCompose} testID="nearby-ask-compose" label={t('circle.nearbyScreen.ask_compose')} />
-        )}
-        {notice ? (
-          <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
-            {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
-          </Text>
-        ) : null}
-        {(model?.myAsks ?? []).map((e) => (
-          <View key={`mine-${e.ask?.id}`}>
-            <Text style={styles.rowMeta} testID={`nearby-my-ask-${e.ask?.id}`}>
-              {t('circle.nearbyScreen.my_ask_row', { heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)) })}
-            </Text>
-            {(e.answers ?? []).map((a) => {
-              const who = a.label ?? String(a.from ?? '').slice(0, 8);
-              return (
-                <View key={`ans-${a.from}`} style={styles.nearbyAsk} testID={`nearby-answer-${e.ask?.id}-${a.from}`}>
-                  <Text style={styles.rowName}>{t('circle.nearbyScreen.answer_row', { name: who, text: a.text ?? '' })}</Text>
-                  <Btn variant="quiet" onPress={(ev) => onShareCard?.(a.from, ev?.nativeEvent ?? null)} testID={`nearby-share-card-${a.from}`} label={t('circle.nearbyScreen.share_card_with', { name: who })} />
-                </View>
-              );
-            })}
-          </View>
-        ))}
-        {asks.length === 0 ? (
-          <Text style={styles.muted}>{t('circle.nearbyScreen.asks_empty')}</Text>
-        ) : asks.map((entry) => (
-          <View key={entry.ask?.id} style={styles.nearbyAsk} testID={`nearby-ask-${entry.ask?.id}`}>
-            <Text style={styles.rowName}>{entry.ask?.text}</Text>
-            {entry.resonant && entry.reason ? (
-              // Names the SHARED tags only; my unmatched drivers never appear here.
-              <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_resonant', { reason: entry.reason })}</Text>
-            ) : null}
-            {/* Shown to me, sent nowhere — the reminder that replying is what reveals me. */}
-            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_disclosure')}</Text>
-            {typeof entry.ask?.expiresAt === 'number' ? (
-              <Text style={styles.rowMeta} testID={`nearby-ask-clock-${entry.ask?.id}`}>
-                {t('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) })}
-              </Text>
-            ) : null}
-            {Array.isArray(entry.actions) && entry.actions.some((a) => NEARBY_ASK_LABELS[a]) ? (
-              <View style={styles.nearbyActions}>
-                {entry.actions.filter((a) => NEARBY_ASK_LABELS[a]).map((action) => (
-                  <Pressable
-                    key={action}
-                    onPress={() => { if (typeof onAskAction === 'function') onAskAction(action, entry.ask); }}
-                    accessibilityRole="button"
-                    testID={`nearby-ask-action-${action}-${entry.ask?.id}`}
-                    style={styles.nearbyAction}
-                  >
-                    <Text style={styles.nearbyActionText}>{t(NEARBY_ASK_LABELS[action])}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        ))}
-      </View>
-      {/* Circles being advertised here (step H). Its own block, not on peer rows: what matters is which
-          CIRCLE is open, not who is holding the door. */}
-      <View style={styles.nearbyAsks} testID="nearby-invites">
-        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.invites_title')}</Text>
-        {invites.length === 0 ? (
-          <Text style={styles.muted}>{t('circle.nearbyScreen.invites_empty')}</Text>
-        ) : invites.map((entry) => (
-          <View key={entry.invite?.circleId} style={styles.nearbyAsk} testID={`nearby-invite-${entry.invite?.circleId}`}>
-            <Text style={styles.rowName}>{entry.invite?.circleName || entry.invite?.circleId}</Text>
-            {/* On every invite: the carrier changed, the gate did not. */}
-            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.join_is_a_join')}</Text>
-            <View style={styles.nearbyActions}>
-              {(entry.actions ?? []).filter((a) => NEARBY_INVITE_LABELS[a]).map((action) => (
-                <Pressable
-                  key={action}
-                  onPress={() => onInviteAction?.(action, entry.invite)}
-                  accessibilityRole="button"
-                  testID={`nearby-invite-action-${action}-${entry.invite?.circleId}`}
-                  style={styles.nearbyAction}
-                >
-                  <Text style={styles.nearbyActionText}>{t(NEARBY_INVITE_LABELS[action])}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ))}
-      </View>
-
       {/* Your side, folded (sketch §2): the allows, the card, what others see — one row that opens. */}
       <Pressable onPress={() => setMineOpen((v) => !v)} accessibilityRole="button" testID="nearby-mine" style={styles.nearbyAsks}>
         <Text style={styles.ownProfileTitle}>
           {t('circle.nearbyScreen.mine_title')}
           {' · '}
-          {[allows.card ? t('circle.nearbyScreen.mine_card_on') : null, allows.chat ? t('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean).join(' · ') || t('circle.nearbyScreen.mine_none')}
+          {/* what the person shows the room (`nearbyMineSummary`): never "in the conversation" while hidden */}
+          {nearbyMineSummary(model).map((k) => t(k)).join(' · ')}
         </Text>
       </Pressable>
       {mineOpen ? (<>
@@ -6328,42 +6505,24 @@ function NearbyScreen({
       </View>
       </>) : null}
 
-      {/* The room chat is its own pane (sketch §2). */}
-      {chat ? (
-        <View style={styles.nearbyAsks} testID="nearby-chat">
-          <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.chat_title')}</Text>
-          {/* A chat window normally implies history; this one has none, so it says so. */}
-          <Text style={styles.muted}>{t('circle.nearbyScreen.chat_ephemeral')}</Text>
-          {chat.length === 0 ? (
-            <Text style={styles.muted}>{t('circle.nearbyScreen.chat_empty')}</Text>
-          ) : chat.map((m) => (
-            <Text key={m.id} style={styles.rowMeta} testID={`nearby-chat-${m.id}`}>{m.text}</Text>
-          ))}
-          <View style={styles.nearbyComposer}>
-            <ThemedTextInput
-              style={styles.nearbyInput}
-              value={chatDraft}
-              onChangeText={setChatDraft}
-              maxLength={500}
-              placeholder={t('circle.nearbyScreen.chat_placeholder')}
-              testID="nearby-chat-input"
-            />
-            <Pressable
-              onPress={() => {
-                const text = chatDraft.trim();
-                if (!text) return;
-                onSay?.(text);
-                setChatDraft('');
-              }}
-              accessibilityRole="button"
-              testID="nearby-chat-send"
-              style={styles.nearbyAction}
-            >
-              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_send')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      {/* The two tabs: Conversation and Questions. */}
+      <View style={styles.circleTabs} accessibilityRole="tablist" testID="nearby-tabs">
+        {tabs.map((tab) => (
+          <Pressable
+            key={tab.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab.id === selectedTab }}
+            testID={`nearby-tab-${tab.id}`}
+            onPress={() => setPickedTab(tab.id)}
+            style={[styles.circleTab, tab.id === selectedTab && styles.circleTabActive]}
+          >
+            <Text style={[styles.circleTabText, tab.id === selectedTab && styles.circleTabTextActive]} numberOfLines={1} testID={`nearby-tab-label-${tab.id}`}>{tabLabel(tab)}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {(tabs.find((x) => x.id === selectedTab)?.sections ?? []).map((id) => (
+        <React.Fragment key={id}>{SECTION_PAINTERS[id]?.() ?? null}</React.Fragment>
+      ))}
 
     </ScrollView>
   );
@@ -6594,6 +6753,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   nearbyActions:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   nearbyAsks:        { marginTop: 12, paddingHorizontal: 2 },
   nearbyAsk:         { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  // a question or an offered circle in the Conversation stream: boxed, with an accent edge, so it is not a chat line
+  nearbyStreamCard:  { marginVertical: 8, padding: 10, borderWidth: 1, borderColor: theme.color.line, borderLeftWidth: 3, borderLeftColor: theme.color.accentInk, borderRadius: 8, backgroundColor: theme.color.card },
   nearbyComposer:    { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 6 },
   nearbyInput:       { flexGrow: 1, minWidth: 160, paddingVertical: 6, paddingHorizontal: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, color: theme.color.ink, marginRight: 6 },
   nearbyAction:      { paddingVertical: 6, paddingHorizontal: 10, marginRight: 6, marginTop: 4, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line },

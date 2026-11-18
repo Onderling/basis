@@ -11,7 +11,7 @@
 import { buildCircleLlmProviders } from './circleLlmProviders.js';
 import { buildCircleEmbedProviders } from './circleEmbedProviders.js';
 import { CIRCLE_LLM_ROUTE_PRESETS } from './circleLlmRoutes.js';
-import { assertConfidentialRouteSafe } from '@onderling/llm-client/routeSafety';
+import { assertConfidentialRouteSafe, isLoopbackBase } from '@onderling/llm-client/routeSafety';
 import { resolveCircleLlm } from './llmPicker.js';
 
 /** The provider-map key (`local`|`cloud`) a posture mode resolves to. resolveCircleLlm reads these. */
@@ -70,6 +70,9 @@ export function buildUserLlmRuntime(userCfg, { env = {} } = {}) {
       [`${k}Model`]:   userCfg.llmModel || undefined,
       apiKey:          userCfg.apiKey || null,
       timeoutMs:       env.timeoutMs,
+      // the prompt-cache salt on every route that may be Privatemode behind an address (local: a proxy on a box; the
+      // confidential proxy); a plain OpenAI-compatible cloud can refuse a field it does not know
+      ...(userCfg.cacheSecret && userCfg.preset !== 'openai-compatible' ? { cacheSecret: userCfg.cacheSecret } : {}),
     });
   } else if (env.llmBaseUrl) {
     llmProviders = buildCircleLlmProviders({ localBaseUrl: env.llmBaseUrl, model: env.llmModel, apiKey: env.llmApiKey, timeoutMs: env.timeoutMs });
@@ -131,3 +134,29 @@ export function ownModelOf(userCfg) {
   try { return ownModelClient({ userCfg, providers: buildUserLlmRuntime(userCfg, { env: {} }).llmProviders }); } catch { return null; }
 }
 
+
+/**
+ * What the person's OWN route is, for saying it plainly (the line at the top of the "+" conversation): whether one is
+ * set (a model the "+" can ask), its KIND, and the host it goes to. ONE rule for confidentiality: the runtime's own
+ * answer (`buildUserLlmRuntime(...).confidential`, the one the help bot words), never a second reading of the preset.
+ *   local         the preset's mode is local: a model the person runs themselves (named by its host)
+ *   confidential  the runtime calls the route confidential and it is on the person's own machine (the proxy there
+ *                 checks the enclave itself)
+ *   confidential-asserted  the runtime calls it confidential, but it is REMOTE: the guard accepts it only because its
+ *                 attestation is configured (the person's flag), which this app has not checked; said as such
+ *   cloud         any other route: not confidential
+ * A route the guard refuses is no route at all.
+ * @param {object|null} userCfg  the saved setting
+ * @returns {{set: boolean, kind: 'none'|'local'|'confidential'|'confidential-asserted'|'cloud', confidential: boolean, host: string|null}}
+ */
+export function ownRouteOf(userCfg) {
+  const none = { set: false, kind: 'none', confidential: false, host: null };
+  if (ownModelOf(userCfg) == null) return none;
+  let runtime;
+  try { runtime = buildUserLlmRuntime(userCfg, { env: {} }); } catch { return none; }
+  let host = null;
+  try { host = userCfg?.llmBaseUrl ? new URL(userCfg.llmBaseUrl).host : null; } catch { host = null; }
+  const confidential = runtime.confidential === true;
+  const kind = confidential ? (isLoopbackBase(userCfg?.llmBaseUrl) ? 'confidential' : 'confidential-asserted') : runtime.mode === 'local' ? 'local' : 'cloud';
+  return { set: true, kind, confidential, host };
+}

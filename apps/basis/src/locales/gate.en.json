@@ -172,15 +172,19 @@
   "lists.markListItemDone.stated": {
     "doc": "Something is done, bought or fixed: tick it off (a chore is completed). Mostly a reply to the bot's own reminder.",
     "patterns": [
-      "(the)? {item} (is|are) (already)? (done|bought|fixed)"
+      "(the)? {item} (is|are) (already)? (done|bought|fixed)",
+      "(the)? {item} (done|bought)"
     ],
     "examples": [
       "the milk is bought",
-      "windows is done"
+      "windows is done",
+      "milk done"
     ],
     "not": [
       "is dinner done?",
-      "when is the lamp fixed"
+      "when is the lamp fixed",
+      "what is done",
+      "what have i done"
     ]
   },
   "assistant.reminders.off": {
@@ -378,6 +382,10 @@
     "calendar": ["appointment", "appointments", "agenda", "calendar", "dentist", "doctor", "birthday", "party", "invite", "invitation", "come", "coming", "move", "reschedule", "cancel", "plan", "planned"],
     "tasks": ["who does", "who is doing", "does", "doing", "task", "tasks", "chore", "chores", "open", "still open", "i'll take", "i'll do", "my chores", "must", "finished", "claim"]
   },
+  "_lead": { "doc": "How a person opens a line that says what they will do (\"IK MOET vrijdag naar de tandarts\"): not part of the thing's title. Stripped from the start of an appointment's title the \"+\" reads, longest first.", "words": ["i need to", "i have to", "i must", "i'm going to", "i am going to", "we need to", "we have to"] },
+  "_ownFamily": { "doc": "The own \"+\"'s extra tool families (beside `_family`), keyed on the app whose ops they keep: the own note (household's note ops). Asked only by the own door (`narrowCatalogueForLine(..., {own: true})`): in a circle the household app also carries the lists, so it is never a family there.", "household": ["note", "notes", "remember", "write down", "jot down", "do you remember"] },
+  "_rare": { "doc": "Acts a person rarely means (put a removed list or entry back, change an entry, remove a whole list): the own \"+\" offers these tools to its model only when the line names one of them, in `words` (whole words). `ops`: the op ids.", "ops": ["restoreList", "restoreEntry", "removeList", "editEntry"], "words": ["back", "restore", "undo", "trash", "change", "edit", "rename", "delete the list", "remove the list", "whole list"] },
+  "_refers": { "doc": "Words that point back at something said before (\"zet DAT morgen in mijn agenda\"), and the words around them in such a request (`around`). A line the \"+\" would read as an appointment by its day alone, holding a pointing word and nothing else but `around` words, is not read by the fixed phrases: only the person's own model, which has the previous turns, knows what it points at. \"onthoud dat de vuilnis dinsdag buiten gaat\" still reads (it says what). Articles that also point (\"het\", \"die\") are left out of `words`.", "words": ["that", "this", "it", "those", "these"], "around": ["put", "add", "plan", "in", "on", "into", "to", "my", "the", "calendar", "agenda", "diary", "also", "just"] },
   "_help": {
     "doc": "Whole lines that ask the assistant for help (\"help\", \"?\"): it answers with what it can do. Read whole, case and trailing punctuation aside; a person may write either language. `questions`: how a line OPENS when it asks how something works (\"hoe …\"): only such a line is looked up in the help cards (their matcher alone hits ordinary lines on a keyword).",
     "words": [

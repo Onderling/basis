@@ -18,7 +18,7 @@ import { ensureHouseholdLists, householdBotApps } from '../src/v2/householdTempl
 import { BOT_OP_MAP, BOT_OP_MAP_UNRESOLVED, botOpLevel, botRoleAllows, botOffers, scopeCatalogueToRole } from '../src/v2/botOpMap.js';
 import { STANDARD_ROLE_TABLE } from '@onderling-app/tasks';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
-import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { createDoorCatalogue } from '../src/assistant/assistantCatalogue.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { allManifests, catalogueManifests, DOOR_MANIFESTS } from '../src/v2/manifestSources.js';
 import { householdManifest } from '../../household/manifest.js';

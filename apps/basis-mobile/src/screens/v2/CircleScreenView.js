@@ -22,7 +22,8 @@
  * Empty `blocks` array → top-level empty state ("admin hasn't set up
  * a screen yet").
  */
-import { blockEmptyLine, blockOpensWhole } from '../../../../basis/src/v2/blockTitle.js';
+import { blockEmptyLine, blockOpensWhole, blockHidden } from '../../../../basis/src/v2/blockTitle.js';
+import { onboardingStripLine } from '../../../../basis/src/v2/onboardingStrip.js';
 import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
@@ -110,8 +111,9 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       </View>
     );
   }
-  // the onboarding strip, all its cards done: nothing at all (not a line saying so)
-  if (block.type === 'onboarding' && block.status === 'empty') return null;
+  // a block that paints nothing at all (blockHidden, shared with web): the onboarding strip with nothing left; the
+  // circles with news when the person sees no circle (the onboarding line says that, once)
+  if (blockHidden(block)) return null;
   if (block.status === 'empty') {
     return (
       <View style={[...baseStyle, styles.blockEmpty]} testID={`screen-block-${block.blockId}`}>
@@ -397,11 +399,14 @@ const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, c
   );
 });
 
-// THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
+// THE ONBOARDING STRIP, folded (onboardingStrip.js): one closed line that counts the set-up cards left; a tap opens
+// the cards, each with its own act through the host. A person in no circle reads one line pointing to Circles.
 // Web twin: circleScreen.js `renderOnboarding`.
 function OnboardingCards({ block, onAction, styles }) {
+  const cards = block.content?.cards ?? [];
+  const [open, setOpen] = useState(false);   // paint state: the strip starts closed
   // starts with the name already on the profile (the one the avatar's letters come from), as web's field does
-  const [handle, setHandle] = useState(() => (block.content?.cards ?? []).find((c) => c.id === 'handle')?.name ?? '');
+  const [handle, setHandle] = useState(() => cards.find((c) => c.id === 'handle')?.name ?? '');
   const act = (a) => { if (typeof onAction === 'function') onAction(a); };
   // the family (Btn): the strip's act is the screen's primary, the second choice quiet
   const OnbBtn = ({ labelKey, a, quiet = false, variant = null, testID }) => (
@@ -409,7 +414,14 @@ function OnboardingCards({ block, onAction, styles }) {
   );
   return (
     <View>
-      {(block.content?.cards ?? []).map((c) => (
+      {cards.length ? (
+        <Pressable style={styles.onbCard} accessibilityRole="button" accessibilityState={{ expanded: open }}
+          onPress={() => setOpen((o) => !o)} testID="onb-strip">
+          <Text style={styles.onbTitle}>{`${onboardingStripLine(cards.length, t)} ${open ? '▴' : '▾'}`}</Text>
+        </Pressable>
+      ) : null}
+      {block.content?.noCircle ? <Text style={styles.onbLine} testID="onb-no-circle">{t('circle.vandaag.onboarding_no_circle')}</Text> : null}
+      {(open ? cards : []).map((c) => (
         <View key={c.id} style={styles.onbCard} testID={`onb-card-${c.id}`}>
           <Text style={styles.onbTitle}>{t(`circle.vandaag.onboarding_${c.id}_title`)}</Text>
           {c.id === 'handle' ? (
@@ -434,7 +446,7 @@ function OnboardingCards({ block, onAction, styles }) {
               <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_reach_hint')}</Text>
               <OnbBtn labelKey="circle.vandaag.onboarding_reach_add" a={{ kind: 'open-points' }} testID="onb-reach-add" />
             </View>
-          ) : c.id === 'intro' ? (
+          ) : (
             <View>
               {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}
               <View style={styles.onbRow}>
@@ -442,11 +454,6 @@ function OnboardingCards({ block, onAction, styles }) {
                 {/* "Lees meer" is the card's one button; "Begrepen" a text link beside it */}
                 <OnbBtn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} variant="ghost" testID="onb-intro-seen" />
               </View>
-            </View>
-          ) : (
-            <View style={styles.onbRow}>
-              <OnbBtn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
-              <OnbBtn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} testID="onb-join" />
             </View>
           )}
         </View>
@@ -700,8 +707,9 @@ const makeStyles = (theme) => StyleSheet.create({
   rowAct:              { paddingVertical: 4, paddingHorizontal: 6, marginLeft: 'auto' },
   rowActText:          { fontSize: 13, color: theme.color.inkSoft },
   taskRowCompact:      { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  taskCircle:          { fontSize: 10, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0 },
-  taskCircleCompact:   { fontSize: 9,  fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 },
+  // the circle's tag on its own line above the task: beside it, a long name took the width and the task wrapped per word
+  taskCircle:          { fontSize: 10, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0, flexBasis: '100%' },
+  taskCircleCompact:   { fontSize: 9,  fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0, flexBasis: '100%' },
   taskText:            { fontSize: 14, color: theme.color.ink, flex: 1 },
   taskTextCompact:     { fontSize: 12, color: theme.color.ink, flex: 1, lineHeight: 16 },
   // S6.B — accent-tinted background flashed on the row a "See also" chip

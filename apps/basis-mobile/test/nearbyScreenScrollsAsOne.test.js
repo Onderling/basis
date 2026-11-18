@@ -20,7 +20,7 @@ function nearbyScreenBody() {
 describe('the Nearby screen', () => {
   it('renders inside one ScrollView, and nothing in it scrolls on its own', () => {
     const body = nearbyScreenBody();
-    const ret = body.slice(body.indexOf('  return ('));
+    const ret = body.slice(body.indexOf('\n  return ('));   // the screen's own return (the section painters above it return too)
     const firstTag = ret.match(/<([A-Z][A-Za-z.]*)/)?.[1];
     expect(firstTag, 'the root of the screen').toBe('ScrollView');
     expect((ret.match(/<ScrollView\b/g) ?? []).length, 'one scroller').toBe(1);

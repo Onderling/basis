@@ -191,8 +191,9 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { createPlusThread, plusThreadId } from '../../src/v2/plusThread.js';
+import { createPlusDoor, conversationSelf, plusRouteLine } from '../../src/assistant/plusDoor.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
-import { plusSuggestionPool, plusSuggest, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusHelpAnswer, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
+import { plusSuggestionPool, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce, plusCircleOp, plusCardCommands, plusDoneLine, plusOwnLists } from '../../src/v2/vandaagPlus.js';
 import { circleListsFor } from '../../src/v2/circleGate.js';
 import { saveNameCard, nameCardWords, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
@@ -303,6 +304,9 @@ import {
 import { buildOnboardingTemplate, loadOnboardingTemplate } from '../../src/v2/onboardingTemplate.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../src/v2/onboardingChat.js';
 import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
+import { renderIntroDeck } from './introDeck.js';
+import { renderFirstOpen } from './firstOpen.js';
+import { firstOpenThen, addressCarriesAct } from '../../src/v2/firstOpen.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -329,7 +333,7 @@ import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
 import { createSingleFlight } from '../../src/v2/singleFlight.js';
 import { askMatchChoices, askMatchThreadId, createAskMatchSkips, localStorageAskMatchSkipsIo } from '../../src/v2/askMatches.js';
-import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient } from '../../src/v2/userLlmRuntime.js';
+import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient, ownRouteOf } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
 // basis's own ops, mounted on the agent's waist at boot. Until this, the v2 web shell was the only
@@ -350,7 +354,7 @@ import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
 // Sibling of the EventLog (which stays append-only); read at render
 // time by circleView to surface pending/failed icons.
-import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { createAppDeliveryMap } from '../../src/v2/deliveryState.js';
 // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out), web + mobile.
 import { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
@@ -816,7 +820,7 @@ import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
 import { mergeCirclePolicy, mergeMemberOverride, settingsSaveNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
-import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
+import { settingsControlsFromManifest, transportsStatusLine, TRANSPORT_MODES } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
 // dispatch as built-ins, not to the bot/LLM).
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
@@ -1387,7 +1391,7 @@ const pullRosterForCircle = async ({ circleId }) => {
 // in-memory EventLog).  showCircle's onSend marks each locally-sent
 // msgId 'pending' → 'sent' | 'failed' as broadcastCircleMessage
 // resolves; the circle renderer reads it at render time.
-const deliveryStateMap = createDeliveryStateMap();
+const deliveryStateMap = createAppDeliveryMap();   // the substrate map + the 'waiting for a connection' words
 // …and REDRAW when a RECEIPT advances a message. `broadcastFanOut` announces its own transitions
 // (`onChange: rerender`), so the receipt was the one writer with nothing to announce it: it arrived, the
 // map advanced to `stored`, and the bubble kept saying "maybe received" until an unrelated render
@@ -1477,6 +1481,9 @@ let resolveSkill = null; // (opId, args) => Promise<object|null>
 // (`podAuth.handleRedirect`) strips `?code=…&state=…` on load (it treats `code` as an OIDC auth
 // code), which would wipe a boot parameter such as `?addbot` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
+// the fragment the app was opened with, before any handler scrubs a link from it (the first open reads it: a link is
+// the scan door, already answered)
+const _bootHash = (typeof window !== 'undefined' && window.location) ? window.location.hash : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
 // THE SHARED ACT STATE (actState.js): every act the person just took paints pending · done · failed through ONE strip,
 // whatever screen dispatched it — the waist is wrapped once where `rawCallSkill` is made (below, at agent boot). The
@@ -1718,7 +1725,7 @@ function readTransportMode() {
   return (v === 'nkn' || v === 'relay' || v === 'both') ? v : null;
 }
 function applyTransportMode(mode) {
-  if (!['nkn', 'relay', 'both'].includes(String(mode))) return { ok: false, error: 'bad_mode' };
+  if (!TRANSPORT_MODES.includes(String(mode))) return { ok: false, error: 'bad_mode' };
   // One home, one application point: the kind-gated write; realAgent's set-param hook applies it
   // to the live transport router. Fire-and-forget — the control re-reads the register.
   circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'transport.mode', value: mode })
@@ -1903,6 +1910,8 @@ let circleResolveRagEmbedder = null;
 // The person's OWN model (their settings' route, never the deployment's fallback), or null — the "+" free line reads
 // with it when the plain reading misses. Published from the same block, same pattern.
 let circleOwnModel = () => null;
+// the person's own route, said plainly at the top of the "+" conversation (set with the model, below)
+let circleOwnRoute = () => ownRouteOf(null);
 // S6.C — per-user surface preference (inline / screen / minimal); hydrated at boot.
 // Register-backed (the device-params consolidation): the thunk resolves once the agent boots;
 // hydrate() runs post-boot, and set() rides the one kind-gated write.
@@ -2590,9 +2599,14 @@ function buildCircleBot(agent) {
   applyUserLlmRuntime({ userCfg: { preset: 'off' }, env: ENV_LLM, llmProviders, embedProviders });
   let userDefault = { mode: ENV_LLM.mode };
   // A browser spec's stand-in model (development builds only, never a released one): the circle bot answers from the
-  // spec's script through the real route — prompt, tools, reading the answer. It wins over any saved model setting.
+  // spec's script through the real route — prompt, tools, reading the answer. It wins over any saved model setting,
+  // and it is set the way a person sets their own local model (preset and endpoint), so the own "+" asks it too
   const testModel = import.meta.env?.DEV ? readTestModel(globalThis) : null;
-  const useTestModel = () => { if (testModel) { Object.assign(llmProviders, testModelProviders(testModel)); userDefault = { mode: 'local' }; } };
+  const useTestModel = () => {
+    if (!testModel) return;
+    Object.assign(llmProviders, testModelProviders(testModel));
+    userDefault = { preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434', mode: 'local' };
+  };
   useTestModel();
   // Task #13 / #37 — whether the route actually in effect is the confidential preset (Privatemode/TEE).
   // Drives the HONEST help wording: a plain route must NOT be called "de vertrouwelijke assistent".
@@ -2622,6 +2636,7 @@ function buildCircleBot(agent) {
   };
   circleResolveRagEmbedder = resolveCircleRagEmbedder;   // reachable from the agent boot (see declaration)
   circleOwnModel = () => ownModelClient({ userCfg: userDefault, providers: llmProviders });
+  circleOwnRoute = () => ownRouteOf(userDefault);
   const policyIo = localStoragePolicyIo(sealedKeyValue(globalThis.localStorage, { name: 'the circle policy' }));
   async function policyFor() {
     const cid = getActiveCircle();
@@ -3079,12 +3094,24 @@ async function refreshSelfSet() {
   try { book = await userScreenStore.get(); _screensBook = book; } catch { /* the book as held stands */ }
   _selfSet = { held, on: held.length ? activeSelves(book ?? {}, held) : ['default'] };
 }
+/** The header's person button just below the host's line when that line is in view, else at the top as before. */
+function placeHeaderAvatar() {
+  if (!_headerAvatarEl) return;
+  const bar = document.querySelector('.cc-host-frame');
+  const below = bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0;
+  _headerAvatarEl.style.top = `calc(${below}px + .5rem)`;
+}
 function paintHeaderAvatar() {
   if (!_headerAvatarEl) {
     _headerAvatarEl = document.createElement('div');
     _headerAvatarEl.style.cssText = 'position:fixed;top:.5rem;right:.75rem;z-index:50;';
     document.body.appendChild(_headerAvatarEl);
+    // placed against the APP, not the whole window: a hosted build paints the site's "back to …" line above the app
+    // (hostFrameBar.js), and the button sat half over it. Its top follows that line while the line is on screen.
+    window.addEventListener('scroll', placeHeaderAvatar, { passive: true });
+    window.addEventListener('resize', placeHeaderAvatar, { passive: true });
   }
+  placeHeaderAvatar();
   // with one self the avatar is the person's editor; with several it is the switcher
   const onOpen = _selfSet.held.length > 1 ? () => showPersonaSwitcher() : () => openAboutMePanel('default');
   renderHeaderAvatar(_headerAvatarEl, { avatar: _headerAvatar, pictureUrl: _headerAvatarUrl, t, onOpen });
@@ -4269,9 +4296,10 @@ function showNearby() {
       // Name the REAL reach. "Asked 3 of 5 nearby" is true; "sent" implies the whole room heard it. The
       // line then follows the receipts ("heard by 2 of 5").
       lastAsk = r.ok ? { id: r.ask?.id ?? null, peers: r.peers } : null;
+      // a refusal the controller can name (hidden from the room) says so; any other says the ask lapsed
       notice = r.ok
         ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } }
-        : { key: 'ask_expired' };
+        : { key: r.notice ?? 'ask_expired' };
       draw(nearbyScreen.model());
     },
     onAskAction: handleNearbyAskAction,
@@ -4288,11 +4316,14 @@ function showNearby() {
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);
       // The real reach, like an ask — "shown to 3 of 5" rather than "saved".
-      notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' };
+      notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' };
       draw(nearbyScreen.model());
     },
     onPrefillCard: () => _nearbyIdentity?.cardPrefill?.() ?? Promise.resolve({}),
-    onSay: (text) => { nearbyScreen.say(text); },
+    onSay: async (text) => {
+      const r = await nearbyScreen.say(text);
+      if (r?.notice) { notice = { key: r.notice }; draw(nearbyScreen.model()); }   // refused while hidden: say why
+    },
     onInviteAction: (action, invite) => {
       // A broadcast invite joins through the SAME path as a scanned QR — that is the point of step H: the
       // carrier changed, the object and the gate did not.
@@ -4745,12 +4776,16 @@ function showVandaagPlus({ edit = null } = {}) {
   // an own row is changed as the self that made it (the row says which); something new as the ticked self
   let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
-  const call = async (op) => {
-    // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-    const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
-    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+  // a self's key: the general self's chat key, a persona's webid (what its rows are made by)
+  const selfKeyOf = (id) => (!id || id === 'default' ? (circleHouseholdAgent?.identity?.chat?.pubKey ?? null) : (_selfSet.held.find((p) => p.id === id)?.webid ?? null));
+  // a call AS one self (the waist's actAs): it rides that self's own lane; the default needs no saying
+  const callAs = (id) => (app, opId, args) => {
+    const actAs = id && id !== 'default' ? (_selfSet.held.find((p) => p.id === id)?.webid ?? null) : null;
+    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(app, opId, args, { actAs }) : rawCallSkill(app, opId, args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // made AS the ticked self
+  const call = async (op) => callAs(asSelf)(op.app, op.opId, op.args);
   // the circles the line is read against (each with what it offers and its lists): the read uses them, and so does the
   // pool of suggestions, computed once at open — a suggestion is a line the "+" reads here
   const plusCircles = () => Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
@@ -4765,21 +4800,42 @@ function showVandaagPlus({ edit = null } = {}) {
   // and governance decide (the "+" has no authority the circle's composer lacks); the reply line says what happened
   const runInCircle = async (command, circleId) => {
     const op = plusCircleOp(command, circleId);
-    if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return; }
+    if (!op) { error = t('circle.vandaag.plus_line_unread'); paint(); return { error }; }
     // an own list's op runs as the ticked self (`call`); a circle's as the person
     const r = op.own ? await call(op) : await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     if (r?.ok === false || r?.error) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); done = null; }
     else { error = null; done = plusDoneLine(r, { opId: op.opId, args: op.args, t }); }
     paint();
+    return { error, done };
+  };
+  // the person's own "+" door, composed for this open: their own model as it is set now, these circles; the conversation
+  // follows the self the "+" writes as (its thread, its memory, what it reads, its Forget: `selfKeyOf`, `readAs`)
+  // EVERY way out of the sheet but a save (Klaar, a bookmark that opens its circle, an act that runs at once; the overlay
+  // has no Escape or backdrop close): a form the "+" opened from a line still unsaved is refused, nothing is stored, and
+  // the conversation says so (the shared door's `settled`; phone twin: VandaagPlusModal closeSheet)
+  const leave = () => { if (actId && !editId) plusDoorNow().settled({ asSelf }, { saved: false }).catch(() => null); close(); };
+  let _door = null;
+  const plusDoorNow = () => {
+    if (!_door) {
+      const th = plusThreadNow();
+      _door = createPlusDoor({ llm: selfKeyOf('default') ? circleOwnModel() : null, threads: th.threads, selfKeyOf, readAs: callAs,
+        householdManifest: circleHouseholdAgent?.manifest, t, lang: currentLang(),
+        circles: plusCircles, ownListsOf: () => ownLists(), runInCircle: (command, circleId) => runInCircle(command, circleId) });
+    }
+    return _door;
   };
   // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
   let shareTargets = null;
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
+    lang: currentLang(),
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, circleCard, done,
-    turns: plusThreadNow().turns(),
-    suggestFor: (typed) => plusSuggest(suggestionPool, typed),
-    onForget: () => { plusThreadNow().forget(); paint(); },
+    routeLine: plusRouteLine(circleOwnRoute(), { t }),
+    turns: conversationSelf(asSelf, selves.length) ? plusDoorNow().turns({ asSelf: conversationSelf(asSelf, selves.length) }) : [],
+    // under the line: on "/" the door's commands (the "/" list), else the lines it reads here (the shared door; phone twin)
+    suggestFor: (typed) => plusDoorNow().suggest(typed, { pool: suggestionPool }),
+    // forgetting the conversation is the door's own op (`assistant-forget`), as in a private Telegram chat
+    onForget: async () => { await plusDoorNow().forget({ asSelf: conversationSelf(asSelf, selves.length) }); paint(); },
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     pinned: pinnedView,
     pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
@@ -4794,14 +4850,14 @@ function showVandaagPlus({ edit = null } = {}) {
       const r = openPin(p, { circles: myCircles() });
       if (r.error) { error = t(r.error); paint(); return; }
       if (r.kind === 'own') { actId = r.actId; error = null; paint(); return; }
-      _pendingPinOpen = r; close(); showDetail(r.circleId);
+      _pendingPinOpen = r; leave(); showDetail(r.circleId);
     },
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => {
       const picked = PLUS_ACTS.find((a) => a.id === id);
       // an act that makes nothing and asks nothing (feedback) runs at once: no empty form in between
       if (actRunsAtOnce(picked)) {
-        close();
+        leave();
         rawCallSkill(picked.appOrigin, picked.opId, { screen: t('circle.vandaag.plus') })
           .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
         return;
@@ -4812,31 +4868,28 @@ function showVandaagPlus({ edit = null } = {}) {
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
       line = text; circleCard = null; done = null;
-      // one exchange in the kept thread (the shared duty): the line heard, the read run, what it answered kept
-      await plusThreadNow().exchange(text, async () => {
-      // an own act; or, for something that lives in a circle, that circle's act: run at once where the circle is clear,
-      // else the card asks which (plusLineOutcome); the own model only reads what the plain reading missed
-      const circles = await plusCircles();
-      const o = plusLineOutcome(text, { circles, own: { lists: await ownLists() }, lang: currentLang() });
-      // help ("help", "?", a how-to question a help card knows): answered in the thread, the same line on the phone
-      if (o?.kind === 'help') { done = plusHelpAnswer(o, { t }); error = null; return { error, done }; }
-      const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
-      if (o?.kind === 'circle' && o.atOnce) { await runInCircle(o.command, o.circleId); return { error, done }; }
-      if (o?.kind === 'circle') { circleCard = { line: text, to: o.to, command: o.command }; error = null; }
-      else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
-      else error = t('circle.vandaag.plus_line_unread');
-      return { error, card: circleCard, actId: r?.actId ?? null };
-      }, { t });
+      // the ONE "+" door (shared with the phone): help, then the plain reading, then the person's own model through the
+      // assistant engine; the line and what it answered are kept in the thread
+      // a slow model is said while the person waits ("even geduld"); its answer replaces it (phone twin: the sheet's onRead)
+      const r = await plusDoorNow().read(text, { asSelf, onSlow: () => { done = t('circle.bot.slow'); error = null; paint(); } });
+      // several selves ticked and none picked: the sheet shows the choice (it does already); nothing was read
+      if (r?.askSelf) { error = null; paint(); return; }
+      if (r?.card) { circleCard = r.card; error = null; }
+      else if (r?.actId) { actId = r.actId; values = { ...values, ...(r.values ?? {}) }; error = null; }
+      else if (r?.done) { done = r.done; error = null; }
+      else error = r?.error ?? t('circle.vandaag.plus_line_unread');
       paint();
     },
     onCircleRun: async (circleId) => {
       const card = circleCard; circleCard = null;
       if (!card) return;
       // the pick on the card: no new line, the run's answer kept (the same shared exchange)
-      await plusThreadNow().exchange(null, async () => { await runInCircle(card.command, circleId); return { error, done }; }, { t });
+      // what the card carries, in order (the make-a-list card: the list, then the item on it); the first failure stops it
+      await plusDoorNow().exchange({ asSelf }, async () => { for (const c of plusCardCommands(card)) { const r = await runInCircle(c, circleId); if (r?.error) break; } return { error, done }; });
       paint();
     },
-    onCircleCancel: () => { circleCard = null; error = null; paint(); },
+    // the card's no: the line was not done, said in the conversation (as a closed form is)
+    onCircleCancel: async () => { const card = circleCard; circleCard = null; error = null; await plusDoorNow().cardRefused({ asSelf }, card); paint(); },
     onSave: async (id, filled) => {
       values = filled;
       const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);
@@ -4845,6 +4898,8 @@ function showVandaagPlus({ edit = null } = {}) {
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
       // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
       if (!editId) actionFrequency.bump(OWN_USAGE_SCOPE, id);
+      // a form the "+" opened from a line: the conversation says it was saved
+      if (!editId) await plusDoorNow().settled({ asSelf }, { saved: true, actId: id }).catch(() => null);
       // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
       const follow = editId ? null : plusFollowUp(_screensBook, id);
       if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
@@ -4864,7 +4919,7 @@ function showVandaagPlus({ edit = null } = {}) {
       if (r?.ok === false) { error = r.error ?? t('circle.vandaag.plus_failed', { error: '' }); paint(); return; }
       close(); _showVandaag();
     } : null,
-    onClose: () => close(),
+    onClose: () => leave(),
   });
   paint();
   refreshPins().catch(() => {});
@@ -4919,7 +4974,8 @@ function onScreenAction(action) {
       .then((r) => { globalThis.alert?.(nameCardWords(r, t)); if (r.ok) return _showVandaag(); return null; });
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
-  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openHelpDoor()); }
+  // "Lees meer": the introduction's seven cards (src/v2/introDeck.js); closed or read through, Today again without the card
+  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => openIntroDeck()); }
   // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
   else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
   else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
@@ -5529,6 +5585,30 @@ async function showMyData(opts) {
 
 /** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
 // THE HELP DOOR (Settings' Help, the intro's "more"): the Help circle, or the line that says it is not here (shared)
+// THE FIRST OPEN (src/v2/firstOpen.js): the three doors on a screen of their own; any door ends it on this device, then
+// Today, then what the door asks for: the one scanner (the scanQr op, as Me's "Scan") or the introduction's cards
+function showFirstOpen() {
+  hideTabBar();
+  renderFirstOpen(rootEl, {
+    t,
+    onDoor: async (door) => {
+      await onboardingFlags.markFirstOpenSeen();
+      await showScreens();
+      const then = firstOpenThen(door);
+      if (then === 'scan') Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {});
+      else if (then === 'intro') { await onboardingFlags.markIntroSeen(); openIntroDeck(); }
+    },
+  });
+}
+
+// THE INTRODUCTION (Today's "Nieuw bij Basis?" → "Lees meer"): the seven cards in the shared overlay; leaving it shows
+// Today again (the card is gone: the intro was marked seen before the deck opened)
+function openIntroDeck() {
+  // every way out (its buttons, a click outside the card) paints Today again: the repaint the flag write sets off is not
+  // reliably there in time (the click-outside spec was flaky under a full-suite load, 2026-11-17)
+  mountMyDataWizard(({ container, onClose }) => renderIntroDeck({ container, t, onClose }), { afterClose: () => _showVandaag() });
+}
+
 function openHelpDoor() {
   const r = helpDoorTarget(circlesCache);
   if (r.kind === 'circle') { showDetail(r.circleId); return; }
@@ -5545,6 +5625,8 @@ function showSettingsHome() {
     onOpenDoor: (d) => {
       // help: the Help circle, where the Onderling bot answers (the intro's "more" opens the same)
       if (d?.target?.kind === 'nav' && d.target.to === 'help') { openHelpDoor(); return; }
+      // the introduction's seven cards again (the manifest's settings door; phone twin: setIntroOpen)
+      if (d?.target?.kind === 'nav' && d.target.to === 'intro') { openIntroDeck(); return; }
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
@@ -5567,7 +5649,9 @@ function showSettingsCircleChooser() {
 // mount one of the existing wizard renderers (restore, recovery file, …)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
-function mountMyDataWizard(renderWizard, extra = {}) {
+function mountMyDataWizard(renderWizard, extraIn = {}) {
+  // `afterClose`: what follows EVERY way out (the wizard's own button, a click outside), for a host that repaints behind it
+  const { afterClose = null, ...extra } = extraIn ?? {};
   const overlay = document.createElement('div');
   overlay.className = 'cc-mydata-modal';
   const card = document.createElement('div');
@@ -5582,7 +5666,7 @@ function mountMyDataWizard(renderWizard, extra = {}) {
     close();
   });
   document.body.appendChild(overlay);
-  function close() { try { overlay.remove(); } catch { /* defensive */ } }
+  function close() { try { overlay.remove(); } catch { /* defensive */ } if (typeof afterClose === 'function') afterClose(); }
   try {
     // Thin adapter: hand the shared renderer this shell's DOM + rawCallSkill; `extra` lets a wizard that
     // needs more (the join wizard wants `args`/`sendPeerRedeem`) get it without a bespoke mount fn.
@@ -5618,7 +5702,7 @@ const SCAN_PAINTERS = {
 
 /** A declared op from a scan: what the code did not say is asked in the shared form (or nothing — it runs). */
 async function runOpFromScan(target, needs) {
-  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), target.app);
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), target.app, t);
   const run = async (op) => {
     const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
     const w = scanOpResultWords(r);
@@ -6532,7 +6616,7 @@ function showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = '
   const picked = {};
   let typed = '';        // what was typed survives a repaint (a pick repaints)
   const done = () => { close(); try { onClosed?.(); } catch { /* */ } };
-  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), 'household');
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), 'household', t);
   const step = async (r) => { inst = r; choices = await ceremonyChoices(renderFlow(FLOW, inst, { ops: OPS }).form, fetchChoices); paint(); };
 
   const paint = () => {
@@ -8292,7 +8376,7 @@ function showCircle(id, circle, policy) {
             const mode = builtin.args?.mode;
             const r = applyTransportMode(mode);
             circleNote(r?.ok
-              ? t('circle.settings.transport_set', { mode: r.mode })
+              ? t('circle.settings.transport_set', { mode: t(`circle.settings.transportMode_opt.${r.mode}`) })
               : t('circle.settings.transport_bad', { mode: mode ?? '—' }));
             return;
           }
@@ -8311,11 +8395,8 @@ function showCircle(id, circle, policy) {
             return;
           }
           if (builtin.opId === 'transports') {
-            const ts = currentTransportState();
-            circleNote(t('circle.settings.transports_status', {
-              mode: ts.mode ?? 'nkn',
-              relay: ts.relayUrl || t('circle.settings.transports_none'),
-            }));
+            // the mode by its label, never the value 'relay' (shared with mobile)
+            circleNote(transportsStatusLine(currentTransportState(), t));
             return;
           }
         }
@@ -9472,6 +9553,7 @@ async function boot() {
   mountPlusButton();   // after localisation: mounted before it, the button was named by its key
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
+  placeHeaderAvatar();   // the person button below the line just painted (it may already be on screen)
   renderCircleLauncher(rootEl, { loading: true, t });
 
   // register the web-push service worker (root-scoped /sw.js). Best-effort:
@@ -9796,7 +9878,7 @@ async function boot() {
       // `circleCatalogue` (null until buildCircleBot sets it; makeResolvingCallSkill tolerates
       // a null catalogue by trying all origins).
       resolveSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalogue);
-      sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name });
+      sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name, unnamedCircleName: () => t('circle.launcher.unnamed') });
       // Phase 5 — build the circle composer's bot now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
       // Delivery honesty + repaint for a signed chat statement that lands: a LIVE inbound insert answers the sender
@@ -10236,6 +10318,13 @@ async function boot() {
   let lastTab = null;
   try { lastTab = window.localStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
   const start = startTabFor(circleHouseholdAgent?.getParamValue?.('home.startScreen'), lastTab);
+  // THE FIRST OPEN on this device: three doors before anything else (src/v2/firstOpen.js); a door chosen, Today
+  // A person who ARRIVED BY A LINK (a contact, an invitation, an enrol offer, an install, a bot) answered the scan door
+  // by opening it: the first open is over, and the link's own sheet goes on (firstOpen.js addressCarriesAct)
+  if (!(await onboardingFlags.isFirstOpenSeen())) {
+    if (addressCarriesAct({ hash: _bootHash, search: _bootSearch })) await onboardingFlags.markFirstOpenSeen();
+    else { showFirstOpen(); return; }
+  }
   if (start === 'screens') showScreens();
   else if (start === 'contacten') showContacts();
   else if (start === 'mij') showMij();

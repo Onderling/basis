@@ -29,6 +29,9 @@ Target an attached phone instead, named by its adb serial:
 DETOX_ADB_NAME=<serial> npm run detox:test:attached
 ```
 
+Walks that TYPE through adb (`input text`, e.g. the "+" walks) find the phone by `ANDROID_SERIAL`, not by Detox's device
+name; set it to the same serial, or they look for an emulator and every typed step fails with `device not found`.
+
 Walks that delete the app (`emulatorOnly` in `support/ui.js`) run on an emulator, or on an agreed TEST phone the run
 names: `E2E_WIPE_OK=<serial> npx detox test -c android.attached.release --device-name <serial> …`. Two locks
 (`support/wipeOk.js`): the serial must be on its agreed list (today only the test Samsung) AND be named; a personal

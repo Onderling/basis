@@ -53,6 +53,17 @@ export function troubleCause(err) {
 }
 
 /** What the person is told, coarser: refused (the admin is told) · slow · unreachable. */
+/**
+ * The class a person is told of when the model did not answer a turn (`refused` / `slow` / `unreachable`), from what
+ * the engine hands a door's `onLlmUnavailable` (`{reason, error}`); null when the model was simply off. Each door words
+ * the class in its own place's terms (the household bot names its admin; the own "+" the person's own setting).
+ * @param {{reason?: string, error?: any}|null|undefined} info
+ * @returns {'refused'|'slow'|'unreachable'|null}
+ */
+export function modelDownClass(info) {
+  return info?.reason === 'unreachable' ? replyClass(troubleCause(info?.error)) : null;
+}
+
 export const replyClass = (cause) => (cause === 'key' || cause === 'limit' || cause === 'refused' ? 'refused' : cause === 'slow' ? 'slow' : 'unreachable');
 
 const ALERT_KEY = { key: 'circle.bot.secret_check_failed', limit: 'circle.bot.secret_check_limit', key_or_route: 'circle.bot.secret_check_key_or_route' };

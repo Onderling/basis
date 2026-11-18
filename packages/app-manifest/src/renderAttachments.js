@@ -1,4 +1,5 @@
 import { encodeGenericOpId } from './genericOp.js';
+import { buttonScopes } from './scopes.js';
 
 /**
  * renderAttachments — the ATTACHMENT projector.
@@ -50,7 +51,7 @@ export function renderAttachments(manifest) {
         // How the entry is invoked. `'media'` bypasses dispatch entirely; absent means the waist.
         ...(a.via ? { via: a.via } : {}),
         // WHERE it is offered: a circle's composer ('circle', the default), the person's own "+" ('own'), a contact thread ('contact')
-        scopes: scopesOf(a),
+        scopes: buttonScopes(op, a),
         ...(Array.isArray(a.fields) && a.fields.length ? { fields: a.fields } : {}),
         // the ops that change and take away what this entry made (a sheet opened on an existing item)
         ...(typeof a.edit === 'string' ? { edit: a.edit } : {}),
@@ -71,7 +72,7 @@ export function renderAttachments(manifest) {
       opId: encodeGenericOpId(manifest.app, 'add', noun),
       itemType: noun,
       ...(a.group ? { group: a.group } : {}),
-      scopes: scopesOf(a),
+      scopes: buttonScopes(decl, a),
       ...(Array.isArray(a.fields) && a.fields.length ? { fields: a.fields } : {}),
       // a noun's own atoms change and take away what it made, when it declares them
       ...(decl.atoms.includes('update') ? { edit: encodeGenericOpId(manifest.app, 'update', noun) } : {}),
@@ -82,12 +83,6 @@ export function renderAttachments(manifest) {
   return { attachMenu };
 }
 
-/** Where an attach entry is offered: its declared scopes, else a circle's composer only. */
-function scopesOf(a) {
-  // 'contact': a contact thread's composer (one affordance everywhere: the same projector the circle composer reads)
-  const s = Array.isArray(a?.scopes) ? a.scopes.filter((x) => x === 'own' || x === 'circle' || x === 'contact') : [];
-  return s.length ? s : ['circle'];
-}
 
 /** The single attachable noun of an op, when `appliesTo.type` names exactly one. */
 function singleType(type) {

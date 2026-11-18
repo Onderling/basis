@@ -152,9 +152,11 @@ export function createDeliveryStateMap() {
       // the ladder, so it cannot drift from the vocabulary again.
       const current = map.get(msgId);
       const next = advanceDelivery(current, state);
+      const reasonBefore = reasons.get(msgId) ?? null;
       if (REASON_STATES.includes(next) && typeof reason === 'string' && reason) reasons.set(msgId, reason);
       else if (next !== current) reasons.delete(msgId);
-      if (next === current) return;
+      // the same state with a new reason is news too: the words a screen shows come from the reason
+      if (next === current) { if ((reasons.get(msgId) ?? null) !== reasonBefore) notify(msgId, next); return; }
       map.set(msgId, next);
       notify(msgId, next);
     },

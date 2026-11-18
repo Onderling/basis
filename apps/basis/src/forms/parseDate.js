@@ -199,10 +199,21 @@ export function readDayAndTime(text, opts = {}) {
     time = `${pad(hour)}:${pad(minute)}`;
   };
   const tt = (re, fn) => { if (time || bad) return; const m = re.exec(s); if (m) { fn(m); s = s.replace(m[0], ' '); } };
-  tt(/ om half (\d{1,2})(?: uur)? /, (m) => setTime(Number(m[1]) - 1, 30, false));
+  // the hour as people say it: a digit or a number word (one to twelve, both languages, beside the day words above);
+  // "half drie" is 2:30 (the Dutch half is before the hour), "kwart over/voor", "half past", "quarter past/to"
+  const WORDS = ['een|één|one', 'twee|two', 'drie|three', 'vier|four', 'vijf|five', 'zes|six', 'zeven|seven', 'acht|eight',
+    'negen|nine', 'tien|ten', 'elf|eleven', 'twaalf|twelve'];
+  const N = `(\\d{1,2}|${WORDS.join('|')})`;
+  const num = (w) => (/^\d+$/.test(w) ? Number(w) : WORDS.findIndex((alts) => alts.split('|').includes(w)) + 1);
+  tt(new RegExp(` (?:om )?half ${N}(?: uur)? `), (m) => setTime(num(m[1]) - 1, 30, false));
+  tt(new RegExp(` (?:om )?kwart over ${N}(?: uur)? `), (m) => setTime(num(m[1]), 15, false));
+  tt(new RegExp(` (?:om )?kwart voor ${N}(?: uur)? `), (m) => setTime(num(m[1]) - 1, 45, false));
+  tt(new RegExp(` (?:at )?half past ${N} `), (m) => setTime(num(m[1]), 30, false));
+  tt(new RegExp(` (?:at )?quarter past ${N} `), (m) => setTime(num(m[1]), 15, false));
+  tt(new RegExp(` (?:at )?quarter to ${N} `), (m) => setTime(num(m[1]) - 1, 45, false));
   tt(/ at (\d{1,2})(?::(\d{2}))? ?(am|pm) /, (m) => { let h = Number(m[1]) % 12; if (m[3] === 'pm') h += 12; setTime(h, m[2], true); });
   tt(/ (?:om |at )?(\d{1,2})[:.](\d{2})(?: uur)? /, (m) => setTime(m[1], m[2], true));
-  tt(/ (?:om|at) (\d{1,2})(?: uur)? /, (m) => setTime(m[1], 0, false));
+  tt(new RegExp(` (?:om|at) ${N}(?: uur| o'clock)? `), (m) => setTime(num(m[1]), 0, false));
   if (bad) return null;
 
   const rest = s.replace(/\s+/g, ' ').trim().replace(/[,.;:!?]+$/, '').trim();

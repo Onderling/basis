@@ -66,3 +66,16 @@ describe('makeResolvingCallSkill', () => {
     expect(await makeResolvingCallSkill(raw, ['pinboard'])('op')).toBeNull();
   });
 });
+
+describe('a circle with no name on this device is never called by its key', () => {
+  const named = async (op) => (op === 'listMyCircles'
+    ? { circles: ['9fccd3f727b0', 'g-named'], names: { 'g-named': 'Straat' }, removed: [{ id: 'g-gone', name: null }] }
+    : null);
+  it('the tile, header and Today tag read the host\'s word for it; a name a person gave stays', async () => {
+    const s = circleSourcesFromAgent({ callSkill: named, unnamedCircleName: () => 'Kring zonder naam' });
+    const groups = await s.fetchGroups();
+    expect(groups.find((g) => g.id === '9fccd3f727b0')?.name).toBe('Kring zonder naam');
+    expect(groups.find((g) => g.id === 'g-named')?.name).toBe('Straat');
+    expect((await s.fetchRemoved())[0]?.name).toBe('Kring zonder naam');
+  });
+});

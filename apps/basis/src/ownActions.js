@@ -13,7 +13,7 @@
  * (13 by default; 0 keeps everything).
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
-import { verbKind } from '@onderling/app-manifest';
+import { verbKind, circleArg } from '@onderling/app-manifest';
 
 export const OWN_ACTION_KIND = 'own-action';
 
@@ -95,7 +95,7 @@ export function recordOwnAction({ deviceLog, enabled = true, app, op, args = {},
   try {
     if (!ownActIs({ app, op, ctx, manifests })) return null;
     const outcome = threw || result?.ok === false ? 'failed' : 'ok';
-    const circleId = typeof args?.circleId === 'string' ? args.circleId : null;
+    const circleId = circleArg(args);   // the op's own circle argument, by whichever name its manifest gives it
     const entry = makeOwnActionEntry({ app, op, outcome, door: ctx?.door ?? 'unknown', circleId, ts: now() });
     if (entry) deviceLog.append(entry);
     return entry;

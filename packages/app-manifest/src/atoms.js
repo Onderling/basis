@@ -199,3 +199,22 @@ export function verbKind(manifest, verb) {
  * @type {ReadonlyArray<'device'|'person'|'circle'>}
  */
 export const WRITE_SCOPES = Object.freeze(['device', 'person', 'circle']);
+
+/**
+ * The names an op's parameters give the circle it is about: `groupId` (the older name, most ops) and `circleId`. One
+ * reading of them, so a caller that wants an op's circle (the person's own-act record, a peer clean-up) does not spell
+ * the pair out again; `circleId` first when both are given.
+ * @type {ReadonlyArray<'circleId'|'groupId'>}
+ */
+export const CIRCLE_ARG_NAMES = Object.freeze(['circleId', 'groupId']);
+
+/**
+ * The circle an op's args name, or null.
+ * @param {object|null} args
+ * @returns {string|null}
+ */
+export function circleArg(args) {
+  if (!args || typeof args !== 'object') return null;
+  for (const k of CIRCLE_ARG_NAMES) if (typeof args[k] === 'string' && args[k]) return args[k];
+  return null;
+}

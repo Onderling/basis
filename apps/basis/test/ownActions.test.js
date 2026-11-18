@@ -67,11 +67,11 @@ describe('which calls are the person\'s own acts (the outer waist)', () => {
     const appended = [];
     const deviceLog = { append: (e) => appended.push(e) };
     recordOwnAction({ manifests, deviceLog, enabled: true, app: 'lists', op: 'addToList', args: { circleId: 'c1', text: 'melk' }, ctx: { door: 'tap' }, result: { ok: true } });
-    recordOwnAction({ manifests, deviceLog, enabled: true, app: 'lists', op: 'addToList', args: {}, ctx: {}, result: { ok: false, error: 'x' } });
+    recordOwnAction({ manifests, deviceLog, enabled: true, app: 'lists', op: 'addToList', args: { groupId: 'g2' }, ctx: {}, result: { ok: false, error: 'x' } });
     recordOwnAction({ manifests, deviceLog, enabled: true, app: 'pinboard', op: 'listMyCircles', args: {}, ctx: {}, result: { ok: true } });
     recordOwnAction({ manifests, deviceLog, enabled: false, app: 'lists', op: 'addToList', args: {}, ctx: {}, result: { ok: true } });
     expect(appended.map((e) => [e.payload.op, e.payload.outcome, e.payload.door, e.circleId])).toEqual([
-      ['addToList', 'ok', 'tap', 'c1'], ['addToList', 'failed', 'unknown', null],
+      ['addToList', 'ok', 'tap', 'c1'], ['addToList', 'failed', 'unknown', 'g2'],
     ]);
     expect(JSON.stringify(appended)).not.toMatch(/melk/);
   });

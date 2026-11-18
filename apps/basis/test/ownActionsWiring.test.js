@@ -31,6 +31,17 @@ describe('own acts at the outer waist', () => {
     expect(JSON.stringify(deviceLog.query().filter((e) => e.type === OWN_ACTION_KIND))).not.toContain('123000');
   });
 
+  it('an act in a circle lands with that circle, whichever name the op gives it (groupId to make it, circleId to add a line)', async () => {
+    const deviceLog = new EventLog({ initial: [], muted: [] });
+    const a = await boot(deviceLog);
+    const made = await a.callSkill('pinboard', 'createGroupV2', { groupId: 'thuis', name: 'Thuis', rules: { text: 't' } });
+    expect(made?.ok ?? true, JSON.stringify(made)).not.toBe(false);
+    await a.callSkill('lists', 'addToList', { circleId: 'thuis', item: 'melk' });
+    const rows = deviceLog.query().reverse().filter((e) => e.type === OWN_ACTION_KIND).map((e) => [e.payload.op, e.circleId]);
+    expect(rows).toEqual(expect.arrayContaining([['createGroupV2', 'thuis'], ['addToList', 'thuis']]));
+    expect(JSON.stringify(deviceLog.query().filter((e) => e.type === OWN_ACTION_KIND))).not.toContain('melk');
+  });
+
   it('a call a door person makes is theirs, not the owner\'s: no own-action', async () => {
     const deviceLog = new EventLog({ initial: [], muted: [] });
     const a = await boot(deviceLog);

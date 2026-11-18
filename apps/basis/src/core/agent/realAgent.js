@@ -333,7 +333,7 @@ import { opDeclared, allManifests } from '../../v2/manifestSources.js';         
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
-import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
+import { isGenericOpId, decodeGenericOpId, isPeopleWritten, circleArg } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 import { makeIsKnownPeer, rosterRowNaming } from '../../v2/knownPeer.js';
 import { parseUntrustedJson } from '@onderling/core';
@@ -437,7 +437,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the identity is up, below), else the legacy bucket.
   let homeCircleId = 'household';
   function resolveCircleId(args) {
-    return (args?.circleId ?? args?.circleId ?? args?.groupId ?? getActiveHouseholdCircleId()) || homeCircleId;
+    return (circleArg(args) ?? getActiveHouseholdCircleId()) || homeCircleId;
   }
   // cluster L · L3 — household is now the UNIFORM wired path by DEFAULT (the legacy agent is retired).
   // Household ops route to the dissolved pure cores (`v2/householdApp.js`) over the per-circle
@@ -3681,7 +3681,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const w = personas.get(args.persona)?.chatId?.pubKey ?? null;
       if (w) return { actAs: w };
     }
-    const c = args?.groupId ?? args?.circleId ?? null;
+    const c = circleArg(args);
     if (typeof c !== 'string' || !c) return {};
     let as = null;
     try { as = circleSelf(c).sendAs ?? null; } catch { as = null; }   // (circleSelf is bound further down; early boot reads none)
@@ -8954,7 +8954,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // no-op so existing tests keep their behaviour.
       if (opId === 'claimTask' && typeof claimRouterRef.hook === 'function') {
         // the call's own args (handed in: this adapter is not inside the call's scope)
-        const circleId = args?.circleId ?? args?.groupId ?? null;
+        const circleId = circleArg(args);
         if (circleId) {
           Promise.resolve(claimRouterRef.hook({ task, circleId, args }))
             .catch((err) => publishEvent?.({
@@ -9584,7 +9584,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // above; when invoked for real, friendly text.
     if (opId === 'leaveGroup' && data.ok) {
       // Forget the left circle's no-pod sync peers (stops stale-peer boot HI-pings).
-      clearCirclePeers(args?.groupId ?? args?.circleId ?? args?.circleId).catch(() => {});
+      clearCirclePeers(circleArg(args)).catch(() => {});
       return {
         ok: true,
         message: tr('circle.groups.left'),

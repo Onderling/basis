@@ -10477,11 +10477,11 @@
         "doc": "A setting's label (projected from the parameter register)."
       },
       "ownActions_record": {
-        "text": "Keep a record of what you do on this device",
+        "text": "Keep a record of what you do in the app",
         "doc": "A setting's label (projected from the parameter register)."
       },
       "ownActions_keepWeeks": {
-        "text": "How long what you do stays on this device (weeks; 0 = keep everything)",
+        "text": "Kept for (weeks; 0 = always)",
         "doc": "A setting's label (projected from the parameter register)."
       },
       "notify_windowDays": {

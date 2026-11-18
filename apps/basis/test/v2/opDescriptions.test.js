@@ -17,6 +17,8 @@ describe('the words of an op', () => {
     expect(opWhat('lists', 'addToList', 'fr'), 'another language: English').toBe('Put something on a list.');
     expect(opWhat('pinboard', 'postRequest', 'nl')).toBeNull();
     expect(Object.keys(OP_DESCRIPTIONS)).toContain('lists');
+    expect(opWhat('calendar', 'addEvent', 'nl')).toBe('Zet een afspraak in de agenda.');
+    expect(opDescription('calendar', 'listEvents', 'en').params.day).toBe('on which day');
   });
 });
 

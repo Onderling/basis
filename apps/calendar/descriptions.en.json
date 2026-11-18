@@ -1,0 +1,50 @@
+{
+  "addEvent": {
+    "what": "Put an appointment in the calendar.",
+    "params": { "title": "what the appointment is about", "when": "when", "duration": "how long", "location": "where", "attendees": "who will be there", "attendees-addr": "who the invitation goes to", "reminders": "when you are reminded" }
+  },
+  "listEvents": {
+    "what": "Show what is planned.",
+    "params": { "days": "how many days ahead", "day": "on which day" }
+  },
+  "rsvpAccept": {
+    "what": "Say yes to an invitation.",
+    "params": { "id": "which appointment" }
+  },
+  "rsvpDecline": {
+    "what": "Say no to an invitation.",
+    "params": { "id": "which appointment" }
+  },
+  "rsvpTentative": {
+    "what": "Say maybe to an invitation.",
+    "params": { "id": "which appointment" }
+  },
+  "cancelEvent": {
+    "what": "Cancel an appointment you made.",
+    "params": { "id": "which appointment" }
+  },
+  "updateEvent": {
+    "what": "Change an appointment: its name or its moment.",
+    "params": { "id": "which appointment", "title": "the new name", "when": "the new moment" }
+  },
+  "shareEvent": {
+    "what": "Share an appointment with someone.",
+    "params": { "id": "which appointment", "with": "with whom" }
+  },
+  "shareTargets": {
+    "what": "Show who you can share an appointment with.",
+    "params": {}
+  },
+  "getEventSnapshot": {
+    "what": "Show one appointment as it is now.",
+    "params": { "id": "which appointment" }
+  },
+  "briefSummary": {
+    "what": "Sum up your calendar for the morning overview.",
+    "params": {}
+  },
+  "searchEvents": {
+    "what": "Find an appointment by a word.",
+    "params": { "query": "what you are looking for" }
+  }
+}

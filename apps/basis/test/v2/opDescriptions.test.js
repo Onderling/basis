@@ -24,6 +24,18 @@ describe('the words of an op', () => {
     expect(opWhat('pinboard', 'postRequest', 'nl')).toBe('Zet iets op het prikbord: een vraag, aanbod of iets om uit te lenen.');
     expect(opDescription('pinboard', 'removeMember', 'en').params.groupId).toBe('which circle');
   });
+  it('folio: described, where a file stays said in the sentence', () => {
+    expect(opWhat('folio', 'deleteFromPod', 'nl')).toBe('Haal een bestand weg van je pod; op dit apparaat blijft het.');
+    expect(opDescription('folio', 'searchNotes', 'en').params.mode).toBe('by words or by meaning');
+  });
+  it('agents: described, a persona by the word the app already uses', () => {
+    expect(opWhat('agents', 'revokeAgent', 'nl')).toBe('Zet een agent uit: al zijn rechten vervallen.');
+    expect(opDescription('agents', 'getPersonaRelease', 'en').params.id).toBe('which persona');
+  });
+  it('tasks: described under its app origin (the manifest lives in tasks-v0)', () => {
+    expect(opWhat('tasks', 'claimTask', 'nl')).toBe('Pak een taak op: jij gaat hem doen.');
+    expect(opDescription('tasks', 'rejectTask', 'en').params.note).toBe('why, in a sentence');
+  });
   it('household: its device and recovery ops described, the phrase named as the person knows it', () => {
     expect(opWhat('household', 'revealOwnerPhrase', 'nl')).toBe('Laat je herstelzin zien.');
     expect(opDescription('household', 'replaceDevice', 'en').params.mnemonic).toBe('your recovery phrase');

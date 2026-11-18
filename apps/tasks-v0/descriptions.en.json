@@ -1,0 +1,198 @@
+{
+  "addTask": {
+    "what": "Make a new task.",
+    "params": {"text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "definitionOfDone": "when it counts as done", "claimConfirmation": "whether taking it on needs confirming", "claimLease": "how long someone may hold it"}
+  },
+  "claimTask": {
+    "what": "Take on a task: you will do it.",
+    "params": {"id": "which task"}
+  },
+  "confirmClaim": {
+    "what": "Confirm that someone may do a task.",
+    "params": {"id": "which task", "assignee": "who does it"}
+  },
+  "completeTask": {
+    "what": "Mark a task as done.",
+    "params": {"id": "which task"}
+  },
+  "getTaskSnapshot": {
+    "what": "Show a task as it is now.",
+    "params": {"id": "which task"}
+  },
+  "removeTask": {
+    "what": "Remove a task.",
+    "params": {"id": "which task"}
+  },
+  "attachTaskGrant": {
+    "what": "Give someone extra rights for this task, until it is done.",
+    "params": {"taskId": "which task", "member": "to whom"}
+  },
+  "reassignTask": {
+    "what": "Give a task to someone else.",
+    "params": {"id": "which task", "newAssignee": "to whom"}
+  },
+  "submitTask": {
+    "what": "Hand in a task for approval.",
+    "params": {"id": "which task", "note": "what you add to it"}
+  },
+  "approveTask": {
+    "what": "Approve a task that was handed in.",
+    "params": {"id": "which task", "note": "what you add to it"}
+  },
+  "rejectTask": {
+    "what": "Turn down a task that was handed in, and say why.",
+    "params": {"id": "which task", "note": "why, in a sentence"}
+  },
+  "revokeTask": {
+    "what": "Withdraw a task, and say why.",
+    "params": {"id": "which task", "reason": "why, in a sentence"}
+  },
+  "listOpen": {
+    "what": "Show the open tasks.",
+    "params": {"type": "what kind of task", "requiredSkill": "what skill it needs", "assignee": "who does it", "status": "how far along it is", "text": "words from the task"}
+  },
+  "listMine": {
+    "what": "Show what you still have to do.",
+    "params": {"who": "or whose"}
+  },
+  "listClaimable": {
+    "what": "Show tasks nobody has taken on yet.",
+    "params": {"skill": "what skill it needs"}
+  },
+  "listClaimConflicts": {
+    "what": "Show tasks two people took on at once.",
+    "params": {}
+  },
+  "resolveClaim": {
+    "what": "Choose who does a task two people took on at once.",
+    "params": {"taskId": "which task", "decision": "yours, theirs or both"}
+  },
+  "listAwaitingApproval": {
+    "what": "Show handed in tasks waiting for approval.",
+    "params": {}
+  },
+  "listMyMasteredTasks": {
+    "what": "Show the tasks you look after.",
+    "params": {}
+  },
+  "listMyPendingClaims": {
+    "what": "Show who wants to do a task of yours and waits for you.",
+    "params": {}
+  },
+  "listMyInbox": {
+    "what": "Show your notifications, newest first.",
+    "params": {"limit": "how many", "since": "since when"}
+  },
+  "clearInboxItem": {
+    "what": "Remove a notification.",
+    "params": {"id": "which notification"}
+  },
+  "approveSubtaskRequest": {
+    "what": "Approve a request for a subtask.",
+    "params": {"requestId": "which request"}
+  },
+  "declineSubtaskRequest": {
+    "what": "Turn down a request for a subtask.",
+    "params": {"requestId": "which request", "note": "why, in a sentence"}
+  },
+  "approveSubtaskProposal": {
+    "what": "Approve a proposed subtask.",
+    "params": {"proposalId": "which proposal"}
+  },
+  "declineSubtaskProposal": {
+    "what": "Turn down a proposed subtask.",
+    "params": {"proposalId": "which proposal", "note": "why, in a sentence"}
+  },
+  "clearInbox": {
+    "what": "Clear your notifications.",
+    "params": {"olderThanMs": "only those older than this"}
+  },
+  "getDagTree": {
+    "what": "Show a task with everything under it.",
+    "params": {"rootId": "from which task"}
+  },
+  "archiveCircle": {
+    "what": "Archive the circle; everything is kept.",
+    "params": {"confirm": "that you are sure"}
+  },
+  "unarchiveCircle": {
+    "what": "Bring the circle back from the archive.",
+    "params": {}
+  },
+  "editTask": {
+    "what": "Change a task.",
+    "params": {"id": "which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "when it counts as done", "scheduledAt": "when you work on it", "estimateMinutes": "how many minutes it takes", "visibility": "who can see it"}
+  },
+  "provisionMyCircle": {
+    "what": "Make a new circle.",
+    "params": {"name": "the name of the circle", "kind": "what kind of circle"}
+  },
+  "myInbox": {
+    "what": "Show what needs your attention.",
+    "params": {}
+  },
+  "getMyAvailability": {
+    "what": "Show when you are free this week.",
+    "params": {"week": "which week"}
+  },
+  "setMyAvailability": {
+    "what": "Say whether you are free for half a day.",
+    "params": {"cellKey": "which half day, and whether you can"}
+  },
+  "setAvailabilityOptIn": {
+    "what": "Say whether others may see when you are free.",
+    "params": {"on": "on or off"}
+  },
+  "suggestSchedule": {
+    "what": "Suggest times to work on your tasks.",
+    "params": {"lookahead-days": "how many days ahead"}
+  },
+  "acceptSchedule": {
+    "what": "Take a suggested time.",
+    "params": {"slotKey": "which time"}
+  },
+  "getMyCircles": {
+    "what": "Show your circles, with what is open in each.",
+    "params": {}
+  },
+  "listMyTasksAcrossCircles": {
+    "what": "Show all your open tasks, in all your circles.",
+    "params": {}
+  },
+  "getCircleConfig": {
+    "what": "Show how the circle is set up.",
+    "params": {}
+  },
+  "listCircleMembers": {
+    "what": "Show the members of the circle, with their role.",
+    "params": {}
+  },
+  "pauseCircle": {
+    "what": "Pause the circle: no new tasks, the old ones go on.",
+    "params": {}
+  },
+  "unpauseCircle": {
+    "what": "Start the circle again after a pause.",
+    "params": {}
+  },
+  "issueInvite": {
+    "what": "Make an invite to the circle, for one use.",
+    "params": {"role": "as member or admin", "ttl-hours": "for how many hours it holds"}
+  },
+  "redeemInvite": {
+    "what": "Join a circle with an invite.",
+    "params": {"invite": "the invite", "displayName": "your name in the circle"}
+  },
+  "addSubtask": {
+    "what": "Make a subtask under a task.",
+    "params": {"parentTaskId": "under which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "when it counts as done"}
+  },
+  "proposeSubtask": {
+    "what": "Propose a subtask under a task that was handed in.",
+    "params": {"parentTaskId": "under which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "definitionOfDone": "when it counts as done"}
+  },
+  "forceSpawnSubtask": {
+    "what": "As admin, make a subtask anyway, outside the usual rules.",
+    "params": {"parentTaskId": "under which task", "text": "what needs doing", "notes": "more detail", "dueAt": "when it must be done", "requiredSkills": "what skills it needs", "reason": "why, in a sentence"}
+  }
+}

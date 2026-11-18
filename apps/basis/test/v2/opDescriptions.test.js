@@ -18,6 +18,10 @@ describe('the words of an op', () => {
     expect(opWhat('pinboard', 'postRequest', 'nl')).toBeNull();
     expect(Object.keys(OP_DESCRIPTIONS)).toContain('lists');
   });
+  it('tasks: described under its app origin (the manifest lives in tasks-v0)', () => {
+    expect(opWhat('tasks', 'claimTask', 'nl')).toBe('Pak een taak op: jij gaat hem doen.');
+    expect(opDescription('tasks', 'rejectTask', 'en').params.note).toBe('why, in a sentence');
+  });
 });
 
 describe('the "/" list shows it under the command', () => {

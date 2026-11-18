@@ -11,10 +11,13 @@
 import { currentLang } from '../localisation.js';
 import listsEn from '../../../lists/descriptions.en.json' with { type: 'json' };
 import listsNl from '../../../lists/descriptions.nl.json' with { type: 'json' };
+import tasksEn from '../../../tasks-v0/descriptions.en.json' with { type: 'json' };
+import tasksNl from '../../../tasks-v0/descriptions.nl.json' with { type: 'json' };
 
 /** `{ app: { en, nl } }`: the described apps (the guard's source of truth). */
 export const OP_DESCRIPTIONS = Object.freeze({
   lists: { en: listsEn, nl: listsNl },
+  tasks: { en: tasksEn, nl: tasksNl },
 });
 
 /**

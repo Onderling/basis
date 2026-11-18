@@ -1,0 +1,198 @@
+{
+  "addTask": {
+    "what": "Maak een nieuwe taak.",
+    "params": {"text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "definitionOfDone": "wanneer het klaar is", "claimConfirmation": "of oppakken eerst bevestigd moet worden", "claimLease": "hoe lang iemand hem vast mag houden"}
+  },
+  "claimTask": {
+    "what": "Pak een taak op: jij gaat hem doen.",
+    "params": {"id": "welke taak"}
+  },
+  "confirmClaim": {
+    "what": "Bevestig dat iemand een taak mag doen.",
+    "params": {"id": "welke taak", "assignee": "wie hem doet"}
+  },
+  "completeTask": {
+    "what": "Zet een taak op klaar.",
+    "params": {"id": "welke taak"}
+  },
+  "getTaskSnapshot": {
+    "what": "Laat een taak zien zoals hij nu is.",
+    "params": {"id": "welke taak"}
+  },
+  "removeTask": {
+    "what": "Haal een taak weg.",
+    "params": {"id": "welke taak"}
+  },
+  "attachTaskGrant": {
+    "what": "Geef iemand voor deze taak wat extra rechten, tot hij klaar is.",
+    "params": {"taskId": "welke taak", "member": "aan wie"}
+  },
+  "reassignTask": {
+    "what": "Geef een taak aan iemand anders.",
+    "params": {"id": "welke taak", "newAssignee": "aan wie"}
+  },
+  "submitTask": {
+    "what": "Lever een taak in om te laten goedkeuren.",
+    "params": {"id": "welke taak", "note": "wat je erbij zegt"}
+  },
+  "approveTask": {
+    "what": "Keur een ingeleverde taak goed.",
+    "params": {"id": "welke taak", "note": "wat je erbij zegt"}
+  },
+  "rejectTask": {
+    "what": "Keur een ingeleverde taak af, en zeg waarom.",
+    "params": {"id": "welke taak", "note": "waarom, in een zin"}
+  },
+  "revokeTask": {
+    "what": "Trek een taak in, en zeg waarom.",
+    "params": {"id": "welke taak", "reason": "waarom, in een zin"}
+  },
+  "listOpen": {
+    "what": "Laat de open taken zien.",
+    "params": {"type": "wat voor soort taak", "requiredSkill": "wat iemand ervoor moet kunnen", "assignee": "wie hem doet", "status": "hoe ver hij is", "text": "woorden uit de taak"}
+  },
+  "listMine": {
+    "what": "Laat zien wat jij nog moet doen.",
+    "params": {"who": "of van wie"}
+  },
+  "listClaimable": {
+    "what": "Laat taken zien die nog niemand doet.",
+    "params": {"skill": "wat iemand ervoor moet kunnen"}
+  },
+  "listClaimConflicts": {
+    "what": "Laat taken zien die twee mensen tegelijk oppakten.",
+    "params": {}
+  },
+  "resolveClaim": {
+    "what": "Kies wie een taak doet als twee hem tegelijk oppakten.",
+    "params": {"taskId": "welke taak", "decision": "de jouwe, de hunne of allebei"}
+  },
+  "listAwaitingApproval": {
+    "what": "Laat ingeleverde taken zien die op goedkeuring wachten.",
+    "params": {}
+  },
+  "listMyMasteredTasks": {
+    "what": "Laat de taken zien die jij beheert.",
+    "params": {}
+  },
+  "listMyPendingClaims": {
+    "what": "Laat zien wie een taak van jou wil doen en op je wacht.",
+    "params": {}
+  },
+  "listMyInbox": {
+    "what": "Laat je meldingen zien, de nieuwste eerst.",
+    "params": {"limit": "hoeveel", "since": "vanaf wanneer"}
+  },
+  "clearInboxItem": {
+    "what": "Haal een melding weg.",
+    "params": {"id": "welke melding"}
+  },
+  "approveSubtaskRequest": {
+    "what": "Keur een verzoek om een deeltaak goed.",
+    "params": {"requestId": "welk verzoek"}
+  },
+  "declineSubtaskRequest": {
+    "what": "Wijs een verzoek om een deeltaak af.",
+    "params": {"requestId": "welk verzoek", "note": "waarom, in een zin"}
+  },
+  "approveSubtaskProposal": {
+    "what": "Keur een voorgestelde deeltaak goed.",
+    "params": {"proposalId": "welk voorstel"}
+  },
+  "declineSubtaskProposal": {
+    "what": "Wijs een voorgestelde deeltaak af.",
+    "params": {"proposalId": "welk voorstel", "note": "waarom, in een zin"}
+  },
+  "clearInbox": {
+    "what": "Haal je meldingen weg.",
+    "params": {"olderThanMs": "alleen wat ouder is dan dit"}
+  },
+  "getDagTree": {
+    "what": "Laat een taak zien met alles wat eronder hangt.",
+    "params": {"rootId": "vanaf welke taak"}
+  },
+  "archiveCircle": {
+    "what": "Zet de kring in het archief; alles blijft bewaard.",
+    "params": {"confirm": "dat je het zeker weet"}
+  },
+  "unarchiveCircle": {
+    "what": "Haal de kring uit het archief.",
+    "params": {}
+  },
+  "editTask": {
+    "what": "Pas een taak aan.",
+    "params": {"id": "welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "wanneer het klaar is", "scheduledAt": "wanneer je eraan werkt", "estimateMinutes": "hoeveel minuten het kost", "visibility": "wie hem kan zien"}
+  },
+  "provisionMyCircle": {
+    "what": "Maak een nieuwe kring.",
+    "params": {"name": "de naam van de kring", "kind": "wat voor kring"}
+  },
+  "myInbox": {
+    "what": "Laat zien wat jouw aandacht vraagt.",
+    "params": {}
+  },
+  "getMyAvailability": {
+    "what": "Laat zien wanneer je deze week kunt.",
+    "params": {"week": "welke week"}
+  },
+  "setMyAvailability": {
+    "what": "Zeg of je een halve dag kunt.",
+    "params": {"cellKey": "welke halve dag, en of je kunt"}
+  },
+  "setAvailabilityOptIn": {
+    "what": "Zeg of anderen mogen zien wanneer je kunt.",
+    "params": {"on": "aan of uit"}
+  },
+  "suggestSchedule": {
+    "what": "Stel momenten voor om aan je taken te werken.",
+    "params": {"lookahead-days": "hoeveel dagen vooruit"}
+  },
+  "acceptSchedule": {
+    "what": "Neem een voorgesteld moment over.",
+    "params": {"slotKey": "welk moment"}
+  },
+  "getMyCircles": {
+    "what": "Laat je kringen zien, met wat er in elk open staat.",
+    "params": {}
+  },
+  "listMyTasksAcrossCircles": {
+    "what": "Laat al je open taken zien, in al je kringen.",
+    "params": {}
+  },
+  "getCircleConfig": {
+    "what": "Laat zien hoe de kring is ingesteld.",
+    "params": {}
+  },
+  "listCircleMembers": {
+    "what": "Laat de leden van de kring zien, met hun rol.",
+    "params": {}
+  },
+  "pauseCircle": {
+    "what": "Zet de kring stil: geen nieuwe taken, de oude kunnen door.",
+    "params": {}
+  },
+  "unpauseCircle": {
+    "what": "Laat de kring weer lopen.",
+    "params": {}
+  },
+  "issueInvite": {
+    "what": "Maak een uitnodiging voor de kring, voor een keer.",
+    "params": {"role": "als lid of beheerder", "ttl-hours": "hoeveel uur hij geldt"}
+  },
+  "redeemInvite": {
+    "what": "Doe mee met een kring met een uitnodiging.",
+    "params": {"invite": "de uitnodiging", "displayName": "je naam in de kring"}
+  },
+  "addSubtask": {
+    "what": "Maak een deeltaak onder een taak.",
+    "params": {"parentTaskId": "onder welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "wanneer het klaar is"}
+  },
+  "proposeSubtask": {
+    "what": "Stel een deeltaak voor onder een ingeleverde taak.",
+    "params": {"parentTaskId": "onder welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "definitionOfDone": "wanneer het klaar is"}
+  },
+  "forceSpawnSubtask": {
+    "what": "Maak als beheerder toch een deeltaak, buiten de gewone regels.",
+    "params": {"parentTaskId": "onder welke taak", "text": "wat er moet gebeuren", "notes": "meer uitleg", "dueAt": "wanneer het af moet zijn", "requiredSkills": "wat iemand ervoor moet kunnen", "reason": "waarom, in een zin"}
+  }
+}

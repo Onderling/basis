@@ -11202,5 +11202,8 @@
       "text": "Gewoon doorgaan",
       "doc": "The first open: three doors the first time the app opens on a device (src/v2/firstOpen.js)."
     }
+  },
+  "framed_refused": {
+    "text": "Basis opent alleen in een eigen venster, niet binnen een andere pagina. Open het direct op zijn eigen adres."
   }
 }

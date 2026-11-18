@@ -3,6 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Only this origin's scripts run (ledger L1041): the inline theme pre-paint by its hash, everything else from
+         'self'. 'unsafe-eval': the item-type validator (ajv) compiles its checks at runtime; dropping it needs
+         precompiled validators (ledger L1041 follow-up). 'wasm-unsafe-eval': the NKN library's WebAssembly.
+         webOwnOrigin.test.js holds the hash to the script. -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'sha256-DlmXtjNvDMi/ohTi1lwoAZ0TRvFYf95HRvkvPX8rx4A=' 'unsafe-eval' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'self'" />
     <title>Basis — Onderling</title>
     <!-- Bulletin design (2026-07): system fonts only — the Google-Fonts
          Source Serif download is gone with the linen theme (theme-linen.js). -->

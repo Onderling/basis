@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-17** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-18** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -1567,6 +1567,14 @@ both are compilers to the waist, and so is a peer. Screens, list→detail drill-
 render generically from the declaration; a capability matrix (circle policy × app) decides what shows.
 The coverage snapshot records which op has which surface, and its guard fails when it drifts from the
 manifests (the guard is in the `npm run guards` aggregate, which CI runs as the first job of the merge gate).
+
+**One origin, Basis only.** A browser separates pages by origin (scheme, host and port), never by path: every
+page on an origin shares its storage, and its scripts can use the keys kept there. So the web app's origin runs only
+the Basis bundle. A toolbox's page, a plugin's view, any bundle we did not build gets an origin of its own (the realm
+is the designed form of this); the page loads no script from another origin, not even a library from a CDN; it
+declares a script policy naming only its own scripts; and it refuses to run inside another page's frame. Held by
+`apps/basis/test/webOwnOrigin.test.js`, `apps/basis/test/web/ownWindow.test.js` and the browser spec
+`apps/basis/test-browser/web-own-window.spec.js`. The decision: `docs/decisions.md` 2026-11-18.
 
 **Every op has a default place, by construction.** An op with no bespoke screen is still visible and
 reachable: the **advanced surface** (Mij → Geavanceerd, both platforms) lists exactly the

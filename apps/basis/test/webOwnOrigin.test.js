@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const HTML = readFileSync(fileURLToPath(new URL('../web/index.html', import.meta.url)), 'utf8');
 // every src/href in a tag that loads code or style (comments dropped: they may name what was there)
@@ -30,5 +31,20 @@ describe('the web app\'s page', () => {
     const declared = JSON.parse(readFileSync(fileURLToPath(new URL('../../../packages/transports/package.json', import.meta.url)), 'utf8')).optionalDependencies['nkn-sdk'];
     const installed = JSON.parse(readFileSync(NKN_FILE.replace(/dist[\\/]nkn\.min\.js$/, 'package.json'), 'utf8')).version;
     expect(installed.split('.')[0], `nkn-sdk ${installed} against the transport's ${declared}`).toBe(declared.replace(/^[^\d]*/, '').split('.')[0]);
+  });
+
+  it('declares a script policy: this origin only, each inline script by its hash, no plugin objects, no base change', () => {
+    const csp = (HTML.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"/i) ?? [])[1];
+    expect(csp, 'the page has no script policy').toBeTruthy();
+    const dir = Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).filter((d) => d[0]).map(([k, ...v]) => [k, v]));
+    expect(dir['object-src']).toEqual(["'none'"]);
+    expect(dir['base-uri']).toEqual(["'self'"]);
+    const src = dir['script-src'];
+    expect(src).toContain("'self'");
+    expect(src.filter((v) => !v.startsWith("'")), 'a host in script-src').toEqual([]);
+    expect(src).not.toContain("'unsafe-inline'");
+    const inline = [...HTML.replace(/<!--[\s\S]*?-->/g, '').matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`);
+    expect(inline.length).toBeGreaterThan(0);
+    for (const h of inline) expect(src, 'an inline script the policy does not name (edit the hash with the script)').toContain(h);
   });
 });

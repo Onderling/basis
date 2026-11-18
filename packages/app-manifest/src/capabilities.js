@@ -23,7 +23,14 @@
 import { canonicalAtom } from './atoms.js';
 
 /** The noun types an op names — via appliesTo.type (string|array|'*') and/or a type-enum param. */
-export function opNouns(op, itemTypes = []) {
+export function opNouns(op, itemTypes = [], declaredNouns = null) {
+  // A KIND the manifest declares as a noun of its own is the op's noun, instead of the type it narrows (a loan is an
+  // `offer` of kind `lend`; the `lend` rows gate `markReturned`): decided by the DECLARATION, never by which keys are
+  // on, so switching the kind's row off can never fall back to the type's row. A kind nobody declares (tasks' inbox
+  // items) leaves the op on its type.
+  const kindsIn = op?.appliesTo?.kind == null ? [] : (Array.isArray(op.appliesTo.kind) ? op.appliesTo.kind : [op.appliesTo.kind]);
+  const declaredKinds = declaredNouns ? kindsIn.filter((k) => typeof k === 'string' && declaredNouns.has(k)) : [];
+  if (declaredKinds.length) return declaredKinds;
   const set = new Set();
   const at = op?.appliesTo?.type;
   const declared = at == null ? [] : (Array.isArray(at) ? at : [at]);
@@ -41,10 +48,16 @@ export function opNouns(op, itemTypes = []) {
   return [...set];
 }
 
+/** The nouns a manifest declares (`manifest.nouns`' keys), or null when it declares none. */
+export function declaredNounsOf(manifest) {
+  const nouns = manifest?.nouns;
+  return nouns && typeof nouns === 'object' && !Array.isArray(nouns) && Object.keys(nouns).length ? new Set(Object.keys(nouns)) : null;
+}
+
 /** True iff `op` implements the (canonical) `atom` on `noun`. */
-function opImplements(op, atom, noun, itemTypes) {
+function opImplements(op, atom, noun, itemTypes, declaredNouns) {
   if (canonicalAtom(op?.verb) !== atom) return false;
-  return opNouns(op, itemTypes).includes(noun);
+  return opNouns(op, itemTypes, declaredNouns).includes(noun);
 }
 
 /**
@@ -65,8 +78,9 @@ export function resolveAtom(manifest, atom, noun) {
   const canonical = canonicalAtom(atom);
   if (!canonical) return null;
   const itemTypes = Array.isArray(manifest?.itemTypes) ? manifest.itemTypes : [];
+  const declared = declaredNounsOf(manifest);
   for (const op of (Array.isArray(manifest?.operations) ? manifest.operations : [])) {
-    if (typeof op?.id === 'string' && opImplements(op, canonical, noun, itemTypes)) return op.id;
+    if (typeof op?.id === 'string' && opImplements(op, canonical, noun, itemTypes, declared)) return op.id;
   }
   return null;
 }
@@ -136,7 +150,7 @@ export function capabilitiesOf(manifest) {
   for (const op of (Array.isArray(manifest?.operations) ? manifest.operations : [])) {
     const atom = canonicalAtom(op?.verb);
     if (!atom || typeof op?.id !== 'string') continue;
-    for (const noun of opNouns(op, itemTypes)) {
+    for (const noun of opNouns(op, itemTypes, declaredNounsOf(manifest))) {
       const k = key(noun, atom);
       if (byKey.has(k)) {
         const cap = byKey.get(k);

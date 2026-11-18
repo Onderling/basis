@@ -336,7 +336,21 @@ describe('cards and chat, each behind its allow (step G)', () => {
     el.querySelector('.circle-nearby__card-label').value = ' Sam ';
     el.querySelector('.circle-nearby__card-line-input').value = 'net verhuisd';
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    expect(onSubmitCard).toHaveBeenCalledWith({ label: 'Sam', line: 'net verhuisd' });
+    expect(onSubmitCard).toHaveBeenCalledWith({ label: 'Sam', line: 'net verhuisd', tags: [] });
+  });
+
+  it('the card editor holds the offers switch: on, the chips still listed go as tags; a removed chip does not', () => {
+    const onSubmitCard = vi.fn();
+    const el = render(withAllows({ card: true, chat: false }, { ownProfile: { publishedSkills: ['koken', 'fietsen'] } }), { onSubmitCard });
+    const form = el.querySelector('.circle-nearby__card-form');
+    el.querySelector('.circle-nearby__card-label').value = 'Sam';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSubmitCard, 'switch off: no tags').toHaveBeenLastCalledWith({ label: 'Sam', line: '', tags: [] });
+    const cb = form.querySelector('.circle-nearby__offers input');
+    cb.checked = true; cb.dispatchEvent(new Event('change'));
+    [...form.querySelectorAll('.circle-nearby__offer-chip')].find((c) => c.textContent === 'koken').click();
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSubmitCard).toHaveBeenLastCalledWith({ label: 'Sam', line: '', tags: ['fietsen'] });
   });
 
   it("another person's card renders on THEIR row, even with my own allow off", () => {
@@ -483,23 +497,43 @@ describe('the card prefill', () => {
   });
 });
 
-describe('the first-use question', () => {
-  it('asks before anything else, offers every level, and hands the choice back', () => {
-    const chosen = [];
-    let later = 0;
-    const el = render(model(), { firstUse: { onChoose: (v) => chosen.push(v), onLater: () => { later += 1; } } });
-    const block = el.querySelector('.circle-nearby__first-use');
-    expect(block, 'the question is shown').not.toBe(null);
-    expect(el.querySelector('.circle-nearby__top').nextElementSibling, 'right under the title row').toBe(block);
-    const opts = [...block.querySelectorAll('.circle-nearby__first-use-option')];
-    expect(opts.map((b) => b.textContent)).toEqual(['circle.nearbyScreen.face_none', 'circle.reveal.preset.handle', 'circle.reveal.preset.profile', 'circle.reveal.preset.full']);
-    opts[2].click();
-    expect(chosen).toEqual(['profile']);
-    block.querySelector('.circle-nearby__first-use-later').click();
-    expect(later).toBe(1);
+describe('the first-time wizard', () => {
+  const selfView = { ask: false, self: { id: 'default', name: 'Frits' }, choices: [] };
+  it('step 1 is the page while open: right under the title, the gear hidden, and the presses go back to the host', () => {
+    const presses = [];
+    const el = render(model(), { roomSelf: { view: selfView }, wizard: { step: 1, onPress: (p, input) => presses.push([p, input]) } });
+    const wz = el.querySelector('.circle-nearby__wizard--step1');
+    expect(wz, 'the wizard is shown').not.toBe(null);
+    expect(el.querySelector('.circle-nearby__top').nextElementSibling, 'right under the title row').toBe(wz);
+    expect(el.querySelector('.circle-nearby__gear').hidden).toBe(true);
+    expect(el.querySelector('.circle-nearby__menu'), 'nothing else is painted').toBe(null);
+    expect(wz.querySelector('.circle-nearby__wizard-self').textContent).toBe('circle.nearbyScreen.wizard1_general');
+    wz.querySelector('[data-press="look"]').click();
+    wz.querySelector('[data-press="yes"]').click();
+    expect(presses.map((p) => p[0])).toEqual(['look', 'yes']);
   });
-  it('is absent when the shell does not ask', () => {
-    expect(render(model()).querySelector('.circle-nearby__first-use')).toBe(null);
+  it('step 2 hands the card typed and the offer chips still listed; nothing offered says where to add it', () => {
+    const presses = [];
+    const el = render(model({ ownProfile: { publishedSkills: ['koken'] } }), { wizard: { step: 2, onPress: (p, input) => presses.push([p, input]) } });
+    el.querySelector('.circle-nearby__wizard-field--name input').value = 'Frits';
+    el.querySelector('.circle-nearby__wizard-field--line input').value = 'nummer 8';
+    const cb = el.querySelector('.circle-nearby__offers input');
+    cb.checked = true; cb.dispatchEvent(new Event('change'));
+    el.querySelector('[data-press="next"]').click();
+    expect(presses[0]).toEqual(['next', { label: 'Frits', line: 'nummer 8', chat: false, showOffers: true, tags: ['koken'] }]);
+    const none = render(model(), { wizard: { step: 2, onPress: () => {} } });
+    expect(none.querySelector('.circle-nearby__offers-none').textContent).toBe('circle.nearbyScreen.wizard2_no_offers');
+  });
+  it('step 3 says nothing is kept and hands the chat switch', () => {
+    const presses = [];
+    const el = render(model(), { wizard: { step: 3, onPress: (p, input) => presses.push([p, input]) } });
+    expect(el.querySelector('.circle-nearby__wizard-box').textContent).toBe('circle.nearbyScreen.chat_ephemeral');
+    el.querySelector('.circle-nearby__wizard-chat input').checked = true;
+    el.querySelector('[data-press="done"]').click();
+    expect(presses[0][1].chat).toBe(true);
+  });
+  it('is absent when the shell does not open it', () => {
+    expect(render(model()).querySelector('.circle-nearby__wizard')).toBe(null);
   });
 });
 

@@ -3797,7 +3797,7 @@
       "doc": "Who said a line in the room chat, for your own lines (the others' lines carry the name or face the room shows)."
     },
     "chat_ephemeral": {
-      "text": "Hier wordt niets bewaard. Weggaan wist het.",
+      "text": "Hier wordt niets bewaard. Wie weggaat, is het gesprek kwijt.",
       "doc": "Says the ephemerality out loud, since a chat window normally implies history."
     },
     "chat_placeholder": {
@@ -4024,18 +4024,6 @@
       "text": "De ruimte ziet elke keer een nieuwe sleutel. Het netwerk ziet nog steeds je apparaat.",
       "doc": "Nearby → You here: what the room key does and does not hide. A new key per entry and per self; the network (IP, MAC) still sees the device."
     },
-    "first_use_title": {
-      "text": "Wat mag deze ruimte van je zien?",
-      "doc": "Nearby first-use question (once per self per device): the room self's level."
-    },
-    "first_use_body": {
-      "text": "Je kiest dit per persona; het reist mee naar je andere apparaten. Je kunt het later wijzigen bij \"Toon hier als\".",
-      "doc": "Under the first-use question: the level is the persona's and syncs; where to change it later."
-    },
-    "first_use_later": {
-      "text": "Later (tot dan je handle)",
-      "doc": "Dismiss the first-use question; the self stays on the floor default (its handle) and is not asked again on this device."
-    },
     "face_row": {
       "text": "Toon hier als",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
@@ -4075,6 +4063,106 @@
     "header_none": {
       "text": "Nog niemand hier laat zien wat hij aanbiedt",
       "doc": "Nearby's top line when people are here but none shows what they offer."
+    },
+    "wizard_step": {
+      "text": "In de buurt · stap {{n}} van {{of}}",
+      "doc": "First-time wizard: the line above each step."
+    },
+    "wizard1_title": {
+      "text": "Wil je hier zichtbaar zijn?",
+      "doc": "First-time wizard, step 1: its title."
+    },
+    "wizard1_text": {
+      "text": "In de buurt laat zien wie er dichtbij ook openstaat. Wie zichtbaar is, ziet elkaars naam en kaartje. Je kunt dit altijd weer veranderen.",
+      "doc": "First-time wizard, step 1: what being visible means."
+    },
+    "wizard1_appear_as": {
+      "text": "Je verschijnt als",
+      "doc": "First-time wizard, step 1: above the choice of who enters the room."
+    },
+    "wizard1_general": {
+      "text": "{{name}} · jijzelf",
+      "doc": "First-time wizard, step 1: the general self in the choice (not a persona)."
+    },
+    "wizard1_general_unnamed": {
+      "text": "jijzelf (nog geen naam)",
+      "doc": "First-time wizard, step 1: the general self while it has no name yet."
+    },
+    "wizard1_fixed": {
+      "text": "Dit wordt je vaste keuze voor In de buurt. Wisselen kan bovenaan het scherm.",
+      "doc": "First-time wizard, step 1: under the choice of who enters the room."
+    },
+    "wizard1_yes": {
+      "text": "Ja, als {{name}}",
+      "doc": "First-time wizard, step 1: become visible as the chosen self (the gear menu's Zichtbaar)."
+    },
+    "wizard1_yes_plain": {
+      "text": "Ja",
+      "doc": "First-time wizard, step 1: become visible, when the self has no name to name."
+    },
+    "wizard1_look": {
+      "text": "Alleen kijken",
+      "doc": "First-time wizard, step 1: write nothing, stay hidden, end the wizard."
+    },
+    "wizard2_title": {
+      "text": "Je kaartje",
+      "doc": "First-time wizard, step 2: its title."
+    },
+    "wizard2_text": {
+      "text": "Dit zien de mensen hier van je. Meer niet.",
+      "doc": "First-time wizard, step 2: what the card is."
+    },
+    "wizard2_name": {
+      "text": "Naam",
+      "doc": "First-time wizard, step 2: the card's name field."
+    },
+    "wizard2_line": {
+      "text": "Eén regel over jezelf",
+      "doc": "First-time wizard, step 2: the card's line field."
+    },
+    "wizard2_line_example": {
+      "text": "bijv. ik woon op nummer 8",
+      "doc": "First-time wizard, step 2: the example in the line field."
+    },
+    "wizard2_offers": {
+      "text": "Laat ook zien wat ik aanbied: {{offers}}",
+      "doc": "First-time wizard, step 2 and the card editor: copy what the room self offers into the card as tags (a prefill the person sees and can remove)."
+    },
+    "wizard2_no_offers": {
+      "text": "Je biedt nog niets aan. Dat kan later, bij Mij.",
+      "doc": "First-time wizard, step 2: in place of the offers switch when nothing is offered yet; Mij/Me is the tab."
+    },
+    "wizard2_under": {
+      "text": "Een vraag van iemand anders wordt op jouw telefoon naast je aanbod gelegd. De vrager hoort pas iets als jij antwoordt.",
+      "doc": "First-time wizard, step 2: how a question meets what you offer."
+    },
+    "wizard3_title": {
+      "text": "Het gesprek hier",
+      "doc": "First-time wizard, step 3: its title."
+    },
+    "wizard3_text": {
+      "text": "Wie zichtbaar is, kan meepraten met de mensen die hier nu zijn. Bij elk bericht staan een naam en een tijd.",
+      "doc": "First-time wizard, step 3: what the conversation is."
+    },
+    "wizard3_switch": {
+      "text": "Meedoen met het gesprek",
+      "doc": "First-time wizard, step 3: the chat switch (the same allow as the gear menu's)."
+    },
+    "wizard3_under": {
+      "text": "Alles wat je hier koos, vind je terug achter het tandwiel in In de buurt.",
+      "doc": "First-time wizard, step 3: where these choices live afterwards."
+    },
+    "wizard_back": {
+      "text": "Vorige",
+      "doc": "First-time wizard: the step before."
+    },
+    "wizard_next": {
+      "text": "Verder",
+      "doc": "First-time wizard: the next step."
+    },
+    "wizard_done": {
+      "text": "Klaar",
+      "doc": "First-time wizard: the last step's button; ends it."
     }
   },
   "viewAsSplit": {

@@ -65,7 +65,7 @@ export function nearbyLevelIsSet(disclosure) {
 }
 
 /**
- * THE FIRST-USE QUESTION — "what may this room see of you?" — asked once per self on each DEVICE. The answer (the level)
+ * THE FIRST TIME — the three-step wizard (`nearbyWizard.js`) — opened once per self on each DEVICE. Its answer (the level)
  * is the person's and travels with the self; the "asked" mark is the device's (`nearbyAskedKey`), so a self whose level
  * was already chosen elsewhere is shown it here and not asked again.
  */

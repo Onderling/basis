@@ -61,7 +61,7 @@ describe('nearbyTabs', () => {
     expect(out.defaultTab).toBe('questions');
     // the radio off: the way back is the radio switch
     expect(nearbyTabs({ ...full, visibility: { radioOff: true }, radioOff: true }).chatOff).toEqual({ reason: 'hidden', act: 'radio-on' });
-    // no level chosen yet: hidden, and the way is the first-use question above, not a button here
+    // no level chosen yet: hidden, and the way is the first-time wizard, not a button here
     expect(nearbyTabs({ ...full, visibility: { publishing: false, levelChosen: false } }).chatOff).toEqual({ reason: 'hidden', act: null });
   });
 

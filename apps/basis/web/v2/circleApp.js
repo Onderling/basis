@@ -797,6 +797,7 @@ import { earlierRoomMessages } from '../../src/v2/nearbyKept.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { nearbyHereChoose } from '../../src/v2/nearbyMenu.js';
+import { nearbyWizardPress } from '../../src/v2/nearbyWizard.js';
 import { renderCircleMyThings } from './circleMyThings.js';
 import { renderCircleAdvisor } from './circleAdvisor.js';
 import { renderOfferingEditor } from './circleOfferingEditor.js';
@@ -4241,7 +4242,7 @@ function showNearby() {
   let notice = null;
   let lastAsk = null;
   let roomLevel = null;   // the room self's level, read from its disclosure (re-read when the self changes)
-  let firstUse = null;    // the once-per-self-per-device question, while it is open
+  let wizard = null;      // the first-time wizard while it is open: `{step, notice}` (`nearbyWizardPress` moves it)
   // which self the level is for: null while the room still asks who enters
   const roomSelfId = () => { const s = nearbyRoomSelfNow().self; return s?.asking ? null : (s?.id ?? null); };
   const markAsked = (id) => { try { localStorage.setItem(`basis.${nearbyAskedKey(id)}`, '1'); } catch { /* best-effort */ } };
@@ -4252,12 +4253,28 @@ function showNearby() {
     roomLevel = v;
     roomLevelSet = true;
     nearbyScreen.levelChanged();   // chosen now: announced, unless the person went quiet
-    if (id) markAsked(id);   // a chosen level answers the first-use question too
-    firstUse = null;
+    if (id) markAsked(id);   // a chosen level answers the first-time question too
     // "Handle" with no handle set announces nothing and looks identical to "Nobody". The binding
     // reports the label it actually sent, so say so rather than leaving the person to guess.
     const r = await ensureNearbyRoom()?.announceFace?.();
     notice = faceNoticeFor({ choice: v, result: r });
+    draw(nearbyScreen.model());
+  };
+  // one press in the first-time wizard: what it writes is the shared rule (`nearbyWizardPress`), through this host's own acts
+  const wizardPress = async (press, input) => {
+    const id = roomSelfId();
+    const r = await nearbyWizardPress(wizard ?? { step: 1 }, press, input, {
+      now: { level: roomLevel, visibility: nearbyScreen.visibility() },
+      setLevel: async (l) => { await changeLevel(l); return { ok: roomLevel === l }; },
+      setQuiet: (q) => nearbyScreen.setQuiet(q),
+      setRadio: (v) => nearbyScreen.setRadio(v),
+      markAsked: () => { if (id) markAsked(id); },
+      setAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); },
+      showCard: (fields) => nearbyScreen.showCard(fields),
+      // the card reaches the room in its own time; its outcome is the card editor's notice ("shown to 3 of 5")
+      cardShown: (r) => { notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: r.notice ?? 'ask_expired' }; if (nearbyScreen) draw(nearbyScreen.model()); },
+    });
+    wizard = r.done ? null : { step: r.step, notice: r.notice ?? null };
     draw(nearbyScreen.model());
   };
   const readRoomLevel = () => _nearbyIdentity?.levelState?.().then((st) => {
@@ -4269,7 +4286,7 @@ function showNearby() {
     try { asked = id ? !!localStorage.getItem(`basis.${nearbyAskedKey(id)}`) : true; } catch { asked = true; }
     const fu = nearbyFirstUse({ self: id ? { id } : { asking: true }, asked, levelSet: st.set });
     if (fu.mark) markAsked(id);
-    firstUse = fu.ask ? { onChoose: changeLevel, onLater: () => { markAsked(id); firstUse = null; draw(nearbyScreen.model()); } } : null;
+    if (fu.ask && !wizard) wizard = { step: 1 };   // an open wizard stays open (a self picked in step 1 re-reads the level)
     draw(nearbyScreen.model());
   }).catch(() => {});
   _unsubscribeNearbyHeard = _nearbyRoom?.subscribeToHeard?.(({ msgId, heard }) => {
@@ -4313,7 +4330,7 @@ function showNearby() {
       draw(nearbyScreen.model());
     },
     level: roomLevel,
-    firstUse,
+    wizard: wizard ? { ...wizard, onPress: (press, input) => wizardPress(press, input) } : null,
     onLevelChange: changeLevel,
     // the gear menu's "how you are here": one shared rule for what each choice writes (`nearbyHereChoose`); the web
     // carries no quiet or radio switch, so its menu offers Zichtbaar only (the painter reads that from the props)
@@ -4322,12 +4339,8 @@ function showNearby() {
       setQuiet: (q) => nearbyScreen.setQuiet(q),
       setRadio: (r) => nearbyScreen.setRadio(r),
     }).then((r) => { if (!r.ok) { notice = { key: 'level_not_set' }; } draw(nearbyScreen.model()); }),
-    // "read the introduction again": the first-use question once more, until the first-time wizard replaces it
-    onIntroAgain: () => {
-      const id = roomSelfId();
-      firstUse = { onChoose: changeLevel, onLater: () => { if (id) markAsked(id); firstUse = null; draw(nearbyScreen.model()); } };
-      draw(nearbyScreen.model());
-    },
+    // "read the introduction again": the first-time wizard from its first step
+    onIntroAgain: () => { wizard = { step: 1 }; draw(nearbyScreen.model()); },
     onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); notice = null; draw(nearbyScreen.model()); },
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);

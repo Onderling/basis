@@ -139,6 +139,7 @@ const basisDeclaresOp = (opId) => basisManifest.operations.some((o) => o.id === 
 import { isAppSurfaceEnabled } from '../../../../basis/src/v2/appFeature.js';
 // the capability gate + the affordance matrix (web≡mobile, shared core).
 import { effectiveCapabilities, checkCapability } from '../../../../basis/src/v2/capabilityGate.js';
+import { gateRefusalKey } from '../../../../basis/src/v2/circleActGate.js';   // a refusal's words, the same for a typed line and a tap
 import { buildCapabilityMatrix } from '@onderling/app-manifest';
 // S6.C — per-user surface preference (inline / screen / minimal), shared selector + the mobile store.
 import { selectSurfaceButtons } from '../../../../basis/src/v2/surfacePref.js';
@@ -3794,6 +3795,9 @@ function CircleDetail({
     setStreamTick((n) => n + 1);
     return { msgId, ts };
   }, [eventLog, circle?.id]);
+  // a tap the circle refused (its capability set, asked at the waist: L1042) is told in the circle's thread, in the typed
+  // line's words (web parity: circleApp's toldTap)
+  const tellRefusal = useCallback((refusal) => appendCircleMessage({ actor: 'bot', text: t(gateRefusalKey(refusal?.code)) }), [appendCircleMessage]);
 
   /**
    * Run a device op for this conversation and put what it answered where it belongs — the mobile twin
@@ -4011,7 +4015,7 @@ function CircleDetail({
       // already consulted for the screen button below); the pure (verb×noun) gate evaluates the capability.
       const denied = capabilityDenyFor(dispatch);
       if (denied) {
-        appendCircleMessage({ actor: 'bot', text: t(denied === 'app-disabled' ? 'circle.gate.appDisabled' : 'circle.gate.capabilityDenied') });
+        appendCircleMessage({ actor: 'bot', text: t(gateRefusalKey(denied)) });
         return;
       }
       // scopeReadyDispatch takes the active-circle id STRING (it writes it into the scope arg keys);
@@ -4895,7 +4899,7 @@ function CircleDetail({
         ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see pinboardCall above).
-          <CircleNoticeboard callSkill={pinboardCall} onPinboardEvent={onPinboardEvent} refreshKey={tabRetap} media={circleMedia} selfProfileId={selfProfileId}
+          <CircleNoticeboard callSkill={pinboardCall} onRefusal={tellRefusal} onPinboardEvent={onPinboardEvent} refreshKey={tabRetap} media={circleMedia} selfProfileId={selfProfileId}
             readOnlyNote={gate.canClose ? t(gate.noteKey) : null} onCloseRemoved={gate.canClose ? onCloseRemoved : null}
             contactChannel={contactChannel}
             notePeer={notePeer}
@@ -5016,7 +5020,7 @@ function CircleDetail({
         ) : activeTab === 'lists' ? (
           // Lists tab: the circle's lists screen itself (make a list, add an entry, tick one off), the one its menu opened
           <View testID="circle-detail-lists" style={{ flex: 1 }}>
-            <CircleListsScreen embedded circleId={circle?.id} storeFor={circleStoreFor} callSkill={rawCallSkill} />
+            <CircleListsScreen embedded circleId={circle?.id} storeFor={circleStoreFor} callSkill={rawCallSkill} onRefusal={tellRefusal} />
           </View>
         ) : activeTab === 'tasks' ? (
           // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the

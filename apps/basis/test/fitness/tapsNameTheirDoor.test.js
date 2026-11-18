@@ -18,6 +18,8 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 /** The circle writes a person taps on a raw path, per shell file (the noticeboard's chips, the lists panel). */
 const TAPS = {
   'apps/basis/web/v2/circleApp.js': ['cancelRequest', 'markReturned', 'acceptResponder', 'assignLend', 'markListItemDone', 'removeFromList', 'addToList', 'createList'],
+  'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js': ['cancelRequest', 'markReturned', 'acceptResponder', 'assignLend'],
+  'apps/basis-mobile/src/screens/v2/CircleListsScreen.js': ['markListItemDone', 'removeFromList', 'addToList', 'createList'],
 };
 
 /**
@@ -35,7 +37,7 @@ const NOT_A_TAP = {
 /** Every call of `op` through pinboardCall / rawCallSkill in `src`, with its full argument text. */
 function callsOf(src, op) {
   const out = [];
-  const re = new RegExp(`(?:pinboardCall|rawCallSkill)\\('(?:pinboard|lists)',\\s*'${op}'`, 'g');
+  const re = new RegExp(`(?:pinboardCall|rawCallSkill|callSkill\\??\\.?)\\('(?:pinboard|lists)',\\s*'${op}'`, 'g');
   for (let m; (m = re.exec(src));) {
     let depth = 0; let i = src.indexOf('(', m.index);
     const start = i;

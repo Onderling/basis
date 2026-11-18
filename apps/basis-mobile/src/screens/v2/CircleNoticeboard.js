@@ -39,7 +39,7 @@ const INTENTS = NOTICEBOARD_INTENTS;
 // The matches I skipped under my own asks — this device only (AsyncStorage), never the circle (web parity).
 const askMatchSkips = createAskMatchSkips(asyncStorageAskMatchSkipsIo(AsyncStorage));
 
-export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onPinboardEvent, refreshKey = 0, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null, onOpenContact = null,
+export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onRefusal = null, onPinboardEvent, refreshKey = 0, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null, onOpenContact = null,
   // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
   // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
   // still loading) → no byline rather than a wire address.
@@ -184,15 +184,18 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     if (att && att.thumbnail) setViewing({ uri: att.thumbnail, pending: true });
   }, [media]);
 
+  // a tap the circle refused (its capability set, asked at the waist: L1042) is told by the launcher, as a typed line's
+  const told = (r) => { if (r?.refusal?.layer === 'availability') onRefusal?.(r.refusal); return r; };
   const runAction = useCallback(async (action, post, responder = null) => {
     try {
       if (action === 'respond') { setReplyingTo(post.id); setReplyText(''); return; }
       if (action === 'assign') { setAssigningTo(post.id); setAssignText(''); return; }
-      if (action === 'cancel') await callSkill('pinboard', 'cancelRequest', { requestId: post.id });
+      // a person's tap names its door, so the circle is asked at the waist (L1042); a refusal is told as a typed line's
+      if (action === 'cancel') told(await callSkill('pinboard', 'cancelRequest', { requestId: post.id }, { door: 'tap' }));
       // a post report is a signed governance report (to the circle's admins only) — the one report door
       else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); }
-      else if (action === 'markReturned') await callSkill('pinboard', 'markReturned', { requestId: post.id });
-      else if (action === 'accept' && responder) await callSkill('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
+      else if (action === 'markReturned') told(await callSkill('pinboard', 'markReturned', { requestId: post.id }, { door: 'tap' }));
+      else if (action === 'accept' && responder) told(await callSkill('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder }, { door: 'tap' }));
       else if (action === 'mute' && post.addedBy) {
         // BLOCK the person — both halves, one act (web parity). Keyed on the webid, which is what
         // makes it a block of a PERSON rather than of one address.
@@ -229,7 +232,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
   const submitAssign = useCallback(async (post) => {
     const borrowerWebid = assignText.trim();
     if (!borrowerWebid) { setAssigningTo(null); return; }
-    try { await callSkill('pinboard', 'assignLend', { itemId: post.id, borrowerWebid }); } catch { /* */ }
+    try { told(await callSkill('pinboard', 'assignLend', { itemId: post.id, borrowerWebid }, { door: 'tap' })); } catch { /* */ }
     setAssigningTo(null); setAssignText('');
     reload();
   }, [assignText, callSkill, reload]);

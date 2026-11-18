@@ -17,7 +17,9 @@ import ThemedTextInput from './ThemedTextInput.js';   // every text input's colo
 const typeLabel = (type) => t(`circle.container.type.${type}`);
 
 // `embedded`: painted inside the circle's Lists tab — no back row on its index (the tab bar is the way out)
-export default function CircleListsScreen({ circleId, storeFor, callSkill, onBack, embedded = false }) {
+export default function CircleListsScreen({ circleId, storeFor, callSkill, onBack, embedded = false, onRefusal = null }) {
+  // a tap the circle refused (its capability set, asked at the waist: L1042) is told by the launcher, as a typed line's
+  const told = (r) => { if (r?.refusal?.layer === 'availability') onRefusal?.(r.refusal); return r; };
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const svcRef = useRef(null);
@@ -60,7 +62,7 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
     // THROUGH THE WAIST — the same op the "+" and a typed command dispatch (web parity). Reads stay on
     // the service: they are this screen's own projection. Writes are the contract's.
     if (kind === 'board') await svcRef.current.createBoard(circleId, v);
-    else await callSkill?.('lists', 'createList', { circleId, text: v });
+    else told(await callSkill?.('lists', 'createList', { circleId, text: v }, { door: 'tap' }));
     setNewName('');
     reloadContainers();
   }, [newName, circleId, reloadContainers]);
@@ -85,15 +87,16 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
     const v = addText.trim(); const target = pendingAdd; const hint = pendingHint;
     setPendingAdd(null); setPendingHint(null); setAddText('');
     if (v && target && svcRef.current && openList) {
-      await callSkill?.('lists', 'addToList', { circleId, list: target, text: v, ...(hint ? { kind: hint } : {}) });
+      told(await callSkill?.('lists', 'addToList', { circleId, list: target, text: v, ...(hint ? { kind: hint } : {}) }, { door: 'tap' }));
       reloadTree(openList.id);
     }
   }, [addText, pendingAdd, pendingHint, circleId, openList, reloadTree]);
 
   const onRowAction = useCallback(async (op, node) => {
     if (!svcRef.current || !openList) return;
-    if (op === 'markComplete') await callSkill?.('lists', 'markListItemDone', { circleId, item: node.id });
-    else if (op === 'removeItem') await svcRef.current.remove(circleId, node.id);
+    // a person's tap names its door, so the circle is asked at the waist (L1042); remove goes through the op (web parity)
+    if (op === 'markComplete') told(await callSkill?.('lists', 'markListItemDone', { circleId, item: node.id }, { door: 'tap' }));
+    else if (op === 'removeItem') told(await callSkill?.('lists', 'removeFromList', { circleId, item: node.id }, { door: 'tap' }));
     reloadTree(openList.id);
   }, [circleId, openList, reloadTree]);
 

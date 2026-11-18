@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auditDescriptions, shrunkBaseline, unreadFiles } from './lint-op-descriptions.mjs';
+import { auditDescriptions, shrunkBaseline, unreadFiles, auditGeneric } from './lint-op-descriptions.mjs';
 
 // one app, two ops; `params` per op
 const declared = { lists: { addToList: ['list', 'text'], listLists: [] }, tasks: { addTask: ['title'] } };
@@ -52,5 +52,25 @@ describe('lint-op-descriptions', () => {
     const onDisk = ['apps/lists/descriptions.en.json', 'apps/lists/descriptions.nl.json', 'apps/calendar/descriptions.nl.json'];
     expect(unreadFiles(onDisk, { lists: { en: {}, nl: {} } })).toEqual(['apps/calendar/descriptions.nl.json']);
     expect(unreadFiles(onDisk.slice(0, 2), { lists: { en: {}, nl: {} } })).toEqual([]);
+  });
+
+  it('generic ops: every verb a described noun uses has its sentence in both languages; every such noun its two names', () => {
+    const generic = [{ app: 'household', noun: 'note', atoms: ['add', 'list'] }, { app: 'pinboard', noun: 'lend', atoms: ['complete'] }];
+    const atomWords = { en: { add: { what: 'Make {{a_noun}}.' }, list: { what: 'Show your {{nouns}}.' } }, nl: { add: { what: 'Maak {{a_noun}}.' } } };
+    const names = { 'household.note': { en: { one: 'note', other: 'notes' }, nl: { one: 'notitie', other: 'notities' } } };
+    const p = auditGeneric({ generic, atomWords, names, owed: ['pinboard.lend'] });
+    expect(p).toEqual(['the generic verb `list` has no sentence (nl), and household.note uses it']);
+    const p2 = auditGeneric({ generic, atomWords: { ...atomWords, nl: { ...atomWords.nl, list: { what: 'Laat je {{nouns}} zien.' } } }, names: {}, owed: [] });
+    expect(p2.some((x) => /household\.note has no names \(en\)/.test(x))).toBe(true);
+    expect(p2.some((x) => /pinboard\.lend has no names \(nl\)/.test(x))).toBe(true);
+    expect(p2.some((x) => /the generic verb `complete` has no sentence \(en\), and pinboard\.lend uses it/.test(x))).toBe(true);
+  });
+  it('an owed noun that is now named, or no longer generic, is a stale baseline entry', () => {
+    const generic = [{ app: 'household', noun: 'note', atoms: ['add'] }];
+    const atomWords = { en: { add: { what: 'Make {{a_noun}}.' } }, nl: { add: { what: 'Maak {{a_noun}}.' } } };
+    const names = { 'household.note': { en: { one: 'note', other: 'notes' }, nl: { one: 'notitie', other: 'notities' } } };
+    const p = auditGeneric({ generic, atomWords, names, owed: ['household.note', 'gone.thing'] });
+    expect(p.some((x) => /baseline owes household\.note, which now has its words/.test(x))).toBe(true);
+    expect(p.some((x) => /baseline owes gone\.thing, which is no generic noun/.test(x))).toBe(true);
   });
 });

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 81
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 82
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -21,6 +21,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `branch-hygiene` | — | the trunk and the release branch move by MERGE, not by commits typed on them |
 | `browser-specs-assert` | — | every spec in apps/basis/test-browser/ asserts something |
 | `callskill-literals` | — | a literal `callSkill('group', 'op')` must name an op some manifest declares |
+| `capability-rows` | — | every op is gated by a capability row (ledger L1040 / L1042) |
 | `carrying` | — | the carrying index held to the code (`carrying.mjs`): every server route and store is declared with |
 | `catalogue-ops` | — | every op in every app manifest is named on exactly ONE page of the functionality catalogue |
 | `chat-hints-localised` | — | every op the household assistant can be asked for has a Dutch hint |
@@ -93,7 +94,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
-## Named design guards (`G-*`, in fitness tests) · 11
+## Named design guards (`G-*`, in fitness tests) · 12
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -105,6 +106,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | sa.audit and the agent trail read their AUDIT retention window from ONE shared table | `apps/basis/test/auditRetentionAgreement.test.js` |
 | — | one item of EVERY canonical type, written to a circle store on one device, arrives in the | `apps/basis/test/perTypeSyncMatrix.test.js` |
 | — | every op is gated by exactly one capability row, and every row gates at least one op | `apps/basis/test/v2/lendCapabilityRows.test.js` |
+| — | confirming a claim, editing and sharing an appointment pass the capability gate in a circle that did not switch them off | `apps/basis/test/v2/threeActsRows.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
 | — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |
 | G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |

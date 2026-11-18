@@ -5,9 +5,6 @@
     "agents.getProfileDisclosure",
     "agents.getProfileDrivers",
     "agents.getProfileProperties",
-    "calendar.shareEvent",
-    "calendar.updateEvent",
-    "tasks.confirmClaim",
     "tasks.getTaskSnapshot"
   ]
 }

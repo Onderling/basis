@@ -2502,6 +2502,14 @@
       "update": {
         "text": "Aanpassen",
         "doc": "Label of the generic verb, beside the others."
+      },
+      "confirm": {
+        "text": "Bevestigen",
+        "doc": "The capability-matrix label for the confirm verb (a claim confirmed: tasks confirmClaim), beside the other verb labels (L1052)."
+      },
+      "share": {
+        "text": "Delen",
+        "doc": "The capability-matrix label for the share verb (an appointment shared: calendar shareEvent), beside the other verb labels (L1052)."
       }
     },
     "verb_what": {

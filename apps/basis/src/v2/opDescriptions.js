@@ -14,6 +14,8 @@ import { sharedCircleLocale } from '../locales/index.js';
 import { allManifests } from './manifestSources.js';
 import listsEn from '../../../lists/descriptions.en.json' with { type: 'json' };
 import listsNl from '../../../lists/descriptions.nl.json' with { type: 'json' };
+import toolsEn from './toolsManifest.descriptions.en.json' with { type: 'json' };
+import toolsNl from './toolsManifest.descriptions.nl.json' with { type: 'json' };
 import householdEn from '../../../household/descriptions.en.json' with { type: 'json' };
 import householdNl from '../../../household/descriptions.nl.json' with { type: 'json' };
 import folioEn from '../../../folio/descriptions.en.json' with { type: 'json' };
@@ -32,6 +34,7 @@ import agentsNl from '../../../agents/descriptions.nl.json' with { type: 'json' 
 /** `{ app: { en, nl } }`: the described apps (the guard's source of truth). */
 export const OP_DESCRIPTIONS = Object.freeze({
   lists: { en: listsEn, nl: listsNl },
+  tools: { en: toolsEn, nl: toolsNl },
   household: { en: householdEn, nl: householdNl },
   folio: { en: folioEn, nl: folioNl },
   pinboard: { en: pinboardEn, nl: pinboardNl },

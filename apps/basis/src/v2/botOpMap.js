@@ -104,8 +104,10 @@ const COLUMNS = {
     ...NOTE_OPS,
     // what the bot will send them this week (their own; an admin also the household's rules)
     'assistant-planned',
+    // a tool of a toolbox the admin added (`zoek …`), and which toolboxes there are (L1035)
+    'useTool', 'listTools',
   ],
-  admin: ['reassignTask', 'removeTask', 'editTask'],
+  admin: ['reassignTask', 'removeTask', 'editTask', 'addToolbox', 'removeToolbox'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
   observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'listDone', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned', 'assistant-feedback'],
 };

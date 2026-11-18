@@ -1,0 +1,18 @@
+{
+  "useTool": {
+    "what": "Ask a tool of a toolbox something, for example to find a product.",
+    "params": { "toolbox": "which toolbox", "tool": "which tool", "input": "what you ask" }
+  },
+  "listTools": {
+    "what": "Show which toolboxes there are, and the word that uses each.",
+    "params": {}
+  },
+  "addToolbox": {
+    "what": "As admin, add a toolbox, with the words for its tools.",
+    "params": { "name": "the toolbox's name", "url": "its address", "words": "which word opens which tool" }
+  },
+  "removeToolbox": {
+    "what": "As admin, remove a toolbox.",
+    "params": { "name": "which toolbox" }
+  }
+}

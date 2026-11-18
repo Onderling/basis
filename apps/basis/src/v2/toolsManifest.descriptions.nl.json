@@ -1,0 +1,18 @@
+{
+  "useTool": {
+    "what": "Vraag iets aan het gereedschap van een gereedschapskist, bijvoorbeeld een product zoeken.",
+    "params": { "toolbox": "welke gereedschapskist", "tool": "welk gereedschap", "input": "wat je vraagt" }
+  },
+  "listTools": {
+    "what": "Laat zien welke gereedschapskisten er zijn, en met welk woord je ze gebruikt.",
+    "params": {}
+  },
+  "addToolbox": {
+    "what": "Voeg als beheerder een gereedschapskist toe, met de woorden voor het gereedschap.",
+    "params": { "name": "de naam van de kist", "url": "het adres", "words": "welk woord welk gereedschap opent" }
+  },
+  "removeToolbox": {
+    "what": "Haal als beheerder een gereedschapskist weg.",
+    "params": { "name": "welke kist" }
+  }
+}

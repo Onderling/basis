@@ -95,3 +95,20 @@ describe('a circle\'s toolboxes', () => {
     expect((await h.ops.listTools({})).toolboxes).toEqual([]);
   });
 });
+
+describe('a toolbox\'s words reach its tool through the deterministic gate', () => {
+  it('"zoek halfvolle melk" and "/zoek halfvolle melk" become useTool with the rest of the line in the named field', async () => {
+    const { toolboxGateRule } = await import('../../src/v2/toolboxes.js');
+    const h = harness();
+    await h.ops.addToolbox({ name: 'boodschappen', url: 'http://boodschappen:3000', words: WORDS });
+    const rule = toolboxGateRule(() => h.ops.wordsNow());
+    for (const line of ['zoek halfvolle melk', '/zoek halfvolle melk', 'Zoek  halfvolle melk ']) {
+      expect(rule.test(line), line).toBe(true);
+      expect(rule.command(line)).toEqual({ opId: 'useTool', appOrigin: 'tools', args: { toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'halfvolle melk' } } });
+    }
+    expect(rule.test('zoek')).toBe(false);                 // a word with nothing to ask is not a call
+    expect(rule.test('zoekt iemand de sleutel')).toBe(false);
+    await h.ops.removeToolbox({ name: 'boodschappen' });
+    expect(rule.test('zoek melk'), 'a removed toolbox\'s word reaches nothing').toBe(false);
+  });
+});

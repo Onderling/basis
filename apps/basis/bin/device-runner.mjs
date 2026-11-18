@@ -119,6 +119,8 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
+import { makeToolboxOps, toolboxGateRule } from '../src/v2/toolboxes.js';   // a circle's toolboxes (L1035): the key from the operator's config
+import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
@@ -1367,6 +1369,23 @@ if (tgToken || inboxDoor.bridge) {
       } catch (err) { console.warn(`device-runner: a removal from a circle was not handled: ${err?.message ?? err}`); }
     };
   }
+  // A CIRCLE'S TOOLBOXES (L1035). The record (address, words) in this box's vault; the KEY from the operator's config
+  // only (an env value TOOLBOX_KEY_<NAME>, or a file <data-dir>/toolbox-keys/<name>.key): it never passes through a chat
+  // and never appears in a reply, a refusal, a log line or the list of tools. Mounted on the waist like any app.
+  const toolboxes = makeToolboxOps({
+    store: new VaultNodeFs(path.join(dataDir, 'toolboxes.json'), vaultPassphrase()),
+    keyOf: async (name) => {
+      const fromEnv = process.env[`TOOLBOX_KEY_${String(name).toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
+      if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
+      try { return readFileSync(path.join(dataDir, 'toolbox-keys', `${String(name).replace(/[^a-z0-9-]/g, '')}.key`), 'utf8').trim() || null; } catch { return null; }
+    },
+    log: (tag, what, fields) => walkLog({ kind: 'toolbox', what, ...fields }),
+  });
+  await toolboxes.load();
+  agent.mountAppOps('tools', {
+    useTool: (args) => toolboxes.useTool(args), listTools: () => toolboxes.listTools(),
+    addToolbox: (args) => toolboxes.addToolbox(args), removeToolbox: (args) => toolboxes.removeToolbox(args),
+  }, toolsManifest);
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     // feedback about the app: the link to add the feedback contact (the same card the apps seed), nothing forwarded
@@ -1528,7 +1547,8 @@ if (tgToken || inboxDoor.bridge) {
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t, rolesPreset()),
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds({ t }),
-      gateRules: listsGateRules(values.lang, templateLists(t)),
+      // the lists' words, then the words a toolbox's admin named (read live: adding or removing one changes them at once)
+      gateRules: [...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
       // the first message says what this bot does for this person, and how the reminders stand and change
       welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings() }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands

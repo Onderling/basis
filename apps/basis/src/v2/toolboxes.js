@@ -28,12 +28,20 @@ const WORD = /^[a-zà-ÿ][a-zà-ÿ0-9-]{0,23}$/;
  */
 export function makeToolboxOps({ store, keyOf, fetch = globalThis.fetch, log = () => {} } = {}) {
   const read = async () => { try { const v = JSON.parse((await store.get(RECORDS_KEY)) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
-  const write = (records) => store.set(RECORDS_KEY, JSON.stringify(records));
+  // the words, held in memory for the deterministic gate (a rule answers synchronously); kept in step with every write
+  let words = [];
+  const remember = (records) => { words = records.flatMap((r) => (r.words ?? []).map((w) => ({ ...w, toolbox: r.name }))); };
+  const write = async (records) => { await store.set(RECORDS_KEY, JSON.stringify(records)); remember(records); };
   const keyFor = async (name) => { try { const k = await keyOf(name); return typeof k === 'string' && k.trim() ? k.trim() : null; } catch { return null; } };
   const wordsOk = (words) => Array.isArray(words) && words.length > 0
     && words.every((w) => w && WORD.test(String(w.word ?? '')) && typeof w.tool === 'string' && w.tool && (w.field == null || typeof w.field === 'string'));
 
   return {
+    /** Read the records once at start, so the gate knows the words before the first add of this run. */
+    async load() { remember(await read()); },
+    /** The words that reach a tool now: `{word, tool, field?, toolbox}` (for the gate; no key, no address). */
+    wordsNow: () => words,
+
     /** The admin adds a toolbox: its name, its address, the words for its tools. The key must already be on the box. */
     async addToolbox({ name, url, words } = {}) {
       const n = String(name ?? '').trim();
@@ -84,4 +92,23 @@ export function makeToolboxOps({ store, keyOf, fetch = globalThis.fetch, log = (
       return list.ok ? { ok: true, name: n, tool, items: list.items } : { ok: true, name: n, tool, output: r.output };
     },
   };
+}
+
+/**
+ * The deterministic gate's rule for a toolbox's words: a line that starts with a word the admin named (with or without
+ * its slash) and asks something after it becomes `useTool`, the rest of the line in the tool's named field (`query`).
+ * The words are read live (`getWords`), so a toolbox added or removed changes what the gate hears at once.
+ * @param {() => Array<{word: string, tool: string, field?: string, toolbox: string}>} getWords
+ * @returns {{name: string, test: (text: string) => boolean, command: (text: string) => object|null}}
+ */
+export function toolboxGateRule(getWords) {
+  const command = (text) => {
+    const m = /^\s*\/?(\S+)\s+(\S[\s\S]*?)\s*$/u.exec(String(text ?? ''));
+    if (!m) return null;
+    const w = (typeof getWords === 'function' ? getWords() : []).find((x) => x.word === m[1].toLowerCase());
+    if (!w) return null;
+    const rest = m[2].replace(/\s+/g, ' ');
+    return { opId: 'useTool', appOrigin: 'tools', args: { toolbox: w.toolbox, tool: w.tool, input: { [w.field ?? 'query']: rest } } };
+  };
+  return { name: 'tools:useTool(word)', test: (text) => Boolean(command(text)), command };
 }

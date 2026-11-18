@@ -1,0 +1,38 @@
+{
+  "membership.create": {
+    "what": "Leg vast dat jij de kring begon.",
+    "params": {}
+  },
+  "membership.join": {
+    "what": "Leg vast dat iemand lid wordt.",
+    "params": {}
+  },
+  "membership.leave": {
+    "what": "Leg vast dat je de kring verlaat.",
+    "params": {}
+  },
+  "membership.evict": {
+    "what": "Leg vast dat een beheerder een lid uit de kring zet.",
+    "params": {}
+  },
+  "membership.role": {
+    "what": "Leg vast dat iemands rol verandert.",
+    "params": {}
+  },
+  "membership.addressRevoke": {
+    "what": "Trek een adres van een van je apparaten in.",
+    "params": {}
+  },
+  "membership.personKey": {
+    "what": "Laat de kring je nieuwe sleutel weten.",
+    "params": {}
+  },
+  "membership.rulesAccept": {
+    "what": "Ga opnieuw akkoord met de regels van de kring.",
+    "params": {}
+  },
+  "membership.props": {
+    "what": "Verander wat anderen van je zien: je naam, je foto.",
+    "params": {}
+  }
+}

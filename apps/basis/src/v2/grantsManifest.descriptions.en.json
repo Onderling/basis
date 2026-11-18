@@ -1,0 +1,14 @@
+{
+  "grants.grant": {
+    "what": "Record that a screen may act for you.",
+    "params": {}
+  },
+  "grants.revoke": {
+    "what": "Record that a screen is unpaired.",
+    "params": {}
+  },
+  "grants.revoke-tokens": {
+    "what": "Withdraw single rights.",
+    "params": {}
+  }
+}

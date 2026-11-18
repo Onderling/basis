@@ -1,0 +1,10 @@
+{
+  "items.snapshot": {
+    "what": "Send an item's new state to the circle.",
+    "params": {}
+  },
+  "items.remove": {
+    "what": "Tell the circle an item is gone.",
+    "params": {}
+  }
+}

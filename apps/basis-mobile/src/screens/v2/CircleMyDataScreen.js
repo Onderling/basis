@@ -30,6 +30,7 @@ import {
 // "Never share my global address" (J-CS8) — the strictest privacy position in the product: one address
 // across everything is what links a person's circles together.
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSharing.js';
+import { ownActionsLines, OWN_RECORD_KEY } from '../../../../basis/src/ownActions.js';   // the record's row (web twin)
 // CONNECTIONS — the same shared projections the web shell paints from, so the two shells cannot
 // drift on what a connection may see or do (invariant 2: web ≡ mobile by construction).
 import {
@@ -101,6 +102,10 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
   const [dataLocation, setDataLocation] = useState({});
   // Re-read tick for the history-mirror row (the flip is live on the agent; the row re-reads it).
   const [, setHistoryTick] = useState(0);
+  // the record of what you do (ownActions.js): repaint after a switch or a wipe; the wipe's first tap arms it
+  const [, setOwnTick] = useState(0);
+  const [ownWipeArmed, setOwnWipeArmed] = useState(false);
+  const [ownWiped, setOwnWiped] = useState(null);
   const [podStatus, setPodStatus] = useState({});
   // The pod session as the `whoami` op reports it — `ok:false` means this build has no pod session
   // capability at all, which is what used to be read off the presence of a `podAuth` prop.
@@ -736,6 +741,46 @@ export default function CircleMyDataScreen({ selvesOn = null, showBotActions = f
         })() : null}
       </>
     ),
+    'own-actions': () => {
+      // the record of what you do in the app, this device only (ledger L203; web twin: circleMyData.js own-actions)
+      if (!agent || typeof agent.ownActionRows !== 'function') return null;
+      const on = agent.getParamValue?.(OWN_RECORD_KEY) !== false;
+      const count = agent.ownActionRows().length;
+      const lines = ownActionsLines({ on, count, t });
+      return (
+        <Section title={t('circle.params.key.ownActions_record')}>
+          <Text style={styles.privacyBody}>{t('circle.mydata.own_actions_note')}</Text>
+          <Pressable style={styles.action} testID="mydata-own-actions-toggle"
+            onPress={async () => {
+              try { await callSkill('params', 'set-param', { key: OWN_RECORD_KEY, value: !on }); } catch { /* the row re-reads the truth */ }
+              setOwnTick((n) => n + 1);
+            }}>
+            <Text style={styles.actionLabel}>{on ? t('circle.mydata.history_disable') : t('circle.mydata.history_enable')}</Text>
+          </Pressable>
+          {lines.off ? <Text style={styles.privacyBody} testID="mydata-own-actions-off">{lines.off}</Text> : null}
+          <Text style={styles.privacyBody} testID="mydata-own-actions-count">{ownWiped != null ? t('circle.mydata.own_actions_wiped', { n: ownWiped }) : lines.count}</Text>
+          {count ? (
+            <>
+              <Pressable style={styles.action} testID="mydata-own-actions-export"
+                onPress={async () => {
+                  try { await Share.share({ message: agent.exportOwnActions(), title: 'onderling-handelingen.json' }); } catch { /* dismissed */ }
+                }}>
+                <Text style={styles.actionLabel}>{t('circle.mydata.own_actions_export')}</Text>
+              </Pressable>
+              <Pressable style={styles.action} testID="mydata-own-actions-wipe"
+                onPress={() => {
+                  // two taps, as on web: the first says it cannot be undone
+                  if (!ownWipeArmed) { setOwnWipeArmed(true); return; }
+                  const n = agent.wipeOwnActions?.() ?? 0;
+                  setOwnWipeArmed(false); setOwnWiped(n); setOwnTick((x) => x + 1);
+                }}>
+                <Text style={styles.actionLabel}>{ownWipeArmed ? t('circle.mydata.own_actions_wipe_confirm') : t('circle.mydata.own_actions_wipe')}</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </Section>
+      );
+    },
     'message-cleanup': () => (
       <>
         {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,

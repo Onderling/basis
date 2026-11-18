@@ -451,6 +451,24 @@ export class EventLog {
   }
 
   /**
+   * WIPE one kind of the person's own record on this device: every entry of that kind, at their explicit ask (the
+   * record of their own acts, `own-action`, from My data). Not retention and not the conversation purge. An AUDIT kind
+   * is never dropped this way: a trail that can be wiped silently looks complete. Persists the shrunk log; returns how
+   * many entries went (the confirmation the screen says back).
+   *
+   * @param {string} type
+   * @returns {number}
+   */
+  dropKind(type) {
+    if (typeof type !== 'string' || !type || isAuditKind(type)) return 0;
+    const before = this.#events.length;
+    this.#events = this.#events.filter((e) => e.type !== type);
+    const dropped = before - this.#events.length;
+    if (dropped) { this.#changed(); this.#persist(this.#events.slice()).catch(() => {}); }
+    return dropped;
+  }
+
+  /**
    * COMPACT named entries in place — the ONE way a RECORD-class entry ever changes after it was written, and
    * only for a set the FOLD computed (L121: `member-props` statements every device agrees are dead —
    * `rosterFold.superseded`). The entry is not dropped: dropping it would shorten the author's chain and move

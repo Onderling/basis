@@ -1,0 +1,158 @@
+{
+  "addItem": {
+    "what": "Zet iets op een lijst van het huishouden.",
+    "params": {"type": "op welke lijst", "text": "wat erop komt"}
+  },
+  "listOpenItems": {
+    "what": "Laat zien wat er open staat op een lijst van het huishouden.",
+    "params": {"type": "welke lijst"}
+  },
+  "markComplete": {
+    "what": "Vink iets af.",
+    "params": {"match": "welke, of een woord eruit"}
+  },
+  "removeItem": {
+    "what": "Haal iets voorgoed weg.",
+    "params": {"match": "welke, of een woord eruit"}
+  },
+  "registerName": {
+    "what": "Zeg hoe je heet in het huishouden.",
+    "params": {"text": "je naam"}
+  },
+  "revokeDevice": {
+    "what": "Trek een apparaat in: het kan niet meer namens je handelen.",
+    "params": {"mnemonic": "je herstelzin", "deviceId": "welk apparaat"}
+  },
+  "pairCirclePeer": {
+    "what": "Koppel een ander apparaat rechtstreeks aan een kring.",
+    "params": {"circle": "welke kring", "addr": "het adres van dat apparaat"}
+  },
+  "stashEnrollOffer": {
+    "what": "Bewaar het aanbod van je andere apparaat, om dit apparaat toe te voegen.",
+    "params": {"offer": "het aanbod"}
+  },
+  "bindCirclePersona": {
+    "what": "Kies als welke persona je in een kring zit.",
+    "params": {"circleId": "welke kring", "personaId": "welke persona", "relayUrl": "via welk verbindingspunt"}
+  },
+  "claimCompanion": {
+    "what": "Neem je metgezel in gebruik met de code uit zijn log.",
+    "params": {"claim": "de code"}
+  },
+  "companionGrantChoices": {
+    "what": "Laat zien wat je metgezel een ander kan laten doen.",
+    "params": {"node": "welke metgezel"}
+  },
+  "grantCompanion": {
+    "what": "Laat een ander, zoals een huishoudbotje, iets doen op je metgezel.",
+    "params": {"node": "welke metgezel", "to": "wie", "families": "wat ze mogen doen"}
+  },
+  "companionGrantList": {
+    "what": "Laat zien wie wat mag op je metgezel.",
+    "params": {"node": "welke metgezel"}
+  },
+  "revokeCompanionGrant": {
+    "what": "Neem iemand de rechten op je metgezel af.",
+    "params": {"to": "wie", "node": "welke metgezel"}
+  },
+  "listRecoveryCircles": {
+    "what": "Laat zien welke kringen een herstelbestand zou meenemen.",
+    "params": {}
+  },
+  "exportRecoveryFile": {
+    "what": "Maak een herstelbestand, zodat je kringen terugkomen op een nieuw apparaat.",
+    "params": {"rosters": "van welke kringen de leden mee moeten"}
+  },
+  "listReceivablePersonas": {
+    "what": "Laat je persona's zien die dit apparaat nog niet heeft.",
+    "params": {}
+  },
+  "removePersonaHere": {
+    "what": "Haal een persona van dit apparaat.",
+    "params": {"mnemonic": "je herstelzin", "personaId": "welke persona"}
+  },
+  "ownSpineOutbox": {
+    "what": "Laat zien wat dit apparaat nog door je hoofdapparaat moet laten tekenen.",
+    "params": {}
+  },
+  "setNearbyLevel": {
+    "what": "Kies hoeveel mensen in de buurt van je zien.",
+    "params": {"personaId": "welke persona", "level": "hoeveel"}
+  },
+  "listPersonasHere": {
+    "what": "Laat de persona's op dit apparaat zien.",
+    "params": {}
+  },
+  "pausePersona": {
+    "what": "Zet een persona op dit apparaat even stil.",
+    "params": {"personaId": "welke persona"}
+  },
+  "resumePersona": {
+    "what": "Laat een stilgezette persona weer lopen.",
+    "params": {"personaId": "welke persona"}
+  },
+  "markRead": {
+    "what": "Onthoud wat je hebt gelezen.",
+    "params": {"group": "in welke kring", "read": "tot waar", "selfId": "als welke persona"}
+  },
+  "listReadMarks": {
+    "what": "Laat zien tot waar je hebt gelezen.",
+    "params": {}
+  },
+  "receivePersonas": {
+    "what": "Zet persona's die je al hebt ook op dit apparaat.",
+    "params": {"mnemonic": "je herstelzin", "personas": "welke persona's"}
+  },
+  "importRecoveryFile": {
+    "what": "Haal je kringen terug uit een herstelbestand.",
+    "params": {"file": "het herstelbestand"}
+  },
+  "restoreStatus": {
+    "what": "Laat zien wat er terugkwam na het herstellen.",
+    "params": {}
+  },
+  "restoreSource": {
+    "what": "Kies waar je kringen vandaan komen als er niets terugkwam.",
+    "params": {"source": "een bestand, of later", "file": "het herstelbestand"}
+  },
+  "restoreIntent": {
+    "what": "Zeg wat er met je oude apparaat is: kapot, kwijt, of je voegt er een toe.",
+    "params": {"intent": "kapot, kwijt of erbij"}
+  },
+  "replaceDevice": {
+    "what": "Vervang een apparaat dat kapot of kwijt is.",
+    "params": {"mnemonic": "je herstelzin"}
+  },
+  "enrollDevice": {
+    "what": "Voeg dit apparaat toe aan je andere apparaten.",
+    "params": {"mnemonic": "je herstelzin", "label": "hoe het apparaat heet", "personas": "welke persona's erop komen", "withDefault": "ook je standaardpersona"}
+  },
+  "buildEnrollOffer": {
+    "what": "Maak een aanbod om een nieuw apparaat toe te voegen.",
+    "params": {"relayUrl": "via welk verbindingspunt"}
+  },
+  "revealOwnerPhrase": {
+    "what": "Laat je herstelzin zien.",
+    "params": {}
+  },
+  "restoreOwnerPhrase": {
+    "what": "Herstel wie je bent met je herstelzin.",
+    "params": {"mnemonic": "je herstelzin"}
+  },
+  "restoreFromMnemonicWizard": {
+    "what": "Herstel alles met je herstelzin; wat hier staat wordt vervangen.",
+    "params": {}
+  },
+  "grantSurface": {
+    "what": "Laat een scherm of apparaat namens je handelen, binnen wat je aanvinkt.",
+    "params": {"viewPubKey": "welk scherm", "ops": "wat het mag doen", "reads": "wat het mag zien", "label": "hoe het heet", "nonce": "de code van het koppelen"}
+  },
+  "revokeSurface": {
+    "what": "Ontkoppel een scherm: het kan niets meer namens je.",
+    "params": {"viewPubKey": "welk scherm"}
+  },
+  "listSurfaceGrants": {
+    "what": "Laat de gekoppelde schermen zien en wat ze mogen.",
+    "params": {}
+  }
+}

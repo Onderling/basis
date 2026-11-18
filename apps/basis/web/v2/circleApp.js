@@ -147,6 +147,7 @@ import { caretakerNotice } from '../../src/v2/caretakerNotice.js';
 import { scopeCatalogueToApps } from '../../src/v2/circleCatalogueScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
+import { gateRefusalKey } from '../../src/v2/circleActGate.js';   // a refusal's words, the same for a typed line and a tap
 // B · (4c) — the member's capability matrix drives affordance greying/hiding on reply buttons.
 import { buildCapabilityMatrix } from '@onderling/app-manifest';
 // D / consumer-switch — select the projected PAGE surface (renderWeb) for
@@ -2730,7 +2731,7 @@ function buildCircleBot(agent) {
       // dispatch itself was not — an op could still run when invoked directly.
       const denyCode = await circleCapabilityDeny(route.appOrigin, route.opId, route.args);
       if (denyCode) {
-        _circleRender?.botBubble(t(denyCode === 'app-disabled' ? 'circle.gate.appDisabled' : 'circle.gate.capabilityDenied'));
+        _circleRender?.botBubble(t(gateRefusalKey(denyCode)));
         return;
       }
       let reply;
@@ -6129,6 +6130,15 @@ function openListsPanel(circleId) {
 
 // A CIRCLE'S LISTS: make a list, add an entry, tick one off (the lists' own ops, through the waist). One body, painted
 // by the circle's Lists tab and by the panel the circle's menu opens.
+/**
+ * A person's tap that the circle refused (its capability set, asked at the outer waist: L1042) is told in the SAME
+ * words as a typed line the gate refuses, in the circle's thread. Returns the result unchanged.
+ */
+function toldTap(r) {
+  if (r?.refusal?.layer === 'availability') _circleRender?.botBubble?.(t(gateRefusalKey(r.refusal.code)));
+  return r;
+}
+
 function renderListsInto(body, circleId) {
   let openListId = null;     // null = the container index; an id = that container's card
   let pendingAddTo = null;   // container node id awaiting an inline add-input
@@ -6165,8 +6175,9 @@ function renderListsInto(body, circleId) {
             // THROUGH THE WAIST — the same op the "+" and a typed command dispatch. The panel used to
             // call the service directly, so "screen ≡ chat ≡ +" was a claim rather than a fact: three
             // doors into one feature, only two of which went through the contract.
-            if (op === 'markComplete') await rawCallSkill('lists', 'markListItemDone', { circleId, item: node.id });
-            else if (op === 'removeItem') await svc.remove(circleId, node.id);
+            // a person's tap: it names its door, so the circle's capability set is asked at the waist (L1042)
+            if (op === 'markComplete') toldTap(await rawCallSkill('lists', 'markListItemDone', { circleId, item: node.id }, { door: 'tap' }));
+            else if (op === 'removeItem') toldTap(await rawCallSkill('lists', 'removeFromList', { circleId, item: node.id }, { door: 'tap' }));
             draw();
           },
         }));
@@ -6198,7 +6209,7 @@ function renderListsInto(body, circleId) {
           const v = addInput.value.trim(); const target = pendingAddTo; const hint = pendingHint;
           pendingAddTo = null; pendingHint = null;
           if (v && target) {
-            await rawCallSkill('lists', 'addToList', { circleId, list: target, text: v, ...(hint ? { kind: hint } : {}) });
+            toldTap(await rawCallSkill('lists', 'addToList', { circleId, list: target, text: v, ...(hint ? { kind: hint } : {}) }, { door: 'tap' }));
           }
           draw();
         });
@@ -6237,7 +6248,7 @@ function renderListsInto(body, circleId) {
       if (!v) return;
       // A board is a container with no default child; the op takes the kind so both go one way.
       if (kind === 'board') await svc.createBoard(circleId, v);
-      else await rawCallSkill('lists', 'createList', { circleId, text: v });
+      else toldTap(await rawCallSkill('lists', 'createList', { circleId, text: v }, { door: 'tap' }));
       input.value = ''; draw();
     };
     form.addEventListener('submit', (e) => { e.preventDefault(); submit('list'); });
@@ -8106,14 +8117,14 @@ function showCircle(id, circle, policy) {
         });
         if (r.ok && r.toPubKey) openThreadWith = r.toPubKey;
       } else if (action === 'cancel') {
-        await pinboardCall('pinboard', 'cancelRequest', { requestId: post.id });
+        toldTap(await pinboardCall('pinboard', 'cancelRequest', { requestId: post.id }, { door: 'tap' }));
       } else if (action === 'report') {
         // §8 unification — a post report is now a governance report event (propagates +
         // shows in the governance Reports section + act→remove), not the older reportPost item.
         const reason = (globalThis.prompt?.(t('circle.governance.report_reason_prompt')) ?? '') || '';
         await fileCircleReport(id, 'post', post.id, (post.text || '').slice(0, 48), reason);
       } else if (action === 'markReturned') {
-        await pinboardCall('pinboard', 'markReturned', { requestId: post.id });
+        toldTap(await pinboardCall('pinboard', 'markReturned', { requestId: post.id }, { door: 'tap' }));
       } else if (action === 'askMatch' && match) {
         // Ask: the contact thread with the person who offers it (nothing is sent until I write)
         const choice = (post.matches ?? []).find((m) => m.webid === match);
@@ -8126,7 +8137,7 @@ function showCircle(id, circle, policy) {
       } else if (action === 'skipMatch' && match) {
         await askMatchSkips.add(post.id, match);
       } else if (action === 'accept' && responder) {
-        await pinboardCall('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
+        toldTap(await pinboardCall('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder }, { door: 'tap' }));
       } else if (action === 'mute') {
         // BLOCK this person — both halves, one act: their envelopes are refused at this device's
         // boundary AND their posts stop showing here. Keyed on the WEBID, which is what makes it a
@@ -8140,7 +8151,7 @@ function showCircle(id, circle, policy) {
         // S3 #4 — lender assigns a borrower to a lend post.
         const borrowerWebid = (globalThis.prompt?.(t('circle.noticeboard.assign_prompt')) || '').trim();
         if (!borrowerWebid) return;
-        await pinboardCall('pinboard', 'assignLend', { itemId: post.id, borrowerWebid });
+        toldTap(await pinboardCall('pinboard', 'assignLend', { itemId: post.id, borrowerWebid }, { door: 'tap' }));
       }
     } catch { /* best-effort; the reload reflects the real state */ }
     await loadNoticeboard();
@@ -9806,6 +9817,12 @@ async function boot() {
         } catch { return null; }   // any failure → local-only (honest degrade)
       },
       getActiveCircleId: getActiveCircle,            // per-circle store scoping — the active circle scopes chat ops
+      // a person's write in a circle asks that circle's capability set at the outer waist (L1042): this shell hands in
+      // only its stores; the decision is the agent's (`circleActGate.js`)
+      circleCapabilityInputs: async (circleId) => ({
+        policy: (await policyStore.get(circleId).catch(() => null)) ?? {},
+        override: (await overrideStore.get(circleId).catch(() => null)) ?? {},
+      }),
       // household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.
     });

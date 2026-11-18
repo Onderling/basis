@@ -81,6 +81,9 @@ export function doorOnly(ctx) {
 
 /** The doors a person comes through: a call naming one of these is theirs; `unknown` is no door. */
 const PERSON_DOORS = new Set(DOORS.filter((d) => d !== 'unknown'));
+/** Is this a door a person acts through (not 'unknown', which a door-less call is)? The ONE reading the own record and the
+ *  circle's capability check at the outer waist share (`circleActGate.js`). */
+export const isPersonDoor = (door) => PERSON_DOORS.has(door);
 
 /**
  * Is this call one of the person's own acts? Only a call that NAMES a person door (`ctx.door`: tap, slash, phrase,

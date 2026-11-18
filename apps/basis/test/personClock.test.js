@@ -66,10 +66,12 @@ describe('the person\'s clock', () => {
     const store = createOwnDevicesStore({ dataSource: memoryDataSource() });
     await store.put({ type: 'intention', trigger: { at: new Date(Date.now() - 60_000).toISOString() }, op: 'weekCard', appOrigin: 'basis', args: {}, actsAs: 'me-person', state: 'open', createdAt: new Date(Date.now() - 3_600_000).toISOString() }, { by: 'me-person' });
     const calls = [];
-    const agent = { ownStore: async () => store, identity: { chat: { pubKey: 'me-person' } }, callSkill: async (app, op, args) => { calls.push({ app, op, args }); return { ok: true }; } };
+    const agent = { ownStore: async () => store, identity: { chat: { pubKey: 'me-person' } }, callSkill: async (app, op, args, ctx) => { calls.push({ app, op, args, ctx }); return { ok: true }; } };
     const clock = await createPersonClock({ agent, log: new EventLog({ initial: [], muted: [] }), tz: 'Europe/Amsterdam', AppState: fakeAppState('active') });
     await clock.start();
     expect(calls.map((c) => `${c.app}.${c.op}`)).toEqual(['basis.weekCard']);
+    // the person's own record names the door: their clock, not a tap
+    expect(calls[0].ctx).toEqual({ door: 'clock' });
     expect(clock.tick.names()).toEqual(['intentions']);
     clock.stop();
   });

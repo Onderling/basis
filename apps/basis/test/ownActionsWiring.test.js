@@ -17,12 +17,13 @@ const boot = (deviceLog) => createRealHouseholdAgent({
 const own = (log) => log.query().reverse().filter((e) => e.type === OWN_ACTION_KIND).map((e) => `${e.payload.app}.${e.payload.op}:${e.payload.outcome}`);
 
 describe('own acts at the outer waist', () => {
-  it('a setting changed and a profile written each land one entry; reads a screen makes land none; no agent-action for the owner', async () => {
+  it('a setting a door names lands one entry, a door-less one none; reads a screen makes land none; no agent-action for the owner', async () => {
     const deviceLog = new EventLog({ initial: [], muted: [] });
     const a = await boot(deviceLog);
     const before = own(deviceLog).length;
-    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 123_000 });   // answered by callSkill itself
-    await a.callSkill('pinboard', 'listMyCircles', {});                                           // a paint read: not an act
+    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 123_000 }, { door: 'tap' });   // answered by callSkill itself
+    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 124_000 });                    // no door: background, not recorded
+    await a.callSkill('pinboard', 'listMyCircles', {}, { door: 'tap' });                          // a paint read: not an act
     await a.callSkill('pinboard', 'whoAmI', {});                                                  // a paint read
     await a.callSkill('pinboard', 'listMyCircles', {}, { door: 'slash' });                         // a read the person asked for
     const rows = own(deviceLog).slice(before);
@@ -34,9 +35,9 @@ describe('own acts at the outer waist', () => {
   it('an act in a circle lands with that circle, whichever name the op gives it (groupId to make it, circleId to add a line)', async () => {
     const deviceLog = new EventLog({ initial: [], muted: [] });
     const a = await boot(deviceLog);
-    const made = await a.callSkill('pinboard', 'createGroupV2', { groupId: 'thuis', name: 'Thuis', rules: { text: 't' } });
+    const made = await a.callSkill('pinboard', 'createGroupV2', { groupId: 'thuis', name: 'Thuis', rules: { text: 't' } }, { door: 'tap' });
     expect(made?.ok ?? true, JSON.stringify(made)).not.toBe(false);
-    await a.callSkill('lists', 'addToList', { circleId: 'thuis', item: 'melk' });
+    await a.callSkill('lists', 'addToList', { circleId: 'thuis', item: 'melk' }, { door: 'phrase' });
     const rows = deviceLog.query().reverse().filter((e) => e.type === OWN_ACTION_KIND).map((e) => [e.payload.op, e.circleId]);
     expect(rows).toEqual(expect.arrayContaining([['createGroupV2', 'thuis'], ['addToList', 'thuis']]));
     expect(JSON.stringify(deviceLog.query().filter((e) => e.type === OWN_ACTION_KIND))).not.toContain('melk');
@@ -46,16 +47,16 @@ describe('own acts at the outer waist', () => {
     const deviceLog = new EventLog({ initial: [], muted: [] });
     const a = await boot(deviceLog);
     const before = own(deviceLog).length;
-    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 99_000 }, { caller: 'someone-else' }).catch(() => null);
+    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 99_000 }, { caller: 'someone-else', door: 'bot' }).catch(() => null);
     expect(own(deviceLog).slice(before)).toEqual([]);
   });
 
   it('the switch off writes nothing from then on (switching it off is the last act recorded)', async () => {
     const deviceLog = new EventLog({ initial: [], muted: [] });
     const a = await boot(deviceLog);
-    await a.callSkill('params', 'set-param', { key: OWN_RECORD_KEY, value: false });
+    await a.callSkill('params', 'set-param', { key: OWN_RECORD_KEY, value: false }, { door: 'tap' });
     const before = own(deviceLog).length;
-    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 77_000 });
+    await a.callSkill('params', 'set-param', { key: 'nearby.ask.defaultTtlMs', value: 77_000 }, { door: 'tap' });
     expect(own(deviceLog).slice(before)).toEqual([]);
   });
 });

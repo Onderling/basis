@@ -21,7 +21,7 @@
   },
   "entryReminders": {
     "what": "Stel in wanneer iedereen aan een regel wordt herinnerd.",
-    "params": { "item": "welke regel", "reminders": "wanneer, bijvoorbeeld 60 of ochtend", "list": "op welke lijst" }
+    "params": { "item": "welke regel", "reminders": "wanneer, bijvoorbeeld 60 minuten ervoor of ochtend", "list": "op welke lijst" }
   },
   "shopVisit": {
     "what": "Laat zien wat je in een winkel nodig hebt.",

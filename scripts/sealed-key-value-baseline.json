@@ -93,7 +93,7 @@
   },
   "apps/basis/src/v2/screenView.js": {
     "count": 2,
-    "note": "debt: onderling.screen.<bot> — a screen's GRANT, including its capability tokens to act as the person at the bot (a credential)"
+    "note": "not sealable: onderling.screen.<bot> — a screen's grant, including its capability tokens to act as the person at the bot; a screen has no content key at all (its own key sits in the same storage), so it is a bearer device by design, as the client notes tell toolbox builders"
   },
   "apps/basis/src/v2/themePref.js": {
     "count": 1,

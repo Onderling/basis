@@ -20,11 +20,15 @@ import { sealedJsonIo } from './localStoreSeal.js';
 
 export const CIRCLE_SEEN_AT_KEY = 'cc.circleSeenAt';
 
-/** The marks' sealed io, over localStorage (web) or AsyncStorage (phone). */
+/**
+ * The marks' sealed io, over localStorage (web) or AsyncStorage (phone). `load` THROWS when the marks could not be read
+ * (a storage error, no content key yet) and answers `null` when the storage answered with nothing readable — nothing
+ * stored, or a value that will not open with this key; then starting from `{}` is right.
+ */
 export function circleSeenMarksIo(storage) {
   const io = sealedJsonIo(storage);
   return {
-    load: () => io.load(CIRCLE_SEEN_AT_KEY),
+    load: () => io.loadOrThrow(CIRCLE_SEEN_AT_KEY),
     save: async (map) => { try { await io.save(CIRCLE_SEEN_AT_KEY, map); } catch { /* no content key yet: kept in memory */ } },
   };
 }
@@ -41,10 +45,14 @@ export function createCircleSeenMarks({ load, save } = {}, { now = () => Date.no
   return {
     /** The marks as held, or `null` while not known yet. */
     current: () => held,
-    /** Read the stored marks (call once the content key exists); applies opens made before, and writes only then. */
+    /**
+     * Read the stored marks (call once the content key exists); applies opens made before, and writes only then. A read
+     * that FAILED (the io threw) is not "nothing stored": the marks stay `null` (not known — no counts), the early opens
+     * are kept, nothing is written, and `load` can be called again. Only a read that answered sets the marks.
+     */
     async load() {
       let stored = null;
-      try { stored = await load?.(); } catch { stored = null; }
+      try { stored = await load?.(); } catch { return held; }
       let map = (stored && typeof stored === 'object' && !Array.isArray(stored)) ? { ...stored } : {};
       const before = pending; pending = [];
       for (const [id, ts] of before) map = bumpSeenAt(map, id, ts);

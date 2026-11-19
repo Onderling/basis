@@ -38,8 +38,10 @@ export function createCirclePinStore({ load, save } = {}) {
         // Defensive: ignore malformed ids; never write garbage to storage.
         return await this.get();
       }
-      const current = await this.get();
-      const next = { ...current };
+      // a read that FAILED is not "no pins": write nothing, so a one-pin map never lands over the person's pins
+      let raw;
+      try { raw = typeof load === 'function' ? await load() : null; } catch { return await this.get(); }
+      const next = { ...normalizePinnedMap(raw) };
       if (next[id]) delete next[id];
       else next[id] = true;
       if (typeof save === 'function') await save(next);
@@ -61,13 +63,11 @@ export function localStoragePinIo(storage = globalThis.localStorage) {
   // key WAITS for it: pins not known yet are not "no pins", and a toggle before it never writes a fresh map over them.
   const kv = sealedKeyValue(storage, { name: 'the circle pins', strict: true, waitForKey: true });
   return {
+    // a storage error comes through (the store tells "could not read" from "nothing pinned"); not JSON / not openable
+    // with this key reads as nothing
     load: async () => {
-      try {
-        const s = await kv.getItem(KEY);
-        return s ? JSON.parse(s) : null;
-      } catch {
-        return null;
-      }
+      const s = await kv.getItem(KEY);
+      try { return s ? JSON.parse(s) : null; } catch { return null; }
     },
     save: async (value) => {
       try { await kv.setItem(KEY, JSON.stringify(value)); }

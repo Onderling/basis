@@ -48,16 +48,24 @@ export function totalUnread(map) {
 
 /**
  * The seen-marks, on this device. `io` is `{ getItem(key), setItem(key, value) }`, sync or async (localStorage,
- * AsyncStorage). A mark only ever moves forward; a value that is not JSON reads as empty.
+ * AsyncStorage). A mark only ever moves forward; a value that is not JSON reads as empty. A read that FAILED (the
+ * storage threw) is not "nothing seen": `read` gives `null` (not known — no counts) and `mark` writes nothing, so a
+ * one-contact map never lands over the person's marks.
  */
 export function makeContactSeenStore(io) {
+  async function readOrThrow() {
+    const raw = await io.getItem(CONTACT_SEEN_KEY);   // a storage error comes through
+    let v = {};
+    try { v = raw ? JSON.parse(raw) : {}; } catch { v = {}; }
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  }
   async function read() {
-    try { const raw = await io.getItem(CONTACT_SEEN_KEY); const v = raw ? JSON.parse(raw) : {}; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
-    catch { return {}; }
+    try { return await readOrThrow(); } catch { return null; }
   }
   async function mark(contactId, ts = Date.now()) {
     if (typeof contactId !== 'string' || !contactId) return;
-    const map = await read();
+    let map;
+    try { map = await readOrThrow(); } catch { return; }   // not read: write nothing over the marks
     if (typeof map[contactId] === 'number' && map[contactId] >= ts) return;
     map[contactId] = ts;
     try { await io.setItem(CONTACT_SEEN_KEY, JSON.stringify(map)); } catch { /* quota / disabled: the badge stays, nothing breaks */ }

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { groupKeyStrategy } from '@onderling/pod-client';
-import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
+import { setShellContentSeal, sealedJsonIo } from '../../src/v2/localStoreSeal.js';
 import { createCircleSeenMarks, circleSeenMarksIo } from '../../src/v2/circleSeenMarks.js';
 import { bumpSeenAt, buildTilePreviews } from '../../src/v2/circleTilePreviews.js';
 import { buildContactUnread, sealedContactSeenStore } from '../../src/v2/contactUnread.js';
@@ -117,5 +117,62 @@ describe('sealed at rest', () => {
     seal();
     await r;
     expect(pins['circle-of-henk']).toBe(true);
+  });
+});
+
+describe('a read that FAILED is not "nothing stored" (no write of an empty map over the marks)', () => {
+  // a storage whose reads throw (a disk / quota / bridge error) while its writes still land
+  function failingReads(initial = {}) {
+    const m = new Map(Object.entries(initial));
+    const writes = [];
+    return { getItem: () => { throw new Error('read failed'); }, setItem: (k, v) => { writes.push(k); m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); }, _m: m, writes };
+  }
+
+  it('sealedJsonIo.loadOrThrow: a storage error comes through; nothing stored and not openable answer null', async () => {
+    seal();
+    await expect(sealedJsonIo(failingReads()).loadOrThrow('k')).rejects.toThrow('read failed');
+    expect(await sealedJsonIo(storage()).loadOrThrow('k')).toBeNull();
+    const other = storage();
+    other._m.set('k', groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(1)).toString('base64url') }).seal('{"a":1}'));
+    expect(await sealedJsonIo(other).loadOrThrow('k')).toBeNull();
+  });
+
+  it('circle marks: a load whose read throws keeps them "not known", keeps the early open, writes nothing, and can run again', async () => {
+    let fail = true;
+    const saves = [];
+    const marks = createCircleSeenMarks({ load: async () => { if (fail) throw new Error('read failed'); return { a: 100 }; }, save: async (m) => { saves.push(m); } });
+    await marks.open('c', 300);
+    expect(await marks.load()).toBeNull();
+    expect(marks.current()).toBeNull();
+    await marks.open('d', 400);
+    expect(saves).toEqual([]);
+    fail = false;
+    expect(await marks.load()).toEqual({ a: 100, c: 300, d: 400 });
+    expect(saves).toEqual([{ a: 100, c: 300, d: 400 }]);
+  });
+
+  it('circle marks over the sealed io: a storage read error is not an empty map', async () => {
+    seal();
+    const s = failingReads();
+    const marks = createCircleSeenMarks(circleSeenMarksIo(s));
+    await marks.load();
+    expect(marks.current()).toBeNull();
+    await marks.open('c', 1);
+    expect(s.writes).toEqual([]);
+  });
+
+  it('contact marks: a read error gives null (not known) and a mark writes nothing', async () => {
+    seal();
+    const s = failingReads();
+    expect(await sealedContactSeenStore(s).read()).toBeNull();
+    await sealedContactSeenStore(s).mark('contact-henk', 5);
+    expect(s.writes).toEqual([]);
+  });
+
+  it('pins: a read error does not let a toggle write a one-pin map over the pins', async () => {
+    seal();
+    const s = failingReads();
+    await createCirclePinStore(localStoragePinIo(s)).toggle('circle-of-henk');
+    expect(s.writes).toEqual([]);
   });
 });

@@ -14,6 +14,10 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   The same answer in words, at every door (also Basis's own bot thread, which has no buttons yet): the list is
   numbered, and `2` or `kies 2` picks the second thing of the LAST list shown in that thread. A number with no list
   open there is an ordinary line. The same thing again raises its quantity.
+  Where a door shows pictures (Telegram), the box fetches each thing's picture from the toolbox's own host and each
+  thing comes as a photo card with its number and button, at most 3 per shop; the rest of that shop sits behind one
+  button, "Meer van <winkel> (n)" (`/meer`, `tools.moreThings`), which shows the next ones from the list already
+  fetched, each with its own number. A door without pictures shows the whole list in words.
 - **A housemate** sees which toolboxes are on, and their words, in `/help` and the welcome.
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches
@@ -34,7 +38,7 @@ was started 2026-11-18 with the first toolbox, a grocery search.
 - The operator's step: `deploy/roles/assistant.yml` (the files in the service's data volume).
 
 <!-- catalogue-ops
-tools: useTool pickThing listTools addToolbox removeToolbox
+tools: useTool pickThing moreThings listTools addToolbox removeToolbox
 assistant: assistant-toolbox
 -->
 

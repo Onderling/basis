@@ -174,14 +174,27 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         if (head.length) await say(chatId, head.join('\n'));
         const buttonsOf = (it) => (it.buttons ?? []).filter(onMap).map((b) => ({ id: b.callbackData, label: b.label }));
         const groups = rendered.groups ? [...rendered.groups, null] : [null];
-        for (const g of groups) {
-          const mine = items.map((it, i) => ({ it, n: i + 1 })).filter(({ it }) => (rendered.groups ? (it.group ?? null) === g : true));
+        for (const [gi, g] of groups.entries()) {
+          const mine = items.map((it, i) => ({ it, n: it.n ?? i + 1 })).filter(({ it }) => (rendered.groups ? (it.group ?? null) === g : true));
           if (!mine.length) continue;
           if (g) await say(chatId, `${g}:`);
-          const cards = mine.filter(({ it }) => it.thumb).slice(0, CARDS_PER_GROUP);
-          for (const { it, n } of cards) await bridge.sendPhoto({ chatId, photo: Buffer.from(it.thumb.data, 'base64'), caption: `${n}. ${it.label}`, buttons: buttonsOf(it) });
-          const rest = mine.filter((x) => !cards.includes(x));
-          if (rest.length) await say(chatId, rest.map(({ it, n }) => `${n}. ${it.label}`).join('\n'), rest.flatMap(({ it, n }) => buttonsOf(it).map((b) => ({ ...b, label: `${b.label}: ${n}` }))));
+          // the first CARDS_PER_GROUP things of the shop: a card where the box brought a picture, a line where not
+          const shown = mine.slice(0, CARDS_PER_GROUP);
+          for (const { it, n } of shown) {
+            if (it.thumb) await bridge.sendPhoto({ chatId, photo: Buffer.from(it.thumb.data, 'base64'), caption: `${n}. ${it.label}`, buttons: buttonsOf(it) });
+            else await say(chatId, `${n}. ${it.label}`, buttonsOf(it).map((b) => ({ ...b, label: `${b.label}: ${n}` })));
+          }
+          // the rest of the shop behind ONE "meer" (Frits): a line like 'Ververs', decided by the gate, to the read of the
+          // kept list (`tools.moreThings`, no new fetch); the button names the kept list, the shop and where to go on
+          const rest = mine.length - shown.length;
+          const tag = String(mine[0].it.id ?? '').split('.')[0];
+          const page = rendered.page ?? null;
+          const shop = page ? page.group : gi;
+          const from = (page ? page.from : 0) + shown.length;
+          const more = `/meer ${tag} ${shop} ${from}`;
+          if (rest > 0 && tag && new TextEncoder().encode(more).length <= 64) {
+            await say(chatId, tc(chatId)('circle.telegram.more_of_line', { n: rest }), [{ id: more, label: tc(chatId)('circle.telegram.more_of', { shop: g ?? rendered.title ?? '', n: rest }) }]);
+          }
         }
         return;
       }

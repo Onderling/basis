@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, toolChoiceGateRule } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -1423,6 +1423,8 @@ if (tgToken || inboxDoor.bridge) {
     },
     // the answer to "which one" after a list of things (the row's button, `/kies <n>`), in the person's own language
     pickThing: (args, ctx) => pickThing(args, ctx, (k, p) => t(k, p, ctx?.lang ?? undefined)),
+    // "meer" under a shop's cards: the rest of that shop from the kept list, in the person's own language
+    moreThings: (args, ctx) => makeMoreThings({ keeper: toolChoices, t: (k, p) => t(k, p, ctx?.lang ?? undefined) })(args, ctx),
     // which toolboxes are on, in words wherever it is painted (a screen too, never a bare tick): `/toolbox`'s own wording
     listTools: async (args, ctx) => {
       const r = await toolboxes.listTools(args);

@@ -9,7 +9,7 @@ import { InMemoryBridge } from '@onderling/chat-agent';
 import { mergeManifests } from '../../src/manifestMerge.js';
 import { toolsManifest } from '../../src/v2/toolsManifest.js';
 import { createTelegramRunner } from '../../src/telegram/runner.js';
-import { toolboxGateRule, toolChoicesReply, makeChoiceKeeper } from '../../src/v2/toolboxes.js';
+import { toolboxGateRule, toolChoicesReply, makeChoiceKeeper, makeMoreThings } from '../../src/v2/toolboxes.js';
 
 const t = (k, v) => (k === 'circle.bot.toolbox_found_row' ? `${v.label} · ${v.more}` : (v ? `${k} ${JSON.stringify(v)}` : k));
 const THUMB = { mime: 'image/jpeg', data: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1]).toString('base64') };
@@ -45,5 +45,38 @@ describe('a toolbox\'s things: cards where a door shows pictures, words where it
     expect(photos.map((p) => p.caption)).toEqual([expect.stringMatching(/^1\. Halfvolle melk/), expect.stringMatching(/^2\. Jumbo halfvolle melk/)]);
     expect(photos.every((p) => Buffer.from(p.photo).length > 0 && p.buttons.length === 1)).toBe(true);
     expect(bridge.outbox.map((m) => m.text)).toEqual(['Boodschappen:', 'Albert Heijn:', 'Jumbo:']);
+  });
+
+  it('more than 3 from one shop: 3 cards and ONE "meer" button; its tap shows the next ones with their own numbers (Frits)', async () => {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const photos = [];
+    bridge.sendPhoto = async (o) => { photos.push(o); };
+    const five = [1, 2, 3, 4, 5].map((i) => ({ label: `Melk ${i}`, seller: 'Jumbo', thumb: THUMB }));
+    const keeper = makeChoiceKeeper();
+    const moreThings = makeMoreThings({ keeper, t });
+    const callSkill = async (_app, op, args, ctx) => {
+      if (op === 'useTool') return toolChoicesReply({ ok: true, title: 'Boodschappen', items: five }, { threadId: ctx?.threadId ?? 'x', keeper, t });
+      if (op === 'moreThings') return moreThings(args, ctx);
+      return { ok: false };
+    };
+    const gateRules = [toolboxGateRule(() => [{ word: 'zoek', toolbox: 'boodschappen', tool: 'products.choices', field: 'query' }])];
+    const runner = createTelegramRunner({ bridge, t, collectMs: 0, catalogue: mergeManifests([{ manifest: toolsManifest }]), manifestsByOrigin: { tools: toolsManifest }, callSkill, gateRules });
+    await runner.start();
+    await bridge.simulateIncoming({ chatId: '9', text: 'zoek melk', sender: { bridgeUid: '9' } });
+    await runner.idle();
+    expect(photos.map((p) => p.caption)).toEqual(['1. Melk 1', '2. Melk 2', '3. Melk 3']);
+    const meer = bridge.outbox.flatMap((m) => m.buttons ?? []).filter((b) => String(b.id).startsWith('/meer '));
+    expect(meer).toHaveLength(1);
+    expect(meer[0].label).toContain('circle.telegram.more_of');
+    expect(Buffer.byteLength(meer[0].id)).toBeLessThanOrEqual(64);
+    // the words of the rest are not painted any more: the button stands for them
+    expect(bridge.outbox.map((m) => m.text).join('\n')).not.toMatch(/4\. Melk 4/);
+    photos.length = 0; bridge.clearOutbox();
+    await bridge.simulateIncoming({ chatId: '9', text: meer[0].id, sender: { bridgeUid: '9' } });
+    await runner.idle();
+    expect(photos.map((p) => p.caption)).toEqual(['4. Melk 4', '5. Melk 5']);
+    expect(bridge.outbox.flatMap((m) => m.buttons ?? []).filter((b) => String(b.id).startsWith('/meer '))).toHaveLength(0);
+    // and a card's own button still picks THAT thing (its number in the kept list)
+    expect(photos[0].buttons[0].id).toMatch(/\.4$/);
   });
 });

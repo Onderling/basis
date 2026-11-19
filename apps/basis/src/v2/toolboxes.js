@@ -272,6 +272,12 @@ export function makeChoiceKeeper({ now = () => Date.now(), keepMs = CHOICE_KEEP 
       const i = Number(n);
       return Number.isInteger(i) && i >= 1 && i <= k.items.length ? k.items[i - 1] : null;
     },
+    /** The thread's kept list itself, when `tag` names it and it is not old: what "meer" pages through. */
+    list(threadId, tag) {
+      const k = kept.get(String(threadId ?? ''));
+      if (!k || now() - k.at > keepMs || String(tag ?? '') !== k.tag) return null;
+      return k.items.slice();
+    },
   };
 }
 
@@ -304,7 +310,38 @@ export function toolChoicesReply(r, { threadId, keeper, t }) {
     ...r,
     title: r.title ?? r.name,
     // the row's id is its button's data: the kept list's tag and the number (`pickThing:<tag>.<n>`)
-    items: items.map((x, i) => ({ id: tag ? `${tag}.${i + 1}` : String(i + 1), type: 'tool-thing', label: thingRow(x, t), ...(x?.seller ? { seller: String(x.seller) } : {}), ...(x?.thumb ? { thumb: x.thumb } : {}) })),
+    items: items.map((x, i) => thingItem(x, i + 1, tag, t)),
+  };
+}
+
+/** A kept thing as a row: its button's data names the kept list and its number (`<tag>.<n>`), and `n` is the number a
+ *  door shows, so a later page ("meer") keeps each thing's own number. */
+function thingItem(x, n, tag, t) {
+  return { id: tag ? `${tag}.${n}` : String(n), n, type: 'tool-thing', label: thingRow(x, t), ...(x?.seller ? { seller: String(x.seller) } : {}), ...(x?.thumb ? { thumb: x.thumb } : {}) };
+}
+
+/**
+ * "Meer van <winkel>" (ledger L1035, Frits): the rest of one shop's things from the thread's KEPT list, from `from` on,
+ * each with its own number, so a typed '7' or a card's button still picks the same thing. A read of what was already
+ * fetched: no new call to the toolbox, nothing leaves. `spec` is `<tag> <shop index> <from>`, the button's own line.
+ * @param {{keeper: ReturnType<typeof makeChoiceKeeper>, t: Function}} o
+ */
+export function makeMoreThings({ keeper, t }) {
+  return async (args, ctx) => {
+    const [tag, gi, from] = String(args?.spec ?? args?._match ?? '').trim().split(/\s+/);
+    const thread = ctx?.threadId ?? ctx?.caller ?? null;
+    const kept = keeper?.list?.(thread, tag);
+    const gone = { ok: false, error: { code: 'list-gone', message: t('circle.bot.toolbox_more_gone') } };
+    if (!kept) return gone;
+    // the shops as the door numbers them: the named ones in the order they first come, things with no shop last
+    const named = [...new Set(kept.map((x) => String(x?.seller ?? '')).filter(Boolean))];
+    const shops = kept.some((x) => !String(x?.seller ?? '')) ? [...named, ''] : named;
+    const g = Number(gi);
+    if (!Number.isInteger(g) || g < 0 || g >= shops.length) return gone;
+    const start = Math.max(0, Number(from) || 0);
+    const rows = kept.map((x, i) => ({ x, n: i + 1 })).filter(({ x }) => String(x?.seller ?? '') === shops[g]).slice(start);
+    if (!rows.length) return gone;
+    return { ok: true, title: shops[g] || null, page: { tag, group: g, from: start }, items: rows.map(({ x, n }) => thingItem(x, n, tag, t)) };
   };
 }
 

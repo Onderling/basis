@@ -6297,6 +6297,10 @@
       "text": "I already use the word '{{word}}' of {{title}} for something else. Choose another word in the file on the box.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_more_gone": {
+      "text": "That list is gone; search again.",
+      "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."
+    },
     "toolbox_found_row": {
       "text": "{{label}} \u00b7 {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
@@ -9950,6 +9954,14 @@
     "empty_list": {
       "text": "Nothing here yet.",
       "doc": "Telegram runner: a list reply with no items."
+    },
+    "more_of": {
+      "text": "More from {{shop}} ({{n}})",
+      "doc": "Telegram: the one button under a shop's photo cards that shows the rest of that shop's things (ledger L1035)."
+    },
+    "more_of_line": {
+      "text": "{{n}} more from this shop:",
+      "doc": "Telegram: the line the more_of button stands under."
     },
     "refresh": {
       "text": "Refresh",

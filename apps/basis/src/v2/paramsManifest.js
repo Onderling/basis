@@ -29,7 +29,7 @@ export const paramsManifest = {
     {
       id:   'set-param',
       verb: 'set-param',
-      writes: { scope: 'circle' },   // widest of what it writes: a param routes by its scope to this device, the person, or the circle
+      writes: { scope: 'circle', what: 'control' },   // widest of what it writes: a param routes by its scope to this device, the person, or the circle
       // The ONE kind-gated write: sets a kind:user param (routed by scope to its home); refuses kind:internal
       // and unknown keys. Reached through the waist so the security gate binds at one place.
       params: [
@@ -62,7 +62,7 @@ export const paramsManifest = {
     {
       id:   'restore-probe',
       verb: 'restore-probe',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'keys' },
       // Re-probe the pod settings medium POST-BOOT. Outcomes: clean (openable, attached, values agree) ·
       // conflicts (openable; the per-param diff rides the result) · undecryptable (sealed under another
       // key — the coarse choice follows) · transport (could not verify; never accuses) · no-medium.
@@ -72,7 +72,7 @@ export const paramsManifest = {
     {
       id:   'restore-merge',
       verb: 'restore-merge',
-      writes: { scope: 'person' },   // adopts the pod's settings values
+      writes: { scope: 'person', what: 'keys' },   // adopts the pod's settings values
       // Apply the per-param choices over the probe's captured conflicts: 'theirs' adopts the pod's value
       // through the ONE kind-gated set-param (so it syncs normally); 'mine' is doing nothing — the local
       // value already stands.
@@ -82,7 +82,7 @@ export const paramsManifest = {
     {
       id:   'restore-resolve-mismatch',
       verb: 'restore-resolve-mismatch',
-      writes: { scope: 'person' },   // 'overwrite' replaces the pod's settings
+      writes: { scope: 'person', what: 'keys' },   // 'overwrite' replaces the pod's settings
       // The coarse choice: 'local' (stay held — the default; nothing is written) · 'phrase' (route to
       // the recovery wizard — the shell launches it off the flow's produce) · 'overwrite' (the one
       // explicit destructive act: this device's settings replace the pod's).

@@ -21,6 +21,7 @@
  * (unchanged). Dedupe is by copy id so a redelivered envelope — or the same copy seen on two devices — never
  * doubles a row.
  */
+import { sealedKeyValue } from './localStoreSeal.js';
 
 export function createSharedWithMeStore({ load, save } = {}) {
   return {
@@ -59,18 +60,20 @@ export function createSharedWithMeStore({ load, save } = {}) {
 /** localStorage-backed IO (web). Single key: `cc.sharedWithMe`. */
 export function localStorageSharedWithMeIo(storage = globalThis.localStorage) {
   const KEY = 'cc.sharedWithMe';
+  // SEALED at rest (ledger L1083: what others shared with the person), on web and phone alike
+  const kv = sealedKeyValue(storage, { name: 'shared with me', strict: true });
   return {
     load: async () => {
       try {
-        const s = storage?.getItem(KEY);
+        const s = await kv.getItem(KEY);
         return s ? JSON.parse(s) : null;
       } catch {
         return null;
       }
     },
     save: async (value) => {
-      try { storage?.setItem(KEY, JSON.stringify(value)); }
-      catch { /* quota / disabled — the list still holds in-memory this session */ }
+      try { await kv.setItem(KEY, JSON.stringify(value)); }
+      catch { /* quota / disabled / no content key yet — the list still holds in-memory this session */ }
     },
   };
 }

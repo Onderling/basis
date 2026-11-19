@@ -295,6 +295,8 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
   // honest and a tampered signature; else tweetnacl stays). Before any store is read, so every check of this run is the fast one.
   { const eq = await installBoxSignatureEquation(nodeCrypto); console.info(`[security] signature equation: ${eq.ok ? eq.name : `tweetnacl (${eq.reason})`}`); }
   { const sg = installBoxSigning(nodeCrypto); console.info(`[security] signing: ${sg.ok ? sg.name : `tweetnacl (${sg.reason})`}`); }
+  // Secretbox stays tweetnacl here: node:crypto offers no XSalsa20-Poly1305 (core `useSecretbox`; the phone installs libsodium).
+  console.info('[security] secretbox: tweetnacl (node:crypto has no XSalsa20-Poly1305)');
   try {
     const forgot = await runPendingForget({
       markerVault: vault,

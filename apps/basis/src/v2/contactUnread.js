@@ -8,6 +8,7 @@
  * VIEW fact of this device — not carried to the siblings (a phone you read on does not silence the laptop; that is a
  * later choice) — read through an injected io so web (localStorage) and mobile (AsyncStorage) run one code.
  */
+import { sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
 
 export const CONTACT_SEEN_KEY = 'cc.contactSeenAt';
 
@@ -25,6 +26,8 @@ export function buildContactUnread({ turns = [], seenAt = {}, readIds = null } =
     const ts = typeof t.receivedAt === 'number' ? t.receivedAt : (typeof t.ts === 'number' ? t.ts : 0);
     const entry = out[id] ?? (out[id] = { unread: 0, lastTs: 0, unreadIds: [] });
     if (ts > entry.lastTs) entry.lastTs = ts;
+    // `seenAt: null` is "the marks are not known yet": no unread is counted, never everything (ledger L1085)
+    if (seenAt === null) continue;
     const seen = typeof seenAt?.[id] === 'number' ? seenAt[id] : -Infinity;
     // …and read on none of my devices (`readMarks.js`: the message id, marked with when it was SENT)
     const mid = typeof t.messageId === 'string' && t.messageId ? t.messageId : null;
@@ -60,4 +63,15 @@ export function makeContactSeenStore(io) {
     try { await io.setItem(CONTACT_SEEN_KEY, JSON.stringify(map)); } catch { /* quota / disabled: the badge stays, nothing breaks */ }
   }
   return { read, mark };
+}
+
+/**
+ * The contact seen-marks, SEALED at rest (ledger L1083), over localStorage (web) or AsyncStorage (phone). A read
+ * before the content key gives `null` — "not known yet", which `buildContactUnread` answers with no unread count, never
+ * "nothing seen" (every contact unread). A `mark` before the key WAITS for it, so the person's look still counts and
+ * it never writes a fresh map over their marks.
+ */
+export function sealedContactSeenStore(storage) {
+  const store = makeContactSeenStore(sealedKeyValue(storage, { name: 'contact seen-marks', strict: true, waitForKey: true }));
+  return { read: async () => (shellContentSeal() ? store.read() : null), mark: store.mark };
 }

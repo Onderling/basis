@@ -1,8 +1,15 @@
 /**
  * β.5 — circlePinStore: per-user "pin to top" map persistence.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
 import { createCirclePinStore, localStoragePinIo } from '../../src/v2/circlePinStore.js';
+import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
+
+// the pins are sealed at rest (ledger L1083): a content key is published, as after a boot
+const SEAL = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(3)).toString('base64url') });
+beforeAll(() => setShellContentSeal(SEAL));
+afterAll(() => setShellContentSeal(null));
 
 describe('createCirclePinStore', () => {
   it('get() returns {} when storage is empty / load returns null', async () => {
@@ -88,6 +95,14 @@ describe('localStoragePinIo', () => {
     await io.save({ c1: true });
     expect(await io.load()).toEqual({ c1: true });
     expect(map.has('cc.circlePinned')).toBe(true);
+  });
+
+  it('an old plain value is read once and resealed', async () => {
+    const map = new Map([['cc.circlePinned', JSON.stringify({ c9: true })]]);
+    const storage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, v) };
+    expect(await localStoragePinIo(storage).load()).toEqual({ c9: true });
+    expect(map.get('cc.circlePinned')).not.toContain('c9');
+    expect(JSON.parse(SEAL.open(map.get('cc.circlePinned')))).toEqual({ c9: true });
   });
 
   it('load returns null for missing / corrupt entries', async () => {

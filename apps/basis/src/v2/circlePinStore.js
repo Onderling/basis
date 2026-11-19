@@ -17,6 +17,7 @@
  * mirror `createCirclePolicyStore` — consumers compose the adapter at
  * the call site.
  */
+import { sealedKeyValue } from './localStoreSeal.js';
 
 export function createCirclePinStore({ load, save } = {}) {
   return {
@@ -56,18 +57,21 @@ export function createCirclePinStore({ load, save } = {}) {
 /** localStorage-backed IO (web).  Single key: `cc.circlePinned`. */
 export function localStoragePinIo(storage = globalThis.localStorage) {
   const KEY = 'cc.circlePinned';
+  // SEALED at rest (ledger L1083: which circles the person pinned), on web and phone alike. A read before the content
+  // key WAITS for it: pins not known yet are not "no pins", and a toggle before it never writes a fresh map over them.
+  const kv = sealedKeyValue(storage, { name: 'the circle pins', strict: true, waitForKey: true });
   return {
     load: async () => {
       try {
-        const s = storage?.getItem(KEY);
+        const s = await kv.getItem(KEY);
         return s ? JSON.parse(s) : null;
       } catch {
         return null;
       }
     },
     save: async (value) => {
-      try { storage?.setItem(KEY, JSON.stringify(value)); }
-      catch { /* quota / disabled */ }
+      try { await kv.setItem(KEY, JSON.stringify(value)); }
+      catch { /* quota / disabled / no content key yet */ }
     },
   };
 }

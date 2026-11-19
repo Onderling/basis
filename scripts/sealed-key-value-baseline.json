@@ -43,10 +43,6 @@
     "count": 1,
     "note": "sealed by its caller: cc.fallbackOffer — both shells hand fallbackOfferStateIo sealedKeyValue"
   },
-  "apps/basis/src/v2/circlePinStore.js": {
-    "count": 1,
-    "note": "debt: cc.circlePinned — the circle ids the person pinned (membership metadata)"
-  },
   "apps/basis/src/v2/circlePolicyStore.js": {
     "count": 2,
     "note": "sealed by its caller: the policy IO (sealedKeyValue in localCirclePolicyStore and the shells); not content: cc.circlePolicyPending.* holds {pending: bool}"
@@ -108,7 +104,7 @@
     "note": "sealed by its caller: both shells hand the peer backend sealedKeyValue (strict) — the web in buildCircleBot (circleApp.js), the phone in bootAgentBundle (agentBundle.js), both after the agent's boot"
   },
   "apps/basis/web/v2/circleApp.js": {
-    "count": 12,
-    "note": "debt: cc.contactSeenAt (read marks per contact) and cc.circleSeenAt — ids, waiting for the ruling on group (c); not content: basis.theme, cc.lastTab, cc.circleViewMode, circle.app.lang (2), basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage), cc.advisorShown.*"
+    "count": 10,
+    "note": "not content: basis.theme, cc.lastTab, cc.circleViewMode, circle.app.lang (2), basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage), cc.advisorShown.* — device settings and view state, no person's content (the seen-marks and pins are sealed through circleSeenMarks.js, contactUnread.js, circlePinStore.js)"
   }
 }

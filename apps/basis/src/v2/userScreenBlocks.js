@@ -255,11 +255,14 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
  * The circles where something is new: the circle tiles' own count (`buildTilePreviews` — another person's line on the
  * human lane, since this device last looked), for the page's circles, newest first, capped by the block's limit.
  * `hostOps.seenAt` and `hostOps.myRefs` are what the tiles use; without them every line counts as new once.
+ * `seenAt: null` is "the marks are not known yet" (sealed, not loaded): the block lists no circle and does not say
+ * "nothing new" either (`content.marksNotKnown`), never everything as new.
  */
 function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [], t = null, readIds = null } = {}) {
   const limit = clampInt(block.config?.limit, 1, 50, 5);
   const base = { blockId: block.id, type: 'circlesUnread', titleKey: 'circle.recipe.block.circlesUnread' };
   if (!eventLog?.query || activeCircleIds.length === 0) return { ...base, status: 'empty', content: { items: [] } };
+  if (seenAt === null) return { ...base, status: 'empty', content: { items: [], marksNotKnown: true } };
   const wanted = new Set(activeCircleIds);
   const inPage = (circles ?? []).filter((c) => c?.id && wanted.has(c.id));
   const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [], t, readIds });
@@ -312,6 +315,7 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
       if (typeof on === 'boolean') readings.push({ key, on });
     } else if (key === 'unread') {
       const r = materializeCirclesUnread({ id: block.id, config: { limit: 50 } }, activeCircleIds, hostOps);
+      if (r.content?.marksNotKnown) continue;   // the marks not known yet: no count rather than a wrong one
       readings.push({ key, count: (r.content?.items ?? []).reduce((n, row) => n + (row.unread ?? 0), 0) });
     } else if (key === 'open') {
       // what is mine and not done, over every noun declaring both

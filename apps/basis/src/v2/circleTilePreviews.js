@@ -74,7 +74,9 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
       if (sub) entry.subtitle = sub;
       entry.ts = landedTimeOf(event);
     }
-    // Unread: what someone ELSE said, newer than the host-supplied seenAt.
+    // Unread: what someone ELSE said, newer than the host-supplied seenAt. `seenAt: null` is "the marks are not known
+    // yet" (sealed, not loaded): then nothing is counted, never everything (ledger L1085); `{}` is known and empty.
+    if (seenAt === null) continue;
     const seen = typeof seenAt[cid] === 'number' ? seenAt[cid] : 0;
     // new = LANDED here after I looked (a line the relay held for hours counts once it arrives)
     // …and read on none of my devices (the read set holds the source's id: a landed item's, a line's own)

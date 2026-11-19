@@ -13,6 +13,10 @@
  *
  *   node apps/e2e-journeys/seed-alpha-size.mjs --serial RFCT504SRZH [--circles 5] [--members 14] [--lines 200] [--port 8799]
  *
+ * Every sender's `undelivered` reports (the relay gave up on a line it was holding) are counted per sender and per
+ * circle and printed at the end, and each later one as it comes (the relay stays up): 'sent' is what left, not what
+ * arrived; the phone's own count is read on the phone.
+ *
  * The phone's join wizard is tapped through by hand (or Detox); the script waits for the founder's roster to hold
  * the phone before it goes on, and says which step it is on.
  */
@@ -44,7 +48,15 @@ console.log(`relay ${relayUrl}; adb reverse tcp:${relay.port} set`);
 
 step(`boot the founder and ${MEMBERS} members`);
 const handles = ['founder', ...Array.from({ length: MEMBERS }, (_, i) => `member-${i + 1}`)];
-const people = await bootPeople({ relayUrl, handles });
+const undelivered = [];   // {handle, circle, reason, msgId}
+let seeded = false;
+const circleOfMsg = (id) => (/^(seed-\d+)-m\d+/.exec(String(id ?? ''))?.[1] ?? '?');
+const onUndelivered = (handle, info) => {
+  const row = { handle, circle: circleOfMsg(info?.msgId), reason: info?.reason ?? 'unknown', msgId: info?.msgId ?? null };
+  undelivered.push(row);
+  if (seeded) console.log(`undelivered (late): ${row.handle} ${row.circle} ${row.msgId} (${row.reason})`);
+};
+const people = await bootPeople({ relayUrl, handles, onUndelivered });
 const [founder, ...members] = people;
 console.log(`${people.length} booted`);
 
@@ -93,7 +105,13 @@ for (let c = 1; c <= CIRCLES; c += 1) {
 }
 
 step('SEEDED');
-console.log(`the phone holds: ${held.circles} circles, up to ${held.members} members each, ${held.lines} chat lines in all`);
+console.log(`sent: ${held.circles} circles, up to ${held.members} members each, ${held.lines} chat lines in all`);
+const tally = (key) => undelivered.reduce((m, r) => m.set(r[key], (m.get(r[key]) ?? 0) + 1), new Map());
+console.log(`undelivered reports so far: ${undelivered.length}`);
+for (const [k, n] of tally('circle')) console.log(`  circle ${k}: ${n}`);
+for (const [k, n] of tally('handle')) console.log(`  sender ${k}: ${n}`);
+for (const [k, n] of tally('reason')) console.log(`  reason ${k}: ${n}`);
+seeded = true;
 console.log('the relay stays UP for the cold starts; Ctrl-C stops it (then: adb reverse --remove-all).');
 const stop = async () => { try { adb('reverse', '--remove-all'); } catch { /* the phone may be gone */ } await relay.stop?.(); process.exit(0); };
 process.on('SIGINT', stop);

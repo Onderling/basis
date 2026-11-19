@@ -106,7 +106,7 @@ export const folioManifest = {
     {
       id:        'deleteFromPod', visibility: 'authenticated',
       verb:      'remove',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       // (basis v0.4, 2026-05-22) — pod-side delete is HTTPS;
       // works in browser.  Per OQ-1.A: basis exposes this in
       // its browser bundle.
@@ -135,7 +135,7 @@ export const folioManifest = {
     {
       id:        'deleteLocally', visibility: 'authenticated',
       verb:      'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'content' },
       // local-fs delete needs Node; basis in browser
       // filters this out per OQ-1.A.
       runtime:   'node',
@@ -161,7 +161,7 @@ export const folioManifest = {
       verb:   'sync',  // F-SP1-e: app-local verb.  Distinct from runOnce
                        // (a normal bi-directional sync) — forceRepush
                        // overwrites pod versions wholesale.
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       // sync touches local fs (reads files to overwrite pod);
       // node-only.  Sidecar-mode basis re-includes.
       runtime: 'node',
@@ -190,7 +190,7 @@ export const folioManifest = {
     {
       id:        'syncOnce', visibility: 'authenticated',
       verb:      'sync',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       // bi-directional fs ↔ pod sync; needs Node.
       runtime:   'node',
       params:    [],
@@ -215,7 +215,7 @@ export const folioManifest = {
     {
       id:        'watchStart', visibility: 'authenticated',
       verb:      'watch',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       // local-fs watcher (chokidar); Node-only.
       runtime:   'node',
       params:    [],
@@ -237,7 +237,7 @@ export const folioManifest = {
       id:        'watchStop', visibility: 'authenticated',
       verb:      'watch',  // F-SP1-e: same verb as watchStart, opposite
                            // semantics — distinguished by skill id.
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       // stops the local-fs watcher; Node-only.
       runtime:   'node',
       params:    [],
@@ -289,7 +289,7 @@ export const folioManifest = {
     },
     {
       id:    'shareFolder', visibility: 'authenticated', group: 'compose', verb: 'add',
-      writes: { scope: 'person' },   // a share token over the person's own pod
+      writes: { scope: 'person', what: 'control' },   // a share token over the person's own pod
       params: [
         { name: 'folder', kind: 'string', required: true },
         { name: 'with',   kind: 'webid',  required: true },
@@ -345,7 +345,7 @@ export const folioManifest = {
      */
     {
       id:    'saveToMyPod', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'file' },
       params: [
         { name: 'path', kind: 'string', required: false,

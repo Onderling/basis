@@ -76,7 +76,7 @@ import {
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
   nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS, POINT_STATUS_LABELS, pointStatus,
-  createConnectionPoints, adoptExistingRelay, asyncStorageConnectionPointsIo,
+  createConnectionPoints, adoptExistingRelay,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // circle-scoped event stream + per-row action chips.
@@ -320,6 +320,7 @@ import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
 import { loadContactRoster, sealedContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import { circleOfferingDraftIo } from '../../../../basis/src/v2/circleOfferingDraft.js';
+import { phoneConnectionPointsIo } from '../../core/connectionPointsRN.js';   // sealed at rest on the phone
 import { showsBotActionsSetting } from '../../../../basis/src/v2/surfacePref.js';
 import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
@@ -1953,7 +1954,7 @@ export default function CircleLauncherScreen({
       // Recorded first so it survives a restart even if the socket does not open now.
       (async () => {
         try {
-          const io = asyncStorageConnectionPointsIo(AsyncStorage);
+          const io = phoneConnectionPointsIo(AsyncStorage);
           createConnectionPoints({ initial: await io.load(), save: (v) => { io.save(v); } }).addManually(parsed.relayUrl);
         } catch { /* the list is a convenience; never block a join on it */ }
         try { await bundle?.agent?.addRelay?.(parsed.relayUrl, { awaitReady: true }); } catch { /* best-effort */ }
@@ -2033,7 +2034,7 @@ export default function CircleLauncherScreen({
       // The relay THIS circle rides per the points mapping, else the device's live relay (web parity).
       let relayUrl = null;
       try {
-        const io = asyncStorageConnectionPointsIo(AsyncStorage);
+        const io = phoneConnectionPointsIo(AsyncStorage);
         const store = createConnectionPoints({ initial: await io.load(), save: () => {} });
         relayUrl = store.pointsFor(circleId).find((p) => (p?.kind ?? 'relay') === 'relay')?.url ?? null;
       } catch { relayUrl = null; }
@@ -5647,7 +5648,7 @@ function ConnectionPointsHost({ bundle, onBack }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const io = asyncStorageConnectionPointsIo(AsyncStorage);
+      const io = phoneConnectionPointsIo(AsyncStorage);
       const initial = await io.load();
       const store = createConnectionPoints({ initial, save: (v) => { io.save(v); } });
       // Non-destructive: the old key still drives what boot connects to, so this seeds the list from it

@@ -37,7 +37,8 @@ import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore, selfMayEstablishKey
 import { createCirclePodProducer, createCircleControlAgentRouter, notePodAgentFor, seedCircleRoster, createProducerKeyWait, isSealedPosture, memberStatusReader } from '../../../basis/src/v2/circlePodProducer.js';
 import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting, circleRootFor, recordedCirclePodUri, ownsCircleRoot } from '../../../basis/src/v2/circleRealPod.js';
-import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
+import { createConnectionPoints } from '../../../basis/src/v2/connectionPoints.js';
+import { phoneConnectionPointsIo } from './connectionPointsRN.js';   // sealed at rest on the phone
 import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.js';
 // the SHARED cross-circle SHARE logic + the platform-neutral enforcement assembly.
 // Mobile calls the SAME builder + ops as web (circleApp.js) — invariant #1/#2, no mobile fork.
@@ -283,7 +284,7 @@ async function buildCirclePod(circleId, policy) {
   let circleRootUri;
   if (routing) {
     let points = null;
-    try { if (asyncStorageRef) points = createConnectionPoints({ initial: await asyncStorageConnectionPointsIo(asyncStorageRef).load(), save: () => {} }); } catch { points = null; }
+    try { if (asyncStorageRef) points = createConnectionPoints({ initial: await phoneConnectionPointsIo(asyncStorageRef).load(), save: () => {} }); } catch { points = null; }
     const recorded = await recordedCirclePodUri({ callSkill: _keyEventWiring?.callSkill, points, circleId });
     circleRootUri = circleRootFor({ pod: policy?.pod, recordedPodUri: recorded, ownCircleRoot: routing.circleRootUri(circleId) });
     if (!circleRootUri) {

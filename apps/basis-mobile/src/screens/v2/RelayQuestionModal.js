@@ -9,7 +9,8 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createRelayQuestion, knownRelayUrl, createConnectionPoints, asyncStorageConnectionPointsIo, adoptInheritedPoint } from '../../../../basis/src/v2/connectionPoints.js';
+import { createRelayQuestion, knownRelayUrl, createConnectionPoints, adoptInheritedPoint } from '../../../../basis/src/v2/connectionPoints.js';
+import { phoneConnectionPointsIo } from '../../core/connectionPointsRN.js';   // sealed at rest on the phone
 import { nameShown } from '../../../../basis/src/v2/personLabel.js';
 import { asyncStorageRelayIo, normalizeRelayUrl } from '../../../../basis/src/v2/relayPref.js';
 import { useTheme } from './themeContext.js';
@@ -20,7 +21,7 @@ import ThemedTextInput from './ThemedTextInput.js';   // every text input's colo
 const readKnown = async () => ({
   saved: await asyncStorageRelayIo(AsyncStorage).load(),
   arg: process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL ?? null,
-  list: createConnectionPoints({ initial: await asyncStorageConnectionPointsIo(AsyncStorage).load(), save: () => {} }).list(),
+  list: createConnectionPoints({ initial: await phoneConnectionPointsIo(AsyncStorage).load(), save: () => {} }).list(),
 });
 
 // One per app session, shared by every screen that asks.
@@ -35,7 +36,7 @@ export const relayQuestion = createRelayQuestion({ read: readKnown });
  */
 export function contactPointAdopter(agent) {
   return async (contact) => {
-    const io = asyncStorageConnectionPointsIo(AsyncStorage);
+    const io = phoneConnectionPointsIo(AsyncStorage);
     const store = createConnectionPoints({ initial: await io.load(), save: io.save });
     return adoptInheritedPoint({
       store, knowsRelay: await relayQuestion.knows(), points: contact?.points ?? [],

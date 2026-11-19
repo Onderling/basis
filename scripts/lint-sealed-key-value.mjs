@@ -11,6 +11,7 @@
  * (scripts/sealed-key-value-baseline.json). Each baselined file carries a note that starts with one of:
  *   • "sealed by its caller:"  — the storage it is handed is `sealedKeyValue(...)` (named where);
  *   • "not content:"           — a device setting, a flag, a seen-time, the last tab (said why);
+ *   • "not sealable:"          — read before the content key exists (the reader named with its file:line);
  *   • "debt:"                  — a person's content (or a secret) written plain today: a FINDING, to be ruled on and sealed.
  * A file above its count, or a new file, is red: a new write is either sealed (`sealedKeyValue`, whose own writes are not
  * counted) or declared here with its reason. A note without one of the three heads is red too. `--update` is not offered:
@@ -26,7 +27,7 @@ const THE_WRAPPER = 'apps/basis/src/v2/localStoreSeal.js';
 const BASELINE = path.join(ROOT, 'scripts/sealed-key-value-baseline.json');
 const RAW = /\.setItem\s*(\?\.)?\s*\(/;   // also the optional call `setItem?.(`
 const VIA_SEAL = /\b(kv|sealed)\.setItem\b/;
-const HEADS = ['sealed by its caller:', 'not content:', 'debt:'];
+const HEADS = ['sealed by its caller:', 'not content:', 'not sealable:', 'debt:'];
 
 /** The shipped files under the roots (no tests). */
 export function shellFiles(root = ROOT) {

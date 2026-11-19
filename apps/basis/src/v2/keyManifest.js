@@ -22,8 +22,8 @@ export const keyManifest = Object.freeze({
   itemTypes: [],
   nouns: {},
   operations: [
-    { id: 'keys.establish', description: 'The circle\'s FIRST group key (version 1), sealed to the founding recipients — authored by the creator when the circle seals.', writes: { scope: 'circle' }, appends: [{ lane: KEY_LANE, kind: 'key-establish' }] },
-    { id: 'keys.rotate',    description: 'A group-key ROTATION (version n+1, sealed to the remaining recipients — backward secrecy). A governed action: the circle policy\'s rotateKey decision-class says who may (default any-admin).', writes: { scope: 'circle' }, appends: [{ lane: KEY_LANE, kind: 'key-rotate' }] },
+    { id: 'keys.establish', description: 'The circle\'s FIRST group key (version 1), sealed to the founding recipients — authored by the creator when the circle seals.', writes: { scope: 'circle', what: 'keys' }, appends: [{ lane: KEY_LANE, kind: 'key-establish' }] },
+    { id: 'keys.rotate',    description: 'A group-key ROTATION (version n+1, sealed to the remaining recipients — backward secrecy). A governed action: the circle policy\'s rotateKey decision-class says who may (default any-admin).', writes: { scope: 'circle', what: 'keys' }, appends: [{ lane: KEY_LANE, kind: 'key-rotate' }] },
   ],
 });
 

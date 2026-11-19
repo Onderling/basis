@@ -32,6 +32,7 @@ import { grantsManifest } from './grantsManifest.js';
 import { itemsManifest } from './itemsManifest.js';
 import { chatManifest } from './chatManifest.js';
 import { assistantManifest } from './assistantManifest.js';
+import { toolsManifest } from './toolsManifest.js';   // a circle's toolboxes (L1035): the box's door, beside the assistant
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 
 /**
@@ -66,7 +67,7 @@ export const PLUMBING_MANIFESTS = Object.freeze([
 ]);
 
 /** The manifests a door that is not a circle adds to its catalogue (the box's Telegram chat): its own ops. */
-export const DOOR_MANIFESTS = Object.freeze([assistantManifest]);
+export const DOOR_MANIFESTS = Object.freeze([assistantManifest, toolsManifest]);
 
 /** Every manifest the app runs — the set the manifest guards read. */
 export function allManifests() {

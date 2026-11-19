@@ -38,6 +38,8 @@ const BOT_ONLY = {
   'assistant.assistant-reminders': "the household bot's reminders; the app has no reminder book of the person's yet",
   'assistant.remindMe': "the household bot's reminders; the app has no reminder book of the person's yet",
   'assistant.cancelReminder': "the household bot's reminders; the app has no reminder book of the person's yet",
+  'tools.useTool': 'a toolbox lives on the box; a screen reaches useTool through the door (L1035)',
+  'tools.listTools': 'a toolbox lives on the box; a screen reaches useTool through the door (L1035)',
   'assistant.sayReminder': "the household bot's reminders; the app has no reminder book of the person's yet",
   'assistant.assistant-overview': "the household's week, from the household's sources",
   'assistant.weekOverview': "the household's week, from the household's sources",

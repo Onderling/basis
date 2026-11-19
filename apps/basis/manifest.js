@@ -57,7 +57,7 @@ export const basisManifest = {
       id:    'help-with', visibility: 'authenticated',
       group: 'help',
       verb:  'add',
-      writes: { scope: 'device' },   // a thread on this device; the post itself is not touched
+      writes: { scope: 'device', what: 'content' },   // a thread on this device; the post itself is not touched
       params: [
         { name: 'postId', kind: 'string', required: true },
       ],
@@ -121,7 +121,7 @@ export const basisManifest = {
     {
       id:    'embed', visibility: 'authenticated',
       verb:  'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'itemId', kind: 'string',  required: true,
           // bare `/embed` → list household chores (default app);
@@ -172,7 +172,7 @@ export const basisManifest = {
     {
       id:    'embed-file', visibility: 'authenticated',
       verb:  'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'path',  kind: 'string',  required: false },
         { name: 'pick',  kind: 'boolean', required: false },
@@ -216,7 +216,7 @@ export const basisManifest = {
     {
       id:    'embed-time', visibility: 'authenticated',
       verb:  'add',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       params: [
         { name: 'title',    kind: 'string', required: true  },
         { name: 'when',     kind: 'date',   required: true  },
@@ -293,6 +293,7 @@ export const basisManifest = {
 
     {
       id:    'scanQr', visibility: 'authenticated',
+      reveals: 'none',
       group: 'device',
       verb:  'list',
       params: [],
@@ -355,7 +356,7 @@ export const basisManifest = {
       id:    'signin', visibility: 'private',
       group: 'identity',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'issuer', kind: 'string', required: false },
       ],
@@ -446,7 +447,7 @@ export const basisManifest = {
       scopes: ['circle', 'contact'],
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
+      writes: { scope: 'circle', what: 'content' },   // delivered to another person: it leaves this person, the widest reach of the three
       params: [
         { name: 'peer', kind: 'string', required: true },
       ],
@@ -490,7 +491,7 @@ export const basisManifest = {
       id:    'publish-peer', visibility: 'authenticated',
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       params: [],
       surfaces: {
         slash: { command: '/publish-peer' },
@@ -529,7 +530,7 @@ export const basisManifest = {
       id:    'set-relay', visibility: 'private',
       group: 'device',
       verb:  'submit',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'url',   kind: 'string',  required: false },
         { name: 'clear', kind: 'boolean', required: false },
@@ -555,7 +556,7 @@ export const basisManifest = {
       id:    'transport-mode', visibility: 'private',
       group: 'device',
       verb:  'submit',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'mode', kind: 'enum', of: ['nkn', 'relay', 'both'], required: true },
       ],
@@ -571,6 +572,7 @@ export const basisManifest = {
      */
     {
       id:    'transports', visibility: 'private',
+      reveals: 'none',
       group: 'device',
       verb:  'list',
       params: [],
@@ -589,6 +591,7 @@ export const basisManifest = {
      */
     {
       id:    'settings', visibility: 'private',
+      reveals: 'none',
       group: 'device',
       verb:  'list',
       params: [
@@ -698,7 +701,7 @@ export const basisManifest = {
       id:    'mute', visibility: 'authenticated',
       group: 'people',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'peer', kind: 'string', required: true },
         // the name the person saw (a post's author): kept with the block so the blocked list names them, never matched on
@@ -718,7 +721,7 @@ export const basisManifest = {
       id:    'unmute', visibility: 'authenticated',
       group: 'people',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'peer', kind: 'string', required: true },
       ],
@@ -791,7 +794,7 @@ export const basisManifest = {
       id:    'peer-connect', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: {
         slash: { command: '/peer-connect' },
@@ -809,7 +812,7 @@ export const basisManifest = {
       id:    'test-peer', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
-      writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
+      writes: { scope: 'circle', what: 'content' },   // delivered to another person: it leaves this person, the widest reach of the three
       params: [
         // 2026-05-27 slash audit close-out — param renamed
         // `address` → `addr` to match the user-facing locale
@@ -830,7 +833,7 @@ export const basisManifest = {
       id:    'signout', visibility: 'private',
       group: 'identity',
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [],
       surfaces: {
         // No CHAT surface — see `signin`. Ending a session is the person's act.
@@ -847,7 +850,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'name', kind: 'string' },
         { name: 'circleIds', kind: 'object' },
@@ -866,7 +869,7 @@ export const basisManifest = {
       id:    'screen-remove-page', visibility: 'private',
       group: 'device',
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
       
@@ -886,7 +889,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'name', kind: 'string', required: true },
@@ -907,7 +910,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
       
@@ -928,7 +931,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'ids', kind: 'object' },
       ],
@@ -946,7 +949,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'circleIds', kind: 'object' },
@@ -969,7 +972,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'kind', kind: 'string', required: true },
         { name: 'actId', kind: 'string' },
@@ -990,7 +993,7 @@ export const basisManifest = {
       group: 'device',
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'key', kind: 'string', required: true },
       ],
@@ -1008,7 +1011,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'add',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'type', kind: 'string', required: true },
@@ -1028,7 +1031,7 @@ export const basisManifest = {
       id:    'screen-remove-block', visibility: 'private',
       group: 'device',
       verb:  'remove',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'blockId', kind: 'string', required: true },
@@ -1047,7 +1050,7 @@ export const basisManifest = {
       id:    'screen-move-block', visibility: 'private',
       group: 'device',
       verb:  'move',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'blockId', kind: 'string', required: true },
@@ -1069,7 +1072,7 @@ export const basisManifest = {
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'update',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
         { name: 'pageId', kind: 'string', required: true },
         { name: 'blockId', kind: 'string', required: true },
@@ -1089,7 +1092,7 @@ export const basisManifest = {
       id:    'screen-undo', visibility: 'private',
       group: 'device',
       verb:  'undo',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'preference' },
       params: [
       ],
       surfaces: {

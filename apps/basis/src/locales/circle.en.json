@@ -6180,6 +6180,150 @@
     "secret_check_key_or_route": {
       "text": "Note: the language model provider gives no answer (status {{status}}). The key {{secret}} may have expired, or the connection to the provider does not work: check the key first. Free-text questions get no answer until that is sorted; commands and buttons still work.",
       "doc": "The alert chat's line for the SDK's \"502 Connection error\": names both an expired key and the route, key first (the cheaper check)."
+    },
+    "toolbox_none": {
+      "text": "No toolbox is placed on the box yet. The box's operator places one with a file and a key; then you switch it on here.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_none_on": {
+      "text": "No toolbox is on right now.",
+      "doc": "The household bot's toolboxes a member may use: none is switched on now (listTools, wherever it is painted, a screen too)."
+    },
+    "toolbox_list_head": {
+      "text": "Toolboxes on the box:",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_row": {
+      "text": "{{title}} ({{name}}): {{state}}{{words}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_state_on": {
+      "text": "on",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_state_off": {
+      "text": "off",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_usage": {
+      "text": "Use: /toolbox, /toolbox <name> aan or /toolbox <name> uit.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_not_private": {
+      "text": "Switch a toolbox on in your own chat with me, not here.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_card": {
+      "text": "{{title}} is placed at {{url}}.\nWords: {{words}}.\n{{receives}}\nSwitch it on?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_receives_question": {
+      "text": "It receives the words of a question, and nothing about who asks.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_receives_list": {
+      "text": "It receives the words of a question, and when a price is asked the marks of the things on a list; nothing about who asks.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_yes": {
+      "text": "Yes, switch on",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_no": {
+      "text": "No",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_on": {
+      "text": "{{title}} is on. Say for example: {{example}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_off": {
+      "text": "{{title}} is off. The file on the box stays.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_unchanged": {
+      "text": "Nothing changed.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_not_placed": {
+      "text": "No toolbox '{{name}}' is placed on the box.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_no_key": {
+      "text": "There is no key for '{{name}}' on the box. The box's operator puts it there.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_is_off": {
+      "text": "{{title}} is off.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_unreachable": {
+      "text": "{{title}} cannot be reached now.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_timeout": {
+      "text": "{{title}} did not answer in time.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_tool_not_offered": {
+      "text": "{{title}} does not offer the tool '{{tool}}'; check the file on the box.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_tool_failed": {
+      "text": "{{title}} could not answer this question.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_failed": {
+      "text": "{{title}} gave an answer I cannot read.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_says_default": {
+      "text": "uses {{title}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_help_line": {
+      "text": "{{word}} <something>: {{says}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_welcome": {
+      "text": "You can also say: {{lines}}.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_none_found": {
+      "text": "{{title}} found nothing.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_word_taken": {
+      "text": "I already use the word '{{word}}' of {{title}} for something else. Choose another word in the file on the box.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_found_row": {
+      "text": "{{label}} \u00b7 {{more}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_button": {
+      "text": "On the list",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_added": {
+      "text": "On {{list}}: {{label}}.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_gone": {
+      "text": "I no longer know that list. Search again and tap one.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_which_list": {
+      "text": "Which list should {{label}} go on?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_no_list": {
+      "text": "There is no list yet to put it on. Make one first.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_failed": {
+      "text": "That could not be put on the list.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     }
   },
   "op": {

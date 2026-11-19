@@ -37,6 +37,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { verbKind, WRITE_SCOPES, WRITE_WHATS, REVEALS } from '../packages/app-manifest/src/atoms.js';
 import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
+import { externalOrigins, PLACED_HOSTS } from '../apps/basis/src/core/agent/egressGate.js';
 
 const CLASSIFY = 'classify this verb: read or write';
 
@@ -45,6 +46,20 @@ const CLASSIFY = 'classify this verb: read or write';
  * @param {object} manifest
  * @returns {{ opId: string|null, message: string }[]}
  */
+/**
+ * The agreement that makes '@placed' honest: the apps that declare it are exactly the apps the egress gate treats as
+ * reaching outside. Red either way (a declaration the gate ignores, or a gate list the manifests do not say).
+ * @param {object[]} manifests @param {Set<string>} gateExternal
+ * @returns {string[]} problems
+ */
+export function auditPlacedAgreement(manifests, gateExternal) {
+  const declared = new Set((manifests ?? []).filter((m) => Array.isArray(m?.hosts) && m.hosts.includes(PLACED_HOSTS)).map((m) => m.app));
+  const problems = [];
+  for (const app of declared) if (!gateExternal.has(app)) problems.push(`${app} declares '${PLACED_HOSTS}' but the egress gate does not treat it as reaching outside`);
+  for (const app of gateExternal) if (!declared.has(app)) problems.push(`the egress gate treats ${app} as reaching outside but its manifest does not declare '${PLACED_HOSTS}'`);
+  return problems;
+}
+
 export function auditManifest(manifest) {
   const problems = [];
   if (!Array.isArray(manifest?.hosts)) {
@@ -53,6 +68,9 @@ export function auditManifest(manifest) {
     manifest.hosts.forEach((h, i) => {
       if (typeof h !== 'string' || h.trim() === '') {
         problems.push({ opId: null, message: `hosts[${i}] must be a non-empty host name (got ${JSON.stringify(h)})` });
+      } else if (h.startsWith('@') && h !== PLACED_HOSTS) {
+        // one reserved word only: '@placed' (the hosts a box's operator places); any other '@' word is no host and no claim
+        problems.push({ opId: null, message: `hosts[${i}] '${h}' is not a host; the only reserved word is '${PLACED_HOSTS}'` });
       }
     });
   }
@@ -154,6 +172,8 @@ async function main() {
       console.error(`  ${app}${p.opId ? `.${p.opId}` : ''}: ${p.message}`);
     }
   }
+  const agreement = auditPlacedAgreement(manifests.map((m) => m.manifest), externalOrigins(manifests.map((m) => m.manifest)));
+  for (const p of agreement) console.error(`  ${p}`);
   const owed = manifests.flatMap(({ app, manifest }) => auditWhat(manifest).map((o) => ({ app, ...o })));
   const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : { what: [], reveals: [] };
   if (process.argv.includes('--update')) {
@@ -164,8 +184,8 @@ async function main() {
   }
   const redWhat = judgeWhat({ owed, baseline });
   for (const line of redWhat) console.error(`  ${line}`);
-  if (redManifests.size || redWhat.length) {
-    console.error(`lint-manifest-scopes: ${opCount} op problem(s) in ${redManifests.size} of ${manifests.length} manifest(s); ${redWhat.length} weight problem(s)`);
+  if (redManifests.size || agreement.length || redWhat.length) {
+    console.error(`lint-manifest-scopes: ${opCount} op problem(s) in ${redManifests.size} of ${manifests.length} manifest(s); ${agreement.length} '${PLACED_HOSTS}' disagreement(s); ${redWhat.length} weight problem(s)`);
     process.exit(1);
   }
   console.log(`lint-manifest-scopes: ${manifests.length} manifests — every writing op declares where it writes, every manifest its hosts; ${owed.filter((o) => o.kind !== 'bad').length} weight declarations still owed (baseline)`);

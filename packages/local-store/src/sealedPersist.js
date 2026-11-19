@@ -63,11 +63,23 @@ export function sealedPersist(persist, strategy, onWarn = null) {
    */
   const sealedOf = new Map();   // key → { plain, sealed }
 
+  /**
+   * A ROW THAT WILL NOT OPEN IS KEPT, NOT DELETED (ledger L1079). A row sealed under another key (another device's, a
+   * key this device no longer has) cannot be opened here, so it is never handed on as content — but before, it also
+   * left the map, and the next save wrote the store without it: deleted for good as a side effect of reading. Now its
+   * sealed bytes are remembered by key and written back UNCHANGED at every save, as long as the caller's map has no
+   * row under that key. If the caller later writes a row under the same key, the caller's row wins and the kept bytes
+   * are forgotten. A key the caller removes is a different thing: it was the caller's row, and it goes.
+   */
+  const unopened = new Map();   // key → the stored (sealed) bytes, exactly as read
+  const warned = new Set();     // keys already said once (the key, never the content)
+
   /** Every value sealed (reused when unchanged); keys untouched. */
   const sealMap = (map) => {
     const out = new Map();
     for (const [k, v] of map ?? []) {
       const plain = typeof v === 'string' ? v : JSON.stringify(v);
+      unopened.delete(k);   // the caller wrote this key: its row wins over bytes kept unopened
       const had = sealedOf.get(k);
       if (had && had.plain === plain) { out.set(k, had.sealed); continue; }
       const sealed = strategy.seal(plain);
@@ -75,18 +87,20 @@ export function sealedPersist(persist, strategy, onWarn = null) {
       out.set(k, sealed);
     }
     if (sealedOf.size > out.size) for (const k of [...sealedOf.keys()]) if (!out.has(k)) sealedOf.delete(k);
+    for (const [k, bytes] of unopened) if (!out.has(k)) out.set(k, bytes);   // kept, byte for byte
     return out;
   };
 
   /**
-   * Every value opened. A value that will not open is DROPPED rather than passed on as ciphertext:
-   * the row would otherwise reach `query()`, fail to parse, and vanish anyway — but silently. Dropping
-   * it here at least says so once, with its key. A value that was really sealed on disk is remembered with its
-   * sealed form; one that was plain (written before sealing) is not, so the next save seals it.
+   * Every value opened. A value that will not open is NOT handed on (as ciphertext it would reach `query()`, fail to
+   * parse and vanish silently): it is kept aside by key (`unopened`, above) and written back unchanged at every save,
+   * and said once per key. A value that was really sealed on disk is remembered with its sealed form; one that was
+   * plain (written before sealing) is not, so the next save seals it.
    */
   const openMap = (map) => {
     const out = new Map();
     sealedOf.clear();
+    unopened.clear();
     for (const [k, v] of map ?? []) {
       const stored = typeof v === 'string' ? v : JSON.stringify(v);
       try {
@@ -94,7 +108,10 @@ export function sealedPersist(persist, strategy, onWarn = null) {
         out.set(k, plain);
         if (typeof plain === 'string' && plain !== stored) sealedOf.set(k, { plain, sealed: stored });
       }
-      catch (err) { warn(`[at-rest] ${k}: stored here but not openable with this device's content key`, err); }
+      catch (err) {
+        unopened.set(k, stored);
+        if (!warned.has(k)) { warned.add(k); warn(`[at-rest] ${k}: stored here but not openable with this device's content key — kept as it is, not read`, err?.message ?? 'not openable'); }
+      }
     }
     return out;
   };

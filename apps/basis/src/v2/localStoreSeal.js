@@ -70,23 +70,46 @@ export function sealedLocalBackend(backend) {
 /**
  * Wrap a key-value storage (localStorage on web, AsyncStorage on mobile, a file on the box) so the VALUES are sealed at
  * rest with this device's content key; the KEYS stay legible, so a store that lists its keys (a versions store) still
- * can. A plain value written before this reads as it is (`open` passes it through: no migration, as everywhere); a
- * write before the key exists is REFUSED rather than stored in the clear.
+ * can. A write before the key exists is REFUSED rather than stored in the clear.
+ *
+ * Two modes for a READ:
+ *   • default (the first stores that took this): a plain value written before this reads as it is (`open` passes it
+ *     through: no migration), and a read before the key hands the stored text on unopened;
+ *   • `strict: true` (ledger L1083, every store of a person's content sealed since): a read before the key answers
+ *     `null` — "not readable yet", never the sealed text as if it were the value — and so does a value that will not
+ *     open with this key (nothing is written over it); a PLAIN value from before is rewritten sealed at its first read
+ *     with the key, once, so content does not wait in plain text for the person to change it. A read that finds a
+ *     sealed value writes nothing. With `waitForKey: true` as well, a read before the key WAITS for it instead
+ *     (`onShellContentSeal`): for a value read at the first frame whose absence would be read as "empty" (a page book,
+ *     a contact's name, the person's availability) — "not read yet" is then the honest answer, and nothing seeds or
+ *     overwrites in the meantime.
  * @param {object} storage  `getItem` / `setItem` / `removeItem` (sync or async), and whatever listing it offers
  *   (`key(i)` + `length`, or `getAllKeys()`), passed through
+ * @param {{name?: string, strict?: boolean, waitForKey?: boolean}} [o]
  */
-export function sealedKeyValue(storage, { name = 'a store' } = {}) {
+export function sealedKeyValue(storage, { name = 'a store', strict = false, waitForKey = false } = {}) {
   const strategy = () => {
     const s = shellContentSeal();
     if (!s) throw new Error(`sealedKeyValue: refusing to write ${name} unsealed — no content key yet`);
     return s;
   };
+  const keyArrives = () => new Promise((resolve) => { onShellContentSeal(resolve); });
   const kv = {
     async getItem(key) {
       const v = await storage.getItem(key);
       if (v == null) return null;
-      const s = shellContentSeal();
-      return s ? s.open(v) : v;
+      if (!strict) {
+        const s = shellContentSeal();
+        return s ? s.open(v) : v;
+      }
+      const s = shellContentSeal() ?? (waitForKey ? await keyArrives() : null);
+      if (!s) return null;
+      let plain;
+      try { plain = s.open(String(v)); } catch { return null; }
+      if (plain === v) {   // it was plain: seal it now, once
+        try { await storage.setItem(key, s.seal(plain)); } catch { /* the next read tries again */ }
+      }
+      return plain;
     },
     async setItem(key, value) { await storage.setItem(key, strategy().seal(String(value))); },
     async removeItem(key) { await storage.removeItem(key); },
@@ -184,28 +207,16 @@ export function sealedLocalVault(vault) {
  * The value is never logged.
  * @param {object} storage  `getItem` / `setItem` / `removeItem` (sync or async)
  */
-export function sealedJsonIo(storage) {
+export function sealedJsonIo(storage, { waitForKey = false } = {}) {
+  const kv = sealedKeyValue(storage, { name: 'a sealed value', strict: true, waitForKey });
   return {
     async load(key) {
       let raw = null;
-      try { raw = await storage?.getItem?.(key); } catch { return null; }
+      try { raw = await kv.getItem(key); } catch { return null; }
       if (raw == null || raw === '') return null;
-      const s = current;
-      if (!s) return null;
-      let plain;
-      try { plain = s.open(String(raw)); } catch { return null; }
-      let value = null;
-      try { value = JSON.parse(plain); } catch { return null; }
-      if (plain === raw) {   // it was plain: seal it now, once
-        try { await storage.setItem(key, s.seal(plain)); } catch { /* the next read tries again */ }
-      }
-      return value;
+      try { return JSON.parse(raw); } catch { return null; }
     },
-    async save(key, value) {
-      const s = current;
-      if (!s) throw new Error('sealedJsonIo: refusing to write unsealed — no content key yet');
-      await storage.setItem(key, s.seal(JSON.stringify(value)));
-    },
-    async remove(key) { await storage?.removeItem?.(key); },
+    async save(key, value) { await kv.setItem(key, JSON.stringify(value)); },
+    async remove(key) { await kv.removeItem(key); },
   };
 }

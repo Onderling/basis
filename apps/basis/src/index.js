@@ -181,7 +181,7 @@ export {
   REFRESHABLE_VERBS, panelMatchesItemRef, itemRefFromReply, collectStalePanels,
 } from './panelRefresh.js';
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions block.
-export { createActionFrequencyStore } from './v2/actionFrequency.js';
+export { createActionFrequencyStore, actionFrequencyIo } from './v2/actionFrequency.js';
 // C9 — the ONE circle data-policy: `policy.pod` is the single vocabulary,
 // mapped once to the send-path dataMove branch + the PseudoPod store mode +
 // the catch-up strategy, so no consumer re-derives the pod posture itself.

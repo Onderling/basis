@@ -20,12 +20,13 @@ export const WEB_MAPPINGS_DEVICE = 'web';
 export function localStorageMappingsStore(storage = globalThis.localStorage) {
   const keyFor = (uri) => PREFIX + uri;
   return {
+    // awaited: the web hands a SEALED storage (ledger L1083), which answers async
     async write(uri, body) {
-      storage.setItem(keyFor(uri), JSON.stringify(body));
+      await storage.setItem(keyFor(uri), JSON.stringify(body));
       return { etag: undefined };
     },
     async read(uri) {
-      const raw = storage.getItem(keyFor(uri));
+      const raw = await storage.getItem(keyFor(uri));
       if (raw == null) return null;
       try { return { bytes: JSON.parse(raw) }; }
       catch { return { bytes: raw }; }
@@ -42,7 +43,7 @@ export function localStorageMappingsStore(storage = globalThis.localStorage) {
       return out;
     },
     async delete(uri) {
-      storage.removeItem(keyFor(uri));
+      await storage.removeItem(keyFor(uri));
     },
   };
 }

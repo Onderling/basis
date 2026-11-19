@@ -3,17 +3,9 @@
     "count": 1,
     "note": "not content: cc.firstBootSeeded.v1 — a first-boot flag"
   },
-  "apps/basis-mobile/src/core/circleRecipePendingStorageRN.js": {
-    "count": 1,
-    "note": "debt: cc.circleRecipePending.* — an incoming circle recipe, plain"
-  },
-  "apps/basis-mobile/src/core/circleRulesPendingStorageRN.js": {
-    "count": 1,
-    "note": "debt: cc.circleRulesPending.* — an incoming circle rules document, plain"
-  },
   "apps/basis-mobile/src/core/circleStoresRN.js": {
     "count": 3,
-    "note": "debt: the shared IO helpers write cc.circleOverride., cc.availability, cc.sharedWithMe, cc.userScreens and cc.circlePinned raw; the same helpers are sealed by their caller for cc.circlePolicy., cc.circleRecipe., cc.circleRules. (sealedKeyValue)"
+    "note": "debt: the shared IO helpers still write cc.circlePinned raw (group (c), waiting); sealed by its caller for cc.circlePolicy., cc.circleRecipe., cc.circleRules. (sealedKeyValue)"
   },
   "apps/basis-mobile/src/core/firstRun.js": {
     "count": 1,
@@ -25,7 +17,7 @@
   },
   "apps/basis-mobile/src/core/mappingsStoreRN.js": {
     "count": 1,
-    "note": "debt: onderling.mappings:* — extension mappings (pod-routing rows)"
+    "note": "not sealable: read before a key exists — bootAgentBundle loads the extension mappings at its start (apps/basis-mobile/src/core/agentBundle.js:198), before createRealHouseholdAgent publishes the content key (agentBundle.js:312); the web's are sealed (read after its boot)"
   },
   "apps/basis-mobile/src/core/nativeCalendar.js": {
     "count": 1,
@@ -40,12 +32,8 @@
     "note": "not content: cc.advisorShown.* — when the advisor card was dismissed"
   },
   "apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js": {
-    "count": 6,
-    "note": "debt: cc.actionFrequency (which ops the person used), cc.circleSkill.* (the person's offering per circle), cc.circleSeenAt; not content: cc.lastTab, cc.circleViewMode"
-  },
-  "apps/basis/src/core/handlers/personaPropsUpdate.js": {
-    "count": 1,
-    "note": "debt: cc.sharedDisclosure.* — what the person last shared of themselves with each circle (persona properties)"
+    "count": 4,
+    "note": "debt: cc.circleSeenAt (2 writes) — circle ids, waiting for the ruling on group (c); not content: cc.lastTab, cc.circleViewMode"
   },
   "apps/basis/src/household/persist.js": {
     "count": 1,
@@ -59,17 +47,13 @@
     "count": 2,
     "note": "debt: cc.askMatchSkips — which ask posts the person skipped for which people (ids)"
   },
-  "apps/basis/src/v2/circleKindFactory.js": {
-    "count": 1,
-    "note": "debt: the web's pending stores built here — cc.circleRecipePending.* and cc.circleRulesPending.* (an incoming circle recipe or rules document, plain)"
-  },
   "apps/basis/src/v2/circlePinStore.js": {
     "count": 1,
     "note": "debt: cc.circlePinned — the circle ids the person pinned (membership metadata)"
   },
   "apps/basis/src/v2/circlePolicyStore.js": {
-    "count": 3,
-    "note": "debt: cc.circleOverride.* (the member override io, raw on web); sealed by its caller: the policy IO (sealedKeyValue in localCirclePolicyStore and the shells); not content: cc.circlePolicyPending.* holds {pending: bool}"
+    "count": 2,
+    "note": "sealed by its caller: the policy IO (sealedKeyValue in localCirclePolicyStore and the shells); not content: cc.circlePolicyPending.* holds {pending: bool}"
   },
   "apps/basis/src/v2/circleRecipe.js": {
     "count": 1,
@@ -89,7 +73,7 @@
   },
   "apps/basis/src/v2/contactsSource.js": {
     "count": 1,
-    "note": "debt: cc.contactNames — each contact's last-read display name"
+    "note": "sealed by its caller: makeContactNameStore is handed sealedKeyValue by sealedContactNameStore, the one both shells use"
   },
   "apps/basis/src/v2/deliverySettings.js": {
     "count": 2,
@@ -103,17 +87,13 @@
     "count": 1,
     "note": "debt: onderling.enrollOffer — the offer link (relays and circle ids plain; personas and devices sealed by the phrase); the box stashes it sealed (boxStorage)"
   },
-  "apps/basis/src/v2/memberAvailability.js": {
-    "count": 1,
-    "note": "debt: cc.availability — the person's availability (away windows)"
-  },
   "apps/basis/src/v2/onboardingFlags.js": {
     "count": 2,
     "note": "not content: first-run flags (cc.onboardingDone, cc.introCardSeen, …)"
   },
   "apps/basis/src/v2/policyUpdateLane.js": {
     "count": 1,
-    "note": "debt: cc.circlePolicyHead.* — the version and the ORIGINAL signed statement of a circle's policy, plain beside the sealed policy"
+    "note": "sealed by its caller: makePolicyHeadStore is handed sealedKeyValue by sealedPolicyHeadStore, the one both shells use"
   },
   "apps/basis/src/v2/relayPref.js": {
     "count": 2,
@@ -127,28 +107,16 @@
     "count": 2,
     "note": "debt: onderling.screen.<bot> — a screen's GRANT, including its capability tokens to act as the person at the bot (a credential)"
   },
-  "apps/basis/src/v2/sharedWithMeStore.js": {
-    "count": 1,
-    "note": "debt: cc.sharedWithMe — what others shared with the person"
-  },
   "apps/basis/src/v2/themePref.js": {
     "count": 1,
     "note": "not content: basis.theme — the theme"
-  },
-  "apps/basis/src/v2/userLlmDefault.js": {
-    "count": 2,
-    "note": "debt: cc.userLlmDefault — the person's own model endpoint, INCLUDING ITS API KEY (a secret)"
-  },
-  "apps/basis/src/v2/userScreens.js": {
-    "count": 1,
-    "note": "debt: cc.userScreens — the person's own pages (names and blocks chosen)"
   },
   "apps/basis/src/web/localStoragePeerBackend.js": {
     "count": 1,
     "note": "debt: cc-peers:* — the circle peer graph (peers' addresses per circle)"
   },
   "apps/basis/web/v2/circleApp.js": {
-    "count": 17,
-    "note": "debt: mixed — cc.actionFrequency (which ops the person used), cc.agentRequestQueue (pending agent-add requests), cc.circlePolicyHead.* via the head store (the circle policy statement, sealed elsewhere, plain here), cc.contactSeenAt + cc.contactNames (contacts' names), cc.circleSeenAt, cc.circleViewMode, cc.circleSkill.* (the person's offering per circle), cc.advisorShown.*; not content: basis.theme, cc.lastTab, circle.app.lang, basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage)"
+    "count": 12,
+    "note": "debt: cc.contactSeenAt (read marks per contact) and cc.circleSeenAt — ids, waiting for the ruling on group (c); not content: basis.theme, cc.lastTab, cc.circleViewMode, circle.app.lang (2), basis.nearby-asked:*, basis.nearbySelf, basis.nearbyAllows, cc.activeCircle (sessionStorage), cc.advisorShown.*"
   }
 }

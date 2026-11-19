@@ -28,6 +28,7 @@
 import { judgePolicyChain, judgeWithProposals, proposalsOn } from './governanceReceiverGate.js';
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES } from './circlePolicy.js';
 import { processRefusalLog } from './refusalLog.js';
+import { sealedKeyValue } from './localStoreSeal.js';
 
 export const POLICY_UPDATE_KIND = 'policy-update';
 
@@ -320,4 +321,10 @@ export function adminsOfViaSkill(callSkill) {
     catch { res = null; }
     return new Set((res?.members ?? []).filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean));
   };
+}
+
+/** The policy-head store, SEALED at rest (ledger L1083: it keeps the circle policy's original statement), over
+ *  localStorage (web) or AsyncStorage (phone). */
+export function sealedPolicyHeadStore(storage) {
+  return makePolicyHeadStore(sealedKeyValue(storage, { name: 'the policy head', strict: true }));
 }

@@ -76,7 +76,8 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
-import { sealedLocalBackend, sealedLocalVault, sealedKeyValue } from '../../src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedLocalBackend, sealedLocalVault, sealedKeyValue, sealedJsonIo, onShellContentSeal } from '../../src/v2/localStoreSeal.js';
+import { circleOfferingDraftIo } from '../../src/v2/circleOfferingDraft.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
 // session routes a sealed circle to the user's REAL pod; otherwise the in-memory pseudo-pod.
@@ -176,7 +177,7 @@ import { createPairRoster } from '../../src/v2/pairRoster.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
-import { loadBookRows, loadContactRoster, makeContactNameStore } from '../../src/v2/contactsSource.js';
+import { loadBookRows, loadContactRoster, sealedContactNameStore } from '../../src/v2/contactsSource.js';
 import { nameShown } from '../../src/v2/personLabel.js';
 import { rosterRowShown } from '../../src/v2/circleViewAs.js';
 import { settleContactAttach } from '../../src/v2/contactAttachOutcome.js';
@@ -246,7 +247,7 @@ import { voteFailedLine, enactOutcomeLine } from '../../src/v2/governanceView.js
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, sealedPolicyHeadStore, membersOfViaSkill } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs, enrollOfferErrorKey } from '../../src/v2/enrollOffer.js';
 import { installWebSignatureEquation } from '../../src/v2/signatureEquations.js';
 import { runStartQueue, startQueueSiblings } from '../../src/v2/startQueue.js';
@@ -388,7 +389,7 @@ import { isFeatureEnabled, defaultViewModeFromPolicy, composerGate } from '../..
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
 import { buildTaskRows } from '../../src/v2/taskRows.js';
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions block.
-import { createActionFrequencyStore } from '../../src/v2/actionFrequency.js';
+import { createActionFrequencyStore, actionFrequencyIo } from '../../src/v2/actionFrequency.js';
 import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
 // No-pod group-key rotation, RECEIVE side: record a fanned key-event into the local per-circle log +
 // fold the recorded events into the key chain on a content read (the counterpart to the key-event log sink).
@@ -1169,10 +1170,7 @@ const policyStore = localCirclePolicyStore();
 // copy of circle state, no longer a per-device setting that only a settings save ever broadcast.
 const circlePolicyLane = makeCirclePolicyLane({
   emitter: () => _peerAgent?.emitPolicyUpdate ?? null,
-  headStore: makePolicyHeadStore({
-    getItem: async (k) => { try { return globalThis.localStorage?.getItem(k) ?? null; } catch { return null; } },
-    setItem: async (k, v) => { try { globalThis.localStorage?.setItem(k, v); } catch { /* quota / disabled */ } },
-  }),
+  headStore: sealedPolicyHeadStore(globalThis.localStorage),   // sealed at rest: it keeps the policy's original statement
   readPolicy: (cid) => policyStore.get(cid),
   // A policy that arrives can change the circle's storage posture — so what was composed from the old one (the seal
   // strategy, the media gateway, both cached per circle, a cached "none" included) is dropped and rebuilt on next use.
@@ -1196,20 +1194,11 @@ const myShareableNknAddr = () => shareableAddress(
 );
 
 // D1 (§5A) — per-circle action-frequency counter (the quickActions row).
-// Hydrated from localStorage at boot; persists its snapshot on every bump.
-const ACTION_FREQ_KEY = 'cc.actionFrequency';
-const actionFrequency = createActionFrequencyStore(readActionFreqSnapshot(), {
-  onChange: (snap) => {
-    try { window.localStorage.setItem(ACTION_FREQ_KEY, JSON.stringify(snap)); }
-    catch { /* quota / disabled */ }
-  },
-});
-function readActionFreqSnapshot() {
-  try {
-    const raw = window.localStorage.getItem(ACTION_FREQ_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
+// Persists its snapshot on every bump, SEALED (which ops the person uses); the stored snapshot is read once the content
+// key exists and merged in (it cannot be opened at module start, before the agent publishes the key).
+const actionFrequencyStorage = actionFrequencyIo(globalThis.localStorage);
+const actionFrequency = createActionFrequencyStore({}, { onChange: (snap) => { actionFrequencyStorage.save(snap); } });
+onShellContentSeal(() => { actionFrequencyStorage.load().then((snap) => actionFrequency.merge(snap)).catch(() => {}); });
 // D1 (§5A) — in-memory fallback recipe for a circle with no authored screen:
 // just the "Veel-gebruikt" row.  Never persisted.
 const DEFAULT_SCREEN_RECIPE = Object.freeze({
@@ -1287,15 +1276,11 @@ const availabilityStore = createAvailabilityStore(
 // persisted pending agent-add requests. Reuses
 // the same {load, save} adapter shape as the proposal store.
 const AGENT_REQ_STORE_KEY = 'cc.agentRequestQueue';
+const agentRequestIo = sealedJsonIo(globalThis.localStorage);   // sealed at rest: pending agent-add requests
 const agentRequestStore = createAgentRequestStore({
   io: {
-    load: async (key) => {
-      try { const raw = window.localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
-      catch { return null; }
-    },
-    save: async (key, value) => {
-      try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota / disabled */ }
-    },
+    load: (key) => agentRequestIo.load(key),
+    save: async (key, value) => { try { await agentRequestIo.save(key, value); } catch { /* quota / disabled / no content key yet */ } },
   },
   storeKey: AGENT_REQ_STORE_KEY,
 });
@@ -2359,7 +2344,7 @@ function buildCircleBot(agent) {
   // scoping — DEFAULT_CIRCLE_ORIGINS alone would drop them. (V0: treat all accepted mappings as app-scoped;
   // per-circle scope is a later refinement.)
   let mappingOrigins = [];
-  const mappingsStore = localStorageMappingsStore();   // V0 web store; swap for a pseudo-pod at 3.3c
+  const mappingsStore = localStorageMappingsStore(sealedKeyValue(globalThis.localStorage, { name: 'the extension mappings', strict: true }));   // V0 web store, sealed at rest; swap for a pseudo-pod at 3.3c
   // S6.C deep — base scope = the 5 circle apps (+ accepted extension mappings); the
   // active circle's policy.apps narrows it further (intersection), so a circle can
   // compose only the apps it uses. null/empty policy.apps → all (no dead circles).
@@ -3161,7 +3146,7 @@ const contactSeen = makeContactSeenStore({ getItem: (k) => window.localStorage.g
 // …and what each contact's row LAST READ on this device — the left-hand side of the rename marker: a
 // contact who renames themselves on the pair roster announces nothing, so the row says what they were until
 // the thread is opened.
-const contactNames = makeContactNameStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
+const contactNames = sealedContactNameStore(globalThis.localStorage);   // sealed at rest; a read before the key waits for it
 let _contactTurns = [];
 // each contact's pair circle, noted by every roster read: "Nieuw voor jou" files a direct message under that circle's
 // persona, as the Contacten switcher does
@@ -5909,8 +5894,8 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
   // the one moment the joiner-side wizard can learn it pre-join. Best-effort: unreadable ⇒ not embedded.
   let inviteOfferingsMatching = false;
   try {
-    const s = localStorage.getItem(skillKey(circleId));
-    inviteOfferingsMatching = !!s && offeringsMatchingEnabled(JSON.parse(s));
+    const s = await offeringDrafts.load(circleId);
+    inviteOfferingsMatching = !!s && offeringsMatchingEnabled(s);
   } catch { inviteOfferingsMatching = false; }
   // NKN+pod circle — read the circle's storage posture so a pod-backed invite says so (J-NP3) and carries
   // its pod as the connection point (rule 1: joining populates the list). Best-effort: a policy read
@@ -8729,19 +8714,19 @@ function showCircle(id, circle, policy) {
 }
 
 
-// Skill editor — draft persists locally per circle (cc.circleSkill.<id>);
+// Skill editor — draft persists locally per circle (cc.circleSkill.<id>), SEALED at rest (circleOfferingDraft.js);
 // "extend the Pinboard skill item" is the later real-persistence path.
-const skillKey = (id) => `cc.circleSkill.${id}`;
-function showSkills(id) {
+const offeringDrafts = circleOfferingDraftIo(globalThis.localStorage);
+async function showSkills(id) {
   let skill = normalizeOffering(null);
-  try { const s = localStorage.getItem(skillKey(id)); if (s) skill = normalizeOffering(JSON.parse(s)); } catch { /* default */ }
+  try { const s = await offeringDrafts.load(id); if (s) skill = normalizeOffering(s); } catch { /* default */ }
   const rerender = () => renderOfferingEditor(rootEl, {
     skill,
     t,
     onChange: (patch) => { skill = mergeOffering(skill, patch); rerender(); },
     onBack: () => showDetail(id),
-    onSave: () => {
-      try { localStorage.setItem(skillKey(id), JSON.stringify(skill)); } catch { /* ignore */ }
+    onSave: async () => {
+      await offeringDrafts.save(id, skill);
       showDetail(id);
     },
   });

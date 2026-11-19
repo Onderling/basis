@@ -83,7 +83,7 @@ import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStor
 // the γ.4 resolver applies / discards.
 import { makeCirclePolicyStoreRN } from './src/core/circleStoresRN.js';
 import { forgetCircleSealStrategyFor } from './src/core/circlePods.js';
-import { makeCirclePolicyLane, makePolicyHeadStore, membersOfViaSkill } from '../basis/src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, sealedPolicyHeadStore, membersOfViaSkill } from '../basis/src/v2/policyUpdateLane.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
@@ -289,7 +289,7 @@ export default function App() {
     const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
     circlePolicyLaneRef.current = makeCirclePolicyLane({
       emitter: () => bundleRef.current?.agent?.emitPolicyUpdate ?? null,
-      headStore: makePolicyHeadStore(AsyncStorage),
+      headStore: sealedPolicyHeadStore(AsyncStorage),   // sealed at rest: it keeps the policy's original statement
       readPolicy: (cid) => policyStore.get(cid),
       // a policy that arrives may change the circle's storage posture — drop the strategy composed from the old one
       writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy, { seen: true }); forgetCircleSealStrategyFor(cid); return r; },

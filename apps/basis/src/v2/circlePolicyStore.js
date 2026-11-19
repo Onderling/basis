@@ -231,18 +231,20 @@ export function createMemberOverrideStore({ load, save } = {}) {
 
 /** localStorage-backed load/save for member overrides. Key: `cc.circleOverride.<circleId>`. */
 export function localStorageOverrideIo(storage = globalThis.localStorage) {
+  // SEALED at rest (ledger L1083: per-member overrides), on web and phone alike
+  const kv = sealedKeyValue(storage, { name: 'the member overrides', strict: true });
   const key = (id) => `cc.circleOverride.${id}`;
   return {
     load: async (id) => {
       try {
-        const s = storage?.getItem(key(id));
+        const s = await kv.getItem(key(id));
         return s ? JSON.parse(s) : null;
       } catch {
         return null;
       }
     },
     save: async (id, override) => {
-      try { storage?.setItem(key(id), JSON.stringify(override)); } catch { /* ignore */ }
+      try { await kv.setItem(key(id), JSON.stringify(override)); } catch { /* ignore: quota, or no content key yet */ }
     },
   };
 }

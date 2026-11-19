@@ -17,6 +17,10 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal } from '../../src/v2/localStoreSeal.js';
+// the pending caches seal at rest (ledger L1083): a content key is published, as after a boot
+setShellContentSeal(groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') }));
 
 import { makeCircleRulesPeerHandler }  from '../../src/v2/circleRulesReceiver.js';
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';

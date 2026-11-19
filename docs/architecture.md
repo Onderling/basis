@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last updated: 2026-11-17** — checked against the code on `development` that day. Every change to this file
+> **Last updated: 2026-11-19** — checked against the code on `development` that day. Every change to this file
 > moves this date (`scripts/lint-architecture-date.mjs` is red otherwise), so the date says how fresh the whole
 > file is, not one paragraph.
 
@@ -544,6 +544,22 @@ layers a surface asks before the model sees any tool (tier, map, availability) a
 the model is SHOWN; the rest run at the waist on the one call. A fitness test pins the code's layer list to the
 line above, so the two cannot drift.
 
+**How heavy an act is, and how far each door goes** (2026-11-19). Every op that writes declares what it writes
+(`writes: {scope, what}`; [`conventions/manifest-standard.md`](conventions/manifest-standard.md)), and its weight, 1
+to 6, follows from that (`opWeight`, `packages/app-manifest/src/atoms.js`): a read 1, the person's own content 2, a
+circle's content 3, the person's control 4, a circle's control 5, keys 6. A door reads the weight instead of keeping
+its own list of what is too much, and an op with no weight is not offered. The person's own "+" offers nothing above
+its ceiling (`withinWeight`, `src/assistant/plusDoor.js`): 3 by default (a circle's things, after a yes on the card),
+set per persona on Mij to 0 (off), 1 (reads) or 2 (own things), kept on the persona as `_plus.ceiling` and inherited
+from the general persona. A turn with several selves ticked holds to the strictest, and the ceiling cuts both what
+the model is handed and every other way in (a slash line, a phrase, a form). In the own place an op whose widest
+scope is a circle weighs as the person's own (`ownPlaceWeight`), since its write lands in the person's store. The
+household bot's role columns agree with the weight (an observer 1 and 2, a member up to 3, an admin up to 3 and 5)
+except for a closed list of ops, each naming its reason on its own manifest row (`botException`: the person's own
+screens, the identity link, the household in their own app). None of them has a chat surface, so the bot's model is
+never handed an op above 3, and their effect and any secret stay in the person's private chat. A test pins the
+columns to the weight (`botTableByWeight.test.js`).
+
 *Found the hard way (2026-08-28): the composer's attach menu did the structural layer and skipped the
 contextual one entirely — projected once at module load, offered whole, while dispatch resolved through
 a per-circle catalogue. Tapping an entry threw, and the shell answered "I couldn't turn that into an
@@ -650,6 +666,7 @@ the honest tail is named below the table rather than dropped.
 | The **inbound handler map** (which subtype goes to which handler) is one shared composition (`src/v2/inboundWiring.js`) | ◐ MOBILE ONLY — the phone composes it; web (`circleApp.js`) and the box still build their own through `makePeerRouter`. That they route the same subtypes is pinned by `shellsRouteTheSameSubtypes`, not by construction |
 | Every peer send leaves through the one send gate | ◐ ONE DECLARED EXCEPTION — the screen view (a granted screen on another device) runs its own secure agent and sends outside `peerSend`; `oneSendGate.test.js` names it as the only exception |
 | A member removed from a circle stops being that circle's address at once | ◐ LAGS ONE READ — the gate's circle-address index (`createCircleAddressIndex`) drops a removed member's address at that circle's next non-empty roster read, not at the removal |
+| Everything a shell writes to the device is **sealed with the content key** (`localStoreSeal.js`) | ◐ PARTLY — the stores and several small key-value stores are sealed, and so is the person's own model setting with its API key; other small key-value stores are still written plain (on the web, for one, which ops the person used, `cc.actionFrequency`), and no guard counts raw key-value writes yet |
 | The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ◐ PARTLY — noticeboard POSTS live in their circle's own store and ride its lane: pinboard is handed the host's circles (`hostCircles`) and writes and reads posts there (`apps/pinboard/src/lib/routedStore.js`); the copy into the circle store and the bridge back are gone. Who answered a post is the poster's own and stays on the poster's device. The pile still holds the circle engine's other rows (membership codes and redemptions, rules and their acceptances, the circle-chat mirror, reports), each tagged by circle id — the shared pile this section forbids, for those rows |
 
 **The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
@@ -933,7 +950,30 @@ Anything that arrives from outside as behaviour — a downloaded extension (a ma
 declared flows) — passes ONE verifier before install and again at boot: its composites compile to flows and are
 checked with the flow verifier (the secrets rule), every step must name an op the catalogue has, a step naming a
 never-delegable op is withheld, and a step outside an installer-named scope is refused; the consent card names
-each refusal (`apps/basis/src/mappings.js`). The confidential LLM route for a Node process (the bots, the Telegram shell) is
+each refusal (`apps/basis/src/mappings.js`).
+
+**A circle reaches an outside toolbox through its household bot, never from a person's device** (decided
+2026-11-18; detail in [`catalogue/tools.md`](catalogue/tools.md)). One op reaches every tool (`tools.useTool
+{toolbox, tool, input}`, `src/v2/toolsManifest.js`), mounted on the box's waist; the call leaves from the box over
+current A2A (1.0: the card at `/.well-known/agent-card.json`, JSON-RPC `SendMessage`, a bearer key the box's operator
+placed; `src/v2/toolboxClient.js`), not over core's older native A2A path. An egress gate at the box's waist
+(`wrapCallSkillWithEgressGate`, `src/core/agent/egressGate.js`) lets exactly the tool and its input leave, refuses a
+toolbox that is not switched on before any call, and records each call on the box (`tool-call`: who, which toolbox,
+which tool, how it ended; never the words). An outside answer is read under caps: at most 24 rows (`tools.rowsMax`),
+a name, detail and seller cut at 120, 160 and 60 characters. The box fetches a thing's picture itself, only from the
+toolbox's own host, only jpeg, png or webp by its first bytes, at most 15 kB each and 10 a reply, and only for a door
+that shows pictures; the picture travels on as bytes and its URL never does, so no door contacts a shop. The things
+are shown under a head per shop; a person chooses one with a button or by its number in words. The list shown is
+kept per thread (`choiceThreadOf`), "meer" (`tools.moreThings`) pages the rest of a shop from that kept list without
+a new call, and "which list?" names the list by id. A toolbox's own page is a paired **screen** of the person: it
+calls `useTool` through the bot, as that person, over the relay. A screen's grant may hold an op that the
+management screen paints no button for (`SCREEN_NO_BUTTON`), which is a different list from what a screen can never
+call (`BOT_SCREEN_NEVER`). The pairing offer names its toolbox and the grant records it: a call for another toolbox
+is refused (`toolbox-not-yours`), and a screen paired without one is not granted `useTool`. Every answer a screen
+asks for is measured before it is sealed, and one too large for a single relay envelope is refused as
+`answer-too-large`, never cut.
+
+The confidential LLM route for a Node process (the bots, the Telegram shell) is
 `@onderling/llm-client/providers/privatemode`: the Ollama provider's wire and parser with Privatemode's SDK as the
 transport, which attests the enclave and encrypts end-to-end on the caller's machine — no proxy; the key comes from the
 environment or a key file, never from code. The assistant a door talks to is one composition
@@ -1066,6 +1106,19 @@ receiver, no handshake goes first and the send reads **delivered**: nothing is h
 silently**. Re-sending such sends blindly is not safe — not every receiver drops a repeat by `msgId` — and the
 delivery receipt that would let a send stay held until confirmed exists only for chat messages, and only while the
 person keeps receipts on. Closing it needs an acknowledgement that every kind of send carries.
+
+**The relay has two limits, and a sender learns something different from each.** The first is a rate per
+connection: a token bucket per socket (`relay.msgRatePerSec` 30, `relay.msgRateBurst` 60). A frame over it is
+refused at once with `OVER_RATE`, written only to the socket it came in on and naming only that frame's envelope id,
+so it says nothing about the receiver. `RelayTransport` keeps each frame it wrote for a short while
+(`transports.overRateKeepMs`, 10 s) and re-sends a refused one after a second, one at a time at 10 a second, at most
+five sends in all; after that, or when the frame was no longer kept, or the socket closed with it queued, it tells
+the give-up path (`onUndelivered`, reason `over-rate`), and the bubble says failed. Order is kept among re-sent
+frames, not between a re-sent frame and a newer one. A relay that names no frame in `OVER_RATE` gets no re-send. The
+second limit is the hold for a receiver that is not connected: the relay keeps the frame for up to 24 h
+(`relay.queueTtlMs`, capped in count per address) and, when it gives up, sends the sender an `undelivered` frame with
+the envelope id if that sender is still connected. It reports only that give-up, never "queued" or "delivered" now:
+that answer on demand would tell anyone whether an address is online.
 
 **A circle address this device cannot place yet is parked, not dropped** (2026-11-10/11). A receiver that has not
 read a circle's roster, or has read it but does not find the sender on it, used to drop the envelope — the old rule
@@ -1369,6 +1422,19 @@ person's seeds, tokens, or mute lists — entries sealed to the old root are und
 by construction. Trust levels and the audit log stay deliberately plain: sealing them buys no secrecy
 and widens the blast radius of an unlock problem.
 
+**What a shell keeps on the device is sealed with the device's content key** (decided 2026-11-19: everything, unless
+it must be read before a key exists). The agent mints that key at boot and publishes it to the shell
+(`src/v2/localStoreSeal.js`, `setShellContentSeal`); a reader that may run earlier, such as a screen's first frame,
+reads again when it arrives (`onShellContentSeal`). A store wraps its backend once (`sealedLocalBackend`, over
+`sealedPersist` in `@onderling/local-store`). It seals only the rows that changed since the last save, so a save of an
+unchanged store writes nothing; a row it cannot open (sealed under another key) is kept and written back byte for
+byte, never handed on as content, until the caller writes that key itself. A small key-value store goes through
+`sealedKeyValue` (values sealed, keys legible, a write before the key refused rather than stored in the clear) or,
+for one JSON value per key, `sealedJsonIo`, which also answers a read before the key as "nothing kept" without
+overwriting anything and reseals an old plain value at its first read. What stays readable, and why: what must be read
+before a key exists, and what a paired screen keeps in its own browser (its grant), because a screen holds no content
+key. Not every small store goes through these yet (the table under "The data plane").
+
 **Two records of what happened, one retention vocabulary.** The agent keeps two append-only records with
 different readers: the **security audit** (a signed hash chain of key ceremonies and crypto events — its
 `verify()` walks every signature and link) and the **agent trail** (the record that an agent *acted*:
@@ -1413,6 +1479,25 @@ honest signature and refuses it tampered. The box hands `node:crypto`, the web W
 self-test; without Ed25519 in the browser tweetnacl stays), the phone libsodium's C over JSI
 (`react-native-libsodium`, pinned). On the phone that took one check from about 60 ms to about 0.1 ms; a
 `lint-one-signature-check` guard keeps any other check from appearing.
+
+**Signing, key derivation and secretbox stand behind ports of the same shape** (`crypto/ed25519Sign.js`,
+`crypto/secretbox.js`). tweetnacl answers until a shell installs a faster implementation, and the kernel takes it
+only if it gives exactly the expected bytes on fixed vectors (decided 2026-11-19). For secretbox that is one key and
+nonce over messages of 0, 29 and 300 bytes and one of 768 KiB built from a byte formula, because a native bridge
+that is right for small inputs and wrong for a device-log segment would otherwise pass; it must also refuse a
+flipped ciphertext byte, a flipped authenticator and a wrong key. The signature check's honest and tampered cases
+are fixed bytes in the source (`SIGNATURE_VECTORS`), so installing it runs no tweetnacl; the signing port still
+computes its reference with tweetnacl, on fixed seeds and messages, at install. An installed implementation that
+throws after its vetting answers that call by tweetnacl, said once in the log; a secretbox open it refuses is asked
+of tweetnacl again, so a box that does not open is `null` to every caller whichever ran. The port never chooses a
+nonce: the caller does, as before. Which shell installs what: the phone libsodium over JSI for all three; the box
+`node:crypto` for the check and for signing, and tweetnacl for secretbox (`node:crypto` has no XSalsa20-Poly1305);
+the web WebCrypto for the check only, because its Ed25519 is asynchronous while every signing path is synchronous,
+and it has no XSalsa20-Poly1305. `lint-one-signing` and `lint-one-secretbox` keep other call sites from appearing;
+the vault's two secretbox calls are that guard's baseline, since `@onderling/vault` cannot import the kernel
+without a cycle. Per peer, the Curve25519 image of its key and the shared box key are remembered for the session
+(`AgentIdentity`), in memory only and bounded, the shared key per identity and keyed by the peer's full key; neither
+is written down.
 
 **The lanes.** Four kinds of circle state ride the same rail with per-lane semantics: **membership**
 (catch-up is pull-everything, because completeness is the point of a roster), **governance** (proposals

@@ -2010,8 +2010,8 @@ a box) are kept as a list of what a replacement must not repeat. No new pod feat
 
 ## 2026-11-18 — A circle uses an outside toolbox: one op for every tool, placed by the operator, switched on by the admin (Frits decided; Fable ruled the shapes)
 
-**Status:** decided; the door half built (the tool call from the box, `/toolbox`, the words); choices, a screen's call
-and the toolbox's own page are later steps.
+**Status:** decided; the door half built (the tool call from the box, `/toolbox`, the words); choices and a screen's
+call built 2026-11-19 (the entries of that date below); the toolbox's own page as one client file is a later step.
 
 **Context:** Frits's grocery app (a toolbox) should be usable from the household bot. Nothing in the repo called an
 outside agent from the box: `contactSkills.js` turns a contact's skill cards into commands at runtime (web and phone,
@@ -2037,3 +2037,134 @@ an entry.
 **Consequences:** `docs/catalogue/tools.md`. The help phrases for new ops are an op's description until the frozen
 phrases move into the descriptions. A key handed over from a person's own app is later work.
 
+---
+
+## 2026-11-19 — An op's weight follows from what it writes, and a door offers by weight; an exception is named on its op (Fable ruled)
+
+**Status:** settled and built for the person's own "+" and the household bot's table.
+
+**Context:** the "+" kept a hand-written fence (an `adminLike` test and four named exceptions), and the household
+bot's role columns were a list of op ids with nothing tying them to what an op does. A new op was safe at a door only
+if someone remembered to list it.
+
+**Decision:** every op that writes declares `writes: {scope, what}`, and its weight (1 to 6) follows from that and from
+`reveals` (`opWeight`); it is never declared by itself. A door offers up to a ceiling: the own "+" up to 3 by default,
+set per persona to 0, 1, 2 or 3 and kept on the persona (`_plus.ceiling`, inherited from the general persona, the
+strictest of a turn's selves holding); the bot's columns are observer 1 and 2, member up to 3, admin up to 3 and 5. An
+op a door offers beyond its column is an exception from a closed list, each named with its reason on its own manifest
+row (`botException`), without a chat surface, and with its effect kept in the person's private chat. An op with no
+weight is not offered. A toolbox's ops are a circle's control (5): a toolbox decides where the circle's questions go,
+and scope is the widest place an op affects, not where its record is kept.
+
+**Alternatives / why:** *a weight declared per op* would be one more value to keep honest beside `writes`; derived, it
+cannot disagree. *Lists per door* (the old fence, the old columns) let a new op through by default and kept the reason
+in a reviewer's head. *No exceptions at the bot* would take away a person's own screens and identity link at the door
+they use.
+
+**Consequences:** the convention is in `docs/conventions/manifest-standard.md`; tests pin the "+" fence
+(`plusModelFence.test.js`) and the bot's columns (`botTableByWeight.test.js`). Code: `packages/app-manifest/src/atoms.js`,
+`apps/basis/src/assistant/plusDoor.js`, `apps/basis/src/v2/assistantOps.js`.
+
+---
+
+## 2026-11-19 — A faster crypto implementation is vetted against fixed bytes in the source, never against tweetnacl at start; tweetnacl answers until then and on any refusal (Fable ruled)
+
+**Status:** settled. Built for the signature check and for secretbox; the signing port still computes its reference
+with tweetnacl at install, on fixed seeds and messages, until its follow-up lands.
+
+**Context:** the signature check, signing and key derivation, and secretbox each stand behind a port a shell may fill
+with a native implementation (libsodium on the phone, `node:crypto` on the box). The check used to mint a random key
+pair and signature with tweetnacl at every install, which is the slow work the port exists to avoid, and on the web it
+vetted tweetnacl against itself.
+
+**Decision:** an implementation is taken only if it gives the expected answers on vectors written in the source as
+bytes: the twelve Ed25519 edge cases, one honest signature and three refusals for the check; fixed boxes for three
+small messages, three forgeries and one 768 KiB message (built from a byte formula, its parts pinned) for secretbox.
+Otherwise tweetnacl stays and the answer says why. After the vetting, a call that throws (or a secretbox open the
+implementation refuses) is answered by tweetnacl and said once in the log, so a broken native module never breaks a
+start or a send. A shell with no implementation that gives the same bytes keeps tweetnacl: the box for secretbox, the
+web for signing and secretbox.
+
+**Alternatives / why:** *compare with tweetnacl at start* costs the start what the port saves, and a reference computed
+at run time is only as fixed as the library that computes it. *Trust a well-known library without vetting* fails on
+the point that made the check strict: Ed25519 libraries disagree on crafted signatures, and a device that answers
+differently forks the circle's view. *Small vectors only* would pass a bridge that is wrong for a device-log segment.
+
+**Consequences:** `packages/core/src/crypto/` (`ed25519Strict.js`, `ed25519Sign.js`, `secretbox.js`); guards
+`lint-one-signing` and `lint-one-secretbox`. Amends nothing in 2026-11-12's one-rule entry; it says how a faster
+equation is admitted.
+
+---
+
+## 2026-11-19 — A toolbox's pictures reach a door only as bytes the box fetched from the toolbox's own host (Frits asked; Fable ruled)
+
+**Status:** settled and built (`fetchThumbs`, `apps/basis/src/v2/toolboxClient.js`).
+
+**Context:** a toolbox's answer names a picture per thing, usually on a shop's own site. A door that loads that URL tells
+the shop the person's address and when they looked.
+
+**Decision:** the box fetches the picture, only from the toolbox's own placed host (the origin of its endpoint, with its
+key), only jpeg, png or webp by the first bytes, within a size, count and time cap, and only for a door that shows
+pictures. It travels on as bytes; the URL never does. Anything else is left out and the thing is shown in words.
+
+**Alternatives / why:** *let the door load the URL* leaks the person to the shop. *Let the box fetch from any host*
+widens the box's egress from one host per toolbox to the whole web. *No pictures* was the fallback; a door that shows
+them is how people choose groceries.
+
+---
+
+## 2026-11-19 — A toolbox's page is a screen bound to its own toolbox (Fable ruled)
+
+**Status:** settled and built (`apps/basis/src/v2/screenActing.js`, `botScreens.js`).
+
+**Context:** a toolbox's own page calls `tools.useTool` through the household bot as a paired screen of the person. One
+list, `BOT_SCREEN_NEVER`, both kept an op off a screen's buttons and made it uncallable by any screen, and a screen's
+grant did not say which toolbox it was for.
+
+**Decision:** two lists: what a screen holds without a button (`SCREEN_NO_BUTTON`, where `useTool` is) and what a
+screen can never call (`BOT_SCREEN_NEVER`). The pairing offer names its toolbox, an offer for a toolbox that is not on
+is refused before anything is asked, and the grant records the toolbox: a call for another toolbox is refused
+(`toolbox-not-yours`), and a screen paired without a toolbox gets no `useTool`. An answer too large for one relay
+envelope is refused as `answer-too-large`, never cut.
+
+**Alternatives / why:** *one list for both* either gives every screen a button for a raw tool call or takes the call away
+from the page that needs it. *An unbound grant* lets one toolbox's page drive another toolbox as the person. *Cutting a
+large answer* hands the page a list that looks complete and is not.
+
+---
+
+## 2026-11-19 — A toolbox's page lives on an origin of its own, never beside the Basis web app (Fable ruled)
+
+**Status:** decided; not built. Basis hosts no toolbox page today; where and how one is hosted is Frits's.
+
+**Context:** a toolbox's page keeps its screen key in the browser, and browser storage is per host, not per path.
+
+**Decision:** a toolbox's page is served from an origin of its own (one per toolbox), never from the host of the Basis
+web app.
+
+**Alternatives / why:** *a path beside the web app* would let the page's code read the web app's own storage, where a
+person's Basis keeps its keys.
+
+---
+
+## 2026-11-19 — Everything a shell writes to the device is sealed, unless it must be read before a key exists (Frits)
+
+**Status:** decided; partly built. The stores, several small key-value stores and the person's own model setting are
+sealed; other small key-value stores are still written plain, and a guard that counts raw key-value writes is not yet
+on the trunk.
+
+**Context:** the agent's vaults and the shells' stores were sealed, but small key-value values the shells write
+(settings, caches, marks) were decided one by one, and one of them held the person's own model endpoint with its API
+key in plain text.
+
+**Decision:** sealed is the default for whatever a shell writes to the device, with the device's content key
+(`apps/basis/src/v2/localStoreSeal.js`). The exception is a value that must be read before that key exists, and what a
+paired screen keeps, since a screen holds no content key. A write before the key is refused rather than stored plain;
+a read before it says "nothing kept" or waits for the key; an old plain value is resealed once.
+
+**Alternatives / why:** *decide per value* is how a key ended up in plain text: nothing failed when a value was left
+out. *Seal only what looks sensitive* asks each writer to judge, and contact ids, circle ids and usage are sensitive
+together even where each is not.
+
+**Consequences:** the remaining plain stores are listed in `docs/architecture.md` under "Where the runtime does NOT
+match this yet" until the guard holds them.

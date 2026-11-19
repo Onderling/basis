@@ -41,6 +41,7 @@ const SPECS = [
   { name: 'agents',    path: 'apps/agents/manifest.js',                           pick: (m) => m.agentsManifest },
   { name: 'lists',     path: 'apps/lists/manifest.js',                            pick: (m) => m.listsManifest },
   { name: 'params',    path: 'apps/basis/src/v2/paramsManifest.js',               pick: (m) => m.paramsManifest },
+  { name: 'tools',     path: 'apps/basis/src/v2/toolsManifest.js',                pick: (m) => m.toolsManifest },   // a circle's toolboxes (L1035)
   // the composed chat stand-ins — tasks has no app manifest of its own today
   { name: 'tasks',     path: 'apps/basis/src/core/manifests/mockManifests.js',    pick: (m) => m.mockTasksManifest },
   { name: 'pinboard',     path: 'apps/basis/src/core/manifests/mockManifests.js',    pick: (m) => m.mockPinboardManifest },

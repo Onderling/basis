@@ -6185,6 +6185,150 @@
     "secret_check_key_or_route": {
       "text": "Let op: de aanbieder van het taalmodel geeft geen antwoord (status {{status}}). De sleutel {{secret}} is mogelijk verlopen, of de verbinding met de aanbieder werkt niet: controleer eerst de sleutel. Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
       "doc": "The alert chat's line for the SDK's \"502 Connection error\": names both an expired key and the route, key first (the cheaper check)."
+    },
+    "toolbox_none": {
+      "text": "Er staat nog geen toolbox klaar op de box. De beheerder van de box zet er een neer met een bestand en een sleutel; daarna zet je hem hier aan.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_none_on": {
+      "text": "Er staat nu geen toolbox aan.",
+      "doc": "The household bot's toolboxes a member may use: none is switched on now (listTools, wherever it is painted, a screen too)."
+    },
+    "toolbox_list_head": {
+      "text": "Toolboxen op de box:",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_row": {
+      "text": "{{title}} ({{name}}): {{state}}{{words}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_state_on": {
+      "text": "aan",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_state_off": {
+      "text": "uit",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_usage": {
+      "text": "Gebruik: /toolbox, /toolbox <naam> aan of /toolbox <naam> uit.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_not_private": {
+      "text": "Zet een toolbox aan in je eigen chat met mij, niet hier.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_card": {
+      "text": "{{title}} staat klaar op {{url}}.\nWoorden: {{words}}.\n{{receives}}\nAanzetten?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_receives_question": {
+      "text": "Hij krijgt de woorden van een vraag, en niets over wie het vraagt.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_receives_list": {
+      "text": "Hij krijgt de woorden van een vraag, en bij een vraag naar de prijs de kenmerken van de dingen op een lijst; niets over wie het vraagt.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_yes": {
+      "text": "Ja, aanzetten",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_no": {
+      "text": "Nee",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_on": {
+      "text": "{{title}} staat aan. Zeg bijvoorbeeld: {{example}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_off": {
+      "text": "{{title}} staat uit. Het bestand op de box blijft.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_unchanged": {
+      "text": "Niets veranderd.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_not_placed": {
+      "text": "Er staat geen toolbox '{{name}}' klaar op de box.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_no_key": {
+      "text": "Voor '{{name}}' staat geen sleutel op de box. Die zet de beheerder van de box erbij.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_is_off": {
+      "text": "{{title}} staat uit.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_unreachable": {
+      "text": "{{title}} is nu niet te bereiken.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_timeout": {
+      "text": "{{title}} antwoordde niet op tijd.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_tool_not_offered": {
+      "text": "{{title}} biedt de tool '{{tool}}' niet aan; kijk het bestand op de box na.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_tool_failed": {
+      "text": "{{title}} kon deze vraag niet beantwoorden.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_failed": {
+      "text": "{{title}} gaf een antwoord dat ik niet kan lezen.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_says_default": {
+      "text": "gebruikt {{title}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_help_line": {
+      "text": "{{word}} <iets>: {{says}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_welcome": {
+      "text": "Verder kun je zeggen: {{lines}}.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_none_found": {
+      "text": "{{title}} vond niets.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_word_taken": {
+      "text": "Het woord '{{word}}' van {{title}} gebruik ik al voor iets anders. Kies in het bestand op de box een ander woord.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_found_row": {
+      "text": "{{label}} \u00b7 {{more}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_button": {
+      "text": "Op de lijst",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_added": {
+      "text": "Op {{list}}: {{label}}.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_gone": {
+      "text": "Die lijst ken ik niet meer. Zoek opnieuw en tik er een aan.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_which_list": {
+      "text": "Op welke lijst moet {{label}}?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_no_list": {
+      "text": "Er is nog geen lijst om het op te zetten. Maak er eerst een.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_failed": {
+      "text": "Dat kon niet op de lijst.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     }
   },
   "op": {

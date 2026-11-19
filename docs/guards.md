@@ -94,7 +94,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
-## Named design guards (`G-*`, in fitness tests) · 18
+## Named design guards (`G-*`, in fitness tests) · 27
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -104,6 +104,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a circle owns ONE store: a list entry is an item in the circle's `CircleItemStore`, so it rides | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | an entry added on A arrives on B | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | sa.audit and the agent trail read their AUDIT retention window from ONE shared table | `apps/basis/test/auditRetentionAgreement.test.js` |
+| — | what leaves for a toolbox is exactly the tool and its input; a toolbox that is not on is refused before the call; eve… | `apps/basis/test/egressToolbox.test.js` |
 | — | an entry added with a ref and a quantity on A arrives on B with both (the item travels whole) | `apps/basis/test/entryRefQuantity.test.js` |
 | — | a second add of the same thing raises the quantity, never a second entry; the reply says so | `apps/basis/test/entryRefQuantity.test.js` |
 | — | list never learns what the thing is: nothing branches on the reference's type | `apps/basis/test/entryRefQuantity.test.js` |
@@ -111,8 +112,16 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a param declared `form: false` (a thing's reference, filled by a toolbox's choice) is not a field of any form built f… | `apps/basis/test/forms/buildFormSpecProgramOnly.test.js` |
 | — | one item of EVERY canonical type, written to a circle store on one device, arrives in the | `apps/basis/test/perTypeSyncMatrix.test.js` |
 | — | a write a circle switched off is refused when tapped, the same refusal as the typed line; a door-less call (plumbing,… | `apps/basis/test/tapAsksTheCircle.test.js` |
+| — | on the booted box, a toolbox's list of things comes with a button each, and tapping one puts that thing on the househ… | `apps/basis/test/toolboxButtons.box.test.js` |
 | — | every op is gated by exactly one capability row, and every row gates at least one op | `apps/basis/test/v2/lendCapabilityRows.test.js` |
 | — | confirming a claim, editing and sharing an appointment pass the capability gate in a circle that did not switch them off | `apps/basis/test/v2/threeActsRows.test.js` |
+| — | a toolbox's list of things gets one /kies button per thing, and the tap adds THAT thing (its reference, quantity 1) t… | `apps/basis/test/v2/toolboxChoices.test.js` |
+| — | a tool call speaks the recorded wire (card, SendMessage, A2A-Version 1.0, bearer) and every failure ends in ONE code,… | `apps/basis/test/v2/toolboxClient.test.js` |
+| — | a toolbox is switched on only after the admin's yes in their own private chat, never from a group chat, and no line o… | `apps/basis/test/v2/toolboxDoor.test.js` |
+| — | Telegram door and a screen's kernel skill both reach tools.useTool through the gated call, so both write the tool-cal… | `apps/basis/test/v2/toolboxEveryRoute.test.js` |
+| — | toolbox wire is crossed for real: a socket, an HTTP server, the client's own fetch | `apps/basis/test/v2/toolboxOverHttp.test.js` |
+| — | a toolbox's key never appears in a reply, a refusal, a log line or the list of tools, and a toolbox with no key on th… | `apps/basis/test/v2/toolboxes.test.js` |
+| — | a placed toolbox is off until the admin's yes; one that is off is refused before any call leaves, and its words reach… | `apps/basis/test/v2/toolboxes.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
 | — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |
 | G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |

@@ -39,6 +39,9 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-hello',
   // a reminder a person set is said by the host's runner, as them, at its moment — not a button
   'assistant.sayReminder',
+  // a toolbox is used by its word in the chat (`zoek melk`), which names the tool and its input; a button with fields for a
+  // toolbox, a tool and an input object means nothing to a person
+  'tools.useTool',
 ]);
 
 /**

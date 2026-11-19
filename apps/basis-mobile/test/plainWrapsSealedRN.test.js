@@ -9,6 +9,7 @@ import { createConnectionPoints } from '../../basis/src/v2/connectionPoints.js';
 import { createAskMatchSkips, asyncStorageAskMatchSkipsIo } from '../../basis/src/v2/askMatches.js';
 import { phoneConnectionPointsIo } from '../src/core/connectionPointsRN.js';
 import { applyDiff, loadEventIdMap } from '../src/core/nativeCalendar.js';
+import { makeCirclePinStoreRN } from '../src/core/circleStoresRN.js';
 
 const RELAY = 'wss://relay.of-the-circle.example';
 afterEach(() => setShellContentSeal(null));
@@ -47,5 +48,15 @@ describe('the phone seals its ids-and-metadata stores', () => {
     await createAskMatchSkips(asyncStorageAskMatchSkipsIo(s)).add('post-1', 'webid-henk');
     expect(raw(s)).not.toContain('webid-henk');
     expect((await createAskMatchSkips(asyncStorageAskMatchSkipsIo(s)).list()).join()).toContain('webid-henk');
+  });
+});
+
+describe('the phone seals its pins (cc.circlePinned) through the shared io', () => {
+  it('not readable as stored; read back with the key', async () => {
+    seal();
+    const s = asyncStorage();
+    await makeCirclePinStoreRN(s).toggle('circle-of-henk');
+    expect(raw(s)).not.toContain('circle-of-henk');
+    expect(await makeCirclePinStoreRN(s).isPinned('circle-of-henk')).toBe(true);
   });
 });

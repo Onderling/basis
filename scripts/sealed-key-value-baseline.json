@@ -32,8 +32,8 @@
     "note": "not content: cc.advisorShown.* — when the advisor card was dismissed"
   },
   "apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js": {
-    "count": 4,
-    "note": "debt: cc.circleSeenAt (2 writes) — circle ids, waiting for the ruling on group (c); not content: cc.lastTab, cc.circleViewMode"
+    "count": 2,
+    "note": "not content: cc.lastTab, cc.circleViewMode — view state (the seen-marks are sealed through the shared circleSeenMarks.js)"
   },
   "apps/basis/src/household/persist.js": {
     "count": 1,

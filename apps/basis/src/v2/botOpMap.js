@@ -108,6 +108,8 @@ const COLUMNS = {
     'useTool', 'listTools',
     // the answer to a toolbox's list of things: the row's button (`/kies <n>`) puts the thing on a list (L1035)
     'pickThing',
+    // …and "meer" under a shop's cards: the rest of that shop from the list already fetched (a read; L1035)
+    'moreThings',
   ],
   admin: ['reassignTask', 'removeTask', 'editTask', 'addToolbox', 'removeToolbox', 'assistant-toolbox'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.

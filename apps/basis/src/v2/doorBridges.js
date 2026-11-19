@@ -39,5 +39,17 @@ export function multiplexBridges(bridges) {
       if (!door) return Promise.resolve();
       return door.sendReply({ ...rest, chatId: s.slice(i + SEP.length) });
     },
+    /** Can this chat's door show a picture of its own (a photo message)? A door without one gets the rows in words. */
+    canSendPhoto(chatId) {
+      const s = String(chatId ?? ''); const i = s.indexOf(SEP);
+      const door = i > 0 ? doors.find((b) => b.id === s.slice(0, i)) : null;
+      return typeof door?.sendPhoto === 'function';
+    },
+    sendPhoto({ chatId, ...rest }) {
+      const s = String(chatId ?? ''); const i = s.indexOf(SEP);
+      const door = i > 0 ? doors.find((b) => b.id === s.slice(0, i)) : null;
+      if (typeof door?.sendPhoto !== 'function') return Promise.resolve();
+      return door.sendPhoto({ ...rest, chatId: s.slice(i + SEP.length) });
+    },
   };
 }

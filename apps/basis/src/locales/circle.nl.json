@@ -6314,6 +6314,10 @@
       "text": "Het woord '{{word}}' van {{title}} gebruik ik al voor iets anders. Kies in het bestand op de box een ander woord.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_more_gone": {
+      "text": "Die lijst is weg; zoek opnieuw.",
+      "doc": "A \"meer\" tapped after its list of things was replaced or went old: nothing to page; search again (ledger L1035)."
+    },
     "toolbox_found_row": {
       "text": "{{label}} \u00b7 {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
@@ -9983,6 +9987,14 @@
     "empty_list": {
       "text": "Nog niets.",
       "doc": "Telegram runner: a list reply with no items."
+    },
+    "more_of": {
+      "text": "Meer van {{shop}} ({{n}})",
+      "doc": "Telegram: the one button under a shop's photo cards that shows the rest of that shop's things (ledger L1035)."
+    },
+    "more_of_line": {
+      "text": "Nog {{n}} van deze winkel:",
+      "doc": "Telegram: the line the more_of button stands under."
     },
     "refresh": {
       "text": "Ververs",

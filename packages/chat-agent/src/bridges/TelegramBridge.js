@@ -326,6 +326,18 @@ export class TelegramBridge {
   }
 
   /**
+   * A picture as a photo message of its own: the BYTES the caller holds (never a URL for Telegram to fetch), a caption,
+   * buttons under it.
+   * @param {{chatId: string|number, photo: Uint8Array, caption?: string, buttons?: Array<{id: string, label: string}>}} o
+   */
+  async sendPhoto({ chatId, photo, caption = '', buttons } = /** @type {any} */ ({})) {
+    if (!this.#bot) throw new Error('TelegramBridge: not started');
+    const extra = { ...(caption ? { caption } : {}) };
+    if (Array.isArray(buttons) && buttons.length) extra.reply_markup = { inline_keyboard: layoutButtons(buttons) };
+    await this.#bot.telegram.sendPhoto(chatId, { source: Buffer.from(photo), filename: 'thing.jpg' }, extra);
+  }
+
+  /**
    * Send a message.  Inline buttons (if any) are stacked one per row
    * by default — Telegram cuts off button labels when too many fit
    * on one row, which makes a long list of items unreadable.

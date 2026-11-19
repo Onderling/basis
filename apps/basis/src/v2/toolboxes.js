@@ -224,14 +224,17 @@ export function makeChoiceKeeper({ now = () => Date.now(), keepMs = CHOICE_KEEP 
   };
 }
 
-/** A thing's line: its name, then what tells it apart (its detail, its seller) and its price, as given. */
-const thingLine = (x, n, t) => t('circle.bot.toolbox_found_row', {
-  n, label: x.label, more: [x.detail && x.detail !== x.seller ? x.detail : null, x.seller, x.price ? `€ ${String(x.price).replace('.', ',')}` : null].filter(Boolean).join(' · '),
-});
+/** A thing's row: its name, then what tells it apart (its detail, its seller) and its price, as given. */
+const thingRow = (x, t) => {
+  const more = [x.detail && x.detail !== x.seller ? x.detail : null, x.seller, x.price ? `€ ${String(x.price).replace('.', ',')}` : null].filter(Boolean).join(' · ');
+  return more ? t('circle.bot.toolbox_found_row', { label: x.label, more }) : String(x.label ?? '');
+};
 
 /**
- * A toolbox's list of things as a reply: a line per thing and one button each, `/kies <n>` (the answer to "which
- * one", ledger L1035). The list is kept for the thread it was shown in. Anything else (a refusal, nothing
+ * A toolbox's list of things as the door paints a list (`useTool` replies a list): a row per thing with its detail.
+ * Each row is a `tool-thing` numbered from 1, so the button the tools manifest declares for it (`pickThing`, the
+ * answer to "which one", ledger L1035) is painted by the shared row buttons: `pickThing:<n>`, well under Telegram's 64
+ * bytes. The list is kept, as the toolbox gave it, for the thread it was shown in. Anything else (a refusal, nothing
  * found, an answer that is not a list) passes unchanged.
  * @param {object} r  `useTool`'s answer
  * @param {{threadId: string, keeper: ReturnType<typeof makeChoiceKeeper>, t: Function}} o
@@ -240,10 +243,12 @@ export function toolChoicesReply(r, { threadId, keeper, t }) {
   const items = r?.ok && Array.isArray(r.items) ? r.items : null;
   if (!items || !items.length) return r;
   keeper?.keep?.(threadId, items);
+  // a row of type `tool-thing`, numbered: the manifest's row button (`tools.pickThing`) is painted on it by the shared
+  // renderer, as on every surface that paints an answer's items
   return {
     ...r,
-    message: [t('circle.bot.toolbox_found_head', { title: r.title ?? r.name }), ...items.map((x, i) => thingLine(x, i + 1, t))].join('\n'),
-    buttons: items.map((x, i) => ({ label: String(x.label ?? '').slice(0, 60), id: `/kies ${i + 1}` })),
+    title: r.title ?? r.name,
+    items: items.map((x, i) => ({ id: String(i + 1), type: 'tool-thing', label: thingRow(x, t) })),
   };
 }
 
@@ -257,6 +262,35 @@ export function listForThing(thing, lists, shopping) {
   const own = seller ? lists.find((l) => String(l.label ?? '').toLowerCase().includes(seller)) : null;
   if (own) return own.label;
   return shopping && lists.some((l) => l.label === shopping) ? shopping : null;
+}
+
+/**
+ * `tools.pickThing` — the answer to "which one" after a list of things (`/kies <n>`, or the row's button). Thing `n` of
+ * the list shown in THIS thread goes on a list as the person who tapped: the list of the shop that sells it, else the
+ * shopping list, else the reply asks which list (`/kies <n> <list>`, as quick replies). The thing's reference and
+ * quantity 1 ride along; the same thing again raises the quantity (the lists op says so, here in the person's words).
+ * @param {{keeper: ReturnType<typeof makeChoiceKeeper>, callSkill: Function, shoppingList: () => string|null}} o
+ * @returns {(args: {spec?: string, _match?: string}, ctx: object, t: Function) => Promise<object>}
+ */
+export function makePickThing({ keeper, callSkill, shoppingList = () => null }) {
+  return async (args, ctx, t) => {
+    const [n, m] = String(args?.spec ?? args?._match ?? '').trim().split(/\s+/);
+    const thing = keeper?.take?.(ctx?.threadId ?? ctx?.caller, n) ?? null;
+    if (!thing) return { ok: false, error: { code: 'choice-gone', message: t('circle.bot.toolbox_pick_gone') } };
+    const read = await callSkill('lists', 'listLists', {}, ctx);
+    const lists = (read?.ok && Array.isArray(read.items) ? read.items : []).filter((l) => l?.type === 'list' && l.label);
+    const chosen = m !== undefined ? (lists[Number(m) - 1]?.label ?? null) : listForThing(thing, lists, shoppingList());
+    if (!chosen) {
+      if (!lists.length) return { ok: false, error: { code: 'no-list', message: t('circle.bot.toolbox_pick_no_list') } };
+      return { ok: true, message: t('circle.bot.toolbox_pick_which_list', { label: thing.label }),
+        quickReplies: lists.map((l, i) => ({ label: String(l.label).slice(0, 60), slash: `/kies ${n} ${i + 1}` })) };
+    }
+    const ref = thing.ref && typeof thing.ref.type === 'string' && typeof thing.ref.ref === 'string' ? { type: thing.ref.type, ref: thing.ref.ref } : undefined;
+    const r = await callSkill('lists', 'addToList', { list: chosen, text: thing.label, ...(ref ? { ref } : {}), quantity: 1 }, ctx);
+    if (!r?.ok) return { ok: false, error: { code: r?.code ?? 'refused', message: typeof r?.error === 'string' ? r.error : (r?.error?.message ?? t('circle.bot.toolbox_pick_failed')) } };
+    if (r.duplicate) return { ok: true, message: t('circle.lists.quantity_raised', { item: thing.label, list: chosen, quantity: r.quantity }) };
+    return { ok: true, message: t('circle.bot.toolbox_pick_added', { list: chosen, label: thing.label }) };
+  };
 }
 
 export const TOOL_CALL_KIND = 'tool-call';

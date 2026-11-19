@@ -31,8 +31,8 @@ was started 2026-11-18 with the first toolbox, a grocery search.
 - The operator's step: `deploy/roles/assistant.yml` (the files in the service's data volume).
 
 <!-- catalogue-ops
-tools: useTool listTools addToolbox removeToolbox
-assistant: assistant-toolbox assistant-pick
+tools: useTool pickThing listTools addToolbox removeToolbox
+assistant: assistant-toolbox
 -->
 
 ## Proof

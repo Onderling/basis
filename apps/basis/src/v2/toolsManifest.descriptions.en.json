@@ -7,6 +7,12 @@
       "input": "what you ask"
     }
   },
+  "pickThing": {
+    "what": "Put a thing a toolbox found on a list: the button under it.",
+    "params": {
+      "spec": "which thing, and which list"
+    }
+  },
   "listTools": {
     "what": "Show which toolboxes are on, and the word that uses each.",
     "params": {

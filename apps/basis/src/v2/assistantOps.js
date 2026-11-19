@@ -31,7 +31,7 @@ import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { replyLine } from './replyLine.js';
 import { THREAD_LANGS } from './botThreads.js';
-import { toolboxRefusalText, listForThing } from './toolboxes.js';
+import { toolboxRefusalText } from './toolboxes.js';
 
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
@@ -111,7 +111,7 @@ const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()]
  * tells them, at once, after the op (`announcements.js`). A read never does.
  */
 
-export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {}, announcer = null, feedback = {}, choices = {} }) {
+export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {}, announcer = null, feedback = {} }) {
   // The planned work of the people this door serves (the week overview's row): the host's own-devices store; a
   // composition that hands none keeps it in memory.
   const book = intentions.book ?? createIntentionBook({ store: createOwnDevicesStore(), actor: 'door', now });
@@ -187,7 +187,6 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-circle') return circleOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       if (op === 'assistant-circles') return circlesOp(caller ?? ctx?.threadId);
       if (op === 'assistant-toolbox') return toolboxOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
-      if (op === 'assistant-pick') return pickOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       // the export key's set and unlock exist for a screen alone: they run only as the yes to a screen's request
       if (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock') {
         if (ctx?.steppedUp !== true) return { ok: false, error: { code: 'screen-only', message: t('circle.bot.export_key_screen_only') } };
@@ -1087,34 +1086,6 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * `<naam> aan`: the card (its name, address, words, what it receives) with Ja/Nee, asked in the admin's own private
    * chat; the Ja (`<naam> aan ja`) switches it on, from that chat only. `<naam> uit`: off. Calls the tools ops at the waist.
    */
-  /**
-   * `/kies <n>` — the answer to "which one" after a toolbox's list of things (L1035; always a button, never
-   * typed from memory). Thing `n` of the list shown in THIS thread goes on a list as the person who tapped: the list of
-   * the shop that sells it, else the shopping list, else the reply asks which list (`/kies <n> <list>`). The thing's
-   * reference and quantity 1 ride along; a second tap of the same thing raises the quantity (the lists op says so).
-   */
-  async function pickOp(person, spec, ctx) {
-    if (!person) return { ok: false, error: 'unwired' };
-    const tp = personT(person);
-    const [n, m] = String(spec ?? '').trim().split(/\s+/);
-    const thing = choices.keeper?.take?.(ctx?.threadId ?? person, n) ?? null;
-    if (!thing) return { ok: false, error: { code: 'choice-gone', message: tp('circle.bot.toolbox_pick_gone') } };
-    const read = await callSkill('lists', 'listLists', {}, ctx);
-    const lists = (read?.ok && Array.isArray(read.items) ? read.items : []).filter((l) => l?.type === 'list' && l.label);
-    const chosen = m !== undefined ? (lists[Number(m) - 1]?.label ?? null) : listForThing(thing, lists, choices.shoppingList?.() ?? null);
-    if (!chosen) {
-      if (!lists.length) return { ok: false, error: { code: 'no-list', message: tp('circle.bot.toolbox_pick_no_list') } };
-      return { ok: true, message: tp('circle.bot.toolbox_pick_which_list', { label: thing.label }),
-        buttons: lists.map((l, i) => ({ label: String(l.label).slice(0, 60), id: `/kies ${n} ${i + 1}` })) };
-    }
-    const ref = thing.ref && typeof thing.ref.type === 'string' && typeof thing.ref.ref === 'string' ? { type: thing.ref.type, ref: thing.ref.ref } : undefined;
-    const r = await callSkill('lists', 'addToList', { list: chosen, text: thing.label, ...(ref ? { ref } : {}), quantity: 1 }, ctx);
-    if (!r?.ok) return { ok: false, error: { code: r?.code ?? 'refused', message: typeof r?.error === 'string' ? r.error : (r?.error?.message ?? tp('circle.bot.toolbox_pick_failed')) } };
-    // the same thing again: its quantity went up, said as the lists op says it (in this person's words)
-    if (r.duplicate) return { ok: true, message: tp('circle.lists.quantity_raised', { item: thing.label, list: chosen, quantity: r.quantity }) };
-    return { ok: true, message: tp('circle.bot.toolbox_pick_added', { list: chosen, label: thing.label }) };
-  }
-
   async function toolboxOp(person, spec, ctx) {
     if (!person) return { ok: false, error: 'unwired' };
     const tp = personT(person);

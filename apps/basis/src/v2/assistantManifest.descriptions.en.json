@@ -186,9 +186,5 @@
   "assistant-toolbox": {
     "what": "Show the toolboxes on the box, or switch one on or off.",
     "params": { "spec": "which toolbox, on or off" }
-  },
-  "assistant-pick": {
-    "what": "Put a thing a toolbox found on a list: the button under it.",
-    "params": { "spec": "which thing, and which list" }
   }
 }

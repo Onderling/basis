@@ -8,8 +8,9 @@
  * op whose argument is that index, so a flow's choice step can later give the same answer (L1039).
  */
 import { describe, it, expect } from 'vitest';
-import { makeChoiceKeeper, toolChoicesReply } from '../../src/v2/toolboxes.js';
-import { withAssistantOps } from '../../src/v2/assistantOps.js';
+import { makeChoiceKeeper, toolChoicesReply, makePickThing } from '../../src/v2/toolboxes.js';
+import { toolsManifest } from '../../src/v2/toolsManifest.js';
+import { renderReply } from '../../src/renderer.js';
 
 const t = (k, p) => `${k}${p ? ` ${JSON.stringify(p)}` : ''}`;
 const ITEMS = [
@@ -19,15 +20,21 @@ const ITEMS = [
 ];
 
 describe('the reply: a line and a button per thing', () => {
-  it('each thing gets one button whose id is /kies <n>, well under Telegram\'s 64 bytes', () => {
+  it('each thing is a row with its detail and one button that answers "this one" (pickThing:<n>, under Telegram\'s 64 bytes), as the painter renders it', () => {
     const keeper = makeChoiceKeeper();
     const r = toolChoicesReply({ ok: true, name: 'boodschappen', title: 'Boodschappen', items: ITEMS }, { threadId: 'telegram:1', keeper, t });
     expect(r.ok).toBe(true);
-    expect(r.buttons.map((b) => b.id)).toEqual(['/kies 1', '/kies 2', '/kies 3']);
-    expect(r.buttons[0].label).toBe('Halfvolle melk 1 L');
-    for (const b of r.buttons) expect(Buffer.byteLength(b.id)).toBeLessThanOrEqual(64);
-    expect(r.message).toContain('circle.bot.toolbox_found_head');
-    expect(r.message).toContain('Halfvolle melk 1 L');
+    // what reaches a person: the list as the door's renderer paints it (useTool's reply is a list)
+    // the buttons are the tools manifest's own row button (the shared row buttons), not built by the reply
+    const painted = renderReply({ shape: 'list', payload: r }, { t, appOrigin: 'tools', manifestsByOrigin: { tools: toolsManifest } });
+    expect(painted.kind).toBe('list');
+    expect(painted.title).toBe('Boodschappen');
+    expect(painted.items[0].label).toContain('Halfvolle melk 1 L');
+    expect(painted.items[0].label).toContain('€ 1,19');
+    expect(painted.items.map((i) => i.buttons.map((b) => b.callbackData))).toEqual([['pickThing:1'], ['pickThing:2'], ['pickThing:3']]);
+    expect(painted.items[0].buttons[0].label).toBe('circle.bot.toolbox_pick_button');
+    for (const i of painted.items) for (const b of i.buttons) expect(Buffer.byteLength(b.callbackData)).toBeLessThanOrEqual(64);
+    // what goes on the list is the thing's own name, not the row's detail
     expect(keeper.take('telegram:1', 2)?.label).toBe('Jumbo halfvolle melk 1 L');
   });
   it('a reply with no things, or a refusal, passes unchanged and keeps nothing', () => {
@@ -60,10 +67,9 @@ function door({ lists = [{ id: 'L1', label: 'Boodschappen', type: 'list' }, { id
     if (app === 'lists' && op === 'addToList') return calls.filter((c) => c.op === 'addToList').length > 1 ? { ok: true, duplicate: true, quantity: 2 } : { ok: true };
     return { ok: true };
   };
-  const threads = { langOf: () => 'nl', modeOf: () => 'short', remindersOn: () => true, viewOf: () => 'buttons', quietOf: () => null };
-  const call = withAssistantOps({ callSkill, threads, t, choices: { keeper, shoppingList: () => shopping } });
-  const pick = (n, threadId = 'telegram:1', caller = 'telegram:1') => call('assistant', 'assistant-pick', { spec: String(n) }, { caller, threadId, door: 'slash' });
-  return { keeper, calls, pick, call };
+  const op = makePickThing({ keeper, callSkill, shoppingList: () => shopping });
+  const pick = (n, threadId = 'telegram:1', caller = 'telegram:1') => op({ spec: String(n) }, { caller, threadId, door: 'slash' }, t);
+  return { keeper, calls, pick };
 }
 
 describe('the tap: the answer to "which one"', () => {
@@ -99,8 +105,9 @@ describe('the tap: the answer to "which one"', () => {
     const ask = await d.pick(3);
     expect(d.calls.some((c) => c.op === 'addToList')).toBe(false);
     expect(ask.message).toContain('circle.bot.toolbox_pick_which_list');
-    expect(ask.buttons.map((b) => b.id)).toEqual(['/kies 3 1', '/kies 3 2']);
-    for (const b of ask.buttons) expect(Buffer.byteLength(b.id)).toBeLessThanOrEqual(64);
+    const painted = renderReply({ shape: 'text', payload: ask }, { t });
+    expect(painted.quickReplies.map((q) => q.slash)).toEqual(['/kies 3 1', '/kies 3 2']);
+    for (const q of painted.quickReplies) expect(Buffer.byteLength(q.slash)).toBeLessThanOrEqual(64);
     await d.pick('3 2');
     expect(d.calls.find((c) => c.op === 'addToList').args).toMatchObject({ list: 'Feest', text: 'Biologische melk' });
   });

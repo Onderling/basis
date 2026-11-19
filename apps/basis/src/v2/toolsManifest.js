@@ -12,13 +12,14 @@ export const toolsManifest = Object.freeze({
   app: 'tools',
   version: '0.1.0',
   description: 'A circle uses the tools of the toolboxes its admin added: one op for every tool, a word per tool.',
-  itemTypes: [],
+  // a toolbox's thing as a row of an answer (`useTool`'s list): what the row button `pickThing` applies to; never stored
+  itemTypes: ['tool-thing'],
   // the hosts a box's OPERATOR places as toolboxes (the reserved word, docs/conventions/manifest-standard.md): none is
   // fixed in the code; the egress gate treats this app as one that reaches outside
   hosts: ['@placed'],
   // the non-atom verbs, classified: a tool call reads (it asks; nothing of the circle is written), adding and removing a
   // toolbox write this device's record
-  domainVerbs: { use: 'read', 'add-toolbox': 'write', 'remove-toolbox': 'write' },
+  domainVerbs: { use: 'read', pick: 'write', 'add-toolbox': 'write', 'remove-toolbox': 'write' },
   operations: [
     {
       id: 'useTool', visibility: 'authenticated', verb: 'use',
@@ -30,6 +31,19 @@ export const toolsManifest = Object.freeze({
       ],
       surfaces: {
         chat: { reply: 'list', hint: 'Use a tool of one of the toolboxes this household added (see listTools): toolbox = its name, tool = the tool id, input = the tool\'s input (a search: {query}). A list of things comes back to choose from.' },
+      },
+    },
+    {
+      // the answer to "which one" after a list of things: the button the manifest declares on each thing's row (the
+      // shared row buttons, `itemRowButtons`: a tap is `pickThing:<n>`, dispatched like `/kies <n>`). The thing goes on
+      // the list of the shop that sells it, else the shopping list, else the reply asks which list (`/kies <n> <list>`).
+      id: 'pickThing', visibility: 'authenticated', verb: 'pick',
+      appliesTo: { type: 'tool-thing' },
+      writes: { scope: 'circle' },
+      params: [{ name: 'spec', kind: 'string', required: false }],
+      surfaces: {
+        slash: { command: '/kies', body: 'argline' },
+        ui: { control: 'button', labelKey: 'circle.bot.toolbox_pick_button' },
       },
     },
     {

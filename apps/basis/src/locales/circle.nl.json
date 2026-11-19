@@ -6298,12 +6298,12 @@
       "text": "Het woord '{{word}}' van {{title}} gebruik ik al voor iets anders. Kies in het bestand op de box een ander woord.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
-    "toolbox_found_head": {
-      "text": "{{title}} vond:",
+    "toolbox_found_row": {
+      "text": "{{label}} \u00b7 {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
-    "toolbox_found_row": {
-      "text": "{{n}}. {{label}} ({{more}})",
+    "toolbox_pick_button": {
+      "text": "Op de lijst",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_pick_added": {

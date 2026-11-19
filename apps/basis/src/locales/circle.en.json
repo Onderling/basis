@@ -6293,12 +6293,12 @@
       "text": "I already use the word '{{word}}' of {{title}} for something else. Choose another word in the file on the box.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
-    "toolbox_found_head": {
-      "text": "{{title}} found:",
+    "toolbox_found_row": {
+      "text": "{{label}} \u00b7 {{more}}",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
-    "toolbox_found_row": {
-      "text": "{{n}}. {{label}} ({{more}})",
+    "toolbox_pick_button": {
+      "text": "On the list",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
     "toolbox_pick_added": {

@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -1410,6 +1410,8 @@ if (tgToken || inboxDoor.bridge) {
   toolboxesRef = toolboxes;
   // the last list of things shown per thread, so a button carries only its number (L1035)
   const toolChoices = makeChoiceKeeper();
+  // through the box's own gated call, as the person who tapped (`ctx`); the shopping list is the template's role
+  const pickThing = makePickThing({ keeper: toolChoices, callSkill, shoppingList: () => templateLists(t).find((l) => l.kind === 'shopping')?.name ?? null });
   agent.mountAppOps('tools', {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
@@ -1419,13 +1421,13 @@ if (tgToken || inboxDoor.bridge) {
       if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };
       return toolChoicesReply(r, { threadId: ctx?.threadId ?? ctx?.caller, keeper: toolChoices, t: tp });
     },
+    // the answer to "which one" after a list of things (the row's button, `/kies <n>`), in the person's own language
+    pickThing: (args, ctx) => pickThing(args, ctx, (k, p) => t(k, p, ctx?.lang ?? undefined)),
     listTools: (args) => toolboxes.listTools(args),
     addToolbox: (args) => toolboxes.addToolbox(args), removeToolbox: (args) => toolboxes.removeToolbox(args),
   }, toolsManifest);
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
-    // a toolbox's list of things: the tap (`/kies <n>`) reads this thread's list; the shopping list is the template's role
-    choices: { keeper: toolChoices, shoppingList: () => templateLists(t).find((l) => l.kind === 'shopping')?.name ?? null },
     // feedback about the app: the link to add the feedback contact (the same card the apps seed), nothing forwarded
     feedback: { card: (process.env.ONDERLING_FEEDBACK_CONTACT_CARD ?? '').trim() || null, appUrl },
     // the planned overview: written by `/overzicht`, sent to the person's own door, never in their quiet hours

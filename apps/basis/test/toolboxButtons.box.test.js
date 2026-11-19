@@ -92,21 +92,21 @@ describe('a toolbox\'s things as buttons, on the booted box', () => {
 
     await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 });
     await ask('/start');
-    const card = await ask("/toolbox boodschappen aan"); console.info("CARD", JSON.stringify(card.map((m) => [m.text, (m.reply_markup?.inline_keyboard ?? []).flat().map((b) => b.callback_data)])));
+    const card = await ask('/toolbox boodschappen aan');
+    // the card's Ja and Nee reach Telegram as buttons
+    expect(card.flatMap((m) => buttonsOf(m))).toEqual(['/toolbox boodschappen aan ja', '/toolbox boodschappen aan nee']);
     const on = await tap('/toolbox boodschappen aan ja');
     expect(on.map((m) => m.text).join('\n')).toMatch(/aan|on/i);
 
-    console.info("ON", JSON.stringify(on.map((m) => [m.text, (m.reply_markup?.inline_keyboard ?? []).flat().map((b) => b.callback_data)])));
     const found = await ask('zoek melk');
-    console.info("FOUND", JSON.stringify(found.map((m) => [m.text, (m.reply_markup?.inline_keyboard ?? []).flat().map((b) => b.callback_data)])));
     const withButtons = found.find((m) => buttonsOf(m).length);
     expect(withButtons, `no buttons: ${JSON.stringify(found)}`).toBeTruthy();
     expect(withButtons.text).toContain('Halfvolle melk 1 L');
-    expect(buttonsOf(withButtons)).toEqual(['/kies 1', '/kies 2']);
+    expect(buttonsOf(withButtons)).toEqual(['pickThing:1', 'pickThing:2']);
 
-    const added = await tap('/kies 1');
+    const added = await tap('pickThing:1');
     expect(added.map((m) => m.text)).toEqual(['Op Boodschappen: Halfvolle melk 1 L.']);
-    const raised = await tap('/kies 1');
+    const raised = await tap('pickThing:1');
     expect(raised.map((m) => m.text).join('\n')).toMatch(/2/);
     // nothing the toolbox should not see, and the key in no message
     expect(JSON.stringify(api.calls)).not.toContain(KEY);

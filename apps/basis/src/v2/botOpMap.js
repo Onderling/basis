@@ -106,8 +106,8 @@ const COLUMNS = {
     'assistant-planned',
     // a tool of a toolbox the admin added (`zoek …`), and which toolboxes there are (L1035)
     'useTool', 'listTools',
-    // the answer to a toolbox's list of things: its button (`/kies <n>`) puts the thing on a list (L1035)
-    'assistant-pick',
+    // the answer to a toolbox's list of things: the row's button (`/kies <n>`) puts the thing on a list (L1035)
+    'pickThing',
   ],
   admin: ['reassignTask', 'removeTask', 'editTask', 'addToolbox', 'removeToolbox', 'assistant-toolbox'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.

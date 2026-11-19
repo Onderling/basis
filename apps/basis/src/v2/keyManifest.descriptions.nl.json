@@ -1,0 +1,10 @@
+{
+  "keys.establish": {
+    "what": "Maak de eerste sleutel van de kring.",
+    "params": {}
+  },
+  "keys.rotate": {
+    "what": "Vervang de sleutel van de kring door een nieuwe.",
+    "params": {}
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "set-param": {
+    "what": "Change a setting.",
+    "params": {"key": "which setting", "value": "the new value"}
+  },
+  "get-param": {
+    "what": "Show how a setting is set.",
+    "params": {"key": "which setting"}
+  },
+  "list-user-params": {
+    "what": "Show the settings you can choose yourself.",
+    "params": {}
+  },
+  "restore-probe": {
+    "what": "Check whether the settings on your pod fit here.",
+    "params": {}
+  },
+  "restore-merge": {
+    "what": "Choose per setting: this device's or your pod's.",
+    "params": {"choices": "your choice per setting"}
+  },
+  "restore-resolve-mismatch": {
+    "what": "Choose what happens when your pod cannot be opened.",
+    "params": {"choice": "keep, restore or overwrite"}
+  }
+}

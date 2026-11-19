@@ -1,0 +1,10 @@
+{
+  "items.snapshot": {
+    "what": "Stuur de nieuwe stand van een item naar de kring.",
+    "params": {}
+  },
+  "items.remove": {
+    "what": "Laat de kring weten dat een item weg is.",
+    "params": {}
+  }
+}

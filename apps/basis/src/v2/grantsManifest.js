@@ -21,6 +21,15 @@ export const GRANTS_LANE = 'grants';
  */
 export const OWN_DEVICES_SCOPE = 'own-devices';
 
+/**
+ * Is this "circle" id the person's OWN place (their own lane: `own-devices`, or a persona's `own-devices:<persona>`)?
+ * Not a circle: no circle's switches govern it, and no device declines it.
+ * @param {unknown} circleId
+ */
+export function isOwnPlaceId(circleId) {
+  return circleId === OWN_DEVICES_SCOPE || String(circleId ?? '').startsWith(`${OWN_DEVICES_SCOPE}:`);
+}
+
 export const grantsManifest = Object.freeze({
   app: 'grants',
   hosts: [],

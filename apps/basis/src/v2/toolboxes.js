@@ -145,7 +145,8 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       // the pictures, fetched here by the box from the toolbox's own host and handed on as bytes; no door ever fetches one.
       // Only for a door that shows pictures (`pictures`): a words door gets none, so no bytes ride the relay or the keeper
       const items = pictures ? await fetchThumbs(list.items, { endpoint: live.endpoint, key, fetch }) : list.items.map(({ image, ...x }) => x);
-      return { ok: true, name: n, title: live.title, tool, items };
+      // `output`: the toolbox's own answer, unchanged, for a screen (a toolbox's page builds on it); `items` for the chat door
+      return { ok: true, name: n, title: live.title, tool, items, output: r.output };
     },
   };
 }

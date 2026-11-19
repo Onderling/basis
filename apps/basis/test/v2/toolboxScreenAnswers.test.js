@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { toolboxListLine } from '../../src/v2/toolboxes.js';
-import { BOT_SCREEN_NEVER } from '../../src/v2/screenActing.js';
+import { BOT_SCREEN_NEVER, SCREEN_NO_BUTTON } from '../../src/v2/screenActing.js';
 
 const tp = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
 
@@ -19,7 +19,8 @@ describe('the toolboxes on the management screen', () => {
     expect(line).toContain('Boodschappen');
     expect(line).toContain('zoek <…>');
   });
-  it('using a tool is no button on a screen', () => {
-    expect(BOT_SCREEN_NEVER).toContain('tools.useTool');
+  it('using a tool is no button on a screen, and a screen may call it (a toolbox\'s own page)', () => {
+    expect(SCREEN_NO_BUTTON).toContain('tools.useTool');
+    expect(BOT_SCREEN_NEVER).not.toContain('tools.useTool');
   });
 });

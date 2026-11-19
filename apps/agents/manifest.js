@@ -108,7 +108,7 @@ export const agentsManifest = {
     {
       id:        'setAgentSkillExposure', visibility: 'authenticated', group: 'admin',
       verb:      'update',
-      writes: { scope: 'person' },   // the exposure lives on the agent's registry entry, the owner's own; a circle admin's narrowing is stored there too
+      writes: { scope: 'person', what: 'control' },   // the exposure lives on the agent's registry entry, the owner's own; a circle admin's narrowing is stored there too
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId',  kind: 'string',  required: true, schema: { minLength: 1 } },
@@ -154,7 +154,7 @@ export const agentsManifest = {
     {
       id:        'createProfile', visibility: 'trusted',
       verb:      'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       params: [
         // The display name a person typed — a property, free to change.
@@ -186,7 +186,7 @@ export const agentsManifest = {
     {
       id:        'setProfileProperty', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',    kind: 'string', required: true, schema: { minLength: 1 } },
@@ -213,7 +213,7 @@ export const agentsManifest = {
     {
       id:        'setProfileDriver', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',   kind: 'string', required: true, schema: { minLength: 1 } },
@@ -228,7 +228,7 @@ export const agentsManifest = {
       // Taking a driver off again (an offering, an interest, a goal): only a driver key; any other property is refused.
       id:        'removeProfileDriver', visibility: 'authenticated', group: 'compose',
       verb:      'remove',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'content' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',  kind: 'string', required: true, schema: { minLength: 1 } },
@@ -251,7 +251,7 @@ export const agentsManifest = {
     {
       id:        'setProfileCircleMembership', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',       kind: 'string', required: true, schema: { minLength: 1 } },
@@ -268,7 +268,7 @@ export const agentsManifest = {
     {
       id:        'removeProfileCircleMembership', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       // The record is a device's own restore-data (never merged with anyone's): the last write to the profile wins,
       // and a leave is a write like the join that made the record.
@@ -285,7 +285,7 @@ export const agentsManifest = {
     {
       id:        'setProfileDisclosure', visibility: 'authenticated', group: 'compose',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',        kind: 'string',  required: true, schema: { minLength: 1 } },
@@ -334,7 +334,7 @@ export const agentsManifest = {
     {
       id:        'revokeAgent', visibility: 'trusted',
       verb:      'revoke',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -362,7 +362,7 @@ export const agentsManifest = {
     {
       id:        'grantAgent', visibility: 'trusted', group: 'admin',
       verb:      'update',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId',       kind: 'string', required: true, schema: { minLength: 1 } },
@@ -408,7 +408,7 @@ export const agentsManifest = {
     {
       id:        'grantRole', visibility: 'authenticated', group: 'admin',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         // The circle/group the role is held IN.
@@ -429,7 +429,7 @@ export const agentsManifest = {
     {
       id:        'revokeGrant', visibility: 'trusted', group: 'admin',
       verb:      'revoke',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -448,7 +448,7 @@ export const agentsManifest = {
     {
       id:        'purgeAgent', visibility: 'trusted',
       verb:      'remove',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'keys' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -500,7 +500,7 @@ export const agentsManifest = {
     {
       id:        'installAgent', visibility: 'trusted',
       verb:      'add',
-      writes: { scope: 'person' },
+      writes: { scope: 'person', what: 'control' },
       appliesTo: { type: 'agent' },
       params: [
         // CURATED path — the id of a catalogue entry (from listCatalogue).
@@ -565,7 +565,7 @@ export const agentsManifest = {
     {
       id:        'restoreDataVersion', visibility: 'trusted',
       verb:      'update',
-      writes: { scope: 'circle' },
+      writes: { scope: 'circle', what: 'content' },
       appliesTo: { type: 'data-version' },
       params: [
         { name: 'circleId', kind: 'string', required: true, schema: { minLength: 1 } },

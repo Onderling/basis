@@ -1,0 +1,30 @@
+{
+  "governance.propose": {
+    "what": "Doe een voorstel in de kring.",
+    "params": {}
+  },
+  "governance.vote": {
+    "what": "Stem voor of tegen een voorstel.",
+    "params": {}
+  },
+  "governance.resolve": {
+    "what": "Leg vast hoe een voorstel afliep.",
+    "params": {}
+  },
+  "governance.policyUpdate": {
+    "what": "Leg als beheerder vast hoe de kring werkt.",
+    "params": {}
+  },
+  "governance.rulesUpdate": {
+    "what": "Vervang als beheerder de regels van de kring.",
+    "params": {}
+  },
+  "governance.reportFile": {
+    "what": "Meld een bericht of een lid bij de beheerders, met een reden.",
+    "params": {}
+  },
+  "governance.reportResolve": {
+    "what": "Sluit als beheerder een melding.",
+    "params": {}
+  }
+}

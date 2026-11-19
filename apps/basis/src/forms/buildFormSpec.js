@@ -69,7 +69,8 @@ export function buildFormSpec({
     throw new TypeError('buildFormSpec: opParams must be an array');
   }
 
-  const fields = opParams.map((p) => {
+  // a param only a program fills (`form: false`: a thing's reference, set by a toolbox's choice) is never a field
+  const fields = opParams.filter((p) => p?.form !== false).map((p) => {
     const name = p.name;
     const hasPrefill = prefilledArgs && Object.prototype.hasOwnProperty.call(prefilledArgs, name);
     const value = hasPrefill ? prefilledArgs[name] : undefined;

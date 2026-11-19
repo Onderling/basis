@@ -1,0 +1,30 @@
+{
+  "governance.propose": {
+    "what": "Make a proposal in the circle.",
+    "params": {}
+  },
+  "governance.vote": {
+    "what": "Vote for or against a proposal.",
+    "params": {}
+  },
+  "governance.resolve": {
+    "what": "Record how a proposal ended.",
+    "params": {}
+  },
+  "governance.policyUpdate": {
+    "what": "As admin, state how the circle works.",
+    "params": {}
+  },
+  "governance.rulesUpdate": {
+    "what": "As admin, replace the circle's rules.",
+    "params": {}
+  },
+  "governance.reportFile": {
+    "what": "Report a post or a member to the admins, with a reason.",
+    "params": {}
+  },
+  "governance.reportResolve": {
+    "what": "As admin, close a report.",
+    "params": {}
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "chat.message": {
+    "what": "Send a signed message in the circle's chat.",
+    "params": {}
+  }
+}

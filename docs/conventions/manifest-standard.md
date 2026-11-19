@@ -149,6 +149,27 @@ device-log lanes) are checked like the app manifests.
   store and a circle lane is `circle`. Widest, not most common, so the declaration can only over-state reach,
   never under-state it. The key is `writes`, not `scope` — `scope` already means who a setting or param
   applies to.
+- **`writes.what` beside the scope, and `reveals` on a device read** — WHAT the op writes (`WRITE_WHATS`):
+  `content` (things people make and use: notes, tasks, posts, appointments), `preference` (how something looks
+  or behaves for the one using it, undone in a tap: dark mode, my tab order), `control` (who can reach what and
+  where things go: members, roles, rules, invites, exposure, a model route, outside storage) or `keys`
+  (devices, keys, identity, recovery, deleting for good). In doubt the heavier one; an op that writes several
+  things declares the heaviest. An op whose answer is itself a key or a credential (an offer that adds a
+  device, an invite token) declares `reveals: 'keys'`, whatever it writes; every read in `group: 'device'` says `reveals: 'keys'` or `'none'`, so the
+  choice is made on purpose. From these an op's weight FOLLOWS (`opWeight`), never declared itself:
+
+  | Weight | Declared as |
+  |---|---|
+  | 1 | reads (and `reveals` is not `keys`) |
+  | 2 | writes · `person` or `device` · `content` or `preference` |
+  | 3 | writes · `circle` · `content` or `preference` |
+  | 4 | writes · `person` or `device` · `control` |
+  | 5 | writes · `circle` · `control` |
+  | 6 | writes `keys`, or any op that `reveals: 'keys'` |
+
+  A writing op without `what` has no weight; once a door reads the weight, that door does not offer it. The
+  same guard checks the words; the ops that owe them today are its baseline
+  (`scripts/manifest-what-baseline.json`), which only shrinks (`--update` only removes).
 - **`hosts: string[]` at the top level** — every network host the app's own code reaches (`[]` for none). An
   endpoint the person configures — their pod, their relay — is not a fixed host and is not listed. **A
   declaration, not a check:** `lint-manifest-scopes` verifies that the array is there, and

@@ -327,6 +327,9 @@ export const SEAMS = Object.freeze([
   { id: 'plus-opening', pattern: /\.opening\(\{/, shells: ['web', 'mobile'], why: 'the "+" says what it is the first time, and once what is new, on every shell' },
   { id: 'plus-help-route', pattern: /createPlusDoor\(\{[^}]*routeLine:/, shells: ['web', 'mobile'], why: '"help" in the "+" ends with the model route that answers, never "no model" while one is set' },
   { id: 'plus-told-log', pattern: /createPlusDoor\(\{[^}]*toldLog:/, shells: ['web', 'mobile'], why: 'what the "+" told a person is kept on their device, so it is said once' },
+  // A PERSON'S WRITE IN A CIRCLE ASKS THAT CIRCLE (L1042): the agent decides at the outer waist; a shell hands in only
+  // the stores it alone has. The box hands none until the box row (L1050): one circle's rule at every door is Frits's call.
+  { id: 'circle-capability-inputs', pattern: /circleCapabilityInputs:/, shells: ['web', 'mobile'], why: 'a write a circle switched off must be refused when tapped, as when typed: the waist reads the circle\'s policy through this reader' },
   { id: 'plus-own-lists', pattern: /createPlusDoor\(\{[^}]*ownListsOf:/, shells: ['web', 'mobile'], why: 'the "+" reads the ticked self\'s own lists first, read as that self' },
   // THE PERSON'S OWN RECORD (ownActions.js, ledger L203): what no op shows (a proposal declined, a line placed nowhere)
   // is noted by the "+" door through the agent's `noteOwnAct`; a shell that does not hand it records only what ran

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import nacl from 'tweetnacl';
-import { ed25519KeyPairFromSeed, ed25519Sign, useSigningEquation, signingEquationName } from '../src/crypto/ed25519Sign.js';
+import { ed25519KeyPairFromSeed, ed25519Sign, useSigningEquation, signingEquationName, SIGNING_VECTORS } from '../src/crypto/ed25519Sign.js';
 
 afterEach(() => useSigningEquation(null));
 const seed = Uint8Array.from({ length: 32 }, (_, i) => i * 7);
@@ -67,5 +67,32 @@ describe('signing and key derivation behind the port', () => {
     ed25519Sign(msg, ref.secretKey);
     expect(warn.mock.calls.filter((c) => String(c[0]).includes('flaky')).length).toBe(1);
     warn.mockRestore();
+  });
+
+  it('the vetting compares against FIXED bytes, so installing costs no tweetnacl at a start (Fable, #1429 follow-up)', () => {
+    const hex = (u) => Buffer.from(u).toString('hex');
+    const bytes = (h) => Uint8Array.from(Buffer.from(h, 'hex'));
+    // an implementation that answers from the vectors themselves (as a native one would, without tweetnacl)
+    const bySeed = new Map(SIGNING_VECTORS.seeds.map((sd, i) => [hex(sd), i]));
+    const eq = {
+      name: 'table',
+      keyPairFromSeed: (sd) => { const i = bySeed.get(hex(sd)); const pub = bytes(SIGNING_VECTORS.expected[i].pub); const sk = new Uint8Array(64); sk.set(sd); sk.set(pub, 32); return { publicKey: pub, secretKey: sk }; },
+      sign: (m, sk) => { const i = bySeed.get(hex(sk.subarray(0, 32))); const j = SIGNING_VECTORS.msgs.findIndex((x) => hex(x) === hex(m)); return bytes(SIGNING_VECTORS.expected[i].sigs[j]); },
+    };
+    const kp = vi.spyOn(nacl.sign.keyPair, 'fromSeed');
+    const sg = vi.spyOn(nacl.sign, 'detached');
+    expect(useSigningEquation(eq)).toMatchObject({ ok: true, name: 'table' });
+    expect(kp).not.toHaveBeenCalled();
+    expect(sg).not.toHaveBeenCalled();
+    kp.mockRestore(); sg.mockRestore();
+  });
+
+  it('tweetnacl still gives the fixed bytes (the vectors are tweetnacl\'s answers)', () => {
+    const hex = (u) => Buffer.from(u).toString('hex');
+    SIGNING_VECTORS.seeds.forEach((sd, i) => {
+      const k = nacl.sign.keyPair.fromSeed(sd);
+      expect(hex(k.publicKey)).toBe(SIGNING_VECTORS.expected[i].pub);
+      SIGNING_VECTORS.msgs.forEach((m, j) => expect(hex(nacl.sign.detached(m, k.secretKey))).toBe(SIGNING_VECTORS.expected[i].sigs[j]));
+    });
   });
 });

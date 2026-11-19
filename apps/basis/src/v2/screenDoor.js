@@ -78,7 +78,7 @@ export function memoryUsedNonces({ now = Date.now } = {}) {
 /**
  * @param {object} a
  * @param {{get: (owner: string) => object|null, set: (owner: string, rec: object|null) => void}} a.pending
- *   where the one pending offer per owner lives (`{viewPubKey, nonce, label, until}`)
+ *   where the one pending offer per owner lives (`{viewPubKey, nonce, label, toolbox?, until}`)
  * @param {{has: (nonce: string) => boolean, add: (nonce: string, until: number) => void}} [a.used]  nonces granted here
  * @param {() => string[]|null} [a.relays]  the relays this device is on (null: not checked, e.g. the bot answers on its own)
  * @param {(r: {check: string, reason: string}) => void} [a.note]  the refusal log (default: the process's)
@@ -98,14 +98,15 @@ export function createScreenDoor({ pending, used = null, relays = null, note = n
      * in the answer: a caller that held it could mark it on the person's screen, and the pick would prove nothing.
      * @returns {Promise<{ok: true, codes: string[], previous: object|null}|{ok: false, reason: string}>}
      */
-    async ask(owner, { viewPubKey, nonce, label = null, relayUrl = null } = {}) {
+    async ask(owner, { viewPubKey, nonce, label = null, relayUrl = null, toolbox = null } = {}) {
       if (typeof viewPubKey !== 'string' || !viewPubKey || typeof nonce !== 'string' || !nonce) return say('offer', 'pairing-not-an-offer');
       const mine = typeof relays === 'function' ? relays() : null;
       if (relayUrl && Array.isArray(mine) && mine.length && !mine.some((r) => sameRelay(r, relayUrl))) return say('offer', 'pairing-other-relay');
       if (used?.has?.(nonce)) return say('offer', 'pairing-nonce-replayed');
       const previous = pending.get(owner) ?? null;
       const code = await screenCode(viewPubKey, nonce);
-      pending.set(owner, { viewPubKey, nonce, label: screenLabel(label), relayUrl: relayUrl ?? null, until: now() + SCREEN_PAIRING_TTL_MS });
+      // a toolbox's page names its toolbox: the grant will be for that toolbox only (L1049)
+      pending.set(owner, { viewPubKey, nonce, label: screenLabel(label), relayUrl: relayUrl ?? null, ...(toolbox ? { toolbox: String(toolbox) } : {}), until: now() + SCREEN_PAIRING_TTL_MS });
       return { ok: true, codes: codeChoices(code, rand), previous };
     },
     /** The owner's pending offer (or null). */

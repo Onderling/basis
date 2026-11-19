@@ -4096,6 +4096,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(expiresIn ? { expiresIn } : {}),
         // the person the screen acts as, when this agent answers for several (a household bot); else its own
         ...(typeof d.actingAs === 'string' && d.actingAs ? { actingAs: d.actingAs } : {}),
+        // a toolbox's page: the toolbox its useTool is for (L1049)
+        ...(typeof d.toolbox === 'string' && d.toolbox ? { toolbox: d.toolbox } : {}),
       });
       // The lane reconciler runs on the grant hook; surface its honest state: a read grant with
       // the mirror OFF (or no backend) yields no lane until the mirror runs.

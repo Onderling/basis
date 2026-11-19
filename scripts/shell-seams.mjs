@@ -393,6 +393,9 @@ export const SEAMS = Object.freeze([
   // box, taken only on tweetnacl's exact bytes. NOT the web: WebCrypto's Ed25519 is asynchronous and every signing path
   // is synchronous, so the web signs with tweetnacl (a laptop signs fast enough; the phone is where it cost seconds).
   { id: 'signing-equation', pattern: /install\w*Signing\(/, shells: ['mobile', 'box'], why: 'a phone that signs and derives keys in pure JS spends part of its start on it (its identities, circle addresses and every greeting it signs)' },
+  // …and SECRETBOX (core `useSecretbox`, L619): libsodium over JSI on the phone, taken only on tweetnacl's exact bytes.
+  // The phone only: node:crypto and WebCrypto offer no XSalsa20-Poly1305, so the box and the web keep tweetnacl.
+  { id: 'secretbox', pattern: /install\w*Secretbox\(/, shells: ['mobile'], why: 'a phone that opens its sealed stores in pure JS spends about a second of its start on it' },
   // NEARBY'S CONVERSATION STREAM AND TAB COUNTS: what the Conversation tab holds in what order (chat lines, question and
   // circle cards by arrival) and how much is new on each tab are decided by shared functions; a painter that sorts or
   // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.

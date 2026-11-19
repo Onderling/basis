@@ -9,7 +9,7 @@ import { screenCode, codeChoices, screenLabel, SCREEN_PAIRING_TTL_MS } from '../
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
-function setup({ tellRefused = null } = {}) {
+function setup({ tellRefused = null, toolboxesOn = ['boodschappen'] } = {}) {
   let clock = 1_000_000;
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore(), now: () => clock });
   const grants = [];
@@ -24,7 +24,8 @@ function setup({ tellRefused = null } = {}) {
     threads,
     isAdmitted: async (p) => admitted.has(p),
     sendPrivately: async (person, text) => { if (!reachable) return { ok: false, reason: 'no-private-chat' }; privately.push({ person, text }); return { ok: true }; },
-    columnOf: async (p) => (p === 'telegram:1' ? ['lists.addToList', 'assistant.assistant-overview'] : []),
+    columnOf: async (p) => (p === 'telegram:1' ? ['lists.addToList', 'assistant.assistant-overview', 'tools.useTool'] : []),
+    toolboxOn: async (name) => toolboxesOn.includes(name),
     grant: async (g) => { grants.push(g); return { ok: true }; },
     revokeView: async (v) => { const i = grants.findIndex((g) => g.viewPubKey === v); if (i < 0) return false; grants.splice(i, 1); return true; },
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
@@ -265,3 +266,27 @@ describe('a refusal to a screen is registered as the one answer to its offer, be
     expect(ctx.registeredFirst).toEqual(['SCREEN-1']);
   });
 });
+
+describe('a toolbox\'s page pairs for ITS toolbox only (ledger L1049)', () => {
+  it('an offer naming a toolbox that is not on is refused in words; nothing is asked', async () => {
+    const ctx = setup({ toolboxesOn: [] });
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen' })).toMatchObject({ ok: false, reason: 'toolbox-not-on' });
+    expect(ctx.asked).toEqual([]);
+  });
+  it('the question names the toolbox; the grant records it and holds useTool', async () => {
+    const ctx = setup();
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n1', label: 'boodschappenpagina', toolbox: 'boodschappen' });
+    expect(ctx.asked.at(-1)).toMatchObject({ toolbox: 'boodschappen', label: 'boodschappenpagina' });
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n1'), { isPrivate: true })).ok).toBe(true);
+    expect(ctx.grants.at(-1)).toMatchObject({ viewPubKey: 'P', toolbox: 'boodschappen' });
+    expect(ctx.grants.at(-1).ops).toContain('tools.useTool');
+  });
+  it('a screen with no toolbox (Basis\'s own screens) does not hold useTool', async () => {
+    const ctx = setup();
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'Q', nonce: 'n2' });
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('Q', 'n2'), { isPrivate: true })).ok).toBe(true);
+    expect(ctx.grants.at(-1).toolbox ?? null).toBeNull();
+    expect(ctx.grants.at(-1).ops).not.toContain('tools.useTool');
+  });
+});
+

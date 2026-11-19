@@ -104,7 +104,7 @@ describe('a placed toolbox, switched on by the admin', () => {
   it('a tool\'s own error comes back as its code; the key is in none of it', async () => {
     const h = harness({ answer: { operation: 'products.choices', error: { code: 'invalid_input', params: {} } } }); await on(h);
     const r = await h.ops.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: {} });
-    expect(r).toEqual({ ok: false, code: 'tool-error', toolCode: 'invalid_input', name: 'boodschappen' });
+    expect(r).toMatchObject({ ok: false, code: 'tool-error', toolCode: 'invalid_input', toolError: { code: 'invalid_input' }, name: 'boodschappen' });
     expect(all(r, h.logs)).not.toContain(KEY);
   });
 

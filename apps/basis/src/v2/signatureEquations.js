@@ -17,7 +17,7 @@
  * imports nothing platform-specific.
  */
 import nacl from 'tweetnacl';
-import { useSignatureEquation, useSigningEquation } from '@onderling/core';
+import { useSignatureEquation, useSigningEquation, useSecretbox } from '@onderling/core';
 
 // The DER prefix of an Ed25519 public key in SubjectPublicKeyInfo form; the 32 key bytes follow it.
 const SPKI_ED25519_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]);
@@ -174,4 +174,29 @@ export async function installBoxSignatureEquation(nodeCrypto) {
 export async function installWebSignatureEquation(subtle) {
   if (!subtle) return { ok: false, reason: 'no-webcrypto' };
   return useSignatureEquation(webCryptoEquation(subtle));
+}
+
+/**
+ * The phone's SECRETBOX (XSalsa20-Poly1305: libsodium's C over JSI, the module its signing uses; ledger L619). The
+ * kernel takes it only if it seals to tweetnacl's exact bytes, opens them back and refuses forgeries on fixed vectors
+ * (`useSecretbox`). libsodium's `_easy` form is NaCl's (the authenticator, then the ciphertext), so the bytes are the
+ * same; its open THROWS on a box that does not authenticate, and the port reads a throw as "does not open" (tweetnacl
+ * confirms it, so every caller still gets `null`). The box has no equivalent: node:crypto offers no XSalsa20-Poly1305,
+ * so the box keeps tweetnacl for secretbox; so does the web (WebCrypto has no XSalsa20 either).
+ * @param {object} sodium  `react-native-libsodium`
+ */
+export function libsodiumSecretbox(sodium) {
+  return {
+    name: 'libsodium-jsi',
+    seal: (msg, nonce, key) => sodium.crypto_secretbox_easy(msg, nonce, key),
+    open: (box, nonce, key) => sodium.crypto_secretbox_open_easy(box, nonce, key),
+  };
+}
+
+/**
+ * Install the phone's secretbox (libsodium over JSI). Returns what `useSecretbox` said (tweetnacl stays on a refusal).
+ * @param {object} sodium  `react-native-libsodium`
+ */
+export function installPhoneSecretbox(sodium) {
+  try { return useSecretbox(libsodiumSecretbox(sodium)); } catch (e) { return { ok: false, reason: String(e?.message ?? e) }; }
 }

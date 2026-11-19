@@ -5,6 +5,7 @@
  * The manifests are the screen's own imports (the bot's door catalogue), filtered by the grant. Pure.
  */
 
+import { SCREEN_NO_BUTTON } from './screenActing.js';
 import { pickerChoices } from '../forms/pickerChoices.js';
 import { composeAssistantCatalogue } from '../assistant/assistantCatalogue.js';
 import { isAdminOp } from './botHelp.js';
@@ -57,7 +58,9 @@ export function screenPanels({ ops, catalogue, isAdmin = () => false, t, order =
 /** The panels for a grant, from the bot's door catalogue as the screen's code knows it (a household bot's apps). */
 export function screenPanelsForGrant(ops, t) {
   const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
-  return screenPanels({ ops, catalogue, isAdmin: isAdminOp, t, order: SCREEN_ORDER });
+  // what a screen holds but the management screen paints no button for (a toolbox's tool: its own page calls it)
+  const painted = (Array.isArray(ops) ? ops : []).filter((id) => !SCREEN_NO_BUTTON.includes(id));
+  return screenPanels({ ops: painted, catalogue, isAdmin: isAdminOp, t, order: SCREEN_ORDER });
 }
 
 /**

@@ -88,7 +88,8 @@ export async function callTool({ endpoint, key, tool, input = {}, fetch = global
   if (json?.error) return { ok: false, code: json.error?.data?.code === 'unauthorized' ? 'toolbox-unauthorized' : 'toolbox-error' };
   const data = json?.result?.message?.parts?.[0]?.data;
   if (!data || typeof data !== 'object') return { ok: false, code: 'toolbox-bad-answer' };
-  if (data.error && typeof data.error === 'object') return { ok: false, code: 'tool-error', toolCode: String(data.error.code ?? 'unknown') };
+  // the tool's own error, its code AND params as the toolbox gave them (a page words them; `toolCode` for the door's log)
+  if (data.error && typeof data.error === 'object') return { ok: false, code: 'tool-error', toolCode: String(data.error.code ?? 'unknown'), toolError: { code: String(data.error.code ?? 'unknown'), params: data.error.params && typeof data.error.params === 'object' ? data.error.params : {} } };
   if (!('output' in data)) return { ok: false, code: 'toolbox-bad-answer' };
   return { ok: true, output: data.output };
 }

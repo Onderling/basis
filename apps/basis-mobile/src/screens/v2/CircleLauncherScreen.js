@@ -98,7 +98,7 @@ import {
   // per-circle bottom tabs from policy.features (v2 §1).
   buildCircleTabs, DEFAULT_CIRCLE_TAB,
   // D1 (§5A) — quickActions row: feature↔tab mapping + frequency counter.
-  featureTabId, featureForTabId, createActionFrequencyStore,
+  featureTabId, featureForTabId, createActionFrequencyStore, actionFrequencyIo,
   // α.1a/b — screen recipe model + per-block materializer.
   getActiveRecipe, materializeRecipe, materializeBlock,
   // α.1d.3 — recipe-editor mutation helpers.
@@ -318,7 +318,8 @@ import ContactsScreen from './ContactsScreen.js';
 import { contactOpenTarget, tileCircles, helpDoorTarget } from '../../../../basis/src/v2/helpContact.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
-import { loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
+import { loadContactRoster, sealedContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
+import { circleOfferingDraftIo } from '../../../../basis/src/v2/circleOfferingDraft.js';
 import { showsBotActionsSetting } from '../../../../basis/src/v2/surfacePref.js';
 import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
@@ -395,21 +396,11 @@ const circleSearchVectorStore = (AsyncStorage && typeof AsyncStorage.getItem ===
 // row.  Module singleton (shared across circle opens), hydrated once from
 // AsyncStorage and persisting its snapshot on every bump.  In-memory reads
 // work before hydration completes (just yield the default feature order).
-const ACTION_FREQ_KEY = 'cc.actionFrequency';
-const actionFrequency = createActionFrequencyStore({}, {
-  onChange: (snap) => { AsyncStorage.setItem(ACTION_FREQ_KEY, JSON.stringify(snap)).catch(() => {}); },
-});
-AsyncStorage.getItem(ACTION_FREQ_KEY).then((raw) => {
-  if (!raw) return;
-  try {
-    const snap = JSON.parse(raw);
-    for (const [cid, counts] of Object.entries(snap ?? {})) {
-      for (const [k, v] of Object.entries(counts ?? {})) {
-        if (typeof v === 'number' && v > 0) actionFrequency.bump(cid, k, v);
-      }
-    }
-  } catch { /* corrupt snapshot — ignore */ }
-}).catch(() => {});
+// The snapshot is SEALED at rest (which ops the person uses: ledger L1083); it is read once the content key exists and
+// merged in without a write (the store no longer re-persists what it just read).
+const actionFrequencyStorage = actionFrequencyIo(AsyncStorage);
+const actionFrequency = createActionFrequencyStore({}, { onChange: (snap) => { actionFrequencyStorage.save(snap); } });
+onShellContentSeal(() => { actionFrequencyStorage.load().then((snap) => actionFrequency.merge(snap)).catch(() => {}); });
 
 // D1 (§5A) — in-memory fallback recipe (just the Veel-gebruikt row) for a
 // circle with no authored screen.  Never persisted.
@@ -733,7 +724,7 @@ export default function CircleLauncherScreen({
     return readMarks.follow((fn) => bundle?.agent?.onCircleChanged?.(fn));
   }, [readMarks, bundle]);
   // …and what each row LAST READ here — the rename marker's left-hand side (web parity).
-  const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
+  const contactNames = useMemo(() => sealedContactNameStore(AsyncStorage), []);   // sealed; a read before the key waits
   const [contactUnread, setContactUnread] = useState({});
   // …and "Nieuw voor jou" on Vandaag reads the same turns, named by the contact book (web parity)
   const [contactTurns, setContactTurns] = useState([]);
@@ -2780,7 +2771,7 @@ export default function CircleLauncherScreen({
       <CircleOfferingEditorScreen
         skill={skillDraft}
         onSave={async (s) => {
-          try { await AsyncStorage.setItem(`cc.circleSkill.${selected.id}`, JSON.stringify(s)); } catch { /* ignore */ }
+          await circleOfferingDraftIo(AsyncStorage).save(selected.id, s);   // sealed at rest
           setSkillDraft(s);
           setView('detail');
         }}
@@ -2950,7 +2941,7 @@ export default function CircleLauncherScreen({
         onAdvisor={() => setView('advisor')}
         onSkills={async () => {
           let raw = null;
-          try { const s = await AsyncStorage.getItem(`cc.circleSkill.${selected.id}`); if (s) raw = JSON.parse(s); } catch { /* fresh */ }
+          try { raw = await circleOfferingDraftIo(AsyncStorage).load(selected.id); } catch { /* fresh */ }
           setSkillDraft(raw);
           setView('skills');
         }}

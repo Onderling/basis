@@ -6,6 +6,11 @@
  * identical on both surfaces.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
+// the cache seals at rest (ledger L1083): a content key is published, as after a boot
+const SEAL = groupKeyStrategy({ groupKey: Buffer.from(new Uint8Array(32).fill(7)).toString('base64url') });
+setShellContentSeal(SEAL);
 import {
   asyncStorageCircleRulesPendingIo,
   makeCircleRulesPendingStoreRN,
@@ -28,8 +33,7 @@ describe('γ-next.rules — circleRulesPendingStorageRN', () => {
   it('round-trips a rules doc through save / load', async () => {
     const io = asyncStorageCircleRulesPendingIo(storage);
     await io.save('g1', { purpose: 'Neighbourhood', agreements: 'be kind' });
-    expect(storage.map.get('cc.circleRulesPending.g1')).toBe(
-      JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
+    expect(SEAL.open(storage.map.get('cc.circleRulesPending.g1'))).toBe(JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
     );
     expect(await io.load('g1')).toEqual({ purpose: 'Neighbourhood', agreements: 'be kind' });
   });

@@ -12,13 +12,16 @@
  * passes the real `AsyncStorage`. Same pattern as `circleStoresRN.js`. Swap for a
  * real pseudo-pod when the mobile pod layer lands (3.3c).
  */
+import { sealedKeyValue } from '../../../basis/src/v2/localStoreSeal.js';
 
 const PREFIX = 'onderling.mappings:';   // AsyncStorage namespace; JSON stored under PREFIX + <uri>
 
 /** The fixed V0 device id for mobile mappings (app-scoped; no real pod yet). */
 export const MAPPINGS_DEVICE = 'mobile';
 
-export function asyncStorageMappingsStore(storage) {
+export function asyncStorageMappingsStore(rawStorage) {
+  // SEALED at rest (ledger L1083), as on the web; the keys stay legible, so `list` still reads them
+  const storage = sealedKeyValue(rawStorage, { name: 'the extension mappings', strict: true });
   const keyFor = (uri) => PREFIX + uri;
   return {
     async write(uri, body) {

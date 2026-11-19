@@ -15,7 +15,7 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 import FaceView from './FaceView.js';
-import { splitShownHidden, loadContactRoster, makeContactNameStore, contactRowMeta } from '../../../../basis/src/v2/contactsSource.js';
+import { splitShownHidden, loadContactRoster, sealedContactNameStore, contactRowMeta } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
@@ -58,7 +58,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   const { shown, hidden } = useMemo(() => splitShownHidden(contacts), [contacts]);
   // What each row last read HERE — the rename marker's left-hand side. The launcher owns the same store;
   // this screen is the other door onto the same list, so it reads through the same one.
-  const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
+  const contactNames = useMemo(() => sealedContactNameStore(AsyncStorage), []);   // sealed; a read before the key waits
 
   // S1 #2 — the unified directory: PeerGraph bots/peers merged with the pinboard
   // ContactBook (people the user added, with trust/tags). Same shared helpers as web.

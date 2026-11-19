@@ -32,7 +32,7 @@ describe('the name markers on Contacten — parity', () => {
     }
   });
   it('both hosts keep the per-device memory through the shared store and hand it to the one read', () => {
-    for (const src of [webHost, launcher, roster]) expect(src).toMatch(/makeContactNameStore\(/);
+    for (const src of [webHost, launcher, roster]) expect(src).toMatch(/sealedContactNameStore\(/);   // the shared store, sealed (ledger L1083)
     for (const src of [webHost, launcher, roster]) expect(src).toMatch(/loadContactRoster\(\{[^}]*names/s);
   });
   it('opening a thread acknowledges the rename on both shells', () => {

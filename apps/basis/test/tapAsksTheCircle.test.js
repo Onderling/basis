@@ -68,6 +68,43 @@ describe('a tap asks the circle', () => {
     expect(read?.ok).toBe(true);
   });
 
+  it('the person\'s OWN place is no circle\'s to switch: an own appointment from the "+" is not refused (development red 2026-11-19)', async () => {
+    // the web shell's reader answers for the own place too (a policy with no calendar): the gate must not ask it
+    const { OWN_DEVICES_SCOPE } = await import('../src/v2/grantsManifest.js');
+    const ownPolicy = { features: { calendar: false, tasks: false }, capabilities: {} };
+    for (const own of [OWN_DEVICES_SCOPE, `${OWN_DEVICES_SCOPE}:p-werk`]) {
+      const { circleActRefusal } = await import('../src/v2/circleActGate.js');
+      const { allManifests } = await import('../src/v2/manifestSources.js');
+      const r = await circleActRefusal({
+        app: 'calendar', op: 'addEvent', args: { circleId: own, title: 'tandarts', start: '2026-12-01T14:00' }, ctx: { door: 'tap' },
+        manifests: allManifests(), activeCircle: () => own, inputs: async () => ({ policy: ownPolicy, override: {} }),
+      });
+      expect(r, `${own}: refused ${JSON.stringify(r)}`).toBeNull();
+    }
+    // and with no circle in the args, looking at the own place is the own place
+    const { circleActRefusal } = await import('../src/v2/circleActGate.js');
+    const { allManifests } = await import('../src/v2/manifestSources.js');
+    expect(await circleActRefusal({ app: 'calendar', op: 'addEvent', args: { title: 'x' }, ctx: { door: 'tap' }, manifests: allManifests(),
+      activeCircle: () => OWN_DEVICES_SCOPE, inputs: async () => ({ policy: ownPolicy, override: {} }) })).toBeNull();
+  });
+
+  it('a circle refuses only what it can switch off: an op with no row (posting an offer, setting a role) is not refused here, and the log says so (development red 2026-11-19)', async () => {
+    const { circleActRefusal } = await import('../src/v2/circleActGate.js');
+    const { allManifests } = await import('../src/v2/manifestSources.js');
+    const { processRefusalLog } = await import('../src/v2/refusalLog.js');
+    const inputs = async () => ({ policy: {}, override: {} });
+    const before = processRefusalLog().size;
+    for (const [op, args] of [['postRequest', { circleId: CIRCLE, intent: 'offer', text: 'boor' }], ['postRequest', { circleId: CIRCLE, intent: 'ask', text: 'ladder' }], ['setMemberRole', { circleId: CIRCLE, role: 'member' }]]) {
+      const r = await circleActRefusal({ app: 'pinboard', op, args, ctx: { door: 'tap' }, manifests: allManifests(), activeCircle: () => CIRCLE, inputs });
+      expect(r, `${op} ${JSON.stringify(args)}: ${JSON.stringify(r)}`).toBeNull();
+    }
+    // the log says it once per window and counts the repeats (refusalLog.js): one coded line gate · availability · circle-capability · no-row
+    expect(processRefusalLog().size, 'a no-row pass leaves a coded line').toBe(before + 1);
+    // what a circle CAN switch off still refuses (the row exists and the template turns it off)
+    const off = await circleActRefusal({ app: 'lists', op: 'addToList', args: { circleId: CIRCLE, list: 'B', text: 'x' }, ctx: { door: 'tap' }, manifests: allManifests(), activeCircle: () => CIRCLE, inputs: async () => ({ policy: OFF, override: {} }) });
+    expect(off).toMatchObject({ layer: 'availability', code: 'capability-denied' });
+  });
+
   it('a reader that throws lets the act go on, and the log says so in codes', async () => {
     const { processRefusalLog } = await import('../src/v2/refusalLog.js');
     const before = processRefusalLog().size;

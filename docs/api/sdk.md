@@ -115,6 +115,8 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `ED25519_ACCEPTED` | constant | [`core.md`](core.md#ed25519_accepted) |
 | `ED25519_EDGE_VECTORS` | constant | [`core.md`](core.md#ed25519_edge_vectors) |
 | `ed25519Disagreements` | function | [`core.md`](core.md#ed25519disagreements) |
+| `ed25519KeyPairFromSeed` | function | [`core.md`](core.md#ed25519keypairfromseed) |
+| `ed25519Sign` | function | [`core.md`](core.md#ed25519sign) |
 | `Emitter` | class | [`core.md`](core.md#emitter) |
 | `envelopeByteLength` | function | [`core.md`](core.md#envelopebytelength) |
 | `envelopeExceedsLimit` | function | [`core.md`](core.md#envelopeexceedslimit) |
@@ -278,6 +280,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `signDeviceRevocation` | function | [`core.md`](core.md#signdevicerevocation) |
 | `signDeviceStatement` | function | [`core.md`](core.md#signdevicestatement) |
 | `signEviction` | function | [`core.md`](core.md#signeviction) |
+| `signingEquationName` | function | [`core.md`](core.md#signingequationname) |
 | `signOrigin` | function | [`core.md`](core.md#signorigin) |
 | `signPersonKeyLink` | function | [`core.md`](core.md#signpersonkeylink) |
 | `signReachabilityClaim` | function | [`core.md`](core.md#signreachabilityclaim) |
@@ -320,6 +323,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `UNSAFE_JSON_KEYS` | constant | [`core.md`](core.md#unsafe_json_keys) |
 | `unsubscribe` | function | [`core.md`](core.md#unsubscribe) |
 | `useSignatureEquation` | function | [`core.md`](core.md#usesignatureequation) |
+| `useSigningEquation` | function | [`core.md`](core.md#usesigningequation) |
 | `validateMnemonic` | function | [`core.md`](core.md#validatemnemonic) |
 | `verifyAddressPossession` | function | [`core.md`](core.md#verifyaddresspossession) |
 | `verifyCeremonyCommitmentDeclaration` | function | [`core.md`](core.md#verifyceremonycommitmentdeclaration) |

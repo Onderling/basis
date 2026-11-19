@@ -12,10 +12,10 @@
 // address cannot forge it (they lack the private key), and a co-member who COPIES a valid proof cannot use it for
 // themselves (it names the other member). The earlier message (circle + address) assumed a replay only re-asserted the
 // same identity; a replay by another member attached the address to them. See NOTE-identity-and-linkability Decision B.
-import nacl from 'tweetnacl';
 import { exactVerdictKey, processSignatureMemo, processVerdictMemo } from '../security/signatureMemo.js';
 import { deriveCircleSeed } from './circleAddress.js';
 import { encode as b64encode } from '../crypto/b64.js';
+import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 /**
  * The canonical challenge a link proof signs: the circle, the address AND THE MEMBER whose address it is in that circle
@@ -45,8 +45,8 @@ export function signCircleLink(identity, groupId, address, memberRef) {
  */
 export function signCircleLinkFromSeed(derivationSeed, circleId, groupId, address, memberRef) {
   if (typeof memberRef !== 'string' || !memberRef) throw new Error('signCircleLinkFromSeed: the member (memberRef) is required');
-  const kp = nacl.sign.keyPair.fromSeed(deriveCircleSeed(derivationSeed, circleId));
-  return b64encode(nacl.sign.detached(new TextEncoder().encode(circleLinkMessage(groupId, address, memberRef)), kp.secretKey));
+  const kp = ed25519KeyPairFromSeed(deriveCircleSeed(derivationSeed, circleId));
+  return b64encode(ed25519Sign(new TextEncoder().encode(circleLinkMessage(groupId, address, memberRef)), kp.secretKey));
 }
 
 /**

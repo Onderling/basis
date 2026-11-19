@@ -41,6 +41,7 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { deriveCircleSeed } from './circleAddress.js';
 import { encode as b64encode } from '../crypto/b64.js';
+import { ed25519KeyPairFromSeed, ed25519Sign } from '../crypto/ed25519Sign.js';   // signing + derivation behind the port a shell may speed up (L619)
 
 /** Bytes of entropy in a registration nonce. 32 = the same order as a key; guessing is not a path. */
 export const ADDRESS_NONCE_BYTES = 32;
@@ -93,8 +94,8 @@ export function signAddressPossession(identity, address, nonce) {
  * @returns {(message: string) => string} sign(message) → base64url Ed25519 signature
  */
 export function circleAddressSigner(derivationSeed, circleId) {
-  const kp = nacl.sign.keyPair.fromSeed(deriveCircleSeed(derivationSeed, circleId));
-  return (message) => b64encode(nacl.sign.detached(new TextEncoder().encode(message), kp.secretKey));
+  const kp = ed25519KeyPairFromSeed(deriveCircleSeed(derivationSeed, circleId));
+  return (message) => b64encode(ed25519Sign(new TextEncoder().encode(message), kp.secretKey));
 }
 
 /**

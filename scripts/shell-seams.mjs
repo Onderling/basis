@@ -382,6 +382,10 @@ export const SEAMS = Object.freeze([
   // `useSignatureEquation`): node:crypto on the box, WebCrypto's batch on the web. A shell that does not checks every
   // signature in pure JS (~10 ms on a laptop, ~61 ms on a mid-range phone, against ~0.15 ms).
   { id: 'signature-equation', pattern: /install\w*SignatureEquation\(/, why: 'a shell that installs no fast equation checks every signature in pure JS: seconds of a start on a phone' },
+  // …and SIGNING + key derivation (core `useSigningEquation`, L619): libsodium over JSI on the phone, node:crypto on the
+  // box, taken only on tweetnacl's exact bytes. NOT the web: WebCrypto's Ed25519 is asynchronous and every signing path
+  // is synchronous, so the web signs with tweetnacl (a laptop signs fast enough; the phone is where it cost seconds).
+  { id: 'signing-equation', pattern: /install\w*Signing\(/, shells: ['mobile', 'box'], why: 'a phone that signs and derives keys in pure JS spends part of its start on it (its identities, circle addresses and every greeting it signs)' },
   // NEARBY'S CONVERSATION STREAM AND TAB COUNTS: what the Conversation tab holds in what order (chat lines, question and
   // circle cards by arrival) and how much is new on each tab are decided by shared functions; a painter that sorts or
   // counts by itself drifts from the other shell. Both are painted by Nearby's painter, so the web set includes it.

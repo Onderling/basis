@@ -15,17 +15,7 @@
     "folio.shareFolder",
     "folio.syncOnce",
     "folio.watchStart",
-    "folio.watchStop",
-    "lists.addToList",
-    "lists.createList",
-    "lists.editEntry",
-    "lists.entryReminders",
-    "lists.makeChore",
-    "lists.markListItemDone",
-    "lists.removeFromList",
-    "lists.removeList",
-    "lists.restoreEntry",
-    "lists.restoreList"
+    "folio.watchStop"
   ],
   "reveals": []
 }

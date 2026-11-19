@@ -63,11 +63,13 @@ const b64url = {
  * @param {string} [a.label]        what the view calls itself ("laptop", "keukentablet")
  * @returns {string} an `onderling-connect://…` URI
  */
-export function encodePairingOffer({ viewPubKey, relayUrl = null, nonce, label = null } = {}) {
+export function encodePairingOffer({ viewPubKey, relayUrl = null, nonce, label = null, toolbox = null } = {}) {
   if (typeof viewPubKey !== 'string' || !viewPubKey) throw new Error('encodePairingOffer: viewPubKey required');
   if (typeof nonce !== 'string' || !nonce) throw new Error('encodePairingOffer: nonce required');
   return CONNECT_SCHEME + b64url.encode({
     v: 1, k: viewPubKey, ...(relayUrl ? { r: relayUrl } : {}), n: nonce, ...(label ? { l: label } : {}),
+    // a toolbox's page names its toolbox: the grant is for that toolbox only (L1049)
+    ...(toolbox ? { t: String(toolbox) } : {}),
   });
 }
 
@@ -76,7 +78,7 @@ export function encodePairingOffer({ viewPubKey, relayUrl = null, nonce, label =
  * object, because a half-understood pairing offer is the kind of thing a UI would happily act on.
  *
  * @param {string} uri
- * @returns {{ok:true, viewPubKey:string, relayUrl:?string, nonce:string, label:?string}
+ * @returns {{ok:true, viewPubKey:string, relayUrl:?string, nonce:string, label:?string, toolbox:?string}
  *          |{ok:false, reason:'not-a-connect-uri'|'unreadable'|'wrong-version'|'incomplete'}}
  */
 export function parsePairingOffer(uri) {
@@ -95,6 +97,7 @@ export function parsePairingOffer(uri) {
     relayUrl: typeof body.r === 'string' && body.r ? body.r : null,
     nonce: body.n,
     label: typeof body.l === 'string' && body.l ? body.l : null,
+    toolbox: typeof body.t === 'string' && body.t ? body.t : null,
   };
 }
 

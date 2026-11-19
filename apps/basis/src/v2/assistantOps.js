@@ -1297,7 +1297,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const tp = personT(person);
     const offer = parsePairingOffer(String(text ?? '').trim());
     if (!offer.ok) return { ok: false, error: { code: offer.reason, message: tp('circle.bot.screen_paste_usage') } };
-    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label });
+    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label, toolbox: offer.toolbox });
+    // a page for a toolbox that is not on here: said in words, nothing asked (L1049)
+    if (!r.ok && r.reason === 'toolbox-not-on') return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_toolbox_not_on', { toolbox: r.toolbox ?? offer.toolbox ?? '' }) } };
     if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_confirm_failed') } };
     return { ok: true, message: tp('circle.bot.screen_paste_asked') };
   }

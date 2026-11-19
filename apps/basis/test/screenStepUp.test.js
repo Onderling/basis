@@ -218,6 +218,6 @@ describe('the admin\'s step-up ops from a screen', () => {
   it('a screen\'s call is marked as a screen\'s, with its key and name', async () => {
     const actsAs = screenActsAs({ list: async () => [{ id: ADMIN }] }, { activeEntry: async () => ({ viewPubKey: 'VIEW', actingAs: ADMIN, label: 'laptop' }) });
     const ctx = await actsAs({ envelope: { payload: { _token: { id: 'T', subject: 'VIEW', constraints: { actingAs: ADMIN } } } } });
-    expect(ctx).toEqual({ caller: ADMIN, threadId: ADMIN, via: 'screen', viewPubKey: 'VIEW', screenLabel: 'laptop' });
+    expect(ctx).toEqual({ caller: ADMIN, threadId: ADMIN, via: 'screen', viewPubKey: 'VIEW', screenLabel: 'laptop', toolbox: null });
   });
 });

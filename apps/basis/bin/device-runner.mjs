@@ -87,7 +87,7 @@ import { createHouseholdInApp } from '../src/v2/householdInApp.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE, SCREEN_WAITING_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
-import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
+import { screenColumnFor, exposeDoorToScreens, screenToolboxRefusal } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { createHostTick } from '../src/v2/hostTick.js';
@@ -1237,10 +1237,12 @@ if (tgToken || inboxDoor.bridge) {
     launchLabel: (person) => t('circle.bot.screen_label_telegram', {}, threads.langOf(person) ?? undefined),
     // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
     // `/koppelen`, which counts only from this private door
-    ask: (person, { codes, replaced }) => {
+    ask: (person, { codes, replaced, label = null, toolbox = null }) => {
       const lang = threads.langOf(person) ?? undefined;
       const tp = (k, p) => t(k, p, lang);
-      const text = [tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
+      // a toolbox's page says which toolbox it pairs for: '<label> wil koppelen voor toolbox <naam>' (L1049)
+      const who = toolbox ? [tp('circle.bot.screen_confirm_toolbox', { label: label ?? 'scherm', toolbox })] : [];
+      const text = [...who, tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
       // the person PICKS the code their screen shows; "none of these" when it is not there (or they did not ask)
       return reach.sendToPerson(person, {
         text, rememberAs: tp('circle.bot.screen_confirm_remembered'),
@@ -1251,8 +1253,10 @@ if (tgToken || inboxDoor.bridge) {
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
     expectRefusal: (viewPubKey) => agent.inviteExchange?.expectScreenRefusal?.(viewPubKey),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
+    // a toolbox's page pairs only for a toolbox that is ON here (the toolboxes are made further down; asked at pairing time)
+    toolboxOn: async (name) => ((await toolboxes?.listTools?.({}))?.toolboxes ?? []).some((b) => b.name === name),
     grant: async (g) => {
-      const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
+      const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce, ...(g.toolbox ? { toolbox: g.toolbox } : {}) });
       // whether the grant reached the screen, or is held until it next speaks (the screen's address, its first characters)
       walkLog({ kind: 'screen-grant', screen: String(g.viewPubKey).slice(0, 8), ok: r?.ok !== false, delivery: r?.delivery ?? null });
       return r;
@@ -1419,7 +1423,11 @@ if (tgToken || inboxDoor.bridge) {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
       // pictures only for a door that shows them (Telegram); the in-app thread paints words, so nothing is fetched for it
-      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true });
+      // a screen (a toolbox's own page) calls only ITS toolbox, the one its grant names (L1049)
+      const notYours = screenToolboxRefusal(ctx, args);
+      if (notYours) return { ...notYours, error: { code: notYours.code, message: t('circle.bot.toolbox_not_yours', { toolbox: String(args?.toolbox ?? '') }, ctx?.lang ?? undefined) } };
+      // a screen (a toolbox's own page) gets the toolbox's raw output too; a chat door only the rows
+      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true, forScreen: ctx?.via === 'screen' });
       const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
       if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };

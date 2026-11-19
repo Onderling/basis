@@ -52,7 +52,9 @@ describe('the start\'s secretbox paths reach the port', () => {
 describe('the phone\'s implementation (libsodium, exercised over libsodium-wrappers)', () => {
   it('passes the vetting, and what either side seals the other opens, byte for byte', async () => {
     const sodium = await loadSodium();
+    const t0 = performance.now();
     expect(installPhoneSecretbox(sodium)).toMatchObject({ ok: true, name: 'libsodium-jsi' });
+    console.info(`[secretbox] vetting libsodium (wasm, in node), incl. the 768 KiB message: ${(performance.now() - t0).toFixed(1)} ms`);
     const key = nacl.randomBytes(32); const nonce = nacl.randomBytes(24);
     const msg = new TextEncoder().encode('both ways, the same bytes');
     const viaPort = secretboxSeal(msg, nonce, key);

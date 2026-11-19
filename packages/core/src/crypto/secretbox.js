@@ -89,6 +89,46 @@ export const SECRETBOX_VECTORS = Object.freeze({
   ],
 });
 
+/**
+ * THE LARGE MESSAGE: 768 KiB built from a byte formula (no constant that size in the source), because the port's main
+ * work on a phone is opening and sealing device-log segments (300-620 kB sealed) and every store row. An implementation
+ * right for small inputs and wrong for large ones (a buffer or length limit in a native bridge) would pass the small
+ * vectors and then seal a segment nothing can open. tweetnacl's answer is pinned in parts: the length, the 16-byte
+ * authenticator (it covers the whole ciphertext) and the first and last 64 ciphertext bytes; a test pins them.
+ */
+export const SECRETBOX_LARGE = Object.freeze({
+  length: 768 * 1024,
+  byteAt: (i) => (i * 131 + (i >>> 8)) & 0xff,
+  boxLength: 786448,
+  tag: '4f927c628c787ab6bddc351bb25e4c89',
+  head: '4ee3c67198eb0730d784b8d9b9ec68baee6ad718501816c148709894ae517e65c50cad7cf05058adc83b08a0f1bb1b58754253f51d19bb2cdbe6a214a124ccca',
+  tail: '9971912776976ea6008184ad3c0c6ce119d350ebc3bacf3211551f5e29bb29c25bac015e1ebaf00b57dfad9db76588f40826bdf7125839805504e86be2228b6b',
+});
+/** The large message itself, built fresh (the vetting and the pin test build the same bytes). */
+export function largeSecretboxMessage() {
+  const m = new Uint8Array(SECRETBOX_LARGE.length);
+  for (let i = 0; i < m.length; i += 1) m[i] = SECRETBOX_LARGE.byteAt(i);
+  return m;
+}
+const hexOf = (u) => { let s = ''; for (let i = 0; i < u.length; i += 1) s += (u[i] < 16 ? '0' : '') + u[i].toString(16); return s; };
+
+/** Does the candidate seal the large message to tweetnacl's box (pinned in parts), open it back and refuse a flipped
+ *  middle byte? */
+function largeAgrees(eq, nonce, key) {
+  const msg = largeSecretboxMessage();
+  const box = eq.seal(msg, Uint8Array.from(nonce), Uint8Array.from(key));
+  const L = SECRETBOX_LARGE;
+  if (!(box instanceof Uint8Array) || box.length !== L.boxLength) return false;
+  if (hexOf(box.subarray(0, 16)) !== L.tag || hexOf(box.subarray(16, 80)) !== L.head || hexOf(box.subarray(box.length - 64)) !== L.tail) return false;
+  let back = null;
+  // (the large box is handed over as it came, not copied: 768 KiB less to move on a phone; the refusal below works on a copy)
+  try { back = eq.open(box, Uint8Array.from(nonce), Uint8Array.from(key)); } catch { back = null; }
+  if (!(back instanceof Uint8Array) || back.length !== msg.length) return false;
+  for (let i = 0; i < msg.length; i += 1) if (back[i] !== msg[i]) return false;
+  const flipped = Uint8Array.from(box); flipped[flipped.length >>> 1] ^= 0x01;
+  return refuses(eq, flipped, nonce, key);
+}
+
 /** Does `open` refuse? `null`, a throw, or anything not bytes all count as a refusal. */
 function refuses(eq, box, nonce, key) {
   try { return !(eq.open(Uint8Array.from(box), Uint8Array.from(nonce), Uint8Array.from(key)) instanceof Uint8Array); }
@@ -98,7 +138,8 @@ function refuses(eq, box, nonce, key) {
 /**
  * A FASTER IMPLEMENTATION, installed once by the shell. Taken only if, on the fixed vectors, it seals to tweetnacl's
  * exact bytes, opens each back to its message, and refuses a box with one ciphertext byte flipped, one with the
- * authenticator flipped, and the right box under a wrong key; otherwise the current one stays and the answer says why.
+ * authenticator flipped, and the right box under a wrong key — and does the same for one LARGE message (768 KiB,
+ * `SECRETBOX_LARGE`); otherwise the current one stays and the answer says why.
  * `null` goes back to tweetnacl.
  * @param {{name: string, seal: (msg: Uint8Array, nonce: Uint8Array, key: Uint8Array) => Uint8Array,
  *          open: (box: Uint8Array, nonce: Uint8Array, key: Uint8Array) => (Uint8Array|null)}|null} eq
@@ -124,6 +165,7 @@ export function useSecretbox(eq) {
         return { ok: false, name: impl.name, reason: 'opens-a-forgery' };
       }
     }
+    if (!largeAgrees(eq, nonce, key)) return { ok: false, name: impl.name, reason: 'large-message-disagrees' };
   } catch (e) {
     return { ok: false, name: impl.name, reason: `failed: ${String(e?.message ?? e)}` };
   }

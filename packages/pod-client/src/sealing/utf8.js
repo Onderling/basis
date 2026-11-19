@@ -28,7 +28,8 @@ export function jsUtf8Decode(bytes) {
   const parts = [];
   const units = [];
   const flush = () => { if (units.length) { parts.push(String.fromCharCode.apply(null, units)); units.length = 0; } };
-  let i = 0;
+  // a leading byte-order mark is dropped, as TextDecoder's default (ignoreBOM: false) does; a later one is kept
+  let i = n >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
   while (i < n) {
     const b = bytes[i];
     if (b < 0x80) {

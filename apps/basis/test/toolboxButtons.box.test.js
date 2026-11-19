@@ -108,6 +108,15 @@ describe('a toolbox\'s things as buttons, on the booted box', () => {
     expect(added.map((m) => m.text)).toEqual(['Op Boodschappen: Halfvolle melk 1 L.']);
     const raised = await tap('pickThing:1');
     expect(raised.map((m) => m.text).join('\n')).toMatch(/2/);
+
+    // the words, at every door (Fable's ruling on L1035): the list is numbered, and '2' or 'kies 2' picks the second
+    // thing of the LAST list shown in this thread; the button only sends the same thing
+    expect(withButtons.text).toMatch(/1\D[^\n]*Halfvolle melk 1 L/);
+    expect(withButtons.text).toMatch(/2\D[^\n]*Jumbo halfvolle melk 1 L/);
+    const typed = await ask('2');
+    expect(typed.map((m) => m.text)).toEqual(['Op Boodschappen: Jumbo halfvolle melk 1 L.']);
+    const kies = await ask('kies 2');
+    expect(kies.map((m) => m.text).join('\n')).toMatch(/Jumbo halfvolle melk 1 L[\s\S]*2|2[\s\S]*Jumbo halfvolle melk 1 L/);
     // nothing the toolbox should not see, and the key in no message
     expect(JSON.stringify(api.calls)).not.toContain(KEY);
   }, 180_000);

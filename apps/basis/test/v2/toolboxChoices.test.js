@@ -8,7 +8,7 @@
  * op whose argument is that index, so a flow's choice step can later give the same answer (L1039).
  */
 import { describe, it, expect } from 'vitest';
-import { makeChoiceKeeper, toolChoicesReply, makePickThing } from '../../src/v2/toolboxes.js';
+import { makeChoiceKeeper, toolChoicesReply, makePickThing, toolChoiceGateRule } from '../../src/v2/toolboxes.js';
 import { toolsManifest } from '../../src/v2/toolsManifest.js';
 import { renderReply } from '../../src/renderer.js';
 
@@ -71,6 +71,22 @@ function door({ lists = [{ id: 'L1', label: 'Boodschappen', type: 'list' }, { id
   const pick = (n, threadId = 'telegram:1', caller = 'telegram:1') => op({ spec: String(n) }, { caller, threadId, door: 'slash' }, t);
   return { keeper, calls, pick };
 }
+
+describe('the words: "2" or "kies 2" picks from the last list in this thread', () => {
+  const kept = () => { const k = makeChoiceKeeper(); k.keep('tg:9', [{ label: 'melk' }, { label: 'brood' }]); return k; };
+  it('takes a number, or kies and a number, while a list is open in the thread', () => {
+    const rule = toolChoiceGateRule(kept());
+    expect(rule.command('2', { id: 'tg:9' })).toEqual({ opId: 'pickThing', appOrigin: 'tools', args: { spec: '2' } });
+    expect(rule.command('kies 2', { id: 'tg:9' })?.args).toEqual({ spec: '2' });
+    expect(rule.command('Kies 1 3', { id: 'tg:9' })?.args).toEqual({ spec: '1 3' });
+  });
+  it('a number with no list open, in another thread, or past the list is an ordinary line', () => {
+    expect(toolChoiceGateRule(makeChoiceKeeper()).test('2', { id: 'tg:9' })).toBe(false);
+    expect(toolChoiceGateRule(kept()).test('2', { id: 'tg:8' })).toBe(false);
+    expect(toolChoiceGateRule(kept()).test('3', { id: 'tg:9' })).toBe(false);
+    expect(toolChoiceGateRule(kept()).test('2 liter melk', { id: 'tg:9' })).toBe(false);
+  });
+});
 
 describe('the tap: the answer to "which one"', () => {
   it('a thing whose seller has its own list goes on that list, with its reference and quantity 1, as the person who tapped', async () => {

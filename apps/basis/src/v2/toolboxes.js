@@ -164,6 +164,24 @@ export function toolboxGateRule(getWords) {
   return { name: 'tools:useTool(word)', test: (text) => Boolean(command(text)), command };
 }
 
+/**
+ * The answer to "which one" in WORDS, at every door (ledger L1035): `2` or `kies 2` (and `kies 2 1`, the list asked
+ * for after it) picks thing 2 of the LAST list of things shown in this thread, as the row's button does: the button
+ * only sends the same thing. A number with no list open here, or past its end, is an ordinary line: the rule does not
+ * take it. The thread is the gate's `ctx.id` (the door's thread), the key the list was kept under.
+ * @param {ReturnType<typeof makeChoiceKeeper>} keeper
+ */
+export function toolChoiceGateRule(keeper) {
+  const command = (text, ctx) => {
+    const m = /^\s*(?:\/?kies\s+)?(\d{1,2})(?:\s+(\d{1,2}))?\s*\.?\s*$/iu.exec(String(text ?? ''));
+    if (!m) return null;
+    const thread = ctx?.id ?? ctx?.threadId ?? null;
+    if (!thread || !keeper?.take?.(thread, m[1])) return null;
+    return { opId: 'pickThing', appOrigin: 'tools', args: { spec: m[2] ? `${m[1]} ${m[2]}` : m[1] } };
+  };
+  return { name: 'tools:pickThing(number)', test: (text, ctx) => Boolean(command(text, ctx)), command };
+}
+
 /** The door's words for a toolbox refusal code (`circle.bot.toolbox_*`), the same from `/toolbox` and from a tool's use. */
 const REFUSAL_KEY = Object.freeze({
   'toolbox-not-placed': 'toolbox_not_placed', 'toolbox-no-key': 'toolbox_no_key', 'toolbox-off': 'toolbox_is_off',

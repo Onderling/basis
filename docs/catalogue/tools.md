@@ -11,6 +11,9 @@ was started 2026-11-18 with the first toolbox, a grocery search.
   bot asks the toolbox's tool and answers with what it found, each with its detail line (size, price) and a button.
   The button (`/kies <n>`) puts that thing on the list of the shop that sells it, else on the shopping list, else the
   bot asks which list; it carries the thing's reference and a quantity of 1, as the person who tapped.
+  The same answer in words, at every door (also Basis's own bot thread, which has no buttons yet): the list is
+  numbered, and `2` or `kies 2` picks the second thing of the LAST list shown in that thread. A number with no list
+  open there is an ordinary line. The same thing again raises its quantity.
 - **A housemate** sees which toolboxes are on, and their words, in `/help` and the welcome.
 - **The household's admin** types `/toolbox`: the toolboxes the box's operator placed, each with its words and whether
   it is on. `/toolbox <naam> aan` shows the toolbox's card (its name, address, words and what it receives) and switches

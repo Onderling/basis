@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, toolChoiceGateRule } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -1588,7 +1588,7 @@ if (tgToken || inboxDoor.bridge) {
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds({ t }),
       // the lists' words, then the words a toolbox's admin named (read live: adding or removing one changes them at once)
-      gateRules: [...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
+      gateRules: [toolChoiceGateRule(toolChoices), ...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
       // the first message says what this bot does for this person, and how the reminders stand and change
       welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings(), toolboxLine: toolboxWelcomeLine(toolboxes.wordsNow(), tp ?? t) }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands

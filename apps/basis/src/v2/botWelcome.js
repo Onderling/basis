@@ -95,6 +95,7 @@ export const WELCOME_LEAVES = Object.freeze({
   useTool: "reached by a toolbox's word: the toolbox line says the words when one is on",
   listTools: "reached by a toolbox's word: the toolbox line says the words when one is on",
   addToolbox: "switched on from the admin's own private chat with /toolbox; never typed by name",
+  pickThing: 'the answer to a list of things a toolbox found: its row\'s button, or the number typed back; never typed by name',
   removeToolbox: "switched off with /toolbox; never typed by name",
   'assistant-toolbox': "the admin's: /toolbox lists the toolboxes the operator placed and switches one on after a yes",
   'assistant-agenda-link': "off unless the admin switches it on (/huishouden agenda on); asked while off, it says so",

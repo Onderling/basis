@@ -47,4 +47,19 @@ describe('the refresh button on a list message', () => {
     await runner.idle();
     expect((bridge.outbox.at(-1).buttons ?? []).some((b) => b.label === 'circle.telegram.refresh')).toBe(true);
   });
+
+  it('a list from another app with a title (a toolbox\'s things) has none: "read again" is a lists read\'s own', async () => {
+    const { toolsManifest } = await import('../../src/v2/toolsManifest.js');
+    const { toolboxGateRule } = await import('../../src/v2/toolboxes.js');
+    const gateRules = [toolboxGateRule(() => [{ word: 'zoek', tool: 'products.choices', field: 'query', toolbox: 'boodschappen' }])];
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const callSkill = async () => ({ ok: true, title: 'Boodschappen', items: [{ id: 'thing-1', label: 'Halfvolle melk 1 L' }] });
+    const runner = createTelegramRunner({ bridge, t, collectMs: 0, catalogue: mergeManifests([{ manifest: listsManifest }, { manifest: toolsManifest }]), callSkill, gateRules });
+    await runner.start();
+    await bridge.simulateIncoming({ chatId: '9', text: 'zoek melk', sender: { bridgeUid: '9' } });
+    await runner.idle();
+    const said = bridge.outbox.at(-1);
+    expect(said.text, JSON.stringify(said)).toContain('Halfvolle melk 1 L');
+    expect((said.buttons ?? []).some((b) => b.label === 'circle.telegram.refresh')).toBe(false);
+  });
 });

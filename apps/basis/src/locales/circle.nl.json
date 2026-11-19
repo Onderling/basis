@@ -6190,6 +6190,10 @@
       "text": "Er staat nog geen toolbox klaar op de box. De beheerder van de box zet er een neer met een bestand en een sleutel; daarna zet je hem hier aan.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     },
+    "toolbox_none_on": {
+      "text": "Er staat nu geen toolbox aan.",
+      "doc": "The household bot's toolboxes a member may use: none is switched on now (listTools, wherever it is painted, a screen too)."
+    },
     "toolbox_list_head": {
       "text": "Toolboxen op de box:",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
@@ -6296,6 +6300,34 @@
     },
     "toolbox_word_taken": {
       "text": "Het woord '{{word}}' van {{title}} gebruik ik al voor iets anders. Kies in het bestand op de box een ander woord.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_found_row": {
+      "text": "{{label}} \u00b7 {{more}}",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_button": {
+      "text": "Op de lijst",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_added": {
+      "text": "Op {{list}}: {{label}}.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_gone": {
+      "text": "Die lijst ken ik niet meer. Zoek opnieuw en tik er een aan.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_which_list": {
+      "text": "Op welke lijst moet {{label}}?",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_no_list": {
+      "text": "Er is nog geen lijst om het op te zetten. Maak er eerst een.",
+      "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
+    },
+    "toolbox_pick_failed": {
+      "text": "Dat kon niet op de lijst.",
       "doc": "The household bot's /toolbox door and a toolbox's tools (L1035)."
     }
   },

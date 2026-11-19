@@ -46,7 +46,7 @@ export const toolsManifest = Object.freeze({
       // (the admin's private chat) switches it on. A placed toolbox is off until then.
       id: 'addToolbox', visibility: 'trusted', verb: 'add-toolbox',
       stepUp: 'private-door',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [
         { name: 'name',    kind: 'string',  required: true, schema: { minLength: 1 } },
         { name: 'confirm', kind: 'boolean', required: false },
@@ -56,7 +56,7 @@ export const toolsManifest = Object.freeze({
     {
       id: 'removeToolbox', visibility: 'trusted', verb: 'remove-toolbox',
       stepUp: 'private-door',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'name', kind: 'string', required: true, schema: { minLength: 1 } }],
       surfaces: {},
     },

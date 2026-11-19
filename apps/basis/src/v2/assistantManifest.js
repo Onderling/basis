@@ -335,7 +335,7 @@ export const assistantManifest = {
       verb:   'toolbox',
       visibility: 'trusted',
       stepUp: 'private-door',
-      writes: { scope: 'device' },
+      writes: { scope: 'device', what: 'control' },
       params: [{ name: 'spec', kind: 'string', required: false }],
       surfaces: { slash: { command: '/toolbox', body: 'argline' } },
     },

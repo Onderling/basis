@@ -20,7 +20,7 @@ import { NOTE_OPS } from './botOpMap.js';
  * @param {(key: string, vars?: object) => string} a.t
  * @returns {string[]}
  */
-export function welcomeLines({ ops, lists = [], role = null, settings = {}, t }) {
+export function welcomeLines({ ops, lists = [], role = null, settings = {}, t, toolboxLine = null }) {
   const has = (op) => ops.has(op);
   const lines = [];
   const plain = lists.filter((l) => !l.defaultChild).map((l) => l.name);
@@ -59,6 +59,8 @@ export function welcomeLines({ ops, lists = [], role = null, settings = {}, t })
     if (has('assistant-quiet')) lines.push(t('circle.bot.welcome_quiet'));
   }
   if (role === 'admin') lines.push(t('circle.bot.welcome_admin'));
+  // the words of a toolbox that is on, in one line (L1035): 'Met een toolbox: zoek <iets>: zoekt producten bij Boodschappen.'
+  if (toolboxLine) lines.push(toolboxLine);
   return lines;
 }
 
@@ -90,6 +92,11 @@ export const WELCOME_SAYS = Object.freeze({
   "assistant-settings": "welcome_admin",
 });
 export const WELCOME_LEAVES = Object.freeze({
+  useTool: "reached by a toolbox's word: the toolbox line says the words when one is on",
+  listTools: "reached by a toolbox's word: the toolbox line says the words when one is on",
+  addToolbox: "switched on from the admin's own private chat with /toolbox; never typed by name",
+  removeToolbox: "switched off with /toolbox; never typed by name",
+  'assistant-toolbox': "the admin's: /toolbox lists the toolboxes the operator placed and switches one on after a yes",
   'assistant-agenda-link': "off unless the admin switches it on (/huishouden agenda on); asked while off, it says so",
   'assistant-companion': "no command: the admin's own app hands the bot its companion, in the same act as the grant there",
   'assistant-planned': "asked when wanted ('wat ga je me sturen?'); /help lists it — the reminders line says when reminders come",

@@ -119,6 +119,9 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
+import { makeToolboxOps, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords } from '../src/v2/toolboxes.js';
+import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
+import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
@@ -375,7 +378,17 @@ const agent = await createRealHouseholdAgent({
 // windowed classes — the bot's turns with each person among them (chat class) — age out on this device's chat window.
 try { deviceLog.setRetention(retentionFromDays(agent.getParamValue?.('retention.chatDays'))); } catch { /* the defaults stand */ }
 // `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
-const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
+// THE EGRESS GATE (L1035): a call to an app that reaches outside (its manifest declares the host '@placed') passes it:
+// exactly a toolbox's tool and its input leave, a toolbox that is not on is refused before the call, and every call is
+// recorded on this box (who, which toolbox, which tool, how it ended; never the words). `ctx` travels on.
+let toolboxesRef = null;
+const callSkill = wrapCallSkillWithEgressGate((app, op, args, ctx) => agent.callSkill(app, op, args, ctx), {
+  isExternalEgress: (app, op) => isExternalEgressOp(app, op),
+  toolCall: {
+    isOn: async (name) => Boolean(await toolboxesRef?.isOn?.(name)),
+    record: (r) => { try { deviceLog.append(makeToolCallEntry(r)); } catch { /* the record never breaks a call */ } },
+  },
+});
 // A household bot's companion is not configured here: the person linked as its admin hands it the companion's card
 // from their app, in the same act as granting it the agenda files there (`identity-link.companion`, below).
 
@@ -1367,6 +1380,45 @@ if (tgToken || inboxDoor.bridge) {
       } catch (err) { console.warn(`device-runner: a removal from a circle was not handled: ${err?.message ?? err}`); }
     };
   }
+  // A CIRCLE'S TOOLBOXES (L1035). The operator PLACES a toolbox as one file, <data-dir>/toolboxes/<name>.json
+  // ({name, url, words: [{word, tool, field}]}), beside its key, <data-dir>/toolboxes/<name>.key (or the env value
+  // TOOLBOX_KEY_<NAME>): no chat line carries an address, a tool id or a key, and the key never appears in a reply, a
+  // refusal, a log line or the list of tools. A placed toolbox is off until the admin's yes (`/toolbox <naam> aan`);
+  // which are on lives in this box's vault. Mounted on the waist like any app.
+  const toolboxDir = path.join(dataDir, 'toolboxes');
+  const toolboxes = makeToolboxOps({
+    store: new VaultNodeFs(path.join(dataDir, 'toolboxes.json'), vaultPassphrase()),
+    placedOf: async () => {
+      let files = [];
+      try { files = readdirSync(toolboxDir).filter((f) => f.endsWith('.json')); } catch { return []; }
+      return files.map((f) => { try { return JSON.parse(readFileSync(path.join(toolboxDir, f), 'utf8')); } catch { return null; } }).filter(Boolean);
+    },
+    keyOf: async (name) => {
+      const fromEnv = process.env[`TOOLBOX_KEY_${String(name).toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
+      if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
+      try { return readFileSync(path.join(toolboxDir, `${String(name).replace(/[^a-z0-9-]/g, '')}.key`), 'utf8').trim() || null; } catch { return null; }
+    },
+    log: (tag, what, fields) => walkLog({ kind: 'toolbox', what, ...fields }),
+    // the words this door already uses (its commands, its manifests' gate words, its own gate's examples): not a toolbox's
+    takenWords: () => doorTakenWords({
+      // …and `help`, which the Telegram runner answers itself before the catalogue (src/telegram/runner.js: the slash `help`)
+      commands: ['/help', ...['admin', 'member', 'observer'].flatMap((role) => (scopeCatalogueToRole(doorCatalogue.catalogue(), role, rolesPreset()).commandMenu ?? []).map((e) => e.command))],
+      manifests: Object.values(doorCatalogue.manifestsByOrigin()),
+    }),
+  });
+  await toolboxes.load();
+  toolboxesRef = toolboxes;
+  agent.mountAppOps('tools', {
+    // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
+    useTool: async (args, ctx) => {
+      const r = await toolboxes.useTool(args);
+      const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
+      if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
+      return Array.isArray(r.items) && !r.items.length ? { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) } : r;
+    },
+    listTools: (args) => toolboxes.listTools(args),
+    addToolbox: (args) => toolboxes.addToolbox(args), removeToolbox: (args) => toolboxes.removeToolbox(args),
+  }, toolsManifest);
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     // feedback about the app: the link to add the feedback contact (the same card the apps seed), nothing forwarded
@@ -1528,14 +1580,15 @@ if (tgToken || inboxDoor.bridge) {
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t, rolesPreset()),
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds({ t }),
-      gateRules: listsGateRules(values.lang, templateLists(t)),
+      // the lists' words, then the words a toolbox's admin named (read live: adding or removing one changes them at once)
+      gateRules: [...listsGateRules(values.lang, templateLists(t)), toolboxGateRule(() => toolboxes.wordsNow())],
       // the first message says what this bot does for this person, and how the reminders stand and change
-      welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings() }),
+      welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings(), toolboxLine: toolboxWelcomeLine(toolboxes.wordsNow(), tp ?? t) }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
       basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
       // `/help` for a person: their language, grouped, the admin's commands last (their level on the bot's map)
       // …and when the bot reminds, in the welcome's own line (the household's rules as they stand)
-      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules } }),
+      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules }, extraLines: toolboxHelpLines(toolboxes.wordsNow(), tp) }),
     } : {}),
   });
   await tgRunner.start();

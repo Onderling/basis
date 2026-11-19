@@ -1,0 +1,29 @@
+{
+  "useTool": {
+    "what": "Vraag iets aan een tool van een toolbox, bijvoorbeeld een product zoeken.",
+    "params": {
+      "toolbox": "welke toolbox",
+      "tool": "welke tool",
+      "input": "wat je vraagt"
+    }
+  },
+  "listTools": {
+    "what": "Laat zien welke toolboxen aan staan, en met welk woord je ze gebruikt.",
+    "params": {
+      "all": "ook wat uit staat"
+    }
+  },
+  "addToolbox": {
+    "what": "Zet als beheerder een toolbox aan die op de box klaarstaat, na je ja.",
+    "params": {
+      "name": "welke toolbox",
+      "confirm": "na je ja"
+    }
+  },
+  "removeToolbox": {
+    "what": "Zet als beheerder een toolbox uit.",
+    "params": {
+      "name": "welke toolbox"
+    }
+  }
+}

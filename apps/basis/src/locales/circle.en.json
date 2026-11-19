@@ -1591,6 +1591,18 @@
       "text": "{{name}}: {{op}}",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
+    "plus_ceiling_off": {
+      "text": "The + is off for this persona.",
+      "doc": "The persona the + speaks as has it switched off (the ceiling per persona, 0): nothing is read and nothing reaches a model."
+    },
+    "plus_ceiling_unread": {
+      "text": "The + cannot read what it may do for this persona right now. Try again in a moment.",
+      "doc": "The ceiling of the persona the + speaks as could not be read (the read failed): this turn runs nothing and reaches no model; a later turn reads it again."
+    },
+    "plus_ceiling_refused": {
+      "text": "The + may not do that for this persona. Do it yourself, or change what the + may do on your persona's page.",
+      "doc": "A line asked for something heavier than this persona lets the + do (its ceiling): refused, whichever way it came in."
+    },
     "plus_line_unread": {
       "text": "I could not read that. Type \"help\" to see what I can do, or fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."
@@ -8478,6 +8490,30 @@
     "personas_tagline": {
       "text": "filters + exceptions on the general one",
       "doc": "mij#personas — section 2 tagline: personas are filters/exceptions on the truth layer."
+    },
+    "plus_ceiling": {
+      "text": "What the + may do for me",
+      "doc": "mij#personas \u2014 a persona card: heading of how far the person's own + goes for this persona (the ceiling, _plus.ceiling)."
+    },
+    "plus_ceiling_0": {
+      "text": "Nothing. The + is off for this persona.",
+      "doc": "the ceiling 0: the + is off for this persona; nothing of it reaches a model."
+    },
+    "plus_ceiling_1": {
+      "text": "Only look things up",
+      "doc": "the ceiling 1: the + only reads (looks things up)."
+    },
+    "plus_ceiling_2": {
+      "text": "Also make and change my own things",
+      "doc": "the ceiling 2: the + also makes and changes the person's own things (after their save)."
+    },
+    "plus_ceiling_3": {
+      "text": "Also things in my circles, when I approve them myself",
+      "doc": "the ceiling 3 (the default): the + also does things in the person's circles, after their yes on a card."
+    },
+    "plus_ceiling_hint": {
+      "text": "Who may join a circle and how a circle is set up, you arrange yourself. That never goes through the +.",
+      "doc": "under the row: what the + never does, whatever the ceiling (a circle's members and settings)."
     },
     "first_messages": {
       "text": "Who may write to this persona first",

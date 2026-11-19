@@ -1823,6 +1823,54 @@ isPresentedAttributeKey(key)
 
 Is this key a persona attribute that statements present, so no release ever carries it?
 
+## `src/plusCeiling.js`
+
+### `PLUS_CEILING_KEY`
+
+**Kind:** constant · **Import:** `PLUS_CEILING_KEY` from `'@onderling/agent-registry'`
+
+The profile property that holds a persona's ceiling for the "+".
+
+### `PLUS_CEILINGS`
+
+**Kind:** constant · **Import:** `PLUS_CEILINGS` from `'@onderling/agent-registry'`
+
+The four ceilings, lightest first.
+
+### `PLUS_CEILING_DEFAULT`
+
+**Kind:** constant · **Import:** `PLUS_CEILING_DEFAULT` from `'@onderling/agent-registry'`
+
+With nothing said anywhere: own things, and a circle's through the card.
+
+### `isPlusCeiling`
+
+**Kind:** function · **Import:** `isPlusCeiling` from `'@onderling/agent-registry'`
+
+```js
+isPlusCeiling(v)
+```
+
+Is it one of the four ceilings?
+
+### `plusCeilingFor`
+
+**Kind:** function · **Import:** `plusCeilingFor` from `'@onderling/agent-registry'`
+
+```js
+plusCeilingFor(getProfile, personaId, { defaultProfileId = null } = {})
+```
+
+A persona's ceiling: its own word, else the default persona's, else 3. A value that is not one of the four reads as
+the default.
+
+**Parameters**
+
+- `getProfile` `(id: string) => object|null` — @param {string} personaId
+- `[opts]` `{ defaultProfileId?: string|null }`
+
+**Returns:** `0|1|2|3`
+
 ## `src/profileFacts.js`
 
 ### `FACTS_AT_KEY`

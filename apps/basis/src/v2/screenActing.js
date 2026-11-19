@@ -127,8 +127,22 @@ export function screenActsAs(users, { activeEntry } = {}) {
     if (!entry || entry.actingAs !== actingAs || entry.viewPubKey !== token?.subject) return null;
     const row = ((await users.list()) ?? []).find((u) => u?.id === actingAs && !u.hidden);
     // marked as a screen's, with its key and name: an op that needs the private chat's yes is held, and the screen told
-    return row ? { caller: actingAs, threadId: actingAs, via: 'screen', viewPubKey: entry.viewPubKey, screenLabel: entry.label ?? null } : null;
+    return row ? { caller: actingAs, threadId: actingAs, via: 'screen', viewPubKey: entry.viewPubKey, screenLabel: entry.label ?? null, toolbox: entry.toolbox ?? null } : null;
   };
+}
+
+/**
+ * A screen's `tools.useTool` runs only for the toolbox its grant names (ledger L1049): a toolbox's page reads its own
+ * toolbox, never another one placed beside it, though it acts as the same housemate. Null when the call may go on (its
+ * own toolbox, or not a screen at all); else the refusal with its code.
+ * @param {{via?: string, toolbox?: string|null}} ctx  the acting ctx (`screenActsAs`)
+ * @param {{toolbox?: string}} args  useTool's arguments
+ * @returns {null|{ok: false, code: 'toolbox-not-yours', error: string}}
+ */
+export function screenToolboxRefusal(ctx, args) {
+  if (ctx?.via !== 'screen') return null;
+  const own = typeof ctx.toolbox === 'string' && ctx.toolbox ? ctx.toolbox : null;
+  return own && String(args?.toolbox ?? '') === own ? null : { ok: false, code: 'toolbox-not-yours', error: 'toolbox-not-yours' };
 }
 
 /**

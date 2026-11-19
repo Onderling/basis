@@ -1419,7 +1419,8 @@ if (tgToken || inboxDoor.bridge) {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
       // pictures only for a door that shows them (Telegram); the in-app thread paints words, so nothing is fetched for it
-      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true });
+      // a screen (a toolbox's own page) gets the toolbox's raw output too; a chat door only the rows
+      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true, forScreen: ctx?.via === 'screen' });
       const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
       if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };

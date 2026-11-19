@@ -44,12 +44,16 @@ function ops(answer) {
 }
 
 describe('what a screen gets back from useTool', () => {
-  it('success always carries the toolbox\'s own output, unchanged (the chat door keeps its items too)', async () => {
+  it('a screen\'s success carries the toolbox\'s own output, unchanged; a chat door\'s does not', async () => {
     const output = { '@type': 'ItemList', itemListElement: [{ '@type': 'ListItem', item: { '@type': 'Product', identifier: 'ah:1', name: 'Melk' } }] };
     const o = ops({ operation: 'products.choices', output }); await o.load(); await o.addToolbox({ name: 'boodschappen', confirm: true });
-    const r = await o.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } }, { pictures: false });
+    const r = await o.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } }, { pictures: false, forScreen: true });
     expect(r.ok).toBe(true);
     expect(r.output).toEqual(output);
+    // a chat door's reply carries no raw output: half the bytes, and none of the shops' image addresses the rows dropped
+    const chat = await o.useTool({ toolbox: 'boodschappen', tool: 'products.choices', input: { query: 'melk' } }, { pictures: false });
+    expect(chat.output).toBeUndefined();
+    expect(chat.items?.[0]?.label).toBe('Melk');
     expect(r.items?.[0]?.label).toBe('Melk');
   });
   it('a tool\'s own error keeps its code AND its params', async () => {

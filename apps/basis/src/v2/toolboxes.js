@@ -127,9 +127,10 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
     /**
      * A member uses a tool of an ON toolbox. Refused before anything leaves when the toolbox is off or not placed, the
      * tool is not one its card offered, or its key is not on the box. A list of things comes back as choices (`items`).
-     * `pictures`: the asking door shows pictures (the box then fetches them); false for a words door.
+     * `pictures`: the asking door shows pictures (the box then fetches them); false for a words door. `forScreen`: the
+     * caller is a connected screen (a toolbox's page), which gets the toolbox's own `output` beside `items`.
      */
-    async useTool({ toolbox, tool, input } = {}, { pictures = true } = {}) {
+    async useTool({ toolbox, tool, input } = {}, { pictures = true, forScreen = false } = {}) {
       const n = String(toolbox ?? '').trim();
       const live = (await readOn())[n];
       const placedNow = (await placed()).find((p) => p.name === n);
@@ -145,8 +146,9 @@ export function makeToolboxOps({ store, placedOf = async () => [], keyOf, fetch 
       // the pictures, fetched here by the box from the toolbox's own host and handed on as bytes; no door ever fetches one.
       // Only for a door that shows pictures (`pictures`): a words door gets none, so no bytes ride the relay or the keeper
       const items = pictures ? await fetchThumbs(list.items, { endpoint: live.endpoint, key, fetch }) : list.items.map(({ image, ...x }) => x);
-      // `output`: the toolbox's own answer, unchanged, for a screen (a toolbox's page builds on it); `items` for the chat door
-      return { ok: true, name: n, title: live.title, tool, items, output: r.output };
+      // `output`: the toolbox's own answer, unchanged, ONLY for a screen (a toolbox's page builds on it); a chat door gets
+      // `items` alone (half the bytes, and none of the shops' image addresses the rows dropped)
+      return { ok: true, name: n, title: live.title, tool, items, ...(forScreen ? { output: r.output } : {}) };
     },
   };
 }

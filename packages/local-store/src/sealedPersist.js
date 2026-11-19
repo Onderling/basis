@@ -56,7 +56,10 @@ export function sealedPersist(persist, strategy, onWarn = null) {
    * had just opened. Reusing a ciphertext for the SAME plaintext reveals nothing the disk did not already hold (it is
    * the bytes already there); a value that changed — even back to an earlier one — never gets an older ciphertext. The
    * memory holds what the store holds: a key gone from the map leaves it. In memory only; the plain side is the very
-   * string the cache above already holds.
+   * string the cache above already holds. It relies on the strategy sealing under ONE key for this wrapper's life:
+   * true of every caller (each passes the device content-seal strategy, whose key is read once when it is built and
+   * never rewritten in a session; a ceremony that re-keys reseals the vault HOLDING that key and ends in a reload).
+   * A strategy whose key could change while the wrapper lives would need this memory dropped when it does.
    */
   const sealedOf = new Map();   // key → { plain, sealed }
 

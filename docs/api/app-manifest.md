@@ -221,7 +221,8 @@ opWeight(manifest, op)
 
 How heavy an op is: a number from 1 to 6 that FOLLOWS from what the row declares, never declared itself.
   1 reads · 2 writes my own content or preference (person/device) · 3 writes a circle's content or preference ·
-  4 writes my own control · 5 writes a circle's control · 6 writes keys, or a read that `reveals: 'keys'`.
+  4 writes my own control · 5 writes a circle's control · 6 writes keys, or any op that `reveals: 'keys'` (its
+  answer is itself a key or a credential: a device offer, an invite token).
 `null`: a writing op without a valid `writes.scope` + `writes.what`, or a verb nobody classified — no level, so a
 door that reads the level does not offer it. (Called a weight in code: the household bot's door map already uses
 "level" for its trust words, `authenticated`/`trusted`/`by-role`.)

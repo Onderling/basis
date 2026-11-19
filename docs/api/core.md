@@ -748,11 +748,13 @@ async useSignatureEquation(eq)
 
 A FASTER EQUATION, installed once by the shell (node:crypto on the box, WebCrypto's batch on the web; a native module
 on the phone later), BEHIND the byte rule. Taken only if, with the rule in front, it gives the platform's answer on
-the twelve edge-case vectors, accepts an honest signature and refuses that signature tampered; otherwise the current
-equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never replaceable. An
-equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path. A `verifyBatch`
-is vetted HERE too, through the batch itself (the vectors with the rule in front, an honest and a tampered
-signature): the one place the rule "nothing faster without agreeing" lives, for every shell. Async for that reason.
+the twelve edge-case vectors, accepts the fixed honest signature and refuses the three fixed negative ones; otherwise
+the current equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never
+replaceable. An equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path —
+which is the reference and is not vetted against itself. A `verifyBatch` is vetted HERE too, through the batch itself
+(the vectors with the rule in front, the honest and the negative signatures): the one place the rule "nothing faster
+without agreeing" lives, for every shell. Async for that reason. No tweetnacl runs at an install: every expected
+answer is fixed bytes.
 
 **Parameters**
 

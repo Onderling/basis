@@ -32,6 +32,7 @@ import { createLastReads } from '../v2/lastRead.js';
 import { telegramPlain } from './telegramPlain.js';
 import { scrubSecrets } from '@onderling/logger';
 import { modelDownClass } from '../v2/modelWatch.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** The line a person gets when the model did not answer, by cause class. */
 const MODEL_DOWN_LINE = { refused: 'circle.bot.model_refused', slow: 'circle.bot.model_slow', unreachable: 'circle.bot.model_down' };
@@ -71,6 +72,9 @@ const NO_WORDS = new Set(['nee', 'n', 'no', 'laat maar', 'nee, laat maar']);
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
+/** How many things of one group (a shop) a door that shows pictures shows as photo cards; the rest come in words. */
+const CARDS_PER_GROUP = param({ key: 'telegram.cardsPerGroup', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+
 export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null, basicHelpFor = null, helpLines = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
@@ -162,6 +166,42 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       const refresh = refreshLine && new TextEncoder().encode(refreshLine).length <= 64
         ? [{ id: refreshLine, label: tc(chatId)('circle.telegram.refresh') }] : [];
       if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n'), refresh.length ? refresh : undefined); return; }
+      // things with a picture (the box fetched it; `thumb`), at a door that shows pictures: a photo card per thing, its
+      // number and words the caption, its own buttons under it; per group (a shop) a head line first, at most
+      // CARDS_PER_GROUP cards, the rest of the group in words under them. A door without pictures gets the words below.
+      const canPhoto = typeof bridge.sendPhoto === 'function' && (typeof bridge.canSendPhoto !== 'function' || bridge.canSendPhoto(chatId));
+      if (canPhoto && items.some((it) => it.thumb)) {
+        if (head.length) await say(chatId, head.join('\n'));
+        const buttonsOf = (it) => (it.buttons ?? []).filter(onMap).map((b) => ({ id: b.callbackData, label: b.label }));
+        const groups = rendered.groups ? [...rendered.groups, null] : [null];
+        for (const [gi, g] of groups.entries()) {
+          const mine = items.map((it, i) => ({ it, n: it.n ?? i + 1 })).filter(({ it }) => (rendered.groups ? (it.group ?? null) === g : true));
+          if (!mine.length) continue;
+          if (g) await say(chatId, `${g}:`);
+          // the first CARDS_PER_GROUP things of the shop: a card where the box brought a picture, a line where not
+          const shown = mine.slice(0, CARDS_PER_GROUP);
+          const asWords = ({ it, n }) => say(chatId, `${n}. ${it.label}`, buttonsOf(it).map((b) => ({ ...b, label: `${b.label}: ${n}` })));
+          for (const one of shown) {
+            if (!one.it.thumb) { await asWords(one); continue; }
+            // a photo Telegram will not take (too large, a bad picture, a hiccup) is that thing's words line with its button;
+            // the rest of the list still comes
+            try { await bridge.sendPhoto({ chatId, photo: Buffer.from(one.it.thumb.data, 'base64'), caption: `${one.n}. ${one.it.label}`, buttons: buttonsOf(one.it) }); }
+            catch (err) { note(chatId, { photoFailed: String(err?.message ?? err).slice(0, 80) }); await asWords(one); }
+          }
+          // the rest of the shop behind ONE "meer" (Frits): a line like 'Ververs', decided by the gate, to the read of the
+          // kept list (`tools.moreThings`, no new fetch); the button names the kept list, the shop and where to go on
+          const rest = mine.length - shown.length;
+          const tag = String(mine[0].it.id ?? '').split('.')[0];
+          const page = rendered.page ?? null;
+          const shop = page ? page.group : gi;
+          const from = (page ? page.from : 0) + shown.length;
+          const more = `/meer ${tag} ${shop} ${from}`;
+          if (rest > 0 && tag && new TextEncoder().encode(more).length <= 64) {
+            await say(chatId, tc(chatId)('circle.telegram.more_of_line', { n: rest }), [{ id: more, label: tc(chatId)('circle.telegram.more_of', { shop: g ?? rendered.title ?? '', n: rest }) }]);
+          }
+        }
+        return;
+      }
       // a list the op groups (`rendered.groups`, a toolbox's things per shop): a head line where the group changes; the
       // numbers run on across the heads (they are what a tap or a typed '2' picks)
       const lines = [...head];

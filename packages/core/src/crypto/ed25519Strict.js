@@ -125,14 +125,41 @@ export async function verifyEd25519StrictBatch(items) {
   return list.map((_, i) => (shapeOk[i] ? answers[j++] === true : false));
 }
 
+const fromHex = (h) => Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16)));
+const SIG_KEY = '9ca0da86726d8282ce4e0719df6d1f4db2902bdfe78632ac4890d0b9a8e38e27';
+const SIG_MSG = '6f6e6465726c696e67206571756174696f6e2073656c662d74657374';   // 'onderling equation self-test'
+const SIG_SIG = 'c9cc2945dfa22f477ab15db089f67c002b8333d49713593cfa75179cf41ac902f28f45e91e0dd003eb21e0548d68b2643f54e9c2dade4779bd77648cc855a301';
+/**
+ * The fixed vectors the vetting checks a candidate against, written down as BYTES so installing an equation at a start
+ * makes no key pair and no signature in tweetnacl (it did, at every install). One honest signature — tweetnacl's, over
+ * the message, with the key of the fixed seed — that must be accepted, and three that must be refused, each passing the
+ * byte rule so the refusal is the equation's own: the message with one bit flipped, the signature's R with one bit
+ * flipped, and the honest signature under another seed's key. A test pins that tweetnacl still gives exactly these.
+ */
+export const SIGNATURE_VECTORS = Object.freeze({
+  seed: fromHex('05101b26313c47525d68737e89949faab5c0cbd6e1ecf7020d18232e39444f5a'),
+  key: fromHex(SIG_KEY),
+  msg: fromHex(SIG_MSG),
+  sig: fromHex(SIG_SIG),
+  negatives: Object.freeze([
+    { case: 'tampered-message', msg: fromHex('6e' + SIG_MSG.slice(2)), sig: fromHex(SIG_SIG), key: fromHex(SIG_KEY) },
+    { case: 'tampered-signature', msg: fromHex(SIG_MSG), sig: fromHex('c8' + SIG_SIG.slice(2)), key: fromHex(SIG_KEY) },
+    { case: 'wrong-key', msg: fromHex(SIG_MSG), sig: fromHex(SIG_SIG), key: fromHex('d685026fc71177fb4945d10d81be65704c47d53cff34014e049c3b714cacb249') },
+  ]),
+});
+/** Fresh copies per check: a candidate that writes into its inputs cannot change the next check. */
+const copy = (u) => Uint8Array.from(u);
+
 /**
  * A FASTER EQUATION, installed once by the shell (node:crypto on the box, WebCrypto's batch on the web; a native module
  * on the phone later), BEHIND the byte rule. Taken only if, with the rule in front, it gives the platform's answer on
- * the twelve edge-case vectors, accepts an honest signature and refuses that signature tampered; otherwise the current
- * equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never replaceable. An
- * equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path. A `verifyBatch`
- * is vetted HERE too, through the batch itself (the vectors with the rule in front, an honest and a tampered
- * signature): the one place the rule "nothing faster without agreeing" lives, for every shell. Async for that reason.
+ * the twelve edge-case vectors, accepts the fixed honest signature and refuses the three fixed negative ones; otherwise
+ * the current equation stays and the answer says why. `null` goes back to tweetnacl. The rule itself is never
+ * replaceable. An equation that brings only `verifyBatch` (an async check) keeps tweetnacl for the synchronous path —
+ * which is the reference and is not vetted against itself. A `verifyBatch` is vetted HERE too, through the batch itself
+ * (the vectors with the rule in front, the honest and the negative signatures): the one place the rule "nothing faster
+ * without agreeing" lives, for every shell. Async for that reason. No tweetnacl runs at an install: every expected
+ * answer is fixed bytes.
  * @param {{name: string, verify?: (msg: Uint8Array, sig: Uint8Array, key: Uint8Array) => boolean,
  *          verifyBatch?: (items: Array<{msg: Uint8Array, sig: Uint8Array, key: Uint8Array}>) => Promise<boolean[]>}|null} eq
  * @returns {Promise<{ok: boolean, name: string, reason?: string, disagreements?: Array<object>}>}
@@ -142,18 +169,20 @@ export async function useSignatureEquation(eq) {
   const hasSync = typeof eq?.verify === 'function';
   if ((!hasSync && typeof eq?.verifyBatch !== 'function') || typeof eq?.name !== 'string' || !eq.name) return { ok: false, name: equation.name, reason: 'not-an-equation' };
   const sync = hasSync ? eq.verify : TWEETNACL.verify;
-  const withRule = (m, s, k) => strictSignatureShapeOk(s, k) && sync(m, s, k) === true;
-  const disagreements = ed25519Disagreements(withRule);
-  if (disagreements.length) return { ok: false, name: equation.name, reason: 'disagrees-on-vectors', disagreements };
-  const kp = nacl.sign.keyPair();
-  const msg = new TextEncoder().encode('onderling equation self-test');
-  const sig = nacl.sign.detached(msg, kp.secretKey);
-  const tampered = new Uint8Array(msg); tampered[0] ^= 1;
-  let honest = false; let refused = false;
-  try { honest = withRule(msg, sig, kp.publicKey); refused = !withRule(tampered, sig, kp.publicKey); } catch { honest = false; }
-  if (!honest || !refused) return { ok: false, name: equation.name, reason: honest ? 'accepts-tampered' : 'refuses-honest' };
+  if (hasSync) {
+    const withRule = (m, s, k) => strictSignatureShapeOk(s, k) && sync(m, s, k) === true;
+    const disagreements = ed25519Disagreements(withRule);
+    if (disagreements.length) return { ok: false, name: equation.name, reason: 'disagrees-on-vectors', disagreements };
+    const { key, msg, sig, negatives } = SIGNATURE_VECTORS;
+    let honest = false; let refused = false;
+    try {
+      honest = withRule(copy(msg), copy(sig), copy(key));
+      refused = negatives.every((n) => !withRule(copy(n.msg), copy(n.sig), copy(n.key)));
+    } catch { honest = false; }
+    if (!honest || !refused) return { ok: false, name: equation.name, reason: honest ? 'accepts-tampered' : 'refuses-honest' };
+  }
   if (typeof eq.verifyBatch === 'function') {
-    const why = await batchDisagrees(eq.verifyBatch, { msg, sig, tampered, key: kp.publicKey });
+    const why = await batchDisagrees(eq.verifyBatch);
     if (why) return { ok: false, name: equation.name, reason: why };
   }
   equation = Object.freeze({ name: eq.name, verify: sync, verifyBatch: typeof eq.verifyBatch === 'function' ? eq.verifyBatch : null });
@@ -161,18 +190,22 @@ export async function useSignatureEquation(eq) {
 }
 
 /** The batch's own answers, with the byte rule in front as the platform runs it: null when it agrees, else why not. */
-async function batchDisagrees(verifyBatch, { msg, sig, tampered, key }) {
-  const hex = (h) => Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16)));
-  const vs = ED25519_EDGE_VECTORS.map(([m, k, s]) => ({ msg: hex(m), sig: hex(s), key: hex(k) }));
+async function batchDisagrees(verifyBatch) {
+  const vs = ED25519_EDGE_VECTORS.map(([m, k, s]) => ({ msg: fromHex(m), sig: fromHex(s), key: fromHex(k) }));
   const shaped = vs.map((v) => strictSignatureShapeOk(v.sig, v.key));
-  const items = [...vs.filter((_, i) => shaped[i]), { msg, sig, key }, { msg: tampered, sig, key }];
+  const { key, msg, sig, negatives } = SIGNATURE_VECTORS;
+  const items = [
+    ...vs.filter((_, i) => shaped[i]),
+    { msg: copy(msg), sig: copy(sig), key: copy(key) },
+    ...negatives.map((n) => ({ msg: copy(n.msg), sig: copy(n.sig), key: copy(n.key) })),
+  ];
   let answers = [];
   try { answers = (await verifyBatch(items)) ?? []; } catch { return 'batch-failed'; }
   let j = 0;
   const vectorsOk = vs.every((_, i) => (shaped[i] ? answers[j++] === true : false) === ED25519_ACCEPTED.includes(i));
   if (!vectorsOk) return 'batch-disagrees-on-vectors';
   if (answers[j] !== true) return 'batch-refuses-honest';
-  if (answers[j + 1] !== false) return 'batch-accepts-tampered';
+  if (negatives.some((_, n) => answers[j + 1 + n] !== false)) return 'batch-accepts-tampered';
   return null;
 }
 

@@ -119,7 +119,7 @@ import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, e
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, toolChoiceGateRule } from '../src/v2/toolboxes.js';
+import { makeToolboxOps, toolboxListLine, toolboxGateRule, toolboxHelpLines, toolboxWelcomeLine, toolboxRefusalText, makeToolCallEntry, doorTakenWords, makeChoiceKeeper, toolChoicesReply, makePickThing, makeMoreThings, toolChoiceGateRule } from '../src/v2/toolboxes.js';
 import { wrapCallSkillWithEgressGate, isExternalEgressOp } from '../src/core/agent/egressGate.js';   // what leaves for a toolbox, and its record   // a circle's toolboxes (L1035): the key from the operator's config
 import { toolsManifest } from '../src/v2/toolsManifest.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -996,6 +996,8 @@ const hostTick = createHostTick({ onError: (e) => walkLog({ kind: 'tick-error', 
 
 // ── The assistant: its doors (Telegram, the bot's inbox), ONE engine behind them ─────────────────────────────
 let tgRunner = null;
+// the door bridge (Telegram + the in-app inbox), set when the runner is built: a tool call asks it whether its chat shows pictures
+let doorBridge = null;
 if (tgToken || inboxDoor.bridge) {
   const { TelegramBridge } = tgToken ? await import('@onderling/chat-agent/bridges/telegram') : {};
   // Who gets in without a code: the admin named at start and a configured allow-list (the bootstrap). Everyone else
@@ -1418,7 +1420,8 @@ if (tgToken || inboxDoor.bridge) {
   agent.mountAppOps('tools', {
     // a refusal or an empty answer told in the person's own language (`ctx.lang`): the sentence, never the key or an address
     useTool: async (args, ctx) => {
-      const r = await toolboxes.useTool(args);
+      // pictures only for a door that shows them (Telegram); the in-app thread paints words, so nothing is fetched for it
+      const r = await toolboxes.useTool(args, { pictures: doorBridge?.canSendPhoto?.(ctx?.chatId) === true });
       const tp = (k, p) => t(k, p, ctx?.lang ?? undefined);
       if (!r.ok) return { ...r, error: { code: r.code, message: toolboxRefusalText(r, tp) } };
       if (Array.isArray(r.items) && !r.items.length) return { ...r, message: tp('circle.bot.toolbox_none_found', { title: r.title ?? r.name }) };
@@ -1426,6 +1429,8 @@ if (tgToken || inboxDoor.bridge) {
     },
     // the answer to "which one" after a list of things (the row's button, `/kies <n>`), in the person's own language
     pickThing: (args, ctx) => pickThing(args, ctx, (k, p) => t(k, p, ctx?.lang ?? undefined)),
+    // "meer" under a shop's cards: the rest of that shop from the kept list, in the person's own language
+    moreThings: (args, ctx) => makeMoreThings({ keeper: toolChoices, t: (k, p) => t(k, p, ctx?.lang ?? undefined) })(args, ctx),
     // which toolboxes are on, in words wherever it is painted (a screen too, never a bare tick): `/toolbox`'s own wording
     listTools: async (args, ctx) => {
       const r = await toolboxes.listTools(args);
@@ -1569,7 +1574,7 @@ if (tgToken || inboxDoor.bridge) {
     }, (err) => walkLog({ kind: 'surface-grants', ready: false, error: String(err?.message ?? err).slice(0, 120) }));
   }
   tgRunner = createTelegramRunner({
-    bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
+    bridge: (doorBridge = multiplexBridges([tgBridge, inboxDoor.bridge])),
     catalogue: doorCatalogue.catalogue,
     manifestsByOrigin: doorCatalogue.manifestsByOrigin,
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are

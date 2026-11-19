@@ -49,24 +49,51 @@ export function sealedPersist(persist, strategy, onWarn = null) {
   if (!strategy || typeof strategy.seal !== 'function' || typeof strategy.open !== 'function') return persist;
   const warn = typeof onWarn === 'function' ? onWarn : (m, e) => console.warn(m, e);
 
-  /** Every value sealed; keys untouched. */
+  /**
+   * ONLY WHAT CHANGED IS SEALED AGAIN. Per key, the plain value last sealed (or opened at load) and its sealed form: an
+   * unchanged value reuses that sealed form, a changed one is always sealed fresh. Before, every save sealed every row
+   * of the whole map, so one changed item re-sealed the store, and the first save after a start re-sealed every row it
+   * had just opened. Reusing a ciphertext for the SAME plaintext reveals nothing the disk did not already hold (it is
+   * the bytes already there); a value that changed — even back to an earlier one — never gets an older ciphertext. The
+   * memory holds what the store holds: a key gone from the map leaves it. In memory only; the plain side is the very
+   * string the cache above already holds. It relies on the strategy sealing under ONE key for this wrapper's life:
+   * true of every caller (each passes the device content-seal strategy, whose key is read once when it is built and
+   * never rewritten in a session; a ceremony that re-keys reseals the vault HOLDING that key and ends in a reload).
+   * A strategy whose key could change while the wrapper lives would need this memory dropped when it does.
+   */
+  const sealedOf = new Map();   // key → { plain, sealed }
+
+  /** Every value sealed (reused when unchanged); keys untouched. */
   const sealMap = (map) => {
     const out = new Map();
     for (const [k, v] of map ?? []) {
-      out.set(k, strategy.seal(typeof v === 'string' ? v : JSON.stringify(v)));
+      const plain = typeof v === 'string' ? v : JSON.stringify(v);
+      const had = sealedOf.get(k);
+      if (had && had.plain === plain) { out.set(k, had.sealed); continue; }
+      const sealed = strategy.seal(plain);
+      sealedOf.set(k, { plain, sealed });
+      out.set(k, sealed);
     }
+    if (sealedOf.size > out.size) for (const k of [...sealedOf.keys()]) if (!out.has(k)) sealedOf.delete(k);
     return out;
   };
 
   /**
    * Every value opened. A value that will not open is DROPPED rather than passed on as ciphertext:
    * the row would otherwise reach `query()`, fail to parse, and vanish anyway — but silently. Dropping
-   * it here at least says so once, with its key.
+   * it here at least says so once, with its key. A value that was really sealed on disk is remembered with its
+   * sealed form; one that was plain (written before sealing) is not, so the next save seals it.
    */
   const openMap = (map) => {
     const out = new Map();
+    sealedOf.clear();
     for (const [k, v] of map ?? []) {
-      try { out.set(k, strategy.open(typeof v === 'string' ? v : JSON.stringify(v))); }
+      const stored = typeof v === 'string' ? v : JSON.stringify(v);
+      try {
+        const plain = strategy.open(stored);
+        out.set(k, plain);
+        if (typeof plain === 'string' && plain !== stored) sealedOf.set(k, { plain, sealed: stored });
+      }
       catch (err) { warn(`[at-rest] ${k}: stored here but not openable with this device's content key`, err); }
     }
     return out;

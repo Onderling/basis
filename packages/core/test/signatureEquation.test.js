@@ -6,9 +6,9 @@
  * signature and a tampered one; otherwise the check stays the rule + tweetnacl. The byte rule is never skipped. A batch
  * (an async check, WebCrypto) fills the signature memo, so the synchronous reads that follow are answered from memory.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import nacl from 'tweetnacl';
-import { useSignatureEquation, signatureEquationName, verifyEd25519Strict, verifyEd25519StrictBatch } from '../src/crypto/ed25519Strict.js';
+import { useSignatureEquation, signatureEquationName, verifyEd25519Strict, verifyEd25519StrictBatch, SIGNATURE_VECTORS } from '../src/crypto/ed25519Strict.js';
 import { ed25519Disagreements } from '../src/conformance/ed25519Conformance.js';
 import { createSignatureMemo } from '../src/security/signatureMemo.js';
 import { AgentIdentity } from '../src/identity/AgentIdentity.js';
@@ -136,5 +136,57 @@ describe('a BATCH equation is vetted by the kernel itself, through the batch', (
   it('a batch that agrees is installed', async () => {
     const r = await useSignatureEquation({ name: 'good-batch', verifyBatch: async (items) => items.map(({ msg, sig, key }) => nacl.sign.detached.verify(msg, sig, key)) });
     expect(r).toMatchObject({ ok: true, name: 'good-batch' });
+  });
+});
+
+describe('the vetting compares against FIXED bytes, so installing an equation costs no tweetnacl at a start', () => {
+  it('installing an agreeing sync equation makes no key pair, no signature and no tweetnacl check', async () => {
+    const verifyOrig = nacl.sign.detached.verify;   // the candidate answers by the same equation, out of the spies' sight
+    const vSpy = vi.spyOn(nacl.sign.detached, 'verify');
+    const kpSpy = vi.spyOn(nacl.sign, 'keyPair');
+    const sgSpy = vi.spyOn(nacl.sign, 'detached');
+    try {
+      const r = await useSignatureEquation({ name: 'quiet', verify: (m, s, k) => verifyOrig(m, s, k) });
+      expect(r).toMatchObject({ ok: true, name: 'quiet' });
+      expect(kpSpy).not.toHaveBeenCalled();
+      expect(sgSpy).not.toHaveBeenCalled();
+      expect(vSpy).not.toHaveBeenCalled();
+    } finally { vSpy.mockRestore(); kpSpy.mockRestore(); sgSpy.mockRestore(); }
+  });
+
+  it('a batch-only equation is vetted through its batch; the sync path stays tweetnacl and is not vetted against itself', async () => {
+    const verifyOrig = nacl.sign.detached.verify;
+    const vSpy = vi.spyOn(nacl.sign.detached, 'verify');
+    try {
+      const r = await useSignatureEquation({ name: 'batch-only', verifyBatch: async (items) => items.map(({ msg, sig, key }) => verifyOrig(msg, sig, key)) });
+      expect(r).toMatchObject({ ok: true, name: 'batch-only' });
+      expect(vSpy).not.toHaveBeenCalled();
+    } finally { vSpy.mockRestore(); }
+  });
+
+  it('tweetnacl still agrees with the fixed vectors: the honest one passes, every negative one fails', () => {
+    const { key, msg, sig, negatives } = SIGNATURE_VECTORS;
+    expect(nacl.sign.detached.verify(msg, sig, key)).toBe(true);
+    expect(verifyEd25519Strict(msg, sig, key)).toBe(true);
+    for (const n of negatives) {
+      expect(nacl.sign.detached.verify(n.msg, n.sig, n.key), n.case).toBe(false);
+      expect(verifyEd25519Strict(n.msg, n.sig, n.key), n.case).toBe(false);
+    }
+    // the honest one is tweetnacl's own signature over the message with the fixed seed's key
+    const kp = nacl.sign.keyPair.fromSeed(SIGNATURE_VECTORS.seed);
+    expect(Buffer.from(kp.publicKey).toString('hex')).toBe(Buffer.from(key).toString('hex'));
+    expect(Buffer.from(nacl.sign.detached(msg, kp.secretKey)).toString('hex')).toBe(Buffer.from(sig).toString('hex'));
+  });
+
+  it('an equation that accepts any one of the negative vectors is refused, each case', async () => {
+    const verifyOrig = nacl.sign.detached.verify;
+    for (const n of SIGNATURE_VECTORS.negatives) {
+      const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+      const r = await useSignatureEquation({ name: `lets-${n.case}`, verify: (m, s, k) => (same(m, n.msg) && same(s, n.sig) && same(k, n.key)) || verifyOrig(m, s, k) });
+      expect(r, n.case).toMatchObject({ ok: false, reason: 'accepts-tampered' });
+      const rb = await useSignatureEquation({ name: `batch-lets-${n.case}`, verifyBatch: async (items) => items.map(({ msg, sig, key }) => (same(msg, n.msg) && same(sig, n.sig) && same(key, n.key)) || verifyOrig(msg, sig, key)) });
+      expect(rb, n.case).toMatchObject({ ok: false, reason: 'batch-accepts-tampered' });
+    }
+    expect(signatureEquationName()).toBe('tweetnacl');
   });
 });

@@ -851,7 +851,8 @@ useSecretbox(eq)
 
 A FASTER IMPLEMENTATION, installed once by the shell. Taken only if, on the fixed vectors, it seals to tweetnacl's
 exact bytes, opens each back to its message, and refuses a box with one ciphertext byte flipped, one with the
-authenticator flipped, and the right box under a wrong key; otherwise the current one stays and the answer says why.
+authenticator flipped, and the right box under a wrong key — and does the same for one LARGE message (768 KiB,
+`SECRETBOX_LARGE`); otherwise the current one stays and the answer says why.
 `null` goes back to tweetnacl.
 
 **Parameters**
